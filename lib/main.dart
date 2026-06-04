@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_constants.dart';
-import 'shared/theme/app_spacing.dart';
 import 'shared/theme/app_theme.dart';
+import 'shared/widgets/splash_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: SupaNotesApp()));
@@ -30,49 +30,6 @@ class SupaNotesApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       home: const SplashScreen(),
-    );
-  }
-}
-
-/// Minimal placeholder shown on first launch.
-///
-/// This is intentionally bare — it exists so the app has something to
-/// render before the router, auth, and home screens land in FE-1 / FE-4.
-/// Once the real home screen ships, the splash can be reused as a
-/// launch-time interstitial that defers to [SplashScreen.onReady] once
-/// bootstrap (Drift open, auth restore, sync kick-off) is complete.
-class SplashScreen extends StatelessWidget {
-  const SplashScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Scaffold(
-      backgroundColor: scheme.surface,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              AppConstants.appName,
-              style: textTheme.displaySmall?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Notes that think ahead.',
-              style: textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
