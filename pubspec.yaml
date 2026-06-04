@@ -65,6 +65,9 @@ dev_dependencies:
   build_runner: ^2.4.13
   drift_dev: ^2.21.2
 
+  # Mocking
+  mocktail: ^1.0.4
+
 # Force the git-forked super_editor to satisfy super_editor_clipboard's
 # transitive dependency on the hosted package. This is the standard pattern
 # when consuming a monorepo fork.
