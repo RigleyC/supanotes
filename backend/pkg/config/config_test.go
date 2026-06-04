@@ -5,8 +5,7 @@ import (
 )
 
 func TestLoad_Defaults(t *testing.T) {
-	// Set all known vars to empty so we observe the defaults.
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "OPENAI_API_KEY", "GEMINI_API_KEY"} {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "OPENAI_API_KEY", "GEMINI_API_KEY", "JWT_SECRET"} {
 		t.Setenv(k, "")
 	}
 
@@ -30,6 +29,9 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.GeminiAPIKey != "" {
 		t.Errorf("GeminiAPIKey: want empty by default, got %q", cfg.GeminiAPIKey)
 	}
+	if cfg.JWTSecret == "" {
+		t.Errorf("JWTSecret: want dev fallback in dev mode, got empty")
+	}
 }
 
 func TestLoad_FromEnv(t *testing.T) {
@@ -38,6 +40,7 @@ func TestLoad_FromEnv(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://user:pass@db:5432/app?sslmode=disable")
 	t.Setenv("OPENAI_API_KEY", "sk-test-openai")
 	t.Setenv("GEMINI_API_KEY", "gem-test-key")
+	t.Setenv("JWT_SECRET", "prod-secret-at-least-32-characters-long")
 
 	cfg, err := Load()
 	if err != nil {
@@ -58,6 +61,20 @@ func TestLoad_FromEnv(t *testing.T) {
 	}
 	if cfg.GeminiAPIKey != "gem-test-key" {
 		t.Errorf("GeminiAPIKey mismatch: %q", cfg.GeminiAPIKey)
+	}
+	if cfg.JWTSecret != "prod-secret-at-least-32-characters-long" {
+		t.Errorf("JWTSecret mismatch: %q", cfg.JWTSecret)
+	}
+}
+
+func TestLoad_ProdRequiresJWTSecret(t *testing.T) {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("ENVIRONMENT", "prod")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() in prod with no JWT_SECRET: want error, got nil")
 	}
 }
 
