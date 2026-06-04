@@ -5,8 +5,8 @@ MIGRATE ?= migrate
 DATABASE_URL ?= postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable
 
 help:
-	@echo "SupaNotes backend — available targets:"
-	@echo "  run             - run the API server ($$PORT or 8080)"
+	@echo "SupaNotes backend - available targets:"
+	@echo "  run             - run the API server (PORT env, default 8080)"
 	@echo "  build           - compile binary into bin/server"
 	@echo "  test            - run go test ./..."
 	@echo "  lint            - run go vet ./..."
