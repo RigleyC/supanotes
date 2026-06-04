@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/constants/app_constants.dart';
 import 'package:supanotes/main.dart';
+import 'package:supanotes/shared/widgets/splash_screen.dart';
 
 void main() {
   testWidgets('SplashScreen renders the app name', (WidgetTester tester) async {
