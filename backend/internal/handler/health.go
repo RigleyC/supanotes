@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
+
+	"github.com/labstack/echo/v4"
 )
 
-// Health handles GET /api/v1/health
-func Health(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+// Health handles GET /api/v1/health.
+func Health(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
