@@ -48,6 +48,7 @@ app.*.map.json
 backend/vendor/
 backend/supanotes-server
 backend/*.exe
+backend/bin/
 
 # Environment variables — never commit real .env files
 .env
