@@ -84,10 +84,19 @@ class _NoopStorage implements AuthLocalStorage {
   @override
   Future<String?> getUserId() async => null;
   @override
+  Future<String?> getUserEmail() async => null;
+  @override
+  Future<String?> getUserName() async => null;
+  @override
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
     required String userId,
+  }) async {}
+  @override
+  Future<void> saveUserProfile({
+    required String email,
+    required String name,
   }) async {}
 }
 
@@ -105,6 +114,10 @@ void main() {
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),
             userId: any(named: 'userId'),
+          )).thenAnswer((_) async {});
+      when(() => storage.saveUserProfile(
+            email: any(named: 'email'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async {});
 
       late _StubAdapter adapter;
@@ -143,6 +156,10 @@ void main() {
             refreshToken: 'refresh-1',
             userId: 'u-1',
           )).called(1);
+      verify(() => storage.saveUserProfile(
+            email: 'a@b.com',
+            name: 'Alice',
+          )).called(1);
     });
 
     test('translates a 409 into ConflictException', () async {
@@ -168,6 +185,10 @@ void main() {
             refreshToken: any(named: 'refreshToken'),
             userId: any(named: 'userId'),
           ));
+      verifyNever(() => storage.saveUserProfile(
+            email: any(named: 'email'),
+            name: any(named: 'name'),
+          ));
     });
   });
 
@@ -178,6 +199,10 @@ void main() {
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),
             userId: any(named: 'userId'),
+          )).thenAnswer((_) async {});
+      when(() => storage.saveUserProfile(
+            email: any(named: 'email'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async {});
 
       final adapter = _StubAdapter((options) async {
@@ -204,6 +229,10 @@ void main() {
             accessToken: 'access-2',
             refreshToken: 'refresh-2',
             userId: 'u-2',
+          )).called(1);
+      verify(() => storage.saveUserProfile(
+            email: 'b@c.com',
+            name: 'Bob',
           )).called(1);
     });
 

@@ -56,6 +56,10 @@ class AuthRepository {
         refreshToken: result.refreshToken,
         userId: result.user.id,
       );
+      await _storage.saveUserProfile(
+        email: result.user.email,
+        name: result.user.name,
+      );
       return result;
     } on DioException catch (e) {
       throw fromDioError(e);
@@ -87,6 +91,10 @@ class AuthRepository {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
         userId: result.user.id,
+      );
+      await _storage.saveUserProfile(
+        email: result.user.email,
+        name: result.user.name,
       );
       return result;
     } on DioException catch (e) {
