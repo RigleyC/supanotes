@@ -51,11 +51,14 @@ func main() {
 	e.Use(echomw.LoggerWithConfig(echomw.LoggerConfig{
 		Format: `{"time":"${time_rfc3339}","id":"${id}","method":"${method}","uri":"${uri}","status":${status},"latency":"${latency_human}","error":"${error}"}` + "\n",
 	}))
-	e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete},
-		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization},
-	}))
+	if len(cfg.CORSOrigins) > 0 {
+		e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
+			AllowOrigins: cfg.CORSOrigins,
+			AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete},
+			AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization},
+		}))
+		log.Info().Strs("cors_origins", cfg.CORSOrigins).Msg("CORS enabled")
+	}
 
 	registerRoutes(e, cfg, pool)
 

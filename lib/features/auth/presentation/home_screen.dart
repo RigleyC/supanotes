@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 

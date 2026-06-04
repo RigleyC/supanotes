@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';

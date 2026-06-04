@@ -12,6 +12,8 @@
 /// touching every call site.
 library;
 
+import 'dart:developer' as dev;
+
 import 'package:dio/dio.dart';
 
 import 'package:supanotes/core/api/auth_interceptor.dart';
@@ -63,11 +65,13 @@ class _LogInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // ignore: avoid_print
-    print('[ApiClient] ${err.requestOptions.method} '
+    dev.log(
+        '[ApiClient] ${err.requestOptions.method} '
         '${err.requestOptions.uri} -> '
         '${err.response?.statusCode ?? "no-response"} '
-        '${err.message ?? ""}');
+        '${err.message ?? ""}',
+        name: 'ApiClient',
+    );
     handler.next(err);
   }
 }

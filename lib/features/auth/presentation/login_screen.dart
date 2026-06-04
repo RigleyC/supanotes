@@ -11,7 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/presentation/widgets/auth_button.dart';
 import 'package:supanotes/features/auth/presentation/widgets/auth_form_field.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
