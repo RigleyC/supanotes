@@ -21,6 +21,7 @@ import (
 
 	authpkg "github.com/RigleyC/supanotes/pkg/auth"
 	"github.com/RigleyC/supanotes/pkg/config"
+	"github.com/RigleyC/supanotes/pkg/uid"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
@@ -71,6 +72,46 @@ func (s *Service) Register(ctx context.Context, email, password, name string) (*
 		Timezone: "UTC",
 	}); err != nil {
 		return nil, "", "", fmt.Errorf("auth: create settings: %w", err)
+	}
+
+	title := "Rascunho"
+	content := "Bem-vindo ao SupaNotes! Esta é sua nota de inbox, o lugar perfeito para despejar ideias rapidamente."
+	if _, err := s.q.CreateNote(ctx, sqlcgen.CreateNoteParams{
+		UserID:          user.ID,
+		Title:           pgtype.Text{String: title, Valid: true},
+		Content:         content,
+		IsInbox:         true,
+		Favorite:        false,
+		Archived:        false,
+		EmbeddingStatus: "pending",
+	}); err != nil {
+		return nil, "", "", fmt.Errorf("auth: create inbox note: %w", err)
+	}
+
+	defaultPersonality := "Você é o assistente SupaNotes. Você deve ser claro, objetivo, proativo e prestativo, auxiliando na organização pessoal e resgate de ideias do usuário."
+	if _, err := s.q.UpsertSoul(ctx, sqlcgen.UpsertSoulParams{
+		UserID:      user.ID,
+		Personality: defaultPersonality,
+	}); err != nil {
+		return nil, "", "", fmt.Errorf("auth: create soul: %w", err)
+	}
+
+	if _, err := s.q.CreateRoutine(ctx, sqlcgen.CreateRoutineParams{
+		UserID:   user.ID,
+		Type:     "daily",
+		CronExpr: "0 8 * * 1-5", // 08:00 AM weekdays
+		Enabled:  true,
+	}); err != nil {
+		return nil, "", "", fmt.Errorf("auth: create daily routine: %w", err)
+	}
+
+	if _, err := s.q.CreateRoutine(ctx, sqlcgen.CreateRoutineParams{
+		UserID:   user.ID,
+		Type:     "weekly",
+		CronExpr: "0 9 * * 1", // 09:00 AM Mondays
+		Enabled:  true,
+	}); err != nil {
+		return nil, "", "", fmt.Errorf("auth: create weekly routine: %w", err)
 	}
 
 	access, refresh, err := s.generateAuthResponse(ctx, user.ID)
@@ -144,7 +185,7 @@ func (s *Service) Logout(ctx context.Context, refreshPlain string) error {
 }
 
 func (s *Service) generateAuthResponse(ctx context.Context, userID pgtype.UUID) (string, string, error) {
-	idStr := UUIDToString(userID)
+	idStr := uid.UUIDToString(userID)
 
 	access, err := authpkg.GenerateAccessToken(idStr, s.cfg.JWTSecret, authpkg.AccessTokenTTL)
 	if err != nil {
@@ -168,21 +209,3 @@ func (s *Service) generateAuthResponse(ctx context.Context, userID pgtype.UUID) 
 	return access, plain, nil
 }
 
-// UUIDToString renders a pgtype.UUID as a canonical hyphenated string,
-// or "" when the value is null.
-func UUIDToString(u pgtype.UUID) string {
-	if !u.Valid {
-		return ""
-	}
-	return uuid.UUID(u.Bytes).String()
-}
-
-// UUIDFromString parses a canonical UUID; returns an invalid pgtype.UUID
-// and an error on bad input.
-func UUIDFromString(s string) (pgtype.UUID, error) {
-	parsed, err := uuid.Parse(s)
-	if err != nil {
-		return pgtype.UUID{}, fmt.Errorf("auth: parse uuid: %w", err)
-	}
-	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
-}

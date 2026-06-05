@@ -15,12 +15,24 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/RigleyC/supanotes/internal/agent"
 	"github.com/RigleyC/supanotes/internal/auth"
+	"github.com/RigleyC/supanotes/internal/contexts"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/embeddings"
 	"github.com/RigleyC/supanotes/internal/handler"
+	"github.com/RigleyC/supanotes/internal/memories"
+	"github.com/RigleyC/supanotes/internal/notes"
+	"github.com/RigleyC/supanotes/internal/search"
+	"github.com/RigleyC/supanotes/internal/soul"
+	"github.com/RigleyC/supanotes/internal/tags"
+	"github.com/RigleyC/supanotes/internal/tasks"
+	"github.com/RigleyC/supanotes/internal/routines"
+	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/config"
 	"github.com/RigleyC/supanotes/pkg/db"
 	"github.com/RigleyC/supanotes/pkg/migrate"
+	"github.com/robfig/cron/v3"
 )
 
 func main() {
@@ -128,4 +140,91 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	api.POST("/auth/login", authH.Login)
 	api.POST("/auth/refresh", authH.Refresh)
 	api.POST("/auth/logout", authH.Logout)
+
+	protected := api.Group("")
+	protected.Use(auth.JWT(cfg))
+
+	// Contexts
+	ctxH := contexts.NewHandler(queries)
+	protected.GET("/contexts", ctxH.List)
+	protected.POST("/contexts", ctxH.Create)
+	protected.DELETE("/contexts/:id", ctxH.Delete)
+
+	// Tags
+	tagsH := tags.NewHandler(queries)
+	protected.GET("/tags", tagsH.List)
+	protected.POST("/tags", tagsH.Create)
+
+	// Notes
+	notesRepo := notes.NewRepository(queries)
+	notesSvc := notes.NewService(notesRepo)
+	notesH := notes.NewHandler(notesSvc)
+	protected.POST("/notes", notesH.Create)
+	protected.GET("/notes", notesH.List)
+	protected.GET("/notes/:id", notesH.Get)
+	protected.PUT("/notes/:id", notesH.Update)
+	protected.DELETE("/notes/:id", notesH.Delete)
+
+	// Tasks
+	tasksRepo := tasks.NewRepository(queries)
+	tasksSvc := tasks.NewService(tasksRepo)
+	tasksH := tasks.NewHandler(tasksSvc)
+	protected.POST("/tasks", tasksH.Create)
+	protected.GET("/tasks", tasksH.List)
+	protected.PUT("/tasks/:id", tasksH.Update)
+	protected.DELETE("/tasks/:id", tasksH.Delete)
+	protected.POST("/tasks/:id/complete", tasksH.Complete)
+	protected.POST("/tasks/:id/reopen", tasksH.Reopen)
+	protected.GET("/tasks/today", tasksH.Today)
+
+	// Embeddings worker
+	embeddingsRepo := embeddings.NewRepository(queries)
+	embeddingsSvc := embeddings.NewService(embeddingsRepo)
+	cronJob := cron.New(cron.WithSeconds())
+	cronJob.AddFunc("*/30 * * * * *", func() {
+		embeddingsSvc.ProcessPending(context.Background())
+	})
+	cronJob.Start()
+
+	// Soul
+	soulH := soul.NewHandler(queries)
+	protected.GET("/soul", soulH.Get)
+	protected.PUT("/soul", soulH.Update)
+
+	// Memories
+	memoriesRepo := memories.NewRepository(queries)
+	memoriesSvc := memories.NewService(memoriesRepo)
+	memoriesH := memories.NewHandler(memoriesSvc)
+	protected.GET("/memories", memoriesH.List)
+	protected.POST("/memories", memoriesH.Create)
+	protected.DELETE("/memories/:id", memoriesH.Delete)
+
+	// Search
+	searchSvc := search.NewService(queries)
+	searchH := search.NewHandler(searchSvc)
+	search.RegisterRoutes(protected, searchH)
+
+	// LLM Factory
+	llmFactory := llm.NewFactory(cfg)
+
+	// Agent Context Builder
+	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc)
+
+	// Routines
+	routinesRepo := routines.NewRepository(queries)
+	routinesSvc := routines.NewService(routinesRepo, agentCtxBldr, llmFactory)
+	routinesH := routines.NewHandler(routinesSvc)
+	routines.RegisterRoutes(protected, routinesH)
+
+	routinesRunner := routines.NewRunner(routinesRepo, agentCtxBldr, llmFactory)
+	routinesRunner.Start()
+
+	// Agent Loop
+	agentRepo := agent.NewRepository(queries)
+	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc)
+	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools)
+	agentH := agent.NewHandler(agentLoop, agentRepo)
+	protected.POST("/agent/chat", agentH.Chat)
+	protected.GET("/agent/messages", agentH.ListMessages)
+	protected.DELETE("/agent/messages", agentH.DeleteMessages)
 }

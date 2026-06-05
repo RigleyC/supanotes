@@ -98,13 +98,8 @@ class AuthController extends AsyncNotifier<AuthState> {
 
   Future<void> logout() async {
     state = const AsyncValue<AuthState>.loading();
-    try {
-      await _repository.logout();
-    } on ApiException {
-      // Swallow: the local state must end up unauthenticated regardless.
-    } finally {
-      state = const AsyncValue<AuthState>.data(AuthUnauthenticated());
-    }
+    await _repository.logout();
+    state = const AsyncValue<AuthState>.data(AuthUnauthenticated());
   }
 
   /// Called by the [AuthInterceptor] when a refresh has failed.

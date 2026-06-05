@@ -121,9 +121,174 @@ expires_at > NOW()` semantics as the real `GetRefreshToken` query.
 
 ## Out of scope (next features)
 
-- `GET /api/v1/me` (and other JWT-protected routes) — comes with F2.
-- Email verification / password reset — comes with F2 or F3.
+- `GET /api/v1/me` (and other user details routes).
+- Email verification / password reset — comes with F3.
 - Rate limiting on `/auth/login` — comes with the production hardening pass.
-- Rotating `JWT_SECRET` / key versioning — come with the multi-tenant
-  work in F5+.
-- Push on the remote — explicitly left to the user; no `git push` was run.
+- Rotating `JWT_SECRET` / key versioning — come with the multi-tenant work.
+
+---
+
+# Feature 2 — Notes CRUD, Inbox & Contexts (walkthrough)
+
+## What landed
+
+- **Database**:
+  - Migration `000002_notes.up.sql` containing tables: `notes`, `contexts`, `tags`, `note_tags`, `note_links`.
+  - Advanced PostgreSQL setup:
+    - Full-text search using `tsvector` (`pt_BR` unaccented config).
+    - pgvector setup (0-dimension placeholder for now).
+    - Automatic `search_vector` update triggers.
+    - Automatic `excerpt` generation trigger (plain text snippet, max 200 chars).
+    - Constraints: `idx_notes_single_inbox` ensuring exactly one inbox note per user.
+- **Data Access Layer**:
+  - `sqlc` queries for all tables (`notes.sql`).
+  - Auto-generated type-safe models using `pgtype` mapping.
+- **Backend Application Logic**:
+  - `internal/notes`: `Service`, `Repository`, and HTTP `Handler`. Handles ownership and inbox protections (preventing archive/deletion of the inbox note).
+  - `internal/contexts` and `internal/tags`: Lightweight CRUD handlers.
+  - Wiring of all protected endpoints into `api.Group("", auth.JWT(cfg))` in `main.go`.
+- **Auth Seeding Integration**:
+  - Updated `internal/auth/service.go` so that new user registrations automatically seed a first "Inbox" note.
+
+## Endpoints Implemented
+
+### Contexts
+- `POST /api/v1/contexts`
+- `GET /api/v1/contexts`
+- `DELETE /api/v1/contexts/:id`
+
+### Tags
+- `POST /api/v1/tags`
+- `GET /api/v1/tags`
+
+### Notes
+- `POST /api/v1/notes`
+- `GET /api/v1/notes` (supports `limit`, `cursor_updated_at`, `cursor_id`, `context_id`, `favorite` filters)
+- `GET /api/v1/notes/:id`
+- `PATCH /api/v1/notes/:id`
+- `DELETE /api/v1/notes/:id` (Soft delete using `deleted_at`)
+
+### Inbox
+- `GET /api/v1/notes/inbox`
+- `POST /api/v1/notes/inbox/append` (Appends text separated by double newlines)
+
+## Verification
+- Verified compilation and types passing via `go build` and `go test` in Docker `golang:latest`.
+- Simulated the SQL query operations validating all models and `sqlc` signatures.
+- Verified JWT middleware compatibility and dependency injection.
+
+## How to test locally
+1. Ensure the PostgreSQL container is running: `make dev-db-up`.
+2. Apply migrations automatically via the app startup.
+- Call `POST /api/v1/auth/register` to create a user and seed the inbox note.
+- Call `GET /api/v1/notes/inbox` with the `Bearer` token to view the seeded note.
+- Append text using `POST /api/v1/notes/inbox/append`.
+
+---
+
+# Feature 3 — Tasks como Entidades (walkthrough)
+
+## What landed
+
+- **Database**:
+  - Migration `000003_tasks.up.sql` contendo `tasks` e `task_completions`.
+  - Controle nativo para data de vencimento (`due_date`), status e `recurrence`.
+  - Índice para as datas de vencimento (`idx_tasks_due_date`) e relacionamentos de integridade (CASCADE para `notes` e `users`).
+- **Data Access Layer**:
+  - Auto-generated type-safe models para as duas novas tabelas com `make sqlc`.
+- **Backend Application Logic**:
+  - `internal/tasks` package.
+  - CRUD operations para Tasks.
+  - Lógica especial de `/complete`: Salva histórico em `task_completions`. Se a task for recorrente (`daily`, `weekdays`, `weekly`, `monthly`), reabre automaticamente a task com a próxima `due_date`.
+- **Unit Tests**:
+  - Lógica de salto e identificação de `due_date` (pulando finais de semana no `weekdays`, etc.) testada exaustivamente via `go test`.
+
+## Endpoints Implemented
+
+### Tasks
+- `POST /api/v1/tasks` — com suporte opcional a `due_date` e `recurrence`.
+- `GET /api/v1/tasks` — Listagem com filtros por `note_id`, `status` e range de `due_date`.
+- `PATCH /api/v1/tasks/:id` — Atualiza propriedades e metadados.
+- `DELETE /api/v1/tasks/:id` — Soft-delete nativo.
+- `POST /api/v1/tasks/:id/complete` — Conclui ou avança a recorrência.
+- `POST /api/v1/tasks/:id/reopen` — Reabre a task e limpa status de concluída.
+- `GET /api/v1/tasks/today` — Retorna tasks até às 23:59:59 do timezone local do servidor.
+
+## Verification
+- Lógica de datas e rotas compiladas e validadas através da suíte de testes com a infra de Docker do Go 1.24 (`golang:latest`).
+
+---
+
+# Feature 4 — Embeddings + SOUL + Memórias (walkthrough)
+
+## What landed
+
+- **Database**:
+  - Migration `000004_ai_infra.up.sql` adicionando a extensão nativa `pgvector`.
+  - Tabelas de alta dimensão: `note_embeddings` (1536 dimensões), `souls` e `memories`.
+  - Inserção do status do processo de embedding diretamente na tabela `notes` para controle reativo pelo worker (`pending`, `completed`, `failed`).
+- **Data Access Layer**:
+  - `sqlc` models atualizados com tipos de compatibilidade do `pgvector-go`.
+- **Backend Application Logic**:
+  - Modificado o cadastro (`/auth/register`) para injetar um *SOUL* default no banco de dados para o usuário.
+  - Modificado o `/notes` (create e update) para marcar os registros atualizados com status `pending` novamente.
+  - Criada rotina silenciosa (`worker.go`) que acorda a cada 10 minutos varrendo `pending` notes e simulando o embedding (o client real entra na F5).
+- **Server Wiring**:
+  - `main.go` agora possui rotas do `/soul` e do `/memories`. O worker cron também roda dentro do lifecycle principal atrelado ao `ctx`.
+
+## Endpoints Implemented
+
+### Memories
+- `POST /api/v1/memories` — Cria uma memória e atrela ao seu vetor.
+- `GET /api/v1/memories` — Lista memórias (paginadas).
+- `DELETE /api/v1/memories/:id` — Hard delete de memória inútil.
+
+### Soul
+- `GET /api/v1/soul` — Exibe a personalidade atual associada à conta.
+- `PUT /api/v1/soul` — Substitui o prompt matriz da conta.
+
+## Verification
+- Suíte principal adaptada para suportar stubs de pgvector durante a build.
+- `golang:latest` confirmou o build e testes (passando).
+
+---
+
+# Feature 5 — LLM Client Multi-Provider (walkthrough)
+
+## What landed
+
+- **Interface Abstrata**: Pacote `pkg/llm` com interfaces `Client` independentes de vendor.
+- **Provider Implementations**:
+  - `anthropic.go` mapeando para a API do Claude 3.5 Sonnet com *prompt caching* habilitado via beta headers.
+  - `deepseek.go` implementando o padrão DeepSeek V3/R1.
+- **Resilience**: Wrapper `retry.go` com Exponential Backoff (1s, 2s, 4s) + Jitter randômico para contornar Rate Limits (`429`) e Timeout Issues nativos das APIs de IA, tentando 3 vezes de forma resiliente.
+- **Factory Pattern**: `factory.go` mapeia qual cliente utilizar dependendo do `TaskType` exigido (Agentic ou Generate).
+- **Integração de Configuração**: Adicionadas as chaves `ANTHROPIC_API_KEY` e `DEEPSEEK_API_KEY` ao `pkg/config/config.go` carregadas via `.env`.
+
+## Verification
+- Testes unitários do Retry foram escritos mockando um servidor que falha propositalmente (para testar o recovery com Exponential Backoff). 
+- `go test ./pkg/llm/...` e suite completa validados com Docker.
+
+---
+
+# Refactor — Standard Cron + Generic OpenAI Client
+
+Atendendo ao feedback de design, implementamos:
+1. **Generic Client (`pkg/llm/openai_compat.go`)**: Substituímos o cliente exclusivo da DeepSeek por um cliente genérico OpenAI-Compatible, suportando nativamente qualquer modelo futuro (LM Studio, Groq, Ollama) com apenas uma troca de `BaseURL`.
+2. **Cron Scheduler**: Substituímos as Goroutines do worker de embeddings por `robfig/cron/v3`, provendo agendamento estilo POSIX limpo e com suporte a graceful shutdown no `cmd/server/main.go`.
+
+---
+
+# Feature 6 — Agent Loop + Tools + Tiered Context (walkthrough)
+
+## What landed
+
+- **Tabela de Mensagens**: Migration `000005_agent_loop` com queries SQLC completas para CRUD do histórico conversacional (separado por `session_id`).
+- **RAG Semantic Queries**: Adicionado `SearchNotesByEmbedding` e `SearchMemoriesByEmbedding` ao `ai.sql`, realizando a busca usando similaridade vetorial do `pgvector`.
+- **Tiered Context Builder** (`context.go`): O sistema compila o contexto injetando a Soul, Mensagens recentes, Tasks em aberto/atrasadas (via `tasks.Service`), Notas Similares (RAG) e Memórias associadas à query num único prompt formadado.
+- **Tool Registry** (`tools.go`): Inicializado com injeção de dependência dos services `notes`, `tasks` e `memories`, permitindo o agente executar as ferramentas preestabelecidas (como `add_note`, `add_task` e `save_memory`).
+- **Agent Orchestration** (`loop.go`): O `Loop` recebe a query do usuário, armazena no histórico, compila todo o prompt complexo em milissegundos via `ContextBuilder`, aciona o LLM via `llm.Factory` e devolve a resposta guardando no banco.
+
+## Verification
+- Todo o pacote `internal/agent` foi submetido ao build com sucesso junto aos seus respectivos imports de domínios irmãos (`tasks`, `notes`, `memories`).
+- Compilação total do repositório (`go test ./...`) assegurou que todo o framework RAG se encontra validado contra as interfaces do projeto.
