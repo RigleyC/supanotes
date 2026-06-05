@@ -209,15 +209,42 @@ final authControllerProvider =
 // Forward declaration
 // ---------------------------------------------------------------------------
 
-/// The real [apiClientProvider] is defined in `core/di/providers.dart`
-/// alongside the rest of the DI graph. We can't import that file from
-/// here (it would be a cycle: the DI module declares
-/// [authControllerProvider], which references [AuthController] from this
-/// file). Instead, [core/di/providers.dart] does
-/// `apiClientProvider = Provider<ApiClient>(...)` and this `late final`
-/// picks up the value at first read.
+/// Backing field for the [apiClientProvider] getter below.
 ///
-/// The boot order is: the DI module is loaded first, which assigns to
-/// [apiClientProvider]; only then does [authRepositoryProvider] get
-/// materialised, triggering the [apiClientProvider] read.
-late final Provider<ApiClient> apiClientProvider;
+/// Set by `core/di/providers.dart` at app startup via
+/// [setApiClientProvider]. Kept private and `late` so any code that
+/// reads the provider before the DI module has loaded gets a clear
+/// [StateError] instead of a silent null.
+late Provider<ApiClient>? _apiClientProvider;
+
+/// The real [apiClientProvider] is created in `core/di/providers.dart`
+/// alongside the rest of the DI graph. We can't import that file from
+/// here (it would be a cycle: the DI module needs [AuthController] for
+/// the `onAuthFailure` callback, and the auth controller is defined in
+/// this file). Instead, the DI module calls [setApiClientProvider] at
+/// boot time, and this getter hands the value back to the rest of
+/// the app.
+///
+/// The boot order is: the DI module is loaded first, which calls
+/// [setApiClientProvider]; only then does [authRepositoryProvider] get
+/// materialised, triggering a read through the getter.
+Provider<ApiClient> get apiClientProvider {
+  final provider = _apiClientProvider;
+  if (provider == null) {
+    throw StateError(
+      'apiClientProvider was read before core/di/providers.dart was '
+      'imported. Make sure main.dart imports the DI module before '
+      'running the app.',
+    );
+  }
+  return provider;
+}
+
+/// Wires the real [apiClientProvider] (defined in
+/// `core/di/providers.dart`) into this module's getter.
+///
+/// Called once at app startup from `core/di/providers.dart`. Safe to
+/// call again in tests to swap the provider; the most recent call wins.
+void setApiClientProvider(Provider<ApiClient> provider) {
+  _apiClientProvider = provider;
+}
