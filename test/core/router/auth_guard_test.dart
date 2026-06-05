@@ -39,9 +39,16 @@ void main() {
           isNull);
     });
 
-    test('lets an unauthenticated user stay on the splash', () {
+    test('redirects to /login when an unauthenticated user lands on /', () {
       const unauth = AsyncValue<AuthState>.data(AuthUnauthenticated());
-      expect(redirectFor(_splash, unauth), isNull);
+      expect(redirectFor(_splash, unauth), _login);
+    });
+
+    test('redirects to /home when an authenticated user lands on /', () {
+      const auth = AsyncValue<AuthState>.data(
+        AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+      );
+      expect(redirectFor(_splash, auth), _home);
     });
 
     test('redirects to /home when an authenticated user revisits /login', () {
@@ -69,19 +76,14 @@ void main() {
           isNull);
     });
 
-    test('lets an authenticated user stay on the splash', () {
-      const auth = AsyncValue<AuthState>.data(
-        AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
-      );
-      expect(redirectFor(_splash, auth), isNull);
-    });
-
     test('treats the AuthInitial data state as not yet routable', () {
       // Per the spec, the router does not redirect while AuthInitial is
       // the current state, so the user is not bounced to /login before
       // we know whether they have a saved session.
       const initial = AsyncValue<AuthState>.data(AuthInitial());
       expect(redirectFor(_home, initial), isNull);
+      // The splash redirects once auth is resolved; AuthInitial counts
+      // as not-yet-resolved, so the user stays on /.
       expect(redirectFor(_splash, initial), isNull);
       expect(redirectFor(_login, initial), isNull);
     });

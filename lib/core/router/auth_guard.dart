@@ -13,22 +13,30 @@ import 'package:supanotes/features/auth/domain/auth_state.dart';
 /// Computes the redirect target for [currentLocation] under [authState].
 ///
 /// Returns:
-///   * `null` — no redirect (used while auth is still loading).
+///   * `null` — no redirect (used while auth is still loading on `/`).
 ///   * `'/login'` — user is unauthenticated and tried to leave the auth
 ///     flow.
 ///   * `'/home'` — user is authenticated and tried to re-enter the auth
 ///     flow.
 ///
-/// Anything that is neither an auth route nor a protected route falls
-/// through and is left to the route table.
+/// The splash (`/`) is the only route that has different behaviour by
+/// auth phase: while the controller is still loading, stay put so the
+/// user does not see a flash of /login; once the controller resolves,
+/// bounce to the correct landing route.
 String? authGuardRedirect({
   required String currentLocation,
   required AsyncValue<AuthState> authState,
 }) {
-  // The splash is always accessible — it is the launch interstitial that
-  // renders while the auth controller resolves, and a hard redirect
-  // away from it would cause a visible flash of /login.
-  if (currentLocation == '/') return null;
+  if (currentLocation == '/') {
+    return authState.when(
+      data: (auth) {
+        if (auth is AuthInitial) return null;
+        return auth is AuthAuthenticated ? '/home' : '/login';
+      },
+      loading: () => null,
+      error: (_, __) => '/login',
+    );
+  }
 
   final isAuthRoute =
       currentLocation == '/login' || currentLocation == '/register';

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,14 +22,22 @@ class _MockAuthRepository extends Mock implements AuthRepository {}
 /// The real `AuthController.build()` reads from secure storage and the
 /// repository; for router tests we drive the state machine
 /// deterministically, so we short-circuit [build] to return whatever the
-/// test specifies.
+/// test specifies. For the loading case the future never completes, so
+/// the provider's [AsyncValue] stays in the loading phase for the
+/// duration of the test — which is exactly what we want when checking
+/// the splash is shown.
 class _StubAuthController extends AuthController {
   _StubAuthController(this._stub);
 
   final AsyncValue<AuthState> _stub;
 
   @override
-  Future<AuthState> build() async => _stub.value as AuthState;
+  Future<AuthState> build() {
+    if (_stub.isLoading) {
+      return Completer<AuthState>().future;
+    }
+    return Future.value(_stub.value as AuthState);
+  }
 }
 
 void _stubEmptySession(_MockAuthLocalStorage storage) {
@@ -80,8 +90,14 @@ const _home = '/home';
 const _splash = '/';
 
 void main() {
-  testWidgets('starting on / renders the splash', (tester) async {
-    const stub = AsyncValue<AuthState>.data(AuthUnauthenticated());
+  Future<void> settleRedirect(WidgetTester tester) async {
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
+
+  testWidgets('starting on / with loading auth renders the splash', (tester) async {
+    const stub = AsyncValue<AuthState>.loading();
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -95,17 +111,48 @@ void main() {
     );
   });
 
+  testWidgets('starting on / with unauth auth redirects to /login',
+      (tester) async {
+    const stub = AsyncValue<AuthState>.data(AuthUnauthenticated());
+    final container = _makeContainer(stub);
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      _login,
+    );
+  });
+
+  testWidgets('starting on / with auth redirects to /home', (tester) async {
+    const stub = AsyncValue<AuthState>.data(
+      AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+    final container = _makeContainer(stub);
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      _home,
+    );
+  });
+
   testWidgets('unauthenticated user on /home is redirected to /login',
       (tester) async {
     const stub = AsyncValue<AuthState>.data(AuthUnauthenticated());
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
-    await tester.pump();
+    await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
     router.go(_home);
-    await tester.pump();
+    await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
@@ -119,11 +166,11 @@ void main() {
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
-    await tester.pump();
+    await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
     router.go(_register);
-    await tester.pump();
+    await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
@@ -139,11 +186,11 @@ void main() {
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
-    await tester.pump();
+    await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
     router.go(_login);
-    await tester.pump();
+    await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
@@ -159,11 +206,11 @@ void main() {
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
-    await tester.pump();
+    await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
     router.go(_register);
-    await tester.pump();
+    await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
@@ -178,11 +225,11 @@ void main() {
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
-    await tester.pump();
+    await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
     router.go(_home);
-    await tester.pump();
+    await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
