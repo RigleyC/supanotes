@@ -20,6 +20,13 @@ RETURNING *;
 SELECT * FROM user_settings
 WHERE user_id = $1;
 
+-- name: UpdateUserSettings :one
+UPDATE user_settings
+SET timezone = $2,
+    updated_at = NOW()
+WHERE user_id = $1
+RETURNING *;
+
 -- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
 VALUES ($1, $2, $3)
