@@ -64,7 +64,7 @@ class NotesListScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final note = notes[index];
                 return DismissibleDeleteWrapper(
-                  key: ValueKey(note.id),
+                  noteId: note.id,
                   onDelete: () async {
                     await ref.read(notesRepositoryProvider).softDelete(note.id);
                     return true;

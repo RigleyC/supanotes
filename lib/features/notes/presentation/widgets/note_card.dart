@@ -27,6 +27,11 @@ class NoteCard extends StatelessWidget {
 
   static const _fallbackTitle = 'Sem título';
 
+  /// Hero tag used to animate the note title from the list into the
+  /// editor's AppBar. Exposed as a public function so the editor screen
+  /// can build the matching tag without having to depend on [NoteCard].
+  static String titleHeroTag(String noteId) => 'note-title-$noteId';
+
   String? _resolveExcerpt(NoteModel note) {
     if (note.excerpt != null && note.excerpt!.trim().isNotEmpty) {
       return note.excerpt!.trim();
@@ -67,14 +72,20 @@ class NoteCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      title,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: scheme.onSurface,
+                    child: Hero(
+                      tag: titleHeroTag(note.id),
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: Text(
+                          title,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (note.favorite)
@@ -204,21 +215,23 @@ class _ContextChip extends StatelessWidget {
 
 /// Wraps [child] in a [Dismissible] configured for swipe-to-delete with
 /// a confirm dialog. Lives next to [NoteCard] so the list builder can
-/// call it as `DismissibleDeleteWrapper(child: NoteCard(...))`.
+/// call it as `DismissibleDeleteWrapper(noteId: ..., child: NoteCard(...))`.
 class DismissibleDeleteWrapper extends StatelessWidget {
   const DismissibleDeleteWrapper({
     super.key,
+    required this.noteId,
     required this.child,
     required this.onDelete,
   });
 
+  final String noteId;
   final Widget child;
   final Future<bool> Function() onDelete;
 
   @override
   Widget build(BuildContext context) {
     return Dismissible(
-      key: ValueKey(child.key ?? child.hashCode),
+      key: ValueKey('delete-$noteId'),
       direction: DismissDirection.endToStart,
       background: const SizedBox.shrink(),
       secondaryBackground: Container(

@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:super_editor/super_editor.dart'
     hide serializeDocumentToMarkdown;
 
@@ -19,6 +20,7 @@ import 'package:supanotes/core/constants/app_constants.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
+import 'package:supanotes/features/notes/presentation/widgets/note_card.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/save_indicator.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
@@ -200,6 +202,18 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     super.dispose();
   }
 
+  Future<void> _saveAndPop() async {
+    _saveDebounce?.cancel();
+    _titleDebounce?.cancel();
+    if (_document != null) {
+      await _flushSave();
+      final title = _titleController?.text ?? '';
+      if (title.isNotEmpty) {
+        await _saveTitle(title);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_document == null || _editor == null || _composer == null) {
@@ -208,21 +222,37 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _saveAndPop().then((_) {
+          if (context.mounted) {
+            context.pop();
+          }
+        });
+      },
+      child: Scaffold(
       appBar: AppBar(
-        title: TextField(
-          controller: _titleController,
-          decoration: const InputDecoration(
-            border: InputBorder.none,
-            filled: false,
-            contentPadding: EdgeInsets.zero,
-            hintText: 'Sem título',
+        title: Hero(
+          tag: NoteCard.titleHeroTag(widget.noteId),
+          child: Material(
+            type: MaterialType.transparency,
+            child: TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
+                hintText: 'Sem título',
+              ),
+              style: AppTypography.textTheme.titleLarge?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: AppTypography.semibold,
+              ),
+              onChanged: _onTitleChanged,
+            ),
           ),
-          style: AppTypography.textTheme.titleLarge?.copyWith(
-            color: colorScheme.onSurface,
-            fontWeight: AppTypography.semibold,
-          ),
-          onChanged: _onTitleChanged,
         ),
         actions: [
           SaveIndicator(state: _saveState),
@@ -246,6 +276,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
