@@ -16,6 +16,7 @@ type Repository interface {
 	CreateRoutineLog(ctx context.Context, routineID, userID pgtype.UUID, status string, content *string, errorMsg *string) (sqlcgen.RoutineLog, error)
 	GetRoutineLogsByUser(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.RoutineLog, error)
 	CleanupOldMessages(ctx context.Context) error
+	HardDeleteExpired(ctx context.Context) error
 }
 
 type repo struct {
@@ -88,4 +89,17 @@ func (r *repo) GetRoutineLogsByUser(ctx context.Context, userID pgtype.UUID, lim
 
 func (r *repo) CleanupOldMessages(ctx context.Context) error {
 	return r.q.CleanupOldMessages(ctx)
+}
+
+// HardDeleteExpired purges notes, tasks, and contexts that have been
+// soft-deleted for more than 30 days. Tags are skipped on purpose:
+// the table has no deleted_at column yet.
+func (r *repo) HardDeleteExpired(ctx context.Context) error {
+	if err := r.q.HardDeleteExpiredNotes(ctx); err != nil {
+		return err
+	}
+	if err := r.q.HardDeleteExpiredTasks(ctx); err != nil {
+		return err
+	}
+	return r.q.HardDeleteExpiredContexts(ctx)
 }

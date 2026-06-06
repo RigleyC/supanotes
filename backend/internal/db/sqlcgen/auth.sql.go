@@ -204,6 +204,37 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID pgtype.UUID) (User
 	return i, err
 }
 
+const listDeviceTokensByUser = `-- name: ListDeviceTokensByUser :many
+SELECT id, user_id, token, platform, created_at FROM device_tokens
+WHERE user_id = $1
+`
+
+func (q *Queries) ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]DeviceToken, error) {
+	rows, err := q.db.Query(ctx, listDeviceTokensByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DeviceToken
+	for rows.Next() {
+		var i DeviceToken
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Token,
+			&i.Platform,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeAllUserRefreshTokens = `-- name: RevokeAllUserRefreshTokens :exec
 UPDATE refresh_tokens
 SET revoked_at = NOW()

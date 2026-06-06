@@ -59,3 +59,7 @@ RETURNING *;
 -- name: DeleteDeviceToken :exec
 DELETE FROM device_tokens
 WHERE id = $1 AND user_id = $2;
+
+-- name: ListDeviceTokensByUser :many
+SELECT id, user_id, token, platform, created_at FROM device_tokens
+WHERE user_id = $1;

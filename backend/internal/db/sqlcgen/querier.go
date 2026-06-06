@@ -60,6 +60,10 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserSettings(ctx context.Context, userID pgtype.UUID) (UserSetting, error)
+	HardDeleteExpiredContexts(ctx context.Context) error
+	HardDeleteExpiredNotes(ctx context.Context) error
+	HardDeleteExpiredTasks(ctx context.Context) error
+	ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]DeviceToken, error)
 	RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error

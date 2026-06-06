@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 
@@ -13,26 +14,48 @@ import (
 	"github.com/RigleyC/supanotes/pkg/llm"
 )
 
+// Notifier is the subset of the FCM sender the runner needs. It is
+// satisfied by *notifications.MultiDeviceSender and by NoopSender in
+// dev. Kept here as an interface to avoid an upward import.
+type Notifier interface {
+	Send(ctx context.Context, userID, title, body string) error
+}
+
+// TelegramNotifier is the optional Telegram side of the same flow.
+// When nil the runner silently skips it.
+type TelegramNotifier interface {
+	NotifyUser(ctx context.Context, userID pgtype.UUID, text string) error
+}
+
 type Runner struct {
 	repo         Repository
 	agentCtxBldr ContextBuilder
 	llmFactory   llm.Factory
+	notifier     Notifier
+	telegram     TelegramNotifier
 	cronJob      *cron.Cron
 	parser       cron.Parser
 	mu           sync.Mutex
-	active       map[string]bool // keep track of running routines to avoid duplicates
+	active       map[string]bool
 }
 
-func NewRunner(repo Repository, agentCtxBldr ContextBuilder, llmFactory llm.Factory) *Runner {
+func NewRunner(
+	repo Repository,
+	agentCtxBldr ContextBuilder,
+	llmFactory llm.Factory,
+	notifier Notifier,
+	telegram TelegramNotifier,
+) *Runner {
 	r := &Runner{
 		repo:         repo,
 		agentCtxBldr: agentCtxBldr,
 		llmFactory:   llmFactory,
+		notifier:     notifier,
+		telegram:     telegram,
 		cronJob:      cron.New(),
 		parser:       cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow),
 		active:       make(map[string]bool),
 	}
-	// Verify every minute
 	r.cronJob.AddFunc("* * * * *", r.tick)
 	return r
 }
@@ -63,15 +86,12 @@ func (r *Runner) tick() {
 			continue
 		}
 
-		// Check timezone
 		loc, err := time.LoadLocation(rt.Timezone)
 		if err != nil {
 			loc = time.UTC
 		}
-		
+
 		nowInLoc := now.In(loc)
-		
-		// If schedule matches the current minute (by checking if Next from 1 minute ago is now)
 		oneMinAgo := nowInLoc.Add(-1 * time.Minute)
 		nextRun := schedule.Next(oneMinAgo).Truncate(time.Minute)
 
@@ -79,15 +99,15 @@ func (r *Runner) tick() {
 			go r.runRoutine(rt)
 		}
 	}
-	
-	// Also trigger cleanup of old messages once a day at UTC midnight
+
+	// Daily at UTC midnight: clean up old messages + tombstone garbage.
 	if now.In(time.UTC).Hour() == 0 && now.In(time.UTC).Minute() == 0 {
 		go func() {
-			err := r.repo.CleanupOldMessages(context.Background())
-			if err != nil {
+			if err := r.repo.CleanupOldMessages(context.Background()); err != nil {
 				log.Error().Err(err).Msg("failed to cleanup old messages")
-			} else {
-				log.Info().Msg("cleaned up old messages")
+			}
+			if err := r.repo.HardDeleteExpired(context.Background()); err != nil {
+				log.Error().Err(err).Msg("failed to hard-delete expired records")
 			}
 		}()
 	}
@@ -114,7 +134,6 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 
 	log.Info().Str("routine_id", fmt.Sprintf("%v", rt.ID)).Str("type", rt.Type).Msg("running routine")
 
-	// Same logic as TestRoutine but saving log
 	ragContext, err := r.agentCtxBldr.BuildForRoutine(ctx, rt.UserID, rt.Type)
 	if err != nil {
 		errMsg := err.Error()
@@ -138,11 +157,35 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 	}
 
 	content := resp.Content
-	_, err = r.repo.CreateRoutineLog(ctx, rt.ID, rt.UserID, "success", &content, nil)
-	if err != nil {
+	if _, err := r.repo.CreateRoutineLog(ctx, rt.ID, rt.UserID, "success", &content, nil); err != nil {
 		log.Error().Err(err).Msg("failed to save routine log")
+		return
 	}
 
-	// Stub: Send Push/Telegram notification
-	log.Info().Str("user_id", fmt.Sprintf("%v", rt.UserID)).Msg("STUB: Sending FCM/Telegram push: Novo brief disponível!")
+	// Notify the user. We do both push and Telegram and never let
+	// either fail the other; the brief was already saved.
+	userIDStr := fmt.Sprintf("%v", rt.UserID)
+
+	if r.notifier != nil {
+		title := "Novo brief disponível"
+		body := briefPreview(content)
+		if err := r.notifier.Send(ctx, userIDStr, title, body); err != nil {
+			log.Error().Err(err).Str("user_id", userIDStr).Msg("push notification failed")
+		}
+	}
+	if r.telegram != nil {
+		if err := r.telegram.NotifyUser(ctx, rt.UserID, content); err != nil {
+			log.Error().Err(err).Str("user_id", userIDStr).Msg("telegram notify failed")
+		}
+	}
+}
+
+// briefPreview returns the first 200 chars of the brief body for
+// the push notification payload. The full body still goes out via
+// Telegram.
+func briefPreview(body string) string {
+	if len(body) <= 200 {
+		return body
+	}
+	return body[:199] + "…"
 }
