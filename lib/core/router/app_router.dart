@@ -27,6 +27,8 @@ import 'package:supanotes/features/search/presentation/search_screen.dart';
 import 'package:supanotes/features/settings/presentation/contexts_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart';
+import 'package:supanotes/features/routines/presentation/brief_history_screen.dart';
+import 'package:supanotes/features/routines/presentation/routines_screen.dart';
 import 'package:supanotes/shared/widgets/splash_screen.dart';
 
 /// Application [GoRouter] driven by the current [authControllerProvider].
@@ -96,6 +98,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/contexts',
         builder: (_, __) => const ContextsScreen(),
+      ),
+      GoRoute(
+        path: '/routines',
+        builder: (_, __) => const RoutinesScreen(),
+      ),
+      GoRoute(
+        path: '/routines/logs',
+        builder: (_, __) => const BriefHistoryScreen(),
       ),
     ],
     redirect: (context, state) => authGuardRedirect(
