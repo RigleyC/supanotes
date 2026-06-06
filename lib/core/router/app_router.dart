@@ -29,6 +29,7 @@ import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart';
 import 'package:supanotes/features/routines/presentation/brief_history_screen.dart';
 import 'package:supanotes/features/routines/presentation/routines_screen.dart';
+import 'package:supanotes/features/telegram/presentation/telegram_link_screen.dart';
 import 'package:supanotes/shared/widgets/splash_screen.dart';
 
 /// Application [GoRouter] driven by the current [authControllerProvider].
@@ -106,6 +107,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/routines/logs',
         builder: (_, __) => const BriefHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/telegram',
+        builder: (_, __) => const TelegramLinkScreen(),
       ),
     ],
     redirect: (context, state) => authGuardRedirect(
