@@ -1,0 +1,62 @@
+name: Android Build
+
+on:
+  push:
+    branches: [main]
+    paths: [lib/**, android/**, pubspec.yaml, .github/workflows/android.yml]
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Unique build identifier'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build APK (debug)
+        env:
+          BUILD_ID: ${{ inputs.build_id || github.run_id }}
+        run: flutter build apk --debug --build-number=$BUILD_ID
+
+      - name: Build App Bundle (release unsigned)
+        env:
+          BUILD_ID: ${{ inputs.build_id || github.run_id }}
+        run: |
+          flutter build appbundle --release --build-number=$BUILD_ID || \
+            echo "App bundle build failed (likely missing signing); APK above is the main artifact"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error

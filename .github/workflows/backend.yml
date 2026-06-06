@@ -1,0 +1,73 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths: [backend/**, .github/workflows/backend.yml]
+  pull_request:
+    branches: [main]
+    paths: [backend/**, .github/workflows/backend.yml]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: supanotes
+          POSTGRES_PASSWORD: supanotes
+          POSTGRES_DB: supanotes
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U supanotes"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable
+      JWT_SECRET: ci-only-secret-32-chars-or-more-please
+      ENVIRONMENT: dev
+      GOFLAGS: -mod=readonly
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: Run unit tests
+        run: go test -count=1 -short ./...
+
+      - name: Smoke (server boots)
+        env:
+          PORT: '8080'
+        run: |
+          go build -o /tmp/supanotes ./cmd/server
+          /tmp/supanotes &
+          SERVER_PID=$!
+          sleep 3
+          curl -sf http://localhost:8080/api/v1/health | tee /tmp/health.json
+          if ! grep -q '"status":"ok"' /tmp/health.json; then
+            echo "Health check failed"; exit 1
+          fi
+          kill $SERVER_PID 2>/dev/null || true
