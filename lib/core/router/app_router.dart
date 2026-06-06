@@ -22,6 +22,8 @@ import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/features/notes/presentation/inbox_screen.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
+import 'package:supanotes/features/routines/presentation/brief_history_screen.dart';
+import 'package:supanotes/features/routines/presentation/routines_screen.dart';
 import 'package:supanotes/shared/widgets/splash_screen.dart';
 
 /// Application [GoRouter] driven by the current [authControllerProvider].
@@ -71,6 +73,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/notes/:id',
         builder: (_, state) =>
             NoteEditorScreen(noteId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/routines',
+        builder: (_, __) => const RoutinesScreen(),
+      ),
+      GoRoute(
+        path: '/routines/logs',
+        builder: (_, __) => const BriefHistoryScreen(),
       ),
     ],
     redirect: (context, state) => authGuardRedirect(
