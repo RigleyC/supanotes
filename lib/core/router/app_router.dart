@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/auth_guard.dart';
+import 'package:supanotes/features/agent/presentation/chat_screen.dart';
 import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/presentation/login_screen.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
@@ -62,6 +63,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/home',
         builder: (_, __) => const NotesListScreen(),
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (_, __) => const ChatScreen(),
       ),
       GoRoute(
         path: '/inbox',
