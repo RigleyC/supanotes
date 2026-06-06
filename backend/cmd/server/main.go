@@ -20,17 +20,20 @@ import (
 	"github.com/RigleyC/supanotes/internal/contexts"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/embeddings"
+	"github.com/RigleyC/supanotes/internal/gateway"
 	"github.com/RigleyC/supanotes/internal/handler"
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/notes"
+	"github.com/RigleyC/supanotes/internal/notifications"
+	"github.com/RigleyC/supanotes/internal/routines"
 	"github.com/RigleyC/supanotes/internal/search"
+	"github.com/RigleyC/supanotes/internal/settings"
 	"github.com/RigleyC/supanotes/internal/soul"
 	"github.com/RigleyC/supanotes/internal/tags"
 	"github.com/RigleyC/supanotes/internal/tasks"
-	"github.com/RigleyC/supanotes/internal/routines"
-	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/config"
 	"github.com/RigleyC/supanotes/pkg/db"
+	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/migrate"
 	"github.com/robfig/cron/v3"
 )
@@ -227,4 +230,20 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	protected.POST("/agent/chat", agentH.Chat)
 	protected.GET("/agent/messages", agentH.ListMessages)
 	protected.DELETE("/agent/messages", agentH.DeleteMessages)
+
+	// Settings
+	settingsH := settings.NewHandler(queries)
+	protected.GET("/settings", settingsH.Get)
+	protected.PUT("/settings", settingsH.Update)
+
+	// Device tokens (FCM push registration)
+	notificationsH := notifications.NewHandler(queries)
+	protected.POST("/device-tokens", notificationsH.RegisterToken)
+	protected.DELETE("/device-tokens/:id", notificationsH.DeleteToken)
+
+	// Telegram gateway
+	gatewayRepo := gateway.NewRepository(pool)
+	gatewayBot := gateway.NewTelegramClient(cfg.TelegramBotToken)
+	gatewayH := gateway.NewHandler(gatewayRepo, gatewayBot)
+	gateway.RegisterRoutes(protected, gatewayH)
 }

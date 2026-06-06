@@ -292,3 +292,150 @@ Atendendo ao feedback de design, implementamos:
 ## Verification
 - Todo o pacote `internal/agent` foi submetido ao build com sucesso junto aos seus respectivos imports de domínios irmãos (`tasks`, `notes`, `memories`).
 - Compilação total do repositório (`go test ./...`) assegurou que todo o framework RAG se encontra validado contra as interfaces do projeto.
+
+---
+
+# Features 9, 10, 12 — Settings, FCM Push, Telegram Gateway (walkthrough)
+
+## What landed
+
+Three backend features closed out in this pass, sharing a small cleanup
+of the auth/uid helper layer that several existing packages already
+depended on:
+
+- **Feature 12 — Settings** (`internal/settings`)
+  - `GET /api/v1/settings` returns the caller's `user_settings` row
+    (timezone, created/updated timestamps).
+  - `PUT /api/v1/settings` accepts `{ "timezone": "America/Sao_Paulo" }`,
+    validates with `go-playground/validator`, then double-checks the
+    timezone against `time.LoadLocation` (Go's tz database) so a bogus
+    string is rejected with a clear 400.
+  - New sqlc query: `UpdateUserSettings :one` in
+    `db/queries/auth.sql` (returns the updated row).
+
+- **Feature 10 — FCM Push Notifications** (`internal/notifications`)
+  - `POST /api/v1/device-tokens` — registers an FCM token for the
+    authenticated user (`{ token, platform: ios|android|web|desktop }`).
+    The existing `CreateDeviceToken` query in `db/queries/auth.sql` is
+    reused (it was already wired for an ON CONFLICT upsert).
+  - `DELETE /api/v1/device-tokens/:id` — removes a token, scoped to the
+    caller's user.
+  - `Sender` interface + `FCMSender` (Firebase Admin SDK) +
+    `NoopSender` + `MultiDeviceSender` (topic-based fan-out) live in
+    `fcm.go` for the routines runner to consume later.
+  - New dep: `firebase.google.com/go/v4` (added via `go get`).
+  - New config fields: `FCMCredentialsFile` (path to service-account
+    JSON) — kept optional; without it the SDK uses the app-default
+    credentials.
+
+- **Feature 9 — Telegram Gateway** (`internal/gateway`)
+  - Migration `000007_telegram.up/down.sql` adds two tables:
+    `telegram_links` (one row per user, holds `telegram_chat_id` and
+    optional `telegram_username`) and `telegram_link_codes` (short-lived
+    one-time codes, 10 min TTL).
+  - `Repository` (raw SQL via `pgxpool` — kept out of sqlcgen because
+    the package is a gateway concern, not a domain table) exposes
+    `CreateLinkCode`, `GetLinkCode`, `UseLinkCode`, `CreateLink`,
+    `GetLinkByUserID`, `GetLinkByChatID`, `DeleteLink`.
+  - `TelegramClient` wraps the bot token and exposes
+    `SendMessage(chatID, text)` (currently a stub returning nil — the
+    `net/http` POST to `api.telegram.org` is intentionally not
+    implemented yet so the wiring can be exercised without leaking
+    tokens in test runs).
+  - `GET /api/v1/telegram/link` — returns `{ linked, chat_id?, username? }`.
+  - `POST /api/v1/telegram/link-code` — mints a 16-hex-char code valid
+    for 10 minutes.
+  - `DELETE /api/v1/telegram/link` — unlinks the account.
+  - `POST /api/v1/gateway/telegram/webhook` — public endpoint that
+    Telegram calls; decodes the update envelope, currently a no-op
+    (text is read, ready for the next agent to wire a reply).
+
+## Auth helper cleanup (foundational)
+
+Several packages (`notes`, `tags`, `contexts`, `soul`, `memories`,
+`routines`, `tasks`, `search` — and the new settings / notifications /
+gateway) were already calling `auth.UUIDFromString` /
+`auth.UUIDToString`, but the only existing helper was
+`auth.UserIDFromContext(c) (string, bool)`. Added
+`internal/auth/helpers.go` with:
+
+- `auth.UUIDFromString(s string) (pgtype.UUID, error)` — wraps
+  `pkg/uid.UUIDFromString`.
+- `auth.UUIDToString(u pgtype.UUID) string` — wraps
+  `pkg/uid.UUIDToString`.
+- `auth.ParsedUserID(c echo.Context) (pgtype.UUID, error)` — reads
+  the JWT-middleware context key, parses it, and returns
+  `ErrInvalidUserID` on any failure (untyped, missing, or malformed).
+
+This stops the existing packages from drifting and gives the new ones
+a single, consistent entry point.
+
+## Files touched
+
+| Layer | File | Status |
+|---|---|---|
+| Auth helpers | `backend/internal/auth/helpers.go` | new |
+| Settings | `backend/internal/settings/handler.go` | new |
+| Settings query | `backend/db/queries/auth.sql` (added `UpdateUserSettings`) | modified |
+| Settings sqlc | `backend/internal/db/sqlcgen/auth.sql.go` | regenerated |
+| Notifications | `backend/internal/notifications/{handler,fcm}.go` | new |
+| Notifications deps | `backend/go.mod`, `backend/go.sum` | modified (`firebase.google.com/go/v4`) |
+| Telegram | `backend/internal/gateway/{handler,repository}.go` | new |
+| Telegram schema | `backend/db/migrations/000007_telegram.{up,down}.sql` | new |
+| Config | `backend/pkg/config/config.go`, `backend/.env.example` | modified (`TelegramBotToken`, `FCMCredentialsFile`) |
+| Wiring | `backend/cmd/server/main.go` | modified (3 new blocks) |
+| Cleanup | `backend/internal/search/service.go` (stray `return`, unused `sort` import) | modified |
+| Cleanup | `backend/db/queries/sync.sql` (added `GetSyncTags`/`UpsertTag`) | modified |
+| Cleanup | `backend/internal/sync/repository.go` (`GetSyncTags` ignores `lastSyncedAt` — tags has no `updated_at` column yet) | modified |
+| Cleanup | `backend/internal/agent/context.go` (corrected Row type usage for `SearchNotesByEmbedding`/`SearchMemoriesByEmbedding` after sqlc regenerate) | modified |
+| Cleanup | `backend/internal/auth/service_test.go`, `handler_test.go` (added missing mockQuerier methods for the new sqlc interface) | modified |
+
+## API surface
+
+| Method | Path | Body | Auth |
+|---|---|---|---|
+| `GET`  | `/api/v1/settings` | — | JWT |
+| `PUT`  | `/api/v1/settings` | `{ timezone }` | JWT |
+| `POST` | `/api/v1/device-tokens` | `{ token, platform }` | JWT |
+| `DELETE` | `/api/v1/device-tokens/:id` | — | JWT |
+| `GET`  | `/api/v1/telegram/link` | — | JWT |
+| `POST` | `/api/v1/telegram/link-code` | — | JWT |
+| `DELETE` | `/api/v1/telegram/link` | — | JWT |
+| `POST` | `/api/v1/gateway/telegram/webhook` | Telegram update envelope | public (no JWT) |
+
+All error responses are `{"error": "<message>"}`.
+
+## Verification
+
+```bash
+cd backend
+go build ./...    # clean
+go vet ./...      # clean
+go test ./...     # all green (auth, handler, sync, tasks, pkg/auth, pkg/config, pkg/llm)
+sqlc generate     # clean — schemas and queries line up
+```
+
+## Out of scope / follow-ups (next features)
+
+- **FCM sender integration with the routines runner**:
+  `internal/routines/runner.go` still has the
+  `// Stub: Send Push/Telegram notification` line at the end of each
+  fired routine. Wiring it up means injecting
+  `*notifications.FCMSender` into `routines.NewRunner(...)` and
+  replacing the stub with a call to `sender.Send(ctx, userID, title, body)`.
+  Same for the multi-device variant.
+- **`TelegramClient.SendMessage` real HTTP call**: needs
+  `net/http.Post` to `https://api.telegram.org/bot<token>/sendMessage`
+  with a 5-second timeout, and a test that swaps the bot base URL
+  to a `httptest.Server`.
+- **Webhook → agent loop**: turn the webhook into a thin shim that
+  forwards `text` messages into the existing agent chat
+  infrastructure (or a dedicated `telegram_inbox` queue).
+- **Tag sync `updated_at`**: tags don't have an `updated_at` column
+  yet, which is why `GetSyncTags` ignores `lastSyncedAt`. Add the
+  column in a future migration and a `BEFORE UPDATE` trigger.
+- **Unit tests for the new packages**: settings/notifications/gateway
+  only have repository-level hand-rolled mocks via the existing
+  `sqlcgen.Querier` interface (settings/notifications) or the
+  `pgxpool.Pool` (gateway); no handler tests yet.
+
