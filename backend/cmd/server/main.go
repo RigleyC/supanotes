@@ -219,10 +219,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	routinesH := routines.NewHandler(routinesSvc)
 	routines.RegisterRoutes(protected, routinesH)
 
-	routinesRunner := routines.NewRunner(routinesRepo, agentCtxBldr, llmFactory)
-	routinesRunner.Start()
-
-	// Agent Loop
+	// Agent Loop (built before the runner so the runner and the
+	// gateway can both depend on it).
 	agentRepo := agent.NewRepository(queries)
 	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc)
 	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools)
@@ -230,6 +228,20 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	protected.POST("/agent/chat", agentH.Chat)
 	protected.GET("/agent/messages", agentH.ListMessages)
 	protected.DELETE("/agent/messages", agentH.DeleteMessages)
+
+	// FCM push + Telegram sender — feed both into the routines runner
+	// so a fired brief triggers real notifications.
+	pushSender, err := notifications.NewMultiDeviceSender(cfg.FCMCredentialsFile, queries)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to build FCM sender")
+	}
+
+	gatewayRepo := gateway.NewRepository(pool)
+	gatewayBot := gateway.NewTelegramClient(cfg.TelegramBotToken)
+	gatewayBot.AttachRepo(gatewayRepo)
+
+	routinesRunner := routines.NewRunner(routinesRepo, agentCtxBldr, llmFactory, pushSender, gatewayBot)
+	routinesRunner.Start()
 
 	// Settings
 	settingsH := settings.NewHandler(queries)
@@ -241,9 +253,9 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	protected.POST("/device-tokens", notificationsH.RegisterToken)
 	protected.DELETE("/device-tokens/:id", notificationsH.DeleteToken)
 
-	// Telegram gateway
-	gatewayRepo := gateway.NewRepository(pool)
-	gatewayBot := gateway.NewTelegramClient(cfg.TelegramBotToken)
-	gatewayH := gateway.NewHandler(gatewayRepo, gatewayBot)
+	// Telegram gateway (uses the agent loop as a bridge for free-form
+	// messages; routes are mounted under the protected group except
+	// for the public webhook).
+	gatewayH := gateway.NewHandler(gatewayRepo, gatewayBot, agentLoop)
 	gateway.RegisterRoutes(protected, gatewayH)
 }

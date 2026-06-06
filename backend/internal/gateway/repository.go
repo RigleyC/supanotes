@@ -1,11 +1,14 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -121,6 +124,8 @@ func generateCode() (string, error) {
 type TelegramClient struct {
 	botToken string
 	baseURL  string
+	repo     *Repository
+	http     *http.Client
 }
 
 func NewTelegramClient(botToken string) *TelegramClient {
@@ -130,13 +135,65 @@ func NewTelegramClient(botToken string) *TelegramClient {
 	return &TelegramClient{
 		botToken: botToken,
 		baseURL:  fmt.Sprintf("https://api.telegram.org/bot%s", botToken),
+		http:     &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-func (t *TelegramClient) SendMessage(chatID int64, text string) error {
-	return nil // Stub: will be implemented with net/http
+// AttachRepo gives the client access to the link table so callers
+// like the routines runner can ask "send this to the user behind
+// <userID>" without first having to look up the chat_id themselves.
+func (t *TelegramClient) AttachRepo(repo *Repository) {
+	t.repo = repo
 }
 
 func (t *TelegramClient) IsEnabled() bool {
 	return t.botToken != ""
+}
+
+// SendMessage POSTs to api.telegram.org/bot<token>/sendMessage. It
+// silently returns nil when the bot token is empty (so a dev server
+// without TELEGRAM_BOT_TOKEN doesn't blow up).
+func (t *TelegramClient) SendMessage(chatID int64, text string) error {
+	if !t.IsEnabled() {
+		return nil
+	}
+
+	payload, err := json.Marshal(map[string]any{
+		"chat_id":    chatID,
+		"text":       text,
+		"parse_mode": "Markdown",
+	})
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, t.baseURL+"/sendMessage", bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := t.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telegram returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// NotifyUser looks up the chat_id for the user and sends the message.
+// Returns ErrLinkNotFound when the user has not linked Telegram.
+func (t *TelegramClient) NotifyUser(ctx context.Context, userID pgtype.UUID, text string) error {
+	if !t.IsEnabled() || t.repo == nil {
+		return nil
+	}
+	chatID, _, err := t.repo.GetLinkByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return t.SendMessage(chatID, text)
 }
