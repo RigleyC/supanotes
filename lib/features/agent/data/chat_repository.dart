@@ -1,0 +1,86 @@
+/// HTTP repository for the agent chat endpoints.
+///
+/// Sits next to [AgentRepository] (which handles the inbox-organization
+/// flow) so the FE-5 and FE-7 features can evolve independently while
+/// sharing the same [ApiClient] and exception mapping.
+///
+/// Endpoints consumed (see `backend/internal/agent/handler.go`):
+///   * `POST /api/v1/agent/chat`
+///   * `GET  /api/v1/agent/messages?session_id=<uuid>`
+///   * `DELETE /api/v1/agent/messages?session_id=<uuid>`
+library;
+
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:supanotes/core/api/api_client.dart';
+import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/di/providers.dart';
+
+import '../domain/message_model.dart';
+
+class ChatRepository {
+  ChatRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
+
+  final Dio _dio;
+
+  /// `POST /agent/chat` → returns the assistant reply body.
+  Future<String> sendMessage({
+    required String sessionId,
+    required String message,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/agent/chat',
+        data: <String, dynamic>{
+          'session_id': sessionId,
+          'message': message,
+        },
+      );
+      final data = response.data;
+      if (data == null || data['response'] is! String) {
+        throw const ServerException(
+          message: 'Resposta inválida do servidor',
+          statusCode: 500,
+        );
+      }
+      return data['response'] as String;
+    } on DioException catch (e) {
+      throw fromDioError(e);
+    }
+  }
+
+  /// `GET /agent/messages?session_id=<uuid>` → persisted history.
+  Future<List<MessageModel>> getHistory(String sessionId) async {
+    try {
+      final response = await _dio.get<List<dynamic>>(
+        '/agent/messages',
+        queryParameters: <String, dynamic>{'session_id': sessionId},
+      );
+      final data = response.data;
+      if (data == null) return const <MessageModel>[];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(MessageModel.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw fromDioError(e);
+    }
+  }
+
+  /// `DELETE /agent/messages?session_id=<uuid>` → wipe history.
+  Future<void> clearHistory(String sessionId) async {
+    try {
+      await _dio.delete<dynamic>(
+        '/agent/messages',
+        queryParameters: <String, dynamic>{'session_id': sessionId},
+      );
+    } on DioException catch (e) {
+      throw fromDioError(e);
+    }
+  }
+}
+
+final chatRepositoryProvider = Provider<ChatRepository>((ref) {
+  return ChatRepository(apiClient: ref.watch(apiClientProvider));
+});
