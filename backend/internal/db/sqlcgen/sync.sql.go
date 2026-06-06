@@ -181,6 +181,39 @@ func (q *Queries) GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]T
 	return items, nil
 }
 
+const hardDeleteExpiredContexts = `-- name: HardDeleteExpiredContexts :exec
+DELETE FROM contexts
+WHERE deleted_at IS NOT NULL
+  AND deleted_at < NOW() - INTERVAL '30 days'
+`
+
+func (q *Queries) HardDeleteExpiredContexts(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, hardDeleteExpiredContexts)
+	return err
+}
+
+const hardDeleteExpiredNotes = `-- name: HardDeleteExpiredNotes :exec
+DELETE FROM notes
+WHERE deleted_at IS NOT NULL
+  AND deleted_at < NOW() - INTERVAL '30 days'
+`
+
+func (q *Queries) HardDeleteExpiredNotes(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, hardDeleteExpiredNotes)
+	return err
+}
+
+const hardDeleteExpiredTasks = `-- name: HardDeleteExpiredTasks :exec
+DELETE FROM tasks
+WHERE deleted_at IS NOT NULL
+  AND deleted_at < NOW() - INTERVAL '30 days'
+`
+
+func (q *Queries) HardDeleteExpiredTasks(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, hardDeleteExpiredTasks)
+	return err
+}
+
 const upsertContext = `-- name: UpsertContext :one
 INSERT INTO contexts (id, user_id, slug, name, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, NOW())

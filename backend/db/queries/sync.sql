@@ -4,6 +4,21 @@ WHERE user_id = $1 AND updated_at > sqlc.arg('last_synced_at')
 ORDER BY updated_at ASC
 LIMIT sqlc.arg('limit');
 
+-- name: HardDeleteExpiredNotes :exec
+DELETE FROM notes
+WHERE deleted_at IS NOT NULL
+  AND deleted_at < NOW() - INTERVAL '30 days';
+
+-- name: HardDeleteExpiredTasks :exec
+DELETE FROM tasks
+WHERE deleted_at IS NOT NULL
+  AND deleted_at < NOW() - INTERVAL '30 days';
+
+-- name: HardDeleteExpiredContexts :exec
+DELETE FROM contexts
+WHERE deleted_at IS NOT NULL
+  AND deleted_at < NOW() - INTERVAL '30 days';
+
 -- name: UpsertNote :one
 INSERT INTO notes (id, user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status, created_at, updated_at, deleted_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)

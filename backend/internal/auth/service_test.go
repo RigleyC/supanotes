@@ -579,3 +579,19 @@ func (m *mockQuerier) GetSyncTags(ctx context.Context, arg sqlcgen.GetSyncTagsPa
 func (m *mockQuerier) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {
 	return sqlcgen.Tag{}, nil
 }
+
+func (m *mockQuerier) ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.DeviceToken, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) HardDeleteExpiredNotes(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockQuerier) HardDeleteExpiredTasks(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockQuerier) HardDeleteExpiredContexts(ctx context.Context) error {
+	return nil
+}
