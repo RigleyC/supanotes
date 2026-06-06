@@ -2,7 +2,6 @@ package search
 
 import (
 	"context"
-	"sort"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -100,9 +99,6 @@ func (s *Service) searchSemantic(ctx context.Context, userID pgtype.UUID, query 
 			Score:     r.Score,
 		})
 	}
-	return res, nil
-}
-
 	return res, nil
 }
 

@@ -56,3 +56,17 @@ SET slug = EXCLUDED.slug,
     updated_at = NOW()
 WHERE contexts.user_id = EXCLUDED.user_id
 RETURNING *;
+
+-- name: GetSyncTags :many
+SELECT * FROM tags
+WHERE user_id = $1
+ORDER BY created_at ASC
+LIMIT sqlc.arg('limit');
+
+-- name: UpsertTag :one
+INSERT INTO tags (id, user_id, name, created_at)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name
+WHERE tags.user_id = EXCLUDED.user_id
+RETURNING *;

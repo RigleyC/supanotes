@@ -6,6 +6,8 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
+
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type RegisterRequest struct {
@@ -73,7 +75,7 @@ func (h *Handler) Register(c echo.Context) error {
 
 	return c.JSON(http.StatusCreated, AuthResponse{
 		User: &UserResponse{
-			ID:    UUIDToString(user.ID),
+			ID:    uid.UUIDToString(user.ID),
 			Email: user.Email,
 			Name:  user.Name,
 		},
@@ -102,7 +104,7 @@ func (h *Handler) Login(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, AuthResponse{
 		User: &UserResponse{
-			ID:    UUIDToString(user.ID),
+			ID:    uid.UUIDToString(user.ID),
 			Email: user.Email,
 			Name:  user.Name,
 		},

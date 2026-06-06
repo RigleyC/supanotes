@@ -29,10 +29,10 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		soul        sqlcgen.Soul
 		recentMsgs  []sqlcgen.Message
 		todayTasks  []sqlcgen.Task
-		recentNotes []sqlcgen.GetRecentNotesRow
-		semNotes    []sqlcgen.Note
+		recentNotes []sqlcgen.Note
+		semNotes    []sqlcgen.SearchNotesByEmbeddingRow
 		linkedNotes []sqlcgen.Note
-		semMemories []sqlcgen.Memory
+		semMemories []sqlcgen.SearchMemoriesByEmbeddingRow
 	)
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -200,7 +200,7 @@ func (cb *ContextBuilder) BuildForRoutine(ctx context.Context, userID pgtype.UUI
 	var (
 		soul        sqlcgen.Soul
 		todayTasks  []sqlcgen.Task
-		recentNotes []sqlcgen.GetRecentNotesRow
+		recentNotes []sqlcgen.Note
 	)
 
 	g, gCtx := errgroup.WithContext(ctx)
