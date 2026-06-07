@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -51,7 +52,7 @@ func OptUUID(s *string) (*pgtype.UUID, error) {
 	}
 	parsed, err := uid.UUIDFromString(*s)
 	if err != nil {
-		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid uuid")
+		return nil, fmt.Errorf("invalid uuid: %w", err)
 	}
 	return &parsed, nil
 }

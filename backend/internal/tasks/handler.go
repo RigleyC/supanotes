@@ -92,7 +92,7 @@ func (h *Handler) List(c echo.Context) error {
 	if str := c.QueryParam("note_id"); str != "" {
 		noteID, err = web.OptUUID(&str)
 		if err != nil {
-			return err
+			return web.JSONError(c, http.StatusBadRequest, "invalid note_id")
 		}
 	}
 

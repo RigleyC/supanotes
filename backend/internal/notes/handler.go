@@ -69,7 +69,7 @@ func (h *Handler) Create(c echo.Context) error {
 	if req.ContextID != nil {
 		ctxID, err = web.OptUUID(req.ContextID)
 		if err != nil {
-			return err
+			return web.JSONError(c, http.StatusBadRequest, "invalid context_id")
 		}
 	}
 
@@ -92,7 +92,7 @@ func (h *Handler) List(c echo.Context) error {
 	if ctxStr := c.QueryParam("context_id"); ctxStr != "" {
 		ctxID, err = web.OptUUID(&ctxStr)
 		if err != nil {
-			return err
+			return web.JSONError(c, http.StatusBadRequest, "invalid context_id")
 		}
 	}
 
@@ -169,7 +169,7 @@ func (h *Handler) Update(c echo.Context) error {
 	if req.ContextID != nil {
 		ctxID, err = web.OptUUID(req.ContextID)
 		if err != nil {
-			return err
+			return web.JSONError(c, http.StatusBadRequest, "invalid context_id")
 		}
 	}
 
