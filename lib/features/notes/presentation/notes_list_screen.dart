@@ -4,20 +4,15 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/sync_service.dart';
-import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/presentation/controllers/notes_list_controller.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_card.dart';
+import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/widgets/app_status_chip.dart';
+import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
-
-final notesListProvider = StreamProvider<List<NoteModel>>((ref) {
-  final repo = ref.watch(notesRepositoryProvider);
-  return repo.watchNotes();
-});
-
-final inboxProvider = StreamProvider<NoteModel?>((ref) {
-  final repo = ref.watch(notesRepositoryProvider);
-  return repo.watchInbox();
-});
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
@@ -27,14 +22,10 @@ class NotesListScreen extends ConsumerStatefulWidget {
 }
 
 class _NotesListScreenState extends ConsumerState<NotesListScreen> {
-  bool _favoritesOnly = false;
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final notesAsync = ref.watch(notesListProvider);
-    final inboxAsync = ref.watch(inboxProvider);
+    final notesAsync = ref.watch(notesListControllerProvider);
 
     return Scaffold(
       backgroundColor: scheme.surface,
@@ -67,11 +58,11 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(syncServiceProvider).sync(),
         child: notesAsync.when(
-          data: (notes) {
-            final inbox = inboxAsync.asData?.value;
-            final visibleNotes = _favoritesOnly
-                ? notes.where((n) => n.favorite).toList()
-                : notes;
+          data: (state) {
+            final inbox = state.inbox;
+            final visibleNotes = state.favoritesOnly
+                ? state.notes.where((n) => n.favorite).toList()
+                : state.notes;
 
             if (inbox == null && visibleNotes.isEmpty) {
               return ListView(
@@ -103,35 +94,38 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                   visibleNotes.length,
               itemBuilder: (context, index) {
                 if (inbox != null && hasInboxContent && index == 0) {
-                  return _NoteRow(
-                    note: inbox,
-                    isInbox: true,
-                    textTheme: textTheme,
-                    scheme: scheme,
-                    onTap: () => context.push('/notes/${inbox.id}'),
-                    onDelete: () => _deleteNote(inbox.id),
-                    onToggleFavorite: () =>
-                        _toggleFavorite(inbox.id, inbox.favorite),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _NoteRow(
+                      note: inbox,
+                      isInbox: true,
+                      onTap: () => context.push('/notes/${inbox.id}'),
+                      onDelete: () => _deleteNote(inbox.id),
+                      onToggleFavorite: () =>
+                          ref.read(notesListControllerProvider.notifier)
+                              .toggleFavorite(inbox.id),
+                    ),
                   );
                 }
                 final noteIndex =
                     (inbox != null && hasInboxContent) ? index - 1 : index;
                 final note = visibleNotes[noteIndex];
-                return _NoteRow(
-                  note: note,
-                  textTheme: textTheme,
-                  scheme: scheme,
-                  onTap: () => context.push('/notes/${note.id}'),
-                  onDelete: () => _deleteNote(note.id),
-                  onToggleFavorite: () =>
-                      _toggleFavorite(note.id, note.favorite),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: _NoteRow(
+                    note: note,
+                    onTap: () => context.push('/notes/${note.id}'),
+                    onDelete: () => _deleteNote(note.id),
+                    onToggleFavorite: () =>
+                        ref.read(notesListControllerProvider.notifier)
+                            .toggleFavorite(note.id),
+                  ),
                 );
               },
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => EmptyState(
-            icon: Icons.error_outline,
+          error: (err, _) => AppErrorView(
             title: 'Erro ao carregar',
             subtitle: err.toString(),
           ),
@@ -149,25 +143,15 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   }
 
   Future<void> _createNote(BuildContext context) async {
-    final note = await ref.read(notesRepositoryProvider).createNote();
+    final note = await ref.read(notesListControllerProvider.notifier).createNote();
     if (!context.mounted) return;
     context.push('/notes/${note.id}');
   }
 
   Future<void> _deleteNote(String id) async {
-    await ref.read(notesRepositoryProvider).softDelete(id);
+    await ref.read(notesListControllerProvider.notifier).deleteNote(id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Nota deletada')),
-    );
-  }
-
-  Future<void> _toggleFavorite(String id, bool current) async {
-    try {
-      await ref
-          .read(notesRepositoryProvider)
-          .updateNote(id, favorite: !current);
-    } catch (_) {}
+    AppMessenger.showSuccess(context, 'Nota deletada');
   }
 
   Future<void> _showMoreMenu(BuildContext context) async {
@@ -187,7 +171,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       items: [
         CheckedPopupMenuItem<_MenuAction>(
           value: _MenuAction.favoritesOnly,
-          checked: _favoritesOnly,
+          checked: ref.read(notesListControllerProvider).value?.favoritesOnly ?? false,
           child: const Text('Apenas favoritos'),
         ),
         const PopupMenuItem<_MenuAction>(
@@ -213,7 +197,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     if (selection == null || !mounted) return;
     switch (selection) {
       case _MenuAction.favoritesOnly:
-        setState(() => _favoritesOnly = !_favoritesOnly);
+        ref.read(notesListControllerProvider.notifier).toggleFavoritesOnly();
       case _MenuAction.sync:
         await ref.read(syncServiceProvider).sync();
       case _MenuAction.logout:
@@ -230,8 +214,6 @@ class _NoteRow extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onToggleFavorite,
-    required this.textTheme,
-    required this.scheme,
     this.isInbox = false,
   });
 
@@ -240,8 +222,6 @@ class _NoteRow extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onToggleFavorite;
-  final TextTheme textTheme;
-  final ColorScheme scheme;
 
   String get _displayTitle {
     final trimmed = note.title?.trim();
@@ -251,18 +231,42 @@ class _NoteRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return AppCard(
       onTap: onTap,
       onLongPress: () => _showActions(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-        child: Text(
-          _displayTitle,
-          style: textTheme.titleMedium?.copyWith(
-            color: scheme.onSurface,
-            fontWeight: FontWeight.w500,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _displayTitle,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (note.favorite)
+                Padding(
+                  padding: const EdgeInsets.only(left: AppSpacing.sm),
+                  child: Icon(
+                    Icons.star,
+                    size: 18,
+                    color: scheme.tertiary,
+                  ),
+                ),
+            ],
           ),
-        ),
+          if (note.contextId != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            AppStatusChip(label: note.contextId!),
+          ],
+        ],
       ),
     );
   }
@@ -311,28 +315,16 @@ class _NoteRow extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context) {
-    showDialog<void>(
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showConfirmDialog(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Deletar nota'),
-          content: const Text('Tem certeza que deseja deletar esta nota?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                onDelete();
-              },
-              child: const Text('Deletar'),
-            ),
-          ],
-        );
-      },
+      title: 'Deletar nota',
+      message: 'Tem certeza que deseja deletar esta nota?',
+      confirmLabel: 'Deletar',
+      destructive: true,
     );
+    if (confirmed) {
+      onDelete();
+    }
   }
 }

@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
-import '../data/tasks_repository.dart';
-import '../domain/task_model.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/today_tasks_controller.dart';
+import 'package:supanotes/shared/widgets/empty_state.dart';
 import 'widgets/quick_task_fab.dart';
 import 'widgets/task_edit_sheet.dart';
 import 'widgets/task_tile.dart';
@@ -16,72 +17,80 @@ class TodayTasksScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final overdueAsync = ref.watch(overdueTasksStreamProvider);
-    final todayAsync = ref.watch(todayDueTasksStreamProvider);
-    final undatedAsync = ref.watch(undatedOpenTasksStreamProvider);
-
-    final overdue = overdueAsync.value ?? const <TaskModel>[];
-    final today = todayAsync.value ?? const <TaskModel>[];
-    final undated = undatedAsync.value ?? const <TaskModel>[];
-
-    final hasAnyData = overdueAsync.hasValue ||
-        todayAsync.hasValue ||
-        undatedAsync.hasValue;
-    final allEmpty = overdue.isEmpty && today.isEmpty && undated.isEmpty;
+    final tasksAsync = ref.watch(todayTasksControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hoje'),
       ),
       floatingActionButton: const QuickTaskFAB(),
-      body: hasAnyData && allEmpty
-          ? const _EmptyState()
-          : CustomScrollView(
-              slivers: [
-                if (overdue.isNotEmpty)
-                  _SectionSliver(
-                    title: 'Atrasadas',
-                    accent: AppColors.muted,
-                    badgeColor: Theme.of(context).colorScheme.error,
-                    count: overdue.length,
-                    children: [
-                      for (final t in overdue)
-                        Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: _TileHost(task: t),
-                        ),
-                    ],
-                  ),
-                if (today.isNotEmpty)
-                  _SectionSliver(
-                    title: 'Hoje',
-                    accent: AppColors.success,
-                    count: today.length,
-                    children: [
-                      for (final t in today)
-                        Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: _TileHost(task: t),
-                        ),
-                    ],
-                  ),
-                if (undated.isNotEmpty)
-                  _UndatedSectionSliver(
-                    count: undated.length,
-                    children: [
-                      for (final t in undated)
-                        Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: _TileHost(task: t),
-                        ),
-                    ],
-                  ),
-                const SliverToBoxAdapter(child: SizedBox(height: 96)),
-              ],
-            ),
+      body: tasksAsync.when(
+        data: (state) {
+          final overdue = state.overdue;
+          final today = state.today;
+          final undated = state.undated;
+          final allEmpty = overdue.isEmpty && today.isEmpty && undated.isEmpty;
+
+          if (allEmpty) {
+            return const EmptyState(
+              icon: Icons.celebration_outlined,
+              title: 'Nenhuma task para hoje',
+              subtitle: 'Aproveite o dia.',
+            );
+          }
+
+          return CustomScrollView(
+            slivers: [
+              if (overdue.isNotEmpty)
+                TaskSectionSliver(
+                  title: 'Atrasadas',
+                  accent: AppColors.muted,
+                  badgeColor: Theme.of(context).colorScheme.error,
+                  count: overdue.length,
+                  children: [
+                    for (final t in overdue)
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: _TileHost(task: t),
+                      ),
+                  ],
+                ),
+              if (today.isNotEmpty)
+                TaskSectionSliver(
+                  title: 'Hoje',
+                  accent: AppColors.success,
+                  count: today.length,
+                  children: [
+                    for (final t in today)
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: _TileHost(task: t),
+                      ),
+                  ],
+                ),
+              if (undated.isNotEmpty)
+                TaskSectionSliver(
+                  title: 'Sem data',
+                  count: undated.length,
+                  collapsible: true,
+                  children: [
+                    for (final t in undated)
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: _TileHost(task: t),
+                      ),
+                  ],
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 96)),
+            ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Erro: $err')),
+      ),
     );
   }
 }
@@ -92,31 +101,33 @@ class _TileHost extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(todayTasksControllerProvider.notifier);
     return TaskTile(
       task: task,
       onTap: () async {
         await TaskEditSheet.show(context, noteId: task.noteId, task: task);
       },
       onToggleComplete: (v) {
-        final repo = ref.read(tasksRepositoryProvider);
         if (v && !task.isCompleted) {
-          repo.completeTask(task.id);
+          controller.completeTask(task.id);
         } else if (!v && task.isCompleted) {
-          repo.reopenTask(task.id);
+          controller.reopenTask(task.id);
         }
       },
-      onDelete: () => ref.read(tasksRepositoryProvider).deleteTask(task.id),
+      onDelete: () => controller.deleteTask(task.id),
     );
   }
 }
 
-class _SectionSliver extends StatelessWidget {
-  const _SectionSliver({
+class TaskSectionSliver extends StatefulWidget {
+  const TaskSectionSliver({
+    super.key,
     required this.title,
     required this.children,
     this.count = 0,
     this.badgeColor,
     this.accent,
+    this.collapsible = false,
   });
 
   final String title;
@@ -124,85 +135,28 @@ class _SectionSliver extends StatelessWidget {
   final int count;
   final Color? badgeColor;
   final Color? accent;
+  final bool collapsible;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.sm,
-      ),
-      sliver: SliverList.list(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: Row(
-              children: [
-                if (badgeColor != null) ...[
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: badgeColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                ],
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: accent ?? theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (accent ?? theme.colorScheme.onSurface)
-                        .withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: accent ?? theme.colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ...children,
-        ],
-      ),
-    );
-  }
+  State<TaskSectionSliver> createState() => _TaskSectionSliverState();
 }
 
-class _UndatedSectionSliver extends StatefulWidget {
-  const _UndatedSectionSliver({required this.children, required this.count});
-  final List<Widget> children;
-  final int count;
-
-  @override
-  State<_UndatedSectionSliver> createState() => _UndatedSectionSliverState();
-}
-
-class _UndatedSectionSliverState extends State<_UndatedSectionSliver> {
+class _TaskSectionSliverState extends State<TaskSectionSliver> {
   bool _expanded = false;
 
   @override
+  void initState() {
+    super.initState();
+    _expanded = !widget.collapsible;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onSurface = widget.accent ?? theme.colorScheme.onSurface;
+    final onSurfaceVariant = theme.colorScheme.onSurfaceVariant;
+    final isCollapsible = widget.collapsible;
+
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -212,23 +166,69 @@ class _UndatedSectionSliverState extends State<_UndatedSectionSliver> {
       ),
       sliver: SliverList.list(
         children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          if (isCollapsible)
+            InkWell(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Row(
+                  children: [
+                    Icon(
+                      _expanded ? Icons.expand_more : Icons.chevron_right,
+                      size: 20,
+                      color: onSurfaceVariant,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      widget.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: onSurfaceVariant.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${widget.count}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Row(
                 children: [
-                  Icon(
-                    _expanded ? Icons.expand_more : Icons.chevron_right,
-                    size: 20,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
+                  if (widget.badgeColor != null) ...[
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: widget.badgeColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                  ],
                   Text(
-                    'Sem data',
+                    widget.title,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: onSurface,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -239,14 +239,13 @@ class _UndatedSectionSliverState extends State<_UndatedSectionSliver> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.08),
+                      color: onSurface.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       '${widget.count}',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: onSurface,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -254,56 +253,9 @@ class _UndatedSectionSliverState extends State<_UndatedSectionSliver> {
                 ],
               ),
             ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            child: _expanded
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: widget.children,
-                  )
-                : const SizedBox.shrink(),
-          ),
+          if (!isCollapsible || _expanded)
+            ...widget.children,
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.celebration_outlined,
-              size: 72,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Nenhuma task para hoje 🎉',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Aproveite o dia.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

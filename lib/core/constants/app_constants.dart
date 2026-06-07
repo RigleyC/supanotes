@@ -17,4 +17,7 @@ class AppConstants {
   /// Maximum number of consecutive tool calls the agent can issue before the
   /// loop is halted server-side.
   static const int maxToolIterations = 5;
+
+  /// Maximum characters for the note excerpt preview shown in note cards.
+  static const int noteExcerptMaxLength = 120;
 }

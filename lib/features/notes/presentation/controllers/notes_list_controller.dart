@@ -40,7 +40,9 @@ class NotesListController extends AsyncNotifier<NotesListState> {
   }
 
   void toggleFavoritesOnly() {
-    // Will be implemented when notes_list_screen is refactored
+    state = AsyncValue.data(
+      state.value!.copyWith(favoritesOnly: !state.value!.favoritesOnly),
+    );
   }
 
   Future<void> toggleFavorite(String noteId) async {
@@ -53,10 +55,11 @@ class NotesListController extends AsyncNotifier<NotesListState> {
     state = AsyncValue.data(state.value!.copyWith(notes: notes));
   }
 
-  Future<void> createNote() async {
+  Future<NoteModel> createNote() async {
     final repo = ref.read(notesRepositoryProvider);
-    await repo.createNote();
+    final note = await repo.createNote();
     final notes = await repo.watchNotes().first;
     state = AsyncValue.data(state.value!.copyWith(notes: notes));
+    return note;
   }
 }

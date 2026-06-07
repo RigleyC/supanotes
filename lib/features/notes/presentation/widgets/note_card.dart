@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/theme/app_spacing.dart';
+import '../../../../shared/widgets/app_card.dart';
+import '../../../../shared/widgets/app_status_chip.dart';
+import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../domain/note_model.dart';
 
 /// Card representation of a single [NoteModel] in the notes list.
@@ -38,8 +42,8 @@ class NoteCard extends StatelessWidget {
     }
     if (note.content.isEmpty) return null;
     final flat = note.content.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (flat.length <= 120) return flat;
-    return '${flat.substring(0, 120)}…';
+    if (flat.length <= AppConstants.noteExcerptMaxLength) return flat;
+    return '${flat.substring(0, AppConstants.noteExcerptMaxLength)}…';
   }
 
   @override
@@ -51,70 +55,56 @@ class NoteCard extends StatelessWidget {
         : _fallbackTitle;
     final excerpt = _resolveExcerpt(note);
 
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: () => _showActions(context),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.md,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppCard(
+      onTap: onTap,
+      onLongPress: () => _showActions(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Hero(
-                      tag: titleHeroTag(note.id),
-                      child: Material(
-                        type: MaterialType.transparency,
-                        child: Text(
-                          title,
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: scheme.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+              Expanded(
+                child: Hero(
+                  tag: titleHeroTag(note.id),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: Text(
+                      title,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (note.favorite)
-                    Padding(
-                      padding: const EdgeInsets.only(left: AppSpacing.sm),
-                      child: Icon(
-                        Icons.star,
-                        size: 18,
-                        color: scheme.tertiary,
-                      ),
-                    ),
-                ],
-              ),
-              if (excerpt != null && excerpt.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  excerpt,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-              const SizedBox(height: AppSpacing.sm),
-              _Footer(note: note),
+              ),
+              if (note.favorite)
+                Padding(
+                  padding: const EdgeInsets.only(left: AppSpacing.sm),
+                  child: Icon(
+                    Icons.star,
+                    size: 18,
+                    color: scheme.tertiary,
+                  ),
+                ),
             ],
           ),
-        ),
+          if (excerpt != null && excerpt.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              excerpt,
+              style: textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          _Footer(note: note),
+        ],
       ),
     );
   }
@@ -172,43 +162,12 @@ class _Footer extends StatelessWidget {
     return Row(
       children: [
         if (note.contextId != null) ...[
-          _ContextChip(label: note.contextId!),
+          AppStatusChip(label: note.contextId!),
           const SizedBox(width: AppSpacing.sm),
         ],
         const Spacer(),
         Text(timeago.format(note.updatedAt, locale: 'pt_BR'), style: muted),
       ],
-    );
-  }
-}
-
-class _ContextChip extends StatelessWidget {
-  const _ContextChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
-      ),
-      child: Text(
-        label,
-        style: textTheme.labelSmall?.copyWith(
-          color: scheme.onSecondaryContainer,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
     );
   }
 }
@@ -244,26 +203,14 @@ class DismissibleDeleteWrapper extends StatelessWidget {
         ),
       ),
       confirmDismiss: (_) async {
-        final confirmed = await showDialog<bool>(
+        final confirmed = await showConfirmDialog(
           context: context,
-          builder: (dialogContext) {
-            return AlertDialog(
-              title: const Text('Apagar nota?'),
-              content: const Text('Esta ação pode ser revertida na sincronização.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(true),
-                  child: const Text('Apagar'),
-                ),
-              ],
-            );
-          },
+          title: 'Apagar nota?',
+          message: 'Esta ação pode ser revertida na sincronização.',
+          confirmLabel: 'Apagar',
+          destructive: true,
         );
-        if (confirmed == true) {
+        if (confirmed) {
           await onDelete();
           return true;
         }
