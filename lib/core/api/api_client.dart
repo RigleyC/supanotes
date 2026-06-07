@@ -22,6 +22,13 @@ import 'package:supanotes/core/constants/api_constants.dart';
 class ApiClient {
   final Dio _dio;
 
+  /// Direct access to the underlying [Dio] instance.
+  ///
+  /// This is exposed for repositories that need fine-grained control over
+  /// HTTP options (e.g. custom CancelToken, streaming responses). Prefer
+  /// using the proxy methods ([get], [post], et al.) when possible.
+  Dio get dio => _dio;
+
   ApiClient({required AuthInterceptor authInterceptor})
       : _dio = _build(authInterceptor);
 
