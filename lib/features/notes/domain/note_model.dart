@@ -35,6 +35,33 @@ class NoteModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  NoteModel copyWith({
+    String? id,
+    String? userId,
+    String? title,
+    String? excerpt,
+    String? content,
+    bool? isInbox,
+    bool? favorite,
+    bool? archived,
+    String? contextId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) =>
+      NoteModel(
+        id: id ?? this.id,
+        userId: userId ?? this.userId,
+        title: title ?? this.title,
+        excerpt: excerpt ?? this.excerpt,
+        content: content ?? this.content,
+        isInbox: isInbox ?? this.isInbox,
+        favorite: favorite ?? this.favorite,
+        archived: archived ?? this.archived,
+        contextId: contextId ?? this.contextId,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+
   /// Builds a presentation-layer [NoteModel] from a Drift row. Centralised
   /// here so the rest of the app never has to know about [NoteData].
   factory NoteModel.fromData(NoteData d) {

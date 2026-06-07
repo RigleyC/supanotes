@@ -6,32 +6,26 @@
 /// title and an "Organizar" affordance that hands the content off to the
 /// agent — see `inbox_organize_sheet.dart` for that flow.
 ///
-/// The Markdown <-> `MutableDocument` round-trip is delegated to
-/// [parseMarkdownToDocument] / [serializeDocumentToMarkdown] in
-/// `data/markdown_serializer.dart`; the only thing this file owns is
-/// `super_editor` wiring, the debounced auto-save, and the task-table
-/// sync. Anything that needs to read or mutate the inbox row goes
-/// through [NotesLocalRepository].
+/// The markdown <-> `MutableDocument` round-trip is delegated to
+/// `data/markdown_serializer.dart`; persistence (auto-save with debounce,
+/// task sync) is managed by [InboxController].
 library;
 
-import 'dart:async';
-
-import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:super_editor/super_editor.dart'
     hide serializeDocumentToMarkdown;
 
-import 'package:supanotes/core/constants/app_constants.dart';
-import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
+import 'package:supanotes/features/notes/presentation/controllers/inbox_controller.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/save_indicator.dart';
-import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key});
@@ -46,125 +40,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   MutableDocumentComposer? _composer;
   FocusNode? _focusNode;
   String? _inboxId;
-  bool _hasContent = false;
-  Timer? _debounceTimer;
-  SaveState _saveState = SaveState.idle;
 
   @override
   void initState() {
     super.initState();
-    _loadInbox();
-  }
-
-  Future<void> _loadInbox() async {
-    final note =
-        await ref.read(notesLocalRepositoryProvider).getOrCreateInboxNote();
-    if (!mounted) return;
-    _inboxId = note.id;
-    _document = parseMarkdownToDocument(note.content);
-    _composer = MutableDocumentComposer();
-    _editor = createDefaultDocumentEditor(
-      document: _document!,
-      composer: _composer!,
-    );
-    _focusNode = FocusNode();
-    _hasContent = note.content.trim().isNotEmpty;
-    _document!.addListener(_onDocumentChanged);
-    setState(() {});
-  }
-
-  void _onDocumentChanged(DocumentChangeLog _) {
-    if (!mounted) return;
-    final doc = _document;
-    if (doc == null) return;
-    final hasContent = doc
-        .toList()
-        .whereType<TextNode>()
-        .any((n) => n.text.toPlainText().trim().isNotEmpty);
-    if (hasContent != _hasContent) {
-      setState(() => _hasContent = hasContent);
-    }
-    _setSaveState(SaveState.saving);
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(
-      const Duration(milliseconds: AppConstants.autoSaveDebounceMs),
-      _flushSave,
-    );
-  }
-
-  Future<void> _flushSave() async {
-    final doc = _document;
-    final id = _inboxId;
-    if (doc == null || id == null) return;
-    final markdown = serializeDocumentToMarkdown(doc);
-    try {
-      await _syncTasks(doc, id);
-      await ref
-          .read(notesLocalRepositoryProvider)
-          .updateNoteContent(id, markdown);
-      _setSaveState(SaveState.saved);
-    } catch (_) {
-      _setSaveState(SaveState.error);
-    }
-  }
-
-  Future<void> _syncTasks(MutableDocument doc, String noteId) async {
-    final tasksRepo = ref.read(tasksLocalRepositoryProvider);
-    final currentTasks = await tasksRepo.watchNoteTasks(noteId).first;
-    final currentIds = currentTasks.map((t) => t.id).toSet();
-    final docIds = <String>{};
-    for (final node in doc) {
-      if (node is TaskNode) {
-        final text = node.text.toPlainText();
-        docIds.add(node.id);
-        if (currentIds.contains(node.id)) {
-          await tasksRepo.updateTask(TasksCompanion(
-            id: drift.Value(node.id),
-            title: drift.Value(text),
-            status: drift.Value(node.isComplete ? 'completed' : 'pending'),
-          ));
-        } else {
-          await tasksRepo.createTask(
-            id: node.id,
-            noteId: noteId,
-            title: text,
-            position: 0,
-            status: node.isComplete ? 'completed' : 'pending',
-          );
-        }
-      }
-    }
-    final removed = currentIds.difference(docIds);
-    for (final id in removed) {
-      await tasksRepo.deleteTask(id);
-    }
-  }
-
-  Future<void> _onOrganizePressed() async {
-    try {
-      final applied = await showInboxOrganizeSheet(context);
-      if (!mounted) return;
-      if (applied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Rascunho organizado')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao organizar: $e')),
-      );
-    }
-  }
-
-  void _setSaveState(SaveState state) {
-    if (!mounted) return;
-    setState(() => _saveState = state);
+    ref.read(inboxControllerProvider.notifier).loadOrCreateInbox();
   }
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
     _document?.removeListener(_onDocumentChanged);
     _document?.dispose();
     _composer?.dispose();
@@ -172,21 +56,67 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     super.dispose();
   }
 
-  Future<void> _saveAndPop() async {
-    _debounceTimer?.cancel();
+  void _onDocumentChanged(DocumentChangeLog _) {
     final doc = _document;
     final id = _inboxId;
-    if (doc != null && id != null) {
-      await _flushSave();
+    if (doc == null || id == null) return;
+    final markdown = serializeDocumentToMarkdown(doc);
+    final tasks = _extractTasks(doc);
+    ref
+        .read(inboxControllerProvider.notifier)
+        .autoSave(id, markdown, tasks);
+  }
+
+  List<TaskEntry> _extractTasks(MutableDocument doc) {
+    final tasks = <TaskEntry>[];
+    for (final node in doc) {
+      if (node is TaskNode) {
+        tasks.add(TaskEntry(
+          id: node.id,
+          text: node.text.toPlainText(),
+          isComplete: node.isComplete,
+        ));
+      }
+    }
+    return tasks;
+  }
+
+  Future<void> _onOrganizePressed() async {
+    try {
+      final applied = await showAppBottomSheet<bool>(
+        context: context,
+        builder: (_) => const InboxOrganizeSheet(),
+      );
+      if (!mounted) return;
+      if (applied == true) {
+        AppMessenger.showSuccess(context, 'Rascunho organizado');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppMessenger.showError(context, 'Erro ao organizar: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final doc = _document;
-    final editor = _editor;
-    final composer = _composer;
-    if (doc == null || editor == null || composer == null) {
+    final state = ref.watch(inboxControllerProvider);
+    final inbox = state.asData?.value.inboxNote;
+    final saveState = state.asData?.value.saveState ?? SaveState.idle;
+    final hasContent = state.asData?.value.hasContent ?? false;
+
+    if (inbox != null && _document == null) {
+      _inboxId = inbox.id;
+      _document = parseMarkdownToDocument(inbox.content);
+      _composer = MutableDocumentComposer();
+      _editor = createDefaultDocumentEditor(
+        document: _document!,
+        composer: _composer!,
+      );
+      _focusNode = FocusNode();
+      _document!.addListener(_onDocumentChanged);
+    }
+
+    if (_document == null || _editor == null || _composer == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -194,39 +124,50 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        _saveAndPop().then((_) {
-          if (context.mounted) {
-            context.pop();
-          }
-        });
+        _saveAndPop();
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Rascunho'),
-        actions: [
-          SaveIndicator(state: _saveState),
-          if (_hasContent)
-            TextButton(
-              onPressed: _onOrganizePressed,
-              child: const Text('Organizar'),
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          NoteToolbar(editor: editor, composer: composer),
-          Expanded(
-            child: SuperEditor(
-              editor: editor,
-              focusNode: _focusNode,
-              stylesheet: defaultStylesheet.copyWith(
-                documentPadding: const EdgeInsets.all(AppSpacing.md),
+        appBar: AppBar(
+          title: const Text('Rascunho'),
+          actions: [
+            SaveIndicator(state: saveState),
+            if (hasContent)
+              TextButton(
+                onPressed: _onOrganizePressed,
+                child: const Text('Organizar'),
+              ),
+          ],
+        ),
+        body: Column(
+          children: [
+            NoteToolbar(editor: _editor!, composer: _composer!),
+            Expanded(
+              child: SuperEditor(
+                editor: _editor!,
+                focusNode: _focusNode,
+                stylesheet: defaultStylesheet.copyWith(
+                  documentPadding: const EdgeInsets.all(AppSpacing.md),
+                ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _saveAndPop() async {
+    final doc = _document;
+    final id = _inboxId;
+    if (doc != null && id != null) {
+      final markdown = serializeDocumentToMarkdown(doc);
+      final tasks = _extractTasks(doc);
+      await ref
+          .read(inboxControllerProvider.notifier)
+          .flushSave(id, markdown, tasks);
+    }
+    if (mounted) {
+      context.pop();
+    }
   }
 }

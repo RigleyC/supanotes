@@ -9,11 +9,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
-
-enum SaveState { idle, saving, saved, error }
 
 class SaveIndicator extends StatefulWidget {
   const SaveIndicator({super.key, required this.state});
