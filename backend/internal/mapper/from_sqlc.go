@@ -165,6 +165,31 @@ func SyncTagFromSQLC(t sqlcgen.Tag) dto.SyncTag {
 	}
 }
 
+func SettingsFromSQLC(s sqlcgen.UserSetting) dto.SettingsResponse {
+	return dto.SettingsResponse{
+		Timezone:  s.Timezone,
+		CreatedAt: Time(s.CreatedAt),
+		UpdatedAt: Time(s.UpdatedAt),
+	}
+}
+
+func SoulFromSQLC(s sqlcgen.Soul) dto.SoulResponse {
+	return dto.SoulResponse{
+		Personality: s.Personality,
+		CreatedAt:   Time(s.CreatedAt),
+		UpdatedAt:   Time(s.UpdatedAt),
+	}
+}
+
+func DeviceTokenFromSQLC(t sqlcgen.DeviceToken) dto.DeviceTokenResponse {
+	return dto.DeviceTokenResponse{
+		ID:        UUID(t.ID),
+		Token:     t.Token,
+		Platform:  t.Platform,
+		CreatedAt: Time(t.CreatedAt),
+	}
+}
+
 func SyncTaskCompletionFromSQLC(tc sqlcgen.TaskCompletion) dto.SyncTaskCompletion {
 	return dto.SyncTaskCompletion{
 		ID:          UUID(tc.ID),

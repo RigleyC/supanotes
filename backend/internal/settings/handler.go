@@ -1,32 +1,24 @@
 package settings
 
 import (
+	"errors"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
 )
-
-type SettingsResponse struct {
-	Timezone  string `json:"timezone"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-}
 
 type UpdateSettingsRequest struct {
 	Timezone string `json:"timezone" validate:"required"`
 }
 
 type Handler struct {
-	q sqlcgen.Querier
+	svc *Service
 }
 
-func NewHandler(q sqlcgen.Querier) *Handler {
-	return &Handler{q: q}
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) Get(c echo.Context) error {
@@ -35,13 +27,16 @@ func (h *Handler) Get(c echo.Context) error {
 		return err
 	}
 
-	settings, err := h.q.GetUserSettings(c.Request().Context(), userID)
+	settings, err := h.svc.Get(c.Request().Context(), userID)
 	if err != nil {
+		if errors.Is(err, ErrSettingsNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "settings not found")
+		}
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get settings")
 	}
 
-	return c.JSON(http.StatusOK, toResponse(settings))
+	return c.JSON(http.StatusOK, settings)
 }
 
 func (h *Handler) Update(c echo.Context) error {
@@ -55,27 +50,14 @@ func (h *Handler) Update(c echo.Context) error {
 		return err
 	}
 
-	tz := strings.TrimSpace(req.Timezone)
-	if _, err := time.LoadLocation(tz); err != nil {
-		return web.JSONError(c, http.StatusBadRequest, "invalid timezone")
-	}
-
-	settings, err := h.q.UpdateUserSettings(c.Request().Context(), sqlcgen.UpdateUserSettingsParams{
-		UserID:   userID,
-		Timezone: tz,
-	})
+	settings, err := h.svc.Update(c.Request().Context(), userID, req.Timezone)
 	if err != nil {
+		if errors.Is(err, ErrInvalidTimezone) {
+			return web.JSONError(c, http.StatusBadRequest, "invalid timezone")
+		}
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to update settings")
 	}
 
-	return c.JSON(http.StatusOK, toResponse(settings))
-}
-
-func toResponse(s sqlcgen.UserSetting) SettingsResponse {
-	return SettingsResponse{
-		Timezone:  s.Timezone,
-		CreatedAt: s.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt: s.UpdatedAt.Time.Format(time.RFC3339),
-	}
+	return c.JSON(http.StatusOK, settings)
 }

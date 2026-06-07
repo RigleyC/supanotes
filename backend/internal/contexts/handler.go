@@ -1,13 +1,13 @@
 package contexts
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/auth"
-	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type CreateContextRequest struct {
@@ -15,20 +15,27 @@ type CreateContextRequest struct {
 	Name string `json:"name" validate:"required,min=1,max=100"`
 }
 
-type ContextResponse struct {
-	ID        string `json:"id"`
-	Slug      string `json:"slug"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-}
-
 type Handler struct {
-	q sqlcgen.Querier
+	svc *Service
 }
 
-func NewHandler(q sqlcgen.Querier) *Handler {
-	return &Handler{q: q}
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
+}
+
+func (h *Handler) List(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	ctxs, err := h.svc.List(c.Request().Context(), userID)
+	if err != nil {
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get contexts")
+	}
+
+	return c.JSON(http.StatusOK, ctxs)
 }
 
 func (h *Handler) Create(c echo.Context) error {
@@ -42,49 +49,13 @@ func (h *Handler) Create(c echo.Context) error {
 		return err
 	}
 
-	ctxResult, err := h.q.CreateContext(c.Request().Context(), sqlcgen.CreateContextParams{
-		UserID: userID,
-		Slug:   req.Slug,
-		Name:   req.Name,
-	})
+	ctxResult, err := h.svc.Create(c.Request().Context(), userID, req.Slug, req.Name)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create context")
 	}
 
-	return c.JSON(http.StatusCreated, ContextResponse{
-		ID:        auth.UUIDToString(ctxResult.ID),
-		Slug:      ctxResult.Slug,
-		Name:      ctxResult.Name,
-		CreatedAt: ctxResult.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: ctxResult.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-	})
-}
-
-func (h *Handler) List(c echo.Context) error {
-	userID, err := web.UserID(c)
-	if err != nil {
-		return err
-	}
-
-	ctxs, err := h.q.GetContexts(c.Request().Context(), userID)
-	if err != nil {
-		c.Logger().Error(err)
-		return web.JSONError(c, http.StatusInternalServerError, "failed to get contexts")
-	}
-
-	res := make([]ContextResponse, 0, len(ctxs))
-	for _, ctxResult := range ctxs {
-		res = append(res, ContextResponse{
-			ID:        auth.UUIDToString(ctxResult.ID),
-			Slug:      ctxResult.Slug,
-			Name:      ctxResult.Name,
-			CreatedAt: ctxResult.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt: ctxResult.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		})
-	}
-
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusCreated, ctxResult)
 }
 
 func (h *Handler) Delete(c echo.Context) error {
@@ -93,16 +64,16 @@ func (h *Handler) Delete(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
-	err = h.q.DeleteContext(c.Request().Context(), sqlcgen.DeleteContextParams{
-		ID:     id,
-		UserID: userID,
-	})
+	err = h.svc.Delete(c.Request().Context(), userID, id)
 	if err != nil {
+		if errors.Is(err, ErrContextHasNotes) {
+			return web.JSONError(c, http.StatusConflict, "cannot delete context with linked notes")
+		}
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to delete context")
 	}

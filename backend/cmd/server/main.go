@@ -162,13 +162,15 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	protected.Use(auth.JWT(cfg))
 
 	// Contexts
-	ctxH := contexts.NewHandler(queries)
+	ctxSvc := contexts.NewService(queries)
+	ctxH := contexts.NewHandler(ctxSvc)
 	protected.GET("/contexts", ctxH.List)
 	protected.POST("/contexts", ctxH.Create)
 	protected.DELETE("/contexts/:id", ctxH.Delete)
 
 	// Tags
-	tagsH := tags.NewHandler(queries)
+	tagsSvc := tags.NewService(queries)
+	tagsH := tags.NewHandler(tagsSvc)
 	protected.GET("/tags", tagsH.List)
 	protected.POST("/tags", tagsH.Create)
 
@@ -204,7 +206,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	cronJob.Start()
 
 	// Soul
-	soulH := soul.NewHandler(queries)
+	soulSvc := soul.NewService(queries)
+	soulH := soul.NewHandler(soulSvc)
 	protected.GET("/soul", soulH.Get)
 	protected.PUT("/soul", soulH.Update)
 
@@ -258,12 +261,14 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	routinesRunner.Start()
 
 	// Settings
-	settingsH := settings.NewHandler(queries)
+	settingsSvc := settings.NewService(queries)
+	settingsH := settings.NewHandler(settingsSvc)
 	protected.GET("/settings", settingsH.Get)
 	protected.PUT("/settings", settingsH.Update)
 
 	// Device tokens (FCM push registration)
-	notificationsH := notifications.NewHandler(queries)
+	notificationsSvc := notifications.NewService(queries)
+	notificationsH := notifications.NewHandler(notificationsSvc)
 	protected.POST("/device-tokens", notificationsH.RegisterToken)
 	protected.DELETE("/device-tokens/:id", notificationsH.DeleteToken)
 
