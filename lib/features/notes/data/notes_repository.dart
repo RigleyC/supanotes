@@ -13,7 +13,17 @@ import 'local/notes_local_repository.dart';
 /// Every mutation goes through here so the `isDirty` flag, the
 /// `updatedAt` timestamp, and the inbox singleton invariant are
 /// consistently maintained.
-class NotesRepository {
+abstract class INotesRepository {
+  Stream<List<NoteModel>> watchNotes({String? contextId, bool favoritesOnly = false});
+  Stream<NoteModel?> watchInbox();
+  Future<NoteModel> createNote({String? title, String content = '', String? contextId});
+  Future<void> updateNote(String id, {String? title, String? content, bool? favorite, bool? archived, String? contextId});
+  Future<void> toggleFavorite(String id);
+  Future<void> softDelete(String id);
+  Future<void> appendToInbox(String text);
+}
+
+class NotesRepository implements INotesRepository {
   NotesRepository(this._local);
 
   final NotesLocalRepository _local;
@@ -139,7 +149,7 @@ class NotesRepository {
 /// Riverpod entry point for the feature-level [NotesRepository]. Reads
 /// [notesLocalRepositoryProvider] which already gates on the signed-in
 /// user, so this provider is itself safe to read only when authenticated.
-final notesRepositoryProvider = Provider<NotesRepository>((ref) {
+final notesRepositoryProvider = Provider<INotesRepository>((ref) {
   final local = ref.watch(notesLocalRepositoryProvider);
   return NotesRepository(local);
 });

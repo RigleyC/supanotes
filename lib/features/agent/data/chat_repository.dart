@@ -19,7 +19,13 @@ import 'package:supanotes/core/di/providers.dart';
 
 import '../domain/message_model.dart';
 
-class ChatRepository {
+abstract class IChatRepository {
+  Future<String> sendMessage({required String sessionId, required String message});
+  Future<List<MessageModel>> getHistory(String sessionId);
+  Future<void> clearHistory(String sessionId);
+}
+
+class ChatRepository implements IChatRepository {
   ChatRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
@@ -81,6 +87,6 @@ class ChatRepository {
   }
 }
 
-final chatRepositoryProvider = Provider<ChatRepository>((ref) {
+final chatRepositoryProvider = Provider<IChatRepository>((ref) {
   return ChatRepository(apiClient: ref.watch(apiClientProvider));
 });

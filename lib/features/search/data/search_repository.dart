@@ -21,7 +21,13 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/search/domain/search_result_model.dart';
 
-class SearchRepository {
+abstract class ISearchRepository {
+  static const int defaultLimit = 10;
+
+  Future<List<SearchResultModel>> search({required String query, SearchMode mode = SearchMode.hybrid, int limit = defaultLimit});
+}
+
+class SearchRepository implements ISearchRepository {
   SearchRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
@@ -68,6 +74,6 @@ class SearchRepository {
 
 /// Single shared [SearchRepository] wired to the app-wide
 /// [apiClientProvider].
-final searchRepositoryProvider = Provider<SearchRepository>((ref) {
+final searchRepositoryProvider = Provider<ISearchRepository>((ref) {
   return SearchRepository(apiClient: ref.watch(apiClientProvider));
 });

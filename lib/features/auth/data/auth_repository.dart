@@ -18,7 +18,14 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
-class AuthRepository {
+abstract class IAuthRepository {
+  Future<AuthResult> register({required String email, required String password, required String name});
+  Future<AuthResult> login({required String email, required String password});
+  Future<void> logout();
+  Future<bool> isAuthenticated();
+}
+
+class AuthRepository implements IAuthRepository {
   AuthRepository({
     required ApiClient apiClient,
     required AuthLocalStorage storage,

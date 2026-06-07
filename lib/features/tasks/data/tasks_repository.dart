@@ -12,7 +12,22 @@ import 'local/tasks_local_repository.dart';
 /// terms of [TaskModel] so widgets never have to import Drift types, and
 /// concentrates the date filtering (overdue / today / undated) that the
 /// "Hoje" screen needs into one place.
-class TasksRepository {
+abstract class ITasksRepository {
+  String get userId;
+  Stream<List<TaskModel>> watchTodayTasks();
+  Stream<List<TaskModel>> watchOverdueTasks();
+  Stream<List<TaskModel>> watchTodayDueTasks();
+  Stream<List<TaskModel>> watchUndatedOpenTasks();
+  Stream<List<TaskModel>> watchByNote(String noteId);
+  Future<TaskModel> createTask({required String noteId, required String title, DateTime? dueDate, String? recurrence, int position = 0});
+  Future<void> completeTask(String id);
+  Future<void> reopenTask(String id);
+  Future<void> updateTask(String id, {String? title, DateTime? dueDate, String? recurrence, int? position, bool clearDueDate = false, bool clearRecurrence = false});
+  Future<void> deleteTask(String id);
+  Future<void> reorderTasks(String noteId, List<String> orderedIds);
+}
+
+class TasksRepository implements ITasksRepository {
   TasksRepository(this._local);
 
   final TasksLocalRepository _local;
@@ -202,7 +217,7 @@ class TasksRepository {
 /// Riverpod entry point for the feature-level [TasksRepository]. Reads
 /// [tasksLocalRepositoryProvider] which already gates on the signed-in
 /// user, so this provider is itself safe to read only when authenticated.
-final tasksRepositoryProvider = Provider<TasksRepository>((ref) {
+final tasksRepositoryProvider = Provider<ITasksRepository>((ref) {
   final local = ref.watch(tasksLocalRepositoryProvider);
   return TasksRepository(local);
 });

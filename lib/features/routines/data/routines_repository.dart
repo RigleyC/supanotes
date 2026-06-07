@@ -18,7 +18,15 @@ import 'package:supanotes/core/di/providers.dart';
 import '../domain/routine_log_model.dart';
 import '../domain/routine_model.dart';
 
-class RoutinesRepository {
+abstract class IRoutinesRepository {
+  Future<List<RoutineModel>> getRoutines();
+  Future<List<RoutineLogModel>> getLogs();
+  Future<RoutineModel> updateRoutine(String id, {String? cronExpr, bool? enabled});
+  Future<String> testDaily();
+  Future<String> testWeekly();
+}
+
+class RoutinesRepository implements IRoutinesRepository {
   RoutinesRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
@@ -123,6 +131,6 @@ class RoutinesRepository {
 /// Single shared [RoutinesRepository] wired to the app-wide
 /// [apiClientProvider]. Reading this provider is the entry point used
 /// by every routines widget.
-final routinesRepositoryProvider = Provider<RoutinesRepository>((ref) {
+final routinesRepositoryProvider = Provider<IRoutinesRepository>((ref) {
   return RoutinesRepository(apiClient: ref.watch(apiClientProvider));
 });

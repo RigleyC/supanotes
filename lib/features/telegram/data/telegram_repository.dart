@@ -76,7 +76,13 @@ class TelegramLinkCode {
   }
 }
 
-class TelegramRepository {
+abstract class ITelegramRepository {
+  Future<TelegramLinkStatus> getLinkStatus();
+  Future<TelegramLinkCode> generateLinkCode();
+  Future<void> deleteLink();
+}
+
+class TelegramRepository implements ITelegramRepository {
   TelegramRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
@@ -134,6 +140,6 @@ class TelegramRepository {
 /// Single shared [TelegramRepository] wired to the app-wide
 /// [apiClientProvider]. Stateless and safe to read from any consumer
 /// that is authenticated.
-final telegramRepositoryProvider = Provider<TelegramRepository>((ref) {
+final telegramRepositoryProvider = Provider<ITelegramRepository>((ref) {
   return TelegramRepository(apiClient: ref.watch(apiClientProvider));
 });

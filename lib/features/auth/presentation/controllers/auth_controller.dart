@@ -23,7 +23,7 @@ import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
 class AuthController extends AsyncNotifier<AuthState> {
-  late final AuthRepository _repository;
+  late final IAuthRepository _repository;
   late final AuthLocalStorage _storage;
 
   @override

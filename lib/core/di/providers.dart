@@ -50,7 +50,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 // ---------------------------------------------------------------------------
 
 /// Single [AuthRepository] wired to the shared [apiClientProvider].
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
+final authRepositoryProvider = Provider<IAuthRepository>((ref) {
   return AuthRepository(
     apiClient: ref.watch(apiClientProvider),
     storage: ref.watch(authLocalStorageProvider),

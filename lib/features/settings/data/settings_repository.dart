@@ -37,7 +37,17 @@ class _SettingsRoutes {
   static String contextById(String id) => '/contexts/$id';
 }
 
-class SettingsRepository {
+abstract class ISettingsRepository {
+  Future<UserSettings> getSettings();
+  Future<UserSettings> updateSettings(String timezone);
+  Future<Soul> getSoul();
+  Future<Soul> updateSoul(String personality);
+  Future<List<UserContext>> getContexts();
+  Future<UserContext> createContext(String name);
+  Future<void> deleteContext(String id);
+}
+
+class SettingsRepository implements ISettingsRepository {
   SettingsRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
@@ -200,6 +210,6 @@ String slugifyContextName(String name) {
 
 /// Single shared [SettingsRepository] wired to the app-wide
 /// [apiClientProvider].
-final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
+final settingsRepositoryProvider = Provider<ISettingsRepository>((ref) {
   return SettingsRepository(apiClient: ref.watch(apiClientProvider));
 });
