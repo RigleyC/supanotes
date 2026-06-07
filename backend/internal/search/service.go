@@ -52,9 +52,9 @@ func (s *Service) searchFTS(ctx context.Context, userID pgtype.UUID, query strin
 		return nil, err
 	}
 
-	res := make([]SearchResult, 0, len(rows))
-	for _, r := range rows {
-		res = append(res, SearchResult{
+	res := make([]SearchResult, len(rows))
+	for i, r := range rows {
+		res[i] = SearchResult{
 			ID:        r.ID,
 			Title:     r.Title.String,
 			Content:   r.Content,
@@ -64,30 +64,24 @@ func (s *Service) searchFTS(ctx context.Context, userID pgtype.UUID, query strin
 			Favorite:  r.Favorite,
 			Archived:  r.Archived,
 			Score:     float64(r.Score),
-		})
+		}
 	}
 	return res, nil
 }
 
 func (s *Service) searchSemantic(ctx context.Context, userID pgtype.UUID, query string, limit int32) ([]SearchResult, error) {
-	// Stub: Em produção (Feature 5 LLM) geraríamos o embedding real da query via OpenAI
-	vec := make([]float32, 1536)
-	for i := range vec {
-		vec[i] = 0.01
-	}
-
 	rows, err := s.q.SearchNotesSemantic(ctx, sqlcgen.SearchNotesSemanticParams{
 		UserID:    userID,
-		Embedding: pgvector.NewVector(vec),
+		Embedding: mockEmbedding(),
 		Limit:     limit,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	res := make([]SearchResult, 0, len(rows))
-	for _, r := range rows {
-		res = append(res, SearchResult{
+	res := make([]SearchResult, len(rows))
+	for i, r := range rows {
+		res[i] = SearchResult{
 			ID:        r.ID,
 			Title:     r.Title.String,
 			Content:   r.Content,
@@ -97,23 +91,17 @@ func (s *Service) searchSemantic(ctx context.Context, userID pgtype.UUID, query 
 			Favorite:  r.Favorite,
 			Archived:  r.Archived,
 			Score:     r.Score,
-		})
+		}
 	}
 	return res, nil
 }
 
 func (s *Service) searchHybrid(ctx context.Context, userID pgtype.UUID, query string, limit int32) ([]SearchResult, error) {
-	// Stub: Em produção geraríamos o embedding real da query via OpenAI
-	vec := make([]float32, 1536)
-	for i := range vec {
-		vec[i] = 0.01
-	}
-
 	rows, err := s.q.SearchNotesHybrid(ctx, sqlcgen.SearchNotesHybridParams{
 		Query:         query,
 		UserID:        userID,
 		FtsLimit:      limit * 2,
-		Embedding:     pgvector.NewVector(vec),
+		Embedding:     mockEmbedding(),
 		SemanticLimit: limit * 2,
 		Limit:         limit,
 	})
@@ -121,9 +109,9 @@ func (s *Service) searchHybrid(ctx context.Context, userID pgtype.UUID, query st
 		return nil, err
 	}
 
-	res := make([]SearchResult, 0, len(rows))
-	for _, r := range rows {
-		res = append(res, SearchResult{
+	res := make([]SearchResult, len(rows))
+	for i, r := range rows {
+		res[i] = SearchResult{
 			ID:        r.ID,
 			Title:     r.Title.String,
 			Content:   r.Content,
@@ -133,8 +121,15 @@ func (s *Service) searchHybrid(ctx context.Context, userID pgtype.UUID, query st
 			Favorite:  r.Favorite,
 			Archived:  r.Archived,
 			Score:     r.Score,
-		})
+		}
 	}
 	return res, nil
+}
 
+func mockEmbedding() pgvector.Vector {
+	vec := make([]float32, 1536)
+	for i := range vec {
+		vec[i] = 0.01
+	}
+	return pgvector.NewVector(vec)
 }
