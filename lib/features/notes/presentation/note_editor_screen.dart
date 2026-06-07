@@ -265,7 +265,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       ),
       body: Column(
         children: [
-          NoteToolbar(editor: _editor!, composer: _composer!),
           Expanded(
             child: SuperEditor(
               editor: _editor!,
@@ -275,6 +274,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               ),
             ),
           ),
+          NoteToolbar(editor: _editor!, composer: _composer!),
         ],
       ),
       ),
