@@ -20,15 +20,30 @@ import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
 
 class ApiClient {
-  /// The underlying Dio instance.
-  ///
-  /// Exposed so tests can stub adapters and so advanced callers can plug
-  /// in their own interceptors. Application code should normally interact
-  /// with the higher-level repositories instead.
-  final Dio dio;
+  final Dio _dio;
 
   ApiClient({required AuthInterceptor authInterceptor})
-      : dio = _build(authInterceptor);
+      : _dio = _build(authInterceptor);
+
+  Future<Response<T>> get<T>(String path, {Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
+    return _dio.get<T>(path, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  }
+
+  Future<Response<T>> post<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
+    return _dio.post<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  }
+
+  Future<Response<T>> put<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
+    return _dio.put<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  }
+
+  Future<Response<T>> patch<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
+    return _dio.patch<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  }
+
+  Future<Response<T>> delete<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
+    return _dio.delete<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  }
 
   static Dio _build(AuthInterceptor authInterceptor) {
     final dio = Dio();

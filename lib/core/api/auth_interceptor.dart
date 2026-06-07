@@ -174,6 +174,6 @@ class AuthInterceptor extends Interceptor {
   }
 
   bool _isAuthRoute(String path) {
-    return path.contains('/auth/');
+    return path.startsWith('/api/v1/auth/');
   }
 }
