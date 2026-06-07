@@ -14,104 +14,16 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
-import 'package:supanotes/shared/widgets/error_snackbar.dart';
 
-import '../data/chat_repository.dart';
-import '../domain/message_model.dart';
-import '../domain/session_manager.dart';
+import 'controllers/chat_controller.dart';
 import 'widgets/chat_input.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/new_session_button.dart';
 import 'widgets/typing_indicator.dart';
-
-// ---------------------------------------------------------------------------
-// Controller
-// ---------------------------------------------------------------------------
-
-/// Owns the chat list + loading/error state.
-///
-/// Watches [sessionManagerProvider] so that rotating the session id
-/// (via the "Nova conversa" button) triggers a fresh history load and
-/// a clean state. All public methods are safe to call from the UI; they
-/// mutate [state] in place and the screen reacts via [ref.watch] and
-/// [ref.listen].
-class ChatController extends Notifier<ChatListState> {
-  @override
-  ChatListState build() {
-    final sessionId = ref.watch(sessionManagerProvider);
-    Future.microtask(() => _loadHistory(sessionId));
-    return const ChatListState(messages: <MessageModel>[], isLoading: true);
-  }
-
-  Future<void> _loadHistory(String sessionId) async {
-    state = state.copyWith(isLoading: true, clearError: true);
-    try {
-      final messages =
-          await ref.read(chatRepositoryProvider).getHistory(sessionId);
-      if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = state.copyWith(messages: messages, isLoading: false);
-    } on ApiException catch (e) {
-      if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = state.copyWith(isLoading: false, error: e.message);
-    }
-  }
-
-  /// Optimistically appends the user message, calls
-  /// `POST /api/v1/agent/chat`, then appends the assistant reply. On
-  /// failure the optimistic message is rolled back and [state.error] is
-  /// set so the screen can surface it as a snackbar.
-  Future<void> sendMessage(String content) async {
-    final sessionId = ref.read(sessionManagerProvider);
-    final pending = MessageModel(
-      id: 'pending-${DateTime.now().microsecondsSinceEpoch}',
-      sessionId: sessionId,
-      role: MessageRole.user,
-      content: content,
-      createdAt: DateTime.now(),
-    );
-    state = state.copyWith(
-      messages: <MessageModel>[...state.messages, pending],
-      isLoading: true,
-      clearError: true,
-    );
-    try {
-      final response = await ref.read(chatRepositoryProvider).sendMessage(
-            sessionId: sessionId,
-            message: content,
-          );
-      if (ref.read(sessionManagerProvider) != sessionId) return;
-      final assistant = MessageModel(
-        id: 'response-${DateTime.now().microsecondsSinceEpoch}',
-        sessionId: sessionId,
-        role: MessageRole.assistant,
-        content: response,
-        createdAt: DateTime.now(),
-      );
-      state = state.copyWith(
-        messages: <MessageModel>[...state.messages, assistant],
-        isLoading: false,
-      );
-    } on ApiException catch (e) {
-      if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = state.copyWith(
-        messages:
-            state.messages.where((m) => m.id != pending.id).toList(growable: false),
-        isLoading: false,
-        error: e.message,
-      );
-    }
-  }
-}
-
-final chatControllerProvider =
-    NotifierProvider<ChatController, ChatListState>(ChatController.new);
-
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -149,7 +61,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _scrollToBottom();
       }
       if (next.error != null && next.error != prev?.error) {
-        showErrorSnackBar(context, message: next.error!);
+        AppMessenger.showError(context, next.error!);
       }
     });
 

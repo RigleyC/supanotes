@@ -1,102 +1,82 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/agent/data/chat_repository.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
-
-class ChatState {
-  final List<MessageModel> messages;
-  final bool isLoading;
-  final String? error;
-
-  const ChatState({
-    this.messages = const [],
-    this.isLoading = false,
-    this.error,
-  });
-
-  ChatState copyWith({
-    List<MessageModel>? messages,
-    bool? isLoading,
-    String? error,
-    bool clearError = false,
-  }) =>
-      ChatState(
-        messages: messages ?? this.messages,
-        isLoading: isLoading ?? this.isLoading,
-        error: clearError ? null : (error ?? this.error),
-      );
-}
+import 'package:supanotes/features/agent/domain/session_manager.dart';
 
 final chatControllerProvider =
-    AsyncNotifierProvider<ChatController, ChatState>(
-  ChatController.new,
-);
+    NotifierProvider<ChatController, ChatListState>(ChatController.new);
 
-class ChatController extends AsyncNotifier<ChatState> {
+class ChatController extends Notifier<ChatListState> {
   @override
-  Future<ChatState> build() async {
-    return const ChatState();
+  ChatListState build() {
+    final sessionId = ref.watch(sessionManagerProvider);
+    Future.microtask(() => _loadHistory(sessionId));
+    return const ChatListState(messages: [], isLoading: true);
   }
 
-  Future<void> sendMessage(String text) async {
-    final trimmed = text.trim();
+  Future<void> _loadHistory(String sessionId) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final messages =
+          await ref.read(chatRepositoryProvider).getHistory(sessionId);
+      if (ref.read(sessionManagerProvider) != sessionId) return;
+      state = state.copyWith(messages: messages, isLoading: false);
+    } on ApiException catch (e) {
+      if (ref.read(sessionManagerProvider) != sessionId) return;
+      state = state.copyWith(isLoading: false, error: e.message);
+    }
+  }
+
+  Future<void> loadHistory() async {
+    final sessionId = ref.read(sessionManagerProvider);
+    await _loadHistory(sessionId);
+  }
+
+  Future<void> sendMessage(String content) async {
+    final trimmed = content.trim();
     if (trimmed.isEmpty) return;
 
-    final chatRepo = ref.read(chatRepositoryProvider);
-    final userMessage = MessageModel(
-      id: '',
-      sessionId: '',
+    final sessionId = ref.read(sessionManagerProvider);
+    final pending = MessageModel(
+      id: 'pending-${DateTime.now().microsecondsSinceEpoch}',
+      sessionId: sessionId,
       role: MessageRole.user,
       content: trimmed,
       createdAt: DateTime.now(),
     );
 
-    state = AsyncValue.data(
-      state.value!.copyWith(
-        messages: [...state.value!.messages, userMessage],
-        isLoading: true,
-        clearError: true,
-      ),
+    state = state.copyWith(
+      messages: [...state.messages, pending],
+      isLoading: true,
+      clearError: true,
     );
 
     try {
-      final reply = await chatRepo.sendMessage(
-        sessionId: '',
-        message: trimmed,
-      );
-      final assistantMessage = MessageModel(
-        id: '',
-        sessionId: '',
+      final response = await ref.read(chatRepositoryProvider).sendMessage(
+            sessionId: sessionId,
+            message: trimmed,
+          );
+      if (ref.read(sessionManagerProvider) != sessionId) return;
+      final assistant = MessageModel(
+        id: 'response-${DateTime.now().microsecondsSinceEpoch}',
+        sessionId: sessionId,
         role: MessageRole.assistant,
-        content: reply,
+        content: response,
         createdAt: DateTime.now(),
       );
-      state = AsyncValue.data(
-        state.value!.copyWith(
-          messages: [...state.value!.messages, assistantMessage],
-          isLoading: false,
-        ),
+      state = state.copyWith(
+        messages: [...state.messages, assistant],
+        isLoading: false,
       );
-    } catch (e) {
-      state = AsyncValue.data(
-        state.value!.copyWith(
-          isLoading: false,
-          error: e.toString(),
-        ),
-      );
-    }
-  }
-
-  Future<void> loadHistory() async {
-    state = AsyncValue.data(state.value!.copyWith(isLoading: true));
-    try {
-      final chatRepo = ref.read(chatRepositoryProvider);
-      final messages = await chatRepo.getHistory('');
-      state = AsyncValue.data(
-        state.value!.copyWith(messages: messages, isLoading: false),
-      );
-    } catch (e) {
-      state = AsyncValue.data(
-        state.value!.copyWith(isLoading: false, error: e.toString()),
+    } on ApiException catch (e) {
+      if (ref.read(sessionManagerProvider) != sessionId) return;
+      state = state.copyWith(
+        messages:
+            state.messages.where((m) => m.id != pending.id).toList(growable: false),
+        isLoading: false,
+        error: e.message,
       );
     }
   }
