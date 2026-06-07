@@ -47,9 +47,17 @@ func (m *mockRepository) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagPar
 	return sqlcgen.Tag{}, nil
 }
 
+func (m *mockRepository) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
+	return nil
+}
+
+func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
+	return m
+}
+
 func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
 	repo := &mockRepository{upsertNoteErr: pgx.ErrNoRows}
-	svc := NewService(repo)
+	svc := NewService(repo, nil)
 
 	userID := pgtype.UUID{Valid: true}
 

@@ -75,6 +75,7 @@ RETURNING *;
 -- name: GetSyncTags :many
 SELECT * FROM tags
 WHERE user_id = $1
+  AND (created_at > sqlc.arg('last_synced_at') OR sqlc.arg('last_synced_at')::timestamptz IS NULL)
 ORDER BY created_at ASC
 LIMIT sqlc.arg('limit');
 
@@ -85,3 +86,17 @@ ON CONFLICT (id) DO UPDATE
 SET name = EXCLUDED.name
 WHERE tags.user_id = EXCLUDED.user_id
 RETURNING *;
+
+-- name: UpsertTaskCompletion :exec
+-- Inserts a completion row only if the parent task belongs to the user
+-- (the SELECT returns 0 rows otherwise, making the INSERT a no-op).
+-- Completions are append-only history; existing rows are never updated.
+INSERT INTO task_completions (id, task_id, completed_at, status)
+SELECT sqlc.arg('id')::uuid,
+       sqlc.arg('task_id')::uuid,
+       sqlc.arg('completed_at')::timestamptz,
+       'completed'
+FROM tasks
+WHERE tasks.id = sqlc.arg('task_id')::uuid
+  AND tasks.user_id = sqlc.arg('user_id')::uuid
+ON CONFLICT (id) DO NOTHING;

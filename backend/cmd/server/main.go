@@ -276,7 +276,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 
 	// Sync (push/pull)
 	syncRepo := syncpkg.NewRepository(queries)
-	syncSvc := syncpkg.NewService(syncRepo)
+	syncSvc := syncpkg.NewService(syncRepo, pool)
 	syncH := syncpkg.NewHandler(syncSvc)
 	protected.POST("/sync/push", syncH.Push)
 	protected.POST("/sync/pull", syncH.Pull)

@@ -102,17 +102,19 @@ func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]N
 const getSyncTags = `-- name: GetSyncTags :many
 SELECT id, user_id, name, created_at FROM tags
 WHERE user_id = $1
+  AND (created_at > $2 OR $2::timestamptz IS NULL)
 ORDER BY created_at ASC
-LIMIT $2
+LIMIT $3
 `
 
 type GetSyncTagsParams struct {
-	UserID pgtype.UUID `json:"user_id"`
-	Limit  int32       `json:"limit"`
+	UserID       pgtype.UUID        `json:"user_id"`
+	LastSyncedAt pgtype.Timestamptz `json:"last_synced_at"`
+	Limit        int32              `json:"limit"`
 }
 
 func (q *Queries) GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error) {
-	rows, err := q.db.Query(ctx, getSyncTags, arg.UserID, arg.Limit)
+	rows, err := q.db.Query(ctx, getSyncTags, arg.UserID, arg.LastSyncedAt, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -408,4 +410,36 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, e
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const upsertTaskCompletion = `-- name: UpsertTaskCompletion :exec
+INSERT INTO task_completions (id, task_id, completed_at, status)
+SELECT $1::uuid,
+       $2::uuid,
+       $3::timestamptz,
+       'completed'
+FROM tasks
+WHERE tasks.id = $2::uuid
+  AND tasks.user_id = $4::uuid
+ON CONFLICT (id) DO NOTHING
+`
+
+type UpsertTaskCompletionParams struct {
+	ID          pgtype.UUID        `json:"id"`
+	TaskID      pgtype.UUID        `json:"task_id"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	UserID      pgtype.UUID        `json:"user_id"`
+}
+
+// Inserts a completion row only if the parent task belongs to the user
+// (the SELECT returns 0 rows otherwise, making the INSERT a no-op).
+// Completions are append-only history; existing rows are never updated.
+func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error {
+	_, err := q.db.Exec(ctx, upsertTaskCompletion,
+		arg.ID,
+		arg.TaskID,
+		arg.CompletedAt,
+		arg.UserID,
+	)
+	return err
 }

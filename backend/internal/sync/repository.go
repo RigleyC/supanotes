@@ -17,6 +17,8 @@ type Repository interface {
 	UpsertContext(ctx context.Context, arg sqlcgen.UpsertContextParams) (sqlcgen.Context, error)
 	GetSyncTags(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Tag, error)
 	UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error)
+	UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error
+	WithQuerier(q sqlcgen.Querier) Repository
 }
 
 type repo struct {
@@ -64,13 +66,21 @@ func (r *repo) UpsertContext(ctx context.Context, arg sqlcgen.UpsertContextParam
 }
 
 func (r *repo) GetSyncTags(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Tag, error) {
-	_ = lastSyncedAt
 	return r.q.GetSyncTags(ctx, sqlcgen.GetSyncTagsParams{
-		UserID: userID,
-		Limit:  limit,
+		UserID:       userID,
+		LastSyncedAt: lastSyncedAt,
+		Limit:        limit,
 	})
 }
 
 func (r *repo) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {
 	return r.q.UpsertTag(ctx, arg)
+}
+
+func (r *repo) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
+	return r.q.UpsertTaskCompletion(ctx, arg)
+}
+
+func (r *repo) WithQuerier(q sqlcgen.Querier) Repository {
+	return &repo{q: q}
 }

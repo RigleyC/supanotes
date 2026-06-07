@@ -46,7 +46,7 @@ func (h *Handler) Pull(c echo.Context) error {
 
 	payload, err := h.service.Pull(c.Request().Context(), userID, lastSyncedAt, req.Limit)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "sync failed"})
 	}
 
 	return c.JSON(http.StatusOK, payload)
@@ -68,7 +68,7 @@ func (h *Handler) Push(c echo.Context) error {
 		if errors.Is(err, ErrSyncConflict) {
 			return c.JSON(http.StatusConflict, map[string]string{"error": "sync conflict"})
 		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "sync failed"})
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
