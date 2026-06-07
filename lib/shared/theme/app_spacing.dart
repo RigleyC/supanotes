@@ -12,6 +12,13 @@ class AppSpacing {
   static const double xl = 32.0;
   static const double xxl = 48.0;
 
+  static const double buttonHeight = 48.0;
+  static const double iconSm = 16.0;
+  static const double iconMd = 24.0;
+  static const double iconLg = 48.0;
+  static const double elevationSm = 1.0;
+  static const double elevationMd = 2.0;
+
   static const double radiusSm = 8.0;
   static const double radiusMd = 12.0;
   static const double radiusLg = 16.0;

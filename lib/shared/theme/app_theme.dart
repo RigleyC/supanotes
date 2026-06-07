@@ -3,6 +3,20 @@ import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 
+/// Border style variant used by [_buildInputBorder].
+enum InputBorderType { outline, underline }
+
+OutlineInputBorder _buildInputBorder(InputBorderType type) {
+  switch (type) {
+    case InputBorderType.outline:
+      return OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      );
+    case InputBorderType.underline:
+      return const OutlineInputBorder();
+  }
+}
+
 /// Assembles the Material 3 [ThemeData] for the SupaNotes app.
 ///
 /// One [ThemeData] per [Brightness] is built lazily and cached in static
@@ -41,7 +55,7 @@ class AppTheme {
         foregroundColor: colorScheme.onSurface,
         surfaceTintColor: colorScheme.surfaceTint,
         elevation: 0,
-        scrolledUnderElevation: 1,
+        scrolledUnderElevation: AppSpacing.elevationSm,
         centerTitle: false,
         titleTextStyle: AppTypography.textTheme.titleLarge?.copyWith(
           color: colorScheme.onSurface,
@@ -63,20 +77,16 @@ class AppTheme {
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm + AppSpacing.xs,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        border: _buildInputBorder(InputBorderType.outline).copyWith(
           borderSide: BorderSide.none,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        enabledBorder: _buildInputBorder(InputBorderType.outline).copyWith(
           borderSide: BorderSide.none,
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        focusedBorder: _buildInputBorder(InputBorderType.outline).copyWith(
           borderSide: BorderSide(color: colorScheme.primary, width: 2),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        errorBorder: _buildInputBorder(InputBorderType.outline).copyWith(
           borderSide: BorderSide(color: colorScheme.error),
         ),
         labelStyle: AppTypography.textTheme.bodyMedium?.copyWith(
@@ -98,7 +108,7 @@ class AppTheme {
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
-        elevation: 2,
+        elevation: AppSpacing.elevationMd,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         ),
@@ -118,6 +128,11 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
         ),
       ),
+      extensions: [
+        brightness == Brightness.light
+            ? AppSemanticColors.light
+            : AppSemanticColors.dark,
+      ],
     );
   }
 }

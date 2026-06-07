@@ -49,3 +49,75 @@ class AppColors {
   static const Color info = Color(0xFF3B82F6);
   static const Color muted = Color(0xFF6B7280);
 }
+
+/// Semantic color tokens exposed as a [ThemeExtension] so they participate
+/// in the Material 3 theme system and respond to light/dark switching.
+class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
+  final Color success;
+  final Color warning;
+  final Color info;
+  final Color highlightBackground;
+  final Color highlightForeground;
+  final Color overlay;
+
+  const AppSemanticColors({
+    required this.success,
+    required this.warning,
+    required this.info,
+    required this.highlightBackground,
+    required this.highlightForeground,
+    required this.overlay,
+  });
+
+  @override
+  AppSemanticColors copyWith({
+    Color? success,
+    Color? warning,
+    Color? info,
+    Color? highlightBackground,
+    Color? highlightForeground,
+    Color? overlay,
+  }) {
+    return AppSemanticColors(
+      success: success ?? this.success,
+      warning: warning ?? this.warning,
+      info: info ?? this.info,
+      highlightBackground: highlightBackground ?? this.highlightBackground,
+      highlightForeground: highlightForeground ?? this.highlightForeground,
+      overlay: overlay ?? this.overlay,
+    );
+  }
+
+  @override
+  AppSemanticColors lerp(ThemeExtension<AppSemanticColors>? other, double t) {
+    if (other is! AppSemanticColors) return this;
+    return AppSemanticColors(
+      success: Color.lerp(success, other.success, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
+      info: Color.lerp(info, other.info, t)!,
+      highlightBackground:
+          Color.lerp(highlightBackground, other.highlightBackground, t)!,
+      highlightForeground:
+          Color.lerp(highlightForeground, other.highlightForeground, t)!,
+      overlay: Color.lerp(overlay, other.overlay, t)!,
+    );
+  }
+
+  static const light = AppSemanticColors(
+    success: Color(0xFF2E7D32),
+    warning: Color(0xFFF57F17),
+    info: Color(0xFF1976D2),
+    highlightBackground: Color(0xFFFFF59D),
+    highlightForeground: Color(0xFF1F1B16),
+    overlay: Color(0x1A000000),
+  );
+
+  static const dark = AppSemanticColors(
+    success: Color(0xFF4CAF50),
+    warning: Color(0xFFFFB300),
+    info: Color(0xFF90CAF9),
+    highlightBackground: Color(0xFF3E2723),
+    highlightForeground: Color(0xFFFFF59D),
+    overlay: Color(0x33FFFFFF),
+  );
+}
