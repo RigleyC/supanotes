@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supanotes/shared/widgets/app_choice_chip.dart';
 
 /// Chip-based picker for the `recurrence` column.
 ///
@@ -33,10 +34,11 @@ class RecurrencePicker extends StatelessWidget {
       runSpacing: 8,
       children: [
         for (final option in _options)
-          _RecurrenceChip(
-            option: option,
-            selected: option.value == initialRecurrence,
+          AppChoiceChip(
+            label: option.label,
+            isSelected: option.value == initialRecurrence,
             selectedColor: scheme.primary,
+            icon: option.icon,
             onTap: () => onChanged(option.value),
           ),
       ],
@@ -49,56 +51,6 @@ class _RecurrenceOption {
   final String? value;
   final String label;
   final IconData icon;
-}
-
-class _RecurrenceChip extends StatelessWidget {
-  const _RecurrenceChip({
-    required this.option,
-    required this.selected,
-    required this.selectedColor,
-    required this.onTap,
-  });
-
-  final _RecurrenceOption option;
-  final bool selected;
-  final Color selectedColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final bg = selected ? selectedColor : scheme.surfaceContainerHighest;
-    final fg = selected ? scheme.onPrimary : scheme.onSurfaceVariant;
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(option.icon, size: 16, color: fg),
-              const SizedBox(width: 6),
-              Text(
-                option.label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: fg,
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-              if (selected) ...[
-                const SizedBox(width: 6),
-                Icon(Icons.check, size: 16, color: fg),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Human-readable label for a recurrence string. Used in the task tile

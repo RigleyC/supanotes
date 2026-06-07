@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supanotes/shared/widgets/app_choice_chip.dart';
 
 /// Quick-pick chips for setting a task's `dueDate`.
 ///
@@ -55,39 +56,39 @@ class DueDatePicker extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        _Chip(
+        AppChoiceChip(
           label: 'Hoje',
-          selected: isSelected(today),
+          isSelected: isSelected(today),
           selectedColor: scheme.primary,
           onTap: () => onChanged(today),
         ),
-        _Chip(
+        AppChoiceChip(
           label: 'Amanhã',
-          selected: isSelected(tomorrow),
+          isSelected: isSelected(tomorrow),
           selectedColor: scheme.primary,
           onTap: () => onChanged(tomorrow),
         ),
-        _Chip(
+        AppChoiceChip(
           label: 'Próx. segunda',
-          selected: isSelected(nextMonday()),
+          isSelected: isSelected(nextMonday()),
           selectedColor: scheme.primary,
           onTap: () => onChanged(nextMonday()),
         ),
-        _Chip(
+        AppChoiceChip(
           label: initialDate != null && !_isQuickPick(initialDate!, today, tomorrow, nextMonday())
               ? DateFormat('d MMM').format(initialDate!)
               : 'Escolher data',
-          selected: initialDate != null &&
+          isSelected: initialDate != null &&
               !_isQuickPick(initialDate!, today, tomorrow, nextMonday()),
           selectedColor: scheme.primary,
-          leading: const Icon(Icons.calendar_today_outlined, size: 16),
+          icon: Icons.calendar_today_outlined,
           onTap: pickCustomDate,
         ),
-        _Chip(
+        AppChoiceChip(
           label: 'Sem data',
-          selected: initialDate == null,
+          isSelected: initialDate == null,
           selectedColor: scheme.primary,
-          leading: const Icon(Icons.block, size: 16),
+          icon: Icons.block,
           onTap: () => onChanged(null),
         ),
       ],
@@ -108,60 +109,3 @@ class DueDatePicker extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.selected,
-    required this.selectedColor,
-    required this.onTap,
-    this.leading,
-  });
-
-  final String label;
-  final bool selected;
-  final Color selectedColor;
-  final VoidCallback onTap;
-  final Widget? leading;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final bg = selected ? selectedColor : scheme.surfaceContainerHighest;
-    final fg = selected ? scheme.onPrimary : scheme.onSurfaceVariant;
-
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (leading != null) ...[
-                IconTheme(
-                  data: IconThemeData(size: 16, color: fg),
-                  child: leading!,
-                ),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: fg,
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-              if (selected) ...[
-                const SizedBox(width: 6),
-                Icon(Icons.check, size: 16, color: fg),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

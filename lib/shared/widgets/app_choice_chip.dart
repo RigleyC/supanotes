@@ -8,20 +8,28 @@ class AppChoiceChip extends StatelessWidget {
     required this.label,
     this.icon,
     this.isSelected = false,
+    this.selectedColor,
     this.onTap,
   });
 
   final String label;
   final IconData? icon;
   final bool isSelected;
+  final Color? selectedColor;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final bg = isSelected
+        ? (selectedColor ?? scheme.primaryContainer)
+        : scheme.surfaceContainerHighest;
+    final fg = isSelected
+        ? (selectedColor != null ? scheme.onPrimary : scheme.onPrimaryContainer)
+        : scheme.onSurfaceVariant;
 
     return Material(
-      color: isSelected ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+      color: bg,
       borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
       child: InkWell(
         onTap: onTap,
@@ -37,23 +45,24 @@ class AppChoiceChip extends StatelessWidget {
               if (icon != null) ...[
                 Icon(
                   icon,
-                  size: 18,
-                  color: isSelected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                  size: AppSpacing.iconSm,
+                  color: fg,
                 ),
                 const SizedBox(width: AppSpacing.xs),
               ],
               Text(
                 label,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: isSelected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                  color: fg,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               if (isSelected) ...[
                 const SizedBox(width: AppSpacing.xs),
                 Icon(
                   Icons.check,
-                  size: 16,
-                  color: scheme.onPrimaryContainer,
+                  size: AppSpacing.iconSm,
+                  color: fg,
                 ),
               ],
             ],

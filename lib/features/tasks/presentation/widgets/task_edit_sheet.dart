@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
+import 'package:supanotes/shared/widgets/app_input.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 import '../../data/tasks_repository.dart';
 import '../../domain/task_model.dart';
@@ -28,11 +32,8 @@ class TaskEditSheet extends ConsumerStatefulWidget {
     required String noteId,
     TaskModel? task,
   }) {
-    return showModalBottomSheet<TaskEditResult>(
+    return showAppBottomSheet<TaskEditResult>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
       builder: (_) => TaskEditSheet(noteId: noteId, task: task),
     );
   }
@@ -67,16 +68,13 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
   Future<void> _onSave() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Digite um título para a tarefa.')),
-      );
+      AppMessenger.showInfo(context, 'Digite um título para a tarefa.');
       return;
     }
 
     setState(() => _saving = true);
     final repo = ref.read(tasksRepositoryProvider);
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
 
     try {
       if (_isEdit) {
@@ -117,9 +115,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
         navigator.pop(TaskEditResult(task: created, deleted: false));
       }
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Erro ao salvar tarefa: $e')),
-      );
+      AppMessenger.showError(context, 'Erro ao salvar tarefa: $e');
       setState(() => _saving = false);
     }
   }
@@ -130,103 +126,81 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
     setState(() => _saving = true);
     final repo = ref.read(tasksRepositoryProvider);
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await repo.deleteTask(task.id);
       navigator.pop(TaskEditResult(task: task, deleted: true));
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Erro ao excluir tarefa: $e')),
-      );
+      AppMessenger.showError(context, 'Erro ao excluir tarefa: $e');
       setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final viewInsets = MediaQuery.of(context).viewInsets;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: AppSpacing.lg,
-        right: AppSpacing.lg,
-        bottom: AppSpacing.lg + viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _isEdit ? 'Editar tarefa' : 'Nova tarefa',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            TextField(
-              controller: _titleController,
-              autofocus: !_isEdit,
-              textInputAction: TextInputAction.done,
-              maxLines: 3,
-              minLines: 1,
-              decoration: const InputDecoration(
-                labelText: 'Título',
-                hintText: 'O que precisa ser feito?',
-              ),
-              onSubmitted: (_) => _onSave(),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Data de vencimento', style: theme.textTheme.titleSmall),
-            const SizedBox(height: AppSpacing.sm),
-            DueDatePicker(
-              initialDate: _dueDate,
-              onChanged: (d) => setState(() => _dueDate = d),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Repetição', style: theme.textTheme.titleSmall),
-            const SizedBox(height: AppSpacing.sm),
-            RecurrencePicker(
-              initialRecurrence: _recurrence,
-              onChanged: (r) => setState(() => _recurrence = r),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Row(
-              children: [
-                if (_isEdit) ...[
-                  TextButton.icon(
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _isEdit ? 'Editar tarefa' : 'Nova tarefa',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppInput(
+            controller: _titleController,
+            autofocus: !_isEdit,
+            textInputAction: TextInputAction.done,
+            maxLines: 3,
+            labelText: 'Título',
+            hintText: 'O que precisa ser feito?',
+            onSubmitted: (_) => _onSave(),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('Data de vencimento', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          DueDatePicker(
+            initialDate: _dueDate,
+            onChanged: (d) => setState(() => _dueDate = d),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('Repetição', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          RecurrencePicker(
+            initialRecurrence: _recurrence,
+            onChanged: (r) => setState(() => _recurrence = r),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              if (_isEdit)
+                IntrinsicWidth(
+                  child: AppButton(
+                    text: 'Excluir',
                     onPressed: _saving ? null : _onDelete,
-                    icon: Icon(
-                      Icons.delete_outline,
-                      color: theme.colorScheme.error,
-                    ),
-                    label: Text(
-                      'Excluir',
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
+                    variant: AppButtonVariant.danger,
+                    isLoading: _saving,
                   ),
-                  const Spacer(),
-                ] else
-                  const Spacer(),
-                TextButton(
-                  onPressed: _saving
-                      ? null
-                      : () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                FilledButton(
+              const Spacer(),
+              IntrinsicWidth(
+                child: AppButton(
+                  text: 'Cancelar',
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  variant: AppButtonVariant.secondary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              IntrinsicWidth(
+                child: AppButton(
+                  text: 'Salvar',
                   onPressed: _saving ? null : _onSave,
-                  child: _saving
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Salvar'),
+                  isLoading: _saving,
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
