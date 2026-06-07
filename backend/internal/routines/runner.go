@@ -2,8 +2,6 @@ package routines
 
 import (
 	"context"
-	"fmt"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/pkg/llm"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 // Notifier is the subset of the FCM sender the runner needs. It is
@@ -28,15 +27,16 @@ type TelegramNotifier interface {
 }
 
 type Runner struct {
-	repo         Repository
-	agentCtxBldr ContextBuilder
-	llmFactory   llm.Factory
-	notifier     Notifier
-	telegram     TelegramNotifier
-	cronJob      *cron.Cron
-	parser       cron.Parser
-	mu           sync.Mutex
-	active       map[string]bool
+	repo           Repository
+	agentCtxBldr   ContextBuilder
+	llmFactory     llm.Factory
+	notifier       Notifier
+	telegram       TelegramNotifier
+	cronJob        *cron.Cron
+	maintenanceJob *cron.Cron
+	sem            chan struct{}
+	reloadTicker   *time.Ticker
+	stopReload     chan struct{}
 }
 
 func NewRunner(
@@ -46,93 +46,91 @@ func NewRunner(
 	notifier Notifier,
 	telegram TelegramNotifier,
 ) *Runner {
-	r := &Runner{
-		repo:         repo,
-		agentCtxBldr: agentCtxBldr,
-		llmFactory:   llmFactory,
-		notifier:     notifier,
-		telegram:     telegram,
-		cronJob:      cron.New(),
-		parser:       cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow),
-		active:       make(map[string]bool),
+	return &Runner{
+		repo:           repo,
+		agentCtxBldr:   agentCtxBldr,
+		llmFactory:     llmFactory,
+		notifier:       notifier,
+		telegram:       telegram,
+		cronJob:        cron.New(),
+		maintenanceJob: cron.New(),
+		sem:            make(chan struct{}, 10),
 	}
-	r.cronJob.AddFunc("* * * * *", r.tick)
-	return r
 }
 
 func (r *Runner) Start() {
+	r.reload()
+
+	r.reloadTicker = time.NewTicker(5 * time.Minute)
+	r.stopReload = make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-r.reloadTicker.C:
+				r.reload()
+			case <-r.stopReload:
+				return
+			}
+		}
+	}()
+
+	r.maintenanceJob.AddFunc("0 0 * * *", func() {
+		ctx := context.Background()
+		if err := r.repo.CleanupOldMessages(ctx); err != nil {
+			log.Error().Err(err).Msg("failed to cleanup old messages")
+		}
+		if err := r.repo.HardDeleteExpired(ctx); err != nil {
+			log.Error().Err(err).Msg("failed to hard-delete expired records")
+		}
+	})
+
 	r.cronJob.Start()
+	r.maintenanceJob.Start()
 	log.Info().Msg("routine runner started")
 }
 
 func (r *Runner) Stop() {
 	r.cronJob.Stop()
+	r.maintenanceJob.Stop()
+	if r.stopReload != nil {
+		close(r.stopReload)
+	}
+	if r.reloadTicker != nil {
+		r.reloadTicker.Stop()
+	}
 }
 
-func (r *Runner) tick() {
+func (r *Runner) reload() {
 	ctx := context.Background()
 	routines, err := r.repo.GetEnabledRoutines(ctx)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to get enabled routines")
+		log.Error().Err(err).Msg("failed to load routines")
 		return
 	}
 
-	now := time.Now().Truncate(time.Minute)
-
-	for _, rt := range routines {
-		schedule, err := r.parser.Parse(rt.CronExpr)
-		if err != nil {
-			log.Warn().Str("routine_id", fmt.Sprintf("%v", rt.ID)).Err(err).Msg("invalid cron expression")
-			continue
-		}
-
-		loc, err := time.LoadLocation(rt.Timezone)
-		if err != nil {
-			loc = time.UTC
-		}
-
-		nowInLoc := now.In(loc)
-		oneMinAgo := nowInLoc.Add(-1 * time.Minute)
-		nextRun := schedule.Next(oneMinAgo).Truncate(time.Minute)
-
-		if nextRun.Equal(nowInLoc) {
-			go r.runRoutine(rt)
-		}
+	for _, entry := range r.cronJob.Entries() {
+		r.cronJob.Remove(entry.ID)
 	}
 
-	// Daily at UTC midnight: clean up old messages + tombstone garbage.
-	if now.In(time.UTC).Hour() == 0 && now.In(time.UTC).Minute() == 0 {
-		go func() {
-			if err := r.repo.CleanupOldMessages(context.Background()); err != nil {
-				log.Error().Err(err).Msg("failed to cleanup old messages")
-			}
-			if err := r.repo.HardDeleteExpired(context.Background()); err != nil {
-				log.Error().Err(err).Msg("failed to hard-delete expired records")
-			}
-		}()
+	for _, rt := range routines {
+		expr := rt.CronExpr
+		routine := rt
+		_, err := r.cronJob.AddFunc(expr, func() {
+			r.sem <- struct{}{}
+			defer func() { <-r.sem }()
+			r.runRoutine(routine)
+		})
+		if err != nil {
+			log.Warn().Err(err).Str("routine_id", uid.UUIDToString(routine.ID)).Msg("invalid cron expression, skipping routine")
+		}
 	}
 }
 
 func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
-	key := fmt.Sprintf("%v", rt.ID)
-	r.mu.Lock()
-	if r.active[key] {
-		r.mu.Unlock()
-		return
-	}
-	r.active[key] = true
-	r.mu.Unlock()
-
-	defer func() {
-		r.mu.Lock()
-		delete(r.active, key)
-		r.mu.Unlock()
-	}()
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	log.Info().Str("routine_id", fmt.Sprintf("%v", rt.ID)).Str("type", rt.Type).Msg("running routine")
+	log.Info().Str("routine_id", uid.UUIDToString(rt.ID)).Str("type", rt.Type).Msg("running routine")
 
 	ragContext, err := r.agentCtxBldr.BuildForRoutine(ctx, rt.UserID, rt.Type)
 	if err != nil {
@@ -162,9 +160,7 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 		return
 	}
 
-	// Notify the user. We do both push and Telegram and never let
-	// either fail the other; the brief was already saved.
-	userIDStr := fmt.Sprintf("%v", rt.UserID)
+	userIDStr := uid.UUIDToString(rt.UserID)
 
 	if r.notifier != nil {
 		title := "Novo brief disponível"
