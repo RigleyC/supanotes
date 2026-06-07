@@ -19,6 +19,12 @@ class AppTypography {
 
   static const String fontFamily = 'Inter';
 
+  /// Monospace style for inline code and code blocks.
+  static TextStyle get codeStyle => const TextStyle(
+        fontFamily: 'monospace',
+        fontFamilyFallback: ['Courier', 'monospace'],
+      );
+
   // ---------------------------------------------------------------------------
   // Font sizes (Material 3 type scale, in logical pixels)
   // ---------------------------------------------------------------------------

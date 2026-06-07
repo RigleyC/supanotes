@@ -18,6 +18,7 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:supanotes/features/search/domain/search_result_model.dart';
+import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 class SearchResultTile extends StatelessWidget {
@@ -34,15 +35,13 @@ class SearchResultTile extends StatelessWidget {
 
   static const _fallbackTitle = 'Sem título';
 
-  /// Highlight strip behind matching substrings. A muted yellow so it
-  /// reads as "marker pen" rather than as a button.
-  static const Color _highlightBackground = Color(0xFFFFF59D);
-  static const Color _highlightForeground = Color(0xFF1F1B16);
+  /// Highlight strip behind matching substrings.
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final semantic = Theme.of(context).extension<AppSemanticColors>();
 
     final title = result.title.trim().isNotEmpty
         ? result.title.trim()
@@ -84,8 +83,8 @@ class SearchResultTile extends StatelessWidget {
                     color: scheme.onSurfaceVariant,
                   ),
                   highlightStyle: textTheme.bodyMedium?.copyWith(
-                    color: _highlightForeground,
-                    backgroundColor: _highlightBackground,
+                    color: semantic?.highlightForeground,
+                    backgroundColor: semantic?.highlightBackground,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

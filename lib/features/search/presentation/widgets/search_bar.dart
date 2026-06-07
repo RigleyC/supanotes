@@ -15,6 +15,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:supanotes/core/constants/app_constants.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 class SearchInputBar extends StatefulWidget {
@@ -23,7 +24,7 @@ class SearchInputBar extends StatefulWidget {
     required this.onQueryChanged,
     this.initialQuery = '',
     this.autofocus = true,
-    this.debounce = const Duration(milliseconds: 300),
+    this.debounce = const Duration(milliseconds: AppConstants.searchDebounceMs),
     this.hintText = 'Buscar notas',
   });
 

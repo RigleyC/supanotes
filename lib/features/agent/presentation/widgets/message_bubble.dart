@@ -30,7 +30,6 @@ class MessageBubble extends StatelessWidget {
     final bg = _isUser ? scheme.primary : scheme.surfaceContainerHigh;
     final fg = _isUser ? scheme.onPrimary : scheme.onSurface;
     final crossAxis = _isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final maxWidth = MediaQuery.of(context).size.width * 0.78;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -47,7 +46,6 @@ class MessageBubble extends StatelessWidget {
               crossAxisAlignment: crossAxis,
               children: <Widget>[
                 Container(
-                  constraints: BoxConstraints(maxWidth: maxWidth),
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.md,
                     vertical: AppSpacing.sm,
@@ -98,11 +96,7 @@ class _MarkdownText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = AppTypography.textTheme.bodyMedium?.copyWith(color: color);
-    final code = AppTypography.textTheme.bodyMedium?.copyWith(
-      color: color,
-      fontFamily: 'monospace',
-      fontFamilyFallback: const <String>['Courier', 'monospace'],
-    );
+    final code = AppTypography.codeStyle.copyWith(color: color);
 
     final segments = _splitCodeBlocks(text);
     if (segments.length == 1 && !segments.first.isCodeBlock) {
@@ -117,7 +111,7 @@ class _MarkdownText extends StatelessWidget {
       children: <Widget>[
         for (final seg in segments)
           if (seg.isCodeBlock)
-            _CodeBlock(text: seg.text, baseStyle: code!)
+            _CodeBlock(text: seg.text, baseStyle: code)
           else
             SelectableText.rich(_parseInlineBold(seg.text, base!)),
       ],

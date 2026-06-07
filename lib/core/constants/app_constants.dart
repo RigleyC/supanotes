@@ -20,4 +20,7 @@ class AppConstants {
 
   /// Maximum characters for the note excerpt preview shown in note cards.
   static const int noteExcerptMaxLength = 120;
+
+  /// Debounce window for search input keystrokes before firing a query.
+  static const int searchDebounceMs = 300;
 }
