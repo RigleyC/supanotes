@@ -70,7 +70,20 @@ class SoulEditorController extends AsyncNotifier<SoulEditorState> {
     }
   }
 
+  void setEditing(bool editing) {
+    state = AsyncValue.data(state.value!.copyWith(isEditing: editing));
+  }
+
   Future<void> restoreDefault() async {
-    // Will be implemented when soul_editor_screen is refactored
+    state = AsyncValue.data(
+      const SoulEditorState(
+        soul: Soul(personality: _kDefaultPersonality),
+        isEditing: true,
+      ),
+    );
   }
 }
+
+const String _kDefaultPersonality =
+    'Você é um assistente pessoal direto, calmo e útil. Respeita o tempo do '
+    'usuário, oferece próximos passos claros e não inventa informações.';

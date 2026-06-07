@@ -2,17 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/theme/app_spacing.dart';
-import '../../../shared/widgets/error_snackbar.dart';
-import '../data/routines_repository.dart';
+import '../../../shared/widgets/app_error_view.dart';
 import '../domain/routine_log_model.dart';
+import 'controllers/brief_history_controller.dart';
 import 'widgets/brief_log_tile.dart';
-
-/// Async load of the most recent brief execution logs. The backend
-/// returns at most 50 rows ordered most-recent-first; the UI mirrors
-/// that ordering verbatim.
-final routineLogsProvider = FutureProvider<List<RoutineLogModel>>((ref) {
-  return ref.watch(routinesRepositoryProvider).getLogs();
-});
 
 class BriefHistoryScreen extends ConsumerWidget {
   const BriefHistoryScreen({super.key});
@@ -24,20 +17,22 @@ class BriefHistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logsAsync = ref.watch(routineLogsProvider);
+    final logsAsync = ref.watch(briefHistoryControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(_appBarTitle),
       ),
       body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(routineLogsProvider),
+        onRefresh: () async =>
+            ref.read(briefHistoryControllerProvider.notifier).refresh(),
         child: logsAsync.when(
-          data: (logs) => _Body(logs: logs),
+          data: (state) => _Body(logs: state.logs),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => _ErrorView(
-            message: '$err',
-            onRetry: () => ref.invalidate(routineLogsProvider),
+          error: (err, _) => AppErrorView(
+            title: '$err',
+            onRetry: () =>
+                ref.read(briefHistoryControllerProvider.notifier).refresh(),
           ),
         ),
       ),
@@ -82,44 +77,6 @@ class _Body extends StatelessWidget {
       itemBuilder: (context, index) {
         return BriefLogTile(log: logs[index]);
       },
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) {
-        showErrorSnackBar(
-          context,
-          message: 'Falha ao carregar histórico: $message',
-          onRetry: onRetry,
-        );
-      }
-    });
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48),
-            const SizedBox(height: AppSpacing.md),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton.tonal(
-              onPressed: onRetry,
-              child: const Text('Tentar novamente'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -1,29 +1,16 @@
-/// Screen for editing the user's SOUL — the persona prompt the agent
-/// is conditioned on.
-///
-/// Two modes are toggled from the app bar:
-///   * Edit (default): a multi-line [TextField] bound to a local
-///     [TextEditingController]. The "Salvar" button posts via
-///     [SettingsRepository.updateSoul].
-///   * View: the same text rendered as plain [SelectableText]. We
-///     intentionally avoid a markdown renderer here because adding a
-///     new dependency is out of scope; the body is still selectable so
-///     the user can copy it into another tool if they want a preview.
-///
-/// "Restaurar padrão" replaces the buffer with [_kDefaultPersonality]
-/// after a confirm dialog. The default is the same short Portuguese
-/// stub the backend would otherwise see on first login.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/features/settings/data/settings_repository.dart';
+import 'package:supanotes/features/settings/presentation/controllers/soul_editor_controller.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
+import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
-/// Strings displayed on the soul editor screen.
 class _SoulStrings {
   _SoulStrings._();
 
@@ -47,18 +34,8 @@ class _SoulStrings {
 
   static const String savedSnackbar = 'Personalidade atualizada.';
   static const String restoredSnackbar = 'Texto restaurado.';
-  static const String emptyError =
-      'A personalidade não pode ficar vazia.';
+  static const String emptyError = 'A personalidade não pode ficar vazia.';
 }
-
-/// The default persona used by "Restaurar padrão".
-///
-/// Kept short and neutral so the agent has *some* identity even when the
-/// user has no opinion. The backend may overwrite this later from its
-/// own seed; until then it's the canonical client-side default.
-const String _kDefaultPersonality =
-    'Você é um assistente pessoal direto, calmo e útil. Respeita o tempo do '
-    'usuário, oferece próximos passos claros e não inventa informações.';
 
 class SoulEditorScreen extends ConsumerStatefulWidget {
   const SoulEditorScreen({super.key});
@@ -69,16 +46,7 @@ class SoulEditorScreen extends ConsumerStatefulWidget {
 
 class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   final TextEditingController _controller = TextEditingController();
-  bool _loading = true;
-  bool _saving = false;
-  bool _editing = true;
-  String? _loadError;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  bool _initialized = false;
 
   @override
   void dispose() {
@@ -86,41 +54,19 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _loadError = null;
-    });
-    try {
-      final soul = await ref.read(settingsRepositoryProvider).getSoul();
-      if (!mounted) return;
-      _controller.text = soul.personality;
-      setState(() => _loading = false);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _loadError = e.message;
-      });
-    }
-  }
-
   Future<void> _save() async {
     final text = _controller.text.trim();
     if (text.isEmpty) {
-      _showSnackBar(_SoulStrings.emptyError);
+      AppMessenger.showError(context, _SoulStrings.emptyError);
       return;
     }
-    setState(() => _saving = true);
     try {
-      await ref.read(settingsRepositoryProvider).updateSoul(text);
+      await ref.read(soulEditorControllerProvider.notifier).save(text);
       if (!mounted) return;
-      _showSnackBar(_SoulStrings.savedSnackbar);
+      AppMessenger.showSuccess(context, _SoulStrings.savedSnackbar);
     } on ApiException catch (e) {
       if (!mounted) return;
-      _showSnackBar(e.message);
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      AppMessenger.showError(context, e.message);
     }
   }
 
@@ -133,19 +79,29 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       destructive: true,
     );
     if (!confirmed || !mounted) return;
-    _controller.text = _kDefaultPersonality;
-    setState(() {
-      _editing = true;
-    });
-    _showSnackBar(_SoulStrings.restoredSnackbar);
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ref.read(soulEditorControllerProvider.notifier).restoreDefault();
+    final restored =
+        ref.read(soulEditorControllerProvider).asData?.value;
+    if (restored?.soul != null) {
+      _controller.text = restored!.soul!.personality;
+    }
+    AppMessenger.showInfo(context, _SoulStrings.restoredSnackbar);
   }
 
   @override
   Widget build(BuildContext context) {
+    final soulAsync = ref.watch(soulEditorControllerProvider);
+    final state = soulAsync.asData?.value;
+
+    if (!_initialized && state?.soul != null) {
+      _initialized = true;
+      _controller.text = state!.soul!.personality;
+    }
+
+    final isEditing = state?.isEditing ?? true;
+    final isSaving = state?.isSaving ?? false;
+    final loadError = state?.loadError;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(_SoulStrings.title),
@@ -153,38 +109,34 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
           IconButton(
             tooltip: _SoulStrings.previewTooltip,
             icon: Icon(
-              _editing ? Icons.visibility_outlined : Icons.edit_outlined,
+              isEditing ? Icons.visibility_outlined : Icons.edit_outlined,
             ),
-            onPressed: _loading ? null : () => setState(() => _editing = !_editing),
+            onPressed: () => ref
+                .read(soulEditorControllerProvider.notifier)
+                .setEditing(!isEditing),
           ),
         ],
       ),
       body: SafeArea(
-        child: _buildBody(context),
+        child: _buildBody(context, soulAsync, loadError, isEditing, isSaving),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
-    if (_loading) {
+  Widget _buildBody(
+    BuildContext context,
+    AsyncValue<SoulEditorState> soulAsync,
+    String? loadError,
+    bool isEditing,
+    bool isSaving,
+  ) {
+    if (soulAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_loadError != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_loadError!),
-              const SizedBox(height: AppSpacing.md),
-              FilledButton(
-                onPressed: _load,
-                child: const Text('Tentar novamente'),
-              ),
-            ],
-          ),
-        ),
+    if (loadError != null) {
+      return AppErrorView(
+        title: loadError,
+        onRetry: () => ref.read(soulEditorControllerProvider.notifier).load(),
       );
     }
 
@@ -193,17 +145,19 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _modeBanner(context),
+          _modeBanner(context, isEditing),
           const SizedBox(height: AppSpacing.sm),
-          Expanded(child: _editing ? _editor(context) : _preview(context)),
+          Expanded(
+            child: isEditing ? _editor(context) : _preview(context),
+          ),
           const SizedBox(height: AppSpacing.md),
-          _footerActions(context),
+          _footerActions(context, isSaving),
         ],
       ),
     );
   }
 
-  Widget _modeBanner(BuildContext context) {
+  Widget _modeBanner(BuildContext context, bool isEditing) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return Container(
@@ -218,13 +172,13 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       child: Row(
         children: [
           Icon(
-            _editing ? Icons.edit_outlined : Icons.visibility_outlined,
+            isEditing ? Icons.edit_outlined : Icons.visibility_outlined,
             size: 18,
             color: scheme.onSurfaceVariant,
           ),
           const SizedBox(width: AppSpacing.sm),
           Text(
-            _editing ? _SoulStrings.editMode : _SoulStrings.previewMode,
+            isEditing ? _SoulStrings.editMode : _SoulStrings.previewMode,
             style: textTheme.labelLarge?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -278,28 +232,22 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     );
   }
 
-  Widget _footerActions(BuildContext context) {
+  Widget _footerActions(BuildContext context, bool isSaving) {
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _saving ? null : _restoreDefault,
-            icon: const Icon(Icons.restart_alt),
-            label: const Text(_SoulStrings.restore),
+          child: AppButton(
+            text: _SoulStrings.restore,
+            variant: AppButtonVariant.secondary,
+            onPressed: _restoreDefault,
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: FilledButton.icon(
-            onPressed: _saving ? null : _save,
-            icon: _saving
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.save_outlined),
-            label: Text(_saving ? _SoulStrings.saving : _SoulStrings.save),
+          child: AppButton(
+            text: isSaving ? _SoulStrings.saving : _SoulStrings.save,
+            isLoading: isSaving,
+            onPressed: _save,
           ),
         ),
       ],

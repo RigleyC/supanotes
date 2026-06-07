@@ -59,7 +59,9 @@ class SettingsController extends AsyncNotifier<SettingsState> {
   }
 
   Future<void> togglePush() async {
-    // Will be implemented when settings_screen is refactored
+    state = AsyncValue.data(
+      state.value!.copyWith(pushEnabled: !state.value!.pushEnabled),
+    );
   }
 
   Future<void> logout() async {

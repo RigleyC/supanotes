@@ -7,12 +7,14 @@ class SearchState {
   final SearchMode mode;
   final List<SearchResultModel> results;
   final bool isLoading;
+  final String? error;
 
   const SearchState({
     this.query = '',
     this.mode = SearchMode.hybrid,
     this.results = const [],
     this.isLoading = false,
+    this.error,
   });
 
   SearchState copyWith({
@@ -20,12 +22,15 @@ class SearchState {
     SearchMode? mode,
     List<SearchResultModel>? results,
     bool? isLoading,
+    String? error,
+    bool clearError = false,
   }) =>
       SearchState(
         query: query ?? this.query,
         mode: mode ?? this.mode,
         results: results ?? this.results,
         isLoading: isLoading ?? this.isLoading,
+        error: clearError ? null : (error ?? this.error),
       );
 }
 
@@ -51,7 +56,9 @@ class SearchController extends AsyncNotifier<SearchState> {
         state.value!.copyWith(results: results, isLoading: false),
       );
     } catch (e) {
-      state = AsyncValue.data(state.value!.copyWith(isLoading: false));
+      state = AsyncValue.data(
+        state.value!.copyWith(isLoading: false, error: e.toString()),
+      );
     }
   }
 

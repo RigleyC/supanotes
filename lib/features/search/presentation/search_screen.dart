@@ -1,39 +1,16 @@
-/// Search screen — single-route entry point for the `/search` location.
-///
-/// Holds three pieces of ephemeral state in [State]: the debounced
-/// query string, the active [SearchMode], and the in-flight
-/// `Future<List<SearchResultModel>>`. Whenever the query *or* the mode
-/// changes the future is rebuilt with a fresh repository call and the
-/// [FutureBuilder] re-renders. We deliberately do **not** push this
-/// state into Riverpod because it is purely transient and would only
-/// add ceremony.
-///
-/// Three idle states are exposed to the user:
-///
-///   * No query yet → `"Digite para buscar"` placeholder.
-///   * Query in flight → skeleton placeholder cards.
-///   * Query returned no hits → `"Nenhum resultado"` placeholder.
-///
-/// The screen is **online-only** (the repository goes through Dio with
-/// no local fallback). Network / server failures surface as an
-/// inline [EmptyState] with a retry action *and* a snack bar, so the
-/// failure mode is hard to miss whichever direction the user is
-/// looking.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/features/search/data/search_repository.dart';
 import 'package:supanotes/features/search/domain/search_result_model.dart';
+import 'package:supanotes/features/search/presentation/controllers/search_controller.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_bar.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_mode_toggle.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_result_tile.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
-import 'package:supanotes/shared/widgets/error_snackbar.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -43,44 +20,35 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
-  String _query = '';
-  SearchMode _mode = SearchMode.hybrid;
-  Future<List<SearchResultModel>>? _resultsFuture;
-
   void _onQueryChanged(String query) {
-    if (query == _query) return;
-    setState(() {
-      _query = query;
-      _resultsFuture = _buildFuture();
-    });
+    if (query.isEmpty) {
+      ref.read(searchControllerProvider.notifier).clear();
+    } else {
+      ref.read(searchControllerProvider.notifier).search(query);
+    }
   }
 
   void _onModeChanged(SearchMode mode) {
-    if (mode == _mode) return;
-    setState(() {
-      _mode = mode;
-      _resultsFuture = _buildFuture();
-    });
-  }
-
-  void _retry() {
-    setState(() {
-      _resultsFuture = _buildFuture();
-    });
-  }
-
-  /// Returns `null` when there is nothing to search for (so the screen
-  /// can fall back to the "type to search" placeholder), otherwise
-  /// fires a fresh request through the repository.
-  Future<List<SearchResultModel>>? _buildFuture() {
-    if (_query.isEmpty) return null;
-    return ref
-        .read(searchRepositoryProvider)
-        .search(query: _query, mode: _mode);
+    final controller = ref.read(searchControllerProvider.notifier);
+    controller.setMode(mode);
+    final currentQuery =
+        ref.read(searchControllerProvider).asData?.value.query ?? '';
+    if (currentQuery.isNotEmpty) {
+      controller.search(currentQuery);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final searchAsync = ref.watch(searchControllerProvider);
+    final state = searchAsync.asData?.value;
+
+    final query = state?.query ?? '';
+    final mode = state?.mode ?? SearchMode.hybrid;
+    final results = state?.results ?? const [];
+    final isLoading = state?.isLoading ?? false;
+    final error = state?.error;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Buscar'),
@@ -114,21 +82,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: SearchModeToggle(
-                  value: _mode,
+                  value: mode,
                   onChanged: _onModeChanged,
                 ),
               ),
             ),
             const Divider(height: 1),
-            Expanded(child: _buildBody()),
+            Expanded(child: _buildBody(query, results, isLoading, error)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_resultsFuture == null) {
+  Widget _buildBody(
+    String query,
+    List<SearchResultModel> results,
+    bool isLoading,
+    String? error,
+  ) {
+    if (query.isEmpty) {
       return const EmptyState(
         icon: Icons.search,
         title: 'Digite para buscar',
@@ -136,74 +109,47 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       );
     }
 
-    return FutureBuilder<List<SearchResultModel>>(
-      future: _resultsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _SkeletonList();
-        }
+    if (isLoading) {
+      return const _SkeletonList();
+    }
 
-        if (snapshot.hasError) {
-          final message = _messageFor(snapshot.error);
-          // Surface a transient snack bar in addition to the inline
-          // error so the failure is hard to miss whichever direction
-          // the user happens to be looking.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            showErrorSnackBar(context, message: message, onRetry: _retry);
-          });
-          return EmptyState(
-            icon: Icons.cloud_off,
-            title: 'Erro na busca',
-            subtitle: message,
-            action: FilledButton.icon(
-              onPressed: _retry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Tentar novamente'),
-            ),
-          );
-        }
+    if (error != null) {
+      return EmptyState(
+        icon: Icons.cloud_off,
+        title: 'Erro na busca',
+        subtitle: error,
+        action: FilledButton.icon(
+          onPressed: () => _onQueryChanged(query),
+          icon: const Icon(Icons.refresh),
+          label: const Text('Tentar novamente'),
+        ),
+      );
+    }
 
-        final results = snapshot.data ?? const [];
-        if (results.isEmpty) {
-          return const EmptyState(
-            icon: Icons.search_off,
-            title: 'Nenhum resultado',
-            subtitle: 'Tente outro termo ou outro modo de busca.',
-          );
-        }
+    if (results.isEmpty) {
+      return const EmptyState(
+        icon: Icons.search_off,
+        title: 'Nenhum resultado',
+        subtitle: 'Tente outro termo ou outro modo de busca.',
+      );
+    }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          itemCount: results.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-          itemBuilder: (context, index) {
-            final result = results[index];
-            return SearchResultTile(
-              result: result,
-              query: _query,
-              onTap: () => context.push('/notes/${result.id}'),
-            );
-          },
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      itemCount: results.length,
+      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+      itemBuilder: (context, index) {
+        final result = results[index];
+        return SearchResultTile(
+          result: result,
+          query: query,
+          onTap: () => context.push('/notes/${result.id}'),
         );
       },
     );
   }
-
-  String _messageFor(Object? error) {
-    if (error is ApiException) return error.message;
-    if (error == null) return 'Erro desconhecido';
-    return error.toString();
-  }
 }
 
-/// Placeholder list rendered while the request is in flight.
-///
-/// Plain card-shaped grey blocks with a top [LinearProgressIndicator]
-/// — no third-party shimmer library is in the pubspec and the design
-/// system does not yet ship a token for animated skeletons, so a
-/// static skeleton plus the progress bar is the minimum-friction
-/// loading affordance.
 class _SkeletonList extends StatelessWidget {
   const _SkeletonList();
 

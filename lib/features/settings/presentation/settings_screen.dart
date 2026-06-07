@@ -1,18 +1,3 @@
-/// Top-level settings screen — the entry point for the "Conta",
-/// "Notificações" and "Avançado" groups.
-///
-/// The screen itself is presentational; the underlying state is owned by:
-///   * [authControllerProvider] — for the account name/email and logout
-///   * [pushNotificationsEnabledProvider] — local-only toggle for the
-///     notifications row (no backend endpoint exists yet)
-///   * [syncStateProvider] — for the "Dados → Última sync" dialog
-///
-/// The advanced rows push to dedicated routes via [GoRouter]:
-///   * `/soul`     — [SoulEditorScreen]
-///   * `/contexts` — [ContextsScreen]
-///   * `/telegram` — added by another agent; tapping the tile before it
-///     ships shows the default GoRouter 404, which is the documented
-///     interim behaviour.
 library;
 
 import 'package:flutter/material.dart';
@@ -23,25 +8,20 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
 import 'package:supanotes/features/auth/domain/auth_state.dart';
+import 'package:supanotes/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:supanotes/features/settings/presentation/widgets/settings_tile.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
-/// Strings shown on the settings screen.
-///
-/// Pulled into a constants class so the screen body is free of literal
-/// strings and so a future i18n pass has a single place to translate.
 class _SettingsStrings {
   _SettingsStrings._();
 
   static const String title = 'Configurações';
 
-  // Sections
   static const String accountSection = 'Conta';
   static const String notificationsSection = 'Notificações';
   static const String advancedSection = 'Avançado';
 
-  // Account
   static const String emailTile = 'Email';
   static const String nameTile = 'Nome';
   static const String fallbackName = '—';
@@ -52,12 +32,10 @@ class _SettingsStrings {
       'Você precisará fazer login novamente para acessar suas notas.';
   static const String logoutConfirmLabel = 'Sair';
 
-  // Notifications
   static const String pushTile = 'Receber push';
   static const String pushSubtitle =
       'Notificações de briefs e lembretes (em breve).';
 
-  // Advanced
   static const String soulTile = 'Personalidade do agent';
   static const String soulSubtitle = 'Edite o prompt da SOUL.';
   static const String contextsTile = 'Contextos';
@@ -67,36 +45,16 @@ class _SettingsStrings {
   static const String dataTile = 'Dados';
   static const String dataSubtitle = 'Informações da última sincronização.';
 
-  // Data dialog
   static const String dataDialogTitle = 'Sincronização';
   static const String dataDialogNoSync = 'Nenhuma sincronização registrada.';
   static String dataDialogLastSynced(String relative) =>
       'Última sync: $relative';
   static const String dataDialogClose = 'Fechar';
 
-  // Routes
   static const String soulRoute = '/soul';
   static const String contextsRoute = '/contexts';
   static const String telegramRoute = '/telegram';
 }
-
-/// Local-only toggle for "Receber push".
-///
-/// The backend currently has no `/api/v1/notifications/preferences`
-/// endpoint, so we keep this as a process-lifetime flag. When that
-/// endpoint lands it will be the only place to swap — every UI reader
-/// already goes through this provider.
-class PushNotificationsEnabledNotifier extends Notifier<bool> {
-  @override
-  bool build() => true;
-
-  void set(bool value) => state = value;
-}
-
-final pushNotificationsEnabledProvider =
-    NotifierProvider<PushNotificationsEnabledNotifier, bool>(
-  PushNotificationsEnabledNotifier.new,
-);
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -104,7 +62,8 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
-    final pushEnabled = ref.watch(pushNotificationsEnabledProvider);
+    final settingsAsync = ref.watch(settingsControllerProvider);
+    final pushEnabled = settingsAsync.asData?.value.pushEnabled ?? false;
 
     final account = authState.maybeWhen(
       data: (s) => s is AuthAuthenticated ? s : null,
@@ -117,9 +76,6 @@ class SettingsScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: AppSpacing.lg),
           children: [
-            // ---------------------------------------------------------------
-            // Conta
-            // ---------------------------------------------------------------
             const SettingsSectionHeader(
               title: _SettingsStrings.accountSection,
             ),
@@ -140,9 +96,6 @@ class SettingsScreen extends ConsumerWidget {
               enabled: account != null,
             ),
 
-            // ---------------------------------------------------------------
-            // Notificações
-            // ---------------------------------------------------------------
             const SettingsSectionHeader(
               title: _SettingsStrings.notificationsSection,
             ),
@@ -151,14 +104,10 @@ class SettingsScreen extends ConsumerWidget {
               title: _SettingsStrings.pushTile,
               subtitle: _SettingsStrings.pushSubtitle,
               value: pushEnabled,
-              onChanged: (next) => ref
-                  .read(pushNotificationsEnabledProvider.notifier)
-                  .set(next),
+              onChanged: (_) =>
+                  ref.read(settingsControllerProvider.notifier).togglePush(),
             ),
 
-            // ---------------------------------------------------------------
-            // Avançado
-            // ---------------------------------------------------------------
             const SettingsSectionHeader(
               title: _SettingsStrings.advancedSection,
             ),
@@ -201,8 +150,7 @@ class SettingsScreen extends ConsumerWidget {
       destructive: true,
     );
     if (!confirmed) return;
-    await ref.read(authControllerProvider.notifier).logout();
-    // The router redirect will bounce to /login automatically.
+    await ref.read(settingsControllerProvider.notifier).logout();
   }
 
   Future<void> _showSyncDialog(BuildContext context, WidgetRef ref) async {
