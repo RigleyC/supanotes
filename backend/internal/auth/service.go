@@ -42,9 +42,10 @@ func NewService(q sqlcgen.Querier, cfg *config.Config) *Service {
 	return &Service{q: q, cfg: cfg}
 }
 
-// Register creates the user, seeds default user_settings (UTC), and
-// emits the access/refresh token pair. Email is lowercased before
-// insert; password is hashed with Argon2id.
+// Register creates the user and emits the access/refresh token pair.
+// Email is lowercased before insert; password is hashed with Argon2id.
+// Onboarding (settings, inbox note, soul, routines) is delegated to
+// the onboarding.Service and runs inside a separate transaction.
 func (s *Service) Register(ctx context.Context, email, password, name string) (*sqlcgen.User, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
@@ -64,53 +65,6 @@ func (s *Service) Register(ctx context.Context, email, password, name string) (*
 			return nil, "", "", ErrEmailInUse
 		}
 		return nil, "", "", fmt.Errorf("auth: create user: %w", err)
-	}
-
-	if _, err := s.q.CreateUserSettings(ctx, sqlcgen.CreateUserSettingsParams{
-		UserID:   user.ID,
-		Timezone: "UTC",
-	}); err != nil {
-		return nil, "", "", fmt.Errorf("auth: create settings: %w", err)
-	}
-
-	title := "Rascunho"
-	content := "Bem-vindo ao SupaNotes! Esta é sua nota de inbox, o lugar perfeito para despejar ideias rapidamente."
-	if _, err := s.q.CreateNote(ctx, sqlcgen.CreateNoteParams{
-		UserID:          user.ID,
-		Title:           pgtype.Text{String: title, Valid: true},
-		Content:         content,
-		IsInbox:         true,
-		Favorite:        false,
-		Archived:        false,
-		EmbeddingStatus: "pending",
-	}); err != nil {
-		return nil, "", "", fmt.Errorf("auth: create inbox note: %w", err)
-	}
-
-	defaultPersonality := "Você é o assistente SupaNotes. Você deve ser claro, objetivo, proativo e prestativo, auxiliando na organização pessoal e resgate de ideias do usuário."
-	if _, err := s.q.UpsertSoul(ctx, sqlcgen.UpsertSoulParams{
-		UserID:      user.ID,
-		Personality: defaultPersonality,
-	}); err != nil {
-		return nil, "", "", fmt.Errorf("auth: create soul: %w", err)
-	}
-
-	if _, err := s.q.CreateRoutine(ctx, sqlcgen.CreateRoutineParams{
-		UserID:   user.ID,
-		Type:     "daily",
-		CronExpr: "0 8 * * 1-5", // 08:00 AM weekdays
-		Enabled:  true,
-	}); err != nil {
-		return nil, "", "", fmt.Errorf("auth: create daily routine: %w", err)
-	}
-
-	if _, err := s.q.CreateRoutine(ctx, sqlcgen.CreateRoutineParams{
-		UserID:   user.ID,
-		Type:     "weekly",
-		CronExpr: "0 9 * * 1", // 09:00 AM Mondays
-		Enabled:  true,
-	}); err != nil {
-		return nil, "", "", fmt.Errorf("auth: create weekly routine: %w", err)
 	}
 
 	access, refresh, err := s.generateAuthResponse(ctx, user.ID)

@@ -7,6 +7,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/onboarding"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -47,12 +48,17 @@ type RefreshResponse struct {
 }
 
 type Handler struct {
-	svc *Service
-	v   *validator.Validate
+	svc           *Service
+	onboardingSvc *onboarding.Service
+	v             *validator.Validate
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc, v: validator.New(validator.WithRequiredStructEnabled())}
+func NewHandler(svc *Service, onboardingSvc *onboarding.Service) *Handler {
+	return &Handler{
+		svc:           svc,
+		onboardingSvc: onboardingSvc,
+		v:             validator.New(validator.WithRequiredStructEnabled()),
+	}
 }
 
 func (h *Handler) Register(c echo.Context) error {
@@ -71,6 +77,13 @@ func (h *Handler) Register(c echo.Context) error {
 		}
 		c.Logger().Error(err)
 		return jsonError(c, http.StatusInternalServerError, "registration failed")
+	}
+
+	if h.onboardingSvc != nil {
+		if err := h.onboardingSvc.OnboardUser(c.Request().Context(), user.ID); err != nil {
+			c.Logger().Error(err)
+			return jsonError(c, http.StatusInternalServerError, "registration failed")
+		}
 	}
 
 	return c.JSON(http.StatusCreated, AuthResponse{

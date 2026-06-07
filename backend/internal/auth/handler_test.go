@@ -24,7 +24,7 @@ func newTestServer(t *testing.T) (*echo.Echo, *mockQuerier) {
 	t.Helper()
 	q := newMockQuerier()
 	svc := NewService(q, testConfig())
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 
 	e := echo.New()
 	e.HideBanner = true

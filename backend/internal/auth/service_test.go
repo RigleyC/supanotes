@@ -325,9 +325,6 @@ func TestService_Register_Success(t *testing.T) {
 	if len(refresh) != 64 {
 		t.Errorf("Register: refresh token want 64 hex chars, got %d", len(refresh))
 	}
-	if _, ok := q.settings[user.ID]; !ok {
-		t.Error("Register: user settings not seeded")
-	}
 }
 
 func TestService_Register_EmailConflict(t *testing.T) {
@@ -482,17 +479,17 @@ func TestUUIDHelpers(t *testing.T) {
 	}
 }
 
-func TestService_Register_SettingsFailureBubblesUp(t *testing.T) {
+func TestService_Register_RefreshFailureBubblesUp(t *testing.T) {
 	q := newMockQuerier()
-	q.createSettingsErr = errors.New("settings boom")
+	q.createRefreshErr = errors.New("store boom")
 	svc := NewService(q, testConfig())
 
-	_, _, _, err := svc.Register(context.Background(), "sf@example.com", "password-1234", "Gus")
+	_, _, _, err := svc.Register(context.Background(), "rf@example.com", "password-1234", "Gus")
 	if err == nil {
-		t.Fatal("Register with settings error: want error, got nil")
+		t.Fatal("Register with refresh error: want error, got nil")
 	}
 	if errors.Is(err, ErrEmailInUse) {
-		t.Fatalf("Register with settings error: got ErrEmailInUse, want %v", err)
+		t.Fatalf("Register with refresh error: got ErrEmailInUse, want %v", err)
 	}
 }
 
@@ -593,5 +590,9 @@ func (m *mockQuerier) HardDeleteExpiredTasks(ctx context.Context) error {
 }
 
 func (m *mockQuerier) HardDeleteExpiredContexts(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
 	return nil
 }
