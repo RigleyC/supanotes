@@ -83,15 +83,15 @@ abstract class ITelegramRepository {
 }
 
 class TelegramRepository implements ITelegramRepository {
-  TelegramRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
+  TelegramRepository({required ApiClient apiClient}) : _api = apiClient;
 
-  final Dio _dio;
+  final ApiClient _api;
 
   /// `GET /telegram/link` → returns the current status. An unlinked
   /// account yields `linked: false` with no `chat_id` / `username` keys.
   Future<TelegramLinkStatus> getLinkStatus() async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>('/telegram/link');
+      final response = await _api.get<Map<String, dynamic>>('/telegram/link');
       final data = response.data;
       if (data == null) {
         throw const ServerException(
@@ -110,7 +110,7 @@ class TelegramRepository implements ITelegramRepository {
   /// not have to.
   Future<TelegramLinkCode> generateLinkCode() async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _api.post<Map<String, dynamic>>(
         '/telegram/link-code',
       );
       final data = response.data;
@@ -130,7 +130,7 @@ class TelegramRepository implements ITelegramRepository {
   /// responds with 204 No Content.
   Future<void> deleteLink() async {
     try {
-      await _dio.delete<dynamic>('/telegram/link');
+      await _api.delete<dynamic>('/telegram/link');
     } on DioException catch (e) {
       throw fromDioError(e);
     }

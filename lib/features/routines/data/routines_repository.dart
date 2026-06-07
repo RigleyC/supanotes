@@ -27,14 +27,14 @@ abstract class IRoutinesRepository {
 }
 
 class RoutinesRepository implements IRoutinesRepository {
-  RoutinesRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
+  RoutinesRepository({required ApiClient apiClient}) : _api = apiClient;
 
-  final Dio _dio;
+  final ApiClient _api;
 
   /// `GET /routines` → list of configured briefs for the user.
   Future<List<RoutineModel>> getRoutines() async {
     try {
-      final response = await _dio.get<dynamic>('/routines');
+      final response = await _api.get<dynamic>('/routines');
       final raw = response.data;
       if (raw is! List) {
         return const [];
@@ -52,7 +52,7 @@ class RoutinesRepository implements IRoutinesRepository {
   /// is the backend's responsibility.
   Future<List<RoutineLogModel>> getLogs() async {
     try {
-      final response = await _dio.get<dynamic>('/routines/logs');
+      final response = await _api.get<dynamic>('/routines/logs');
       final raw = response.data;
       if (raw is! List) {
         return const [];
@@ -78,7 +78,7 @@ class RoutinesRepository implements IRoutinesRepository {
     if (enabled != null) body['enabled'] = enabled;
 
     try {
-      final response = await _dio.patch<Map<String, dynamic>>(
+      final response = await _api.patch<Map<String, dynamic>>(
         '/routines/$id',
         data: body,
       );
@@ -104,7 +104,7 @@ class RoutinesRepository implements IRoutinesRepository {
 
   Future<String> _testBrief(BriefType type) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _api.post<Map<String, dynamic>>(
         '/routines/${type.testPath}/test',
       );
       final data = response.data;

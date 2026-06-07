@@ -26,9 +26,9 @@ abstract class IChatRepository {
 }
 
 class ChatRepository implements IChatRepository {
-  ChatRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
+  ChatRepository({required ApiClient apiClient}) : _api = apiClient;
 
-  final Dio _dio;
+  final ApiClient _api;
 
   /// `POST /agent/chat` → returns the assistant reply body.
   Future<String> sendMessage({
@@ -36,7 +36,7 @@ class ChatRepository implements IChatRepository {
     required String message,
   }) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _api.post<Map<String, dynamic>>(
         '/agent/chat',
         data: <String, dynamic>{
           'session_id': sessionId,
@@ -59,7 +59,7 @@ class ChatRepository implements IChatRepository {
   /// `GET /agent/messages?session_id=<uuid>` → persisted history.
   Future<List<MessageModel>> getHistory(String sessionId) async {
     try {
-      final response = await _dio.get<List<dynamic>>(
+      final response = await _api.get<List<dynamic>>(
         '/agent/messages',
         queryParameters: <String, dynamic>{'session_id': sessionId},
       );
@@ -77,7 +77,7 @@ class ChatRepository implements IChatRepository {
   /// `DELETE /agent/messages?session_id=<uuid>` → wipe history.
   Future<void> clearHistory(String sessionId) async {
     try {
-      await _dio.delete<dynamic>(
+      await _api.delete<dynamic>(
         '/agent/messages',
         queryParameters: <String, dynamic>{'session_id': sessionId},
       );

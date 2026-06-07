@@ -29,10 +29,10 @@ class AuthRepository implements IAuthRepository {
   AuthRepository({
     required ApiClient apiClient,
     required AuthLocalStorage storage,
-  })  : _dio = apiClient.dio,
+  })  : _api = apiClient,
         _storage = storage;
 
-  final Dio _dio;
+  final ApiClient _api;
   final AuthLocalStorage _storage;
 
   /// `POST /auth/register` → persist tokens, return the [AuthResult].
@@ -42,7 +42,7 @@ class AuthRepository implements IAuthRepository {
     required String name,
   }) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _api.post<Map<String, dynamic>>(
         '/auth/register',
         data: {
           'email': email,
@@ -79,7 +79,7 @@ class AuthRepository implements IAuthRepository {
     required String password,
   }) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _api.post<Map<String, dynamic>>(
         '/auth/login',
         data: {
           'email': email,
@@ -117,7 +117,7 @@ class AuthRepository implements IAuthRepository {
     final refreshToken = await _storage.getRefreshToken();
     try {
       if (refreshToken != null) {
-        await _dio.post<dynamic>(
+        await _api.post<dynamic>(
           '/auth/logout',
           data: {'refresh_token': refreshToken},
         );

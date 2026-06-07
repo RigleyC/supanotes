@@ -24,15 +24,15 @@ import 'package:supanotes/core/di/providers.dart';
 import '../domain/organization_plan.dart';
 
 class AgentRepository {
-  AgentRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
+  AgentRepository({required ApiClient apiClient}) : _api = apiClient;
 
-  final Dio _dio;
+  final ApiClient _api;
 
   /// `POST /agent/inbox/organize/plan` → ask the agent to draft a plan
   /// from the user's current inbox note.
   Future<OrganizationPlan> planInboxOrganization() async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _api.post<Map<String, dynamic>>(
         '/agent/inbox/organize/plan',
       );
       final data = response.data;
@@ -55,7 +55,7 @@ class AgentRepository {
     required List<String> acceptedItemIds,
   }) async {
     try {
-      await _dio.post<dynamic>(
+      await _api.post<dynamic>(
         '/agent/inbox/organize/apply',
         data: {
           'plan_id': planId,

@@ -28,9 +28,9 @@ abstract class ISearchRepository {
 }
 
 class SearchRepository implements ISearchRepository {
-  SearchRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
+  SearchRepository({required ApiClient apiClient}) : _api = apiClient;
 
-  final Dio _dio;
+  final ApiClient _api;
 
   /// Default `limit` the backend falls back to when the request omits
   /// (or sends a non-positive) value. Kept in sync with
@@ -53,7 +53,7 @@ class SearchRepository implements ISearchRepository {
     if (trimmed.isEmpty) return const [];
 
     try {
-      final response = await _dio.post<List<dynamic>>(
+      final response = await _api.post<List<dynamic>>(
         '/search',
         data: {
           'query': trimmed,

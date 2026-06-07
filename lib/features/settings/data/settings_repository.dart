@@ -48,9 +48,9 @@ abstract class ISettingsRepository {
 }
 
 class SettingsRepository implements ISettingsRepository {
-  SettingsRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
+  SettingsRepository({required ApiClient apiClient}) : _api = apiClient;
 
-  final Dio _dio;
+  final ApiClient _api;
 
   // ---------------------------------------------------------------------------
   // Settings (timezone, created/updated timestamps)
@@ -59,7 +59,7 @@ class SettingsRepository implements ISettingsRepository {
   /// `GET /settings` → the user's [UserSettings].
   Future<UserSettings> getSettings() async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
+      final response = await _api.get<Map<String, dynamic>>(
         _SettingsRoutes.settings,
       );
       final body = response.data;
@@ -78,7 +78,7 @@ class SettingsRepository implements ISettingsRepository {
   /// `PUT /settings` with a new IANA [timezone] string.
   Future<UserSettings> updateSettings(String timezone) async {
     try {
-      final response = await _dio.put<Map<String, dynamic>>(
+      final response = await _api.put<Map<String, dynamic>>(
         _SettingsRoutes.settings,
         data: {'timezone': timezone},
       );
@@ -102,7 +102,7 @@ class SettingsRepository implements ISettingsRepository {
   /// `GET /soul` → the user's [Soul] (persona prompt).
   Future<Soul> getSoul() async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
+      final response = await _api.get<Map<String, dynamic>>(
         _SettingsRoutes.soul,
       );
       final body = response.data;
@@ -121,7 +121,7 @@ class SettingsRepository implements ISettingsRepository {
   /// `PUT /soul` with the new [personality] markdown.
   Future<Soul> updateSoul(String personality) async {
     try {
-      final response = await _dio.put<Map<String, dynamic>>(
+      final response = await _api.put<Map<String, dynamic>>(
         _SettingsRoutes.soul,
         data: {'personality': personality},
       );
@@ -145,7 +145,7 @@ class SettingsRepository implements ISettingsRepository {
   /// `GET /contexts` → the user's [UserContext] list.
   Future<List<UserContext>> getContexts() async {
     try {
-      final response = await _dio.get<List<dynamic>>(
+      final response = await _api.get<List<dynamic>>(
         _SettingsRoutes.contexts,
       );
       final body = response.data ?? const [];
@@ -166,7 +166,7 @@ class SettingsRepository implements ISettingsRepository {
     final trimmed = name.trim();
     final slug = slugifyContextName(trimmed);
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _api.post<Map<String, dynamic>>(
         _SettingsRoutes.contexts,
         data: {'name': trimmed, 'slug': slug},
       );
@@ -186,7 +186,7 @@ class SettingsRepository implements ISettingsRepository {
   /// `DELETE /contexts/:id`.
   Future<void> deleteContext(String id) async {
     try {
-      await _dio.delete<dynamic>(_SettingsRoutes.contextById(id));
+      await _api.delete<dynamic>(_SettingsRoutes.contextById(id));
     } on DioException catch (e) {
       throw fromDioError(e);
     }
