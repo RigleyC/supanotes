@@ -31,6 +31,7 @@ class ChatRepository implements IChatRepository {
   final ApiClient _api;
 
   /// `POST /agent/chat` → returns the assistant reply body.
+  @override
   Future<String> sendMessage({
     required String sessionId,
     required String message,
@@ -57,6 +58,7 @@ class ChatRepository implements IChatRepository {
   }
 
   /// `GET /agent/messages?session_id=<uuid>` → persisted history.
+  @override
   Future<List<MessageModel>> getHistory(String sessionId) async {
     try {
       final response = await _api.get<List<dynamic>>(
@@ -75,6 +77,7 @@ class ChatRepository implements IChatRepository {
   }
 
   /// `DELETE /agent/messages?session_id=<uuid>` → wipe history.
+  @override
   Future<void> clearHistory(String sessionId) async {
     try {
       await _api.delete<dynamic>(

@@ -36,6 +36,7 @@ class AuthRepository implements IAuthRepository {
   final AuthLocalStorage _storage;
 
   /// `POST /auth/register` → persist tokens, return the [AuthResult].
+  @override
   Future<AuthResult> register({
     required String email,
     required String password,
@@ -74,6 +75,7 @@ class AuthRepository implements IAuthRepository {
   }
 
   /// `POST /auth/login` → persist tokens, return the [AuthResult].
+  @override
   Future<AuthResult> login({
     required String email,
     required String password,
@@ -113,6 +115,7 @@ class AuthRepository implements IAuthRepository {
   ///
   /// Best-effort: if the network call fails the local tokens are still
   /// cleared so the user is signed out from the device's perspective.
+  @override
   Future<void> logout() async {
     final refreshToken = await _storage.getRefreshToken();
     try {
@@ -135,6 +138,7 @@ class AuthRepository implements IAuthRepository {
   /// tell you whether the backend still accepts the token. Use the
   /// [AuthInterceptor] for that: any 401 on a real call will surface as a
   /// refresh attempt, and a failed refresh will clear the tokens.
+  @override
   Future<bool> isAuthenticated() async {
     final token = await _storage.getAccessToken();
     return token != null && token.isNotEmpty;

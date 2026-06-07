@@ -33,6 +33,7 @@ class TasksRepository implements ITasksRepository {
   final TasksLocalRepository _local;
   final Uuid _uuid = const Uuid();
 
+  @override
   String get userId => _local.userId;
 
   // ---------------------------------------------------------------------------
@@ -41,6 +42,7 @@ class TasksRepository implements ITasksRepository {
 
   /// All tasks whose due date is today or in the past, ordered: overdue
   /// first (oldest first), then today, then completed at the bottom.
+  @override
   Stream<List<TaskModel>> watchTodayTasks() {
     return _local
         .watchOpenTasks()
@@ -49,6 +51,7 @@ class TasksRepository implements ITasksRepository {
   }
 
   /// Tasks whose due date is strictly before today (and still pending).
+  @override
   Stream<List<TaskModel>> watchOverdueTasks() {
     return _local.watchOpenTasks().map((rows) {
       return rows
@@ -60,6 +63,7 @@ class TasksRepository implements ITasksRepository {
   }
 
   /// Tasks whose due date is exactly today (and still pending).
+  @override
   Stream<List<TaskModel>> watchTodayDueTasks() {
     return _local.watchOpenTasks().map((rows) {
       return rows
@@ -72,6 +76,7 @@ class TasksRepository implements ITasksRepository {
 
   /// Pending tasks that have no due date at all — surfaced in the
   /// collapsible "Sem data" section.
+  @override
   Stream<List<TaskModel>> watchUndatedOpenTasks() {
     return _local.watchOpenTasks().map((rows) {
       return rows
@@ -84,6 +89,7 @@ class TasksRepository implements ITasksRepository {
 
   /// Every task attached to [noteId], in their stable `position` order,
   /// pending first then completed. Useful from the note editor.
+  @override
   Stream<List<TaskModel>> watchByNote(String noteId) {
     return _local.watchNoteTasks(noteId).map((rows) {
       return rows.map(TaskModel.fromData).toList();
@@ -97,6 +103,7 @@ class TasksRepository implements ITasksRepository {
   /// Inserts a brand-new task. Generates the UUID, stamps `userId` from
   /// the bound repository, and marks the row dirty so the next sync round
   /// pushes it to the backend.
+  @override
   Future<TaskModel> createTask({
     required String noteId,
     required String title,
@@ -131,15 +138,18 @@ class TasksRepository implements ITasksRepository {
   /// Delegates to the DAO, which marks the row completed and, if the
   /// task is recurring, schedules the next occurrence in the same
   /// transaction.
+  @override
   Future<void> completeTask(String id) => _local.completeTask(id);
 
   /// Reverses a completion: clears `completedAt` and re-opens the task.
+  @override
   Future<void> reopenTask(String id) => _local.reopenTask(id);
 
   /// Partial update of the task with [id]. Pass `null` for any field
   /// that should not change. An explicit `Value(null)` (via the
   /// [clearDueDate] / [clearRecurrence] helpers below) is required to
   /// wipe a nullable column.
+  @override
   Future<void> updateTask(
     String id, {
     String? title,
@@ -166,12 +176,15 @@ class TasksRepository implements ITasksRepository {
   }
 
   /// Soft-deletes the task. The row stays in the database with
-  /// `deletedAt` set so the tombstone reaches the backend.
+  /// `deletedAt` set so the tombstone reaches the backend on the next
+  /// sync round.
+  @override
   Future<void> deleteTask(String id) => _local.softDeleteTask(id);
 
   /// Rewrites the `position` of every task in [noteId] to match
   /// [orderedIds]. Wrapped in a single transaction so a crash mid-reorder
   /// does not leave the list half-ordered.
+  @override
   Future<void> reorderTasks(String noteId, List<String> orderedIds) async {
     for (var i = 0; i < orderedIds.length; i++) {
       await _local.updateTask(TasksCompanion(

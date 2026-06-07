@@ -32,6 +32,7 @@ class RoutinesRepository implements IRoutinesRepository {
   final ApiClient _api;
 
   /// `GET /routines` → list of configured briefs for the user.
+  @override
   Future<List<RoutineModel>> getRoutines() async {
     try {
       final response = await _api.get<dynamic>('/routines');
@@ -50,6 +51,7 @@ class RoutinesRepository implements IRoutinesRepository {
 
   /// `GET /routines/logs` → execution history, newest-first ordering
   /// is the backend's responsibility.
+  @override
   Future<List<RoutineLogModel>> getLogs() async {
     try {
       final response = await _api.get<dynamic>('/routines/logs');
@@ -68,6 +70,7 @@ class RoutinesRepository implements IRoutinesRepository {
 
   /// `PATCH /routines/:id` with the given (optional) field changes.
   /// Returns the updated routine as echoed by the backend.
+  @override
   Future<RoutineModel> updateRoutine(
     String id, {
     String? cronExpr,
@@ -97,9 +100,11 @@ class RoutinesRepository implements IRoutinesRepository {
 
   /// `POST /routines/daily/test` → dry-run, returns the brief body
   /// the LLM produced for the user's current context.
+  @override
   Future<String> testDaily() => _testBrief(BriefType.daily);
 
   /// `POST /routines/weekly/test` → dry-run for the weekly brief.
+  @override
   Future<String> testWeekly() => _testBrief(BriefType.weekly);
 
   Future<String> _testBrief(BriefType type) async {

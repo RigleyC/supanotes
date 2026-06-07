@@ -57,6 +57,7 @@ class SettingsRepository implements ISettingsRepository {
   // ---------------------------------------------------------------------------
 
   /// `GET /settings` → the user's [UserSettings].
+  @override
   Future<UserSettings> getSettings() async {
     try {
       final response = await _api.get<Map<String, dynamic>>(
@@ -76,6 +77,7 @@ class SettingsRepository implements ISettingsRepository {
   }
 
   /// `PUT /settings` with a new IANA [timezone] string.
+  @override
   Future<UserSettings> updateSettings(String timezone) async {
     try {
       final response = await _api.put<Map<String, dynamic>>(
@@ -100,6 +102,7 @@ class SettingsRepository implements ISettingsRepository {
   // ---------------------------------------------------------------------------
 
   /// `GET /soul` → the user's [Soul] (persona prompt).
+  @override
   Future<Soul> getSoul() async {
     try {
       final response = await _api.get<Map<String, dynamic>>(
@@ -119,6 +122,7 @@ class SettingsRepository implements ISettingsRepository {
   }
 
   /// `PUT /soul` with the new [personality] markdown.
+  @override
   Future<Soul> updateSoul(String personality) async {
     try {
       final response = await _api.put<Map<String, dynamic>>(
@@ -143,6 +147,7 @@ class SettingsRepository implements ISettingsRepository {
   // ---------------------------------------------------------------------------
 
   /// `GET /contexts` → the user's [UserContext] list.
+  @override
   Future<List<UserContext>> getContexts() async {
     try {
       final response = await _api.get<List<dynamic>>(
@@ -162,6 +167,7 @@ class SettingsRepository implements ISettingsRepository {
   /// The backend requires both a `name` and a `slug`; we derive the slug
   /// from the name client-side via [slugifyContextName] so the UI only
   /// has to ask the user for one value.
+  @override
   Future<UserContext> createContext(String name) async {
     final trimmed = name.trim();
     final slug = slugifyContextName(trimmed);
@@ -184,6 +190,7 @@ class SettingsRepository implements ISettingsRepository {
   }
 
   /// `DELETE /contexts/:id`.
+  @override
   Future<void> deleteContext(String id) async {
     try {
       await _api.delete<dynamic>(_SettingsRoutes.contextById(id));

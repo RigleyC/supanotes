@@ -34,6 +34,7 @@ class NotesRepository implements INotesRepository {
   /// to favorite notes; when [contextId] is non-null, the result is
   /// filtered to notes attached to that context. When both are set,
   /// [contextId] wins because it is a more restrictive index.
+  @override
   Stream<List<NoteModel>> watchNotes({
     String? contextId,
     bool favoritesOnly = false,
@@ -51,12 +52,14 @@ class NotesRepository implements INotesRepository {
 
   /// Streams the single inbox note, if any. The inbox is a singleton
   /// per user — there is at most one row with `isInbox = true`.
+  @override
   Stream<NoteModel?> watchInbox() {
     return _local.watchInbox().map((d) => d == null ? null : NoteModel.fromData(d));
   }
 
   /// Creates a new note and returns the freshly-saved row. Always marks
   /// the row as dirty so the next sync round pushes it to the backend.
+  @override
   Future<NoteModel> createNote({
     String? title,
     String content = '',
@@ -83,6 +86,7 @@ class NotesRepository implements INotesRepository {
   /// Applies a partial update to the note with [id]. Only non-null
   /// arguments are written. Bumps `updatedAt` and re-flips `isDirty`
   /// so the change reaches the backend on the next sync round.
+  @override
   Future<void> updateNote(
     String id, {
     String? title,
@@ -115,6 +119,7 @@ class NotesRepository implements INotesRepository {
 
   /// Flips the favorite flag on the given note. No-op if the row no
   /// longer exists (e.g. it was deleted in another tab).
+  @override
   Future<void> toggleFavorite(String id) async {
     final current = await _local.getNoteById(id);
     if (current == null) return;
@@ -124,6 +129,7 @@ class NotesRepository implements INotesRepository {
   /// Soft-deletes the note. The row stays in the database with
   /// `deletedAt` set so the tombstone reaches the backend on the next
   /// sync round; sync is the only thing that ever hard-deletes a row.
+  @override
   Future<void> softDelete(String id) async {
     await _local.softDeleteNote(id);
   }
@@ -131,6 +137,7 @@ class NotesRepository implements INotesRepository {
   /// Appends [text] to the user's inbox note, creating the inbox row
   /// on first use. The new block is separated from the existing content
   /// by a blank line so distinct captures stay visually distinct.
+  @override
   Future<void> appendToInbox(String text) async {
     final existing = await _local.getOrCreateInboxNote();
     final separator = existing.content.isEmpty ? '' : '\n\n';

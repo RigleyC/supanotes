@@ -44,6 +44,7 @@ class SearchRepository implements ISearchRepository {
   /// An empty or whitespace-only [query] short-circuits to an empty
   /// list without touching the network — the screen uses this to keep
   /// the input live without spamming the backend.
+  @override
   Future<List<SearchResultModel>> search({
     required String query,
     SearchMode mode = SearchMode.hybrid,

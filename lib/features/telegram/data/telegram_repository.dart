@@ -89,6 +89,7 @@ class TelegramRepository implements ITelegramRepository {
 
   /// `GET /telegram/link` → returns the current status. An unlinked
   /// account yields `linked: false` with no `chat_id` / `username` keys.
+  @override
   Future<TelegramLinkStatus> getLinkStatus() async {
     try {
       final response = await _api.get<Map<String, dynamic>>('/telegram/link');
@@ -108,6 +109,7 @@ class TelegramRepository implements ITelegramRepository {
   /// `POST /telegram/link-code` → returns a fresh pairing code and its
   /// expiry. The backend enforces a per-user cooldown; the caller does
   /// not have to.
+  @override
   Future<TelegramLinkCode> generateLinkCode() async {
     try {
       final response = await _api.post<Map<String, dynamic>>(
@@ -128,6 +130,7 @@ class TelegramRepository implements ITelegramRepository {
 
   /// `DELETE /telegram/link` → tears down the active link. Backend
   /// responds with 204 No Content.
+  @override
   Future<void> deleteLink() async {
     try {
       await _api.delete<dynamic>('/telegram/link');
