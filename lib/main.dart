@@ -39,9 +39,9 @@ class SupaNotesApp extends ConsumerWidget {
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+/*       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.dark, */
       routerConfig: router,
     );
   }

@@ -1,0 +1,52 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Backend (Go Server)",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/backend/cmd/server",
+            "env": {
+                "PORT": "8080",
+                "DATABASE_URL": "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable"
+            },
+            "cwd": "${workspaceFolder}/backend",
+            "console": "integratedTerminal",
+            "logOutput": "rpc"
+        },
+        {
+            "name": "Frontend (Flutter)",
+            "type": "dart",
+            "request": "launch",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Backend + Frontend",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/backend/cmd/server",
+            "env": {
+                "PORT": "8080",
+                "DATABASE_URL": "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable"
+            },
+            "cwd": "${workspaceFolder}/backend",
+            "console": "integratedTerminal",
+            "logOutput": "rpc",
+            "preLaunchTask": "flutter-dev",
+            "postDebugTask": "flutter-stop"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Backend + Frontend (Compound)",
+            "configurations": [
+                "Backend (Go Server)",
+                "Frontend (Flutter)"
+            ]
+        }
+    ]
+}

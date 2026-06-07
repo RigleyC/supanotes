@@ -124,13 +124,13 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
 
   Future<void> _onDelete() async {
     final confirmed = await showConfirmDialog(
-      context,
+      context: context,
       title: 'Desconectar Telegram?',
       message:
           'Você deixará de receber mensagens no Telegram vinculado a esta conta.',
       confirmLabel: 'Desconectar',
       cancelLabel: 'Cancelar',
-      isDestructive: true,
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
 

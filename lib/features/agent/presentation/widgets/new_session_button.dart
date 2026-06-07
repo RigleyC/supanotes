@@ -27,11 +27,11 @@ class NewSessionButton extends ConsumerWidget {
   Future<void> _onPressed(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showConfirmDialog(
-      context,
+      context: context,
       title: 'Nova conversa',
       message: 'Iniciar uma nova conversa? O histórico atual será apagado.',
       confirmLabel: 'Nova conversa',
-      isDestructive: true,
+      destructive: true,
     );
     if (confirmed != true) return;
 

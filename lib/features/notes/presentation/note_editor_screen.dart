@@ -233,27 +233,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         });
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: Hero(
-          tag: NoteCard.titleHeroTag(widget.noteId),
-          child: Material(
-            type: MaterialType.transparency,
-            child: TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                filled: false,
-                contentPadding: EdgeInsets.zero,
-                hintText: 'Sem título',
+        appBar: AppBar(
+          title: Hero(
+            tag: NoteCard.titleHeroTag(widget.noteId),
+            child: Material(
+              type: MaterialType.transparency,
+              child: TextField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                  hintText: 'Sem título',
+                ),
+                style: AppTypography.textTheme.titleLarge?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: AppTypography.semibold,
+                ),
+                onChanged: _onTitleChanged,
               ),
-              style: AppTypography.textTheme.titleLarge?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: AppTypography.semibold,
-              ),
-              onChanged: _onTitleChanged,
             ),
           ),
-        ),
         actions: [
           SaveIndicator(state: _saveState),
           IconButton(
@@ -265,6 +265,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       ),
       body: Column(
         children: [
+          NoteToolbar(editor: _editor!, composer: _composer!),
           Expanded(
             child: SuperEditor(
               editor: _editor!,
@@ -274,10 +275,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               ),
             ),
           ),
-          NoteToolbar(editor: _editor!, composer: _composer!),
         ],
       ),
-      ),
-    );
-  }
+    ),
+  );
+}
 }
