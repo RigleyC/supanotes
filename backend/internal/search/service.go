@@ -2,10 +2,10 @@ package search
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
 )
 
 type SearchResult struct {
@@ -70,66 +70,9 @@ func (s *Service) searchFTS(ctx context.Context, userID pgtype.UUID, query strin
 }
 
 func (s *Service) searchSemantic(ctx context.Context, userID pgtype.UUID, query string, limit int32) ([]SearchResult, error) {
-	rows, err := s.q.SearchNotesSemantic(ctx, sqlcgen.SearchNotesSemanticParams{
-		UserID:    userID,
-		Embedding: mockEmbedding(),
-		Limit:     limit,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]SearchResult, len(rows))
-	for i, r := range rows {
-		res[i] = SearchResult{
-			ID:        r.ID,
-			Title:     r.Title.String,
-			Content:   r.Content,
-			Excerpt:   r.Excerpt.String,
-			UpdatedAt: r.UpdatedAt,
-			ContextID: r.ContextID,
-			Favorite:  r.Favorite,
-			Archived:  r.Archived,
-			Score:     r.Score,
-		}
-	}
-	return res, nil
+	return nil, fmt.Errorf("search: semantic mode not available — no real embedding API configured")
 }
 
 func (s *Service) searchHybrid(ctx context.Context, userID pgtype.UUID, query string, limit int32) ([]SearchResult, error) {
-	rows, err := s.q.SearchNotesHybrid(ctx, sqlcgen.SearchNotesHybridParams{
-		Query:         query,
-		UserID:        userID,
-		FtsLimit:      limit * 2,
-		Embedding:     mockEmbedding(),
-		SemanticLimit: limit * 2,
-		Limit:         limit,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]SearchResult, len(rows))
-	for i, r := range rows {
-		res[i] = SearchResult{
-			ID:        r.ID,
-			Title:     r.Title.String,
-			Content:   r.Content,
-			Excerpt:   r.Excerpt.String,
-			UpdatedAt: r.UpdatedAt,
-			ContextID: r.ContextID,
-			Favorite:  r.Favorite,
-			Archived:  r.Archived,
-			Score:     r.Score,
-		}
-	}
-	return res, nil
-}
-
-func mockEmbedding() pgvector.Vector {
-	vec := make([]float32, 1536)
-	for i := range vec {
-		vec[i] = 0.01
-	}
-	return pgvector.NewVector(vec)
+	return nil, fmt.Errorf("search: hybrid mode not available — no real embedding API configured")
 }
