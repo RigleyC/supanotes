@@ -11,7 +11,8 @@ func BindAndValidate(c echo.Context, req any) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	if err := c.Validate(req); err != nil {
-		return JSONValidationError(c, err)
+		JSONValidationError(c, err)
+		return echo.ErrBadRequest
 	}
 	return nil
 }
