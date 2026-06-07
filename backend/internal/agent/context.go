@@ -3,15 +3,16 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/tasks"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type ContextBuilder struct {
@@ -30,18 +31,9 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		recentMsgs  []sqlcgen.Message
 		todayTasks  []sqlcgen.Task
 		recentNotes []sqlcgen.Note
-		semNotes    []sqlcgen.SearchNotesByEmbeddingRow
-		linkedNotes []sqlcgen.Note
-		semMemories []sqlcgen.SearchMemoriesByEmbeddingRow
 	)
 
 	g, gCtx := errgroup.WithContext(ctx)
-
-	queryEmb := make([]float32, 1536)
-	for i := range queryEmb {
-		queryEmb[i] = 0.01
-	}
-	vec := pgvector.NewVector(queryEmb)
 
 	g.Go(func() error {
 		var err error
@@ -84,115 +76,35 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		return nil
 	})
 
-	g.Go(func() error {
-		var err error
-		semNotes, err = cb.q.SearchNotesByEmbedding(gCtx, sqlcgen.SearchNotesByEmbeddingParams{
-			UserID:  userID,
-			Column2: vec,
-			Limit:   6,
-		})
-		if err != nil {
-			return fmt.Errorf("search notes: %w", err)
-		}
-
-		var semNoteIDs []pgtype.UUID
-		for _, sn := range semNotes {
-			semNoteIDs = append(semNoteIDs, sn.ID)
-		}
-
-		if len(semNoteIDs) > 0 {
-			linkedNotes, _ = cb.q.GetLinkedNotes(gCtx, sqlcgen.GetLinkedNotesParams{
-				Column1: semNoteIDs,
-				UserID:  userID,
-			})
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		var err error
-		semMemories, err = cb.q.SearchMemoriesByEmbedding(gCtx, sqlcgen.SearchMemoriesByEmbeddingParams{
-			UserID:  userID,
-			Column2: vec,
-			Limit:   5,
-		})
-		if err != nil {
-			return fmt.Errorf("search memories: %w", err)
-		}
-		return nil
-	})
-
 	if err := g.Wait(); err != nil {
 		return "", err
 	}
 
-	// Meta
 	now := time.Now().Format(time.RFC1123)
 
-	// Combine Context
-	sysContext := fmt.Sprintf(`SOUL:
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf(`SOUL:
 %s
 
 CURRENT DATE & TIME:
 %s
 
 RECENT MESSAGES HISTORY (Up to 10):
-`, soul.Personality, now)
+`, soul.Personality, now))
 
 	for _, m := range recentMsgs {
-		sysContext += fmt.Sprintf("[%s]: %s\n", m.Role, m.Content)
+		b.WriteString(fmt.Sprintf("[%s]: %s\n", m.Role, m.Content))
 	}
 
-	sysContext += "\nTODAY/OVERDUE TASKS:\n"
-	for _, t := range todayTasks {
-		sysContext += fmt.Sprintf("- [%s] %s\n", t.Status, t.Title)
-	}
+	b.WriteString("\nTODAY/OVERDUE TASKS:\n")
+	writeTasksWithStatus(&b, todayTasks)
 
-	sysContext += "\nRECENT NOTES (Last 48h):\n"
-	for _, n := range recentNotes {
-		idStr := ""
-		if n.ID.Valid {
-			idStr = fmt.Sprintf("%x", n.ID.Bytes)
-		}
-		sysContext += fmt.Sprintf("- ID: %s | Title: %s\n", idStr, n.Title.String)
-	}
+	b.WriteString("\nRECENT NOTES (Last 48h):\n")
+	writeNotesWithID(&b, recentNotes)
 
-	sysContext += "\nSEMANTICALLY RELEVANT NOTES:\n"
-	for _, n := range semNotes {
-		idStr := ""
-		if n.ID.Valid {
-			idStr = fmt.Sprintf("%x", n.ID.Bytes)
-		}
-		content := n.Content
-		if len(content) > 1000 {
-			content = content[:1000] + "... [TRUNCATED]"
-		}
-		sysContext += fmt.Sprintf("- ID: %s | Title: %s | Content: %s\n", idStr, n.Title.String, content)
-	}
+	b.WriteString("\nYou have access to tools to modify the database. If the user asks you to create a note, use add_note. If the user asks about a specific file/note that is not in the context, search for it using search_notes.")
 
-	if len(linkedNotes) > 0 {
-		sysContext += "\nLINKED NOTES (Related to Semantic Notes):\n"
-		for _, n := range linkedNotes {
-			idStr := ""
-			if n.ID.Valid {
-				idStr = fmt.Sprintf("%x", n.ID.Bytes)
-			}
-			content := n.Content
-			if len(content) > 500 {
-				content = content[:500] + "... [TRUNCATED]"
-			}
-			sysContext += fmt.Sprintf("- ID: %s | Title: %s | Content: %s\n", idStr, n.Title.String, content)
-		}
-	}
-
-	sysContext += "\nRELEVANT MEMORIES:\n"
-	for _, m := range semMemories {
-		sysContext += fmt.Sprintf("- %s\n", m.Content)
-	}
-
-	sysContext += "\nYou have access to tools to modify the database. If the user asks you to create a note, use add_note. If the user asks about a specific file/note that is not in the context, search for it using search_notes."
-
-	return sysContext, nil
+	return b.String(), nil
 }
 
 // BuildForRoutine builds the context RAG string concurrently, omitting the conversation history.
@@ -229,7 +141,8 @@ func (cb *ContextBuilder) BuildForRoutine(ctx context.Context, userID pgtype.UUI
 
 	now := time.Now()
 
-	sysContext := fmt.Sprintf(`META:
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf(`META:
 Current User Time: %s
 Routine Type: %s
 
@@ -237,21 +150,43 @@ SOUL (User Personality/Settings):
 %s
 
 TODAY / OVERDUE TASKS:
-`, now.Format(time.RFC3339), routineType, soul.Personality)
+`, now.Format(time.RFC3339), routineType, soul.Personality))
 
-	for _, t := range todayTasks {
-		sysContext += fmt.Sprintf("- [ ] %s (Due: %v)\n", t.Title, t.DueDate.Time)
+	writeTasksWithDueDate(&b, todayTasks)
+
+	b.WriteString("\nRECENT NOTES (Last 48h):\n")
+	writeNotesWithContent(&b, recentNotes, 500)
+
+	b.WriteString("\nMake the brief concise and actionable based on the above information.")
+	return b.String(), nil
+}
+
+// --- formatting helpers ---
+
+func writeTasksWithStatus(b *strings.Builder, tasks []sqlcgen.Task) {
+	for _, t := range tasks {
+		b.WriteString(fmt.Sprintf("- [%s] %s\n", t.Status, t.Title))
 	}
+}
 
-	sysContext += "\nRECENT NOTES (Last 48h):\n"
-	for _, n := range recentNotes {
+func writeTasksWithDueDate(b *strings.Builder, tasks []sqlcgen.Task) {
+	for _, t := range tasks {
+		b.WriteString(fmt.Sprintf("- [ ] %s (Due: %v)\n", t.Title, t.DueDate.Time))
+	}
+}
+
+func writeNotesWithID(b *strings.Builder, notes []sqlcgen.Note) {
+	for _, n := range notes {
+		b.WriteString(fmt.Sprintf("- ID: %s | Title: %s\n", uid.UUIDToString(n.ID), n.Title.String))
+	}
+}
+
+func writeNotesWithContent(b *strings.Builder, notes []sqlcgen.Note, maxContentLen int) {
+	for _, n := range notes {
 		content := n.Content
-		if len(content) > 500 {
-			content = content[:500] + "... [TRUNCATED]"
+		if maxContentLen > 0 && len(content) > maxContentLen {
+			content = content[:maxContentLen] + "... [TRUNCATED]"
 		}
-		sysContext += fmt.Sprintf("- Title: %s | Content: %s\n", n.Title.String, content)
+		b.WriteString(fmt.Sprintf("- Title: %s | Content: %s\n", n.Title.String, content))
 	}
-
-	sysContext += "\nMake the brief concise and actionable based on the above information."
-	return sysContext, nil
 }

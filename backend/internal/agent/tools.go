@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/memories"
@@ -78,6 +77,20 @@ func (tr *ToolRegistry) Execute(ctx context.Context, userID pgtype.UUID, toolNam
 	return executor.Execute(ctx, userID, argsJSON)
 }
 
+// --- helpers ---
+
+func parseArgs[T any](argsJSON string) (T, error) {
+	var args T
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return args, fmt.Errorf("parse args: %w", err)
+	}
+	return args, nil
+}
+
+func formatID(id pgtype.UUID) string {
+	return uid.UUIDToString(id)
+}
+
 // --- AddNoteTool ---
 type AddNoteTool struct {
 	notesSvc *notes.Service
@@ -89,22 +102,18 @@ func (t *AddNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"title":{"type":"string"},"content":{"type":"string"}},"required":["title","content"]}`
 }
 func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	var args struct {
+	args, err := parseArgs[struct {
 		Title   string `json:"title"`
 		Content string `json:"content"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+	}](argsJSON)
+	if err != nil {
 		return "", err
 	}
 	note, err := t.notesSvc.CreateNote(ctx, userID, &args.Title, args.Content, nil, false, false)
 	if err != nil {
 		return "", err
 	}
-	idStr := ""
-	if note.ID.Valid {
-		idStr = fmt.Sprintf("%x", note.ID.Bytes)
-	}
-	return fmt.Sprintf("Note created with ID: %s", idStr), nil
+	return fmt.Sprintf("Note created with ID: %s", formatID(note.ID)), nil
 }
 
 // --- AddTaskTool ---
@@ -118,21 +127,17 @@ func (t *AddTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]}`
 }
 func (t *AddTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	var args struct {
+	args, err := parseArgs[struct {
 		Title string `json:"title"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+	}](argsJSON)
+	if err != nil {
 		return "", err
 	}
 	task, err := t.tasksSvc.CreateTask(ctx, userID, pgtype.UUID{}, args.Title, nil, nil, 0)
 	if err != nil {
 		return "", err
 	}
-	idStr := ""
-	if task.ID.Valid {
-		idStr = fmt.Sprintf("%x", task.ID.Bytes)
-	}
-	return fmt.Sprintf("Task created with ID: %s", idStr), nil
+	return fmt.Sprintf("Task created with ID: %s", formatID(task.ID)), nil
 }
 
 // --- SaveMemoryTool ---
@@ -140,27 +145,25 @@ type SaveMemoryTool struct {
 	memoriesSvc *memories.Service
 }
 
-func (t *SaveMemoryTool) Name() string        { return "save_memory" }
-func (t *SaveMemoryTool) Description() string { return "Save an important fact or preference about the user" }
+func (t *SaveMemoryTool) Name() string { return "save_memory" }
+func (t *SaveMemoryTool) Description() string {
+	return "Save an important fact or preference about the user"
+}
 func (t *SaveMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
 func (t *SaveMemoryTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	var args struct {
+	args, err := parseArgs[struct {
 		Content string `json:"content"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+	}](argsJSON)
+	if err != nil {
 		return "", err
 	}
 	mem, err := t.memoriesSvc.CreateMemory(ctx, userID, args.Content)
 	if err != nil {
 		return "", err
 	}
-	idStr := ""
-	if mem.ID.Valid {
-		idStr = fmt.Sprintf("%x", mem.ID.Bytes)
-	}
-	return fmt.Sprintf("Memory saved with ID: %s", idStr), nil
+	return fmt.Sprintf("Memory saved with ID: %s", formatID(mem.ID)), nil
 }
 
 // --- CompleteTaskTool ---
@@ -174,10 +177,10 @@ func (t *CompleteTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]}`
 }
 func (t *CompleteTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	var args struct {
+	args, err := parseArgs[struct {
 		TaskID string `json:"task_id"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+	}](argsJSON)
+	if err != nil {
 		return "", err
 	}
 	tid, err := uid.UUIDFromString(args.TaskID)
@@ -209,12 +212,8 @@ func (t *GetOpenTasksTool) Execute(ctx context.Context, userID pgtype.UUID, args
 	}
 	result := "Open Tasks:\n"
 	for _, t := range tasksList {
-		tid := ""
-		if t.ID.Valid {
-			tid = fmt.Sprintf("%x", t.ID.Bytes)
-		}
-		if t.Status == "pending" {
-			result += fmt.Sprintf("- [%s] %s\n", tid, t.Title)
+		if t.Status == "open" {
+			result += fmt.Sprintf("- [%s] %s\n", formatID(t.ID), t.Title)
 		}
 	}
 	return result, nil
@@ -237,11 +236,7 @@ func (t *ListMemoriesTool) Execute(ctx context.Context, userID pgtype.UUID, args
 	}
 	result := "Memories:\n"
 	for _, m := range mems {
-		mid := ""
-		if m.ID.Valid {
-			mid = fmt.Sprintf("%x", m.ID.Bytes)
-		}
-		result += fmt.Sprintf("- [%s] %s\n", mid, m.Content)
+		result += fmt.Sprintf("- [%s] %s\n", formatID(m.ID), m.Content)
 	}
 	return result, nil
 }
@@ -251,8 +246,10 @@ type GetInboxNoteTool struct {
 	notesSvc *notes.Service
 }
 
-func (t *GetInboxNoteTool) Name() string        { return "get_inbox_note" }
-func (t *GetInboxNoteTool) Description() string { return "Get the current content of the user's Inbox note" }
+func (t *GetInboxNoteTool) Name() string { return "get_inbox_note" }
+func (t *GetInboxNoteTool) Description() string {
+	return "Get the current content of the user's Inbox note"
+}
 func (t *GetInboxNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -275,13 +272,13 @@ func (t *AppendToInboxTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
 func (t *AppendToInboxTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	var args struct {
+	args, err := parseArgs[struct {
 		Content string `json:"content"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+	}](argsJSON)
+	if err != nil {
 		return "", err
 	}
-	_, err := t.notesSvc.AppendToInbox(ctx, userID, args.Content)
+	_, err = t.notesSvc.AppendToInbox(ctx, userID, args.Content)
 	if err != nil {
 		return "", err
 	}
@@ -293,39 +290,15 @@ type SearchNotesTool struct {
 	q sqlcgen.Querier
 }
 
-func (t *SearchNotesTool) Name() string        { return "search_notes" }
-func (t *SearchNotesTool) Description() string { return "Search for notes semantically related to a query" }
+func (t *SearchNotesTool) Name() string { return "search_notes" }
+func (t *SearchNotesTool) Description() string {
+	return "Search for notes semantically related to a query"
+}
 func (t *SearchNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`
 }
 func (t *SearchNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	var args struct {
-		Query string `json:"query"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return "", err
-	}
-	vec := make([]float32, 1536)
-	for i := range vec {
-		vec[i] = 0.01
-	}
-	notes, err := t.q.SearchNotesByEmbedding(ctx, sqlcgen.SearchNotesByEmbeddingParams{
-		UserID:  userID,
-		Column2: pgvector.NewVector(vec),
-		Limit:   5,
-	})
-	if err != nil {
-		return "", err
-	}
-	result := "Search Results:\n"
-	for _, n := range notes {
-		idStr := ""
-		if n.ID.Valid {
-			idStr = fmt.Sprintf("%x", n.ID.Bytes)
-		}
-		result += fmt.Sprintf("- ID: %s | Title: %s\n%s\n---\n", idStr, n.Title.String, n.Content)
-	}
-	return result, nil
+	return "", fmt.Errorf("semantic search requires a real embedding service")
 }
 
 // --- GetSoulTool ---
@@ -333,8 +306,10 @@ type GetSoulTool struct {
 	q sqlcgen.Querier
 }
 
-func (t *GetSoulTool) Name() string        { return "get_soul" }
-func (t *GetSoulTool) Description() string { return "Get the agent's Soul (personality and core directives)" }
+func (t *GetSoulTool) Name() string { return "get_soul" }
+func (t *GetSoulTool) Description() string {
+	return "Get the agent's Soul (personality and core directives)"
+}
 func (t *GetSoulTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -351,8 +326,10 @@ type ListRoutinesTool struct {
 	routinesSvc *routines.Service
 }
 
-func (t *ListRoutinesTool) Name() string        { return "list_routines" }
-func (t *ListRoutinesTool) Description() string { return "List all active routines (daily/weekly briefs)" }
+func (t *ListRoutinesTool) Name() string { return "list_routines" }
+func (t *ListRoutinesTool) Description() string {
+	return "List all active routines (daily/weekly briefs)"
+}
 func (t *ListRoutinesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -370,8 +347,10 @@ type TestDailyBriefTool struct {
 	routinesSvc *routines.Service
 }
 
-func (t *TestDailyBriefTool) Name() string        { return "test_daily_brief" }
-func (t *TestDailyBriefTool) Description() string { return "Run a dry-run test of the daily brief routine" }
+func (t *TestDailyBriefTool) Name() string { return "test_daily_brief" }
+func (t *TestDailyBriefTool) Description() string {
+	return "Run a dry-run test of the daily brief routine"
+}
 func (t *TestDailyBriefTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -388,8 +367,10 @@ type TestWeeklyBriefTool struct {
 	routinesSvc *routines.Service
 }
 
-func (t *TestWeeklyBriefTool) Name() string        { return "test_weekly_brief" }
-func (t *TestWeeklyBriefTool) Description() string { return "Run a dry-run test of the weekly brief routine" }
+func (t *TestWeeklyBriefTool) Name() string { return "test_weekly_brief" }
+func (t *TestWeeklyBriefTool) Description() string {
+	return "Run a dry-run test of the weekly brief routine"
+}
 func (t *TestWeeklyBriefTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -406,17 +387,19 @@ type SetDailyBriefScheduleTool struct {
 	routinesSvc *routines.Service
 }
 
-func (t *SetDailyBriefScheduleTool) Name() string        { return "set_daily_brief_schedule" }
-func (t *SetDailyBriefScheduleTool) Description() string { return "Update the cron schedule or status for the daily brief" }
+func (t *SetDailyBriefScheduleTool) Name() string { return "set_daily_brief_schedule" }
+func (t *SetDailyBriefScheduleTool) Description() string {
+	return "Update the cron schedule or status for the daily brief"
+}
 func (t *SetDailyBriefScheduleTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"cron_expr":{"type":"string"},"enabled":{"type":"boolean"}}}`
 }
 func (t *SetDailyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	var args struct {
+	args, err := parseArgs[struct {
 		CronExpr *string `json:"cron_expr"`
 		Enabled  *bool   `json:"enabled"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+	}](argsJSON)
+	if err != nil {
 		return "", err
 	}
 	rs, err := t.routinesSvc.GetRoutines(ctx, userID)
@@ -441,17 +424,19 @@ type SetWeeklyBriefScheduleTool struct {
 	routinesSvc *routines.Service
 }
 
-func (t *SetWeeklyBriefScheduleTool) Name() string        { return "set_weekly_brief_schedule" }
-func (t *SetWeeklyBriefScheduleTool) Description() string { return "Update the cron schedule or status for the weekly brief" }
+func (t *SetWeeklyBriefScheduleTool) Name() string { return "set_weekly_brief_schedule" }
+func (t *SetWeeklyBriefScheduleTool) Description() string {
+	return "Update the cron schedule or status for the weekly brief"
+}
 func (t *SetWeeklyBriefScheduleTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"cron_expr":{"type":"string"},"enabled":{"type":"boolean"}}}`
 }
 func (t *SetWeeklyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	var args struct {
+	args, err := parseArgs[struct {
 		CronExpr *string `json:"cron_expr"`
 		Enabled  *bool   `json:"enabled"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+	}](argsJSON)
+	if err != nil {
 		return "", err
 	}
 	rs, err := t.routinesSvc.GetRoutines(ctx, userID)

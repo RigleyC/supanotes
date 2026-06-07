@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/pkg/llm"
 )
 
@@ -51,28 +52,13 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 	client := l.llmFact.For(llm.TaskTypeAgentic)
 	tools := l.tools.GetTools()
 
-	// Initial message history array
-	var messages []llm.Message
-	
-	recentMsgs, err := l.repo.GetMessages(ctx, userID, sessionUUID, 20, 0)
-	if err == nil {
-		for _, m := range recentMsgs {
-			msg := llm.Message{
-				Role:    llm.Role(m.Role),
-				Content: m.Content,
-			}
-			if len(m.ToolCalls) > 0 {
-				json.Unmarshal(m.ToolCalls, &msg.ToolCalls)
-			}
-			if m.ToolCallID.Valid {
-				msg.ToolCallID = m.ToolCallID.String
-			}
-			messages = append(messages, msg)
-		}
+	messages, err := l.loadHistory(ctx, userID, sessionUUID)
+	if err != nil {
+		return "", fmt.Errorf("load history: %w", err)
 	}
 
 	finalContent := ""
-	
+
 	// 4. Tool Calling Loop (max 5 iterations)
 	for i := 0; i < 5; i++ {
 		req := llm.Request{
@@ -88,7 +74,6 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 			return "", fmt.Errorf("llm call: %w", err)
 		}
 
-		// Save the assistant's message to our local memory chain
 		assistMsg := llm.Message{
 			Role:      llm.RoleAssistant,
 			Content:   res.Content,
@@ -96,31 +81,21 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 		}
 		messages = append(messages, assistMsg)
 
-		var tcBytes []byte
-		if len(res.ToolCalls) > 0 {
-			tcBytes, _ = json.Marshal(res.ToolCalls)
-		}
-
-		// Also save to database
-		_, err = l.repo.CreateMessage(ctx, userID, sessionUUID, string(llm.RoleAssistant), res.Content, tcBytes, nil)
-		if err != nil {
+		if _, err := l.persistTurn(ctx, userID, sessionUUID, assistMsg); err != nil {
 			return "", fmt.Errorf("save assistant msg: %w", err)
 		}
 
-		// If no tools were called, we are done!
 		if len(res.ToolCalls) == 0 {
 			finalContent = res.Content
 			break
 		}
 
-		// Execute tools
 		for _, tc := range res.ToolCalls {
 			resultStr, err := l.tools.Execute(ctx, userID, tc.Name, tc.ArgsJSON)
 			if err != nil {
 				resultStr = fmt.Sprintf("Error executing tool: %v", err)
 			}
 
-			// Save tool response locally
 			toolMsg := llm.Message{
 				Role:       llm.RoleTool,
 				Content:    resultStr,
@@ -128,12 +103,7 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 			}
 			messages = append(messages, toolMsg)
 
-			var tcIDStr *string
-			if tc.ID != "" {
-				tcIDStr = &tc.ID
-			}
-			_, err = l.repo.CreateMessage(ctx, userID, sessionUUID, string(llm.RoleTool), resultStr, nil, tcIDStr)
-			if err != nil {
+			if _, err := l.persistTurn(ctx, userID, sessionUUID, toolMsg); err != nil {
 				return "", fmt.Errorf("save tool msg: %w", err)
 			}
 		}
@@ -144,4 +114,45 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 	}
 
 	return finalContent, nil
+}
+
+func (l *Loop) loadHistory(ctx context.Context, userID, sessionID pgtype.UUID) ([]llm.Message, error) {
+	recentMsgs, err := l.repo.GetMessages(ctx, userID, sessionID, 20, 0)
+	if err != nil {
+		return nil, fmt.Errorf("get messages: %w", err)
+	}
+
+	var messages []llm.Message
+	for _, m := range recentMsgs {
+		msg := llm.Message{
+			Role:    llm.Role(m.Role),
+			Content: m.Content,
+		}
+		if len(m.ToolCalls) > 0 {
+			if err := json.Unmarshal(m.ToolCalls, &msg.ToolCalls); err != nil {
+				return nil, fmt.Errorf("unmarshal tool calls: %w", err)
+			}
+		}
+		if m.ToolCallID.Valid {
+			msg.ToolCallID = m.ToolCallID.String
+		}
+		messages = append(messages, msg)
+	}
+	return messages, nil
+}
+
+func (l *Loop) persistTurn(ctx context.Context, userID, sessionID pgtype.UUID, msg llm.Message) (sqlcgen.Message, error) {
+	var tcBytes []byte
+	if len(msg.ToolCalls) > 0 {
+		var err error
+		tcBytes, err = json.Marshal(msg.ToolCalls)
+		if err != nil {
+			return sqlcgen.Message{}, fmt.Errorf("marshal tool calls: %w", err)
+		}
+	}
+	var tcIDPtr *string
+	if msg.ToolCallID != "" {
+		tcIDPtr = &msg.ToolCallID
+	}
+	return l.repo.CreateMessage(ctx, userID, sessionID, string(msg.Role), msg.Content, tcBytes, tcIDPtr)
 }
