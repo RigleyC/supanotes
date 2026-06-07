@@ -5,8 +5,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type PutSoulRequest struct {
@@ -26,29 +26,29 @@ func NewHandler(q sqlcgen.Querier) *Handler {
 }
 
 func (h *Handler) Get(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	s, err := h.q.GetSoul(c.Request().Context(), userID)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get soul"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get soul")
 	}
 
 	return c.JSON(http.StatusOK, SoulResponse{Personality: s.Personality})
 }
 
 func (h *Handler) Update(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var req PutSoulRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	s, err := h.q.UpsertSoul(c.Request().Context(), sqlcgen.UpsertSoulParams{
@@ -57,7 +57,7 @@ func (h *Handler) Update(c echo.Context) error {
 	})
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to update soul"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to update soul")
 	}
 
 	return c.JSON(http.StatusOK, SoulResponse{Personality: s.Personality})

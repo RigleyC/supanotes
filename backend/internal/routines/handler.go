@@ -3,10 +3,10 @@ package routines
 import (
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/auth"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type UpdateRoutineRequest struct {
@@ -20,93 +20,86 @@ type TestRoutineResponse struct {
 
 type Handler struct {
 	svc *Service
-	v   *validator.Validate
 }
 
 func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc, v: validator.New(validator.WithRequiredStructEnabled())}
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) List(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	routines, err := h.svc.GetRoutines(c.Request().Context(), userID)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get routines"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get routines")
 	}
 	return c.JSON(http.StatusOK, routines)
 }
 
 func (h *Handler) Update(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid routine id"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid routine id")
 	}
 
 	var req UpdateRoutineRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
 	routine, err := h.svc.UpdateRoutine(c.Request().Context(), id, userID, req.CronExpr, req.Enabled)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to update routine"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to update routine")
 	}
 
 	return c.JSON(http.StatusOK, routine)
 }
 
 func (h *Handler) Logs(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	// Use limit/offset in real app
 	logs, err := h.svc.GetRoutineLogs(c.Request().Context(), userID, 50, 0)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get logs"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get logs")
 	}
 	return c.JSON(http.StatusOK, logs)
 }
 
-func (h *Handler) TestDaily(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+func (h *Handler) testRoutine(c echo.Context, routineType string) error {
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
-	content, err := h.svc.TestRoutine(c.Request().Context(), userID, "daily")
+	content, err := h.svc.TestRoutine(c.Request().Context(), userID, routineType)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to test daily routine"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to test "+routineType+" routine")
 	}
 	return c.JSON(http.StatusOK, TestRoutineResponse{Content: content})
 }
 
-func (h *Handler) TestWeekly(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
-	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
-	}
+func (h *Handler) TestDaily(c echo.Context) error {
+	return h.testRoutine(c, "daily")
+}
 
-	content, err := h.svc.TestRoutine(c.Request().Context(), userID, "weekly")
-	if err != nil {
-		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to test weekly routine"})
-	}
-	return c.JSON(http.StatusOK, TestRoutineResponse{Content: content})
+func (h *Handler) TestWeekly(c echo.Context) error {
+	return h.testRoutine(c, "weekly")
 }
 
 func RegisterRoutes(api *echo.Group, h *Handler) {

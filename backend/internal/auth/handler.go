@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/onboarding"
+	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -50,39 +50,34 @@ type RefreshResponse struct {
 type Handler struct {
 	svc           *Service
 	onboardingSvc *onboarding.Service
-	v             *validator.Validate
 }
 
 func NewHandler(svc *Service, onboardingSvc *onboarding.Service) *Handler {
 	return &Handler{
 		svc:           svc,
 		onboardingSvc: onboardingSvc,
-		v:             validator.New(validator.WithRequiredStructEnabled()),
 	}
 }
 
 func (h *Handler) Register(c echo.Context) error {
 	var req RegisterRequest
-	if err := c.Bind(&req); err != nil {
-		return jsonError(c, http.StatusBadRequest, "invalid request body")
-	}
-	if err := h.v.Struct(req); err != nil {
-		return jsonError(c, http.StatusBadRequest, validationMessage(err))
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	user, access, refresh, err := h.svc.Register(c.Request().Context(), req.Email, req.Password, req.Name)
 	if err != nil {
 		if errors.Is(err, ErrEmailInUse) {
-			return jsonError(c, http.StatusConflict, "email already in use")
+			return web.JSONError(c, http.StatusConflict, "email already in use")
 		}
 		c.Logger().Error(err)
-		return jsonError(c, http.StatusInternalServerError, "registration failed")
+		return web.JSONError(c, http.StatusInternalServerError, "registration failed")
 	}
 
 	if h.onboardingSvc != nil {
 		if err := h.onboardingSvc.OnboardUser(c.Request().Context(), user.ID); err != nil {
 			c.Logger().Error(err)
-			return jsonError(c, http.StatusInternalServerError, "registration failed")
+			return web.JSONError(c, http.StatusInternalServerError, "registration failed")
 		}
 	}
 
@@ -99,20 +94,17 @@ func (h *Handler) Register(c echo.Context) error {
 
 func (h *Handler) Login(c echo.Context) error {
 	var req LoginRequest
-	if err := c.Bind(&req); err != nil {
-		return jsonError(c, http.StatusBadRequest, "invalid request body")
-	}
-	if err := h.v.Struct(req); err != nil {
-		return jsonError(c, http.StatusBadRequest, validationMessage(err))
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	user, access, refresh, err := h.svc.Login(c.Request().Context(), req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
-			return jsonError(c, http.StatusUnauthorized, "invalid credentials")
+			return web.JSONError(c, http.StatusUnauthorized, "invalid credentials")
 		}
 		c.Logger().Error(err)
-		return jsonError(c, http.StatusInternalServerError, "login failed")
+		return web.JSONError(c, http.StatusInternalServerError, "login failed")
 	}
 
 	return c.JSON(http.StatusOK, AuthResponse{
@@ -128,20 +120,17 @@ func (h *Handler) Login(c echo.Context) error {
 
 func (h *Handler) Refresh(c echo.Context) error {
 	var req RefreshRequest
-	if err := c.Bind(&req); err != nil {
-		return jsonError(c, http.StatusBadRequest, "invalid request body")
-	}
-	if err := h.v.Struct(req); err != nil {
-		return jsonError(c, http.StatusBadRequest, validationMessage(err))
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	access, refresh, err := h.svc.Refresh(c.Request().Context(), req.RefreshToken)
 	if err != nil {
 		if errors.Is(err, ErrInvalidRefreshToken) {
-			return jsonError(c, http.StatusUnauthorized, "invalid refresh token")
+			return web.JSONError(c, http.StatusUnauthorized, "invalid refresh token")
 		}
 		c.Logger().Error(err)
-		return jsonError(c, http.StatusInternalServerError, "refresh failed")
+		return web.JSONError(c, http.StatusInternalServerError, "refresh failed")
 	}
 
 	return c.JSON(http.StatusOK, RefreshResponse{AccessToken: access, RefreshToken: refresh})
@@ -149,29 +138,13 @@ func (h *Handler) Refresh(c echo.Context) error {
 
 func (h *Handler) Logout(c echo.Context) error {
 	var req LogoutRequest
-	if err := c.Bind(&req); err != nil {
-		return jsonError(c, http.StatusBadRequest, "invalid request body")
-	}
-	if err := h.v.Struct(req); err != nil {
-		return jsonError(c, http.StatusBadRequest, validationMessage(err))
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	if err := h.svc.Logout(c.Request().Context(), req.RefreshToken); err != nil {
 		c.Logger().Error(err)
-		return jsonError(c, http.StatusInternalServerError, "logout failed")
+		return web.JSONError(c, http.StatusInternalServerError, "logout failed")
 	}
 	return c.NoContent(http.StatusNoContent)
-}
-
-func jsonError(c echo.Context, status int, msg string) error {
-	return c.JSON(status, map[string]string{"error": msg})
-}
-
-func validationMessage(err error) string {
-	var verrs validator.ValidationErrors
-	if errors.As(err, &verrs) && len(verrs) > 0 {
-		e := verrs[0]
-		return e.Field() + " failed " + e.Tag() + " validation"
-	}
-	return "validation failed"
 }

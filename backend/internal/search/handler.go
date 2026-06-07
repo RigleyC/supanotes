@@ -3,8 +3,9 @@ package search
 import (
 	"net/http"
 
-	"github.com/RigleyC/supanotes/pkg/uid"
 	"github.com/labstack/echo/v4"
+
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type Handler struct {
@@ -22,17 +23,14 @@ type SearchRequest struct {
 }
 
 func (h *Handler) HandleSearch(c echo.Context) error {
-	userID, err := uid.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "missing or invalid user token")
+		return err
 	}
 
 	var req SearchRequest
-	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	if err := c.Validate(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	mode := req.Mode
@@ -46,7 +44,7 @@ func (h *Handler) HandleSearch(c echo.Context) error {
 
 	results, err := h.svc.Search(c.Request().Context(), userID, req.Query, mode, limit)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return web.JSONError(c, http.StatusInternalServerError, err.Error())
 	}
 
 	return c.JSON(http.StatusOK, results)

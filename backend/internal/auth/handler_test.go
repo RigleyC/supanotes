@@ -7,10 +7,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/pkg/auth"
 )
+
+type testValidator struct {
+	v *validator.Validate
+}
+
+func (tv *testValidator) Validate(i any) error {
+	return tv.v.Struct(i)
+}
 
 type httpCase struct {
 	name       string
@@ -28,6 +37,7 @@ func newTestServer(t *testing.T) (*echo.Echo, *mockQuerier) {
 
 	e := echo.New()
 	e.HideBanner = true
+	e.Validator = &testValidator{v: validator.New(validator.WithRequiredStructEnabled())}
 	v1 := e.Group("/api/v1")
 	v1.POST("/auth/register", h.Register)
 	v1.POST("/auth/login", h.Login)

@@ -3,12 +3,11 @@ package contexts
 import (
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
-
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type CreateContextRequest struct {
@@ -26,25 +25,21 @@ type ContextResponse struct {
 
 type Handler struct {
 	q sqlcgen.Querier
-	v *validator.Validate
 }
 
 func NewHandler(q sqlcgen.Querier) *Handler {
-	return &Handler{q: q, v: validator.New(validator.WithRequiredStructEnabled())}
+	return &Handler{q: q}
 }
 
 func (h *Handler) Create(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var req CreateContextRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-	}
-	if err := h.v.Struct(req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "validation failed"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	ctxResult, err := h.q.CreateContext(c.Request().Context(), sqlcgen.CreateContextParams{
@@ -54,7 +49,7 @@ func (h *Handler) Create(c echo.Context) error {
 	})
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create context"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to create context")
 	}
 
 	return c.JSON(http.StatusCreated, ContextResponse{
@@ -67,15 +62,15 @@ func (h *Handler) Create(c echo.Context) error {
 }
 
 func (h *Handler) List(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	ctxs, err := h.q.GetContexts(c.Request().Context(), userID)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get contexts"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get contexts")
 	}
 
 	res := make([]ContextResponse, 0, len(ctxs))
@@ -93,14 +88,14 @@ func (h *Handler) List(c echo.Context) error {
 }
 
 func (h *Handler) Delete(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	err = h.q.DeleteContext(c.Request().Context(), sqlcgen.DeleteContextParams{
@@ -109,7 +104,7 @@ func (h *Handler) Delete(c echo.Context) error {
 	})
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to delete context"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to delete context")
 	}
 
 	return c.NoContent(http.StatusNoContent)

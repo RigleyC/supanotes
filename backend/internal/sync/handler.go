@@ -8,6 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
+
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type PullRequest struct {
@@ -24,15 +26,14 @@ func NewHandler(service Service) *Handler {
 }
 
 func (h *Handler) Pull(c echo.Context) error {
-	userIDStr := c.Get("user_id").(string)
-	var userID pgtype.UUID
-	if err := userID.Scan(userIDStr); err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user id"})
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
 	}
 
 	var req PullRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
 	if req.Limit <= 0 || req.Limit > 1000 {
@@ -46,29 +47,28 @@ func (h *Handler) Pull(c echo.Context) error {
 
 	payload, err := h.service.Pull(c.Request().Context(), userID, lastSyncedAt, req.Limit)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "sync failed"})
+		return web.JSONError(c, http.StatusInternalServerError, "sync failed")
 	}
 
 	return c.JSON(http.StatusOK, payload)
 }
 
 func (h *Handler) Push(c echo.Context) error {
-	userIDStr := c.Get("user_id").(string)
-	var userID pgtype.UUID
-	if err := userID.Scan(userIDStr); err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user id"})
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
 	}
 
 	var payload SyncPayload
 	if err := c.Bind(&payload); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
 	if err := h.service.Push(c.Request().Context(), userID, &payload); err != nil {
 		if errors.Is(err, ErrSyncConflict) {
-			return c.JSON(http.StatusConflict, map[string]string{"error": "sync conflict"})
+			return web.JSONError(c, http.StatusConflict, "sync conflict")
 		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "sync failed"})
+		return web.JSONError(c, http.StatusInternalServerError, "sync failed")
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})

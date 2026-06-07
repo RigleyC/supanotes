@@ -3,11 +3,10 @@ package notifications
 import (
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -25,25 +24,21 @@ type DeviceTokenResponse struct {
 
 type Handler struct {
 	q sqlcgen.Querier
-	v *validator.Validate
 }
 
 func NewHandler(q sqlcgen.Querier) *Handler {
-	return &Handler{q: q, v: validator.New(validator.WithRequiredStructEnabled())}
+	return &Handler{q: q}
 }
 
 func (h *Handler) RegisterToken(c echo.Context) error {
-	userID, err := auth.ParsedUserID(c)
+	userID, err := web.UserID(c)
 	if err != nil {
 		return err
 	}
 
 	var req RegisterDeviceTokenRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-	}
-	if err := h.v.Struct(req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "validation failed"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	token, err := h.q.CreateDeviceToken(c.Request().Context(), sqlcgen.CreateDeviceTokenParams{
@@ -53,7 +48,7 @@ func (h *Handler) RegisterToken(c echo.Context) error {
 	})
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to register device token"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to register device token")
 	}
 
 	return c.JSON(http.StatusCreated, DeviceTokenResponse{
@@ -65,14 +60,14 @@ func (h *Handler) RegisterToken(c echo.Context) error {
 }
 
 func (h *Handler) DeleteToken(c echo.Context) error {
-	userID, err := auth.ParsedUserID(c)
+	userID, err := web.UserID(c)
 	if err != nil {
 		return err
 	}
 
 	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	if err := h.q.DeleteDeviceToken(c.Request().Context(), sqlcgen.DeleteDeviceTokenParams{
@@ -80,7 +75,7 @@ func (h *Handler) DeleteToken(c echo.Context) error {
 		UserID: userID,
 	}); err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to delete device token"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to delete device token")
 	}
 
 	return c.NoContent(http.StatusNoContent)

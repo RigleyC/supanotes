@@ -1,14 +1,13 @@
 package web
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v4"
 )
 
 func BindAndValidate(c echo.Context, req any) error {
 	if err := c.Bind(req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+		JSONError(c, 400, "invalid request body")
+		return echo.ErrBadRequest
 	}
 	if err := c.Validate(req); err != nil {
 		JSONValidationError(c, err)

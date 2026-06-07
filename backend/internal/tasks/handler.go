@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type CreateTaskRequest struct {
@@ -43,30 +43,26 @@ type TaskResponse struct {
 
 type Handler struct {
 	svc *Service
-	v   *validator.Validate
 }
 
 func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc, v: validator.New(validator.WithRequiredStructEnabled())}
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) Create(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var req CreateTaskRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-	}
-	if err := h.v.Struct(req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "validation failed"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	noteID, err := auth.UUIDFromString(req.NoteID)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid note_id"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid note_id")
 	}
 
 	var dueDate *time.Time
@@ -80,22 +76,23 @@ func (h *Handler) Create(c echo.Context) error {
 	task, err := h.svc.CreateTask(c.Request().Context(), userID, noteID, req.Title, dueDate, req.Recurrence, req.Position)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create task"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to create task")
 	}
 
 	return c.JSON(http.StatusCreated, mapToTaskResponse(task))
 }
 
 func (h *Handler) List(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var noteID *pgtype.UUID
 	if str := c.QueryParam("note_id"); str != "" {
-		if parsed, err := auth.UUIDFromString(str); err == nil {
-			noteID = &parsed
+		noteID, err = web.OptUUID(&str)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -109,7 +106,7 @@ func (h *Handler) List(c echo.Context) error {
 	tasks, err := h.svc.GetTasks(c.Request().Context(), userID, noteID, status, nil, nil, limit, 0)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get tasks"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get tasks")
 	}
 
 	res := make([]TaskResponse, 0, len(tasks))
@@ -120,19 +117,19 @@ func (h *Handler) List(c echo.Context) error {
 }
 
 func (h *Handler) Update(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	var req UpdateTaskRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
 	var dueDate *time.Time
@@ -146,94 +143,94 @@ func (h *Handler) Update(c echo.Context) error {
 	task, err := h.svc.UpdateTask(c.Request().Context(), userID, id, req.Title, req.Status, dueDate, req.Recurrence, req.Position)
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "task not found"})
+			return web.JSONError(c, http.StatusNotFound, "task not found")
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to update task"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to update task")
 	}
 
 	return c.JSON(http.StatusOK, mapToTaskResponse(task))
 }
 
 func (h *Handler) Delete(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	err = h.svc.DeleteTask(c.Request().Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "task not found"})
+			return web.JSONError(c, http.StatusNotFound, "task not found")
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to delete task"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to delete task")
 	}
 
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *Handler) Complete(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	task, err := h.svc.CompleteTask(c.Request().Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "task not found"})
+			return web.JSONError(c, http.StatusNotFound, "task not found")
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to complete task"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to complete task")
 	}
 
 	return c.JSON(http.StatusOK, mapToTaskResponse(task))
 }
 
 func (h *Handler) Reopen(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	task, err := h.svc.ReopenTask(c.Request().Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "task not found"})
+			return web.JSONError(c, http.StatusNotFound, "task not found")
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to reopen task"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to reopen task")
 	}
 
 	return c.JSON(http.StatusOK, mapToTaskResponse(task))
 }
 
 func (h *Handler) Today(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	tasks, err := h.svc.GetTodayTasks(c.Request().Context(), userID)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get today tasks"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get today tasks")
 	}
 
 	res := make([]TaskResponse, 0, len(tasks))

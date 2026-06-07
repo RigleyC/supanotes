@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/auth"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type CreateMemoryRequest struct {
@@ -28,15 +29,15 @@ func NewHandler(svc *Service) *Handler {
 }
 
 func (h *Handler) List(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	memories, err := h.svc.GetMemories(c.Request().Context(), userID, 50, 0)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to list memories"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to list memories")
 	}
 
 	res := make([]MemoryResponse, 0, len(memories))
@@ -51,20 +52,20 @@ func (h *Handler) List(c echo.Context) error {
 }
 
 func (h *Handler) Create(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var req CreateMemoryRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	memory, err := h.svc.CreateMemory(c.Request().Context(), userID, req.Content)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create memory"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to create memory")
 	}
 
 	return c.JSON(http.StatusCreated, MemoryResponse{
@@ -75,19 +76,19 @@ func (h *Handler) Create(c echo.Context) error {
 }
 
 func (h *Handler) Delete(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	if err := h.svc.DeleteMemory(c.Request().Context(), id, userID); err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to delete memory"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to delete memory")
 	}
 
 	return c.NoContent(http.StatusNoContent)

@@ -3,12 +3,11 @@ package tags
 import (
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
-
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type CreateTagRequest struct {
@@ -23,25 +22,21 @@ type TagResponse struct {
 
 type Handler struct {
 	q sqlcgen.Querier
-	v *validator.Validate
 }
 
 func NewHandler(q sqlcgen.Querier) *Handler {
-	return &Handler{q: q, v: validator.New(validator.WithRequiredStructEnabled())}
+	return &Handler{q: q}
 }
 
 func (h *Handler) Create(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var req CreateTagRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-	}
-	if err := h.v.Struct(req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "validation failed"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	tag, err := h.q.CreateTag(c.Request().Context(), sqlcgen.CreateTagParams{
@@ -50,7 +45,7 @@ func (h *Handler) Create(c echo.Context) error {
 	})
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create tag"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to create tag")
 	}
 
 	return c.JSON(http.StatusCreated, TagResponse{
@@ -61,15 +56,15 @@ func (h *Handler) Create(c echo.Context) error {
 }
 
 func (h *Handler) List(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	tags, err := h.q.GetTags(c.Request().Context(), userID)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get tags"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get tags")
 	}
 
 	res := make([]TagResponse, 0, len(tags))

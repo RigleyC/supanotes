@@ -5,11 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type SettingsResponse struct {
@@ -24,15 +23,14 @@ type UpdateSettingsRequest struct {
 
 type Handler struct {
 	q sqlcgen.Querier
-	v *validator.Validate
 }
 
 func NewHandler(q sqlcgen.Querier) *Handler {
-	return &Handler{q: q, v: validator.New(validator.WithRequiredStructEnabled())}
+	return &Handler{q: q}
 }
 
 func (h *Handler) Get(c echo.Context) error {
-	userID, err := auth.ParsedUserID(c)
+	userID, err := web.UserID(c)
 	if err != nil {
 		return err
 	}
@@ -40,29 +38,26 @@ func (h *Handler) Get(c echo.Context) error {
 	settings, err := h.q.GetUserSettings(c.Request().Context(), userID)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get settings"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get settings")
 	}
 
 	return c.JSON(http.StatusOK, toResponse(settings))
 }
 
 func (h *Handler) Update(c echo.Context) error {
-	userID, err := auth.ParsedUserID(c)
+	userID, err := web.UserID(c)
 	if err != nil {
 		return err
 	}
 
 	var req UpdateSettingsRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-	}
-	if err := h.v.Struct(req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "validation failed"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	tz := strings.TrimSpace(req.Timezone)
 	if _, err := time.LoadLocation(tz); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid timezone"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid timezone")
 	}
 
 	settings, err := h.q.UpdateUserSettings(c.Request().Context(), sqlcgen.UpdateUserSettingsParams{
@@ -71,7 +66,7 @@ func (h *Handler) Update(c echo.Context) error {
 	})
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to update settings"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to update settings")
 	}
 
 	return c.JSON(http.StatusOK, toResponse(settings))

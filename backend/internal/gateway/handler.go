@@ -8,13 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 
-	"github.com/RigleyC/supanotes/internal/auth"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 // AgentBridge is the subset of the agent loop the gateway needs to
@@ -62,7 +61,6 @@ type Handler struct {
 	repo  *Repository
 	bot   *TelegramClient
 	agent AgentBridge
-	v     *validator.Validate
 }
 
 func NewHandler(repo *Repository, bot *TelegramClient, agent AgentBridge) *Handler {
@@ -70,12 +68,11 @@ func NewHandler(repo *Repository, bot *TelegramClient, agent AgentBridge) *Handl
 		repo:  repo,
 		bot:   bot,
 		agent: agent,
-		v:     validator.New(validator.WithRequiredStructEnabled()),
 	}
 }
 
 func (h *Handler) GetLinkStatus(c echo.Context) error {
-	userID, err := auth.ParsedUserID(c)
+	userID, err := web.UserID(c)
 	if err != nil {
 		return err
 	}
@@ -86,7 +83,7 @@ func (h *Handler) GetLinkStatus(c echo.Context) error {
 			return c.JSON(http.StatusOK, LinkStatusResponse{Linked: false})
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get link status"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get link status")
 	}
 
 	return c.JSON(http.StatusOK, LinkStatusResponse{
@@ -97,7 +94,7 @@ func (h *Handler) GetLinkStatus(c echo.Context) error {
 }
 
 func (h *Handler) GenerateLinkCode(c echo.Context) error {
-	userID, err := auth.ParsedUserID(c)
+	userID, err := web.UserID(c)
 	if err != nil {
 		return err
 	}
@@ -105,13 +102,13 @@ func (h *Handler) GenerateLinkCode(c echo.Context) error {
 	code, err := generateCode()
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to generate code"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to generate code")
 	}
 
 	expiresAt := time.Now().Add(linkCodeTTL)
 	if err := h.repo.CreateLinkCode(c.Request().Context(), userID, code, expiresAt); err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to save link code"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to save link code")
 	}
 
 	return c.JSON(http.StatusCreated, LinkCodeResponse{
@@ -121,14 +118,14 @@ func (h *Handler) GenerateLinkCode(c echo.Context) error {
 }
 
 func (h *Handler) DeleteLink(c echo.Context) error {
-	userID, err := auth.ParsedUserID(c)
+	userID, err := web.UserID(c)
 	if err != nil {
 		return err
 	}
 
 	if err := h.repo.DeleteLink(c.Request().Context(), userID); err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to delete link"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to delete link")
 	}
 
 	return c.NoContent(http.StatusNoContent)
@@ -141,7 +138,7 @@ func (h *Handler) DeleteLink(c echo.Context) error {
 func (h *Handler) Webhook(c echo.Context) error {
 	var update WebhookUpdate
 	if err := c.Bind(&update); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid update"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid update")
 	}
 
 	msg := update.Message
@@ -259,6 +256,4 @@ func RegisterRoutes(g *echo.Group, h *Handler) {
 	tg.GET("/link", h.GetLinkStatus)
 	tg.POST("/link-code", h.GenerateLinkCode)
 	tg.DELETE("/link", h.DeleteLink)
-
-	g.POST("/gateway/telegram/webhook", h.Webhook)
 }

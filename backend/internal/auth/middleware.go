@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/web"
 	authpkg "github.com/RigleyC/supanotes/pkg/auth"
 	"github.com/RigleyC/supanotes/pkg/config"
 )
@@ -19,22 +20,22 @@ func JWT(cfg *config.Config) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			header := c.Request().Header.Get(echo.HeaderAuthorization)
 			if header == "" {
-				return jsonError(c, http.StatusUnauthorized, "missing authorization header")
+				return web.JSONError(c, http.StatusUnauthorized, "missing authorization header")
 			}
 
 			const prefix = "Bearer "
 			if !strings.HasPrefix(header, prefix) {
-				return jsonError(c, http.StatusUnauthorized, "invalid authorization scheme")
+				return web.JSONError(c, http.StatusUnauthorized, "invalid authorization scheme")
 			}
 
 			token := strings.TrimSpace(strings.TrimPrefix(header, prefix))
 			if token == "" {
-				return jsonError(c, http.StatusUnauthorized, "empty bearer token")
+				return web.JSONError(c, http.StatusUnauthorized, "empty bearer token")
 			}
 
 			claims, err := authpkg.ParseAccessToken(token, cfg.JWTSecret)
 			if err != nil {
-				return jsonError(c, http.StatusUnauthorized, "invalid or expired token")
+				return web.JSONError(c, http.StatusUnauthorized, "invalid or expired token")
 			}
 
 			c.Set(userIDContextKey, claims.UserID)

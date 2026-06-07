@@ -9,6 +9,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/web"
 	authpkg "github.com/RigleyC/supanotes/pkg/auth"
 	"github.com/RigleyC/supanotes/pkg/config"
 )
@@ -23,7 +24,7 @@ func newProtectedRoute(t *testing.T) (*echo.Echo, *config.Config) {
 	g.GET("/me", func(c echo.Context) error {
 		uid, ok := UserIDFromContext(c)
 		if !ok {
-			return jsonError(c, http.StatusInternalServerError, "no user id in context")
+			return web.JSONError(c, http.StatusInternalServerError, "no user id in context")
 		}
 		return c.JSON(http.StatusOK, map[string]string{"user_id": uid})
 	})

@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/web"
 )
 
 type CreateNoteRequest struct {
@@ -48,55 +48,51 @@ type NoteResponse struct {
 
 type Handler struct {
 	svc *Service
-	v   *validator.Validate
 }
 
 func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc, v: validator.New(validator.WithRequiredStructEnabled())}
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) Create(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var req CreateNoteRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-	}
-	if err := h.v.Struct(req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "validation failed"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	var ctxID *pgtype.UUID
 	if req.ContextID != nil {
-		parsed, err := auth.UUIDFromString(*req.ContextID)
-		if err == nil {
-			ctxID = &parsed
+		ctxID, err = web.OptUUID(req.ContextID)
+		if err != nil {
+			return err
 		}
 	}
 
 	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Title, req.Content, ctxID, req.Favorite, req.Archived)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create note"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to create note")
 	}
 
 	return c.JSON(http.StatusCreated, mapToNoteResponse(note))
 }
 
 func (h *Handler) List(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var ctxID *pgtype.UUID
 	if ctxStr := c.QueryParam("context_id"); ctxStr != "" {
-		parsed, err := auth.UUIDFromString(ctxStr)
-		if err == nil {
-			ctxID = &parsed
+		ctxID, err = web.OptUUID(&ctxStr)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -119,7 +115,7 @@ func (h *Handler) List(c echo.Context) error {
 	notes, err := h.svc.GetNotes(c.Request().Context(), userID, ctxID, fav, limit, cursorUpdatedAt, cursorID)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get notes"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get notes")
 	}
 
 	res := make([]NoteResponse, 0, len(notes))
@@ -131,129 +127,126 @@ func (h *Handler) List(c echo.Context) error {
 }
 
 func (h *Handler) Get(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	note, err := h.svc.GetNoteByID(c.Request().Context(), id, userID)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "note not found"})
+			return web.JSONError(c, http.StatusNotFound, "note not found")
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get note"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get note")
 	}
 
 	return c.JSON(http.StatusOK, mapToNoteResponse(note))
 }
 
 func (h *Handler) Update(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	var req UpdateNoteRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
 	var ctxID *pgtype.UUID
 	if req.ContextID != nil {
-		parsed, err := auth.UUIDFromString(*req.ContextID)
-		if err == nil {
-			ctxID = &parsed
+		ctxID, err = web.OptUUID(req.ContextID)
+		if err != nil {
+			return err
 		}
 	}
 
 	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Title, req.Content, ctxID, req.Favorite, req.Archived)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "note not found"})
+			return web.JSONError(c, http.StatusNotFound, "note not found")
 		}
 		if errors.Is(err, ErrInboxRule) {
-			return c.JSON(http.StatusForbidden, map[string]string{"error": "cannot modify inbox note properties"})
+			return web.JSONError(c, http.StatusForbidden, "cannot modify inbox note properties")
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to update note"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to update note")
 	}
 
 	return c.JSON(http.StatusOK, mapToNoteResponse(note))
 }
 
 func (h *Handler) Delete(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	id, err := auth.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id format"})
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
 
 	err = h.svc.DeleteNote(c.Request().Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "note not found"})
+			return web.JSONError(c, http.StatusNotFound, "note not found")
 		}
 		if errors.Is(err, ErrInboxRule) {
-			return c.JSON(http.StatusForbidden, map[string]string{"error": "cannot delete inbox note"})
+			return web.JSONError(c, http.StatusForbidden, "cannot delete inbox note")
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to delete note"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to delete note")
 	}
 
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *Handler) GetInbox(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	note, err := h.svc.GetInboxNote(c.Request().Context(), userID)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "inbox note not found"})
+			return web.JSONError(c, http.StatusNotFound, "inbox note not found")
 		}
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get inbox note"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get inbox note")
 	}
 
 	return c.JSON(http.StatusOK, mapToNoteResponse(note))
 }
 
 func (h *Handler) AppendToInbox(c echo.Context) error {
-	userID, err := auth.UUIDFromString(c.Get("user_id").(string))
+	userID, err := web.UserID(c)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+		return err
 	}
 
 	var req AppendToInboxRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-	}
-	if err := h.v.Struct(req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "validation failed"})
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	note, err := h.svc.AppendToInbox(c.Request().Context(), userID, req.Content)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to append to inbox note"})
+		return web.JSONError(c, http.StatusInternalServerError, "failed to append to inbox note")
 	}
 
 	return c.JSON(http.StatusOK, mapToNoteResponse(note))
