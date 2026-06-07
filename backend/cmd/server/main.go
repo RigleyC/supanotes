@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/go-playground/validator/v10"
+
 	"github.com/RigleyC/supanotes/internal/agent"
 	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/contexts"
@@ -29,6 +31,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/search"
 	"github.com/RigleyC/supanotes/internal/settings"
 	"github.com/RigleyC/supanotes/internal/soul"
+	syncpkg "github.com/RigleyC/supanotes/internal/sync"
 	"github.com/RigleyC/supanotes/internal/tags"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/config"
@@ -58,6 +61,7 @@ func main() {
 	}
 
 	e := echo.New()
+	e.Validator = &CustomValidator{validator: validator.New(validator.WithRequiredStructEnabled())}
 	e.HideBanner = true
 	e.HidePort = true
 
@@ -96,6 +100,14 @@ func main() {
 	}
 
 	log.Info().Msg("server stopped cleanly")
+}
+
+type CustomValidator struct {
+	validator *validator.Validate
+}
+
+func (cv *CustomValidator) Validate(i any) error {
+	return cv.validator.Struct(i)
 }
 
 func setupLogger(cfg *config.Config) {
@@ -254,8 +266,16 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	protected.DELETE("/device-tokens/:id", notificationsH.DeleteToken)
 
 	// Telegram gateway (uses the agent loop as a bridge for free-form
-	// messages; routes are mounted under the protected group except
-	// for the public webhook).
+	// messages; the public webhook is mounted on the unauthenticated
+	// `api` group because Telegram's servers do not send our JWT).
 	gatewayH := gateway.NewHandler(gatewayRepo, gatewayBot, agentLoop)
 	gateway.RegisterRoutes(protected, gatewayH)
+	api.POST("/gateway/telegram/webhook", gatewayH.Webhook)
+
+	// Sync (push/pull)
+	syncRepo := syncpkg.NewRepository(queries)
+	syncSvc := syncpkg.NewService(syncRepo)
+	syncH := syncpkg.NewHandler(syncSvc)
+	protected.POST("/sync/push", syncH.Push)
+	protected.POST("/sync/pull", syncH.Pull)
 }
