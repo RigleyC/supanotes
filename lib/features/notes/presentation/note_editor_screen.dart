@@ -55,9 +55,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   Future<void> _loadNote() async {
-    final note = await ref
-        .read(notesLocalRepositoryProvider)
-        .getNoteById(widget.noteId);
+    final note =
+        await ref.read(notesLocalRepositoryProvider).getNoteById(widget.noteId);
     if (note == null || !mounted) return;
 
     _document = parseMarkdownToDocument(note.content);
@@ -106,9 +105,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       isDirty: const drift.Value(true),
     );
     try {
-      await ref
-          .read(notesLocalRepositoryProvider)
-          .updateNoteRaw(companion);
+      await ref.read(notesLocalRepositoryProvider).updateNoteRaw(companion);
       _setSaveState(SaveState.saved);
     } catch (_) {
       _setSaveState(SaveState.error);
@@ -125,9 +122,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       isDirty: const drift.Value(true),
     );
     try {
-      await ref
-          .read(notesLocalRepositoryProvider)
-          .updateNoteRaw(companion);
+      await ref.read(notesLocalRepositoryProvider).updateNoteRaw(companion);
     } catch (_) {
       if (mounted) {
         setState(() => _favorite = !_favorite);
@@ -163,8 +158,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           await tasksRepo.updateTask(TasksCompanion(
             id: drift.Value(node.id),
             title: drift.Value(text),
-            status:
-                drift.Value(node.isComplete ? 'completed' : 'pending'),
+            status: drift.Value(node.isComplete ? 'completed' : 'pending'),
           ));
         } else {
           await tasksRepo.createTask(
@@ -221,8 +215,47 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
 
     final colorScheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: CustomScrollView(slivers: [
+        SliverAppBar.medium(
+          title: Hero(
+            tag: NoteCard.titleHeroTag(widget.noteId),
+            child: TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
+                hintText: 'Sem título',
+              ),
+              style: AppTypography.textTheme.titleLarge?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: AppTypography.semibold,
+              ),
+              onChanged: _onTitleChanged,
+            ),
+          ),
+        ),
+        SliverFillRemaining(
+          child: SliverList.list(
+            children: [
+              Expanded(
+                child: SuperEditor(
+                  editor: _editor!,
+                  focusNode: _editorFocusNode,
+                  stylesheet: defaultStylesheet.copyWith(
+                    documentPadding: const EdgeInsets.all(AppSpacing.md),
+                  ),
+                ),
+              ),
+              NoteToolbar(editor: _editor!, composer: _composer!),
+            ],
+          ),
+        ),
+      ]),
+    );
 
-    return PopScope(
+    /*  return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
@@ -278,6 +311,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         ],
       ),
     ),
-  );
-}
+  ); */
+  }
 }

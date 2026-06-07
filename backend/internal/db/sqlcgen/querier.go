@@ -83,6 +83,10 @@ type Querier interface {
 	UpsertSoul(ctx context.Context, arg UpsertSoulParams) (Soul, error)
 	UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, error)
 	UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, error)
+	// Inserts a completion row only if the parent task belongs to the user
+	// (the SELECT returns 0 rows otherwise, making the INSERT a no-op).
+	// Completions are append-only history; existing rows are never updated.
+	UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error
 }
 
 var _ Querier = (*Queries)(nil)

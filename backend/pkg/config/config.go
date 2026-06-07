@@ -11,17 +11,19 @@ import (
 const devJWTSecret = "dev-only-jwt-secret-change-me-in-production-32+chars"
 
 type Config struct {
-	Port               string
-	DatabaseURL        string
-	JWTSecret          string
-	CORSOrigins        []string
-	OpenAIAPIKey       string
-	GeminiAPIKey       string
-	AnthropicAPIKey    string
-	DeepSeekAPIKey     string
-	TelegramBotToken   string
-	FCMCredentialsFile string
-	Environment        string
+	Port                string
+	DatabaseURL         string
+	JWTSecret           string
+	CORSOrigins         []string
+	OpenAIAPIKey        string
+	GeminiAPIKey        string
+	AnthropicAPIKey     string
+	DeepSeekAPIKey      string
+	OpenAICompatBaseURL string
+	OpenAICompatModel   string
+	TelegramBotToken    string
+	FCMCredentialsFile  string
+	Environment         string
 }
 
 func Load() (*Config, error) {
@@ -48,17 +50,19 @@ func Load() (*Config, error) {
 	corsOrigins := parseCORSOrigins(os.Getenv("CORS_ORIGINS"), env)
 
 	return &Config{
-		Port:               port,
-		Environment:        env,
-		DatabaseURL:        os.Getenv("DATABASE_URL"),
-		JWTSecret:          jwtSecret,
-		CORSOrigins:        corsOrigins,
-		OpenAIAPIKey:       os.Getenv("OPENAI_API_KEY"),
-		GeminiAPIKey:       os.Getenv("GEMINI_API_KEY"),
-		AnthropicAPIKey:    os.Getenv("ANTHROPIC_API_KEY"),
-		DeepSeekAPIKey:     os.Getenv("DEEPSEEK_API_KEY"),
-		TelegramBotToken:   os.Getenv("TELEGRAM_BOT_TOKEN"),
-		FCMCredentialsFile: os.Getenv("FCM_CREDENTIALS_FILE"),
+		Port:                port,
+		Environment:         env,
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		JWTSecret:           jwtSecret,
+		CORSOrigins:         corsOrigins,
+		OpenAIAPIKey:        os.Getenv("OPENAI_API_KEY"),
+		GeminiAPIKey:        os.Getenv("GEMINI_API_KEY"),
+		AnthropicAPIKey:     os.Getenv("ANTHROPIC_API_KEY"),
+		DeepSeekAPIKey:      os.Getenv("DEEPSEEK_API_KEY"),
+		OpenAICompatBaseURL: os.Getenv("OPENAI_COMPAT_BASE_URL"),
+		OpenAICompatModel:   os.Getenv("OPENAI_COMPAT_MODEL"),
+		TelegramBotToken:    os.Getenv("TELEGRAM_BOT_TOKEN"),
+		FCMCredentialsFile:  os.Getenv("FCM_CREDENTIALS_FILE"),
 	}, nil
 }
 

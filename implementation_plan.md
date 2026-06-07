@@ -1,195 +1,450 @@
-# Implementation Plan — Frontend Critical Bugs + FE-2/3/4/5/6 Completion
+# Refatoracao Termo-Nuclear — SupaNotes Implementation Plan
 
-> Escopo aprovado: **Opção 2** — só os 5 bugs críticos + completar o que já foi começado (FE-2, FE-3, FE-4, FE-5, FE-6). Sem iniciar FE-7~12.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
----
+**Goal:** Eliminar god methods/classes, corrigir violações SOLID, centralizar validadores/widgets globais, desacoplar views de repositories, e estabelecer transações atômicas no backend.
 
-## Estratégia de waves
+**Architecture:** Backend Go ganha camada `internal/web/` (helpers compartilhados) + `internal/dto/` (desacoplamento DB/API) + transações `pgx.Tx` para operações multi-tabela. Frontend Flutter ganha 1 controller por tela em `controllers/` + widgets globais em `shared/widgets/` + `StatefulShellRoute` no GoRouter.
 
-| Wave | Modo | Agentes | Razão |
-|---|---|---|---|
-| **1** | Sequencial | 1 agent (fundação) | Tudo depende de schema estável, router wirado e contrato user_id |
-| **2** | Paralelo | 3 agents (B/C/D em features disjuntas) | Cada um possui arquivos próprios — zero overlap |
-
-Wave 1 **deve completar** antes de Wave 2 disparar.
+**Tech Stack:** Go 1.22+ (Echo, pgx, sqlc), Flutter 3.22+ (Riverpod, GoRouter, Drift, super_editor)
 
 ---
 
-## Wave 1 — Foundation Agent (sequencial)
+## Phase 0 — Foundation (Backend Helpers + Frontend Globals)
 
-**Subagent**: `general`
-**Branch**: trabalha em `main` (worktree atual)
-**Escopo**: bugs 1–5 + FE-2 DAOs faltantes + FE-3 lifecycle
+### Task 0.1: Criar `internal/web/` — Helpers HTTP Compartilhados
 
-### Entregáveis
+**Files:**
+- Create: `backend/internal/web/context.go`
+- Create: `backend/internal/web/response.go`
+- Create: `backend/internal/web/bind.go`
+- Modify: `backend/cmd/server/main.go` (registrar validator global no Echo)
 
-1. **Bug #1 — Router não wirado no main.dart**
-   - `lib/main.dart`: trocar `MaterialApp` por `MaterialApp.router` consumindo `goRouterProvider`
-   - Remover import `NotesListScreen` (router já cuida)
+**Descrição:**
+Crie o pacote `internal/web` com helpers que eliminam a repetição massiva nos handlers.
 
-2. **Bug #2 — user_id hardcoded como `'local'`**
-   - Criar `lib/core/auth/current_user.dart` → provider `currentUserIdProvider` lendo de `authControllerProvider`
-   - Refatorar `NotesLocalRepository`, `TasksLocalRepository`, `InboxScreen`, `NoteEditorScreen` para receber `userId` em vez de "local"
-   - Sync pull agora pode confiar que `json['user_id']` casa com o que está no banco
+- `context.go`:
+  ```go
+  func UserID(c echo.Context) (pgtype.UUID, error)
+  ```
+  - Parseia `c.Get("user_id").(string)` com `pgtype.UUID.Scan()`.
+  - Retorna `echo.NewHTTPError(401, ...)` se ausente ou inválido.
 
-3. **Bug #3 — Recorrência no `completeTask` é só TODO**
-   - Implementar lógica em `tasks_dao.completeTask`:
-     - `daily` → nova entry com `due_date = today + 1d`
-     - `weekdays` → próximo dia útil (skip sáb/dom)
-     - `weekly` → +7d
-     - `monthly` → +1 mês
-   - Histórico: criar tabela `task_completions` (id, taskId, completedAt) + DAO method `recordCompletion`
+- `response.go`:
+  ```go
+  func JSONError(c echo.Context, status int, msg string) error
+  func JSONValidationError(c echo.Context, err error) error
+  func FormatTime(t pgtype.Timestamptz) string
+  func UUIDToString(u pgtype.UUID) string
+  func OptUUID(s *string) (*pgtype.UUID, error)
+  ```
 
-4. **Bug #4 — `tags_dao` não existe**
-   - Criar `lib/core/database/daos/tags_dao.dart` com `watchTags`, `watchTagsForNote`, CRUD, dirty methods
-   - Criar tabela `LocalNoteTags` (junção noteId+tagId) em `lib/core/database/tables/note_tags.dart`
-   - Registrar em `@DriftDatabase(tables: [..., LocalNoteTags], daos: [..., TagsDao])`
+- `bind.go`:
+  ```go
+  func BindAndValidate(c echo.Context, req any) error
+  ```
+  - Unifica `c.Bind(req)` + `c.Validate(req)` em um único helper.
+  - Retorna `*echo.HTTPError` pronto para ser retornado pelo handler.
 
-5. **Bug #5 — Markdown conversion limitada**
-   - Extrair conversor para `lib/features/notes/data/markdown_serializer.dart`
-   - Suportar: headings (#, ##, ###), bold (**), italic (*), bullet list (-), numbered list (1.), blockquote (>), checklist (TaskNode), paragraphs
-   - Wave-2 Agent C usará isto no editor
+- `main.go`: Configure `e.Validator = &CustomValidator{validator: validator.New()}` UMA vez. Remova `validator.New` de todos os handlers.
 
-6. **FE-2 — Métodos DAO faltantes**
-   - `NotesDao`: `watchInboxNote(userId)`, `watchNotesByContext(userId, contextId)`, `watchFavorites(userId)`, `softDeleteNote(id)`, `getDirtyNotes()`, `clearDirtyFlag(id)`, `upsertFromRemote(NoteData)`
-   - `TasksDao`: `watchOpenTasks(userId)`, `softDeleteTask(id)`, `reopenTask(id)`, `getDirtyTasks()`, `clearDirtyFlag(id)`, `upsertFromRemote(TaskData)`
-   - `ContextsDao`: garantir `watchContexts(userId)`, CRUD, dirty methods
-   - `TagsDao`: ver bug #4
-   - Schema bump → version 2, com `MigrationStrategy` que adiciona `LocalNoteTags` + `task_completions`
-
-7. **FE-3 — Sync lifecycle**
-   - Criar `lib/core/sync/sync_state.dart` com `enum SyncStatus { idle, syncing, error, offline }` + `lastSyncedAt` provider via `SharedPreferences`
-   - `sync_service.dart`:
-     - Expor `Stream<SyncStatus>`
-     - Usar `getDirtyNotes/Tasks/...` e `upsertFromRemote` (em vez de `insertOrReplace` cru)
-     - Incluir `excerpt`, `updated_at` no payload de push
-     - Tags com `isDirty` + `updatedAt` consistentes
-   - Integrar lifecycle: em `lib/main.dart` (ou via Riverpod listener) → quando `authControllerProvider` vira `AuthAuthenticated`, dispara `syncServiceProvider`; quando vira `AuthUnauthenticated`, chama `dispose()`
-   - Refatorar `OfflineIndicator` para consumir `syncStateProvider` (mostra "syncing…" quando `SyncStatus.syncing`, "offline" quando `SyncStatus.offline`, nada quando idle)
-
-8. **Verificação**
-   - `dart run build_runner build --delete-conflicting-outputs`
-   - `flutter analyze` — zero erros
-   - `flutter test` — todos passam (criar testes mínimos se não existirem)
+**Critérios de Aceitação:**
+- `go build ./...` passa.
+- Nenhum handler deve mais chamar `validator.New` (verificar com grep).
 
 ---
 
-## Wave 2 — Feature Completion Agents (paralelo, 3 agents)
+### Task 0.2: Criar `internal/dto/` — Data Transfer Objects
 
-Disparados **após** Wave 1 terminar. Cada agent possui arquivos disjuntos.
+**Files:**
+- Create: `backend/internal/dto/note.go`
+- Create: `backend/internal/dto/task.go`
+- Create: `backend/internal/dto/context.go`
+- Create: `backend/internal/dto/tag.go`
+- Create: `backend/internal/dto/memory.go`
+- Create: `backend/internal/dto/message.go`
+- Create: `backend/internal/dto/search.go`
+- Create: `backend/internal/dto/sync.go`
 
-### Agent B — FE-4 Home Shell + Notas
+**Descrição:**
+Crie structs de response que NUNCA expõem `sqlcgen.*` ou `pgtype.UUID`/`pgtype.Timestamptz` diretamente. Todos os IDs devem ser `string`. Todas as datas devem ser `string` (RFC3339).
 
-**Subagent**: `general`
-**Arquivos que possui** (não toca em mais nada):
-- `lib/features/notes/domain/note_model.dart` (novo)
-- `lib/features/notes/data/notes_repository.dart` (novo, abstrai DAO + sync)
-- `lib/features/notes/data/local/notes_local_repository.dart` (modifica — usa NoteModel)
-- `lib/features/notes/presentation/notes_list_screen.dart` (modifica — usa NoteCard)
-- `lib/features/notes/presentation/widgets/note_card.dart` (novo)
-- `lib/features/notes/presentation/widgets/quick_capture_fab.dart` (novo)
-- `lib/features/notes/presentation/widgets/main_shell.dart` (novo — Scaffold com BottomNavigationBar)
-- `lib/shared/widgets/empty_state.dart` (novo)
-- `lib/core/router/app_router.dart` (modifica — adiciona ShellRoute com 4 tabs: /home, /today, /chat, /search; chat e search são placeholders "em breve")
+Exemplo (`note.go`):
+```go
+type NoteResponse struct {
+    ID          string    `json:"id"`
+    Title       string    `json:"title"`
+    Content     string    `json:"content"`
+    IsInbox     bool      `json:"is_inbox"`
+    IsFavorite  bool      `json:"is_favorite"`
+    ContextID   *string   `json:"context_id,omitempty"`
+    CreatedAt   string    `json:"created_at"`
+    UpdatedAt   string    `json:"updated_at"`
+}
+```
 
-**Funcionalidades**:
-- NoteModel (id, title, excerpt, isInbox, favorite, archived, contextId, createdAt, updatedAt) + factory de/para NoteData
-- NotesRepository: `watchNotes({contextId?, favoritesOnly?})`, `watchInbox()`, `createNote`, `updateNote`, `toggleFavorite`, `softDelete`
-- NoteCard: título bold + excerpt 2 linhas + favorite star + context chip + timeago + swipe-to-delete (com `confirm_dialog` se existir, senão `AlertDialog`) + long-press menu (favorite, delete)
-- QuickCaptureFAB: tap → bottom sheet com TextField multi-linha → salva no inbox via `getOrCreateInboxNote` + append → snackbar "Salvo no rascunho"
-- MainShell: BottomNavigationBar com 4 tabs (Notas / Hoje / Chat / Busca), tabs Chat e Busca exibem placeholder `EmptyState(icon, "Em breve")`
-- Pull-to-refresh na lista: dispara `syncServiceProvider.sync()`
-- Empty state: "Crie sua primeira nota" com ícone
-
-**Constraints**:
-- ❌ NÃO modificar: `note_editor_screen.dart`, `inbox_screen.dart`, `today_tasks_screen.dart`, qualquer coisa em `tasks/`, `core/database/*`, `core/sync/*`, `auth/*`
-- ✅ Pode importar (sem modificar): TodayTasksScreen do FE-6, repos da Wave 1
-- Usa `currentUserIdProvider` da Wave 1 para passar userId aos repos
-
----
-
-### Agent C — FE-5 Editor Polish
-
-**Subagent**: `general`
-**Arquivos que possui**:
-- `lib/features/notes/presentation/note_editor_screen.dart` (rewrite)
-- `lib/features/notes/presentation/inbox_screen.dart` (rewrite)
-- `lib/features/notes/presentation/widgets/note_toolbar.dart` (novo)
-- `lib/features/notes/presentation/widgets/inbox_organize_sheet.dart` (novo)
-- `lib/features/notes/presentation/widgets/save_indicator.dart` (novo)
-- `lib/features/agent/data/agent_repository.dart` (novo — somente método `planInboxOrganization` e `applyOrganizationPlan`)
-- `lib/features/agent/domain/organization_plan.dart` (novo — model do plano)
-
-**Funcionalidades**:
-- Importa `MarkdownSerializer` da Wave 1 (substitui parse/serialize artesanal atual)
-- Note editor: título editável fora do super_editor (TextField no topo dentro de SliverAppBar/AppBar) + favorite button no AppBar + SaveIndicator ("Salvando…" / "Salvo" sutil) + toolbar acima do editor
-- NoteToolbar: chips/icons para B, I, H1, H2, H3, bullet, numbered, checklist, blockquote — usa `Editor.execute(...)` do super_editor para aplicar
-- Inbox editor: AppBar com botão "Organizar" só visível se conteúdo não vazio; tap → bottom sheet
-- InboxOrganizeSheet:
-  - Estado loading enquanto chama `POST /api/v1/notes/inbox/organize/plan`
-  - Exibe lista de itens do plano (trecho original + destino proposto + toggle aceitar/rejeitar)
-  - Botão "Aplicar selecionados" → `POST /api/v1/notes/inbox/organize/apply` com IDs dos itens aceitos
-  - Snackbar de sucesso + fecha sheet
-
-**Constraints**:
-- ❌ NÃO modificar: `notes_list_screen.dart`, `tasks/*`, `core/*`, `auth/*`, qualquer arquivo de Agent B/D
-- ❌ NÃO criar `agent/presentation/*` — feature do agent chat (FE-7) não está no escopo
-- ✅ Pode usar `apiClientProvider` para chamar backend
-- Usa `currentUserIdProvider` da Wave 1
+**Critérios de Aceitação:**
+- `go build ./...` passa.
+- Nenhum handler usa `sqlcgen.Note` como tipo de response.
 
 ---
 
-### Agent D — FE-6 Tasks Completas
+### Task 0.3: Criar `internal/mapper/` — Mapeamento Generico
 
-**Subagent**: `general`
-**Arquivos que possui**:
-- `lib/features/tasks/domain/task_model.dart` (novo)
-- `lib/features/tasks/data/tasks_repository.dart` (novo — abstrai DAO)
-- `lib/features/tasks/data/local/tasks_local_repository.dart` (modifica — usa TaskModel)
-- `lib/features/tasks/presentation/today_tasks_screen.dart` (rewrite — seções)
-- `lib/features/tasks/presentation/widgets/task_tile.dart` (novo)
-- `lib/features/tasks/presentation/widgets/task_checkbox.dart` (novo)
-- `lib/features/tasks/presentation/widgets/due_date_picker.dart` (novo)
-- `lib/features/tasks/presentation/widgets/recurrence_picker.dart` (novo)
-- `lib/features/tasks/presentation/widgets/note_tasks_list.dart` (novo)
-- `lib/features/tasks/presentation/widgets/task_edit_sheet.dart` (novo)
-- `lib/features/tasks/presentation/widgets/quick_task_fab.dart` (novo)
+**Files:**
+- Create: `backend/internal/mapper/mapper.go`
 
-**Funcionalidades**:
-- TaskModel: id, noteId, title, status, position, dueDate, completedAt, recurrence, createdAt, updatedAt + computed `isOverdue`, `isDueToday`, `isRepeating`
-- TasksRepository: `watchTodayTasks()`, `watchOverdueTasks()`, `watchUndatedOpenTasks()`, `watchByNote(noteId)`, `createTask`, `completeTask`, `reopenTask`, `updateTask`, `deleteTask`, `reorderTask`
-- TaskTile: checkbox + título + due-date badge (verde/vermelho/cinza) + recurrence icon + swipe-right (complete) + swipe-left (delete) + tap (edit sheet)
-- TaskCheckbox: animação scale + cor + strikethrough fade
-- DueDatePicker: chips "Hoje", "Amanhã", "Próx segunda", "Escolher data" → showDatePicker
-- RecurrencePicker: chips "Nenhuma", "Diária", "Dias úteis", "Semanal", "Mensal" — retorna string
-- NoteTasksList: widget embeddable que recebe noteId → lista de TaskTile + ReorderableListView + botão "+" inline
-- TaskEditSheet: bottom sheet com título, due date, recurrence
-- QuickTaskFAB: FAB no today screen → bottom sheet (título + due opcional) → cria task no inbox
-- TodayTasksScreen: três seções colapsáveis — "Atrasadas" (vermelho), "Hoje", "Sem data"; empty state "Nenhuma task para hoje 🎉"
+**Descrição:**
+Funções puras para converter tipos do banco em strings.
 
-**Constraints**:
-- ❌ NÃO modificar: notes/*, core/*, auth/*, qualquer arquivo de Agent B/C
-- ✅ Recorrência usa `recurrence` do banco mas a LÓGICA já foi implementada na Wave 1 — agent D só consome
-- Usa `currentUserIdProvider` da Wave 1
+```go
+func UUID(u pgtype.UUID) string
+func OptUUID(u pgtype.UUID) *string
+func Time(t pgtype.Timestamptz) string
+func OptTime(t pgtype.Timestamptz) *string
+```
+
+**Critérios de Aceitação:**
+- Cobertura 100% com testes unitários simples.
 
 ---
 
-## Pós-execução (eu integro)
+### Task 0.4: Criar Widgets Globais Flutter
 
-1. Cada agente devolve resumo de arquivos tocados
-2. Eu rodo `flutter analyze` + `flutter test`
-3. Se algo quebrar, dispatcho agente de fix focado no erro
-4. Atualizo `walkthrough.md` com seção "FE-1~6 Completion"
-5. Reporto status final ao usuário
+**Files:**
+- Create: `lib/shared/widgets/app_button.dart`
+- Create: `lib/shared/widgets/app_input.dart`
+- Create: `lib/shared/widgets/app_bottom_sheet.dart`
+- Create: `lib/shared/widgets/app_snackbar.dart`
+- Create: `lib/shared/widgets/app_choice_chip.dart`
+- Create: `lib/shared/widgets/app_error_view.dart`
+- Create: `lib/shared/widgets/app_card.dart`
+- Create: `lib/shared/widgets/app_status_chip.dart`
+
+**Descrição:**
+Proíba qualquer tela de chamar `showModalBottomSheet`, `ScaffoldMessenger.of(context).showSnackBar`, `AlertDialog`, ou `ElevatedButton` diretamente.
+
+- `AppButton`: recebe `VoidCallback? onPressed`, `String text`, `bool isLoading`, `AppButtonVariant variant`.
+- `AppInput`: `TextFormField` padronizado.
+- `AppBottomSheet`: função global `Future<T?> showAppBottomSheet<T>(BuildContext context, ...)`.
+- `AppMessenger`: classe estática com `showSuccess`, `showError`, `showInfo`.
+- `AppChoiceChip`: extrair o `_Chip` de `due_date_picker`/`recurrence_picker`.
+- `AppErrorView`: widget com ícone, título, subtítulo, botão retry.
+- `AppCard`: Card com `elevation: 0`.
+- `AppStatusChip`: Container + padding + borderRadius.
+
+**Critérios de Aceitação:**
+- `flutter analyze` passa para todos os novos arquivos.
 
 ---
 
-## Riscos identificados
+### Task 0.5: Criar Validadores Estaticos Flutter
 
-| Risco | Mitigação |
-|---|---|
-| Agent C precisa de `MarkdownSerializer` da Wave 1 | Wave 1 cria e exporta; Wave 2 só importa |
-| Schema bump v1→v2 pode quebrar DB local existente | `MigrationStrategy` com `onUpgrade` adicionando tabelas novas; dados antigos preservados |
-| `currentUserIdProvider` retorna null se ainda em loading | Repos devolvem stream vazio nesse estado; UI já trata `AsyncValue.loading` |
-| Backend não tem endpoint `inbox/organize/plan`? | Verificado `internal/agent` existe; se o endpoint específico faltar, Agent C devolve stub + relatório |
-| `build_runner` em paralelo causa race | Só Wave 1 roda build_runner; Wave 2 só consome código gerado |
+**Files:**
+- Create: `lib/core/validators/input_validators.dart`
+
+**Descrição:**
+Extraia TODOS os validadores inline das telas para métodos estáticos puros.
+
+```dart
+class EmailValidator { static String? validate(String? value); }
+class PasswordValidator { static String? validate(String? value, {int minLength = 8}); }
+class NameValidator { static String? validate(String? value); }
+class NonEmptyValidator { static String? validate(String? value, {required String fieldName}); }
+```
+
+**Critérios de Aceitação:**
+- `login_screen.dart` e `register_screen.dart` usam `EmailValidator.validate`.
+
+---
+
+### Task 0.6: Corrigir `AppTheme` e `AppSpacing`
+
+**Files:**
+- Modify: `lib/shared/theme/app_spacing.dart`
+- Modify: `lib/shared/theme/app_theme.dart`
+- Modify: `lib/shared/theme/app_colors.dart`
+- Create: `lib/shared/theme/app_semantic_colors.dart` (ThemeExtension)
+
+**Descrição:**
+- `app_spacing.dart`: adicionar `buttonHeight = 48.0`, `iconSm/Md/Lg`, `elevationSm/Md`, `radiusFull = 999.0`.
+- `app_theme.dart`: extrair helper `_buildInputBorder()`.
+- `app_colors.dart`: criar `AppSemanticColors` via `ThemeExtension`.
+- `offline_indicator.dart`: usar `ColorScheme` + `AppTypography` + `AppSpacing`.
+
+**Critérios de Aceitação:**
+- `offline_indicator.dart` não contém `Colors.` (verificar com grep).
+
+---
+
+### Task 0.7: Corrigir `ApiClient` e `AuthInterceptor`
+
+**Files:**
+- Modify: `lib/core/api/api_client.dart`
+- Modify: `lib/core/api/auth_interceptor.dart`
+
+**Descrição:**
+- `api_client.dart`: tornar `dio` privado (`_dio`). Expor métodos proxy (`get`, `post`, etc).
+- `auth_interceptor.dart`: criar factory `Dio _createBaseDio()` compartilhada. Corrigir `_isAuthRoute` para `path.startsWith('/api/v1/auth/')`.
+
+**Critérios de Aceitação:**
+- Nenhum arquivo fora de `api_client.dart` acessa `.dio`.
+
+---
+
+## Phase 1 — Backend Core
+
+### Task 1.1: Extrair OnboardingService (auth.Register)
+
+**Files:**
+- Modify: `backend/internal/auth/service.go`
+- Create: `backend/internal/onboarding/service.go`
+- Modify: `backend/internal/auth/handler.go`
+- Modify: `backend/cmd/server/main.go`
+
+**Descrição:**
+Quebrar `auth.Service.Register`: auth cria só o usuário; `onboarding.Service.OnboardUser` cria settings, inbox, soul, routines dentro de transação.
+
+---
+
+### Task 1.2: Transacao em sync.Push
+
+**Files:**
+- Modify: `backend/internal/sync/service.go`
+- Modify: `backend/internal/sync/repository.go`
+- Modify: `backend/internal/sync/handler.go`
+
+**Descrição:**
+Envolver Push em `pgx.Tx`. Corrigir `GetSyncTags` que ignora `lastSyncedAt`. Nao expor `err.Error()` cru.
+
+---
+
+### Task 1.3: Refatorar Handlers Gordos
+
+**Files:**
+- Create+Modify: `settings`, `contexts`, `soul`, `tags`, `notifications` (service + repository + handler)
+
+**Descrição:**
+Extrair service/repository. Handlers finos (<80 linhas). Validar requests ausentes.
+
+---
+
+### Task 1.4: Unificar UUID Parse e Responses
+
+**Files:**
+- Modify: TODOS os handlers internos
+
+**Descrição:**
+Substituir parse manual por `web.UserID(c)`. Substituir `map[string]string` por `web.JSONError`. Validar params ignorados (ex: `note_id` in tasks).
+
+---
+
+### Task 1.5: Otimizar CompleteTask
+
+**Files:**
+- Modify: `backend/internal/tasks/service.go`
+- Modify: `backend/internal/tasks/repository.go`
+
+**Descrição:**
+Reduzir 4 queries para 1-2. Eliminar `GetTaskByID` desnecessário em Update/Delete.
+
+---
+
+### Task 1.6: Eliminar DRY em search
+
+**Files:**
+- Modify: `backend/internal/search/service.go`
+
+**Descrição:**
+Extrair `mapRowToSearchResult` unico. Extrair `mockEmbedding()` para isolado.
+
+---
+
+### Task 1.7: Corrigir agent tools e context
+
+**Files:**
+- Modify: `backend/internal/agent/tools.go`
+- Modify: `backend/internal/agent/context.go`
+- Modify: `backend/internal/agent/loop.go`
+
+**Descrição:**
+Substituir fake embedding por erro explícito. Padronizar UUID formatting. Extrair helpers `parseArgs[T]`. Usar `strings.Builder`.
+
+---
+
+### Task 1.8: Usar robfig/cron corretamente
+
+**Files:**
+- Modify: `backend/internal/routines/runner.go`
+
+**Descrição:**
+Substituir polling manual por `AddFunc`. Adicionar semaphore. Mover cleanup para separado.
+
+---
+
+### Task 1.9: Separar Gateway
+
+**Files:**
+- Modify: `backend/internal/gateway/repository.go`
+- Create: `backend/internal/gateway/telegram_client.go`
+- Modify: `backend/internal/gateway/handler.go`
+
+**Descrição:**
+Separar SQL raw de HTTP client. Quebrar Webhook em sub-metodos.
+
+---
+
+## Phase 2 — Frontend Core
+
+### Task 2.1: Criar Controllers (1 por tela)
+
+**Files:**
+- Create: 12 controllers em `lib/features/*/presentation/controllers/`
+- Modify: todas as telas para usar controllers
+
+**Descrição:**
+Cada controller é um `AsyncNotifier`. View nunca acessa repository diretamente.
+
+---
+
+### Task 2.2: StatefulShellRoute no GoRouter
+
+**Files:**
+- Modify: `lib/core/router/app_router.dart`
+- Modify: `lib/features/notes/presentation/widgets/main_shell.dart`
+
+**Descrição:**
+Substituir rota `/home` por `StatefulShellRoute` com 4 branches. Tabs endereçáveis.
+
+---
+
+### Task 2.3: Extrair SyncRepository e SyncMapper
+
+**Files:**
+- Modify: `lib/core/sync/sync_service.dart`
+- Create: `lib/core/sync/sync_repository.dart`
+- Create: `lib/core/sync/sync_mapper.dart`
+
+**Descrição:**
+Quebrar God Object de 306 linhas. Isolar HTTP, JSON parsing, SharedPreferences.
+
+---
+
+### Task 2.4: Refatorar notes_list_screen + today_tasks_screen
+
+**Files:**
+- Modify: `lib/features/notes/presentation/notes_list_screen.dart`
+- Modify: `lib/features/tasks/presentation/today_tasks_screen.dart`
+
+**Descrição:**
+Criar controllers. Remover acesso direto a repositories. Usar widgets globais.
+
+---
+
+### Task 2.5: Refatorar note_editor_screen + inbox_screen
+
+**Files:**
+- Modify: `lib/features/notes/presentation/note_editor_screen.dart`
+- Modify: `lib/features/notes/presentation/inbox_screen.dart`
+
+**Descrição:**
+Extrair NoteEditorController. Remover codigo comentado morto. Corrigir bug de layout.
+
+---
+
+### Task 2.6: Refatorar telegram_link_screen + contexts_screen
+
+**Files:**
+- Modify: `lib/features/telegram/presentation/telegram_link_screen.dart`
+- Modify: `lib/features/settings/presentation/contexts_screen.dart`
+
+**Descrição:**
+Extrair TelegramLinkController e ContextsController. Quebrar em widgets menores.
+
+---
+
+### Task 2.7: Refatorar telas restantes
+
+**Files:**
+- Modify: `soul_editor_screen`, `settings_screen`, `routines_screen`, `brief_history_screen`, `search_screen`
+
+**Descrição:**
+Criar controllers para cada. Remover `setState`/`addPostFrameCallback`.
+
+---
+
+### Task 2.8: Extrair ChatController
+
+**Files:**
+- Modify: `lib/features/agent/presentation/chat_screen.dart`
+- Create: `lib/features/agent/presentation/controllers/chat_controller.dart`
+
+**Descrição:**
+Extrair controller do arquivo da screen.
+
+---
+
+## Phase 3 — Polimento
+
+### Task 3.1: Extrair duplicacoes (DueDatePicker + RecurrencePicker)
+
+**Files:**
+- Modify: `due_date_picker.dart`, `recurrence_picker.dart`, `task_edit_sheet.dart`
+- Create: `app_dismissible_wrapper.dart`, `app_choice_chip.dart`
+
+### Task 3.2: Corrigir Agent + Search widgets
+
+**Files:**
+- Modify: `message_bubble.dart`, `search_result_tile.dart`, `search_bar.dart`
+
+### Task 3.3: Interfaces de repositories
+
+**Files:**
+- Create: interfaces para NotesRepository, TasksRepository, SettingsRepository
+
+---
+
+## Phase 4 — Verificacao Final
+
+### Task 4.1: Backend verification
+`go build ./...`, `go test ./...`, `go vet ./...`
+
+### Task 4.2: Frontend verification
+`flutter analyze`, `flutter test`, `dart run build_runner build`
+
+### Task 4.3: Documentacao
+Update `walkthrough.md`, `ROADMAP_FRONTEND.md`
+
+---
+
+## Dependencies
+
+```
+Phase 0 (Foundation) -> Phase 1 (Backend Core) -> Phase 2 (Frontend Core) -> Phase 3 (Polimento) -> Phase 4 (Verificacao)
+```
+
+Phase 0 and Phase 1 can be done in parallel. Phase 2 depends on Phase 0 for widgets/validators.
+
+---
+
+## Riscos e Mitigacoes
+
+| Risco | Impacto | Mitigacao |
+|-------|---------|-----------|
+| Quebrar API para o Flutter | Alto | DTOs primeiro, garantir JSON identico |
+| build_runner race condition | Medio | So rodar na Phase 0 e 4 |
+| Telas grandes dificeis de testar | Alto | Refatorar 1 tela por vez |
+| Embedding real nao pronto | Alto | Retornar erro explicito, nao vetor fake |
+
+---
+
+## Estimativa
+
+| Fase | Tarefas | Estimativa |
+|------|---------|------------|
+| Phase 0 | 7 | 2-3 dias |
+| Phase 1 | 9 | 3-4 dias |
+| Phase 2 | 8 | 4-5 dias |
+| Phase 3 | 3 | 1-2 dias |
+| Phase 4 | 3 | 1 dia |
+| **Total** | **30** | **11-15 dias** |
