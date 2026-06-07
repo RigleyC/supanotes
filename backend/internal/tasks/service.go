@@ -51,11 +51,6 @@ func (s *Service) GetTaskByID(ctx context.Context, id pgtype.UUID, userID pgtype
 }
 
 func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, title *string, status *string, dueDate *time.Time, recurrence *string, position *int) (sqlcgen.Task, error) {
-	_, err := s.GetTaskByID(ctx, id, userID)
-	if err != nil {
-		return sqlcgen.Task{}, err
-	}
-
 	arg := sqlcgen.UpdateTaskParams{
 		ID:     id,
 		UserID: userID,
@@ -76,48 +71,85 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, title 
 		arg.Position = pgtype.Int4{Int32: int32(*position), Valid: true}
 	}
 
-	return s.repo.UpdateTask(ctx, arg)
+	task, err := s.repo.UpdateTask(ctx, arg)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlcgen.Task{}, ErrTaskNotFound
+		}
+		return sqlcgen.Task{}, err
+	}
+	return task, nil
 }
 
 func (s *Service) DeleteTask(ctx context.Context, userID, id pgtype.UUID) error {
-	_, err := s.GetTaskByID(ctx, id, userID)
-	if err != nil {
+	if err := s.repo.DeleteTask(ctx, id, userID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTaskNotFound
+		}
 		return err
 	}
-	return s.repo.DeleteTask(ctx, id, userID)
+	return nil
 }
 
 func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sqlcgen.Task, error) {
-	task, err := s.GetTaskByID(ctx, id, userID)
+	task, err := s.repo.GetTaskByID(ctx, id, userID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlcgen.Task{}, ErrTaskNotFound
+		}
 		return sqlcgen.Task{}, err
 	}
 
-	// Salva o histórico
-	_, err = s.repo.CreateTaskCompletion(ctx, id, "completed")
-	if err != nil {
+	if _, err := s.repo.CreateTaskCompletion(ctx, id, "completed"); err != nil {
 		return sqlcgen.Task{}, err
 	}
 
-	// Se for recorrente, calcula a próxima due_date e mantém 'open'
+	// Recurring task: calculate next due_date, keep 'open'
 	if task.Recurrence.Valid && task.Recurrence.String != "" && task.DueDate.Valid {
 		nextDue := calculateNextDueDate(task.DueDate.Time, task.Recurrence.String)
-		return s.UpdateTask(ctx, userID, id, nil, nil, &nextDue, nil, nil)
+		task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
+			ID:      id,
+			UserID:  userID,
+			DueDate: pgtype.Timestamptz{Time: nextDue, Valid: true},
+			Status:  pgtype.Text{String: "open", Valid: true},
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return sqlcgen.Task{}, ErrTaskNotFound
+			}
+			return sqlcgen.Task{}, err
+		}
+		return task, nil
 	}
 
-	// Caso contrário, marca como 'completed'
-	completedStatus := "completed"
-	return s.UpdateTask(ctx, userID, id, nil, &completedStatus, nil, nil, nil)
+	// Non-recurring: mark completed
+	task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
+		ID:     id,
+		UserID: userID,
+		Status: pgtype.Text{String: "completed", Valid: true},
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlcgen.Task{}, ErrTaskNotFound
+		}
+		return sqlcgen.Task{}, err
+	}
+	return task, nil
 }
 
 func (s *Service) ReopenTask(ctx context.Context, userID, id pgtype.UUID) (sqlcgen.Task, error) {
-	_, err := s.GetTaskByID(ctx, id, userID)
+	task, err := s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
+		ID:     id,
+		UserID: userID,
+		Status: pgtype.Text{String: "open", Valid: true},
+	})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlcgen.Task{}, ErrTaskNotFound
+		}
 		return sqlcgen.Task{}, err
 	}
-
-	openStatus := "open"
-	return s.UpdateTask(ctx, userID, id, nil, &openStatus, nil, nil, nil)
+	return task, nil
 }
 
 func (s *Service) GetTasks(ctx context.Context, userID pgtype.UUID, noteID *pgtype.UUID, status *string, dueBefore, dueAfter *time.Time, limit int32, offset int32) ([]sqlcgen.Task, error) {
