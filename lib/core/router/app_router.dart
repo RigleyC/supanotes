@@ -23,12 +23,14 @@ import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/features/notes/presentation/inbox_screen.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
+import 'package:supanotes/features/notes/presentation/widgets/main_shell.dart';
 import 'package:supanotes/features/search/presentation/search_screen.dart';
 import 'package:supanotes/features/settings/presentation/contexts_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart';
 import 'package:supanotes/features/routines/presentation/brief_history_screen.dart';
 import 'package:supanotes/features/routines/presentation/routines_screen.dart';
+import 'package:supanotes/features/tasks/presentation/today_tasks_screen.dart';
 import 'package:supanotes/features/telegram/presentation/telegram_link_screen.dart';
 import 'package:supanotes/shared/widgets/splash_screen.dart';
 
@@ -67,13 +69,44 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/register',
         builder: (_, __) => const RegisterScreen(),
       ),
-      GoRoute(
-        path: '/home',
-        builder: (_, __) => const NotesListScreen(),
-      ),
-      GoRoute(
-        path: '/chat',
-        builder: (_, __) => const ChatScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return MainShell(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/home',
+                builder: (_, __) => const NotesListScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/today',
+                builder: (_, __) => const TodayTasksScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/chat',
+                builder: (_, __) => const ChatScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/search',
+                builder: (_, __) => const SearchScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: '/inbox',
@@ -83,10 +116,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/notes/:id',
         builder: (_, state) =>
             NoteEditorScreen(noteId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/search',
-        builder: (_, __) => const SearchScreen(),
       ),
       GoRoute(
         path: '/settings',
