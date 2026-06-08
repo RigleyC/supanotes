@@ -11,10 +11,8 @@ import (
 	"github.com/RigleyC/supanotes/pkg/config"
 )
 
-const userIDContextKey = "user_id"
-
 // JWT returns middleware that extracts and validates a Bearer token,
-// then stuffs the user ID into the Echo context under userIDContextKey.
+// then stuffs the user ID into the Echo context via web.SetUserID.
 func JWT(cfg *config.Config) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -38,18 +36,8 @@ func JWT(cfg *config.Config) echo.MiddlewareFunc {
 				return web.JSONError(c, http.StatusUnauthorized, "invalid or expired token")
 			}
 
-			c.Set(userIDContextKey, claims.UserID)
+			web.SetUserID(c, claims.UserID)
 			return next(c)
 		}
 	}
-}
-
-// UserIDFromContext returns the authenticated user ID set by the JWT
-// middleware. Use only inside handlers behind JWT().
-func UserIDFromContext(c echo.Context) (string, bool) {
-	v, ok := c.Get(userIDContextKey).(string)
-	if !ok || v == "" {
-		return "", false
-	}
-	return v, true
 }

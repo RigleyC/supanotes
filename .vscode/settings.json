@@ -1,0 +1,9 @@
+{
+  "go.alternateTools": {
+    "go": "C:\\Users\\rigleyc\\go-sdk\\bin\\go.exe"
+  },
+  "go.goroot": "C:\\Users\\rigleyc\\go-sdk",
+  "terminal.integrated.env.windows": {
+    "PATH": "C:\\Users\\rigleyc\\go-sdk\\bin;${env:PATH}"
+  }
+}

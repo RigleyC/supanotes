@@ -6,10 +6,25 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/onboarding"
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
+
+type errResponse struct {
+	err    error
+	status int
+	msg    string
+}
+
+func respondError(c echo.Context, err error, mappings []errResponse, defaultMsg string) error {
+	for _, m := range mappings {
+		if errors.Is(err, m.err) {
+			return web.JSONError(c, m.status, m.msg)
+		}
+	}
+	c.Logger().Error(err)
+	return web.JSONError(c, http.StatusInternalServerError, defaultMsg)
+}
 
 type RegisterRequest struct {
 	Email    string `json:"email"    validate:"required,email"`
@@ -48,15 +63,11 @@ type RefreshResponse struct {
 }
 
 type Handler struct {
-	svc           *Service
-	onboardingSvc *onboarding.Service
+	svc *Service
 }
 
-func NewHandler(svc *Service, onboardingSvc *onboarding.Service) *Handler {
-	return &Handler{
-		svc:           svc,
-		onboardingSvc: onboardingSvc,
-	}
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) Register(c echo.Context) error {
@@ -67,18 +78,9 @@ func (h *Handler) Register(c echo.Context) error {
 
 	user, access, refresh, err := h.svc.Register(c.Request().Context(), req.Email, req.Password, req.Name)
 	if err != nil {
-		if errors.Is(err, ErrEmailInUse) {
-			return web.JSONError(c, http.StatusConflict, "email already in use")
-		}
-		c.Logger().Error(err)
-		return web.JSONError(c, http.StatusInternalServerError, "registration failed")
-	}
-
-	if h.onboardingSvc != nil {
-		if err := h.onboardingSvc.OnboardUser(c.Request().Context(), user.ID); err != nil {
-			c.Logger().Error(err)
-			return web.JSONError(c, http.StatusInternalServerError, "registration failed")
-		}
+		return respondError(c, err, []errResponse{
+			{ErrEmailInUse, http.StatusConflict, "email already in use"},
+		}, "registration failed")
 	}
 
 	return c.JSON(http.StatusCreated, AuthResponse{
@@ -100,11 +102,9 @@ func (h *Handler) Login(c echo.Context) error {
 
 	user, access, refresh, err := h.svc.Login(c.Request().Context(), req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, ErrInvalidCredentials) {
-			return web.JSONError(c, http.StatusUnauthorized, "invalid credentials")
-		}
-		c.Logger().Error(err)
-		return web.JSONError(c, http.StatusInternalServerError, "login failed")
+		return respondError(c, err, []errResponse{
+			{ErrInvalidCredentials, http.StatusUnauthorized, "invalid credentials"},
+		}, "login failed")
 	}
 
 	return c.JSON(http.StatusOK, AuthResponse{
@@ -126,11 +126,9 @@ func (h *Handler) Refresh(c echo.Context) error {
 
 	access, refresh, err := h.svc.Refresh(c.Request().Context(), req.RefreshToken)
 	if err != nil {
-		if errors.Is(err, ErrInvalidRefreshToken) {
-			return web.JSONError(c, http.StatusUnauthorized, "invalid refresh token")
-		}
-		c.Logger().Error(err)
-		return web.JSONError(c, http.StatusInternalServerError, "refresh failed")
+		return respondError(c, err, []errResponse{
+			{ErrInvalidRefreshToken, http.StatusUnauthorized, "invalid refresh token"},
+		}, "refresh failed")
 	}
 
 	return c.JSON(http.StatusOK, RefreshResponse{AccessToken: access, RefreshToken: refresh})
@@ -143,8 +141,7 @@ func (h *Handler) Logout(c echo.Context) error {
 	}
 
 	if err := h.svc.Logout(c.Request().Context(), req.RefreshToken); err != nil {
-		c.Logger().Error(err)
-		return web.JSONError(c, http.StatusInternalServerError, "logout failed")
+		return respondError(c, err, nil, "logout failed")
 	}
 	return c.NoContent(http.StatusNoContent)
 }

@@ -6,8 +6,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/web"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type CreateMemoryRequest struct {
@@ -43,7 +43,7 @@ func (h *Handler) List(c echo.Context) error {
 	res := make([]MemoryResponse, 0, len(memories))
 	for _, m := range memories {
 		res = append(res, MemoryResponse{
-			ID:        auth.UUIDToString(m.ID),
+			ID:        uid.UUIDToString(m.ID),
 			Content:   m.Content,
 			CreatedAt: m.CreatedAt.Time.Format(time.RFC3339),
 		})
@@ -69,7 +69,7 @@ func (h *Handler) Create(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, MemoryResponse{
-		ID:        auth.UUIDToString(memory.ID),
+		ID:        uid.UUIDToString(memory.ID),
 		Content:   memory.Content,
 		CreatedAt: memory.CreatedAt.Time.Format(time.RFC3339),
 	})
@@ -81,7 +81,7 @@ func (h *Handler) Delete(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}

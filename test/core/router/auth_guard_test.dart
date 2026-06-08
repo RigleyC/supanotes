@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/auth/domain/auth_state.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/core/router/auth_guard.dart';
 
 const _login = '/login';
@@ -46,14 +47,14 @@ void main() {
 
     test('redirects to /home when an authenticated user lands on /', () {
       const auth = AsyncValue<AuthState>.data(
-        AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+        AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
       );
       expect(redirectFor(_splash, auth), _home);
     });
 
     test('redirects to /home when an authenticated user revisits /login', () {
       const auth = AsyncValue<AuthState>.data(
-        AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+        AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
       );
       expect(authGuardRedirect(currentLocation: _login, authState: auth),
           _home);
@@ -62,7 +63,7 @@ void main() {
     test('redirects to /home when an authenticated user revisits /register',
         () {
       const auth = AsyncValue<AuthState>.data(
-        AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+        AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
       );
       expect(authGuardRedirect(currentLocation: _register, authState: auth),
           _home);
@@ -70,22 +71,10 @@ void main() {
 
     test('lets an authenticated user stay on /home', () {
       const auth = AsyncValue<AuthState>.data(
-        AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+        AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
       );
       expect(authGuardRedirect(currentLocation: _home, authState: auth),
           isNull);
-    });
-
-    test('treats the AuthInitial data state as not yet routable', () {
-      // Per the spec, the router does not redirect while AuthInitial is
-      // the current state, so the user is not bounced to /login before
-      // we know whether they have a saved session.
-      const initial = AsyncValue<AuthState>.data(AuthInitial());
-      expect(redirectFor(_home, initial), isNull);
-      // The splash redirects once auth is resolved; AuthInitial counts
-      // as not-yet-resolved, so the user stays on /.
-      expect(redirectFor(_splash, initial), isNull);
-      expect(redirectFor(_login, initial), isNull);
     });
 
     test('falls back to /login when the auth provider is in an error state',

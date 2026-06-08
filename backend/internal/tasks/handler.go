@@ -8,9 +8,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type CreateTaskRequest struct {
@@ -60,7 +60,7 @@ func (h *Handler) Create(c echo.Context) error {
 		return err
 	}
 
-	noteID, err := auth.UUIDFromString(req.NoteID)
+	noteID, err := uid.UUIDFromString(req.NoteID)
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid note_id")
 	}
@@ -122,7 +122,7 @@ func (h *Handler) Update(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
@@ -158,7 +158,7 @@ func (h *Handler) Delete(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
@@ -181,7 +181,7 @@ func (h *Handler) Complete(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
@@ -204,7 +204,7 @@ func (h *Handler) Reopen(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
@@ -252,8 +252,8 @@ func mapToTaskResponse(t sqlcgen.Task) TaskResponse {
 		rec = &r
 	}
 	return TaskResponse{
-		ID:         auth.UUIDToString(t.ID),
-		NoteID:     auth.UUIDToString(t.NoteID),
+		ID:         uid.UUIDToString(t.ID),
+		NoteID:     uid.UUIDToString(t.NoteID),
 		Title:      t.Title,
 		Status:     t.Status,
 		DueDate:    due,

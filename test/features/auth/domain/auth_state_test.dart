@@ -26,9 +26,9 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
 
 void main() {
   setUpAll(() {
-    registerFallbackValue(
-      const AuthAuthenticated(userId: '', email: '', name: ''),
-    );
+    registerFallbackValue(const AuthAuthenticated(
+      User(id: '', email: '', name: ''),
+    ));
   });
 
   ProviderContainer makeContainer({
@@ -47,17 +47,16 @@ void main() {
 
   group('AuthState', () {
     test('sealed class variants are equal to themselves', () {
-      expect(const AuthInitial(), const AuthInitial());
       expect(const AuthUnauthenticated(), const AuthUnauthenticated());
       expect(
-        const AuthAuthenticated(userId: 'u', email: 'e', name: 'n'),
-        const AuthAuthenticated(userId: 'u', email: 'e', name: 'n'),
+        const AuthAuthenticated(User(id: 'u', email: 'e', name: 'n')),
+        const AuthAuthenticated(User(id: 'u', email: 'e', name: 'n')),
       );
     });
 
     test('two AuthAuthenticated with different fields are not equal', () {
-      const a = AuthAuthenticated(userId: '1', email: 'a', name: 'A');
-      const b = AuthAuthenticated(userId: '2', email: 'b', name: 'B');
+      const a = AuthAuthenticated(User(id: '1', email: 'a', name: 'A'));
+      const b = AuthAuthenticated(User(id: '2', email: 'b', name: 'B'));
       expect(a == b, isFalse);
     });
   });
@@ -85,6 +84,9 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => '');
+      when(() => storage.getUserId()).thenAnswer((_) async => null);
+      when(() => storage.getUserEmail()).thenAnswer((_) async => null);
+      when(() => storage.getUserName()).thenAnswer((_) async => null);
 
       final container = makeContainer(
         storage: storage,
@@ -108,12 +110,9 @@ void main() {
       );
       final state = await container.read(authControllerProvider.future);
       expect(state, isA<AuthAuthenticated>());
-      expect(
-        (state as AuthAuthenticated).userId,
-        'u-1',
-      );
-      expect(state.email, 'a@b');
-      expect(state.name, 'Alice');
+      expect((state as AuthAuthenticated).user.id, 'u-1');
+      expect(state.user.email, 'a@b');
+      expect(state.user.name, 'Alice');
     });
 
     test('wipes storage and returns Unauthenticated on partial session',
@@ -166,9 +165,9 @@ void main() {
       final state = container.read(authControllerProvider).requireValue;
       expect(state, isA<AuthAuthenticated>());
       final auth = state as AuthAuthenticated;
-      expect(auth.userId, 'u-1');
-      expect(auth.email, 'a@b.com');
-      expect(auth.name, 'Alice');
+      expect(auth.user.id, 'u-1');
+      expect(auth.user.email, 'a@b.com');
+      expect(auth.user.name, 'Alice');
     });
 
     test('on failure, rethrows and stores the error in state', () async {
@@ -230,7 +229,7 @@ void main() {
 
       final state = container.read(authControllerProvider).requireValue;
       expect(state, isA<AuthAuthenticated>());
-      expect((state as AuthAuthenticated).userId, 'u-2');
+      expect((state as AuthAuthenticated).user.id, 'u-2');
     });
   });
 

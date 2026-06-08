@@ -5,8 +5,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/web"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type ChatRequest struct {
@@ -58,7 +58,7 @@ func (h *Handler) ListMessages(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "session_id is required")
 	}
 
-	sessionUUID, err := auth.UUIDFromString(sessionIDStr)
+	sessionUUID, err := uid.UUIDFromString(sessionIDStr)
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid session_id")
 	}
@@ -83,7 +83,7 @@ func (h *Handler) DeleteMessages(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "session_id is required")
 	}
 
-	sessionUUID, err := auth.UUIDFromString(sessionIDStr)
+	sessionUUID, err := uid.UUIDFromString(sessionIDStr)
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid session_id")
 	}

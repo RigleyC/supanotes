@@ -27,7 +27,6 @@ import (
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/notifications"
-	"github.com/RigleyC/supanotes/internal/onboarding"
 	"github.com/RigleyC/supanotes/internal/routines"
 	"github.com/RigleyC/supanotes/internal/search"
 	"github.com/RigleyC/supanotes/internal/settings"
@@ -149,9 +148,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	}
 
 	queries := sqlcgen.New(pool)
-	authSvc := auth.NewService(queries, cfg)
-	onboardingSvc := onboarding.NewService(pool)
-	authH := auth.NewHandler(authSvc, onboardingSvc)
+	authSvc := auth.NewService(queries, cfg, pool)
+	authH := auth.NewHandler(authSvc)
 
 	api.POST("/auth/register", authH.Register)
 	api.POST("/auth/login", authH.Login)

@@ -1,20 +1,16 @@
 /// Dio interceptor that injects the bearer token and transparently
 /// refreshes it on 401 responses.
 ///
-/// **Request flow** — for every outgoing request whose path is *not* under
-/// `/auth/`, the interceptor attaches `Authorization: Bearer <accessToken>`
-/// (if a token is present in [tokenStorage]).
+/// **Request flow** — for every outgoing request, the interceptor attaches
+/// `Authorization: Bearer <accessToken>` if a token is present.
 ///
-/// **Error flow** — when a request comes back with HTTP 401, the
-/// interceptor:
-///   1. Calls `POST /auth/refresh` on a *secondary* [Dio] that does **not**
-///      have this interceptor attached, so the refresh call itself cannot
-///      recurse.
-///   2. If the refresh succeeds, persists the new pair of tokens and
-///      replays the original request with the new bearer header.
-///   3. If the refresh fails, invokes [onAuthFailure] once (no matter how
-///      many concurrent requests are in flight) and propagates the
-///      original 401 error.
+/// **Error flow** — when a request comes back with HTTP 401 (and the path
+/// is not an auth endpoint like /login or /register), the interceptor:
+///   1. Calls [_onRefresh] with the current refresh token.
+///   2. If the refresh succeeds, persists the new pair and replays the
+///      original request via [_replay].
+///   3. If the refresh fails, invokes [onAuthFailure] once and propagates
+///      the original 401 error.
 ///
 /// **Single-flight refresh** — concurrent 401s share a single in-flight
 /// refresh future via [_refreshing], and a single in-flight auth-failure
@@ -26,53 +22,43 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
-import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 
 /// Signature of the callback invoked when a token refresh has failed and
 /// the user must be considered signed out.
 typedef AuthFailureHandler = Future<void> Function();
 
+/// Signature for the refresh HTTP call. Receives the plain refresh token
+/// and returns a new token pair, or null on failure.
+typedef RefreshHandler = Future<({String accessToken, String refreshToken})?> Function(
+  String refreshToken,
+);
+
+/// Signature for replaying a failed request after a successful refresh.
+typedef ReplayHandler = Future<Response<dynamic>> Function(RequestOptions options);
+
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required this.tokenStorage,
     required this.onAuthFailure,
-    Dio? refreshDio,
-  }) : _refreshDio = refreshDio ?? _defaultRefreshDio();
+    required RefreshHandler onRefresh,
+    required ReplayHandler replay,
+  })  : _onRefresh = onRefresh,
+        _replay = replay;
 
   final AuthLocalStorage tokenStorage;
   final AuthFailureHandler onAuthFailure;
-  final Dio _refreshDio;
+  final RefreshHandler _onRefresh;
+  final ReplayHandler _replay;
 
-  // Single-flight guards. Stored as nullable futures so concurrent 401s
-  // can `await` the same in-flight work.
   Future<bool>? _refreshing;
   Future<void>? _notifyingFailure;
-
-  static Dio _defaultRefreshDio() {
-    final dio = Dio();
-    dio.options
-      ..baseUrl = ApiConstants.baseUrl
-      ..connectTimeout = const Duration(
-        milliseconds: ApiConstants.connectTimeoutMs,
-      )
-      ..receiveTimeout = const Duration(
-        milliseconds: ApiConstants.receiveTimeoutMs,
-      )
-      ..contentType = Headers.jsonContentType
-      ..responseType = ResponseType.json;
-    return dio;
-  }
 
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    if (_isAuthRoute(options.path)) {
-      handler.next(options);
-      return;
-    }
     final token = await tokenStorage.getAccessToken();
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
@@ -88,6 +74,13 @@ class AuthInterceptor extends Interceptor {
     final isUnauthorized = err.response?.statusCode == 401;
     final isAlreadyRetried = err.requestOptions.extra['retry'] == true;
     if (!isUnauthorized || isAlreadyRetried) {
+      handler.next(err);
+      return;
+    }
+
+    // Skip auth endpoints (login/register) so failed credentials
+    // don't trigger an unnecessary session-clear cycle.
+    if (err.requestOptions.path.startsWith('/api/v1/auth/')) {
       handler.next(err);
       return;
     }
@@ -110,7 +103,7 @@ class AuthInterceptor extends Interceptor {
     err.requestOptions.extra['retry'] = true;
 
     try {
-      final response = await _refreshDio.fetch<dynamic>(err.requestOptions);
+      final response = await _replay(err.requestOptions);
       handler.resolve(response);
     } on DioException catch (e) {
       handler.next(e);
@@ -122,8 +115,6 @@ class AuthInterceptor extends Interceptor {
     if (cached != null) return cached;
     late Future<bool> future;
     future = _doRefresh().whenComplete(() {
-      // Only clear if we are still the most recent attempt. A new attempt
-      // started by a later 401 should keep its own slot.
       if (identical(_refreshing, future)) {
         _refreshing = null;
       }
@@ -149,31 +140,15 @@ class AuthInterceptor extends Interceptor {
     final refreshToken = await tokenStorage.getRefreshToken();
     if (refreshToken == null) return false;
 
-    try {
-      final response = await _refreshDio.post<Map<String, dynamic>>(
-        '/auth/refresh',
-        data: {'refresh_token': refreshToken},
-      );
-      final data = response.data;
-      if (data == null) return false;
-      final newAccess = data['access_token'] as String?;
-      final newRefresh = data['refresh_token'] as String?;
-      if (newAccess == null || newRefresh == null) return false;
+    final tokens = await _onRefresh(refreshToken);
+    if (tokens == null) return false;
 
-      // userId is preserved across refreshes, so we just round-trip it.
-      final userId = await tokenStorage.getUserId();
-      await tokenStorage.saveTokens(
-        accessToken: newAccess,
-        refreshToken: newRefresh,
-        userId: userId ?? '',
-      );
-      return true;
-    } on DioException {
-      return false;
-    }
-  }
-
-  bool _isAuthRoute(String path) {
-    return path.startsWith('/api/v1/auth/');
+    final userId = await tokenStorage.getUserId();
+    await tokenStorage.saveTokens(
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      userId: userId ?? '',
+    );
+    return true;
   }
 }

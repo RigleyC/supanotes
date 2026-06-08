@@ -68,10 +68,13 @@ ApiClient _apiClient(_StubAdapter adapter) {
   final interceptor = AuthInterceptor(
     tokenStorage: _NoopStorage(),
     onAuthFailure: () async {},
+    onRefresh: (_) async => null,
+    replay: (_) => throw UnimplementedError('not used in repository test'),
   );
-  final client = ApiClient(authInterceptor: interceptor);
-  client.dio.httpClientAdapter = adapter;
-  return client;
+  final dio = Dio()
+    ..httpClientAdapter = adapter
+    ..interceptors.add(interceptor);
+  return ApiClient(authInterceptor: interceptor, dio: dio);
 }
 
 class _NoopStorage implements AuthLocalStorage {

@@ -24,7 +24,7 @@ class HomeScreen extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final name = state.maybeWhen(
-      data: (auth) => auth is AuthAuthenticated ? auth.name : 'there',
+      data: (auth) => auth is AuthAuthenticated ? auth.user.name : 'there',
       orElse: () => 'there',
     );
 

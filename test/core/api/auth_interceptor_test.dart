@@ -21,8 +21,6 @@ class _AdapterHit {
 class _TestAdapter implements HttpClientAdapter {
   _TestAdapter(this.responder);
 
-  /// Called for every outbound request. Returns a [ResponseBody] (or throws
-  /// a [DioException]) based on the [RequestOptions].
   final Future<ResponseBody> Function(RequestOptions options) responder;
 
   final List<_AdapterHit> hits = [];
@@ -86,6 +84,33 @@ DioException _dioError({
   );
 }
 
+/// Build the [RefreshHandler] and [ReplayHandler] callbacks from a shared
+/// [Dio] so tests can inspect [adapter] for both refresh and replay hits.
+({
+  RefreshHandler onRefresh,
+  ReplayHandler replay,
+}) _refreshCallbacks(Dio dio) {
+  return (
+    onRefresh: (token) async {
+      try {
+        final response = await dio.post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: {'refresh_token': token},
+        );
+        final data = response.data;
+        if (data == null) return null;
+        final at = data['access_token'] as String?;
+        final rt = data['refresh_token'] as String?;
+        if (at == null || rt == null) return null;
+        return (accessToken: at, refreshToken: rt);
+      } on DioException {
+        return null;
+      }
+    },
+    replay: (options) => dio.fetch<dynamic>(options),
+  );
+}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(
@@ -100,6 +125,8 @@ void main() {
       final interceptor = AuthInterceptor(
         tokenStorage: storage,
         onAuthFailure: () async {},
+        onRefresh: (_) async => null,
+        replay: (_) => throw UnimplementedError('not used in this test'),
       );
 
       final capturedHeaders = <String, String>{};
@@ -117,12 +144,14 @@ void main() {
       expect(capturedHeaders['Authorization'], 'Bearer tok-1');
     });
 
-    test('skips Authorization header for /auth/* paths', () async {
+    test('attaches Authorization header even for /auth/* paths', () async {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok-1');
       final interceptor = AuthInterceptor(
         tokenStorage: storage,
         onAuthFailure: () async {},
+        onRefresh: (_) async => null,
+        replay: (_) => throw UnimplementedError('not used in this test'),
       );
 
       final capturedHeaders = <String, String>{};
@@ -137,7 +166,7 @@ void main() {
 
       await dio.post<dynamic>('/auth/login', data: {'email': 'a@b'});
 
-      expect(capturedHeaders.containsKey('Authorization'), isFalse);
+      expect(capturedHeaders['Authorization'], 'Bearer tok-1');
     });
 
     test('does not attach Authorization when storage is empty', () async {
@@ -146,6 +175,8 @@ void main() {
       final interceptor = AuthInterceptor(
         tokenStorage: storage,
         onAuthFailure: () async {},
+        onRefresh: (_) async => null,
+        replay: (_) => throw UnimplementedError('not used in this test'),
       );
 
       final capturedHeaders = <String, String>{};
@@ -169,8 +200,6 @@ void main() {
         'on 401, calls /auth/refresh and replays the original request with '
         'the new token', () async {
       final storage = _MockAuthLocalStorage();
-      // Initial request reads the original (expired) token.
-      // Refresh reads the refresh token, then saves the new pair.
       when(() => storage.getAccessToken())
           .thenAnswer((_) async => 'old-access');
       when(() => storage.getRefreshToken())
@@ -182,7 +211,6 @@ void main() {
             userId: any(named: 'userId'),
           )).thenAnswer((_) async {});
 
-      // After saveTokens, subsequent reads see the new token.
       var tokenReadCount = 0;
       when(() => storage.getAccessToken()).thenAnswer((_) async {
         tokenReadCount++;
@@ -190,25 +218,28 @@ void main() {
       });
 
       var refreshCount = 0;
+      final refreshAdapter = _TestAdapter((options) async {
+        if (options.path == '/auth/refresh') {
+          refreshCount++;
+          return _jsonResponse(200, {
+            'access_token': 'new-access',
+            'refresh_token': 'new-refresh',
+          });
+        }
+        return _jsonResponse(200, {'replayed': true});
+      });
+      final refreshDio = Dio()..httpClientAdapter = refreshAdapter;
+      final cb = _refreshCallbacks(refreshDio);
+
       final interceptor = AuthInterceptor(
         tokenStorage: storage,
         onAuthFailure: () async {},
-        refreshDio: Dio()..httpClientAdapter = _TestAdapter((options) async {
-          if (options.path == '/auth/refresh') {
-            refreshCount++;
-            return _jsonResponse(200, {
-              'access_token': 'new-access',
-              'refresh_token': 'new-refresh',
-            });
-          }
-          // Replay of original /notes — return success.
-          return _jsonResponse(200, {'replayed': true});
-        }),
+        onRefresh: cb.onRefresh,
+        replay: cb.replay,
       );
 
       final dio = Dio()
         ..httpClientAdapter = _TestAdapter((options) async {
-          // The first attempt to /notes always 401s.
           return _jsonResponse(401, {'error': 'expired'});
         })
         ..interceptors.add(interceptor);
@@ -217,7 +248,6 @@ void main() {
 
       expect(refreshCount, 1);
       expect(response.statusCode, 200);
-      // saveTokens was called with the new pair.
       verify(() => storage.saveTokens(
             accessToken: 'new-access',
             refreshToken: 'new-refresh',
@@ -234,17 +264,22 @@ void main() {
           .thenAnswer((_) async => 'old-refresh');
 
       var failureCalls = 0;
+      final refreshAdapter = _TestAdapter((options) async {
+        if (options.path == '/auth/refresh') {
+          return _jsonResponse(401, {'error': 'refresh expired'});
+        }
+        return _jsonResponse(500, {'error': 'unexpected'});
+      });
+      final refreshDio = Dio()..httpClientAdapter = refreshAdapter;
+      final cb = _refreshCallbacks(refreshDio);
+
       final interceptor = AuthInterceptor(
         tokenStorage: storage,
         onAuthFailure: () async {
           failureCalls++;
         },
-        refreshDio: Dio()..httpClientAdapter = _TestAdapter((options) async {
-          if (options.path == '/auth/refresh') {
-            return _jsonResponse(401, {'error': 'refresh expired'});
-          }
-          return _jsonResponse(500, {'error': 'unexpected'});
-        }),
+        onRefresh: cb.onRefresh,
+        replay: cb.replay,
       );
 
       final dio = Dio()
@@ -268,10 +303,12 @@ void main() {
       final interceptor = AuthInterceptor(
         tokenStorage: storage,
         onAuthFailure: () async {},
-        refreshDio: Dio()
-          ..httpClientAdapter = _TestAdapter((_) async {
-            fail('refresh should not be called on a retried request');
-          }),
+        onRefresh: (_) async {
+          fail('refresh should not be called on a retried request');
+        },
+        replay: (_) {
+          fail('replay should not be called on a retried request');
+        },
       );
 
       final dio = Dio()
@@ -280,7 +317,6 @@ void main() {
         })
         ..interceptors.add(interceptor);
 
-      // Simulate the request having already been retried once.
       final err = _dioError(status: 401, path: '/notes', method: 'GET');
       err.requestOptions.extra['retry'] = true;
 
@@ -300,20 +336,24 @@ void main() {
 
       var refreshHits = 0;
       var failureCalls = 0;
+      final refreshAdapter = _TestAdapter((options) async {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        if (options.path == '/auth/refresh') {
+          refreshHits++;
+          return _jsonResponse(401, {'error': 'nope'});
+        }
+        return _jsonResponse(200, {'x': true});
+      });
+      final refreshDio = Dio()..httpClientAdapter = refreshAdapter;
+      final cb = _refreshCallbacks(refreshDio);
+
       final interceptor = AuthInterceptor(
         tokenStorage: storage,
         onAuthFailure: () async {
           failureCalls++;
         },
-        refreshDio: Dio()..httpClientAdapter = _TestAdapter((options) async {
-          // Slow refresh to ensure both 401s arrive while it is in flight.
-          await Future<void>.delayed(const Duration(milliseconds: 20));
-          if (options.path == '/auth/refresh') {
-            refreshHits++;
-            return _jsonResponse(401, {'error': 'nope'});
-          }
-          return _jsonResponse(200, {'x': true});
-        }),
+        onRefresh: cb.onRefresh,
+        replay: cb.replay,
       );
 
       final dio = Dio()
@@ -322,8 +362,6 @@ void main() {
         })
         ..interceptors.add(interceptor);
 
-      // Fire three concurrent requests that all 401, then settle each one
-      // individually so an error on one does not short-circuit the others.
       final futures = <Future<dynamic>>[
         for (final path in ['/a', '/b', '/c'])
           dio.get<dynamic>(path).then<dynamic>(
@@ -332,7 +370,6 @@ void main() {
           ),
       ];
       final results = await Future.wait<dynamic>(futures);
-      // All three surface as DioException.
       for (final r in results) {
         expect(r, isA<DioException>());
       }
@@ -348,9 +385,12 @@ void main() {
       final interceptor = AuthInterceptor(
         tokenStorage: storage,
         onAuthFailure: () async {},
-        refreshDio: Dio()..httpClientAdapter = _TestAdapter((_) async {
+        onRefresh: (_) async {
           fail('refresh should not be called on a 500');
-        }),
+        },
+        replay: (_) {
+          fail('replay should not be called on a 500');
+        },
       );
 
       final dio = Dio()
@@ -361,6 +401,39 @@ void main() {
 
       await expectLater(
         () => dio.get<dynamic>('/notes'),
+        throwsA(isA<DioException>()),
+      );
+    });
+  });
+
+  group('AuthInterceptor.onError (401 on auth route)', () {
+    test('auth route 401s skip refresh and are passed through', () async {
+      final storage = _MockAuthLocalStorage();
+      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
+      final interceptor = AuthInterceptor(
+        tokenStorage: storage,
+        onAuthFailure: () async {
+          fail('onAuthFailure should not be called for auth-route 401s');
+        },
+        onRefresh: (_) async {
+          fail('refresh should not be called for auth-route 401s');
+        },
+        replay: (_) {
+          fail('replay should not be called for auth-route 401s');
+        },
+      );
+
+      final dio = Dio()
+        ..httpClientAdapter = _TestAdapter((_) async {
+          return _jsonResponse(401, {'error': 'invalid credentials'});
+        })
+        ..interceptors.add(interceptor);
+
+      await expectLater(
+        () => dio.post<dynamic>('/api/v1/auth/login', data: {
+          'email': 'a@b.com',
+          'password': 'x',
+        }),
         throwsA(isA<DioException>()),
       );
     });

@@ -18,7 +18,7 @@ import 'package:supanotes/features/auth/domain/auth_state.dart';
 final currentUserIdProvider = Provider<String?>((ref) {
   final state = ref.watch(authControllerProvider);
   return state.maybeWhen(
-    data: (s) => s is AuthAuthenticated ? s.userId : null,
+    data: (s) => s is AuthAuthenticated ? s.user.id : null,
     orElse: () => null,
   );
 });

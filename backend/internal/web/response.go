@@ -42,10 +42,6 @@ func FormatTime(t pgtype.Timestamptz) string {
 	return t.Time.Format(time.RFC3339)
 }
 
-func UUIDToString(u pgtype.UUID) string {
-	return uid.UUIDToString(u)
-}
-
 func OptUUID(s *string) (*pgtype.UUID, error) {
 	if s == nil {
 		return nil, nil

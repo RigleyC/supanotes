@@ -28,11 +28,20 @@ class NameValidator {
     if (value == null || value.trim().isEmpty) {
       return 'Nome é obrigatório';
     }
-    if (value.trim().length < 1) {
-      return 'Nome deve ter no mínimo 1 caractere';
-    }
     if (value.trim().length > 100) {
       return 'Nome deve ter no máximo 100 caracteres';
+    }
+    return null;
+  }
+}
+
+class ConfirmPasswordValidator {
+  static String? validate(String? value, {required String expected}) {
+    if (value == null || value.isEmpty) {
+      return 'Confirmação de senha é obrigatória';
+    }
+    if (value != expected) {
+      return 'Senhas não conferem';
     }
     return null;
   }

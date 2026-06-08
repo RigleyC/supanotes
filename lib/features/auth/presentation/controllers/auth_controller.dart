@@ -34,19 +34,24 @@ class AuthController extends AsyncNotifier<AuthState> {
   }
 
   Future<AuthState> _restore() async {
-    final accessToken = await _storage.getAccessToken();
+    final results = await Future.wait([
+      _storage.getAccessToken(),
+      _storage.getUserId(),
+      _storage.getUserEmail(),
+      _storage.getUserName(),
+    ]);
+    final accessToken = results[0] as String?;
     if (accessToken == null || accessToken.isEmpty) {
       return const AuthUnauthenticated();
     }
-    final userId = await _storage.getUserId();
-    final email = await _storage.getUserEmail();
-    final name = await _storage.getUserName();
+    final userId = results[1] as String?;
+    final email = results[2] as String?;
+    final name = results[3] as String?;
     if (userId == null || email == null || name == null) {
-      // Partial session — wipe and force a re-login.
       await _storage.clear();
       return const AuthUnauthenticated();
     }
-    return AuthAuthenticated(userId: userId, email: email, name: name);
+    return AuthAuthenticated(User(id: userId, email: email, name: name));
   }
 
   Future<AuthResult> login({
@@ -57,11 +62,7 @@ class AuthController extends AsyncNotifier<AuthState> {
     try {
       final result = await _repository.login(email: email, password: password);
       state = AsyncValue.data(
-        AuthAuthenticated(
-          userId: result.user.id,
-          email: result.user.email,
-          name: result.user.name,
-        ),
+        AuthAuthenticated(result.user),
       );
       return result;
     } catch (e, st) {
@@ -83,11 +84,7 @@ class AuthController extends AsyncNotifier<AuthState> {
         name: name,
       );
       state = AsyncValue.data(
-        AuthAuthenticated(
-          userId: result.user.id,
-          email: result.user.email,
-          name: result.user.name,
-        ),
+        AuthAuthenticated(result.user),
       );
       return result;
     } catch (e, st) {
@@ -98,7 +95,12 @@ class AuthController extends AsyncNotifier<AuthState> {
 
   Future<void> logout() async {
     state = const AsyncValue<AuthState>.loading();
-    await _repository.logout();
+    try {
+      await _repository.logout();
+    } catch (_) {
+      // Network errors during logout are non-fatal — the local session
+      // is still cleared on the next line.
+    }
     state = const AsyncValue<AuthState>.data(AuthUnauthenticated());
   }
 

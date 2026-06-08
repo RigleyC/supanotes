@@ -16,6 +16,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/pkg/auth"
 	"github.com/RigleyC/supanotes/pkg/config"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 // mockQuerier implements sqlcgen.Querier by recording calls and returning
@@ -301,7 +302,7 @@ func testConfig() *config.Config {
 
 func TestService_Register_Success(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	user, access, refresh, err := svc.Register(context.Background(), "User@Example.COM  ", "correct-horse-battery", "  Alice  ")
 	if err != nil {
@@ -329,7 +330,7 @@ func TestService_Register_Success(t *testing.T) {
 
 func TestService_Register_EmailConflict(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, _, err := svc.Register(context.Background(), "dup@example.com", "password-1234", "Bob")
 	if err != nil {
@@ -343,7 +344,7 @@ func TestService_Register_EmailConflict(t *testing.T) {
 
 func TestService_Login_Success(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, _, err := svc.Register(context.Background(), "login@example.com", "supersecret", "Cara")
 	if err != nil {
@@ -364,7 +365,7 @@ func TestService_Login_Success(t *testing.T) {
 
 func TestService_Login_UnknownUser(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, _, err := svc.Login(context.Background(), "ghost@example.com", "anything-here")
 	if !errors.Is(err, ErrInvalidCredentials) {
@@ -374,7 +375,7 @@ func TestService_Login_UnknownUser(t *testing.T) {
 
 func TestService_Login_WrongPassword(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, _, err := svc.Register(context.Background(), "wp@example.com", "right-password", "Dan")
 	if err != nil {
@@ -388,7 +389,7 @@ func TestService_Login_WrongPassword(t *testing.T) {
 
 func TestService_Refresh_RotatesToken(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, oldRefresh, err := svc.Register(context.Background(), "rot@example.com", "password-1234", "Eve")
 	if err != nil {
@@ -421,7 +422,7 @@ func TestService_Refresh_RotatesToken(t *testing.T) {
 
 func TestService_Refresh_UnknownToken(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, err := svc.Refresh(context.Background(), "deadbeef")
 	if !errors.Is(err, ErrInvalidRefreshToken) {
@@ -431,7 +432,7 @@ func TestService_Refresh_UnknownToken(t *testing.T) {
 
 func TestService_Logout_RevokesToken(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, refresh, err := svc.Register(context.Background(), "lo@example.com", "password-1234", "Finn")
 	if err != nil {
@@ -449,7 +450,7 @@ func TestService_Logout_RevokesToken(t *testing.T) {
 
 func TestService_Logout_UnknownTokenIsNoop(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	if err := svc.Logout(context.Background(), "nope"); err != nil {
 		t.Fatalf("Logout unknown: want nil, got %v", err)
@@ -460,21 +461,21 @@ func TestUUIDHelpers(t *testing.T) {
 	original := uuid.New()
 	pg := pgUUID(original)
 
-	if got := UUIDToString(pg); got != original.String() {
+	if got := uid.UUIDToString(pg); got != original.String() {
 		t.Errorf("UUIDToString: want %q, got %q", original.String(), got)
 	}
-	if got := UUIDToString(pgtype.UUID{}); got != "" {
+	if got := uid.UUIDToString(pgtype.UUID{}); got != "" {
 		t.Errorf("UUIDToString(null): want empty, got %q", got)
 	}
 
-	parsed, err := UUIDFromString(original.String())
+	parsed, err := uid.UUIDFromString(original.String())
 	if err != nil {
 		t.Fatalf("UUIDFromString: %v", err)
 	}
 	if parsed.Bytes != original {
 		t.Errorf("UUIDFromString: bytes mismatch")
 	}
-	if _, err := UUIDFromString("not-a-uuid"); err == nil {
+	if _, err := uid.UUIDFromString("not-a-uuid"); err == nil {
 		t.Error("UUIDFromString: want error on bad input")
 	}
 }
@@ -482,7 +483,7 @@ func TestUUIDHelpers(t *testing.T) {
 func TestService_Register_RefreshFailureBubblesUp(t *testing.T) {
 	q := newMockQuerier()
 	q.createRefreshErr = errors.New("store boom")
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, _, err := svc.Register(context.Background(), "rf@example.com", "password-1234", "Gus")
 	if err == nil {
@@ -495,7 +496,7 @@ func TestService_Register_RefreshFailureBubblesUp(t *testing.T) {
 
 func TestService_Refresh_StoreFailureBubblesUp(t *testing.T) {
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
+	svc := NewService(q, testConfig(), nil)
 
 	_, _, refresh, err := svc.Register(context.Background(), "rf@example.com", "password-1234", "Hana")
 	if err != nil {

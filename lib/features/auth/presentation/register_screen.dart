@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/validators/input_validators.dart';
 import 'package:supanotes/features/auth/presentation/widgets/auth_button.dart';
 import 'package:supanotes/features/auth/presentation/widgets/auth_form_field.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -30,7 +31,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
-  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -43,21 +43,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() => _isSubmitting = true);
     try {
       await ref.read(authControllerProvider.notifier).register(
             email: _emailController.text.trim(),
             password: _passwordController.text,
             name: _nameController.text.trim(),
           );
-      // Router will redirect to /home on the AuthAuthenticated state flip.
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -65,6 +61,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    final isLoading = ref.watch(authControllerProvider.select((s) => s.isLoading));
 
     return Scaffold(
       body: SafeArea(
@@ -101,7 +98,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       textInputAction: TextInputAction.next,
                       controller: _nameController,
                       prefixIcon: const Icon(Icons.person_outline),
-                      validator: _validateName,
+                      validator: (v) => NameValidator.validate(v),
                     ),
                     AuthFormField(
                       label: 'Email',
@@ -111,7 +108,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       textInputAction: TextInputAction.next,
                       controller: _emailController,
                       prefixIcon: const Icon(Icons.email_outlined),
-                      validator: _validateEmail,
+                      validator: (v) => EmailValidator.validate(v),
                     ),
                     AuthFormField(
                       label: 'Password',
@@ -130,7 +127,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           () => _obscurePassword = !_obscurePassword,
                         ),
                       ),
-                      validator: _validatePassword,
+                      validator: (v) => PasswordValidator.validate(v, minLength: 8),
                     ),
                     AuthFormField(
                       label: 'Confirm password',
@@ -150,7 +147,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           () => _obscureConfirm = !_obscureConfirm,
                         ),
                       ),
-                      validator: (value) => _validateConfirm(
+                      validator: (value) => ConfirmPasswordValidator.validate(
                         value,
                         expected: _passwordController.text,
                       ),
@@ -158,12 +155,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: AppSpacing.md),
                     AuthButton(
                       label: 'Create account',
-                      isLoading: _isSubmitting,
+                      isLoading: isLoading,
                       onPressed: _submit,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextButton(
-                      onPressed: _isSubmitting
+                      onPressed: isLoading
                           ? null
                           : () => context.go('/login'),
                       child: const Text('Already have an account? Sign in'),
@@ -177,29 +174,4 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
     );
   }
-}
-
-String? _validateName(String? value) {
-  if (value == null || value.trim().isEmpty) return 'Name is required';
-  return null;
-}
-
-String? _validateEmail(String? value) {
-  final v = value?.trim() ?? '';
-  if (v.isEmpty) return 'Email is required';
-  final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-  if (!emailRegex.hasMatch(v)) return 'Enter a valid email address';
-  return null;
-}
-
-String? _validatePassword(String? value) {
-  if (value == null || value.isEmpty) return 'Password is required';
-  if (value.length < 8) return 'Password must be at least 8 characters';
-  return null;
-}
-
-String? _validateConfirm(String? value, {required String expected}) {
-  if (value == null || value.isEmpty) return 'Please re-enter your password';
-  if (value != expected) return 'Passwords do not match';
-  return null;
 }

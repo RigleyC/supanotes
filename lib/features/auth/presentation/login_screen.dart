@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/validators/input_validators.dart';
 import 'package:supanotes/features/auth/presentation/widgets/auth_button.dart';
 import 'package:supanotes/features/auth/presentation/widgets/auth_form_field.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -28,7 +29,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -39,21 +39,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() => _isSubmitting = true);
     try {
       await ref.read(authControllerProvider.notifier).login(
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
-      // Success: the auth controller has flipped to AuthAuthenticated and
-      // the GoRouter redirect will navigate us to /home. Nothing to do here.
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -61,6 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    final isLoading = ref.watch(authControllerProvider.select((s) => s.isLoading));
 
     return Scaffold(
       body: SafeArea(
@@ -97,7 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textInputAction: TextInputAction.next,
                       controller: _emailController,
                       prefixIcon: const Icon(Icons.email_outlined),
-                      validator: _validateEmail,
+                      validator: (v) => EmailValidator.validate(v),
                     ),
                     AuthFormField(
                       label: 'Password',
@@ -117,17 +113,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           () => _obscurePassword = !_obscurePassword,
                         ),
                       ),
-                      validator: _validatePassword,
+                      validator: (v) => PasswordValidator.validate(v),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AuthButton(
                       label: 'Sign in',
-                      isLoading: _isSubmitting,
+                      isLoading: isLoading,
                       onPressed: _submit,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextButton(
-                      onPressed: _isSubmitting
+                      onPressed: isLoading
                           ? null
                           : () => context.go('/register'),
                       child: const Text("Don't have an account? Create one"),
@@ -141,18 +137,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-}
-
-String? _validateEmail(String? value) {
-  final v = value?.trim() ?? '';
-  if (v.isEmpty) return 'Email is required';
-  // Lightweight RFC-5322-ish check; the server is the source of truth.
-  final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-  if (!emailRegex.hasMatch(v)) return 'Enter a valid email address';
-  return null;
-}
-
-String? _validatePassword(String? value) {
-  if (value == null || value.isEmpty) return 'Password is required';
-  return null;
 }

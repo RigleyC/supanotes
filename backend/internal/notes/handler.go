@@ -8,9 +8,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
-	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type CreateNoteRequest struct {
@@ -132,7 +132,7 @@ func (h *Handler) Get(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
@@ -155,7 +155,7 @@ func (h *Handler) Update(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
@@ -194,7 +194,7 @@ func (h *Handler) Delete(c echo.Context) error {
 		return err
 	}
 
-	id, err := auth.UUIDFromString(c.Param("id"))
+	id, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
 	}
@@ -255,7 +255,7 @@ func (h *Handler) AppendToInbox(c echo.Context) error {
 func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
 	var ctxID *string
 	if n.ContextID.Valid {
-		id := auth.UUIDToString(n.ContextID)
+		id := uid.UUIDToString(n.ContextID)
 		ctxID = &id
 	}
 	var title *string
@@ -269,7 +269,7 @@ func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
 		excerpt = &e
 	}
 	return NoteResponse{
-		ID:        auth.UUIDToString(n.ID),
+		ID:        uid.UUIDToString(n.ID),
 		ContextID: ctxID,
 		Title:     title,
 		Content:   n.Content,

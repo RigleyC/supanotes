@@ -54,7 +54,7 @@ Widget _wrap(Widget child, {required ProviderContainer container}) {
 void main() {
   setUpAll(() {
     registerFallbackValue(
-      const AuthAuthenticated(userId: '', email: '', name: ''),
+      const AuthAuthenticated(User(id: '', email: '', name: '')),
     );
   });
 
@@ -99,7 +99,7 @@ void main() {
     await tester.tap(find.text('Create account'));
     await tester.pump();
 
-    expect(find.text('Password must be at least 8 characters'), findsOneWidget);
+    expect(find.text('Senha deve ter no mínimo 8 caracteres'), findsOneWidget);
     verifyNever(() => repository.register(
           email: any(named: 'email'),
           password: any(named: 'password'),
@@ -129,7 +129,7 @@ void main() {
     await tester.tap(find.text('Create account'));
     await tester.pump();
 
-    expect(find.text('Passwords do not match'), findsOneWidget);
+    expect(find.text('Senhas não conferem'), findsOneWidget);
     verifyNever(() => repository.register(
           email: any(named: 'email'),
           password: any(named: 'password'),

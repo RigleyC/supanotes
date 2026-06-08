@@ -9,6 +9,7 @@ import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/auth_state.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:supanotes/shared/widgets/splash_screen.dart';
@@ -128,7 +129,7 @@ void main() {
 
   testWidgets('starting on / with auth redirects to /home', (tester) async {
     const stub = AsyncValue<AuthState>.data(
-      AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+      AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
     );
     final container = _makeContainer(stub);
 
@@ -181,7 +182,7 @@ void main() {
   testWidgets('authenticated user on /login is redirected to /home',
       (tester) async {
     const stub = AsyncValue<AuthState>.data(
-      AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+      AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
     );
     final container = _makeContainer(stub);
 
@@ -201,7 +202,7 @@ void main() {
   testWidgets('authenticated user on /register is redirected to /home',
       (tester) async {
     const stub = AsyncValue<AuthState>.data(
-      AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+      AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
     );
     final container = _makeContainer(stub);
 
@@ -220,7 +221,7 @@ void main() {
 
   testWidgets('authenticated user on /home stays at /home', (tester) async {
     const stub = AsyncValue<AuthState>.data(
-      AuthAuthenticated(userId: 'u-1', email: 'a@b.com', name: 'Alice'),
+      AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
     );
     final container = _makeContainer(stub);
 

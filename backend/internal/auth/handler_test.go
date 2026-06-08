@@ -32,8 +32,8 @@ type httpCase struct {
 func newTestServer(t *testing.T) (*echo.Echo, *mockQuerier) {
 	t.Helper()
 	q := newMockQuerier()
-	svc := NewService(q, testConfig())
-	h := NewHandler(svc, nil)
+	svc := NewService(q, testConfig(), nil)
+	h := NewHandler(svc)
 
 	e := echo.New()
 	e.HideBanner = true

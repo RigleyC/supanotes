@@ -82,12 +82,12 @@ class SettingsScreen extends ConsumerWidget {
             SettingsTile.action(
               icon: Icons.alternate_email,
               title: _SettingsStrings.emailTile,
-              subtitle: account?.email ?? _SettingsStrings.fallbackEmail,
+              subtitle: account?.user.email ?? _SettingsStrings.fallbackEmail,
             ),
             SettingsTile.action(
               icon: Icons.person_outline,
               title: _SettingsStrings.nameTile,
-              subtitle: account?.name ?? _SettingsStrings.fallbackName,
+              subtitle: account?.user.name ?? _SettingsStrings.fallbackName,
             ),
             SettingsTile.action(
               icon: Icons.logout,

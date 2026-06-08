@@ -7,10 +7,12 @@
 /// declaring them inline within feature modules.
 library;
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/auth_interceptor.dart';
+import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/auth_state.dart';
@@ -26,6 +28,29 @@ final authLocalStorageProvider = Provider<AuthLocalStorage>((ref) {
 });
 
 // ---------------------------------------------------------------------------
+// Raw Dio (no auth interceptor) for refresh + replay calls
+// ---------------------------------------------------------------------------
+
+/// A plain [Dio] instance without any interceptors, used internally for
+/// the refresh HTTP call and for replaying original requests after a
+/// successful refresh. Avoids the recursion that would occur if the
+/// [AuthInterceptor]'s own [ApiClient] were used for these operations.
+final _rawDioProvider = Provider<Dio>((ref) {
+  final dio = Dio();
+  dio.options
+    ..baseUrl = ApiConstants.baseUrl
+    ..connectTimeout = const Duration(
+      milliseconds: ApiConstants.connectTimeoutMs,
+    )
+    ..receiveTimeout = const Duration(
+      milliseconds: ApiConstants.receiveTimeoutMs,
+    )
+    ..contentType = Headers.jsonContentType
+    ..responseType = ResponseType.json;
+  return dio;
+});
+
+// ---------------------------------------------------------------------------
 // API client
 // ---------------------------------------------------------------------------
 
@@ -36,11 +61,29 @@ final authLocalStorageProvider = Provider<AuthLocalStorage>((ref) {
 /// [AuthUnauthenticated] and triggers a router redirect to /login.
 final apiClientProvider = Provider<ApiClient>((ref) {
   final storage = ref.watch(authLocalStorageProvider);
+  final rawDio = ref.watch(_rawDioProvider);
   final interceptor = AuthInterceptor(
     tokenStorage: storage,
     onAuthFailure: () async {
       ref.read(authControllerProvider.notifier).onSessionExpired();
     },
+    onRefresh: (refreshToken) async {
+      try {
+        final response = await rawDio.post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: {'refresh_token': refreshToken},
+        );
+        final data = response.data;
+        if (data == null) return null;
+        final newAccess = data['access_token'] as String?;
+        final newRefresh = data['refresh_token'] as String?;
+        if (newAccess == null || newRefresh == null) return null;
+        return (accessToken: newAccess, refreshToken: newRefresh);
+      } on DioException {
+        return null;
+      }
+    },
+    replay: (options) => rawDio.fetch<dynamic>(options),
   );
   return ApiClient(authInterceptor: interceptor);
 });

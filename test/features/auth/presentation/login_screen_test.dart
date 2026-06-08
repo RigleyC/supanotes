@@ -54,7 +54,7 @@ Widget _wrap(Widget child, {required ProviderContainer container}) {
 void main() {
   setUpAll(() {
     registerFallbackValue(
-      const AuthAuthenticated(userId: '', email: '', name: ''),
+      const AuthAuthenticated(User(id: '', email: '', name: '')),
     );
   });
 
@@ -96,8 +96,8 @@ void main() {
     await tester.tap(find.text('Sign in'));
     await tester.pump();
 
-    expect(find.text('Email is required'), findsOneWidget);
-    expect(find.text('Password is required'), findsOneWidget);
+    expect(find.text('Email é obrigatório'), findsOneWidget);
+    expect(find.text('Senha é obrigatória'), findsOneWidget);
     verifyNever(() => repository.login(
           email: any(named: 'email'),
           password: any(named: 'password'),
@@ -123,7 +123,7 @@ void main() {
     await tester.tap(find.text('Sign in'));
     await tester.pump();
 
-    expect(find.text('Enter a valid email address'), findsOneWidget);
+    expect(find.text('Email inválido'), findsOneWidget);
     verifyNever(() => repository.login(
           email: any(named: 'email'),
           password: any(named: 'password'),
@@ -194,7 +194,7 @@ void main() {
     await tester.pumpWidget(_wrap(const LoginScreen(), container: container));
     await tester.pump();
     await tester.enterText(find.byType(TextFormField).at(0), 'a@b.com');
-    await tester.enterText(find.byType(TextFormField).at(1), 'wrong');
+    await tester.enterText(find.byType(TextFormField).at(1), 'wrongpassword');
     await tester.tap(find.text('Sign in'));
     await tester.pump();
     await tester.pump();
