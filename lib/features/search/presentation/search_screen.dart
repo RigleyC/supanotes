@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/search/domain/search_result_model.dart';
 import 'package:supanotes/features/search/presentation/controllers/search_controller.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_bar.dart';
@@ -49,7 +50,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Voltar',
           onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/home'),
+              context.canPop() ? context.pop() : context.go(AppRoutes.home),
         ),
       ),
       body: SafeArea(
@@ -136,7 +137,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         return SearchResultTile(
           result: result,
           query: query,
-          onTap: () => context.push('/notes/${result.id}'),
+          onTap: () => context.push(AppRoutes.note(result.id)),
         );
       },
     );

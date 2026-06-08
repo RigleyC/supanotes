@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/validators/input_validators.dart';
 import 'package:supanotes/features/auth/presentation/widgets/auth_button.dart';
 import 'package:supanotes/features/auth/presentation/widgets/auth_form_field.dart';
@@ -125,7 +126,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextButton(
                       onPressed: isLoading
                           ? null
-                          : () => context.go('/register'),
+                          : () => context.go(AppRoutes.register),
                       child: const Text("Don't have an account? Create one"),
                     ),
                   ],

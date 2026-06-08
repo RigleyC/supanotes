@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
 import 'package:supanotes/features/settings/presentation/widgets/settings_tile.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -49,9 +50,6 @@ class _SettingsStrings {
       'Última sync: $relative';
   static const String dataDialogClose = 'Fechar';
 
-  static const String soulRoute = '/soul';
-  static const String contextsRoute = '/contexts';
-  static const String telegramRoute = '/telegram';
 }
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -112,19 +110,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Icons.auto_awesome_outlined,
               title: _SettingsStrings.soulTile,
               subtitle: _SettingsStrings.soulSubtitle,
-              onTap: () => context.push(_SettingsStrings.soulRoute),
+              onTap: () => context.push(AppRoutes.soul),
             ),
             SettingsTile.navigation(
               icon: Icons.folder_outlined,
               title: _SettingsStrings.contextsTile,
               subtitle: _SettingsStrings.contextsSubtitle,
-              onTap: () => context.push(_SettingsStrings.contextsRoute),
+              onTap: () => context.push(AppRoutes.contexts),
             ),
             SettingsTile.navigation(
               icon: Icons.send_outlined,
               title: _SettingsStrings.telegramTile,
               subtitle: _SettingsStrings.telegramSubtitle,
-              onTap: () => context.push(_SettingsStrings.telegramRoute),
+              onTap: () => context.push(AppRoutes.telegram),
             ),
             SettingsTile.navigation(
               icon: Icons.cloud_sync_outlined,

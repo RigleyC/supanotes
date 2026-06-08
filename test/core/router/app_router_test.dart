@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/router/app_router.dart';
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/di/providers.dart';
@@ -65,10 +66,7 @@ Widget _wrapRouter(ProviderContainer container) {
   );
 }
 
-const _login = '/login';
-const _register = '/register';
-const _home = '/home';
-const _splash = '/';
+
 
 void main() {
   Future<void> settleRedirect(WidgetTester tester) async {
@@ -88,7 +86,7 @@ void main() {
     final router = container.read(goRouterProvider);
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      _splash,
+      AppRoutes.splash,
     );
   });
 
@@ -103,7 +101,7 @@ void main() {
     final router = container.read(goRouterProvider);
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      _login,
+      AppRoutes.login,
     );
   });
 
@@ -119,7 +117,7 @@ void main() {
     final router = container.read(goRouterProvider);
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      _home,
+      AppRoutes.home,
     );
   });
 
@@ -132,12 +130,12 @@ void main() {
     await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
-    router.go(_home);
+    router.go(AppRoutes.home);
     await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      _login,
+      AppRoutes.login,
     );
   });
 
@@ -150,12 +148,12 @@ void main() {
     await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
-    router.go(_register);
+    router.go(AppRoutes.register);
     await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      _register,
+      AppRoutes.register,
     );
   });
 
@@ -170,12 +168,12 @@ void main() {
     await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
-    router.go(_login);
+    router.go(AppRoutes.login);
     await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      _home,
+      AppRoutes.home,
     );
   });
 
@@ -190,12 +188,12 @@ void main() {
     await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
-    router.go(_register);
+    router.go(AppRoutes.register);
     await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      _home,
+      AppRoutes.home,
     );
   });
 
@@ -209,12 +207,12 @@ void main() {
     await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
-    router.go(_home);
+    router.go(AppRoutes.home);
     await settleRedirect(tester);
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      _home,
+      AppRoutes.home,
     );
   });
 }

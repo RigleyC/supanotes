@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/sync/sync_service.dart';
+import 'package:supanotes/shared/widgets/offline_indicator.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
@@ -34,7 +36,14 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       return Scaffold(
         backgroundColor: scheme.surface,
         appBar: _buildAppBar(scheme),
-        body: const Center(child: CircularProgressIndicator()),
+        body: Column(
+          children: [
+            const OfflineIndicator(),
+            const Expanded(
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ],
+        ),
       );
     }
 
@@ -44,9 +53,16 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       return Scaffold(
         backgroundColor: scheme.surface,
         appBar: _buildAppBar(scheme),
-        body: AppErrorView(
-          title: 'Erro ao carregar',
-          subtitle: error.toString(),
+        body: Column(
+          children: [
+            const OfflineIndicator(),
+            Expanded(
+              child: AppErrorView(
+                title: 'Erro ao carregar',
+                subtitle: error.toString(),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -61,15 +77,22 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       return Scaffold(
         backgroundColor: scheme.surface,
         appBar: _buildAppBar(scheme),
-        body: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+        body: Column(
           children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.6,
-              child: const EmptyState(
-                icon: Icons.edit_note,
-                title: 'Nenhuma nota',
-                subtitle: 'Toque no botão + para criar sua primeira nota',
+            const OfflineIndicator(),
+            Expanded(
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: const EmptyState(
+                      icon: Icons.edit_note,
+                      title: 'Nenhuma nota',
+                      subtitle: 'Toque no botão + para criar sua primeira nota',
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -84,45 +107,52 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     return Scaffold(
       backgroundColor: scheme.surface,
       appBar: _buildAppBar(scheme),
-      body: RefreshIndicator(
-        onRefresh: () => ref.read(syncServiceProvider).sync(),
-        child: ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.lg,
-          ),
-          itemCount: (inbox != null && hasInboxContent ? 1 : 0) +
-              visibleNotes.length,
-          itemBuilder: (context, index) {
-            if (inbox != null && hasInboxContent && index == 0) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _NoteRow(
-                  note: inbox,
-                  isInbox: true,
-                  onTap: () => context.push('/notes/${inbox.id}'),
-                  onDelete: () => _deleteNote(inbox.id),
-                  onToggleFavorite: () =>
-                      ref.read(notesRepositoryProvider).toggleFavorite(inbox.id),
+      body: Column(
+        children: [
+          const OfflineIndicator(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.read(syncServiceProvider).sync(),
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.lg,
                 ),
-              );
-            }
-            final noteIndex =
-                (inbox != null && hasInboxContent) ? index - 1 : index;
-            final note = visibleNotes[noteIndex];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: _NoteRow(
-                note: note,
-                onTap: () => context.push('/notes/${note.id}'),
-                onDelete: () => _deleteNote(note.id),
-                onToggleFavorite: () =>
-                    ref.read(notesRepositoryProvider).toggleFavorite(note.id),
+                itemCount: (inbox != null && hasInboxContent ? 1 : 0) +
+                    visibleNotes.length,
+                itemBuilder: (context, index) {
+                  if (inbox != null && hasInboxContent && index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: _NoteRow(
+                        note: inbox,
+                        isInbox: true,
+                        onTap: () => context.push(AppRoutes.note(inbox.id)),
+                        onDelete: () => _deleteNote(inbox.id),
+                        onToggleFavorite: () =>
+                            ref.read(notesRepositoryProvider).toggleFavorite(inbox.id),
+                      ),
+                    );
+                  }
+                  final noteIndex =
+                      (inbox != null && hasInboxContent) ? index - 1 : index;
+                  final note = visibleNotes[noteIndex];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _NoteRow(
+                      note: note,
+                      onTap: () => context.push(AppRoutes.note(note.id)),
+                      onDelete: () => _deleteNote(note.id),
+                      onToggleFavorite: () =>
+                          ref.read(notesRepositoryProvider).toggleFavorite(note.id),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: _buildFab(scheme),
     );
@@ -139,18 +169,37 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: AppSpacing.sm),
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: scheme.surfaceContainerHighest,
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.more_horiz,
-                color: scheme.onSurfaceVariant,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.surfaceContainerHighest,
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.search,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  onPressed: () => context.push(AppRoutes.search),
+                ),
               ),
-              onPressed: () => _showMoreMenu(context),
-            ),
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.surfaceContainerHighest,
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.more_horiz,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  onPressed: () => _showMoreMenu(context),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -171,7 +220,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   Future<void> _createNote(BuildContext context) async {
     final note = await ref.read(notesRepositoryProvider).createNote();
     if (!context.mounted) return;
-    context.push('/notes/${note.id}');
+    context.push(AppRoutes.note(note.id));
   }
 
   Future<void> _deleteNote(String id) async {

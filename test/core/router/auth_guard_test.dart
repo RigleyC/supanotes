@@ -1,62 +1,58 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/core/router/auth_guard.dart';
-
-const _login = '/login';
-const _register = '/register';
-const _home = '/home';
-const _splash = '/';
 
 void main() {
   group('authGuardRedirect', () {
     test('returns null while auth is still loading (do not bounce)', () {
       const loading = AsyncValue<User?>.loading();
-      expect(authGuardRedirect(currentLocation: _home, authState: loading),
+      expect(authGuardRedirect(currentLocation: AppRoutes.home, authState: loading),
           isNull);
       expect(
-          authGuardRedirect(currentLocation: _login, authState: loading),
+          authGuardRedirect(currentLocation: AppRoutes.login, authState: loading),
           isNull);
-      expect(redirectFor(_splash, loading), isNull);
+      expect(redirectFor(AppRoutes.splash, loading), isNull);
     });
 
     test('redirects to /login when unauthenticated user hits a protected route',
         () {
       final unauth = AsyncValue<User?>.data(null);
-      expect(authGuardRedirect(currentLocation: _home, authState: unauth),
-          _login);
+      expect(authGuardRedirect(currentLocation: AppRoutes.home, authState: unauth),
+          AppRoutes.login);
     });
 
     test('leaves the user on /login when they are already there', () {
       final unauth = AsyncValue<User?>.data(null);
-      expect(authGuardRedirect(currentLocation: _login, authState: unauth),
+      expect(authGuardRedirect(currentLocation: AppRoutes.login, authState: unauth),
           isNull);
     });
 
     test('leaves the user on /register when they are already there', () {
       final unauth = AsyncValue<User?>.data(null);
-      expect(authGuardRedirect(currentLocation: _register, authState: unauth),
+      expect(authGuardRedirect(currentLocation: AppRoutes.register, authState: unauth),
           isNull);
     });
 
     test('redirects to /login when an unauthenticated user lands on /', () {
       final unauth = AsyncValue<User?>.data(null);
-      expect(redirectFor(_splash, unauth), _login);
+      expect(redirectFor(AppRoutes.splash, unauth), AppRoutes.login);
     });
 
     test('redirects to /home when an authenticated user lands on /', () {
       final auth = AsyncValue<User?>.data(
         const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
-      expect(redirectFor(_splash, auth), _home);
+      expect(redirectFor(AppRoutes.splash, auth), AppRoutes.home);
     });
 
     test('redirects to /home when an authenticated user revisits /login', () {
       final auth = AsyncValue<User?>.data(
         const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
-      expect(authGuardRedirect(currentLocation: _login, authState: auth),
-          _home);
+      expect(authGuardRedirect(currentLocation: AppRoutes.login, authState: auth),
+          AppRoutes.home);
     });
 
     test('redirects to /home when an authenticated user revisits /register',
@@ -64,15 +60,15 @@ void main() {
       final auth = AsyncValue<User?>.data(
         const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
-      expect(authGuardRedirect(currentLocation: _register, authState: auth),
-          _home);
+      expect(authGuardRedirect(currentLocation: AppRoutes.register, authState: auth),
+          AppRoutes.home);
     });
 
     test('lets an authenticated user stay on /home', () {
       final auth = AsyncValue<User?>.data(
         const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
-      expect(authGuardRedirect(currentLocation: _home, authState: auth),
+      expect(authGuardRedirect(currentLocation: AppRoutes.home, authState: auth),
           isNull);
     });
 
@@ -82,8 +78,8 @@ void main() {
         StateError('storage unavailable'),
         StackTrace.current,
       );
-      expect(authGuardRedirect(currentLocation: _home, authState: errored),
-          _login);
+      expect(authGuardRedirect(currentLocation: AppRoutes.home, authState: errored),
+          AppRoutes.login);
     });
   });
 }

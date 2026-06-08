@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/telegram/data/telegram_repository.dart';
 import 'package:supanotes/features/telegram/presentation/controllers/telegram_link_controller.dart';
 import 'package:supanotes/features/telegram/presentation/widgets/telegram_linked_view.dart';
@@ -35,7 +36,7 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
         if (context.canPop()) {
           context.pop();
         } else {
-          context.go('/home');
+          context.go(AppRoutes.home);
         }
       }
     });

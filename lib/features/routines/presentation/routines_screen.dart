@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_routes.dart';
 import '../../../shared/theme/app_spacing.dart';
 import '../../../shared/widgets/app_error_view.dart';
 import '../domain/routine_model.dart';
@@ -10,8 +11,6 @@ import 'widgets/brief_schedule_card.dart';
 
 class RoutinesScreen extends ConsumerWidget {
   const RoutinesScreen({super.key});
-
-  static const _routeRoutinesLogs = '/routines/logs';
 
   static const _appBarTitle = 'Rotinas';
   static const _seeHistory = 'Ver histórico';
@@ -29,7 +28,7 @@ class RoutinesScreen extends ConsumerWidget {
         child: routinesAsync.when(
           data: (routines) => _Body(
             routines: routines,
-            onSeeHistory: () => context.push(_routeRoutinesLogs),
+            onSeeHistory: () => context.push(AppRoutes.routinesLogs),
           ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => AppErrorView(

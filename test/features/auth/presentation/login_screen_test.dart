@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/di/providers.dart';
@@ -26,15 +27,15 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
 
 Widget _wrap(Widget child, {required ProviderContainer container}) {
   final router = GoRouter(
-    initialLocation: '/login',
+    initialLocation: AppRoutes.login,
     routes: [
-      GoRoute(path: '/login', builder: (_, __) => child),
+      GoRoute(path: AppRoutes.login, builder: (_, __) => child),
       GoRoute(
-        path: '/register',
+        path: AppRoutes.register,
         builder: (_, __) => const Scaffold(body: Text('register-stub')),
       ),
       GoRoute(
-        path: '/home',
+        path: AppRoutes.home,
         builder: (_, __) => const Scaffold(body: Text('home-stub')),
       ),
     ],
