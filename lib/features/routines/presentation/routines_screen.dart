@@ -18,25 +18,23 @@ class RoutinesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final routinesAsync = ref.watch(routinesControllerProvider);
+    final routinesAsync = ref.watch(routinesProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(_appBarTitle),
       ),
       body: RefreshIndicator(
-        onRefresh: () async =>
-            ref.read(routinesControllerProvider.notifier).refresh(),
+        onRefresh: () async => ref.invalidate(routinesProvider),
         child: routinesAsync.when(
-          data: (state) => _Body(
-            routines: state.routines,
+          data: (routines) => _Body(
+            routines: routines,
             onSeeHistory: () => context.push(_routeRoutinesLogs),
           ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => AppErrorView(
             title: '$err',
-            onRetry: () =>
-                ref.read(routinesControllerProvider.notifier).refresh(),
+            onRetry: () => ref.invalidate(routinesProvider),
           ),
         ),
       ),

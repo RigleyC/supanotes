@@ -1,15 +1,6 @@
-/// Inbox screen.
-///
-/// The inbox is a single per-user note that the quick-capture FAB and
-/// free-form text dumps land in. It is rendered with `SuperEditor` like
-/// any other note, but the AppBar is stripped down to a fixed "Rascunho"
-/// title and an "Organizar" affordance that hands the content off to the
-/// agent — see `inbox_organize_sheet.dart` for that flow.
-///
-/// The markdown <-> `MutableDocument` round-trip is delegated to
-/// `data/markdown_serializer.dart`; persistence (auto-save with debounce,
-/// task sync) is managed by [InboxController].
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,9 +8,12 @@ import 'package:go_router/go_router.dart';
 import 'package:super_editor/super_editor.dart'
     hide serializeDocumentToMarkdown;
 
+import 'package:supanotes/core/constants/app_constants.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
-import 'package:supanotes/features/notes/presentation/controllers/inbox_controller.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/data/notes_repository.dart';
+import 'package:supanotes/features/notes/domain/task_entry.dart';
+import 'package:supanotes/features/notes/presentation/controllers/editor_status_notifier.dart';
+import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/save_indicator.dart';
@@ -39,16 +33,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   Editor? _editor;
   MutableDocumentComposer? _composer;
   FocusNode? _focusNode;
+  Timer? _debounceTimer;
   String? _inboxId;
 
   @override
   void initState() {
     super.initState();
-    ref.read(inboxControllerProvider.notifier).loadOrCreateInbox();
+    ref.invalidate(inboxProvider);
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _document?.removeListener(_onDocumentChanged);
     _document?.dispose();
     _composer?.dispose();
@@ -62,9 +58,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     if (doc == null || id == null) return;
     final markdown = serializeDocumentToMarkdown(doc);
     final tasks = _extractTasks(doc);
-    ref
-        .read(inboxControllerProvider.notifier)
-        .autoSave(id, markdown, tasks);
+    _debounceTimer?.cancel();
+    ref.read(editorStatusProvider.notifier).saving();
+    _debounceTimer = Timer(
+      Duration(milliseconds: AppConstants.autoSaveDebounceMs),
+      () => _flushSave(id, markdown, tasks),
+    );
   }
 
   List<TaskEntry> _extractTasks(MutableDocument doc) {
@@ -79,6 +78,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       }
     }
     return tasks;
+  }
+
+  Future<void> _flushSave(String noteId, String markdown, List<TaskEntry> tasks) async {
+    _debounceTimer?.cancel();
+    try {
+      await ref.read(notesRepositoryProvider).syncTasksFromDocument(noteId, tasks);
+      await ref
+          .read(notesRepositoryProvider)
+          .updateNote(noteId, content: markdown);
+      ref.read(editorStatusProvider.notifier).saved();
+    } catch (_) {
+      ref.read(editorStatusProvider.notifier).errored();
+    }
   }
 
   Future<void> _onOrganizePressed() async {
@@ -99,10 +111,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(inboxControllerProvider);
-    final inbox = state.asData?.value.inboxNote;
-    final saveState = state.asData?.value.saveState ?? SaveState.idle;
-    final hasContent = state.asData?.value.hasContent ?? false;
+    final inboxAsync = ref.watch(inboxProvider);
+    final editorStatus = ref.watch(editorStatusProvider);
+    final inbox = inboxAsync.asData?.value;
+    final hasContent = inbox != null && inbox.content.isNotEmpty;
 
     if (inbox != null && _document == null) {
       _inboxId = inbox.id;
@@ -130,7 +142,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         appBar: AppBar(
           title: const Text('Rascunho'),
           actions: [
-            SaveIndicator(state: saveState),
+            SaveIndicator(state: editorStatus),
             if (hasContent)
               TextButton(
                 onPressed: _onOrganizePressed,
@@ -162,9 +174,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     if (doc != null && id != null) {
       final markdown = serializeDocumentToMarkdown(doc);
       final tasks = _extractTasks(doc);
-      await ref
-          .read(inboxControllerProvider.notifier)
-          .flushSave(id, markdown, tasks);
+      await _flushSave(id, markdown, tasks);
     }
     if (mounted) {
       context.pop();

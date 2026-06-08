@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/controllers/contexts_controller.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
@@ -34,7 +35,8 @@ class _NewContextSheetState extends ConsumerState<NewContextSheet> {
       _error = null;
     });
     try {
-      await ref.read(contextsControllerProvider.notifier).createContext(name);
+      await ref.read(settingsRepositoryProvider).createContext(name);
+      ref.invalidate(contextsProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {

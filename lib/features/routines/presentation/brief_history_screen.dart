@@ -17,22 +17,20 @@ class BriefHistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logsAsync = ref.watch(briefHistoryControllerProvider);
+    final logsAsync = ref.watch(briefHistoryProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(_appBarTitle),
       ),
       body: RefreshIndicator(
-        onRefresh: () async =>
-            ref.read(briefHistoryControllerProvider.notifier).refresh(),
+        onRefresh: () async => ref.invalidate(briefHistoryProvider),
         child: logsAsync.when(
-          data: (state) => _Body(logs: state.logs),
+          data: (logs) => _Body(logs: logs),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => AppErrorView(
             title: '$err',
-            onRetry: () =>
-                ref.read(briefHistoryControllerProvider.notifier).refresh(),
+            onRetry: () => ref.invalidate(briefHistoryProvider),
           ),
         ),
       ),

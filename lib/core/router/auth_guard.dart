@@ -8,7 +8,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:supanotes/features/auth/domain/auth_state.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
 
 /// Computes the redirect target for [currentLocation] under [authState].
 ///
@@ -23,21 +23,17 @@ import 'package:supanotes/features/auth/domain/auth_state.dart';
 /// not see a flash of /login before the session check completes.
 String? authGuardRedirect({
   required String currentLocation,
-  required AsyncValue<AuthState> authState,
+  required AsyncValue<User?> authState,
 }) {
   return authState.when(
-    data: (auth) {
-      if (auth is AuthAuthenticated) {
-        if (currentLocation == '/' ||
-            currentLocation == '/login' ||
-            currentLocation == '/register') {
-          return '/home';
-        }
+    data: (user) {
+      final isAuthPage = currentLocation == '/login' ||
+          currentLocation == '/register';
+      if (user != null) {
+        if (currentLocation == '/' || isAuthPage) return '/home';
         return null;
       }
-      if (currentLocation == '/login' || currentLocation == '/register') {
-        return null;
-      }
+      if (isAuthPage) return null;
       return '/login';
     },
     loading: () => null,

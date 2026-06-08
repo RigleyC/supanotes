@@ -12,8 +12,8 @@ class TelegramUnlinkedView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(telegramLinkControllerProvider).asData?.value;
-    final code = state?.code;
+    final pairing = ref.watch(telegramPairingProvider);
+    final code = pairing.code;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -45,27 +45,15 @@ class TelegramUnlinkedView extends ConsumerWidget {
               FilledButton.icon(
                 icon: const Icon(Icons.link),
                 label: const Text('Conectar Telegram'),
-                onPressed: state?.isLoading == true ? null : onGenerate,
+                onPressed: onGenerate,
               )
             else
               TelegramCodeCard(
                 code: code,
-                countdown: state?.countdown ?? 0,
-                isExpired: (state?.countdown ?? 0) <= 0,
-                onRegenerate: (state?.countdown ?? 0) <= 0
-                    ? onGenerate
-                    : null,
+                countdown: pairing.countdown,
+                isExpired: pairing.countdown <= 0,
+                onRegenerate: pairing.countdown <= 0 ? onGenerate : null,
               ),
-            if (state?.error != null && code == null) ...[
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                state!.error!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
           ],
         ),
       ),

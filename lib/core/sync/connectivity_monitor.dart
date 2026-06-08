@@ -4,7 +4,9 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final connectivityMonitorProvider = Provider<ConnectivityMonitor>((ref) {
-  return ConnectivityMonitor();
+  final monitor = ConnectivityMonitor();
+  ref.onDispose(monitor.dispose);
+  return monitor;
 });
 
 class ConnectivityMonitor {
@@ -30,4 +32,8 @@ class ConnectivityMonitor {
   bool get isConnected => _isConnected;
   Stream<bool> get onConnected => _controller.stream.where((connected) => connected);
   Stream<bool> get onConnectivityChanged => _controller.stream;
+
+  void dispose() {
+    _controller.close();
+  }
 }

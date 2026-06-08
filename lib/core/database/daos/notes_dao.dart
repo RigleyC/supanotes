@@ -24,6 +24,10 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return (select(notes)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  Stream<NoteData?> watchNoteById(String id) {
+    return (select(notes)..where((t) => t.id.equals(id))).watchSingleOrNull();
+  }
+
   /// Returns the first inbox note (the spec says there is exactly one) or
   /// `null` if none has been created yet.
   Future<NoteData?> getInboxNote() {

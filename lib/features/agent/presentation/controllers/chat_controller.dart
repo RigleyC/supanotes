@@ -5,27 +5,33 @@ import 'package:supanotes/features/agent/data/chat_repository.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/domain/session_manager.dart';
 
-final chatControllerProvider =
-    NotifierProvider<ChatController, ChatListState>(ChatController.new);
+typedef ChatState = ({
+  List<MessageModel> messages,
+  bool isLoading,
+  String? error,
+});
 
-class ChatController extends Notifier<ChatListState> {
+final chatControllerProvider =
+    NotifierProvider<ChatController, ChatState>(ChatController.new);
+
+class ChatController extends Notifier<ChatState> {
   @override
-  ChatListState build() {
+  ChatState build() {
     final sessionId = ref.watch(sessionManagerProvider);
     Future.microtask(() => _loadHistory(sessionId));
-    return const ChatListState(messages: [], isLoading: true);
+    return (messages: [], isLoading: true, error: null);
   }
 
   Future<void> _loadHistory(String sessionId) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = (messages: state.messages, isLoading: true, error: null);
     try {
       final messages =
           await ref.read(chatRepositoryProvider).getHistory(sessionId);
       if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = state.copyWith(messages: messages, isLoading: false);
+      state = (messages: messages, isLoading: false, error: null);
     } on ApiException catch (e) {
       if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = state.copyWith(isLoading: false, error: e.message);
+      state = (messages: state.messages, isLoading: false, error: e.message);
     }
   }
 
@@ -47,10 +53,10 @@ class ChatController extends Notifier<ChatListState> {
       createdAt: DateTime.now(),
     );
 
-    state = state.copyWith(
+    state = (
       messages: [...state.messages, pending],
       isLoading: true,
-      clearError: true,
+      error: null,
     );
 
     try {
@@ -66,13 +72,14 @@ class ChatController extends Notifier<ChatListState> {
         content: response,
         createdAt: DateTime.now(),
       );
-      state = state.copyWith(
+      state = (
         messages: [...state.messages, assistant],
         isLoading: false,
+        error: null,
       );
     } on ApiException catch (e) {
       if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = state.copyWith(
+      state = (
         messages:
             state.messages.where((m) => m.id != pending.id).toList(growable: false),
         isLoading: false,

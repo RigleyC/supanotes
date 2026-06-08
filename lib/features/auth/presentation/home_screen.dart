@@ -11,7 +11,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -19,14 +18,11 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(authControllerProvider);
+    final asyncUser = ref.watch(authControllerProvider);
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final name = state.maybeWhen(
-      data: (auth) => auth is AuthAuthenticated ? auth.user.name : 'there',
-      orElse: () => 'there',
-    );
+    final name = asyncUser.asData?.value?.name ?? 'there';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Home')),

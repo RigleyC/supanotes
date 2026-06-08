@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/sync_service.dart';
+import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/notes/presentation/controllers/notes_list_controller.dart';
+import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_card.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
@@ -25,131 +26,156 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final notesAsync = ref.watch(notesListControllerProvider);
+    final inboxAsync = ref.watch(inboxProvider);
+    final notesAsync = ref.watch(activeNotesProvider);
+    final favoritesOnly = ref.watch(favoritesFilterProvider);
+
+    if (inboxAsync.isLoading || notesAsync.isLoading) {
+      return Scaffold(
+        backgroundColor: scheme.surface,
+        appBar: _buildAppBar(scheme),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final error =
+        inboxAsync.hasError ? inboxAsync.error : notesAsync.hasError ? notesAsync.error : null;
+    if (error != null) {
+      return Scaffold(
+        backgroundColor: scheme.surface,
+        appBar: _buildAppBar(scheme),
+        body: AppErrorView(
+          title: 'Erro ao carregar',
+          subtitle: error.toString(),
+        ),
+      );
+    }
+
+    final inbox = inboxAsync.asData?.value;
+    final notes = notesAsync.asData?.value ?? [];
+    final visibleNotes = favoritesOnly
+        ? notes.where((n) => n.favorite).toList()
+        : notes;
+
+    if (inbox == null && visibleNotes.isEmpty) {
+      return Scaffold(
+        backgroundColor: scheme.surface,
+        appBar: _buildAppBar(scheme),
+        body: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: const EmptyState(
+                icon: Icons.edit_note,
+                title: 'Nenhuma nota',
+                subtitle: 'Toque no botão + para criar sua primeira nota',
+              ),
+            ),
+          ],
+        ),
+        floatingActionButton: _buildFab(scheme),
+      );
+    }
+
+    final hasInboxContent =
+        inbox != null && (inbox.title != null || inbox.content.isNotEmpty);
 
     return Scaffold(
       backgroundColor: scheme.surface,
-      appBar: AppBar(
-        backgroundColor: scheme.surface,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        titleSpacing: AppSpacing.md,
-        toolbarHeight: 56,
-        title: const SizedBox.shrink(),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.sm),
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: scheme.surfaceContainerHighest,
-              ),
-              child: IconButton(
-                icon: Icon(
-                  Icons.more_horiz,
-                  color: scheme.onSurfaceVariant,
-                ),
-                onPressed: () => _showMoreMenu(context),
-              ),
-            ),
-          ),
-        ],
-      ),
+      appBar: _buildAppBar(scheme),
       body: RefreshIndicator(
         onRefresh: () => ref.read(syncServiceProvider).sync(),
-        child: notesAsync.when(
-          data: (state) {
-            final inbox = state.inbox;
-            final visibleNotes = state.favoritesOnly
-                ? state.notes.where((n) => n.favorite).toList()
-                : state.notes;
-
-            if (inbox == null && visibleNotes.isEmpty) {
-              return ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.6,
-                    child: const EmptyState(
-                      icon: Icons.edit_note,
-                      title: 'Nenhuma nota',
-                      subtitle:
-                          'Toque no botão + para criar sua primeira nota',
-                    ),
-                  ),
-                ],
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.lg,
+          ),
+          itemCount: (inbox != null && hasInboxContent ? 1 : 0) +
+              visibleNotes.length,
+          itemBuilder: (context, index) {
+            if (inbox != null && hasInboxContent && index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: _NoteRow(
+                  note: inbox,
+                  isInbox: true,
+                  onTap: () => context.push('/notes/${inbox.id}'),
+                  onDelete: () => _deleteNote(inbox.id),
+                  onToggleFavorite: () =>
+                      ref.read(notesRepositoryProvider).toggleFavorite(inbox.id),
+                ),
               );
             }
-
-            final hasInboxContent =
-                inbox != null && (inbox.title != null || inbox.content.isNotEmpty);
-
-            return ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.lg,
+            final noteIndex =
+                (inbox != null && hasInboxContent) ? index - 1 : index;
+            final note = visibleNotes[noteIndex];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _NoteRow(
+                note: note,
+                onTap: () => context.push('/notes/${note.id}'),
+                onDelete: () => _deleteNote(note.id),
+                onToggleFavorite: () =>
+                    ref.read(notesRepositoryProvider).toggleFavorite(note.id),
               ),
-              itemCount: (inbox != null && hasInboxContent ? 1 : 0) +
-                  visibleNotes.length,
-              itemBuilder: (context, index) {
-                if (inbox != null && hasInboxContent && index == 0) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: _NoteRow(
-                      note: inbox,
-                      isInbox: true,
-                      onTap: () => context.push('/notes/${inbox.id}'),
-                      onDelete: () => _deleteNote(inbox.id),
-                      onToggleFavorite: () =>
-                          ref.read(notesListControllerProvider.notifier)
-                              .toggleFavorite(inbox.id),
-                    ),
-                  );
-                }
-                final noteIndex =
-                    (inbox != null && hasInboxContent) ? index - 1 : index;
-                final note = visibleNotes[noteIndex];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: _NoteRow(
-                    note: note,
-                    onTap: () => context.push('/notes/${note.id}'),
-                    onDelete: () => _deleteNote(note.id),
-                    onToggleFavorite: () =>
-                        ref.read(notesListControllerProvider.notifier)
-                            .toggleFavorite(note.id),
-                  ),
-                );
-              },
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => AppErrorView(
-            title: 'Erro ao carregar',
-            subtitle: err.toString(),
-          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _createNote(context),
-        backgroundColor: scheme.onSurface,
-        foregroundColor: scheme.surface,
-        elevation: 2,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.edit_outlined, size: 22),
-      ),
+      floatingActionButton: _buildFab(scheme),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(ColorScheme scheme) {
+    return AppBar(
+      backgroundColor: scheme.surface,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      titleSpacing: AppSpacing.md,
+      toolbarHeight: 56,
+      title: const SizedBox.shrink(),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: AppSpacing.sm),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: scheme.surfaceContainerHighest,
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.more_horiz,
+                color: scheme.onSurfaceVariant,
+              ),
+              onPressed: () => _showMoreMenu(context),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFab(ColorScheme scheme) {
+    return FloatingActionButton(
+      onPressed: () => _createNote(context),
+      backgroundColor: scheme.onSurface,
+      foregroundColor: scheme.surface,
+      elevation: 2,
+      shape: const CircleBorder(),
+      child: const Icon(Icons.edit_outlined, size: 22),
     );
   }
 
   Future<void> _createNote(BuildContext context) async {
-    final note = await ref.read(notesListControllerProvider.notifier).createNote();
+    final note = await ref.read(notesRepositoryProvider).createNote();
     if (!context.mounted) return;
     context.push('/notes/${note.id}');
   }
 
   Future<void> _deleteNote(String id) async {
-    await ref.read(notesListControllerProvider.notifier).deleteNote(id);
+    await ref.read(notesRepositoryProvider).softDelete(id);
     if (!mounted) return;
     AppMessenger.showSuccess(context, 'Nota deletada');
   }
@@ -165,13 +191,14 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       ),
       Offset.zero & overlay.size,
     );
+    final favoritesOnly = ref.read(favoritesFilterProvider);
     final selection = await showMenu<_MenuAction>(
       context: context,
       position: position,
       items: [
         CheckedPopupMenuItem<_MenuAction>(
           value: _MenuAction.favoritesOnly,
-          checked: ref.read(notesListControllerProvider).value?.favoritesOnly ?? false,
+          checked: favoritesOnly,
           child: const Text('Apenas favoritos'),
         ),
         const PopupMenuItem<_MenuAction>(
@@ -197,7 +224,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     if (selection == null || !mounted) return;
     switch (selection) {
       case _MenuAction.favoritesOnly:
-        ref.read(notesListControllerProvider.notifier).toggleFavoritesOnly();
+        ref.read(favoritesFilterProvider.notifier).toggle();
       case _MenuAction.sync:
         await ref.read(syncServiceProvider).sync();
       case _MenuAction.logout:

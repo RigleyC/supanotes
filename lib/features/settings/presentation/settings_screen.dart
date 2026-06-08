@@ -7,8 +7,6 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
-import 'package:supanotes/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:supanotes/features/settings/presentation/widgets/settings_tile.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
@@ -56,19 +54,19 @@ class _SettingsStrings {
   static const String telegramRoute = '/telegram';
 }
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authControllerProvider);
-    final settingsAsync = ref.watch(settingsControllerProvider);
-    final pushEnabled = settingsAsync.asData?.value.pushEnabled ?? false;
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
 
-    final account = authState.maybeWhen(
-      data: (s) => s is AuthAuthenticated ? s : null,
-      orElse: () => null,
-    );
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _pushEnabled = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final account = ref.watch(authControllerProvider).asData?.value;
 
     return Scaffold(
       appBar: AppBar(title: const Text(_SettingsStrings.title)),
@@ -82,12 +80,12 @@ class SettingsScreen extends ConsumerWidget {
             SettingsTile.action(
               icon: Icons.alternate_email,
               title: _SettingsStrings.emailTile,
-              subtitle: account?.user.email ?? _SettingsStrings.fallbackEmail,
+              subtitle: account?.email ?? _SettingsStrings.fallbackEmail,
             ),
             SettingsTile.action(
               icon: Icons.person_outline,
               title: _SettingsStrings.nameTile,
-              subtitle: account?.user.name ?? _SettingsStrings.fallbackName,
+              subtitle: account?.name ?? _SettingsStrings.fallbackName,
             ),
             SettingsTile.action(
               icon: Icons.logout,
@@ -103,9 +101,8 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.notifications_outlined,
               title: _SettingsStrings.pushTile,
               subtitle: _SettingsStrings.pushSubtitle,
-              value: pushEnabled,
-              onChanged: (_) =>
-                  ref.read(settingsControllerProvider.notifier).togglePush(),
+              value: _pushEnabled,
+              onChanged: (_) => setState(() => _pushEnabled = !_pushEnabled),
             ),
 
             const SettingsSectionHeader(
@@ -150,7 +147,7 @@ class SettingsScreen extends ConsumerWidget {
       destructive: true,
     );
     if (!confirmed) return;
-    await ref.read(settingsControllerProvider.notifier).logout();
+    await ref.read(authControllerProvider.notifier).logout();
   }
 
   Future<void> _showSyncDialog(BuildContext context, WidgetRef ref) async {

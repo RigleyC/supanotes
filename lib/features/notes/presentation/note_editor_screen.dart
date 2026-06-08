@@ -1,22 +1,27 @@
-/// Note editor screen.
-///
-/// Owns a [SuperEditor] instance and delegates persistence (auto-save
-/// with debounce, task sync, favorite toggle) to [NoteEditorController].
-/// The markdown round-trip happens in `data/markdown_serializer.dart`.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_editor/super_editor.dart'
     hide serializeDocumentToMarkdown;
 
+import 'package:supanotes/core/constants/app_constants.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/data/notes_repository.dart';
+import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/task_entry.dart';
+import 'package:supanotes/features/notes/presentation/controllers/editor_status_notifier.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_card.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/save_indicator.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
+
+final noteProvider = StreamProvider.family<NoteModel?, String>((ref, id) {
+  return ref.watch(notesRepositoryProvider).watchNoteById(id);
+});
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
@@ -33,15 +38,19 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   MutableDocumentComposer? _composer;
   FocusNode? _editorFocusNode;
   TextEditingController? _titleController;
+  Timer? _saveDebounce;
+  Timer? _titleDebounce;
 
   @override
   void initState() {
     super.initState();
-    ref.read(noteEditorControllerProvider.notifier).loadNote(widget.noteId);
+    ref.invalidate(noteProvider(widget.noteId));
   }
 
   @override
   void dispose() {
+    _saveDebounce?.cancel();
+    _titleDebounce?.cancel();
     _titleController?.dispose();
     _composer?.removeListener(_onComposerChanged);
     _document?.removeListener(_onDocumentChanged);
@@ -61,9 +70,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (doc == null) return;
     final markdown = serializeDocumentToMarkdown(doc);
     final tasks = _extractTasks(doc);
-    ref
-        .read(noteEditorControllerProvider.notifier)
-        .onContentChanged(widget.noteId, markdown, tasks);
+    _saveDebounce?.cancel();
+    ref.read(editorStatusProvider.notifier).saving();
+    _saveDebounce = Timer(
+      Duration(milliseconds: AppConstants.autoSaveDebounceMs),
+      () => _flushContentSave(widget.noteId, markdown, tasks),
+    );
   }
 
   List<TaskEntry> _extractTasks(MutableDocument doc) {
@@ -81,16 +93,44 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   void _onTitleChanged(String value) {
-    ref
-        .read(noteEditorControllerProvider.notifier)
-        .onTitleChanged(widget.noteId, value);
+    _titleDebounce?.cancel();
+    ref.read(editorStatusProvider.notifier).saving();
+    _titleDebounce = Timer(
+      Duration(milliseconds: AppConstants.autoSaveDebounceMs),
+      () => _flushTitleSave(widget.noteId, value),
+    );
+  }
+
+  Future<void> _flushContentSave(
+      String noteId, String markdown, List<TaskEntry> tasks) async {
+    try {
+      await ref.read(notesRepositoryProvider).syncTasksFromDocument(noteId, tasks);
+      await ref
+          .read(notesRepositoryProvider)
+          .updateNote(noteId, content: markdown);
+      ref.read(editorStatusProvider.notifier).saved();
+    } catch (_) {
+      ref.read(editorStatusProvider.notifier).errored();
+    }
+  }
+
+  Future<void> _flushTitleSave(String noteId, String title) async {
+    try {
+      await ref.read(notesRepositoryProvider).updateNote(
+            noteId,
+            title: title.isEmpty ? null : title,
+          );
+      ref.read(editorStatusProvider.notifier).saved();
+    } catch (_) {
+      ref.read(editorStatusProvider.notifier).errored();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(noteEditorControllerProvider);
-    final note = state.asData?.value.note;
-    final saveState = state.asData?.value.saveState ?? SaveState.idle;
+    final noteAsync = ref.watch(noteProvider(widget.noteId));
+    final note = noteAsync.asData?.value;
+    final editorStatus = ref.watch(editorStatusProvider);
 
     if (note != null && _document == null) {
       _document = parseMarkdownToDocument(note.content);
@@ -131,31 +171,33 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             ),
           ),
           actions: [
-            SaveIndicator(state: saveState),
+            SaveIndicator(state: editorStatus),
             IconButton(
               icon: Icon(
                 note?.favorite == true ? Icons.star : Icons.star_border,
               ),
               tooltip: note?.favorite == true ? 'Desfavoritar' : 'Favoritar',
-              onPressed: () => ref
-                  .read(noteEditorControllerProvider.notifier)
-                  .toggleFavorite(widget.noteId),
+              onPressed: () =>
+                  ref.read(notesRepositoryProvider).toggleFavorite(widget.noteId),
             ),
           ],
         ),
-        Column(
-          children: [
-            Expanded(
-              child: SuperEditor(
-                editor: _editor!,
-                focusNode: _editorFocusNode,
-                stylesheet: defaultStylesheet.copyWith(
-                  documentPadding: const EdgeInsets.all(AppSpacing.md),
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Column(
+            children: [
+              Expanded(
+                child: SuperEditor(
+                  editor: _editor!,
+                  focusNode: _editorFocusNode,
+                  stylesheet: defaultStylesheet.copyWith(
+                    documentPadding: const EdgeInsets.all(AppSpacing.md),
+                  ),
                 ),
               ),
-            ),
-            NoteToolbar(editor: _editor!, composer: _composer!),
-          ],
+              NoteToolbar(editor: _editor!, composer: _composer!),
+            ],
+          ),
         ),
       ]),
     );

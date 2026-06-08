@@ -14,10 +14,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:supanotes/features/auth/domain/user.dart';
+
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/auth_guard.dart';
 import 'package:supanotes/features/agent/presentation/chat_screen.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/presentation/login_screen.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/features/notes/presentation/inbox_screen.dart';
@@ -30,23 +31,21 @@ import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart';
 import 'package:supanotes/features/routines/presentation/brief_history_screen.dart';
 import 'package:supanotes/features/routines/presentation/routines_screen.dart';
-import 'package:supanotes/features/tasks/presentation/today_tasks_screen.dart';
 import 'package:supanotes/features/telegram/presentation/telegram_link_screen.dart';
 import 'package:supanotes/shared/widgets/splash_screen.dart';
 
 /// Application [GoRouter] driven by the current [authControllerProvider].
 ///
 /// The [ValueNotifier] is seeded with whatever the provider currently
-/// holds (typically [AsyncLoading] on first build, then transitioning
-/// to [AsyncData] of the resolved [AuthState]), and updated via
-/// [Ref.listen] every time the auth controller emits a new value. The
-/// router consults the notifier's current value inside its `redirect`
-/// callback, so the rule always sees the latest auth snapshot.
+/// holds, and updated via [Ref.listen] every time the auth controller
+/// emits a new value. The router consults the notifier's current value
+/// inside its `redirect` callback, so the rule always sees the latest
+/// auth snapshot.
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final notifier = ValueNotifier<AsyncValue<AuthState>>(
+  final notifier = ValueNotifier<AsyncValue<User?>>(
     ref.read(authControllerProvider),
   );
-  ref.listen<AsyncValue<AuthState>>(
+  ref.listen<AsyncValue<User?>>(
     authControllerProvider,
     (_, next) => notifier.value = next,
   );
@@ -79,14 +78,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home',
                 builder: (_, __) => const NotesListScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/today',
-                builder: (_, __) => const TodayTasksScreen(),
               ),
             ],
           ),

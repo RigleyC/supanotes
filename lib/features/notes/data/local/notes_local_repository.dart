@@ -8,12 +8,7 @@ import '../../../../core/database/daos/notes_dao.dart';
 
 final notesLocalRepositoryProvider = Provider<NotesLocalRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) {
-    throw StateError(
-      'notesLocalRepositoryProvider read while unauthenticated',
-    );
-  }
+  final userId = ref.watch(currentUserIdProvider)!;
   return NotesLocalRepository(db.notesDao, userId);
 });
 
@@ -42,6 +37,8 @@ class NotesLocalRepository {
   }
 
   Stream<NoteData?> watchInbox() => _dao.watchInboxNote();
+
+  Stream<NoteData?> watchNoteById(String id) => _dao.watchNoteById(id);
 
   Future<NoteData?> getNoteById(String id) {
     return _dao.getNoteById(id);

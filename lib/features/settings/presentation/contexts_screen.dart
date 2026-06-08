@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/settings/data/settings_models.dart';
+import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/controllers/contexts_controller.dart';
 import 'package:supanotes/features/settings/presentation/widgets/new_context_sheet.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -33,19 +34,18 @@ class ContextsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(contextsControllerProvider);
+    final async = ref.watch(contextsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text(_ContextsStrings.title)),
       body: RefreshIndicator(
-        onRefresh: () =>
-            ref.read(contextsControllerProvider.notifier).loadContexts(),
+        onRefresh: () async => ref.invalidate(contextsProvider),
         child: async.when(
-          data: (state) => _ContextsList(contexts: state.contexts),
+          data: (contexts) => _ContextsList(contexts: contexts),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => AppErrorView(
             title: err is ApiException ? err.message : err.toString(),
-            onRetry: () => ref.invalidate(contextsControllerProvider),
+            onRetry: () => ref.invalidate(contextsProvider),
           ),
         ),
       ),
@@ -133,12 +133,13 @@ class _ContextsList extends ConsumerWidget {
 
   Future<void> _delete(BuildContext context, WidgetRef ref, String id) async {
     try {
-      await ref.read(contextsControllerProvider.notifier).deleteContext(id);
+      await ref.read(settingsRepositoryProvider).deleteContext(id);
+      ref.invalidate(contextsProvider);
       if (context.mounted) {
         AppMessenger.showSuccess(context, _ContextsStrings.deletedSnackbar);
       }
     } on ApiException catch (e) {
-      ref.read(contextsControllerProvider.notifier).loadContexts();
+      ref.invalidate(contextsProvider);
       if (context.mounted) {
         AppMessenger.showError(context, e.message);
       }

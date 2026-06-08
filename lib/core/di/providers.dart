@@ -15,8 +15,8 @@ import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
 
 // ---------------------------------------------------------------------------
 // Auth local storage
@@ -106,5 +106,8 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
 
 /// Global [AuthController] — consumed by the router, the auth screens,
 /// and any other widget that needs to know the current session.
+///
+/// State is [AsyncValue<User?>]: loading, data(user) → authenticated,
+/// data(null) → unauthenticated, error → unauthenticated with feedback.
 final authControllerProvider =
-    AsyncNotifierProvider<AuthController, AuthState>(AuthController.new);
+    NotifierProvider<AuthController, AsyncValue<User?>>(AuthController.new);

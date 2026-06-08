@@ -4,6 +4,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/database/database.dart';
 import '../domain/note_model.dart';
+import '../domain/task_entry.dart';
+import '../../tasks/data/local/tasks_local_repository.dart';
 import 'local/notes_local_repository.dart';
 
 /// Presentation-facing facade over the local notes database.
@@ -16,17 +18,20 @@ import 'local/notes_local_repository.dart';
 abstract class INotesRepository {
   Stream<List<NoteModel>> watchNotes({String? contextId, bool favoritesOnly = false});
   Stream<NoteModel?> watchInbox();
+  Stream<NoteModel?> watchNoteById(String id);
   Future<NoteModel> createNote({String? title, String content = '', String? contextId});
   Future<void> updateNote(String id, {String? title, String? content, bool? favorite, bool? archived, String? contextId});
   Future<void> toggleFavorite(String id);
   Future<void> softDelete(String id);
   Future<void> appendToInbox(String text);
+  Future<void> syncTasksFromDocument(String noteId, List<TaskEntry> tasks);
 }
 
 class NotesRepository implements INotesRepository {
-  NotesRepository(this._local);
+  NotesRepository(this._local, this._tasksLocal);
 
   final NotesLocalRepository _local;
+  final TasksLocalRepository _tasksLocal;
   final Uuid _uuid = const Uuid();
 
   /// Streams active (non-archived, non-deleted, non-inbox) notes, mapped
@@ -55,6 +60,12 @@ class NotesRepository implements INotesRepository {
   @override
   Stream<NoteModel?> watchInbox() {
     return _local.watchInbox().map((d) => d == null ? null : NoteModel.fromData(d));
+  }
+
+  /// Streams a single note by id.
+  @override
+  Stream<NoteModel?> watchNoteById(String id) {
+    return _local.watchNoteById(id).map((d) => d == null ? null : NoteModel.fromData(d));
   }
 
   /// Creates a new note and returns the freshly-saved row. Always marks
@@ -145,6 +156,39 @@ class NotesRepository implements INotesRepository {
     await _local.updateNoteContent(existing.id, newContent);
   }
 
+  /// Syncs the tasks extracted from a note document with the tasks
+  /// database. Creates new tasks, updates matching ones, and removes
+  /// tasks that were deleted from the document.
+  @override
+  Future<void> syncTasksFromDocument(String noteId, List<TaskEntry> tasks) async {
+    final currentTasks = await _tasksLocal.watchNoteTasks(noteId).first;
+    final currentIds = currentTasks.map((t) => t.id).toSet();
+    final docIds = tasks.map((t) => t.id).toSet();
+
+    for (final task in tasks) {
+      if (currentIds.contains(task.id)) {
+        await _tasksLocal.updateTask(TasksCompanion(
+          id: Value(task.id),
+          title: Value(task.text),
+          status: Value(task.isComplete ? 'done' : 'pending'),
+        ));
+      } else {
+        await _tasksLocal.createTask(
+          id: task.id,
+          noteId: noteId,
+          title: task.text,
+          position: 0,
+          status: task.isComplete ? 'done' : 'pending',
+        );
+      }
+    }
+
+    final removed = currentIds.difference(docIds);
+    for (final id in removed) {
+      await _tasksLocal.deleteTask(id);
+    }
+  }
+
   String? _excerptFrom(String content) {
     if (content.isEmpty) return null;
     final flat = content.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -158,5 +202,6 @@ class NotesRepository implements INotesRepository {
 /// user, so this provider is itself safe to read only when authenticated.
 final notesRepositoryProvider = Provider<INotesRepository>((ref) {
   final local = ref.watch(notesLocalRepositoryProvider);
-  return NotesRepository(local);
+  final tasksLocal = ref.watch(tasksLocalRepositoryProvider);
+  return NotesRepository(local, tasksLocal);
 });

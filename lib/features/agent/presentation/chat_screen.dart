@@ -14,7 +14,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
@@ -54,7 +53,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<ChatListState>(chatControllerProvider, (prev, next) {
+    ref.listen<ChatState>(chatControllerProvider, (prev, next) {
       final messageCountChanged = prev?.messages.length != next.messages.length;
       final loadingChanged = prev?.isLoading != next.isLoading;
       if (messageCountChanged || loadingChanged) {
@@ -91,7 +90,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildBody(ChatListState state, bool isLoading) {
+  Widget _buildBody(ChatState state, bool isLoading) {
     if (state.messages.isEmpty && !isLoading) {
       return const EmptyState(
         icon: Icons.chat_bubble_outline,

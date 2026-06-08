@@ -4,12 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/features/settings/data/settings_models.dart';
+import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/controllers/soul_editor_controller.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
+
+const String _kDefaultPersonality =
+    'Você é um assistente pessoal direto, calmo e útil. Respeita o tempo do '
+    'usuário, oferece próximos passos claros e não inventa informações.';
 
 class _SoulStrings {
   _SoulStrings._();
@@ -47,6 +53,8 @@ class SoulEditorScreen extends ConsumerStatefulWidget {
 class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _initialized = false;
+  bool _isEditing = true;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -60,13 +68,17 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       AppMessenger.showError(context, _SoulStrings.emptyError);
       return;
     }
+    setState(() => _isSaving = true);
     try {
-      await ref.read(soulEditorControllerProvider.notifier).save(text);
+      await ref.read(settingsRepositoryProvider).updateSoul(text);
+      ref.invalidate(soulProvider);
       if (!mounted) return;
       AppMessenger.showSuccess(context, _SoulStrings.savedSnackbar);
     } on ApiException catch (e) {
       if (!mounted) return;
       AppMessenger.showError(context, e.message);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -79,28 +91,19 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       destructive: true,
     );
     if (!confirmed || !mounted) return;
-    ref.read(soulEditorControllerProvider.notifier).restoreDefault();
-    final restored =
-        ref.read(soulEditorControllerProvider).asData?.value;
-    if (restored?.soul != null) {
-      _controller.text = restored!.soul!.personality;
-    }
+    _controller.text = _kDefaultPersonality;
     AppMessenger.showInfo(context, _SoulStrings.restoredSnackbar);
   }
 
   @override
   Widget build(BuildContext context) {
-    final soulAsync = ref.watch(soulEditorControllerProvider);
-    final state = soulAsync.asData?.value;
+    final soulAsync = ref.watch(soulProvider);
+    final soul = soulAsync.asData?.value;
 
-    if (!_initialized && state?.soul != null) {
+    if (!_initialized && soul != null) {
       _initialized = true;
-      _controller.text = state!.soul!.personality;
+      _controller.text = soul.personality;
     }
-
-    final isEditing = state?.isEditing ?? true;
-    final isSaving = state?.isSaving ?? false;
-    final loadError = state?.loadError;
 
     return Scaffold(
       appBar: AppBar(
@@ -109,55 +112,47 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
           IconButton(
             tooltip: _SoulStrings.previewTooltip,
             icon: Icon(
-              isEditing ? Icons.visibility_outlined : Icons.edit_outlined,
+              _isEditing ? Icons.visibility_outlined : Icons.edit_outlined,
             ),
-            onPressed: () => ref
-                .read(soulEditorControllerProvider.notifier)
-                .setEditing(!isEditing),
+            onPressed: () => setState(() => _isEditing = !_isEditing),
           ),
         ],
       ),
       body: SafeArea(
-        child: _buildBody(context, soulAsync, loadError, isEditing, isSaving),
+        child: _buildBody(context, soulAsync),
       ),
     );
   }
 
   Widget _buildBody(
     BuildContext context,
-    AsyncValue<SoulEditorState> soulAsync,
-    String? loadError,
-    bool isEditing,
-    bool isSaving,
+    AsyncValue<Soul> soulAsync,
   ) {
-    if (soulAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (loadError != null) {
-      return AppErrorView(
-        title: loadError,
-        onRetry: () => ref.read(soulEditorControllerProvider.notifier).load(),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _modeBanner(context, isEditing),
-          const SizedBox(height: AppSpacing.sm),
-          Expanded(
-            child: isEditing ? _editor(context) : _preview(context),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _footerActions(context, isSaving),
-        ],
+    return soulAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, _) => AppErrorView(
+        title: err is ApiException ? err.message : err.toString(),
+        onRetry: () => ref.invalidate(soulProvider),
+      ),
+      data: (_) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _modeBanner(context),
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(
+              child: _isEditing ? _editor(context) : _preview(context),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _footerActions(context),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _modeBanner(BuildContext context, bool isEditing) {
+  Widget _modeBanner(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return Container(
@@ -172,13 +167,13 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       child: Row(
         children: [
           Icon(
-            isEditing ? Icons.edit_outlined : Icons.visibility_outlined,
+            _isEditing ? Icons.edit_outlined : Icons.visibility_outlined,
             size: 18,
             color: scheme.onSurfaceVariant,
           ),
           const SizedBox(width: AppSpacing.sm),
           Text(
-            isEditing ? _SoulStrings.editMode : _SoulStrings.previewMode,
+            _isEditing ? _SoulStrings.editMode : _SoulStrings.previewMode,
             style: textTheme.labelLarge?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -232,7 +227,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     );
   }
 
-  Widget _footerActions(BuildContext context, bool isSaving) {
+  Widget _footerActions(BuildContext context) {
     return Row(
       children: [
         Expanded(
@@ -245,8 +240,8 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: AppButton(
-            text: isSaving ? _SoulStrings.saving : _SoulStrings.save,
-            isLoading: isSaving,
+            text: _isSaving ? _SoulStrings.saving : _SoulStrings.save,
+            isLoading: _isSaving,
             onPressed: _save,
           ),
         ),

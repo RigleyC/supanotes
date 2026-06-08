@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/features/telegram/data/telegram_repository.dart';
 import 'package:supanotes/features/telegram/presentation/controllers/telegram_link_controller.dart';
 import 'package:supanotes/features/telegram/presentation/widgets/telegram_linked_view.dart';
 import 'package:supanotes/features/telegram/presentation/widgets/telegram_unlinked_view.dart';
@@ -19,37 +20,50 @@ class TelegramLinkScreen extends ConsumerStatefulWidget {
 
 class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
   bool _waitingForLink = false;
-  bool _isDeleting = false;
-  String? _deleteError;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ref.listenManual(telegramLinkControllerProvider, (prev, next) {
-        final prevLinked = prev?.asData?.value.linked ?? false;
-        final nextLinked = next.asData?.value.linked ?? false;
-        if (!prevLinked && nextLinked && _waitingForLink && mounted) {
-          setState(() => _waitingForLink = false);
-          AppMessenger.showSuccess(
-            context,
-            'Telegram conectado com sucesso!',
-          );
-          if (context.canPop()) {
-            context.pop();
-          } else {
-            context.go('/home');
-          }
+  Widget build(BuildContext context) {
+    ref.listen(telegramStatusProvider, (prev, next) {
+      final prevLinked = prev?.asData?.value.linked ?? false;
+      final nextLinked = next.asData?.value.linked ?? false;
+      if (!prevLinked && nextLinked && _waitingForLink && mounted) {
+        setState(() => _waitingForLink = false);
+        AppMessenger.showSuccess(
+          context,
+          'Telegram conectado com sucesso!',
+        );
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home');
         }
-      });
+      }
     });
+
+    final statusAsync = ref.watch(telegramStatusProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Telegram')),
+      body: statusAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => AppErrorView(
+          title: err is ApiException ? err.message : err.toString(),
+          onRetry: () => ref.invalidate(telegramStatusProvider),
+        ),
+        data: (status) => status.linked
+            ? TelegramLinkedView(
+                username: status.username,
+                chatId: status.chatId,
+                onDelete: _onDelete,
+              )
+            : TelegramUnlinkedView(onGenerate: _onGenerate),
+      ),
+    );
   }
 
   Future<void> _onGenerate() async {
-    final controller = ref.read(telegramLinkControllerProvider.notifier);
     try {
-      await controller.generateCode();
+      await ref.read(telegramPairingProvider.notifier).start();
       if (mounted) setState(() => _waitingForLink = true);
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -69,44 +83,14 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    setState(() {
-      _deleteError = null;
-      _isDeleting = true;
-    });
     try {
-      await ref.read(telegramLinkControllerProvider.notifier).deleteLink();
+      await ref.read(telegramRepositoryProvider).deleteLink();
+      ref.invalidate(telegramStatusProvider);
       if (!mounted) return;
       AppMessenger.showSuccess(context, 'Telegram desconectado');
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _deleteError = e.message);
-    } finally {
-      if (mounted) setState(() => _isDeleting = false);
+      AppMessenger.showError(context, e.message);
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final stateAsync = ref.watch(telegramLinkControllerProvider);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Telegram')),
-      body: stateAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => AppErrorView(
-          title: err is ApiException ? err.message : err.toString(),
-          onRetry: () => ref.invalidate(telegramLinkControllerProvider),
-        ),
-        data: (state) => state.linked
-            ? TelegramLinkedView(
-                username: state.username,
-                chatId: state.chatId,
-                onDelete: _onDelete,
-                isDeleting: _isDeleting,
-                deleteError: _deleteError,
-              )
-            : TelegramUnlinkedView(onGenerate: _onGenerate),
-      ),
-    );
   }
 }

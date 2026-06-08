@@ -20,34 +20,27 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
+  String _query = '';
+
   void _onQueryChanged(String query) {
-    if (query.isEmpty) {
-      ref.read(searchControllerProvider.notifier).clear();
-    } else {
-      ref.read(searchControllerProvider.notifier).search(query);
-    }
+    setState(() => _query = query);
   }
 
   void _onModeChanged(SearchMode mode) {
-    final controller = ref.read(searchControllerProvider.notifier);
-    controller.setMode(mode);
-    final currentQuery =
-        ref.read(searchControllerProvider).asData?.value.query ?? '';
-    if (currentQuery.isNotEmpty) {
-      controller.search(currentQuery);
-    }
+    ref.read(searchModeProvider.notifier).set(mode);
   }
 
   @override
   Widget build(BuildContext context) {
-    final searchAsync = ref.watch(searchControllerProvider);
-    final state = searchAsync.asData?.value;
+    final mode = ref.watch(searchModeProvider);
+    final searchAsync =
+        ref.watch(searchResultsProvider((query: _query, mode: mode)));
 
-    final query = state?.query ?? '';
-    final mode = state?.mode ?? SearchMode.hybrid;
-    final results = state?.results ?? const [];
-    final isLoading = state?.isLoading ?? false;
-    final error = state?.error;
+    final results = searchAsync.asData?.value ?? const [];
+    final isLoading = searchAsync.isLoading;
+    final error = searchAsync.hasError
+        ? searchAsync.error.toString()
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -88,7 +81,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ),
             const Divider(height: 1),
-            Expanded(child: _buildBody(query, results, isLoading, error)),
+            Expanded(child: _buildBody(_query, results, isLoading, error)),
           ],
         ),
       ),
@@ -207,7 +200,8 @@ class _SkeletonCard extends StatelessWidget {
     );
   }
 
-  Widget _bar(Color color, {required double widthFactor, required double height}) {
+  Widget _bar(Color color,
+      {required double widthFactor, required double height}) {
     return FractionallySizedBox(
       alignment: Alignment.centerLeft,
       widthFactor: widthFactor,

@@ -43,11 +43,6 @@ class MainShell extends ConsumerWidget {
             label: 'Notas',
           ),
           NavigationDestination(
-            icon: Icon(Icons.checklist_outlined),
-            selectedIcon: Icon(Icons.checklist),
-            label: 'Hoje',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
             label: 'Chat',
