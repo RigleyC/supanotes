@@ -47,6 +47,11 @@ class ApiClient {
     return _dio.delete<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
   }
 
+  Future<Response<ResponseBody>> postStream(String path, {dynamic data, Options? options, CancelToken? cancelToken}) async {
+    final opts = (options ?? Options()).copyWith(responseType: ResponseType.stream);
+    return _dio.post<ResponseBody>(path, data: data, options: opts, cancelToken: cancelToken);
+  }
+
   static Dio _build(AuthInterceptor authInterceptor) {
     final dio = Dio();
 

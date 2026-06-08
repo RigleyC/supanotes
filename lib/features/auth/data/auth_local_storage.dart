@@ -11,6 +11,8 @@
 /// cannot quietly write to a different namespace.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthLocalStorage {
@@ -24,6 +26,7 @@ class AuthLocalStorage {
   static const String _kUserId = 'user_id';
   static const String _kUserEmail = 'user_email';
   static const String _kUserName = 'user_name';
+  static const String _kSessionData = 'session_data';
 
   /// Persists the JWT pair and the user id. The user profile (email/name)
   /// is **not** touched — call [saveUserProfile] separately so the
@@ -64,6 +67,26 @@ class AuthLocalStorage {
 
   Future<String?> getUserName() => _storage.read(key: _kUserName);
 
+  /// Persists the raw session data (settings, soul, contexts, routines)
+  /// as a JSON blob so controllers can hydrate from disk on cold start.
+  Future<void> saveSessionData(Map<String, dynamic> data) async {
+    await _storage.write(
+      key: _kSessionData,
+      value: jsonEncode(data),
+    );
+  }
+
+  /// Returns the parsed session data or an empty map if missing.
+  Future<Map<String, dynamic>> getSessionData() async {
+    final raw = await _storage.read(key: _kSessionData);
+    if (raw == null || raw.isEmpty) return const {};
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return const {};
+    }
+  }
+
   /// Wipes every key this class owns.
   Future<void> clear() async {
     await Future.wait<dynamic>([
@@ -72,6 +95,7 @@ class AuthLocalStorage {
       _storage.delete(key: _kUserId),
       _storage.delete(key: _kUserEmail),
       _storage.delete(key: _kUserName),
+      _storage.delete(key: _kSessionData),
     ]);
   }
 }

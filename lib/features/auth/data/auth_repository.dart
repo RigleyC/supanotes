@@ -68,6 +68,12 @@ class AuthRepository implements IAuthRepository {
         email: result.user.email,
         name: result.user.name,
       );
+      await _storage.saveSessionData({
+        'settings': result.session.settings,
+        'soul': result.session.soul,
+        'contexts': result.session.contexts,
+        'routines': result.session.routines,
+      });
       return result;
     } on DioException catch (e) {
       throw fromDioError(e);
@@ -105,6 +111,12 @@ class AuthRepository implements IAuthRepository {
         email: result.user.email,
         name: result.user.name,
       );
+      await _storage.saveSessionData({
+        'settings': result.session.settings,
+        'soul': result.session.soul,
+        'contexts': result.session.contexts,
+        'routines': result.session.routines,
+      });
       return result;
     } on DioException catch (e) {
       throw fromDioError(e);
