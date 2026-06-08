@@ -19,11 +19,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/dto"
 	authpkg "github.com/RigleyC/supanotes/pkg/auth"
 	"github.com/RigleyC/supanotes/pkg/config"
 	"github.com/RigleyC/supanotes/pkg/uid"
-
-	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
 var (
@@ -33,6 +33,16 @@ var (
 )
 
 const uniqueViolationCode = "23505"
+
+// SessionData holds the full user context returned on login / register
+// so the client can bootstrap its local cache without extra round-trips.
+type SessionData struct {
+	User     sqlcgen.User
+	Settings dto.SettingsResponse
+	Soul     dto.SoulResponse
+	Contexts []dto.ContextResponse
+	Routines []sqlcgen.Routine
+}
 
 type Service struct {
 	q    sqlcgen.Querier
@@ -65,7 +75,7 @@ func (s *Service) inTx(ctx context.Context, fn func(sqlcgen.Querier) error) erro
 // token pair — all inside a single transaction so a failure at any step
 // leaves no partial state.
 // Email is lowercased before insert; password is hashed with Argon2id.
-func (s *Service) Register(ctx context.Context, email, password, name string) (*sqlcgen.User, string, string, error) {
+func (s *Service) Register(ctx context.Context, email, password, name string) (*SessionData, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
 	hash, err := authpkg.HashPassword(password)
@@ -73,7 +83,7 @@ func (s *Service) Register(ctx context.Context, email, password, name string) (*
 		return nil, "", "", fmt.Errorf("auth: hash password: %w", err)
 	}
 
-	var user sqlcgen.User
+	var session SessionData
 	var access, refresh string
 
 	err = s.inTx(ctx, func(q sqlcgen.Querier) error {
@@ -85,13 +95,13 @@ func (s *Service) Register(ctx context.Context, email, password, name string) (*
 		if err != nil {
 			return err
 		}
-		user = u
+		session.User = u
 
-		if err := seedUserDefaults(ctx, q, user.ID); err != nil {
+		if err := seedUserDefaults(ctx, q, session.User.ID); err != nil {
 			return err
 		}
 
-		access, refresh, err = s.generateAuthResponse(ctx, q, user.ID)
+		access, refresh, err = s.generateAuthResponse(ctx, q, session.User.ID)
 		return err
 	})
 	if err != nil {
@@ -102,13 +112,18 @@ func (s *Service) Register(ctx context.Context, email, password, name string) (*
 		return nil, "", "", fmt.Errorf("auth: register: %w", err)
 	}
 
-	return &user, access, refresh, nil
+	// Load session data outside the auth tx so we don't hold it open.
+	if err := s.loadSessionData(ctx, &session); err != nil {
+		return nil, "", "", fmt.Errorf("auth: load session data: %w", err)
+	}
+
+	return &session, access, refresh, nil
 }
 
 // Login validates the credentials in constant time relative to the
 // hash, then emits a fresh token pair. Both "user not found" and
 // "wrong password" surface as ErrInvalidCredentials.
-func (s *Service) Login(ctx context.Context, email, password string) (*sqlcgen.User, string, string, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (*SessionData, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
 	user, err := s.q.GetUserByEmail(ctx, email)
@@ -128,7 +143,13 @@ func (s *Service) Login(ctx context.Context, email, password string) (*sqlcgen.U
 	if err != nil {
 		return nil, "", "", err
 	}
-	return &user, access, refresh, nil
+
+	session := SessionData{User: user}
+	if err := s.loadSessionData(ctx, &session); err != nil {
+		return nil, "", "", fmt.Errorf("auth: load session data: %w", err)
+	}
+
+	return &session, access, refresh, nil
 }
 
 // Refresh rotates the supplied refresh token: validates by hash,
@@ -206,6 +227,56 @@ func (s *Service) generateAuthResponse(ctx context.Context, q sqlcgen.Querier, u
 	return access, plain, nil
 }
 
+func (s *Service) loadSessionData(ctx context.Context, session *SessionData) error {
+	userID := session.User.ID
+
+	// Settings
+	settings, err := s.q.GetUserSettings(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("load settings: %w", err)
+	}
+	session.Settings = dto.SettingsResponse{
+		Timezone:  settings.Timezone,
+		CreatedAt: settings.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt: settings.UpdatedAt.Time.Format(time.RFC3339),
+	}
+
+	// Soul
+	soul, err := s.q.GetSoul(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("load soul: %w", err)
+	}
+	session.Soul = dto.SoulResponse{
+		Personality: soul.Personality,
+		CreatedAt:   soul.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   soul.UpdatedAt.Time.Format(time.RFC3339),
+	}
+
+	// Contexts
+	ctxs, err := s.q.GetContexts(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("load contexts: %w", err)
+	}
+	for _, c := range ctxs {
+		session.Contexts = append(session.Contexts, dto.ContextResponse{
+			ID:        uid.UUIDToString(c.ID),
+			Slug:      c.Slug,
+			Name:      c.Name,
+			CreatedAt: c.CreatedAt.Time.Format(time.RFC3339),
+			UpdatedAt: c.UpdatedAt.Time.Format(time.RFC3339),
+		})
+	}
+
+	// Routines
+	routines, err := s.q.GetRoutinesByUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("load routines: %w", err)
+	}
+	session.Routines = routines
+
+	return nil
+}
+
 func seedUserDefaults(ctx context.Context, q sqlcgen.Querier, userID pgtype.UUID) error {
 	if _, err := q.CreateUserSettings(ctx, sqlcgen.CreateUserSettingsParams{
 		UserID:   userID,
@@ -228,7 +299,31 @@ func seedUserDefaults(ctx context.Context, q sqlcgen.Querier, userID pgtype.UUID
 		return fmt.Errorf("auth: seed inbox note: %w", err)
 	}
 
-	personality := "Você é o assistente SupaNotes. Você deve ser claro, objetivo, proativo e prestativo, auxiliando na organização pessoal e resgate de ideias do usuário."
+	personality := `# Personalidade
+Você é o assistente pessoal SupaNotes — um parceiro de organização proativo, claro e direto. Seu tom é caloroso mas profissional, como um assistente executivo de confiança.
+
+# Regras
+1. Seja conciso. Prefira bullet points a parágrafos.
+2. Seja proativo: sugira ações, não apenas liste informações.
+3. Contexto é rei: use as notas, tarefas e memórias do usuário para personalizar cada interação.
+4. Se o usuário pedir algo ambíguo, peça esclarecimento educadamente.
+5. Ao organizar o inbox, agrupe ideias relacionadas e sugira títulos descritivos.
+6. Mantenha confidencialidade — nunca compartilhe informações do usuário.
+7. Se não souber algo, admita e sugira alternativas.
+
+# Formato de Resposta
+- Use Markdown para formatação
+- Headings (##) para seções
+- Bullet points para listas
+- Checklist (- []) para tarefas sugeridas
+- Citações em bloco para citações ou exemplos
+
+# Briefs (Rotinas)
+Nos briefs diários/semanais:
+- Destaque tarefas urgentes primeiro
+- Resuma notas recentes em 1-2 frases
+- Sugira uma "intenção do dia" semanal
+- Mantenha o brief em 3-5 parágrafos`
 	if _, err := q.UpsertSoul(ctx, sqlcgen.UpsertSoulParams{
 		UserID:      userID,
 		Personality: personality,

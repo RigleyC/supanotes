@@ -55,7 +55,7 @@ class TaskModel {
     );
   }
 
-  bool get isCompleted => status == 'completed';
+  bool get isCompleted => status == 'done' || status == 'completed';
   bool get isPending => status == 'pending';
 
   bool get isRepeating =>

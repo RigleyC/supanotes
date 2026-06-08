@@ -146,7 +146,12 @@ func (m *mockQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlcgen.
 	return sqlcgen.User{}, errors.New("GetUserByID: not implemented in mock")
 }
 func (m *mockQuerier) GetUserSettings(ctx context.Context, userID pgtype.UUID) (sqlcgen.UserSetting, error) {
-	return sqlcgen.UserSetting{}, errors.New("GetUserSettings: not implemented in mock")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if s, ok := m.settings[userID]; ok {
+		return s, nil
+	}
+	return sqlcgen.UserSetting{UserID: userID, Timezone: "UTC", CreatedAt: pgtype.Timestamptz{Valid: true}, UpdatedAt: pgtype.Timestamptz{Valid: true}}, nil
 }
 func (m *mockQuerier) RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error {
 	return errors.New("RevokeAllUserRefreshTokens: not implemented in mock")
@@ -304,21 +309,21 @@ func TestService_Register_Success(t *testing.T) {
 	q := newMockQuerier()
 	svc := NewService(q, testConfig(), nil)
 
-	user, access, refresh, err := svc.Register(context.Background(), "User@Example.COM  ", "correct-horse-battery", "  Alice  ")
+	session, access, refresh, err := svc.Register(context.Background(), "User@Example.COM  ", "correct-horse-battery", "  Alice  ")
 	if err != nil {
 		t.Fatalf("Register: %v", err)
 	}
-	if user == nil {
-		t.Fatal("Register: user is nil")
+	if session == nil {
+		t.Fatal("Register: session is nil")
 	}
-	if user.Email != "user@example.com" {
-		t.Errorf("Register: email not lowercased, got %q", user.Email)
+	if session.User.Email != "user@example.com" {
+		t.Errorf("Register: email not lowercased, got %q", session.User.Email)
 	}
-	if user.Name != "Alice" {
-		t.Errorf("Register: name not trimmed, got %q", user.Name)
+	if session.User.Name != "Alice" {
+		t.Errorf("Register: name not trimmed, got %q", session.User.Name)
 	}
-	if !strings.HasPrefix(user.PasswordHash, "$argon2id$") {
-		t.Errorf("Register: password hash not Argon2id PHC, got prefix %q", user.PasswordHash[:20])
+	if !strings.HasPrefix(session.User.PasswordHash, "$argon2id$") {
+		t.Errorf("Register: password hash not Argon2id PHC, got prefix %q", session.User.PasswordHash[:20])
 	}
 	if access == "" {
 		t.Error("Register: empty access token")
@@ -351,12 +356,12 @@ func TestService_Login_Success(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	user, access, refresh, err := svc.Login(context.Background(), "LOGIN@EXAMPLE.COM", "supersecret")
+	session, access, refresh, err := svc.Login(context.Background(), "LOGIN@EXAMPLE.COM", "supersecret")
 	if err != nil {
 		t.Fatalf("Login: %v", err)
 	}
-	if user.Email != "login@example.com" {
-		t.Errorf("Login: email mismatch %q", user.Email)
+	if session.User.Email != "login@example.com" {
+		t.Errorf("Login: email mismatch %q", session.User.Email)
 	}
 	if access == "" || refresh == "" {
 		t.Error("Login: empty tokens")
@@ -515,7 +520,7 @@ func TestService_Refresh_StoreFailureBubblesUp(t *testing.T) {
 func TestService_IssuedTokenIsValid(t *testing.T) {
 	q := newMockQuerier()
 	cfg := testConfig()
-	svc := NewService(q, cfg)
+	svc := NewService(q, cfg, nil)
 
 	_, access, _, err := svc.Register(context.Background(), "vt@example.com", "password-1234", "Iris")
 	if err != nil {

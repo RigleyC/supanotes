@@ -48,6 +48,28 @@ supanotes/
 - All endpoints must have a health check equivalent.
 - Use structured logging (e.g., `log/slog`).
 
+### State Management (Riverpod 3.x)
+
+- **OBRIGATÓRIO**: providers declarados **manualmente** com `Notifier`/`StreamProvider`/`FutureProvider`/`AsyncNotifier`.
+  **PROIBIDO**: codegen (`@riverpod`, `riverpod_generator`, `.g.dart`).
+- **PROIBIDO**: `StateNotifier` (deprecated), classes `State`/`Store` com `copyWith` manual,
+  `state.value!` sem checagem, `repo.watchX().first` em `build()`.
+- Use `StreamProvider` / `StreamProvider.family` para dados do Drift (nunca `.first` em `build()`).
+- Use `FutureProvider` / `FutureProvider.family` para fetch HTTP único.
+- Use `Notifier`/`AsyncNotifier` **somente** para state genuinamente compartilhado + mutação complexa
+  (auth, chat, sync).
+- State de UI local (save status, countdown, query string, visibilidade de sheet)
+  fica no widget com `setState` ou `ValueNotifier` — não vira provider.
+- **`.autoDispose` por padrão**. Exceções: `authController`, `goRouter`,
+  `appDatabase`, `apiClient`, `authLocalStorage`, `authRepository`,
+  `syncService`, `syncState`, `connectivityMonitor`, `sessionCache`.
+- Erros não podem ser engolidos. `catch (e) { return const EmptyState() }` é proibido —
+  propague na UI via `AsyncValue.error`.
+- `AsyncValue` já cobre `loading`/`data`/`error`. Não crie campos `isLoading`/`error`
+  dentro do state — eles duplicam o que o Riverpod já te dá.
+- Estado digitado pelo usuário usa `TextEditingController`, não provider.
+- Regras detalhadas e exemplos em `RIVERPOD.md` (raiz do projeto).
+
 ### Git
 - Branch naming: `feat/<name>`, `fix/<name>`, `chore/<name>`
 - Commit format: `type(scope): description` (Conventional Commits)

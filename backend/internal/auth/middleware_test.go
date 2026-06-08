@@ -22,7 +22,7 @@ func newProtectedRoute(t *testing.T) (*echo.Echo, *config.Config) {
 	g := e.Group("/api/v1")
 	g.Use(JWT(cfg))
 	g.GET("/me", func(c echo.Context) error {
-		uid, ok := UserIDFromContext(c)
+		uid, ok := web.UserIDFromContext(c)
 		if !ok {
 			return web.JSONError(c, http.StatusInternalServerError, "no user id in context")
 		}
@@ -139,7 +139,7 @@ func TestMiddleware_ExpiredToken(t *testing.T) {
 func TestUserIDFromContext_Missing(t *testing.T) {
 	e := echo.New()
 	c := e.NewContext(nil, nil)
-	if _, ok := UserIDFromContext(c); ok {
+	if _, ok := web.UserIDFromContext(c); ok {
 		t.Error("UserIDFromContext: want ok=false for empty context")
 	}
 }

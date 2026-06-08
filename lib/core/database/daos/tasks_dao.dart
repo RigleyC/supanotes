@@ -26,7 +26,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
               DateTime(today.year, today.month, today.day, 23, 59, 59)))
           ..orderBy([
             (t) => OrderingTerm(
-                  expression: t.status.equals('completed'),
+                  expression: t.status.equals('done'),
                   mode: OrderingMode.asc,
                 ),
             (t) => OrderingTerm(expression: t.dueDate, mode: OrderingMode.asc),
@@ -58,7 +58,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
           ..where((t) => t.noteId.equals(noteId))
           ..orderBy([
             (t) => OrderingTerm(
-                  expression: t.status.equals('completed'),
+                  expression: t.status.equals('done'),
                   mode: OrderingMode.asc,
                 ),
             (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
@@ -109,7 +109,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       // 1. Mark the current row as completed.
       await (update(tasks)..where((t) => t.id.equals(id))).write(
         TasksCompanion(
-          status: const Value('completed'),
+          status: const Value('done'),
           updatedAt: Value(now),
           isDirty: const Value(true),
         ),

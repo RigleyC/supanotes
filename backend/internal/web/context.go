@@ -3,7 +3,10 @@ package web
 import (
 	"errors"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
+
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 const userIDContextKey = "user_id"
@@ -24,4 +27,15 @@ func UserIDFromContext(c echo.Context) (string, bool) {
 		return "", false
 	}
 	return v, true
+}
+
+// UserID returns the parsed UUID of the authenticated user from the
+// Echo context. It is the recommended way to extract the user ID in
+// HTTP handlers.
+func UserID(c echo.Context) (pgtype.UUID, error) {
+	idStr, ok := UserIDFromContext(c)
+	if !ok {
+		return pgtype.UUID{}, ErrNoUserID
+	}
+	return uid.UUIDFromString(idStr)
 }

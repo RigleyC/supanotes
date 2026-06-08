@@ -221,6 +221,23 @@ func (h *Handler) Reopen(c echo.Context) error {
 	return c.JSON(http.StatusOK, mapToTaskResponse(task))
 }
 
+func (h *Handler) GetByNoteID(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+	noteID, err := uid.UUIDFromString(c.Param("id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid note id")
+	}
+	tasks, err := h.svc.GetTasks(c.Request().Context(), userID, &noteID, nil, nil, nil, 100, 0)
+	if err != nil {
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get tasks")
+	}
+	return c.JSON(http.StatusOK, tasks)
+}
+
 func (h *Handler) Today(c echo.Context) error {
 	userID, err := web.UserID(c)
 	if err != nil {

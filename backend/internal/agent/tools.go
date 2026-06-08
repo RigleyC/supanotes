@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/routines"
+	"github.com/RigleyC/supanotes/internal/soul"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
@@ -27,7 +30,7 @@ type ToolRegistry struct {
 	tools map[string]ToolExecutor
 }
 
-func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks.Service, memoriesSvc *memories.Service, routinesSvc *routines.Service) *ToolRegistry {
+func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks.Service, memoriesSvc *memories.Service, routinesSvc *routines.Service, soulSvc *soul.Service) *ToolRegistry {
 	registry := &ToolRegistry{
 		tools: make(map[string]ToolExecutor),
 	}
@@ -48,6 +51,17 @@ func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks
 		&TestWeeklyBriefTool{routinesSvc: routinesSvc},
 		&SetDailyBriefScheduleTool{routinesSvc: routinesSvc},
 		&SetWeeklyBriefScheduleTool{routinesSvc: routinesSvc},
+		&GetNotesTool{notesSvc: notesSvc},
+		&UpdateNoteTool{notesSvc: notesSvc},
+		&AppendToNoteTool{notesSvc: notesSvc},
+		&LinkNotesTool{notesSvc: notesSvc},
+		&DeleteMemoryTool{memoriesSvc: memoriesSvc},
+		&UpdateSoulTool{soulSvc: soulSvc},
+		&GetTodayTasksTool{tasksSvc: tasksSvc},
+		&UpdateTaskTool{tasksSvc: tasksSvc},
+		&PlanInboxOrganizationTool{},
+		&ApplyInboxOrganizationTool{},
+		&GetVaultContextTool{q: q},
 	}
 
 	for _, e := range executors {
@@ -124,16 +138,35 @@ type AddTaskTool struct {
 func (t *AddTaskTool) Name() string        { return "add_task" }
 func (t *AddTaskTool) Description() string { return "Create a new actionable task" }
 func (t *AddTaskTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]}`
+	return `{"type":"object","properties":{"title":{"type":"string"},"note_id":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date"},"recurrence":{"type":"string","enum":["none","daily","weekdays","weekly","monthly"]}},"required":["title"]}`
 }
 func (t *AddTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
-		Title string `json:"title"`
+		Title      string  `json:"title"`
+		NoteID     *string `json:"note_id"`
+		DueDate   *string `json:"due_date"`
+		Recurrence *string `json:"recurrence"`
 	}](argsJSON)
 	if err != nil {
 		return "", err
 	}
-	task, err := t.tasksSvc.CreateTask(ctx, userID, pgtype.UUID{}, args.Title, nil, nil, 0)
+	var noteID pgtype.UUID
+	if args.NoteID != nil {
+		nid, err := uid.UUIDFromString(*args.NoteID)
+		if err != nil {
+			return "", fmt.Errorf("invalid note_id: %w", err)
+		}
+		noteID = nid
+	}
+	var dueDateTime *time.Time
+	if args.DueDate != nil {
+		t, err := time.Parse("2006-01-02", *args.DueDate)
+		if err != nil {
+			return "", fmt.Errorf("invalid due_date format, use YYYY-MM-DD: %w", err)
+		}
+		dueDateTime = &t
+	}
+	task, err := t.tasksSvc.CreateTask(ctx, userID, noteID, args.Title, dueDateTime, args.Recurrence, 0)
 	if err != nil {
 		return "", err
 	}
@@ -417,6 +450,311 @@ func (t *SetDailyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.U
 		}
 	}
 	return "Daily routine not found", nil
+}
+
+// --- GetNotesTool ---
+type GetNotesTool struct {
+	notesSvc *notes.Service
+}
+
+func (t *GetNotesTool) Name() string { return "get_notes" }
+func (t *GetNotesTool) Description() string { return "List notes in the vault" }
+func (t *GetNotesTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"limit":{"type":"integer"}},"required":[]}`
+}
+func (t *GetNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	args, err := parseArgs[struct {
+		Limit int32 `json:"limit"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+	if args.Limit <= 0 || args.Limit > 50 {
+		args.Limit = 20
+	}
+	notesList, err := t.notesSvc.GetNotes(ctx, userID, nil, nil, args.Limit, nil, nil)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, n := range notesList {
+		b.WriteString(fmt.Sprintf("- [%s] %s\n", formatID(n.ID), n.Title.String))
+	}
+	if b.Len() == 0 {
+		return "No notes found", nil
+	}
+	return b.String(), nil
+}
+
+// --- UpdateNoteTool ---
+type UpdateNoteTool struct {
+	notesSvc *notes.Service
+}
+
+func (t *UpdateNoteTool) Name() string { return "update_note" }
+func (t *UpdateNoteTool) Description() string { return "Update title or content of a note" }
+func (t *UpdateNoteTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"note_id":{"type":"string"},"title":{"type":"string"},"content":{"type":"string"}},"required":["note_id"]}`
+}
+func (t *UpdateNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	args, err := parseArgs[struct {
+		NoteID  string  `json:"note_id"`
+		Title   *string `json:"title"`
+		Content *string `json:"content"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+	nid, err := uid.UUIDFromString(args.NoteID)
+	if err != nil {
+		return "", err
+	}
+	note, err := t.notesSvc.UpdateNote(ctx, userID, nid, args.Title, args.Content, nil, nil, nil)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Note updated: [%s] %s", formatID(note.ID), note.Title.String), nil
+}
+
+// --- AppendToNoteTool ---
+type AppendToNoteTool struct {
+	notesSvc *notes.Service
+}
+
+func (t *AppendToNoteTool) Name() string { return "append_to_note" }
+func (t *AppendToNoteTool) Description() string { return "Append text to an existing note by ID" }
+func (t *AppendToNoteTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"note_id":{"type":"string"},"content":{"type":"string"}},"required":["note_id","content"]}`
+}
+func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	args, err := parseArgs[struct {
+		NoteID  string `json:"note_id"`
+		Content string `json:"content"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+	nid, err := uid.UUIDFromString(args.NoteID)
+	if err != nil {
+		return "", err
+	}
+	note, err := t.notesSvc.GetNoteByID(ctx, nid, userID)
+	if err != nil {
+		return "", err
+	}
+	newContent := note.Content + "\n" + args.Content
+	updated, err := t.notesSvc.UpdateNote(ctx, userID, nid, nil, &newContent, nil, nil, nil)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Content appended to note [%s] %s", formatID(updated.ID), updated.Title.String), nil
+}
+
+// --- LinkNotesTool ---
+type LinkNotesTool struct {
+	notesSvc *notes.Service
+}
+
+func (t *LinkNotesTool) Name() string { return "link_notes" }
+func (t *LinkNotesTool) Description() string { return "Create a bi-directional link between two notes" }
+func (t *LinkNotesTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"source_id":{"type":"string"},"target_id":{"type":"string"}},"required":["source_id","target_id"]}`
+}
+func (t *LinkNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	return "", fmt.Errorf("tool not fully implemented yet — no CreateNoteLink query in sqlcgen")
+}
+
+// --- DeleteMemoryTool ---
+type DeleteMemoryTool struct {
+	memoriesSvc *memories.Service
+}
+
+func (t *DeleteMemoryTool) Name() string { return "delete_memory" }
+func (t *DeleteMemoryTool) Description() string { return "Delete a specific memory by ID" }
+func (t *DeleteMemoryTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"memory_id":{"type":"string"}},"required":["memory_id"]}`
+}
+func (t *DeleteMemoryTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	args, err := parseArgs[struct {
+		MemoryID string `json:"memory_id"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+	mid, err := uid.UUIDFromString(args.MemoryID)
+	if err != nil {
+		return "", err
+	}
+	if err := t.memoriesSvc.DeleteMemory(ctx, mid, userID); err != nil {
+		return "", err
+	}
+	return "Memory deleted", nil
+}
+
+// --- UpdateSoulTool ---
+type UpdateSoulTool struct {
+	soulSvc *soul.Service
+}
+
+func (t *UpdateSoulTool) Name() string { return "update_soul" }
+func (t *UpdateSoulTool) Description() string { return "Update the agent's personality (Soul)" }
+func (t *UpdateSoulTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
+}
+func (t *UpdateSoulTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	args, err := parseArgs[struct {
+		Content string `json:"content"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+	if _, err := t.soulSvc.Update(ctx, userID, args.Content); err != nil {
+		return "", err
+	}
+	return "Soul updated", nil
+}
+
+// --- GetTodayTasksTool ---
+type GetTodayTasksTool struct {
+	tasksSvc *tasks.Service
+}
+
+func (t *GetTodayTasksTool) Name() string { return "get_today_tasks" }
+func (t *GetTodayTasksTool) Description() string { return "List today's tasks" }
+func (t *GetTodayTasksTool) SchemaJSON() string {
+	return `{"type":"object","properties":{}}`
+}
+func (t *GetTodayTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	ts, err := t.tasksSvc.GetTodayTasks(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, task := range ts {
+		b.WriteString(fmt.Sprintf("- [%s] %s (Due: %v)\n", task.Status, task.Title, task.DueDate.Time))
+	}
+	if b.Len() == 0 {
+		return "No tasks for today", nil
+	}
+	return b.String(), nil
+}
+
+// --- UpdateTaskTool ---
+type UpdateTaskTool struct {
+	tasksSvc *tasks.Service
+}
+
+func (t *UpdateTaskTool) Name() string { return "update_task" }
+func (t *UpdateTaskTool) Description() string { return "Update a task's title, due_date, or recurrence" }
+func (t *UpdateTaskTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"task_id":{"type":"string"},"title":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date"},"recurrence":{"type":"string","enum":["daily","weekdays","weekly","monthly"]}},"required":["task_id"]}`
+}
+func (t *UpdateTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	args, err := parseArgs[struct {
+		TaskID     string  `json:"task_id"`
+		Title      *string `json:"title"`
+		DueDate    *string `json:"due_date"`
+		Recurrence *string `json:"recurrence"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+	tid, err := uid.UUIDFromString(args.TaskID)
+	if err != nil {
+		return "", err
+	}
+	var dueDateTime *time.Time
+	if args.DueDate != nil {
+		t, err := time.Parse("2006-01-02", *args.DueDate)
+		if err != nil {
+			return "", fmt.Errorf("invalid due_date format, use YYYY-MM-DD: %w", err)
+		}
+		dueDateTime = &t
+	}
+	updated, err := t.tasksSvc.UpdateTask(ctx, userID, tid, args.Title, nil, dueDateTime, args.Recurrence, nil)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Task updated: [%s] %s", formatID(updated.ID), updated.Title), nil
+}
+
+// --- PlanInboxOrganizationTool ---
+type PlanInboxOrganizationTool struct{}
+
+func (t *PlanInboxOrganizationTool) Name() string { return "plan_inbox_organization" }
+func (t *PlanInboxOrganizationTool) Description() string {
+	return "Analyzes inbox and returns an organization plan"
+}
+func (t *PlanInboxOrganizationTool) SchemaJSON() string {
+	return `{"type":"object","properties":{}}`
+}
+func (t *PlanInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	return `{"message":"Use the dedicated /api/v1/notes/inbox/organize/plan endpoint"}`, nil
+}
+
+// --- ApplyInboxOrganizationTool ---
+type ApplyInboxOrganizationTool struct{}
+
+func (t *ApplyInboxOrganizationTool) Name() string { return "apply_inbox_organization" }
+func (t *ApplyInboxOrganizationTool) Description() string {
+	return "Apply an inbox organization plan"
+}
+func (t *ApplyInboxOrganizationTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"plan_id":{"type":"string"},"accepted_item_ids":{"type":"array","items":{"type":"string"}}},"required":["plan_id","accepted_item_ids"]}`
+}
+func (t *ApplyInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	return `{"message":"Use the dedicated /api/v1/notes/inbox/organize/apply endpoint"}`, nil
+}
+
+// --- GetVaultContextTool ---
+type GetVaultContextTool struct {
+	q sqlcgen.Querier
+}
+
+func (t *GetVaultContextTool) Name() string { return "get_vault_context" }
+func (t *GetVaultContextTool) Description() string {
+	return "Returns stats about the vault: total notes, tasks, contexts, tags"
+}
+func (t *GetVaultContextTool) SchemaJSON() string {
+	return `{"type":"object","properties":{}}`
+}
+func (t *GetVaultContextTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	notesList, err := t.q.GetNotes(ctx, sqlcgen.GetNotesParams{
+		UserID: userID,
+		Limit:  10000,
+	})
+	if err != nil {
+		return "", fmt.Errorf("count notes: %w", err)
+	}
+	tasksList, err := t.q.GetTasks(ctx, sqlcgen.GetTasksParams{
+		UserID: userID,
+		Limit:  10000,
+	})
+	if err != nil {
+		return "", fmt.Errorf("count tasks: %w", err)
+	}
+	contexts, err := t.q.GetContexts(ctx, userID)
+	if err != nil {
+		return "", fmt.Errorf("get contexts: %w", err)
+	}
+	tags, err := t.q.GetTags(ctx, userID)
+	if err != nil {
+		return "", fmt.Errorf("get tags: %w", err)
+	}
+	var openCount, completedCount int32
+	for _, t := range tasksList {
+		if t.Status == "open" {
+			openCount++
+		} else {
+			completedCount++
+		}
+	}
+	return fmt.Sprintf(`Vault Stats:
+- Notes: %d
+- Open Tasks: %d
+- Completed Tasks: %d
+- Contexts: %d
+- Tags: %d`, len(notesList), openCount, completedCount, len(contexts), len(tags)), nil
 }
 
 // --- SetWeeklyBriefScheduleTool ---

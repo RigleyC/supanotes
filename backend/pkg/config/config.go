@@ -15,13 +15,15 @@ type Config struct {
 	DatabaseURL         string
 	JWTSecret           string
 	CORSOrigins         []string
-	OpenAIAPIKey        string
-	GeminiAPIKey        string
-	AnthropicAPIKey     string
-	DeepSeekAPIKey      string
-	OpenAICompatBaseURL string
-	OpenAICompatModel   string
-	TelegramBotToken    string
+	OpenAIAPIKey            string
+	GeminiAPIKey            string
+	AnthropicAPIKey         string
+	DeepSeekAPIKey          string
+	OpenAICompatBaseURL     string
+	OpenAICompatModel       string
+	OpenAIEmbeddingsAPIKey  string
+	OpenAIEmbeddingsModel   string
+	TelegramBotToken        string
 	FCMCredentialsFile  string
 	Environment         string
 }
@@ -59,9 +61,11 @@ func Load() (*Config, error) {
 		GeminiAPIKey:        os.Getenv("GEMINI_API_KEY"),
 		AnthropicAPIKey:     os.Getenv("ANTHROPIC_API_KEY"),
 		DeepSeekAPIKey:      os.Getenv("DEEPSEEK_API_KEY"),
-		OpenAICompatBaseURL: os.Getenv("OPENAI_COMPAT_BASE_URL"),
-		OpenAICompatModel:   os.Getenv("OPENAI_COMPAT_MODEL"),
-		TelegramBotToken:    os.Getenv("TELEGRAM_BOT_TOKEN"),
+		OpenAICompatBaseURL:     os.Getenv("OPENAI_COMPAT_BASE_URL"),
+		OpenAICompatModel:       os.Getenv("OPENAI_COMPAT_MODEL"),
+		OpenAIEmbeddingsAPIKey:  os.Getenv("OPENAI_EMBEDDINGS_API_KEY"),
+		OpenAIEmbeddingsModel:   os.Getenv("OPENAI_EMBEDDINGS_MODEL"),
+		TelegramBotToken:        os.Getenv("TELEGRAM_BOT_TOKEN"),
 		FCMCredentialsFile:  os.Getenv("FCM_CREDENTIALS_FILE"),
 	}, nil
 }

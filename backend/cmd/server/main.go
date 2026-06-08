@@ -179,8 +179,13 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	protected.POST("/notes", notesH.Create)
 	protected.GET("/notes", notesH.List)
 	protected.GET("/notes/:id", notesH.Get)
-	protected.PUT("/notes/:id", notesH.Update)
+	protected.PATCH("/notes/:id", notesH.Update)
 	protected.DELETE("/notes/:id", notesH.Delete)
+
+	protected.GET("/notes/inbox", notesH.GetInbox)
+	protected.POST("/notes/inbox/append", notesH.AppendToInbox)
+	protected.POST("/notes/inbox/organize/plan", notesH.PlanOrganization)
+	protected.POST("/notes/inbox/organize/apply", notesH.ApplyOrganization)
 
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
@@ -188,15 +193,17 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	tasksH := tasks.NewHandler(tasksSvc)
 	protected.POST("/tasks", tasksH.Create)
 	protected.GET("/tasks", tasksH.List)
-	protected.PUT("/tasks/:id", tasksH.Update)
+	protected.PATCH("/tasks/:id", tasksH.Update)
 	protected.DELETE("/tasks/:id", tasksH.Delete)
 	protected.POST("/tasks/:id/complete", tasksH.Complete)
 	protected.POST("/tasks/:id/reopen", tasksH.Reopen)
 	protected.GET("/tasks/today", tasksH.Today)
+	protected.GET("/notes/:id/tasks", tasksH.GetByNoteID)
 
 	// Embeddings worker
 	embeddingsRepo := embeddings.NewRepository(queries)
-	embeddingsSvc := embeddings.NewService(embeddingsRepo)
+	embeddingClient := llm.NewEmbeddingClient(cfg.OpenAIEmbeddingsAPIKey, cfg.OpenAICompatBaseURL, cfg.OpenAIEmbeddingsModel)
+	embeddingsSvc := embeddings.NewService(embeddingsRepo, embeddingClient)
 	cronJob := cron.New(cron.WithSeconds())
 	cronJob.AddFunc("*/30 * * * * *", func() {
 		embeddingsSvc.ProcessPending(context.Background())
@@ -218,7 +225,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	protected.DELETE("/memories/:id", memoriesH.Delete)
 
 	// Search
-	searchSvc := search.NewService(queries)
+	searchSvc := search.NewService(queries, embeddingClient)
 	searchH := search.NewHandler(searchSvc)
 	search.RegisterRoutes(protected, searchH)
 
@@ -237,10 +244,11 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	// Agent Loop (built before the runner so the runner and the
 	// gateway can both depend on it).
 	agentRepo := agent.NewRepository(queries)
-	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc)
+	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc)
 	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools)
 	agentH := agent.NewHandler(agentLoop, agentRepo)
 	protected.POST("/agent/chat", agentH.Chat)
+	protected.POST("/agent/chat/stream", agentH.ChatSSE)
 	protected.GET("/agent/messages", agentH.ListMessages)
 	protected.DELETE("/agent/messages", agentH.DeleteMessages)
 

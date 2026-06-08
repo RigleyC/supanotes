@@ -2,6 +2,7 @@ package routines
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -141,9 +142,16 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 
 	sysPrompt := buildBriefPrompt(rt.Type, ragContext)
 
-	llmClient := r.llmFactory.For(llm.TaskTypeAgentic)
+	loc, err := time.LoadLocation(rt.Timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	now := time.Now().In(loc)
+	timezonePrompt := fmt.Sprintf("User's local time: %s\nTimezone: %s\n\n%s", now.Format(time.RFC1123), rt.Timezone, sysPrompt)
+
+	llmClient := r.llmFactory.For(llm.TaskTypeGenerate)
 	req := llm.Request{
-		System:   sysPrompt,
+		System:   timezonePrompt,
 		Messages: []llm.Message{{Role: "user", Content: "Gere a rotina agora."}},
 	}
 
@@ -159,6 +167,8 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 		log.Error().Err(err).Msg("failed to save routine log")
 		return
 	}
+
+	// TODO: update last_run_at on the routine once the column is added via migration
 
 	userIDStr := uid.UUIDToString(rt.UserID)
 

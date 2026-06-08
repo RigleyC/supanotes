@@ -59,7 +59,7 @@ func (s *Service) TestRoutine(ctx context.Context, userID pgtype.UUID, rType str
 
 	sysPrompt := buildBriefPrompt(rType, ragContext)
 
-	llmClient := s.llmFactory.For(llm.TaskTypeAgentic)
+	llmClient := s.llmFactory.For(llm.TaskTypeGenerate)
 	req := llm.Request{
 		System:   sysPrompt,
 		Messages: []llm.Message{{Role: "user", Content: "Gere a rotina agora."}},

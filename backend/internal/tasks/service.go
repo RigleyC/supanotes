@@ -126,7 +126,7 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 	task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
 		ID:     id,
 		UserID: userID,
-		Status: pgtype.Text{String: "completed", Valid: true},
+		Status: pgtype.Text{String: "done", Valid: true},
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

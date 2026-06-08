@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/pgvector/pgvector-go"
 )
 
 type SearchResult struct {
@@ -21,11 +23,12 @@ type SearchResult struct {
 }
 
 type Service struct {
-	q sqlcgen.Querier
+	q      sqlcgen.Querier
+	embedC *llm.EmbeddingClient
 }
 
-func NewService(q sqlcgen.Querier) *Service {
-	return &Service{q: q}
+func NewService(q sqlcgen.Querier, embedC *llm.EmbeddingClient) *Service {
+	return &Service{q: q, embedC: embedC}
 }
 
 func (s *Service) Search(ctx context.Context, userID pgtype.UUID, query string, mode string, limit int32) ([]SearchResult, error) {
@@ -37,7 +40,6 @@ func (s *Service) Search(ctx context.Context, userID pgtype.UUID, query string, 
 	case "hybrid":
 		return s.searchHybrid(ctx, userID, query, limit)
 	default:
-		// Se não especificar ou for inválido, cai pra FTS como fallback
 		return s.searchFTS(ctx, userID, query, limit)
 	}
 }
@@ -70,9 +72,78 @@ func (s *Service) searchFTS(ctx context.Context, userID pgtype.UUID, query strin
 }
 
 func (s *Service) searchSemantic(ctx context.Context, userID pgtype.UUID, query string, limit int32) ([]SearchResult, error) {
-	return nil, fmt.Errorf("search: semantic mode not available — no real embedding API configured")
+	emb64, err := s.embedC.GenerateEmbedding(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("generate query embedding: %w", err)
+	}
+	emb := make([]float32, len(emb64))
+	for i := range emb64 {
+		emb[i] = float32(emb64[i])
+	}
+	vec := pgvector.NewVector(emb)
+
+	rows, err := s.q.SearchNotesSemantic(ctx, sqlcgen.SearchNotesSemanticParams{
+		UserID:    userID,
+		Embedding: vec,
+		Limit:     limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]SearchResult, len(rows))
+	for i, r := range rows {
+		res[i] = SearchResult{
+			ID:        r.ID,
+			Title:     r.Title.String,
+			Content:   r.Content,
+			Excerpt:   r.Excerpt.String,
+			UpdatedAt: r.UpdatedAt,
+			ContextID: r.ContextID,
+			Favorite:  r.Favorite,
+			Archived:  r.Archived,
+			Score:     r.Score,
+		}
+	}
+	return res, nil
 }
 
 func (s *Service) searchHybrid(ctx context.Context, userID pgtype.UUID, query string, limit int32) ([]SearchResult, error) {
-	return nil, fmt.Errorf("search: hybrid mode not available — no real embedding API configured")
+	emb64, err := s.embedC.GenerateEmbedding(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("generate query embedding: %w", err)
+	}
+	emb := make([]float32, len(emb64))
+	for i := range emb64 {
+		emb[i] = float32(emb64[i])
+	}
+	vec := pgvector.NewVector(emb)
+
+	rows, err := s.q.SearchNotesHybrid(ctx, sqlcgen.SearchNotesHybridParams{
+		UserID:        userID,
+		Query:         query,
+		Limit:         limit,
+		FtsLimit:      limit * 2,
+		Embedding:     vec,
+		SemanticLimit: limit * 2,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]SearchResult, len(rows))
+	for i, r := range rows {
+		res[i] = SearchResult{
+			ID:        r.ID,
+			Title:     r.Title.String,
+			Content:   r.Content,
+			Excerpt:   r.Excerpt.String,
+			UpdatedAt: r.UpdatedAt,
+			ContextID: r.ContextID,
+			Favorite:  r.Favorite,
+			Archived:  r.Archived,
+			Score:     r.Score,
+		}
+	}
+	return res, nil
 }

@@ -24,13 +24,14 @@ func NewAnthropicClient(apiKey string) Client {
 }
 
 type anthropicContentBlock struct {
-	Type      string `json:"type"`
-	Text      string `json:"text,omitempty"`
-	ID        string `json:"id,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Input     any    `json:"input,omitempty"`
-	ToolUseID string `json:"tool_use_id,omitempty"`
-	Content   string `json:"content,omitempty"`
+	Type         string            `json:"type"`
+	Text         string            `json:"text,omitempty"`
+	ID           string            `json:"id,omitempty"`
+	Name         string            `json:"name,omitempty"`
+	Input        any               `json:"input,omitempty"`
+	ToolUseID    string            `json:"tool_use_id,omitempty"`
+	Content      string            `json:"content,omitempty"`
+	CacheControl map[string]string `json:"cache_control,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -45,9 +46,9 @@ type anthropicTool struct {
 }
 
 type anthropicRequest struct {
-	Model       string             `json:"model"`
+	Model       string              `json:"model"`
 	MaxTokens   int                `json:"max_tokens"`
-	System      string             `json:"system,omitempty"`
+	System      []anthropicContentBlock `json:"system,omitempty"`
 	Messages    []anthropicMessage `json:"messages"`
 	Tools       []anthropicTool    `json:"tools,omitempty"`
 	Temperature float32            `json:"temperature"`
@@ -62,8 +63,9 @@ type anthropicResponse struct {
 		Input any    `json:"input"`
 	} `json:"content"`
 	Usage struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
+		InputTokens          int  `json:"input_tokens"`
+		OutputTokens         int  `json:"output_tokens"`
+		CacheReadInputTokens *int `json:"cache_read_input_tokens,omitempty"`
 	} `json:"usage"`
 }
 
@@ -77,10 +79,16 @@ func (c *anthropicClient) Complete(ctx context.Context, req Request) (*Response,
 	}
 
 	payload := anthropicRequest{
-		Model:       "claude-3-5-sonnet-latest",
+		Model:       "claude-sonnet-4-20250514",
 		MaxTokens:   req.MaxTokens,
-		System:      req.System,
 		Temperature: req.Temperature,
+	}
+	if req.System != "" {
+		payload.System = []anthropicContentBlock{{
+			Type:         "text",
+			Text:         req.System,
+			CacheControl: map[string]string{"type": "ephemeral"},
+		}}
 	}
 
 	if payload.MaxTokens == 0 {
@@ -185,10 +193,16 @@ func (c *anthropicClient) Complete(ctx context.Context, req Request) (*Response,
 		}
 	}
 
+	cacheHits := 0
+	if parsed.Usage.CacheReadInputTokens != nil {
+		cacheHits = *parsed.Usage.CacheReadInputTokens
+	}
+
 	return &Response{
 		Content:      content,
 		ToolCalls:    toolCalls,
 		InputTokens:  parsed.Usage.InputTokens,
 		OutputTokens: parsed.Usage.OutputTokens,
+		CacheHits:    cacheHits,
 	}, nil
 }

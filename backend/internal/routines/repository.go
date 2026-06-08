@@ -17,6 +17,7 @@ type Repository interface {
 	GetRoutineLogsByUser(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.RoutineLog, error)
 	CleanupOldMessages(ctx context.Context) error
 	HardDeleteExpired(ctx context.Context) error
+	UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error
 }
 
 type repo struct {
@@ -85,6 +86,12 @@ func (r *repo) GetRoutineLogsByUser(ctx context.Context, userID pgtype.UUID, lim
 		Limit:  limit,
 		Offset: offset,
 	})
+}
+
+// UpdateRoutineLastRunAt updates the last_run_at timestamp.
+// TODO: implement once last_run_at column is added via migration.
+func (r *repo) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error {
+	return nil
 }
 
 func (r *repo) CleanupOldMessages(ctx context.Context) error {
