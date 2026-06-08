@@ -7,7 +7,6 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/login_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
@@ -52,12 +51,6 @@ Widget _wrap(Widget child, {required ProviderContainer container}) {
 }
 
 void main() {
-  setUpAll(() {
-    registerFallbackValue(
-      const AuthAuthenticated(User(id: '', email: '', name: '')),
-    );
-  });
-
   testWidgets('renders the title and both fields', (tester) async {
     final storage = _MockAuthLocalStorage();
     final repository = _MockAuthRepository();
@@ -143,6 +136,12 @@ void main() {
           user: User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
           accessToken: 'a',
           refreshToken: 'r',
+          session: SessionData(
+            settings: {},
+            soul: {},
+            contexts: [],
+            routines: [],
+          ),
         ));
 
     final container = ProviderContainer(
@@ -167,7 +166,7 @@ void main() {
         )).called(1);
     expect(
       container.read(authControllerProvider).requireValue,
-      isA<AuthAuthenticated>(),
+      isNotNull,
     );
   });
 

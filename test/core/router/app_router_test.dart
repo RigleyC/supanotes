@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,7 +6,6 @@ import 'package:supanotes/core/router/app_router.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
@@ -18,27 +15,13 @@ class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
-/// Stub [AuthController] that returns a fixed [AsyncValue] for [build].
-///
-/// The real `AuthController.build()` reads from secure storage and the
-/// repository; for router tests we drive the state machine
-/// deterministically, so we short-circuit [build] to return whatever the
-/// test specifies. For the loading case the future never completes, so
-/// the provider's [AsyncValue] stays in the loading phase for the
-/// duration of the test — which is exactly what we want when checking
-/// the splash is shown.
 class _StubAuthController extends AuthController {
   _StubAuthController(this._stub);
 
-  final AsyncValue<AuthState> _stub;
+  final AsyncValue<User?> _stub;
 
   @override
-  Future<AuthState> build() {
-    if (_stub.isLoading) {
-      return Completer<AuthState>().future;
-    }
-    return Future.value(_stub.value as AuthState);
-  }
+  AsyncValue<User?> build() => _stub;
 }
 
 void _stubEmptySession(_MockAuthLocalStorage storage) {
@@ -50,7 +33,7 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.clear()).thenAnswer((_) async {});
 }
 
-ProviderContainer _makeContainer(AsyncValue<AuthState> stub) {
+ProviderContainer _makeContainer(AsyncValue<User?> stub) {
   final storage = _MockAuthLocalStorage();
   final repository = _MockAuthRepository();
   _stubEmptySession(storage);
@@ -65,9 +48,6 @@ ProviderContainer _makeContainer(AsyncValue<AuthState> stub) {
   return container;
 }
 
-/// Wraps the router inside an [UncontrolledProviderScope] so the routed
-/// ConsumerWidgets ([HomeScreen], [LoginScreen], etc.) can resolve
-/// [authControllerProvider] when they build.
 Widget _wrapRouter(ProviderContainer container) {
   return UncontrolledProviderScope(
     container: container,
@@ -98,7 +78,7 @@ void main() {
   }
 
   testWidgets('starting on / with loading auth renders the splash', (tester) async {
-    const stub = AsyncValue<AuthState>.loading();
+    final stub = AsyncValue<User?>.loading();
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -114,7 +94,7 @@ void main() {
 
   testWidgets('starting on / with unauth auth redirects to /login',
       (tester) async {
-    const stub = AsyncValue<AuthState>.data(AuthUnauthenticated());
+    final stub = AsyncValue<User?>.data(null);
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -128,8 +108,8 @@ void main() {
   });
 
   testWidgets('starting on / with auth redirects to /home', (tester) async {
-    const stub = AsyncValue<AuthState>.data(
-      AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
+    final stub = AsyncValue<User?>.data(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
     final container = _makeContainer(stub);
 
@@ -145,7 +125,7 @@ void main() {
 
   testWidgets('unauthenticated user on /home is redirected to /login',
       (tester) async {
-    const stub = AsyncValue<AuthState>.data(AuthUnauthenticated());
+    final stub = AsyncValue<User?>.data(null);
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -163,7 +143,7 @@ void main() {
 
   testWidgets('unauthenticated user on /register is left at /register',
       (tester) async {
-    const stub = AsyncValue<AuthState>.data(AuthUnauthenticated());
+    final stub = AsyncValue<User?>.data(null);
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -181,8 +161,8 @@ void main() {
 
   testWidgets('authenticated user on /login is redirected to /home',
       (tester) async {
-    const stub = AsyncValue<AuthState>.data(
-      AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
+    final stub = AsyncValue<User?>.data(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
     final container = _makeContainer(stub);
 
@@ -201,8 +181,8 @@ void main() {
 
   testWidgets('authenticated user on /register is redirected to /home',
       (tester) async {
-    const stub = AsyncValue<AuthState>.data(
-      AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
+    final stub = AsyncValue<User?>.data(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
     final container = _makeContainer(stub);
 
@@ -220,8 +200,8 @@ void main() {
   });
 
   testWidgets('authenticated user on /home stays at /home', (tester) async {
-    const stub = AsyncValue<AuthState>.data(
-      AuthAuthenticated(User(id: 'u-1', email: 'a@b.com', name: 'Alice')),
+    final stub = AsyncValue<User?>.data(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
     final container = _makeContainer(stub);
 

@@ -5,7 +5,6 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
@@ -24,46 +23,29 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.clear()).thenAnswer((_) async {});
 }
 
+ProviderContainer makeContainer({
+  required AuthLocalStorage storage,
+  required AuthRepository repository,
+}) {
+  final container = ProviderContainer(
+    overrides: [
+      authLocalStorageProvider.overrideWithValue(storage),
+      authRepositoryProvider.overrideWithValue(repository),
+    ],
+  );
+  addTearDown(container.dispose);
+  return container;
+}
+
+/// Triggers the notifier's build() and flushes the _restore microtask.
+Future<void> waitForBuild(ProviderContainer container) async {
+  container.read(authControllerProvider);
+  await Future(() {});
+}
+
 void main() {
-  setUpAll(() {
-    registerFallbackValue(const AuthAuthenticated(
-      User(id: '', email: '', name: ''),
-    ));
-  });
-
-  ProviderContainer makeContainer({
-    required AuthLocalStorage storage,
-    required AuthRepository repository,
-  }) {
-    final container = ProviderContainer(
-      overrides: [
-        authLocalStorageProvider.overrideWithValue(storage),
-        authRepositoryProvider.overrideWithValue(repository),
-      ],
-    );
-    addTearDown(container.dispose);
-    return container;
-  }
-
-  group('AuthState', () {
-    test('sealed class variants are equal to themselves', () {
-      expect(const AuthUnauthenticated(), const AuthUnauthenticated());
-      expect(
-        const AuthAuthenticated(User(id: 'u', email: 'e', name: 'n')),
-        const AuthAuthenticated(User(id: 'u', email: 'e', name: 'n')),
-      );
-    });
-
-    test('two AuthAuthenticated with different fields are not equal', () {
-      const a = AuthAuthenticated(User(id: '1', email: 'a', name: 'A'));
-      const b = AuthAuthenticated(User(id: '2', email: 'b', name: 'B'));
-      expect(a == b, isFalse);
-    });
-  });
-
   group('AuthController.build', () {
-    test('returns AuthUnauthenticated when no access token is stored',
-        () async {
+    test('sets null when no access token is stored', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => null);
@@ -76,11 +58,12 @@ void main() {
         storage: storage,
         repository: repository,
       );
-      final state = await container.read(authControllerProvider.future);
-      expect(state, isA<AuthUnauthenticated>());
+      await waitForBuild(container);
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isNull);
     });
 
-    test('returns AuthUnauthenticated when the token is empty', () async {
+    test('sets null when the token is empty', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => '');
@@ -92,11 +75,12 @@ void main() {
         storage: storage,
         repository: repository,
       );
-      final state = await container.read(authControllerProvider.future);
-      expect(state, isA<AuthUnauthenticated>());
+      await waitForBuild(container);
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isNull);
     });
 
-    test('returns AuthAuthenticated when full session is on disk', () async {
+    test('sets User when full session is on disk', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
@@ -108,15 +92,15 @@ void main() {
         storage: storage,
         repository: repository,
       );
-      final state = await container.read(authControllerProvider.future);
-      expect(state, isA<AuthAuthenticated>());
-      expect((state as AuthAuthenticated).user.id, 'u-1');
-      expect(state.user.email, 'a@b');
-      expect(state.user.name, 'Alice');
+      await waitForBuild(container);
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isA<User>());
+      expect(user!.id, 'u-1');
+      expect(user.email, 'a@b');
+      expect(user.name, 'Alice');
     });
 
-    test('wipes storage and returns Unauthenticated on partial session',
-        () async {
+    test('wipes storage and sets null on partial session', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
@@ -129,15 +113,15 @@ void main() {
         storage: storage,
         repository: repository,
       );
-      final state = await container.read(authControllerProvider.future);
-      expect(state, isA<AuthUnauthenticated>());
+      await waitForBuild(container);
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isNull);
       verify(() => storage.clear()).called(1);
     });
   });
 
   group('AuthController.login', () {
-    test('on success, emits AuthAuthenticated with the user fields',
-        () async {
+    test('on success, sets User with the returned data', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
@@ -148,26 +132,30 @@ void main() {
             user: User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
             accessToken: 'a',
             refreshToken: 'r',
+            session: SessionData(
+              settings: {},
+              soul: {},
+              contexts: [],
+              routines: [],
+            ),
           ));
 
       final container = makeContainer(
         storage: storage,
         repository: repository,
       );
-      // First read to build the notifier.
-      await container.read(authControllerProvider.future);
+      await waitForBuild(container);
 
       final result = await container
           .read(authControllerProvider.notifier)
           .login(email: 'a@b.com', password: 'hunter2hunter2');
 
       expect(result.user.id, 'u-1');
-      final state = container.read(authControllerProvider).requireValue;
-      expect(state, isA<AuthAuthenticated>());
-      final auth = state as AuthAuthenticated;
-      expect(auth.user.id, 'u-1');
-      expect(auth.user.email, 'a@b.com');
-      expect(auth.user.name, 'Alice');
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isA<User>());
+      expect(user!.id, 'u-1');
+      expect(user.email, 'a@b.com');
+      expect(user.name, 'Alice');
     });
 
     test('on failure, rethrows and stores the error in state', () async {
@@ -185,7 +173,7 @@ void main() {
         storage: storage,
         repository: repository,
       );
-      await container.read(authControllerProvider.future);
+      await waitForBuild(container);
 
       await expectLater(
         () => container
@@ -201,7 +189,7 @@ void main() {
   });
 
   group('AuthController.register', () {
-    test('on success, emits AuthAuthenticated', () async {
+    test('on success, sets User with the returned data', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
@@ -213,13 +201,19 @@ void main() {
             user: User(id: 'u-2', email: 'b@c.com', name: 'Bob'),
             accessToken: 'a',
             refreshToken: 'r',
+            session: SessionData(
+              settings: {},
+              soul: {},
+              contexts: [],
+              routines: [],
+            ),
           ));
 
       final container = makeContainer(
         storage: storage,
         repository: repository,
       );
-      await container.read(authControllerProvider.future);
+      await waitForBuild(container);
 
       await container.read(authControllerProvider.notifier).register(
             email: 'b@c.com',
@@ -227,14 +221,14 @@ void main() {
             name: 'Bob',
           );
 
-      final state = container.read(authControllerProvider).requireValue;
-      expect(state, isA<AuthAuthenticated>());
-      expect((state as AuthAuthenticated).user.id, 'u-2');
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isA<User>());
+      expect(user!.id, 'u-2');
     });
   });
 
   group('AuthController.logout', () {
-    test('on success, emits AuthUnauthenticated', () async {
+    test('on success, sets null', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
@@ -244,15 +238,15 @@ void main() {
         storage: storage,
         repository: repository,
       );
-      await container.read(authControllerProvider.future);
+      await waitForBuild(container);
 
       await container.read(authControllerProvider.notifier).logout();
-      final state = container.read(authControllerProvider).requireValue;
-      expect(state, isA<AuthUnauthenticated>());
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isNull);
       verify(() => repository.logout()).called(1);
     });
 
-    test('on ApiException, still ends in AuthUnauthenticated', () async {
+    test('on ApiException, still sets null', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
@@ -264,16 +258,16 @@ void main() {
         storage: storage,
         repository: repository,
       );
-      await container.read(authControllerProvider.future);
+      await waitForBuild(container);
 
       await container.read(authControllerProvider.notifier).logout();
-      final state = container.read(authControllerProvider).requireValue;
-      expect(state, isA<AuthUnauthenticated>());
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isNull);
     });
   });
 
   group('AuthController.onSessionExpired', () {
-    test('clears storage and emits AuthUnauthenticated', () async {
+    test('clears storage and sets null', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
@@ -283,13 +277,13 @@ void main() {
         storage: storage,
         repository: repository,
       );
-      await container.read(authControllerProvider.future);
+      await waitForBuild(container);
 
       await container
           .read(authControllerProvider.notifier)
           .onSessionExpired();
-      final state = container.read(authControllerProvider).requireValue;
-      expect(state, isA<AuthUnauthenticated>());
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, isNull);
       verify(() => storage.clear()).called(1);
     });
   });

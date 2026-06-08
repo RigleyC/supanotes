@@ -7,7 +7,6 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/auth/domain/auth_state.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
@@ -52,12 +51,6 @@ Widget _wrap(Widget child, {required ProviderContainer container}) {
 }
 
 void main() {
-  setUpAll(() {
-    registerFallbackValue(
-      const AuthAuthenticated(User(id: '', email: '', name: '')),
-    );
-  });
-
   testWidgets('renders all four fields and the create button', (tester) async {
     final storage = _MockAuthLocalStorage();
     final repository = _MockAuthRepository();
@@ -171,10 +164,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('email already in use'), findsOneWidget);
-    expect(
-      container.read(authControllerProvider).requireValue,
-      isA<AuthUnauthenticated>(),
-    );
+    final user = container.read(authControllerProvider).requireValue;
+    expect(user, isNull);
   });
 
   testWidgets(
@@ -191,6 +182,12 @@ void main() {
           user: User(id: 'u-2', email: 'a@b.com', name: 'Alice'),
           accessToken: 'a',
           refreshToken: 'r',
+          session: SessionData(
+            settings: {},
+            soul: {},
+            contexts: [],
+            routines: [],
+          ),
         ));
 
     final container = ProviderContainer(
@@ -217,9 +214,7 @@ void main() {
           password: 'hunter2hunter2',
           name: 'Alice',
         )).called(1);
-    expect(
-      container.read(authControllerProvider).requireValue,
-      isA<AuthAuthenticated>(),
-    );
+    final user = container.read(authControllerProvider).requireValue;
+    expect(user, isNotNull);
   });
 }

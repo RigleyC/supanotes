@@ -101,6 +101,10 @@ class _NoopStorage implements AuthLocalStorage {
     required String email,
     required String name,
   }) async {}
+  @override
+  Future<Map<String, dynamic>> getSessionData() async => const {};
+  @override
+  Future<void> saveSessionData(Map<String, dynamic> data) async {}
 }
 
 void main() {
