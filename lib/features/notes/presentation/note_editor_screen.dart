@@ -136,29 +136,26 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               icon: Icon(
                 note?.favorite == true ? Icons.star : Icons.star_border,
               ),
-              tooltip:
-                  note?.favorite == true ? 'Desfavoritar' : 'Favoritar',
-              onPressed: () =>
-                  ref.read(noteEditorControllerProvider.notifier).toggleFavorite(widget.noteId),
+              tooltip: note?.favorite == true ? 'Desfavoritar' : 'Favoritar',
+              onPressed: () => ref
+                  .read(noteEditorControllerProvider.notifier)
+                  .toggleFavorite(widget.noteId),
             ),
           ],
         ),
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: SuperEditor(
-                  editor: _editor!,
-                  focusNode: _editorFocusNode,
-                  stylesheet: defaultStylesheet.copyWith(
-                    documentPadding: const EdgeInsets.all(AppSpacing.md),
-                  ),
+        Column(
+          children: [
+            Expanded(
+              child: SuperEditor(
+                editor: _editor!,
+                focusNode: _editorFocusNode,
+                stylesheet: defaultStylesheet.copyWith(
+                  documentPadding: const EdgeInsets.all(AppSpacing.md),
                 ),
               ),
-              NoteToolbar(editor: _editor!, composer: _composer!),
-            ],
-          ),
+            ),
+            NoteToolbar(editor: _editor!, composer: _composer!),
+          ],
         ),
       ]),
     );

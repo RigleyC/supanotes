@@ -1,0 +1,3 @@
+# Tasks as Database Entities
+
+Tasks (including repeating tasks) are first-class entities stored in the database, not lines parsed from Markdown. Every task belongs to exactly one note. The editor renders tasks as interactive checkbox widgets inline; the Markdown text is produced as output from the entity state, not consumed as input. This replaces the previous model where checklist items lived as `- [ ]` lines in Markdown and habits were a separate disconnected concept. The unified model enables due dates, recurrence intervals (daily, weekdays, weekly, monthly), and completion history — all queryable without regex parsing.
