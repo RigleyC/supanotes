@@ -40,11 +40,20 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   TextEditingController? _titleController;
   Timer? _saveDebounce;
   Timer? _titleDebounce;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    ref.invalidate(noteProvider(widget.noteId));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      ref.invalidate(noteProvider(widget.noteId));
+    }
   }
 
   @override
@@ -182,22 +191,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             ),
           ],
         ),
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: SuperEditor(
-                  editor: _editor!,
-                  focusNode: _editorFocusNode,
-                  stylesheet: defaultStylesheet.copyWith(
-                    documentPadding: const EdgeInsets.all(AppSpacing.md),
-                  ),
-                ),
-              ),
-              NoteToolbar(editor: _editor!, composer: _composer!),
-            ],
+        SuperEditor(
+          editor: _editor!,
+          focusNode: _editorFocusNode,
+          stylesheet: defaultStylesheet.copyWith(
+            documentPadding: const EdgeInsets.all(AppSpacing.md),
           ),
+        ),
+        SliverToBoxAdapter(
+          child: NoteToolbar(editor: _editor!, composer: _composer!),
         ),
       ]),
     );

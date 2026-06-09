@@ -47,7 +47,8 @@ func (h *Handler) Pull(c echo.Context) error {
 
 	payload, err := h.service.Pull(c.Request().Context(), userID, lastSyncedAt, req.Limit)
 	if err != nil {
-		return web.JSONError(c, http.StatusInternalServerError, "sync failed")
+		c.Logger().Errorf("sync.Pull failed: %v", err)
+		return web.JSONError(c, http.StatusInternalServerError, "sync failed: "+err.Error())
 	}
 
 	return c.JSON(http.StatusOK, payload)

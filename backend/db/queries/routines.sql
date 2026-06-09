@@ -1,6 +1,6 @@
 -- name: CreateRoutine :one
-INSERT INTO routines (user_id, type, cron_expr, enabled)
-VALUES ($1, $2, $3, $4)
+INSERT INTO routines (user_id, type, cron_expr, enabled, name, brief_type)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: UpdateRoutine :one

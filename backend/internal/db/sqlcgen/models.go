@@ -66,7 +66,7 @@ type Note struct {
 	IsInbox         bool               `json:"is_inbox"`
 	Favorite        bool               `json:"favorite"`
 	Archived        bool               `json:"archived"`
-	SearchVector    interface{}        `json:"search_vector"`
+	SearchVector    []byte             `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
@@ -108,6 +108,9 @@ type Routine struct {
 	Enabled   bool               `json:"enabled"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	Name      string             `json:"name"`
+	LastRunAt pgtype.Timestamptz `json:"last_run_at"`
+	BriefType string             `json:"brief_type"`
 }
 
 type RoutineLog struct {

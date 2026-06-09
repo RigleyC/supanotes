@@ -332,19 +332,23 @@ Nos briefs diários/semanais:
 	}
 
 	if _, err := q.CreateRoutine(ctx, sqlcgen.CreateRoutineParams{
-		UserID:   userID,
-		Type:     "daily",
-		CronExpr: "0 8 * * 1-5",
-		Enabled:  true,
+		UserID:    userID,
+		Type:      "daily",
+		CronExpr:  "0 8 * * 1-5",
+		Enabled:   true,
+		Name:      "Daily Brief",
+		BriefType: "daily",
 	}); err != nil {
 		return fmt.Errorf("auth: seed daily routine: %w", err)
 	}
 
 	if _, err := q.CreateRoutine(ctx, sqlcgen.CreateRoutineParams{
-		UserID:   userID,
-		Type:     "weekly",
-		CronExpr: "0 9 * * 1",
-		Enabled:  true,
+		UserID:    userID,
+		Type:      "weekly",
+		CronExpr:  "0 9 * * 1",
+		Enabled:   true,
+		Name:      "Weekly Brief",
+		BriefType: "weekly",
 	}); err != nil {
 		return fmt.Errorf("auth: seed weekly routine: %w", err)
 	}

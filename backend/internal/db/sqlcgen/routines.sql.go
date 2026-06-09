@@ -22,16 +22,18 @@ func (q *Queries) CleanupOldMessages(ctx context.Context) error {
 }
 
 const createRoutine = `-- name: CreateRoutine :one
-INSERT INTO routines (user_id, type, cron_expr, enabled)
-VALUES ($1, $2, $3, $4)
-RETURNING id, user_id, type, cron_expr, enabled, created_at, updated_at
+INSERT INTO routines (user_id, type, cron_expr, enabled, name, brief_type)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type
 `
 
 type CreateRoutineParams struct {
-	UserID   pgtype.UUID `json:"user_id"`
-	Type     string      `json:"type"`
-	CronExpr string      `json:"cron_expr"`
-	Enabled  bool        `json:"enabled"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Type      string      `json:"type"`
+	CronExpr  string      `json:"cron_expr"`
+	Enabled   bool        `json:"enabled"`
+	Name      string      `json:"name"`
+	BriefType string      `json:"brief_type"`
 }
 
 func (q *Queries) CreateRoutine(ctx context.Context, arg CreateRoutineParams) (Routine, error) {
@@ -40,6 +42,8 @@ func (q *Queries) CreateRoutine(ctx context.Context, arg CreateRoutineParams) (R
 		arg.Type,
 		arg.CronExpr,
 		arg.Enabled,
+		arg.Name,
+		arg.BriefType,
 	)
 	var i Routine
 	err := row.Scan(
@@ -50,6 +54,9 @@ func (q *Queries) CreateRoutine(ctx context.Context, arg CreateRoutineParams) (R
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Name,
+		&i.LastRunAt,
+		&i.BriefType,
 	)
 	return i, err
 }
@@ -174,7 +181,7 @@ func (q *Queries) GetRoutineLogsByUser(ctx context.Context, arg GetRoutineLogsBy
 }
 
 const getRoutinesByUser = `-- name: GetRoutinesByUser :many
-SELECT id, user_id, type, cron_expr, enabled, created_at, updated_at FROM routines
+SELECT id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type FROM routines
 WHERE user_id = $1
 ORDER BY created_at ASC
 `
@@ -196,6 +203,9 @@ func (q *Queries) GetRoutinesByUser(ctx context.Context, userID pgtype.UUID) ([]
 			&i.Enabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Name,
+			&i.LastRunAt,
+			&i.BriefType,
 		); err != nil {
 			return nil, err
 		}
@@ -213,7 +223,7 @@ SET cron_expr = COALESCE($3, cron_expr),
     enabled = COALESCE($4, enabled),
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, type, cron_expr, enabled, created_at, updated_at
+RETURNING id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type
 `
 
 type UpdateRoutineParams struct {
@@ -239,6 +249,9 @@ func (q *Queries) UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (R
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Name,
+		&i.LastRunAt,
+		&i.BriefType,
 	)
 	return i, err
 }
