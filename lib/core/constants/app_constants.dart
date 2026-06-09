@@ -9,7 +9,7 @@ class AppConstants {
 
   /// Debounce window after the last editor change before triggering an
   /// auto-save to local Drift storage.
-  static const int autoSaveDebounceMs = 2000;
+  static const int autoSaveDebounceMs = 500;
 
   /// Inactivity window after which the agent chat session is rotated.
   static const int sessionTimeoutMinutes = 30;

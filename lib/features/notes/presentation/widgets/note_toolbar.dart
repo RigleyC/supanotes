@@ -5,6 +5,10 @@
 /// directly. The active state (bold/italic/highlights) is reflected
 /// back by re-reading the composer's selection on every rebuild and
 /// checking what attributions are present at the caret / selection.
+///
+/// The toolbar rebuilds itself independently by listening to
+/// [MutableDocumentComposer.selectionNotifier], so the parent widget
+/// does not need to call `setState` whenever the selection changes.
 library;
 
 import 'package:flutter/material.dart';
@@ -25,11 +29,150 @@ class NoteToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final activeNodeId = _activeNodeId();
-    final blockType = _activeBlockType(activeNodeId);
+    return ValueListenableBuilder<DocumentSelection?>(
+      valueListenable: composer.selectionNotifier,
+      builder: (context, selection, child) {
+        final activeNodeId = _activeNodeId(selection);
+        final blockType = _activeBlockType(activeNodeId);
+        return _ToolbarContainer(
+          isBold: _selectionHasAttribution(selection, boldAttribution),
+          isItalic: _selectionHasAttribution(selection, italicsAttribution),
+          blockType: blockType,
+          onToggleBold: () => _toggleInline(boldAttribution),
+          onToggleItalic: () => _toggleInline(italicsAttribution),
+          onSetH1: () => _setBlockType(header1Attribution),
+          onSetH2: () => _setBlockType(header2Attribution),
+          onSetH3: () => _setBlockType(header3Attribution),
+          onConvertToUnorderedList: () => _convertToListItem(ListItemType.unordered),
+          onConvertToOrderedList: () => _convertToListItem(ListItemType.ordered),
+          onConvertToTask: _convertToTask,
+          onConvertToQuote: () => _setBlockType(blockquoteAttribution),
+        );
+      },
+    );
+  }
 
+  String? _activeNodeId(DocumentSelection? selection) {
+    if (selection == null) return null;
+    if (selection.isCollapsed) return selection.extent.nodeId;
+    return selection.start.nodeId;
+  }
+
+  Attribution? _activeBlockType(String? nodeId) {
+    if (nodeId == null) return null;
+    final node = editor.context.document.getNodeById(nodeId);
+    if (node is ParagraphNode) {
+      return node.getMetadataValue('blockType') as Attribution?;
+    }
+    if (node is ListItemNode) {
+      return listItemAttribution;
+    }
+    return null;
+  }
+
+  bool _selectionHasAttribution(DocumentSelection? selection, Attribution attribution) {
+    if (selection == null) return false;
+    final nodes = editor.context.document
+        .getNodesInside(selection.start, selection.end)
+        .whereType<TextNode>();
+    for (final node in nodes) {
+      final start = (selection.start.nodeId == node.id)
+          ? (selection.start.nodePosition as TextPosition).offset
+          : 0;
+      final end = (selection.end.nodeId == node.id)
+          ? (selection.end.nodePosition as TextPosition).offset
+          : node.text.length;
+      if (start >= end) continue;
+      if (node.text.getAttributionSpansInRange(
+            attributionFilter: (a) => a == attribution,
+            range: SpanRange(start, end),
+          ).isNotEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _toggleInline(Attribution attribution) {
+    final selection = composer.selection;
+    if (selection == null) return;
+    final range = selection.isCollapsed
+        ? DocumentRange(start: selection.extent, end: selection.extent)
+        : selection;
+    editor.execute([
+      ToggleTextAttributionsRequest(
+        documentRange: range,
+        attributions: {attribution},
+      ),
+    ]);
+  }
+
+  void _setBlockType(Attribution? blockType) {
+    final nodeId = _activeNodeId(composer.selection);
+    if (nodeId == null) return;
+    final node = editor.context.document.getNodeById(nodeId);
+    if (node is! ParagraphNode) return;
+    editor.execute([
+      ChangeParagraphBlockTypeRequest(nodeId: nodeId, blockType: blockType),
+    ]);
+  }
+
+  void _convertToListItem(ListItemType type) {
+    final nodeId = _activeNodeId(composer.selection);
+    if (nodeId == null) return;
+    final node = editor.context.document.getNodeById(nodeId);
+    if (node is ListItemNode) {
+      editor.execute([ChangeListItemTypeRequest(nodeId: nodeId, newType: type)]);
+      return;
+    }
+    if (node is! ParagraphNode) return;
+    editor.execute([ConvertParagraphToListItemRequest(nodeId: nodeId, type: type)]);
+  }
+
+  void _convertToTask() {
+    final nodeId = _activeNodeId(composer.selection);
+    if (nodeId == null) return;
+    final node = editor.context.document.getNodeById(nodeId);
+    if (node is! ParagraphNode) return;
+    editor.execute([ConvertParagraphToTaskRequest(nodeId: nodeId)]);
+  }
+}
+
+/// Pure presentational widget — receives only the resolved state and
+/// callbacks. Decoupling it from the [NoteToolbar] shell allows it to
+/// be rebuilt in isolation by [ValueListenableBuilder].
+class _ToolbarContainer extends StatelessWidget {
+  const _ToolbarContainer({
+    required this.isBold,
+    required this.isItalic,
+    required this.blockType,
+    required this.onToggleBold,
+    required this.onToggleItalic,
+    required this.onSetH1,
+    required this.onSetH2,
+    required this.onSetH3,
+    required this.onConvertToUnorderedList,
+    required this.onConvertToOrderedList,
+    required this.onConvertToTask,
+    required this.onConvertToQuote,
+  });
+
+  final bool isBold;
+  final bool isItalic;
+  final Attribution? blockType;
+  final VoidCallback onToggleBold;
+  final VoidCallback onToggleItalic;
+  final VoidCallback onSetH1;
+  final VoidCallback onSetH2;
+  final VoidCallback onSetH3;
+  final VoidCallback onConvertToUnorderedList;
+  final VoidCallback onConvertToOrderedList;
+  final VoidCallback onConvertToTask;
+  final VoidCallback onConvertToQuote;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -58,161 +201,60 @@ class NoteToolbar extends StatelessWidget {
             _ToolbarButton(
               icon: Icons.format_bold,
               tooltip: 'Negrito',
-              isActive: _selectionHasAttribution(boldAttribution),
-              onPressed: () => _toggleInline(boldAttribution),
+              isActive: isBold,
+              onPressed: onToggleBold,
             ),
             _ToolbarButton(
               icon: Icons.format_italic,
               tooltip: 'Itálico',
-              isActive: _selectionHasAttribution(italicsAttribution),
-              onPressed: () => _toggleInline(italicsAttribution),
+              isActive: isItalic,
+              onPressed: onToggleItalic,
             ),
             const _ToolbarDivider(),
             _LabeledToolbarButton(
               label: 'H1',
               isActive: blockType == header1Attribution,
-              onPressed: () => _setBlockType(header1Attribution),
+              onPressed: onSetH1,
             ),
             _LabeledToolbarButton(
               label: 'H2',
               isActive: blockType == header2Attribution,
-              onPressed: () => _setBlockType(header2Attribution),
+              onPressed: onSetH2,
             ),
             _LabeledToolbarButton(
               label: 'H3',
               isActive: blockType == header3Attribution,
-              onPressed: () => _setBlockType(header3Attribution),
+              onPressed: onSetH3,
             ),
             const _ToolbarDivider(),
             _ToolbarButton(
               icon: Icons.format_list_bulleted,
               tooltip: 'Lista',
               isActive: blockType == listItemAttribution,
-              onPressed: () => _convertToListItem(ListItemType.unordered),
+              onPressed: onConvertToUnorderedList,
             ),
             _ToolbarButton(
               icon: Icons.format_list_numbered,
               tooltip: 'Lista numerada',
               isActive: false,
-              onPressed: () => _convertToListItem(ListItemType.ordered),
+              onPressed: onConvertToOrderedList,
             ),
             _ToolbarButton(
               icon: Icons.check_box_outlined,
               tooltip: 'Tarefa',
               isActive: false,
-              onPressed: _convertToTask,
+              onPressed: onConvertToTask,
             ),
             _ToolbarButton(
               icon: Icons.format_quote,
               tooltip: 'Citação',
               isActive: blockType == blockquoteAttribution,
-              onPressed: () => _setBlockType(blockquoteAttribution),
+              onPressed: onConvertToQuote,
             ),
           ],
         ),
       ),
     );
-  }
-
-  String? _activeNodeId() {
-    final selection = composer.selection;
-    if (selection == null) return null;
-    if (selection.isCollapsed) {
-      return selection.extent.nodeId;
-    }
-    return selection.start.nodeId;
-  }
-
-  Attribution? _activeBlockType(String? nodeId) {
-    if (nodeId == null) return null;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is ParagraphNode) {
-      return node.getMetadataValue('blockType') as Attribution?;
-    }
-    if (node is ListItemNode) {
-      return listItemAttribution;
-    }
-    return null;
-  }
-
-  bool _selectionHasAttribution(Attribution attribution) {
-    final selection = composer.selection;
-    if (selection == null) return false;
-    final nodes = editor.context.document
-        .getNodesInside(selection.start, selection.end)
-        .whereType<TextNode>();
-    for (final node in nodes) {
-      final start = (selection.start.nodeId == node.id)
-          ? (selection.start.nodePosition as TextPosition).offset
-          : 0;
-      final end = (selection.end.nodeId == node.id)
-          ? (selection.end.nodePosition as TextPosition).offset
-          : node.text.length;
-      if (start >= end) continue;
-      if (node.text.getAttributionSpansInRange(
-            attributionFilter: (a) => a == attribution,
-            range: SpanRange(start, end),
-          ).isNotEmpty) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  void _toggleInline(Attribution attribution) {
-    final selection = composer.selection;
-    if (selection == null) return;
-    final range = selection.isCollapsed
-        ? DocumentRange(
-            start: selection.extent,
-            end: selection.extent,
-          )
-        : selection;
-    editor.execute([
-      ToggleTextAttributionsRequest(
-        documentRange: range,
-        attributions: {attribution},
-      ),
-    ]);
-  }
-
-  void _setBlockType(Attribution? blockType) {
-    final nodeId = _activeNodeId();
-    if (nodeId == null) return;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is! ParagraphNode) return;
-    editor.execute([
-      ChangeParagraphBlockTypeRequest(
-        nodeId: nodeId,
-        blockType: blockType,
-      ),
-    ]);
-  }
-
-  void _convertToListItem(ListItemType type) {
-    final nodeId = _activeNodeId();
-    if (nodeId == null) return;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is ListItemNode) {
-      editor.execute([
-        ChangeListItemTypeRequest(nodeId: nodeId, newType: type),
-      ]);
-      return;
-    }
-    if (node is! ParagraphNode) return;
-    editor.execute([
-      ConvertParagraphToListItemRequest(nodeId: nodeId, type: type),
-    ]);
-  }
-
-  void _convertToTask() {
-    final nodeId = _activeNodeId();
-    if (nodeId == null) return;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is! ParagraphNode) return;
-    editor.execute([
-      ConvertParagraphToTaskRequest(nodeId: nodeId),
-    ]);
   }
 }
 

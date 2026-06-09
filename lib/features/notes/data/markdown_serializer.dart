@@ -151,13 +151,22 @@ MutableDocument parseMarkdownToDocument(String markdown) {
     ));
   }
 
+  // UX: sempre termina com um parágrafo vazio para que o usuário
+  // consiga colocar o cursor após a última task/lista e continuar
+  // digitando normalmente.
+  if (nodes.last is! ParagraphNode) {
+    nodes.add(ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(''),
+    ));
+  }
+
   return MutableDocument(nodes: nodes);
 }
 
 /// Serializes a [MutableDocument] tree back to its markdown string form.
 String serializeDocumentToMarkdown(MutableDocument doc) {
   final buffer = StringBuffer();
-
   for (final node in doc) {
     if (node is TaskNode) {
       final marker = node.isComplete ? 'x' : ' ';
@@ -196,7 +205,8 @@ String serializeDocumentToMarkdown(MutableDocument doc) {
   }
 
   // Trim trailing newlines so callers can store the result directly.
-  return buffer.toString().trimRight();
+  final result = buffer.toString().trimRight();
+  return result;
 }
 
 /// Applies the supported inline formatting (`**bold**`, `*italic*`) to

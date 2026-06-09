@@ -102,10 +102,33 @@ func (h *Handler) TestWeekly(c echo.Context) error {
 	return h.testRoutine(c, "weekly")
 }
 
+func (h *Handler) GetLatestBrief(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	briefType := c.Param("type")
+	if briefType != "daily" && briefType != "weekly" {
+		return web.JSONError(c, http.StatusBadRequest, "invalid brief type, must be 'daily' or 'weekly'")
+	}
+
+	content, err := h.svc.GetLatestBrief(c.Request().Context(), userID, briefType)
+	if err != nil {
+		if err == ErrBriefNotFound {
+			return web.JSONError(c, http.StatusNotFound, "no brief available yet")
+		}
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to get latest brief")
+	}
+	return c.JSON(http.StatusOK, TestRoutineResponse{Content: content})
+}
+
 func RegisterRoutes(api *echo.Group, h *Handler) {
 	r := api.Group("/routines")
 	r.GET("", h.List)
 	r.GET("/logs", h.Logs)
+	r.GET("/brief/:type", h.GetLatestBrief)
 	r.PATCH("/:id", h.Update)
 	r.POST("/daily/test", h.TestDaily)
 	r.POST("/weekly/test", h.TestWeekly)

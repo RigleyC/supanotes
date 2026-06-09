@@ -1,39 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/app_status_chip.dart';
-import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../domain/note_model.dart';
 
-/// Card representation of a single [NoteModel] in the notes list.
-///
-/// Stateless layout: title (bold, single line) + excerpt (2 lines,
-/// muted) + footer (favorite star, context chip, relative timestamp).
-/// Swipe-to-delete and long-press are wired in the parent list so the
-/// `Dismissible` and `showModalBottomSheet` plumbing does not pollute
-/// the row itself.
 class NoteCard extends StatelessWidget {
   const NoteCard({
     super.key,
     required this.note,
     required this.onTap,
-    required this.onDelete,
-    required this.onToggleFavorite,
   });
 
   final NoteModel note;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
-  final VoidCallback onToggleFavorite;
 
   static const _fallbackTitle = 'Sem título';
 
-  /// Hero tag used to animate the note title from the list into the
-  /// editor's AppBar. Exposed as a public function so the editor screen
-  /// can build the matching tag without having to depend on [NoteCard].
   static String titleHeroTag(String noteId) => 'note-title-$noteId';
 
   String? _resolveExcerpt(NoteModel note) {
@@ -57,7 +40,6 @@ class NoteCard extends StatelessWidget {
 
     return AppCard(
       onTap: onTap,
-      onLongPress: () => _showActions(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -102,121 +84,8 @@ class NoteCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const SizedBox(height: AppSpacing.sm),
-          _Footer(note: note),
         ],
       ),
-    );
-  }
-
-  void _showActions(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(
-                  note.favorite ? Icons.star_border : Icons.star,
-                ),
-                title: Text(
-                  note.favorite ? 'Desfavoritar' : 'Favoritar',
-                ),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  onToggleFavorite();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Apagar'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  onDelete();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _Footer extends StatelessWidget {
-  const _Footer({required this.note});
-
-  final NoteModel note;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final muted = textTheme.bodySmall?.copyWith(
-      color: scheme.onSurfaceVariant,
-    );
-
-    return Row(
-      children: [
-        if (note.contextId != null) ...[
-          AppStatusChip(label: note.contextId!),
-          const SizedBox(width: AppSpacing.sm),
-        ],
-        const Spacer(),
-        Text(timeago.format(note.updatedAt, locale: 'pt_BR'), style: muted),
-      ],
-    );
-  }
-}
-
-/// Wraps [child] in a [Dismissible] configured for swipe-to-delete with
-/// a confirm dialog. Lives next to [NoteCard] so the list builder can
-/// call it as `DismissibleDeleteWrapper(noteId: ..., child: NoteCard(...))`.
-class DismissibleDeleteWrapper extends StatelessWidget {
-  const DismissibleDeleteWrapper({
-    super.key,
-    required this.noteId,
-    required this.child,
-    required this.onDelete,
-  });
-
-  final String noteId;
-  final Widget child;
-  final Future<bool> Function() onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Dismissible(
-      key: ValueKey('delete-$noteId'),
-      direction: DismissDirection.endToStart,
-      background: const SizedBox.shrink(),
-      secondaryBackground: Container(
-        alignment: Alignment.centerRight,
-        color: Theme.of(context).colorScheme.errorContainer,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-        child: Icon(
-          Icons.delete_outline,
-          color: Theme.of(context).colorScheme.onErrorContainer,
-        ),
-      ),
-      confirmDismiss: (_) async {
-        final confirmed = await showConfirmDialog(
-          context: context,
-          title: 'Apagar nota?',
-          message: 'Esta ação pode ser revertida na sincronização.',
-          confirmLabel: 'Apagar',
-          destructive: true,
-        );
-        if (confirmed) {
-          await onDelete();
-          return true;
-        }
-        return false;
-      },
-      child: child,
     );
   }
 }

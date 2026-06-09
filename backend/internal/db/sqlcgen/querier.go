@@ -35,6 +35,7 @@ type Querier interface {
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	GetContexts(ctx context.Context, userID pgtype.UUID) ([]Context, error)
 	GetEnabledRoutines(ctx context.Context) ([]GetEnabledRoutinesRow, error)
+	GetLatestBriefByType(ctx context.Context, arg GetLatestBriefByTypeParams) (RoutineLog, error)
 	GetInboxNote(ctx context.Context, userID pgtype.UUID) (Note, error)
 	GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) ([]Note, error)
 	GetMemories(ctx context.Context, arg GetMemoriesParams) ([]Memory, error)

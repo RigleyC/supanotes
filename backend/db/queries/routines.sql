@@ -33,6 +33,13 @@ WHERE user_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3;
 
+-- name: GetLatestBriefByType :one
+SELECT rl.* FROM routine_logs rl
+JOIN routines r ON rl.routine_id = r.id
+WHERE rl.user_id = $1 AND r.type = $2 AND rl.status = 'success'
+ORDER BY rl.created_at DESC
+LIMIT 1;
+
 -- name: CleanupOldMessages :exec
 DELETE FROM messages
 WHERE created_at < NOW() - INTERVAL '90 days';

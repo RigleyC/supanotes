@@ -68,6 +68,8 @@ _Avoid_: Bot token, Telegram account as user record
 
 ## Flagged ambiguities
 
+- **"save" versus "sync"**: A **save** is a local persistence operation (Drift). A **sync** is a network push/pull operation. The user should never perceive either; the UI reflects the local database immediately. The network is an implementation detail.
+- **"flush"**: A **flush** is an immediate, synchronous-or-near-synchronous **save** that bypasses the debounce. Used when the user leaves the editing surface so that no in-flight edits are lost.
 - "task" was being used to mean both a standalone entity and a checklist line inside a **Note**; resolved: a **Task** is now a first-class entity in the database, always owned by a **Note**. The database is the source of truth for task state, not the Markdown text.
 - "habit" was a separate concept with its own tables and API; resolved: habits are now modeled as **Repeating Tasks** — a **Task** with a recurrence interval. The `habits` and `habit_logs` tables are removed.
 - "checklist item" was compared to **Attachment**; resolved: a **Task** is a database entity rendered as a widget in the editor, while an **Attachment** is a separate associated asset.

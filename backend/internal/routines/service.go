@@ -12,6 +12,7 @@ import (
 
 var (
 	ErrRoutineNotFound = errors.New("routine not found")
+	ErrBriefNotFound   = errors.New("no brief available")
 )
 
 type ContextBuilder interface {
@@ -47,6 +48,17 @@ func (s *Service) UpdateRoutine(ctx context.Context, id, userID pgtype.UUID, cro
 
 func (s *Service) GetRoutineLogs(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.RoutineLog, error) {
 	return s.repo.GetRoutineLogsByUser(ctx, userID, limit, offset)
+}
+
+func (s *Service) GetLatestBrief(ctx context.Context, userID pgtype.UUID, briefType string) (string, error) {
+	log, err := s.repo.GetLatestBriefByType(ctx, userID, briefType)
+	if err != nil {
+		return "", ErrBriefNotFound
+	}
+	if !log.Content.Valid {
+		return "", ErrBriefNotFound
+	}
+	return log.Content.String, nil
 }
 
 // TestRoutine performs a dry-run of a routine by generating the LLM context and calling the LLM, but doesn't save any logs.

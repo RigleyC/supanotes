@@ -20,7 +20,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         .watch();
   }
 
-  Future<NoteData?> getNoteById(String id) {
+  Future<NoteData?> getNoteById(String id) async {
     return (select(notes)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
@@ -74,8 +74,22 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return into(notes).insert(note);
   }
 
-  Future<void> updateNote(NotesCompanion note) {
-    return update(notes).replace(note);
+  Future<void> upsertNote(NotesCompanion note) {
+    return into(notes).insert(
+      note,
+      onConflict: DoUpdate.withExcluded((old, excluded) => NotesCompanion.custom(
+        title: excluded.title,
+        content: excluded.content,
+        contextId: excluded.contextId,
+        excerpt: excluded.excerpt,
+        updatedAt: excluded.updatedAt,
+        isDirty: excluded.isDirty,
+      )),
+    );
+  }
+
+  Future<void> updateNote(NotesCompanion note) async {
+    await (update(notes)..where((t) => t.id.equals(note.id.value))).write(note);
   }
 
   /// Marks [id] as soft-deleted (sets [NotesTable.deletedAt] to "now" and

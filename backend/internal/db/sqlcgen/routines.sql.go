@@ -139,6 +139,34 @@ func (q *Queries) GetEnabledRoutines(ctx context.Context) ([]GetEnabledRoutinesR
 	return items, nil
 }
 
+const getLatestBriefByType = `-- name: GetLatestBriefByType :one
+SELECT rl.id, rl.routine_id, rl.user_id, rl.status, rl.content, rl.error_msg, rl.created_at FROM routine_logs rl
+JOIN routines r ON rl.routine_id = r.id
+WHERE rl.user_id = $1 AND r.type = $2 AND rl.status = 'success'
+ORDER BY rl.created_at DESC
+LIMIT 1
+`
+
+type GetLatestBriefByTypeParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Type   string      `json:"type"`
+}
+
+func (q *Queries) GetLatestBriefByType(ctx context.Context, arg GetLatestBriefByTypeParams) (RoutineLog, error) {
+	row := q.db.QueryRow(ctx, getLatestBriefByType, arg.UserID, arg.Type)
+	var i RoutineLog
+	err := row.Scan(
+		&i.ID,
+		&i.RoutineID,
+		&i.UserID,
+		&i.Status,
+		&i.Content,
+		&i.ErrorMsg,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getRoutineLogsByUser = `-- name: GetRoutineLogsByUser :many
 SELECT id, routine_id, user_id, status, content, error_msg, created_at FROM routine_logs
 WHERE user_id = $1

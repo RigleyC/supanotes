@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../core/database/database.dart';
 import '../domain/note_model.dart';
@@ -19,7 +18,7 @@ abstract class INotesRepository {
   Stream<List<NoteModel>> watchNotes({String? contextId, bool favoritesOnly = false});
   Stream<NoteModel?> watchInbox();
   Stream<NoteModel?> watchNoteById(String id);
-  Future<NoteModel> createNote({String? title, String content = '', String? contextId});
+  Future<NoteModel> upsertNote({required String id, String? title, String content = '', String? contextId});
   Future<void> updateNote(String id, {String? title, String? content, bool? favorite, bool? archived, String? contextId});
   Future<void> toggleFavorite(String id);
   Future<void> softDelete(String id);
@@ -32,7 +31,7 @@ class NotesRepository implements INotesRepository {
 
   final NotesLocalRepository _local;
   final TasksLocalRepository _tasksLocal;
-  final Uuid _uuid = const Uuid();
+
 
   /// Streams active (non-archived, non-deleted, non-inbox) notes, mapped
   /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
@@ -68,28 +67,30 @@ class NotesRepository implements INotesRepository {
     return _local.watchNoteById(id).map((d) => d == null ? null : NoteModel.fromData(d));
   }
 
-  /// Creates a new note and returns the freshly-saved row. Always marks
-  /// the row as dirty so the next sync round pushes it to the backend.
+  /// Insert-or-update a note by [id]. When the row does not exist (lazy
+  /// creation), a new row is created. When it does, only the provided
+  /// fields are overwritten. Always marks the row as dirty so the next
+  /// sync round pushes changes to the backend.
   @override
-  Future<NoteModel> createNote({
+  Future<NoteModel> upsertNote({
+    required String id,
     String? title,
     String content = '',
     String? contextId,
   }) async {
     final now = DateTime.now().toUtc();
-    final id = _uuid.v4();
-    final companion = NotesCompanion.insert(
-      id: id,
-      userId: _local.userId,
+    final companion = NotesCompanion(
+      id: Value(id),
+      userId: Value(_local.userId),
       title: Value(title),
-      content: content,
+      content: Value(content),
       contextId: Value(contextId),
       excerpt: Value(_excerptFrom(content)),
-      createdAt: now,
-      updatedAt: now,
+      createdAt: Value(now),
+      updatedAt: Value(now),
       isDirty: const Value(true),
     );
-    await _local.createNoteRaw(companion);
+    await _local.upsertNoteRaw(companion);
     final saved = await _local.getNoteById(id);
     return NoteModel.fromData(saved!);
   }

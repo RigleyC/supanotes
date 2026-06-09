@@ -76,7 +76,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       updatedAt: Value(now),
       isDirty: const Value(true),
     );
-    await update(tasks).replace(updatedCompanion);
+    await (update(tasks)..where((t) => t.id.equals(companion.id.value))).write(updatedCompanion);
   }
 
   /// Marks the row with [id] as completed, records the completion event

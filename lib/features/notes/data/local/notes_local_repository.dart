@@ -66,6 +66,12 @@ class NotesLocalRepository {
     return _dao.createNote(companion);
   }
 
+  /// Insert-or-update a note row by id. Uses [insertOnConflictUpdate] so
+  /// the same call works for both new (lazy-created) and existing notes.
+  Future<void> upsertNoteRaw(NotesCompanion companion) {
+    return _dao.upsertNote(companion);
+  }
+
   /// Replace a note row with a partially-built [NotesCompanion].
   /// The caller is responsible for the field set and for bumping
   /// `updatedAt` / `isDirty`.

@@ -15,6 +15,7 @@ type Repository interface {
 	GetEnabledRoutines(ctx context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error)
 	CreateRoutineLog(ctx context.Context, routineID, userID pgtype.UUID, status string, content *string, errorMsg *string) (sqlcgen.RoutineLog, error)
 	GetRoutineLogsByUser(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.RoutineLog, error)
+	GetLatestBriefByType(ctx context.Context, userID pgtype.UUID, briefType string) (sqlcgen.RoutineLog, error)
 	CleanupOldMessages(ctx context.Context) error
 	HardDeleteExpired(ctx context.Context) error
 	UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error
@@ -85,6 +86,13 @@ func (r *repo) GetRoutineLogsByUser(ctx context.Context, userID pgtype.UUID, lim
 		UserID: userID,
 		Limit:  limit,
 		Offset: offset,
+	})
+}
+
+func (r *repo) GetLatestBriefByType(ctx context.Context, userID pgtype.UUID, briefType string) (sqlcgen.RoutineLog, error) {
+	return r.q.GetLatestBriefByType(ctx, sqlcgen.GetLatestBriefByTypeParams{
+		UserID: userID,
+		Type:   briefType,
 	})
 }
 
