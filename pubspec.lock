@@ -258,13 +258,13 @@ packages:
     source: hosted
     version: "0.7.14"
   device_info_plus:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: device_info_plus
-      sha256: "98f28b42168cc509abc92f88518882fd58061ea372d7999aecc424345c7bff6a"
+      sha256: b4fed1b2835da9d670d7bed7db79ae2a94b0f5ad6312268158a9b5479abbacdd
       url: "https://pub.dev"
     source: hosted
-    version: "11.5.0"
+    version: "12.4.0"
   device_info_plus_platform_interface:
     dependency: transitive
     description:
@@ -1144,12 +1144,13 @@ packages:
     source: git
     version: "0.2.10"
   super_keyboard:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: super_keyboard
-      sha256: b5381ca46cf2cbc8cae79f8304e848f83363a8f47c1851125133c8af87d0f488
-      url: "https://pub.dev"
-    source: hosted
+      path: super_keyboard
+      ref: main
+      resolved-ref: "165e9a24c6d2ca6035567fe04147a02a7c313313"
+      url: "https://github.com/RigleyC/super_editor.git"
+    source: git
     version: "0.4.0"
   super_native_extensions:
     dependency: transitive
@@ -1160,7 +1161,7 @@ packages:
     source: hosted
     version: "0.9.1"
   super_text_layout:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       path: super_text_layout
       ref: main
