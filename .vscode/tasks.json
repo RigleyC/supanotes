@@ -2,69 +2,48 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "flutter-dev",
+            "label": "setup-dev-env",
             "type": "shell",
-            "command": "flutter",
+            "command": "python",
             "args": [
-                "run"
+                "${workspaceFolder}/scripts/setup-dev-env.py"
             ],
-            "cwd": "${workspaceFolder}",
-            "isBackground": true,
-            "problemMatcher": {
-                "pattern": {
-                    "regexp": "^.*$",
-                    "file": 1,
-                    "location": 2,
-                    "message": 3
-                },
-                "background": {
-                    "activeOnStart": true,
-                    "beginsPattern": "^.*Flutter.*",
-                    "endsPattern": "^.*Application finished.*"
-                }
-            }
+            "presentation": {
+                "reveal": "silent",
+                "close": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "health-check",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-Command",
+                "for ($i = 0; $i -lt 30; $i++) { try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://127.0.0.1:8080/healthz; if ($r.StatusCode -eq 200) { Write-Host '[health-check] backend up'; exit 0 } } catch { Start-Sleep -Milliseconds 500 } }; Write-Host '[health-check] backend did not respond on :8080'; exit 1"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "close": false
+            },
+            "problemMatcher": []
         },
         {
             "label": "flutter-stop",
             "type": "shell",
-            "command": "pkill",
+            "command": "taskkill",
             "args": [
-                "-f",
-                "flutter"
+                "/F",
+                "/IM",
+                "flutter.exe"
             ],
             "cwd": "${workspaceFolder}",
-            "windows": {
-                "command": "taskkill",
-                "args": [
-                    "/F",
-                    "/IM",
-                    "flutter.exe"
-                ]
-            }
-        },
-        {
-            "label": "Backend (Go)",
-            "type": "shell",
-            "command": "go",
-            "args": [
-                "run",
-                "./cmd/server"
-            ],
-            "cwd": "${workspaceFolder}/backend",
-            "isBackground": true,
-            "problemMatcher": {
-                "pattern": {
-                    "regexp": "^.*$",
-                    "file": 1,
-                    "location": 2,
-                    "message": 3
-                },
-                "background": {
-                    "activeOnStart": true,
-                    "beginsPattern": "^.*listening.*",
-                    "endsPattern": "^.*$"
-                }
-            }
+            "presentation": {
+                "reveal": "silent",
+                "close": false
+            },
+            "problemMatcher": []
         }
     ]
 }

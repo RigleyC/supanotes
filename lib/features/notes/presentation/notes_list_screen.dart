@@ -27,7 +27,69 @@ class NotesListScreen extends ConsumerStatefulWidget {
 class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+
+    // se nao tiver notas não precisa exibir nada na listagem, mantenha apenas as sections
+    final notes = ref.watch(activeNotesProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        // a appbar pode ser customizada como transparent desde o themedata
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => context.push(AppRoutes.search),
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_horiz),
+            onPressed: () => _showMoreMenu(
+                context), // Esse menu deve ser um popup menu comum, extraido pra um widget/componente
+          ),
+        ],
+      ),
+      body: Column(children: [
+        SizedBox(height: 24),
+        ListTile(
+          //esse tambem vira um componente
+          // leading: const Icon(Icons.), coloca o icone de lixeira aqui
+          title: const Text('Brain Dump'),
+          onTap: () => context.push(AppRoutes.inbox),
+        ),
+        SizedBox(height: 40),
+        ListTile(
+          // esse aqui pode ser um componente/widget tambem, algo como sectiontitle
+          // leading: const Icon(Icons.), coloca o icone de lixeira aqui
+          title: const Text('Notas'),
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          itemCount: notes.asData?.value.length ?? 0,
+          itemBuilder: (context, index) {
+            final note = notes.asData!.value[index];
+            return Dismissible(
+              //adicionar confirmação pra deletar, um dialog, extrai pra widget/componente, acho que seria o noteRow
+              key: Key(note.id),
+              onDismissed: (_) => _deleteNote(note.id),
+              child: ListTile(
+                title: Text(note.title ?? 'Sem título'),
+                onTap: () => context.push(AppRoutes.note(note.id)),
+              ),
+            );
+          },
+        ),
+      ]),
+      floatingActionButton: FloatingActionButton(
+        // adicionar esse botao como componente la em button.dart
+        onPressed: () => _createNote(context),
+        shape: const CircleBorder(),
+        child: const Icon(Icons.edit_outlined, size: 22),
+      ),
+    );
+
+    /*    final scheme = Theme.of(context).colorScheme;
     final inboxAsync = ref.watch(inboxProvider);
     final notesAsync = ref.watch(activeNotesProvider);
     final favoritesOnly = ref.watch(favoritesFilterProvider);
@@ -47,8 +109,11 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       );
     }
 
-    final error =
-        inboxAsync.hasError ? inboxAsync.error : notesAsync.hasError ? notesAsync.error : null;
+    final error = inboxAsync.hasError
+        ? inboxAsync.error
+        : notesAsync.hasError
+            ? notesAsync.error
+            : null;
     if (error != null) {
       return Scaffold(
         backgroundColor: scheme.surface,
@@ -69,9 +134,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
     final inbox = inboxAsync.asData?.value;
     final notes = notesAsync.asData?.value ?? [];
-    final visibleNotes = favoritesOnly
-        ? notes.where((n) => n.favorite).toList()
-        : notes;
+    final visibleNotes =
+        favoritesOnly ? notes.where((n) => n.favorite).toList() : notes;
 
     if (inbox == null && visibleNotes.isEmpty) {
       return Scaffold(
@@ -130,8 +194,9 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                         isInbox: true,
                         onTap: () => context.push(AppRoutes.note(inbox.id)),
                         onDelete: () => _deleteNote(inbox.id),
-                        onToggleFavorite: () =>
-                            ref.read(notesRepositoryProvider).toggleFavorite(inbox.id),
+                        onToggleFavorite: () => ref
+                            .read(notesRepositoryProvider)
+                            .toggleFavorite(inbox.id),
                       ),
                     );
                   }
@@ -144,8 +209,9 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                       note: note,
                       onTap: () => context.push(AppRoutes.note(note.id)),
                       onDelete: () => _deleteNote(note.id),
-                      onToggleFavorite: () =>
-                          ref.read(notesRepositoryProvider).toggleFavorite(note.id),
+                      onToggleFavorite: () => ref
+                          .read(notesRepositoryProvider)
+                          .toggleFavorite(note.id),
                     ),
                   );
                 },
@@ -155,7 +221,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         ],
       ),
       floatingActionButton: _buildFab(scheme),
-    );
+    ); */
   }
 
   PreferredSizeWidget _buildAppBar(ColorScheme scheme) {

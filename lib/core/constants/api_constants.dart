@@ -7,6 +7,11 @@ import 'package:supanotes/core/constants/platform_info.dart';
 /// In production these values can be injected from build-time environment
 /// variables using `--dart-define=API_BASE_URL=...`.
 ///
+/// During local development the [setup-dev-env.ps1] script auto-detects the
+/// target (emulator, physical device, or desktop) and writes the correct URL
+/// to `.vscode/.dart-define.json`, which is then passed via
+/// `--dart-define-from-file` in launch.json.
+///
 /// In dev:
 /// - **Android emulator**: traffic is routed through the host machine at
 ///   `10.0.2.2`.

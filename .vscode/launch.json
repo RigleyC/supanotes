@@ -5,11 +5,12 @@
             "name": "Backend (Go Server)",
             "type": "go",
             "request": "launch",
-            "mode": "debug",
+            "mode": "auto",
             "program": "${workspaceFolder}/backend/cmd/server",
             "env": {
                 "PORT": "8080",
-                "DATABASE_URL": "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable"
+                "DATABASE_URL": "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable",
+                "PATH": "C:\\Users\\rigleyc\\go\\bin;${env:PATH}"
             },
             "cwd": "${workspaceFolder}/backend",
             "console": "integratedTerminal",
@@ -21,28 +22,18 @@
             "request": "launch",
             "program": "${workspaceFolder}/lib/main.dart",
             "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Backend + Frontend",
-            "type": "go",
-            "request": "launch",
-            "mode": "debug",
-            "program": "${workspaceFolder}/backend/cmd/server",
-            "env": {
-                "PORT": "8080",
-                "DATABASE_URL": "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable"
-            },
-            "cwd": "${workspaceFolder}/backend",
             "console": "integratedTerminal",
-            "logOutput": "rpc",
-            "preLaunchTask": "flutter-dev",
-            "postDebugTask": "flutter-stop"
+            "preLaunchTask": "setup-dev-env",
+            "args": [
+                "--dart-define-from-file=${workspaceFolder}/.vscode/.dart-define.json"
+            ]
         }
     ],
     "compounds": [
         {
             "name": "Backend + Frontend (Compound)",
+            "preLaunchTask": "setup-dev-env",
+            "postDebugTask": "flutter-stop",
             "configurations": [
                 "Backend (Go Server)",
                 "Frontend (Flutter)"

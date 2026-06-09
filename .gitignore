@@ -56,5 +56,9 @@ backend/bin/
 .env
 backend/.env
 
+# VS Code generated dev files
+.vscode/.dart-define.json
+.vscode/.dev-target.json
+
 # SuperNotes design docs — separate git repository
 SuperNotes/

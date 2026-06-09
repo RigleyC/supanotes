@@ -113,7 +113,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Future<void> _flushContentSave(
       String noteId, String markdown, List<TaskEntry> tasks) async {
     try {
-      await ref.read(notesRepositoryProvider).syncTasksFromDocument(noteId, tasks);
+      await ref
+          .read(notesRepositoryProvider)
+          .syncTasksFromDocument(noteId, tasks);
       await ref
           .read(notesRepositoryProvider)
           .updateNote(noteId, content: markdown);
@@ -160,48 +162,54 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: CustomScrollView(slivers: [
-        SliverAppBar.medium(
-          title: Hero(
-            tag: NoteCard.titleHeroTag(widget.noteId),
-            child: TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                filled: false,
-                contentPadding: EdgeInsets.zero,
-                hintText: 'Sem título',
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar.medium(
+            title: Hero(
+              tag: NoteCard.titleHeroTag(widget.noteId),
+              child: TextField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                  hintText: 'Sem título',
+                ),
+                style: AppTypography.textTheme.headlineMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
+                onChanged: _onTitleChanged,
               ),
-              style: AppTypography.textTheme.titleLarge?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: AppTypography.semibold,
-              ),
-              onChanged: _onTitleChanged,
             ),
+            actions: [
+              SaveIndicator(state: editorStatus),
+              IconButton(
+                icon: Icon(
+                  note?.favorite == true ? Icons.star : Icons.star_border,
+                ),
+                tooltip: note?.favorite == true ? 'Desfavoritar' : 'Favoritar',
+                onPressed: () => ref
+                    .read(notesRepositoryProvider)
+                    .toggleFavorite(widget.noteId),
+              ),
+            ],
           ),
-          actions: [
-            SaveIndicator(state: editorStatus),
-            IconButton(
-              icon: Icon(
-                note?.favorite == true ? Icons.star : Icons.star_border,
+        ],
+        body: Column(
+          children: [
+            Expanded(
+              child: SuperEditor(
+                editor: _editor!,
+                focusNode: _editorFocusNode,
+                stylesheet: defaultStylesheet.copyWith(
+                  documentPadding: const EdgeInsets.all(AppSpacing.md),
+                ),
               ),
-              tooltip: note?.favorite == true ? 'Desfavoritar' : 'Favoritar',
-              onPressed: () =>
-                  ref.read(notesRepositoryProvider).toggleFavorite(widget.noteId),
             ),
+            NoteToolbar(editor: _editor!, composer: _composer!),
           ],
         ),
-        SuperEditor(
-          editor: _editor!,
-          focusNode: _editorFocusNode,
-          stylesheet: defaultStylesheet.copyWith(
-            documentPadding: const EdgeInsets.all(AppSpacing.md),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: NoteToolbar(editor: _editor!, composer: _composer!),
-        ),
-      ]),
+      ),
     );
   }
 }
