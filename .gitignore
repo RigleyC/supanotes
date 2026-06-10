@@ -62,3 +62,6 @@ backend/.env
 
 # SuperNotes design docs — separate git repository
 SuperNotes/
+
+# Super Editor local fork — separate git repository
+super_editor_fork/

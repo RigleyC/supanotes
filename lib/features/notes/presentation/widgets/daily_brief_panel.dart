@@ -8,45 +8,79 @@ import '../../../routines/presentation/controllers/daily_brief_provider.dart';
 class DailyBriefPanel extends ConsumerWidget {
   const DailyBriefPanel({super.key});
 
+  static const String _placeholder =
+      'Suas prioridades, notas recentes e proximos passos aparecem aqui.';
+  static const String _error = 'Nao foi possivel carregar o brief agora.';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final briefAsync = ref.watch(dailyBriefProvider);
 
-    return ClipRect(
-      child: SingleChildScrollView(
-        physics: const NeverScrollableScrollPhysics(),
+    return DecoratedBox(
+      decoration: BoxDecoration(color: Colors.black),
+      child: SafeArea(
+        bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.md,
             AppSpacing.sm,
             AppSpacing.md,
-            AppSpacing.sm,
+            AppSpacing.md,
           ),
-          child: briefAsync.when(
-            data: (text) {
-              if (text == null || text.isEmpty) return const SizedBox.shrink();
-              return Cue.onMount(
-                motion: .smooth(),
-                acts: [.fadeIn(), .slideY(from: -0.1)],
-                child: Text(
-                  text,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurface,
-                  ),
-                ),
-              );
-            },
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => Text(
-              'Não foi possível carregar o brief',
-              style: textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: briefAsync.when(
+              data: (text) => _BriefText(text: _briefText(text)),
+              loading: () => const _BriefText(text: _placeholder),
+              error: (_, _) => const _BriefText(text: _error),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  String _briefText(String? text) {
+    final value = text?.trim();
+    return value == null || value.isEmpty ? _placeholder : value;
+  }
+}
+
+class _BriefText extends StatelessWidget {
+  const _BriefText({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Cue.onMount(
+      motion: .smooth(),
+      acts: [.fadeIn(), .slideY(from: -0.1)],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Morning brief',
+            style: textTheme.titleMedium?.copyWith(
+              color: Colors.black87,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            text,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

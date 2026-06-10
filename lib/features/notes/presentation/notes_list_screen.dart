@@ -1,5 +1,3 @@
-import 'dart:developer' as dev;
-
 import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +10,6 @@ import 'package:supanotes/core/sync/sync_service.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
-import 'package:supanotes/features/notes/presentation/controllers/notes_view_mode_provider.dart';
 import 'package:supanotes/features/notes/presentation/widgets/brain_dump_tile.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_grid_view.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_list_view.dart';
@@ -33,6 +30,8 @@ class _Strings {
   static const String errorTitle = 'Erro ao carregar as notas';
 }
 
+enum _NotesViewMode { list, grid }
+
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
 
@@ -42,6 +41,8 @@ class NotesListScreen extends ConsumerStatefulWidget {
 
 class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   static const double _fabClearance = 80;
+  _NotesViewMode _viewMode = _NotesViewMode.list;
+  bool _isPanelOpen = false;
 
   @override
   void initState() {
@@ -53,64 +54,33 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(activeNotesProvider);
     final favoritesOnly = ref.watch(favoritesFilterProvider);
-    final viewMode = ref.watch(notesViewModeProvider);
 
-    dev.log(
-      '[NotesListScreen] notesAsync: ${notesAsync.runtimeType}, '
-      'hasValue=${notesAsync.hasValue}, isLoading=${notesAsync.isLoading}, '
-      'notesCount=${notesAsync.hasValue ? (notesAsync.value?.length ?? 0) : 0}',
-      name: 'NotesList',
-    );
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          _ViewModeToggle(
-            viewMode: viewMode,
-            onToggle: () =>
-                ref.read(notesViewModeProvider.notifier).toggle(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.black),
-            onPressed: () => context.push(AppRoutes.search),
-          ),
-          NotesMoreMenu(
-            favoritesOnly: favoritesOnly,
-            onToggleFavorites: () =>
-                ref.read(favoritesFilterProvider.notifier).toggle(),
-            onSync: () => ref.read(syncServiceProvider).sync(),
-            onLogout: () => ref.read(authControllerProvider.notifier).logout(),
-          ),
-        ],
+    return TweenAnimationBuilder<Color?>(
+      tween: ColorTween(
+        begin: Colors.transparent,
+        end: _isPanelOpen ? Colors.black : Colors.transparent,
       ),
-      body: notesAsync.when(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+      child: notesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorView(
-          title: _Strings.errorTitle,
-          subtitle: e.toString(),
-        ),
+        error: (e, _) =>
+            AppErrorView(title: _Strings.errorTitle, subtitle: e.toString()),
         data: (notes) {
           final visibleNotes = favoritesOnly
               ? notes.where((n) => n.favorite).toList()
               : notes;
-          dev.log(
-            '[NotesListScreen] Rendering ${visibleNotes.length} notes',
-            name: 'NotesList',
-          );
           final headerSlivers = _buildHeaderSlivers();
 
           return Stack(
             children: [
               PullDownBriefPanel(
+                onOpenChanged: (open) => setState(() => _isPanelOpen = open),
                 child: Cue.onChange(
-                  value: viewMode,
+                  value: _viewMode,
                   motion: .smooth(),
-                  acts: [.fadeIn(), .slideY(from: 0.06)],
-                  child: viewMode == NotesViewMode.grid
+                  acts: [.fadeIn()],
+                  child: _viewMode == _NotesViewMode.grid
                       ? NotesGridView(
                           key: const ValueKey('grid'),
                           notes: visibleNotes,
@@ -139,27 +109,61 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openNewNote(context),
-        shape: const CircleBorder(),
-        child: const Icon(Icons.edit_outlined, size: 22),
-      ),
+      builder: (context, animatedBgColor, child) {
+        final isDark = animatedBgColor!.computeLuminance() < 0.15;
+        final iconColor = isDark ? Colors.white : Colors.black;
+
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: animatedBgColor,
+            foregroundColor: iconColor,
+            surfaceTintColor: animatedBgColor,
+            shadowColor: Colors.transparent,
+            animateColor: false,
+            elevation: 0,
+            actions: [
+              _ViewModeToggle(
+                viewMode: _viewMode,
+                onToggle: _toggleViewMode,
+                color: iconColor,
+              ),
+              IconButton(
+                icon: Icon(Icons.search, color: iconColor),
+                onPressed: () => context.push(AppRoutes.search),
+              ),
+              NotesMoreMenu(
+                favoritesOnly: favoritesOnly,
+                onToggleFavorites: () =>
+                    ref.read(favoritesFilterProvider.notifier).toggle(),
+                onSync: () => ref.read(syncServiceProvider).sync(),
+                onLogout: () =>
+                    ref.read(authControllerProvider.notifier).logout(),
+              ),
+            ],
+          ),
+          body: child,
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => _openNewNote(context),
+            shape: const CircleBorder(),
+            child: const Icon(Icons.edit_outlined, size: 22),
+          ),
+        );
+      },
     );
   }
 
+  //Isso aqui pode ficar fixo na pagina sem rebuildar, podemos rebuildar apenas a visualização das notas, alem de que nao precisa ta extraindo aqui embaixo
   List<Widget> _buildHeaderSlivers() => [
-        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
-        SliverToBoxAdapter(
-          child: BrainDumpTile(
-            title: _Strings.brainDump,
-            onTap: () => context.push(AppRoutes.inbox),
-          ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
-        const SliverToBoxAdapter(
-          child: SectionTitle(title: _Strings.notesSection),
-        ),
-      ];
+    const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
+    SliverToBoxAdapter(
+      child: BrainDumpTile(
+        title: _Strings.brainDump,
+        onTap: () => context.push(AppRoutes.inbox),
+      ),
+    ),
+    const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
+    const SliverToBoxAdapter(child: SectionTitle(title: _Strings.notesSection)),
+  ];
 
   void _openNote(NoteModel note) => context.push(AppRoutes.note(note.id));
 
@@ -177,29 +181,39 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   void _toggleFavorite(NoteModel note) {
     ref.read(notesRepositoryProvider).toggleFavorite(note.id);
   }
+
+  void _toggleViewMode() {
+    setState(() {
+      _viewMode = _viewMode == _NotesViewMode.grid
+          ? _NotesViewMode.list
+          : _NotesViewMode.grid;
+    });
+  }
 }
 
 class _ViewModeToggle extends StatelessWidget {
   const _ViewModeToggle({
     required this.viewMode,
     required this.onToggle,
+    required this.color,
   });
 
-  final NotesViewMode viewMode;
+  final _NotesViewMode viewMode;
   final VoidCallback onToggle;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Cue.onToggle(
-      toggled: viewMode == NotesViewMode.grid,
+      toggled: viewMode == _NotesViewMode.grid,
       motion: .snappy(),
       acts: [.rotate(to: 90)],
       child: IconButton(
         icon: Icon(
-          viewMode == NotesViewMode.grid
+          viewMode == _NotesViewMode.grid
               ? Icons.list_rounded
               : Icons.grid_view_rounded,
-          color: Colors.black,
+          color: color,
         ),
         onPressed: onToggle,
       ),

@@ -1146,8 +1146,8 @@ packages:
     description:
       path: super_editor
       ref: main
-      resolved-ref: "19cc3fbcec10e6d51f2173f5c961a63c73f60cb9"
-      url: "https://github.com/RigleyC/super_editor.git"
+      resolved-ref: "3233a97510ee859fe1e8224f735966691a7e6194"
+      url: "https://github.com/Flutter-Bounty-Hunters/super_editor.git"
     source: git
     version: "0.3.0-dev.51"
   super_editor_clipboard:
@@ -1155,8 +1155,8 @@ packages:
     description:
       path: super_editor_clipboard
       ref: main
-      resolved-ref: "19cc3fbcec10e6d51f2173f5c961a63c73f60cb9"
-      url: "https://github.com/RigleyC/super_editor.git"
+      resolved-ref: "3233a97510ee859fe1e8224f735966691a7e6194"
+      url: "https://github.com/Flutter-Bounty-Hunters/super_editor.git"
     source: git
     version: "0.2.10"
   super_keyboard:
@@ -1164,8 +1164,8 @@ packages:
     description:
       path: super_keyboard
       ref: main
-      resolved-ref: "165e9a24c6d2ca6035567fe04147a02a7c313313"
-      url: "https://github.com/RigleyC/super_editor.git"
+      resolved-ref: "3233a97510ee859fe1e8224f735966691a7e6194"
+      url: "https://github.com/Flutter-Bounty-Hunters/super_editor.git"
     source: git
     version: "0.4.0"
   super_native_extensions:
@@ -1181,8 +1181,8 @@ packages:
     description:
       path: super_text_layout
       ref: main
-      resolved-ref: "19cc3fbcec10e6d51f2173f5c961a63c73f60cb9"
-      url: "https://github.com/RigleyC/super_editor.git"
+      resolved-ref: "3233a97510ee859fe1e8224f735966691a7e6194"
+      url: "https://github.com/Flutter-Bounty-Hunters/super_editor.git"
     source: git
     version: "0.1.20"
   term_glyph:

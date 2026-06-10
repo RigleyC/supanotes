@@ -15,13 +15,29 @@ import 'local/notes_local_repository.dart';
 /// `updatedAt` timestamp, and the inbox singleton invariant are
 /// consistently maintained.
 abstract class INotesRepository {
-  Stream<List<NoteModel>> watchNotes({String? contextId, bool favoritesOnly = false});
+  Stream<List<NoteModel>> watchNotes({
+    String? contextId,
+    bool favoritesOnly = false,
+  });
   Stream<NoteModel?> watchInbox();
   Stream<NoteModel?> watchNoteById(String id);
-  Future<NoteModel> upsertNote({required String id, String? title, String content = '', String? contextId});
-  Future<void> updateNote(String id, {String? title, String? content, bool? favorite, bool? archived, String? contextId});
+  Future<NoteModel> upsertNote({
+    required String id,
+    String? title,
+    String content = '',
+    String? contextId,
+  });
+  Future<void> updateNote(
+    String id, {
+    String? title,
+    String? content,
+    bool? favorite,
+    bool? archived,
+    String? contextId,
+  });
   Future<void> toggleFavorite(String id);
   Future<void> softDelete(String id);
+  Future<NoteModel> ensureInbox();
   Future<void> appendToInbox(String text);
   Future<void> syncTasksFromDocument(String noteId, List<TaskEntry> tasks);
 }
@@ -31,7 +47,6 @@ class NotesRepository implements INotesRepository {
 
   final NotesLocalRepository _local;
   final TasksLocalRepository _tasksLocal;
-
 
   /// Streams active (non-archived, non-deleted, non-inbox) notes, mapped
   /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
@@ -58,13 +73,17 @@ class NotesRepository implements INotesRepository {
   /// per user — there is at most one row with `isInbox = true`.
   @override
   Stream<NoteModel?> watchInbox() {
-    return _local.watchInbox().map((d) => d == null ? null : NoteModel.fromData(d));
+    return _local.watchInbox().map(
+      (d) => d == null ? null : NoteModel.fromData(d),
+    );
   }
 
   /// Streams a single note by id.
   @override
   Stream<NoteModel?> watchNoteById(String id) {
-    return _local.watchNoteById(id).map((d) => d == null ? null : NoteModel.fromData(d));
+    return _local
+        .watchNoteById(id)
+        .map((d) => d == null ? null : NoteModel.fromData(d));
   }
 
   /// Insert-or-update a note by [id]. When the row does not exist (lazy
@@ -120,9 +139,7 @@ class NotesRepository implements INotesRepository {
           : Value(_excerptFrom(nextContent)),
       favorite: favorite == null ? const Value.absent() : Value(favorite),
       archived: archived == null ? const Value.absent() : Value(archived),
-      contextId: contextId == null
-          ? const Value.absent()
-          : Value(contextId),
+      contextId: contextId == null ? const Value.absent() : Value(contextId),
       updatedAt: Value(DateTime.now().toUtc()),
       isDirty: const Value(true),
     );
@@ -146,6 +163,12 @@ class NotesRepository implements INotesRepository {
     await _local.softDeleteNote(id);
   }
 
+  @override
+  Future<NoteModel> ensureInbox() async {
+    final inbox = await _local.getOrCreateInboxNote();
+    return NoteModel.fromData(inbox);
+  }
+
   /// Appends [text] to the user's inbox note, creating the inbox row
   /// on first use. The new block is separated from the existing content
   /// by a blank line so distinct captures stay visually distinct.
@@ -161,18 +184,23 @@ class NotesRepository implements INotesRepository {
   /// database. Creates new tasks, updates matching ones, and removes
   /// tasks that were deleted from the document.
   @override
-  Future<void> syncTasksFromDocument(String noteId, List<TaskEntry> tasks) async {
+  Future<void> syncTasksFromDocument(
+    String noteId,
+    List<TaskEntry> tasks,
+  ) async {
     final currentTasks = await _tasksLocal.watchNoteTasks(noteId).first;
     final currentIds = currentTasks.map((t) => t.id).toSet();
     final docIds = tasks.map((t) => t.id).toSet();
 
     for (final task in tasks) {
       if (currentIds.contains(task.id)) {
-        await _tasksLocal.updateTask(TasksCompanion(
-          id: Value(task.id),
-          title: Value(task.text),
-          status: Value(task.isComplete ? 'done' : 'pending'),
-        ));
+        await _tasksLocal.updateTask(
+          TasksCompanion(
+            id: Value(task.id),
+            title: Value(task.text),
+            status: Value(task.isComplete ? 'done' : 'pending'),
+          ),
+        );
       } else {
         await _tasksLocal.createTask(
           id: task.id,

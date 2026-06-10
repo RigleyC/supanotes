@@ -18,11 +18,7 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 
 class NoteToolbar extends StatelessWidget {
-  const NoteToolbar({
-    super.key,
-    required this.editor,
-    required this.composer,
-  });
+  const NoteToolbar({super.key, required this.editor, required this.composer});
 
   final Editor editor;
   final MutableDocumentComposer composer;
@@ -43,8 +39,10 @@ class NoteToolbar extends StatelessWidget {
           onSetH1: () => _setBlockType(header1Attribution),
           onSetH2: () => _setBlockType(header2Attribution),
           onSetH3: () => _setBlockType(header3Attribution),
-          onConvertToUnorderedList: () => _convertToListItem(ListItemType.unordered),
-          onConvertToOrderedList: () => _convertToListItem(ListItemType.ordered),
+          onConvertToUnorderedList: () =>
+              _convertToListItem(ListItemType.unordered),
+          onConvertToOrderedList: () =>
+              _convertToListItem(ListItemType.ordered),
           onConvertToTask: _convertToTask,
           onConvertToQuote: () => _setBlockType(blockquoteAttribution),
         );
@@ -70,7 +68,10 @@ class NoteToolbar extends StatelessWidget {
     return null;
   }
 
-  bool _selectionHasAttribution(DocumentSelection? selection, Attribution attribution) {
+  bool _selectionHasAttribution(
+    DocumentSelection? selection,
+    Attribution attribution,
+  ) {
     if (selection == null) return false;
     final nodes = editor.context.document
         .getNodesInside(selection.start, selection.end)
@@ -83,10 +84,12 @@ class NoteToolbar extends StatelessWidget {
           ? (selection.end.nodePosition as TextPosition).offset
           : node.text.length;
       if (start >= end) continue;
-      if (node.text.getAttributionSpansInRange(
+      if (node.text
+          .getAttributionSpansInRange(
             attributionFilter: (a) => a == attribution,
             range: SpanRange(start, end),
-          ).isNotEmpty) {
+          )
+          .isNotEmpty) {
         return true;
       }
     }
@@ -122,11 +125,15 @@ class NoteToolbar extends StatelessWidget {
     if (nodeId == null) return;
     final node = editor.context.document.getNodeById(nodeId);
     if (node is ListItemNode) {
-      editor.execute([ChangeListItemTypeRequest(nodeId: nodeId, newType: type)]);
+      editor.execute([
+        ChangeListItemTypeRequest(nodeId: nodeId, newType: type),
+      ]);
       return;
     }
     if (node is! ParagraphNode) return;
-    editor.execute([ConvertParagraphToListItemRequest(nodeId: nodeId, type: type)]);
+    editor.execute([
+      ConvertParagraphToListItemRequest(nodeId: nodeId, type: type),
+    ]);
   }
 
   void _convertToTask() {
@@ -174,7 +181,7 @@ class _ToolbarContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 24),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(30),
@@ -191,7 +198,7 @@ class _ToolbarContainer extends StatelessWidget {
       ),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: 4,
+        vertical: 6,
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -278,8 +285,8 @@ class _ToolbarButton extends StatelessWidget {
       message: tooltip,
       child: IconButton(
         icon: Icon(icon),
-        iconSize: 20,
-        visualDensity: VisualDensity.compact,
+        iconSize: 26,
+        visualDensity: VisualDensity.comfortable,
         isSelected: isActive,
         color: colorScheme.onSurface,
         selectedIcon: Icon(icon, color: colorScheme.primary),

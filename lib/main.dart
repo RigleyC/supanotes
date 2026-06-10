@@ -1,3 +1,5 @@
+import 'package:cue/cue.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -31,7 +33,7 @@ class SupaNotesApp extends ConsumerWidget {
           }
         },
         loading: () {},
-        error: (_, __) {},
+        error: (_, _) {},
       );
     });
 
@@ -40,10 +42,16 @@ class SupaNotesApp extends ConsumerWidget {
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
-/*       theme: AppTheme.lightTheme,
+      /*       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark, */
       routerConfig: router,
+      builder: (context, child) {
+        if (kDebugMode) {
+          return CueDebugTools(child: child!);
+        }
+        return child!;
+      },
     );
   }
 }

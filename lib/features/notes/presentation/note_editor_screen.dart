@@ -13,6 +13,7 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_co
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
+import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 
 final noteProvider = StreamProvider.family<NoteModel?, String>((ref, id) {
   return ref.watch(notesRepositoryProvider).watchNoteById(id);
@@ -89,49 +90,43 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         await _controller.flushBeforePop();
-        if (mounted) context.pop();
+        if (!context.mounted) return;
+        context.pop();
       },
       child: Scaffold(
-        body: Stack(
-          children: [
-            CustomScrollView(
-              slivers: [
-                SliverAppBar.medium(
-                  centerTitle: true,
-                  title: TextField(
-                    controller: _controller.titleController,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.zero,
-                      hintText: 'Sem título',
-                    ),
-                    style: AppTypography.textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                SuperEditor(
-                  editor: _controller.editor!,
-                  focusNode: _controller.focusNode,
-                  stylesheet: defaultStylesheet.copyWith(
-                    documentPadding: const EdgeInsets.all(AppSpacing.md),
-                  ),
-                  componentBuilders: [
-                    ...defaultComponentBuilders,
-                    TaskComponentBuilder(_controller.editor!),
-                  ],
-                ),
-              ],
+        appBar: AppBar(
+          centerTitle: true,
+          title: TextField(
+            controller: _controller.titleController,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              filled: false,
+              contentPadding: EdgeInsets.zero,
+              hintText: 'Sem titulo',
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: NoteToolbar(
+            style: AppTypography.textTheme.headlineMedium?.copyWith(
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: SuperEditor(
                 editor: _controller.editor!,
-                composer: _controller.composer!,
+                focusNode: _controller.focusNode,
+                stylesheet: defaultStylesheet.copyWith(
+                  documentPadding: const EdgeInsets.all(AppSpacing.md),
+                ),
+                componentBuilders: [
+                  ...defaultComponentBuilders,
+                  CustomTaskComponentBuilder(_controller.editor!),
+                ],
               ),
+            ),
+            NoteToolbar(
+              editor: _controller.editor!,
+              composer: _controller.composer!,
             ),
           ],
         ),

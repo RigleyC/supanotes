@@ -32,9 +32,7 @@ class NotesGridView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
+      physics: const ClampingScrollPhysics(),
       slivers: [
         ...headerSlivers,
         SliverPadding(
@@ -57,6 +55,8 @@ class NotesGridView extends StatelessWidget {
                 child: NoteCard(
                   note: note,
                   onTap: () => onTap(note),
+                  onDelete: () => onDelete(note),
+                  onToggleFavorite: () => onToggleFavorite(note),
                 ),
               );
             },

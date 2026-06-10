@@ -31,9 +31,7 @@ class NotesListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
+      physics: const ClampingScrollPhysics(),
       slivers: [
         ...headerSlivers,
         SliverPadding(

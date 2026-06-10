@@ -12,18 +12,21 @@ class BrainDumpTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return ListTile(
-      leading: Icon(Icons.inbox_outlined, color: scheme.onSurfaceVariant),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: scheme.onSurface,
-          fontWeight: FontWeight.w500,
+    return Material(
+      type: MaterialType.transparency,
+      child: ListTile(
+        leading: Icon(Icons.inbox_outlined, color: scheme.onSurfaceVariant),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: scheme.onSurface,
+            fontWeight: FontWeight.w500,
+          ),
         ),
+        trailing: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       ),
-      trailing: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
     );
   }
 }

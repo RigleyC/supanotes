@@ -13,17 +13,29 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
-  # Super Editor and clipboard from RigleyC's fork
+  # Super Editor and clipboard from Flutter-Bounty-Hunters (upstream)
   super_editor:
     git:
-      url: https://github.com/RigleyC/super_editor.git
+      url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
       ref: main
       path: super_editor
   super_editor_clipboard:
     git:
-      url: https://github.com/RigleyC/super_editor.git
+      url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
       ref: main
       path: super_editor_clipboard
+
+  # Super Editor and clipboard from RigleyC's fork
+  # super_editor:
+  #   git:
+  #     url: https://github.com/RigleyC/super_editor.git
+  #     ref: main
+  #     path: super_editor
+  # super_editor_clipboard:
+  #   git:
+  #     url: https://github.com/RigleyC/super_editor.git
+  #     ref: main
+  #     path: super_editor_clipboard
   follow_the_leader: ^0.5.3
 
   # State management
@@ -83,24 +95,45 @@ dev_dependencies:
 dependency_overrides:
   super_editor:
     git:
-      url: https://github.com/RigleyC/super_editor.git
+      url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
       ref: main
       path: super_editor
   super_keyboard:
     git:
-      url: https://github.com/RigleyC/super_editor.git
+      url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
       ref: main
       path: super_keyboard
   super_text_layout:
     git:
-      url: https://github.com/RigleyC/super_editor.git
+      url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
       ref: main
       path: super_text_layout
   super_editor_clipboard:
     git:
-      url: https://github.com/RigleyC/super_editor.git
+      url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
       ref: main
       path: super_editor_clipboard
+
+  # super_editor:
+  #   git:
+  #     url: https://github.com/RigleyC/super_editor.git
+  #     ref: main
+  #     path: super_editor
+  # super_keyboard:
+  #   git:
+  #     url: https://github.com/RigleyC/super_editor.git
+  #     ref: main
+  #     path: super_keyboard
+  # super_text_layout:
+  #   git:
+  #     url: https://github.com/RigleyC/super_editor.git
+  #     ref: main
+  #     path: super_text_layout
+  # super_editor_clipboard:
+  #   git:
+  #     url: https://github.com/RigleyC/super_editor.git
+  #     ref: main
+  #     path: super_editor_clipboard
   device_info_plus: ^12.0.0
 
 flutter:

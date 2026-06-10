@@ -1,5 +1,7 @@
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +13,7 @@ import 'package:supanotes/features/notes/presentation/controllers/notes_provider
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -34,8 +37,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.invalidate(inboxProvider);
-      ref.read(notesRepositoryProvider).appendToInbox('');
+      unawaited(ref.read(notesRepositoryProvider).ensureInbox());
     });
   }
 
@@ -96,7 +98,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         await _controller.flushBeforePop();
-        if (mounted) context.pop();
+        if (!context.mounted) return;
+        context.pop();
       },
       child: Scaffold(
         appBar: AppBar(
@@ -132,7 +135,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 ),
                 componentBuilders: [
                   ...defaultComponentBuilders,
-                  TaskComponentBuilder(_controller.editor!),
+                  CustomTaskComponentBuilder(_controller.editor!),
                 ],
               ),
             ),
