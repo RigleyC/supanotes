@@ -92,46 +92,43 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         if (mounted) context.pop();
       },
       child: Scaffold(
-        body: Stack(
+        body: Column(
           children: [
-            CustomScrollView(
-              slivers: [
-                SliverAppBar.medium(
-                  centerTitle: true,
-                  title: TextField(
-                    controller: _controller.titleController,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.zero,
-                      hintText: 'Sem título',
-                    ),
-                    style: AppTypography.textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onSurface,
+            Expanded(
+              child: CustomScrollView(
+                slivers: [
+                  SliverAppBar.medium(
+                    centerTitle: true,
+                    title: TextField(
+                      controller: _controller.titleController,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.zero,
+                        hintText: 'Sem título',
+                      ),
+                      style: AppTypography.textTheme.headlineMedium?.copyWith(
+                        color: colorScheme.onSurface,
+                      ),
                     ),
                   ),
-                ),
-                SuperEditor(
-                  editor: _controller.editor!,
-                  focusNode: _controller.focusNode,
-                  stylesheet: defaultStylesheet.copyWith(
-                    documentPadding: const EdgeInsets.all(AppSpacing.md),
+                  SuperEditor(
+                    editor: _controller.editor!,
+                    focusNode: _controller.focusNode,
+                    stylesheet: defaultStylesheet.copyWith(
+                      documentPadding: const EdgeInsets.all(AppSpacing.md),
+                    ),
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      TaskComponentBuilder(_controller.editor!),
+                    ],
                   ),
-                  componentBuilders: [
-                    ...defaultComponentBuilders,
-                    TaskComponentBuilder(_controller.editor!),
-                  ],
-                ),
-              ],
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: NoteToolbar(
-                editor: _controller.editor!,
-                composer: _controller.composer!,
+                ],
               ),
+            ),
+            NoteToolbar(
+              editor: _controller.editor!,
+              composer: _controller.composer!,
             ),
           ],
         ),

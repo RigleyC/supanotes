@@ -68,6 +68,7 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  flutter_test_robots: ^0.0.24
 
   # Code generation
   riverpod_generator: ^4.0.3
