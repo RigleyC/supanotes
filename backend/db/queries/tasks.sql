@@ -52,3 +52,12 @@ ORDER BY position ASC, created_at ASC;
 INSERT INTO task_completions (task_id, status)
 VALUES ($1, $2)
 RETURNING *;
+
+-- name: CountTasks :one
+SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL;
+
+-- name: CountOpenTasks :one
+SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open';
+
+-- name: CountCompletedTasks :one
+SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'completed';

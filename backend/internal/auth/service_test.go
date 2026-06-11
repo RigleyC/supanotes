@@ -311,6 +311,18 @@ func (m *mockQuerier) GetRoutineLogsByUser(ctx context.Context, arg sqlcgen.GetR
 	return nil, nil
 }
 func (m *mockQuerier) CleanupOldMessages(ctx context.Context) error { return nil }
+func (m *mockQuerier) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (m *mockQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (m *mockQuerier) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (m *mockQuerier) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
 
 func testConfig() *config.Config {
 

@@ -98,6 +98,17 @@ func (q *Queries) AppendToNoteContent(ctx context.Context, arg AppendToNoteConte
 	return i, err
 }
 
+const countNotes = `-- name: CountNotes :one
+SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL AND NOT is_inbox
+`
+
+func (q *Queries) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countNotes, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createContext = `-- name: CreateContext :one
 INSERT INTO contexts (user_id, slug, name)
 VALUES ($1, $2, $3)

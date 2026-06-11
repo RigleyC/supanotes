@@ -41,6 +41,15 @@ func (s *stubTasksRepo) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID
 func (s *stubTasksRepo) CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, status string) (sqlcgen.TaskCompletion, error) {
 	panic("unimplemented")
 }
+func (s *stubTasksRepo) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
+func (s *stubTasksRepo) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
+func (s *stubTasksRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
 
 type stubMemRepo struct{}
 

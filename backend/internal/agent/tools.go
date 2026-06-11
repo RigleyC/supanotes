@@ -61,8 +61,6 @@ func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks
 		&UpdateSoulTool{soulSvc: soulSvc},
 		&GetTodayTasksTool{tasksSvc: tasksSvc},
 		&UpdateTaskTool{tasksSvc: tasksSvc},
-		&PlanInboxOrganizationTool{},
-		&ApplyInboxOrganizationTool{},
 		&GetVaultContextTool{q: q},
 	}
 
@@ -752,34 +750,6 @@ func (t *UpdateTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJS
 	return fmt.Sprintf("Task updated: [%s] %s", formatID(updated.ID), updated.Title), nil
 }
 
-// --- PlanInboxOrganizationTool ---
-type PlanInboxOrganizationTool struct{}
-
-func (t *PlanInboxOrganizationTool) Name() string { return "plan_inbox_organization" }
-func (t *PlanInboxOrganizationTool) Description() string {
-	return "Analyzes inbox and returns an organization plan"
-}
-func (t *PlanInboxOrganizationTool) SchemaJSON() string {
-	return `{"type":"object","properties":{}}`
-}
-func (t *PlanInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	return `{"message":"Use the dedicated /api/v1/notes/inbox/organize/plan endpoint"}`, nil
-}
-
-// --- ApplyInboxOrganizationTool ---
-type ApplyInboxOrganizationTool struct{}
-
-func (t *ApplyInboxOrganizationTool) Name() string { return "apply_inbox_organization" }
-func (t *ApplyInboxOrganizationTool) Description() string {
-	return "Apply an inbox organization plan"
-}
-func (t *ApplyInboxOrganizationTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"plan_id":{"type":"string"},"accepted_item_ids":{"type":"array","items":{"type":"string"}}},"required":["plan_id","accepted_item_ids"]}`
-}
-func (t *ApplyInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	return `{"message":"Use the dedicated /api/v1/notes/inbox/organize/apply endpoint"}`, nil
-}
-
 // --- GetVaultContextTool ---
 type GetVaultContextTool struct {
 	q sqlcgen.Querier
@@ -793,19 +763,17 @@ func (t *GetVaultContextTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
 func (t *GetVaultContextTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	notesList, err := t.q.GetNotes(ctx, sqlcgen.GetNotesParams{
-		UserID: userID,
-		Limit:  10000,
-	})
+	noteCount, err := t.q.CountNotes(ctx, userID)
 	if err != nil {
 		return "", fmt.Errorf("count notes: %w", err)
 	}
-	tasksList, err := t.q.GetTasks(ctx, sqlcgen.GetTasksParams{
-		UserID: userID,
-		Limit:  10000,
-	})
+	openTaskCount, err := t.q.CountOpenTasks(ctx, userID)
 	if err != nil {
-		return "", fmt.Errorf("count tasks: %w", err)
+		return "", fmt.Errorf("count open tasks: %w", err)
+	}
+	completedTaskCount, err := t.q.CountCompletedTasks(ctx, userID)
+	if err != nil {
+		return "", fmt.Errorf("count completed tasks: %w", err)
 	}
 	contexts, err := t.q.GetContexts(ctx, userID)
 	if err != nil {
@@ -815,20 +783,12 @@ func (t *GetVaultContextTool) Execute(ctx context.Context, userID pgtype.UUID, a
 	if err != nil {
 		return "", fmt.Errorf("get tags: %w", err)
 	}
-	var openCount, completedCount int32
-	for _, t := range tasksList {
-		if t.Status == "open" {
-			openCount++
-		} else {
-			completedCount++
-		}
-	}
 	return fmt.Sprintf(`Vault Stats:
 - Notes: %d
 - Open Tasks: %d
 - Completed Tasks: %d
 - Contexts: %d
-- Tags: %d`, len(notesList), openCount, completedCount, len(contexts), len(tags)), nil
+- Tags: %d`, noteCount, openTaskCount, completedTaskCount, len(contexts), len(tags)), nil
 }
 
 // --- SetWeeklyBriefScheduleTool ---

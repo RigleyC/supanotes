@@ -15,6 +15,10 @@ type Querier interface {
 	AppendToInbox(ctx context.Context, arg AppendToInboxParams) (Note, error)
 	AppendToNoteContent(ctx context.Context, arg AppendToNoteContentParams) (Note, error)
 	CleanupOldMessages(ctx context.Context) error
+	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
 	CreateDeviceToken(ctx context.Context, arg CreateDeviceTokenParams) (DeviceToken, error)
 	CreateMemory(ctx context.Context, arg CreateMemoryParams) (Memory, error)

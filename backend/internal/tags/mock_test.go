@@ -23,7 +23,13 @@ func (m *mockQuerier) AppendToInbox(_ context.Context, _ sqlcgen.AppendToInboxPa
 func (m *mockQuerier) AppendToNoteContent(_ context.Context, _ sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
-func (m *mockQuerier) CleanupOldMessages(_ context.Context) error { return nil }
+func (m *mockQuerier) CleanupOldMessages(_ context.Context) error                     { return nil }
+func (m *mockQuerier) CountNotes(_ context.Context, _ pgtype.UUID) (int64, error)     { return 0, nil }
+func (m *mockQuerier) CountTasks(_ context.Context, _ pgtype.UUID) (int64, error)     { return 0, nil }
+func (m *mockQuerier) CountOpenTasks(_ context.Context, _ pgtype.UUID) (int64, error) { return 0, nil }
+func (m *mockQuerier) CountCompletedTasks(_ context.Context, _ pgtype.UUID) (int64, error) {
+	return 0, nil
+}
 func (m *mockQuerier) CreateContext(_ context.Context, _ sqlcgen.CreateContextParams) (sqlcgen.Context, error) {
 	return sqlcgen.Context{}, nil
 }

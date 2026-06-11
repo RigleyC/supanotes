@@ -122,3 +122,6 @@ RETURNING *;
 INSERT INTO note_links (source_id, target_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING;
+
+-- name: CountNotes :one
+SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL AND NOT is_inbox;

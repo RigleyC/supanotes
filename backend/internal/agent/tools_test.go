@@ -77,6 +77,18 @@ func (s *stubQuerier) AppendToNoteContent(ctx context.Context, arg sqlcgen.Appen
 	panic("unimplemented")
 }
 func (s *stubQuerier) CleanupOldMessages(ctx context.Context) error { panic("unimplemented") }
+func (s *stubQuerier) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) CreateContext(ctx context.Context, arg sqlcgen.CreateContextParams) (sqlcgen.Context, error) {
 	panic("unimplemented")
 }
@@ -435,6 +447,9 @@ func (m *mockNotesRepo) SetInboxContent(ctx context.Context, arg sqlcgen.SetInbo
 	panic("unimplemented")
 }
 func (m *mockNotesRepo) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
 }
 func (m *mockNotesRepo) AddTagToNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error {

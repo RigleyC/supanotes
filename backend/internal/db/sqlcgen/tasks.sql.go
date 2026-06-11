@@ -11,6 +11,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countCompletedTasks = `-- name: CountCompletedTasks :one
+SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'completed'
+`
+
+func (q *Queries) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCompletedTasks, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countOpenTasks = `-- name: CountOpenTasks :one
+SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open'
+`
+
+func (q *Queries) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOpenTasks, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countTasks = `-- name: CountTasks :one
+SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countTasks, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position)
 VALUES ($1, $2, $3, $4, $5, $6)

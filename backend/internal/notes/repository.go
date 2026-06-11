@@ -20,6 +20,7 @@ type Repository interface {
 	AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error)
 	AddTagToNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error
 	RemoveTagFromNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error
+	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
 }
 
 type repository struct {
@@ -64,6 +65,10 @@ func (r *repository) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxCo
 
 func (r *repository) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	return r.q.AppendToNoteContent(ctx, arg)
+}
+
+func (r *repository) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return r.q.CountNotes(ctx, userID)
 }
 
 func (r *repository) AddTagToNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error {

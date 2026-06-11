@@ -17,6 +17,9 @@ type Repository interface {
 	GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo pgtype.Timestamptz) ([]sqlcgen.Task, error)
 	GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error)
 	CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, status string) (sqlcgen.TaskCompletion, error)
+	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 }
 
 type repository struct {
@@ -57,4 +60,16 @@ func (r *repository) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, n
 
 func (r *repository) CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, status string) (sqlcgen.TaskCompletion, error) {
 	return r.q.CreateTaskCompletion(ctx, sqlcgen.CreateTaskCompletionParams{TaskID: taskID, Status: status})
+}
+
+func (r *repository) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return r.q.CountTasks(ctx, userID)
+}
+
+func (r *repository) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return r.q.CountOpenTasks(ctx, userID)
+}
+
+func (r *repository) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return r.q.CountCompletedTasks(ctx, userID)
 }
