@@ -211,11 +211,11 @@ class NotesRepository implements INotesRepository {
     required String content,
     required List<TaskEntry> tasks,
   }) async {
-    await syncTasksFromDocument(id, tasks);
-    final normalizedTitle = title.trim().isEmpty ? null : title;
     final current = await _local.getNoteById(id);
     if (current == null) return;
 
+    await syncTasksFromDocument(id, tasks);
+    final normalizedTitle = title.trim().isEmpty ? null : title;
     await updateNote(
       id,
       title: normalizedTitle,
