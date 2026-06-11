@@ -63,11 +63,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         );
       }
       final note = asyncValue.asData?.value;
-      dev.log(
-        '[NoteEditor] noteId=${widget.noteId}, note=${note != null ? 'exists' : 'null'}',
-        name: 'NoteEditor',
-      );
-      _controller.init(content: note?.content ?? '', title: note?.title);
+      if (note == null) {
+        return const Scaffold(
+          body: Center(child: Text('Nota nao encontrada')),
+        );
+      }
+      _controller.init(content: note.content, title: note.title);
     }
 
     if (_controller.document == null ||

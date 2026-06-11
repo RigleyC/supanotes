@@ -183,8 +183,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
   void _openNote(NoteModel note) => context.push(AppRoutes.note(note.id));
 
-  void _openNewNote(BuildContext context) {
+  Future<void> _openNewNote(BuildContext context) async {
     final id = const Uuid().v4();
+    await ref.read(notesRepositoryProvider).createLocalNote(id: id);
+    if (!context.mounted) return;
     context.push(AppRoutes.note(id));
   }
 
