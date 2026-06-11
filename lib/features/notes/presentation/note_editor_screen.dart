@@ -14,6 +14,8 @@ import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart'
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 final noteProvider = StreamProvider.autoDispose.family<NoteModel?, String>((
   ref,
@@ -47,6 +49,26 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             defaultSnapshotSave(ref, noteId, title, markdown, tasks),
         emptyNoteExit: (noteId) => defaultEmptyNoteExit(ref, noteId),
       );
+
+  Future<void> _openTaskActions(
+    NoteEditorController controller,
+    Map<String, TaskModel> taskMetadataById,
+    String taskId,
+  ) async {
+    await controller.persistSnapshotNow();
+    if (!mounted) return;
+
+    final task = taskMetadataById[taskId];
+    if (task == null) {
+      AppMessenger.showInfo(
+        context,
+        'A tarefa acabou de ser criada. Tente novamente em instantes.',
+      );
+      return;
+    }
+
+    await TaskActionsSheet.show(context, task: task);
+  }
 
   @override
   void dispose() {
@@ -134,6 +156,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     CustomTaskComponentBuilder(
                       controller.editor!,
                       taskMetadataById: taskMetadataById,
+                      onTaskLongPress: (taskId) =>
+                          _openTaskActions(controller, taskMetadataById, taskId),
                     ),
                   ],
                 ),
