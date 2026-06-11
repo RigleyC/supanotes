@@ -7,14 +7,32 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
-	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/notes"
+	"github.com/RigleyC/supanotes/pkg/llm"
 )
 
 // stubQuerier panics on any method call.
 type stubQuerier struct {
 	searchByEmbedding func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error)
+	createNoteLink    func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error
+	getNoteByID       func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error)
+}
+
+func (s *stubQuerier) CreateNoteLink(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
+	if s.createNoteLink != nil {
+		return s.createNoteLink(ctx, arg)
+	}
+	panic("unimplemented")
+}
+
+func (s *stubQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
+	if s.getNoteByID != nil {
+		return s.getNoteByID(ctx, arg)
+	}
+	panic("unimplemented")
 }
 
 func (s *stubQuerier) SearchNotesByEmbedding(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error) {
@@ -114,9 +132,6 @@ func (s *stubQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesPa
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetMessages(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error) {
-	panic("unimplemented")
-}
-func (s *stubQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
@@ -312,4 +327,100 @@ func TestSearchNotesTool_EmptyResults(t *testing.T) {
 	if result != "No matching notes found" {
 		t.Fatalf("expected 'No matching notes found', got %q", result)
 	}
+}
+
+func TestLinkNotesTool_Execute(t *testing.T) {
+	q := &stubQuerier{
+		createNoteLink: func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
+			return nil
+		},
+		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
+			return sqlcgen.Note{
+				ID:     arg.ID,
+				UserID: arg.UserID,
+			}, nil
+		},
+	}
+	// notesSvc backed by the mock querier; NewService expects notes.Repository
+	// which wraps sqlcgen.Querier. Use a notesService that delegates GetNoteByID
+	// through the stub querier.
+	notesSvc := newMockNotesService(q)
+	tool := &LinkNotesTool{q: q, notesSvc: notesSvc}
+
+	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{1}, Valid: true}, `{"source_id":"00000000-0000-0000-0000-000000000001","target_id":"00000000-0000-0000-0000-000000000002"}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == "" {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestLinkNotesTool_InvalidUUID(t *testing.T) {
+	tool := &LinkNotesTool{}
+	_, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"source_id":"not-a-uuid","target_id":"00000000-0000-0000-0000-000000000002"}`)
+	if err == nil {
+		t.Fatal("expected error for invalid UUID")
+	}
+}
+
+func TestLinkNotesTool_SourceNotFound(t *testing.T) {
+	q := &stubQuerier{
+		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
+			return sqlcgen.Note{}, notes.ErrNoteNotFound
+		},
+		createNoteLink: func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
+			t.Fatal("should not be called")
+			return nil
+		},
+	}
+	notesSvc := newMockNotesService(q)
+	tool := &LinkNotesTool{q: q, notesSvc: notesSvc}
+	_, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"source_id":"00000000-0000-0000-0000-000000000001","target_id":"00000000-0000-0000-0000-000000000002"}`)
+	if err == nil {
+		t.Fatal("expected error for missing source note")
+	}
+}
+
+// newMockNotesService creates a notes.Service that uses a stubQuerier
+func newMockNotesService(q sqlcgen.Querier) *notes.Service {
+	return notes.NewService(&mockNotesRepo{q: q})
+}
+
+type mockNotesRepo struct {
+	q sqlcgen.Querier
+}
+
+func (m *mockNotesRepo) CreateNote(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Note, error) {
+	return m.q.GetNoteByID(ctx, sqlcgen.GetNoteByIDParams{ID: id, UserID: userID})
+}
+func (m *mockNotesRepo) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) DeleteNote(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) error {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) AddTagToNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error {
+	panic("unimplemented")
+}
+func (m *mockNotesRepo) RemoveTagFromNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error {
+	panic("unimplemented")
 }

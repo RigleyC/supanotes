@@ -55,7 +55,7 @@ func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks
 		&GetNotesTool{notesSvc: notesSvc},
 		&UpdateNoteTool{notesSvc: notesSvc},
 		&AppendToNoteTool{notesSvc: notesSvc},
-		&LinkNotesTool{notesSvc: notesSvc},
+		&LinkNotesTool{q: q, notesSvc: notesSvc},
 		&DeleteMemoryTool{memoriesSvc: memoriesSvc},
 		&UpdateSoulTool{soulSvc: soulSvc},
 		&GetTodayTasksTool{tasksSvc: tasksSvc},
@@ -583,6 +583,7 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, args
 
 // --- LinkNotesTool ---
 type LinkNotesTool struct {
+	q        sqlcgen.Querier
 	notesSvc *notes.Service
 }
 
@@ -592,7 +593,38 @@ func (t *LinkNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"source_id":{"type":"string"},"target_id":{"type":"string"}},"required":["source_id","target_id"]}`
 }
 func (t *LinkNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	return "", fmt.Errorf("tool not fully implemented yet — no CreateNoteLink query in sqlcgen")
+	args, err := parseArgs[struct {
+		SourceID string `json:"source_id"`
+		TargetID string `json:"target_id"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+
+	srcID, err := uid.UUIDFromString(args.SourceID)
+	if err != nil {
+		return "", fmt.Errorf("invalid source_id: %w", err)
+	}
+	tgtID, err := uid.UUIDFromString(args.TargetID)
+	if err != nil {
+		return "", fmt.Errorf("invalid target_id: %w", err)
+	}
+
+	if _, err := t.notesSvc.GetNoteByID(ctx, srcID, userID); err != nil {
+		return "", fmt.Errorf("source note not found: %w", err)
+	}
+	if _, err := t.notesSvc.GetNoteByID(ctx, tgtID, userID); err != nil {
+		return "", fmt.Errorf("target note not found: %w", err)
+	}
+
+	if err := t.q.CreateNoteLink(ctx, sqlcgen.CreateNoteLinkParams{
+		SourceID: srcID,
+		TargetID: tgtID,
+	}); err != nil {
+		return "", fmt.Errorf("create link: %w", err)
+	}
+
+	return fmt.Sprintf("Bi-directional link created between [%s] and [%s]", args.SourceID, args.TargetID), nil
 }
 
 // --- DeleteMemoryTool ---

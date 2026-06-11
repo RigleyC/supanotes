@@ -20,6 +20,7 @@ type Querier interface {
 	CreateMemory(ctx context.Context, arg CreateMemoryParams) (Memory, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error)
+	CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) error
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRoutine(ctx context.Context, arg CreateRoutineParams) (Routine, error)
 	CreateRoutineLog(ctx context.Context, arg CreateRoutineLogParams) (RoutineLog, error)

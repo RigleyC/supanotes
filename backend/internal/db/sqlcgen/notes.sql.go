@@ -172,6 +172,22 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 	return i, err
 }
 
+const createNoteLink = `-- name: CreateNoteLink :exec
+INSERT INTO note_links (source_id, target_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type CreateNoteLinkParams struct {
+	SourceID pgtype.UUID `json:"source_id"`
+	TargetID pgtype.UUID `json:"target_id"`
+}
+
+func (q *Queries) CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) error {
+	_, err := q.db.Exec(ctx, createNoteLink, arg.SourceID, arg.TargetID)
+	return err
+}
+
 const createTag = `-- name: CreateTag :one
 INSERT INTO tags (user_id, name)
 VALUES ($1, $2)
