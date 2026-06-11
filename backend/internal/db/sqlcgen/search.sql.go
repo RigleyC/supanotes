@@ -19,6 +19,7 @@ FROM notes n
 WHERE n.user_id = $2
   AND n.deleted_at IS NULL 
   AND NOT n.is_inbox
+  AND n.archived = false
   AND n.search_vector @@ plainto_tsquery('simple', $1::text)
 ORDER BY score DESC
 LIMIT $3
@@ -80,6 +81,7 @@ WITH fts AS (
   WHERE n.user_id = $3
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
+    AND n.archived = false
     AND n.search_vector @@ plainto_tsquery('simple', $2::text)
   LIMIT $4::int
 ),
@@ -91,6 +93,7 @@ semantic AS (
   WHERE n.user_id = $3
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
+    AND n.archived = false
   LIMIT $6::int
 )
 SELECT 
@@ -175,6 +178,7 @@ JOIN note_embeddings ne ON n.id = ne.note_id
 WHERE n.user_id = $2
   AND n.deleted_at IS NULL 
   AND NOT n.is_inbox
+  AND n.archived = false
 ORDER BY ne.embedding <=> $1::vector
 LIMIT $3
 `

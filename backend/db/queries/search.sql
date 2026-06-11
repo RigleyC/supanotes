@@ -5,6 +5,7 @@ FROM notes n
 WHERE n.user_id = sqlc.arg('user_id')
   AND n.deleted_at IS NULL 
   AND NOT n.is_inbox
+  AND n.archived = false
   AND n.search_vector @@ plainto_tsquery('simple', sqlc.arg('query')::text)
 ORDER BY score DESC
 LIMIT sqlc.arg('limit');
@@ -17,6 +18,7 @@ JOIN note_embeddings ne ON n.id = ne.note_id
 WHERE n.user_id = sqlc.arg('user_id')
   AND n.deleted_at IS NULL 
   AND NOT n.is_inbox
+  AND n.archived = false
 ORDER BY ne.embedding <=> sqlc.arg('embedding')::vector
 LIMIT sqlc.arg('limit');
 
@@ -28,6 +30,7 @@ WITH fts AS (
   WHERE n.user_id = sqlc.arg('user_id')
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
+    AND n.archived = false
     AND n.search_vector @@ plainto_tsquery('simple', sqlc.arg('query')::text)
   LIMIT sqlc.arg('fts_limit')::int
 ),
@@ -39,6 +42,7 @@ semantic AS (
   WHERE n.user_id = sqlc.arg('user_id')
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
+    AND n.archived = false
   LIMIT sqlc.arg('semantic_limit')::int
 )
 SELECT 
