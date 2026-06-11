@@ -17,6 +17,8 @@ class Notes extends Table {
   DateTimeColumn get deletedAt => dateTime().nullable()();
   
   BoolColumn get isDirty => boolean().withDefault(const Constant(true))();
+  BoolColumn get hasRemoteCopy =>
+      boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -172,6 +172,21 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _hasRemoteCopyMeta = const VerificationMeta(
+    'hasRemoteCopy',
+  );
+  @override
+  late final GeneratedColumn<bool> hasRemoteCopy = GeneratedColumn<bool>(
+    'has_remote_copy',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_remote_copy" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -188,6 +203,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     updatedAt,
     deletedAt,
     isDirty,
+    hasRemoteCopy,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -295,6 +311,15 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         isDirty.isAcceptableOrUnknown(data['is_dirty']!, _isDirtyMeta),
       );
     }
+    if (data.containsKey('has_remote_copy')) {
+      context.handle(
+        _hasRemoteCopyMeta,
+        hasRemoteCopy.isAcceptableOrUnknown(
+          data['has_remote_copy']!,
+          _hasRemoteCopyMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -360,6 +385,10 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_dirty'],
       )!,
+      hasRemoteCopy: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_remote_copy'],
+      )!,
     );
   }
 
@@ -384,6 +413,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
   final DateTime updatedAt;
   final DateTime? deletedAt;
   final bool isDirty;
+  final bool hasRemoteCopy;
   const NoteData({
     required this.id,
     required this.userId,
@@ -399,6 +429,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     required this.updatedAt,
     this.deletedAt,
     required this.isDirty,
+    required this.hasRemoteCopy,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -427,6 +458,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
     map['is_dirty'] = Variable<bool>(isDirty);
+    map['has_remote_copy'] = Variable<bool>(hasRemoteCopy);
     return map;
   }
 
@@ -456,6 +488,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ? const Value.absent()
           : Value(deletedAt),
       isDirty: Value(isDirty),
+      hasRemoteCopy: Value(hasRemoteCopy),
     );
   }
 
@@ -479,6 +512,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       isDirty: serializer.fromJson<bool>(json['isDirty']),
+      hasRemoteCopy: serializer.fromJson<bool>(json['hasRemoteCopy']),
     );
   }
   @override
@@ -499,6 +533,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'isDirty': serializer.toJson<bool>(isDirty),
+      'hasRemoteCopy': serializer.toJson<bool>(hasRemoteCopy),
     };
   }
 
@@ -517,6 +552,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     bool? isDirty,
+    bool? hasRemoteCopy,
   }) => NoteData(
     id: id ?? this.id,
     userId: userId ?? this.userId,
@@ -534,6 +570,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     isDirty: isDirty ?? this.isDirty,
+    hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
   );
   NoteData copyWithCompanion(NotesCompanion data) {
     return NoteData(
@@ -553,6 +590,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       isDirty: data.isDirty.present ? data.isDirty.value : this.isDirty,
+      hasRemoteCopy: data.hasRemoteCopy.present
+          ? data.hasRemoteCopy.value
+          : this.hasRemoteCopy,
     );
   }
 
@@ -572,7 +612,8 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
-          ..write('isDirty: $isDirty')
+          ..write('isDirty: $isDirty, ')
+          ..write('hasRemoteCopy: $hasRemoteCopy')
           ..write(')'))
         .toString();
   }
@@ -593,6 +634,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     updatedAt,
     deletedAt,
     isDirty,
+    hasRemoteCopy,
   );
   @override
   bool operator ==(Object other) =>
@@ -611,7 +653,8 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
-          other.isDirty == this.isDirty);
+          other.isDirty == this.isDirty &&
+          other.hasRemoteCopy == this.hasRemoteCopy);
 }
 
 class NotesCompanion extends UpdateCompanion<NoteData> {
@@ -629,6 +672,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<bool> isDirty;
+  final Value<bool> hasRemoteCopy;
   final Value<int> rowid;
   const NotesCompanion({
     this.id = const Value.absent(),
@@ -645,6 +689,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.isDirty = const Value.absent(),
+    this.hasRemoteCopy = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NotesCompanion.insert({
@@ -662,6 +707,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.isDirty = const Value.absent(),
+    this.hasRemoteCopy = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        userId = Value(userId),
@@ -683,6 +729,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<bool>? isDirty,
+    Expression<bool>? hasRemoteCopy,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -700,6 +747,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (isDirty != null) 'is_dirty': isDirty,
+      if (hasRemoteCopy != null) 'has_remote_copy': hasRemoteCopy,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -719,6 +767,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<bool>? isDirty,
+    Value<bool>? hasRemoteCopy,
     Value<int>? rowid,
   }) {
     return NotesCompanion(
@@ -736,6 +785,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       isDirty: isDirty ?? this.isDirty,
+      hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -785,6 +835,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     if (isDirty.present) {
       map['is_dirty'] = Variable<bool>(isDirty.value);
     }
+    if (hasRemoteCopy.present) {
+      map['has_remote_copy'] = Variable<bool>(hasRemoteCopy.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -808,6 +861,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('isDirty: $isDirty, ')
+          ..write('hasRemoteCopy: $hasRemoteCopy, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3113,6 +3167,7 @@ typedef $$NotesTableCreateCompanionBuilder =
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<bool> isDirty,
+      Value<bool> hasRemoteCopy,
       Value<int> rowid,
     });
 typedef $$NotesTableUpdateCompanionBuilder =
@@ -3131,6 +3186,7 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<bool> isDirty,
+      Value<bool> hasRemoteCopy,
       Value<int> rowid,
     });
 
@@ -3232,6 +3288,11 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<bool> get isDirty => $composableBuilder(
     column: $table.isDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasRemoteCopy => $composableBuilder(
+    column: $table.hasRemoteCopy,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3339,6 +3400,11 @@ class $$NotesTableOrderingComposer
     column: $table.isDirty,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get hasRemoteCopy => $composableBuilder(
+    column: $table.hasRemoteCopy,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$NotesTableAnnotationComposer
@@ -3393,6 +3459,11 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<bool> get isDirty =>
       $composableBuilder(column: $table.isDirty, builder: (column) => column);
+
+  GeneratedColumn<bool> get hasRemoteCopy => $composableBuilder(
+    column: $table.hasRemoteCopy,
+    builder: (column) => column,
+  );
 
   Expression<T> localNoteTagsRefs<T extends Object>(
     Expression<T> Function($$LocalNoteTagsTableAnnotationComposer a) f,
@@ -3462,6 +3533,7 @@ class $$NotesTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<bool> isDirty = const Value.absent(),
+                Value<bool> hasRemoteCopy = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotesCompanion(
                 id: id,
@@ -3478,6 +3550,7 @@ class $$NotesTableTableManager
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 isDirty: isDirty,
+                hasRemoteCopy: hasRemoteCopy,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3496,6 +3569,7 @@ class $$NotesTableTableManager
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<bool> isDirty = const Value.absent(),
+                Value<bool> hasRemoteCopy = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotesCompanion.insert(
                 id: id,
@@ -3512,6 +3586,7 @@ class $$NotesTableTableManager
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 isDirty: isDirty,
+                hasRemoteCopy: hasRemoteCopy,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

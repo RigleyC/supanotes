@@ -33,19 +33,20 @@ class AppDatabase extends _$AppDatabase {
   /// tables, the `updated_at` column on `tags`, and the `completed_at`
   /// column on `tasks`. See [migration] for the full upgrade plan.
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
           if (from < 2) {
-            // v1 → v2: introduce the v2-only tables and add the
-            // missing columns on existing tables.
             await m.createTable(localNoteTags);
             await m.createTable(localTaskCompletions);
             await m.addColumn(tags, tags.updatedAt);
             await m.addColumn(tasks, tasks.completedAt);
+          }
+          if (from < 3) {
+            await m.addColumn(notes, notes.hasRemoteCopy);
           }
         },
       );
