@@ -1,5 +1,6 @@
 library;
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/di/providers.dart';
@@ -45,6 +46,18 @@ class AuthController extends Notifier<AsyncValue<User?>> {
       return;
     }
     state = AsyncValue.data(User(id: userId, email: email, name: name));
+    await _registerFcmToken();
+  }
+
+  Future<void> _registerFcmToken() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await _repository.registerDeviceToken(token);
+      }
+    } catch (_) {
+      // Non-fatal: push notifications may not work.
+    }
   }
 
   Future<AuthResult> login({
@@ -61,6 +74,7 @@ class AuthController extends Notifier<AsyncValue<User?>> {
         'routines': result.session.routines,
       });
       state = AsyncValue.data(result.user);
+      await _registerFcmToken();
       return result;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -87,6 +101,7 @@ class AuthController extends Notifier<AsyncValue<User?>> {
         'routines': result.session.routines,
       });
       state = AsyncValue.data(result.user);
+      await _registerFcmToken();
       return result;
     } catch (e, st) {
       state = AsyncValue.error(e, st);

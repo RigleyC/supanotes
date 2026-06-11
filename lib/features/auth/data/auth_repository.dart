@@ -23,6 +23,7 @@ abstract class IAuthRepository {
   Future<AuthResult> login({required String email, required String password});
   Future<void> logout();
   Future<bool> isAuthenticated();
+  Future<void> registerDeviceToken(String token);
 }
 
 class AuthRepository implements IAuthRepository {
@@ -154,5 +155,15 @@ class AuthRepository implements IAuthRepository {
   Future<bool> isAuthenticated() async {
     final token = await _storage.getAccessToken();
     return token != null && token.isNotEmpty;
+  }
+
+  /// Registers the device's FCM push token with the backend.
+  @override
+  Future<void> registerDeviceToken(String token) async {
+    try {
+      await _api.post('/api/v1/device-tokens', data: {'token': token});
+    } on DioException {
+      // Non-fatal — push will simply not work until the next registration.
+    }
   }
 }
