@@ -28,10 +28,10 @@ part 'database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
-  /// Latest schema version. Bumped to `2` in the FE-2/3 wave — the
-  /// upgrade adds the `local_note_tags` and `local_task_completions`
-  /// tables, the `updated_at` column on `tags`, and the `completed_at`
-  /// column on `tasks`. See [migration] for the full upgrade plan.
+  /// Latest schema version. Bumped to `3` — the v2 wave added the
+  /// `local_note_tags` and `local_task_completions` tables, the
+  /// `updated_at` column on `tags`, and the `completed_at` column on
+  /// `tasks`; v3 adds the `has_remote_copy` column on `notes`.
   @override
   int get schemaVersion => 3;
 
@@ -40,6 +40,8 @@ class AppDatabase extends _$AppDatabase {
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
           if (from < 2) {
+            // v1 → v2: introduce the v2-only tables and add the
+            // missing columns on existing tables.
             await m.createTable(localNoteTags);
             await m.createTable(localTaskCompletions);
             await m.addColumn(tags, tags.updatedAt);
