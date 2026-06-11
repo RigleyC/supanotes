@@ -226,6 +226,21 @@ func (q *Queries) DeleteNote(ctx context.Context, arg DeleteNoteParams) error {
 	return err
 }
 
+const deleteTag = `-- name: DeleteTag :exec
+DELETE FROM tags
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteTagParams struct {
+	ID     pgtype.UUID `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTag(ctx context.Context, arg DeleteTagParams) error {
+	_, err := q.db.Exec(ctx, deleteTag, arg.ID, arg.UserID)
+	return err
+}
+
 const getContexts = `-- name: GetContexts :many
 SELECT id, user_id, slug, name, created_at, updated_at FROM contexts
 WHERE user_id = $1

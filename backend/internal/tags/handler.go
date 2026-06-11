@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/web"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type CreateTagRequest struct {
@@ -33,6 +34,25 @@ func (h *Handler) List(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, tags)
+}
+
+func (h *Handler) Delete(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	id, err := uid.UUIDFromString(c.Param("id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid tag id")
+	}
+
+	if err := h.svc.Delete(c.Request().Context(), id, userID); err != nil {
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to delete tag")
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *Handler) Create(c echo.Context) error {

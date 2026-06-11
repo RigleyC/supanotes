@@ -30,6 +30,13 @@ func (s *Service) List(ctx context.Context, userID pgtype.UUID) ([]dto.TagRespon
 	return res, nil
 }
 
+func (s *Service) Delete(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) error {
+	return s.q.DeleteTag(ctx, sqlcgen.DeleteTagParams{
+		ID:     id,
+		UserID: userID,
+	})
+}
+
 func (s *Service) Create(ctx context.Context, userID pgtype.UUID, name string) (dto.TagResponse, error) {
 	tag, err := s.q.CreateTag(ctx, sqlcgen.CreateTagParams{
 		UserID: userID,

@@ -60,6 +60,10 @@ SET content = content || E'\n\n' || $3,
 WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
 RETURNING *;
 
+-- name: DeleteTag :exec
+DELETE FROM tags
+WHERE id = $1 AND user_id = $2;
+
 -- name: CreateTag :one
 INSERT INTO tags (user_id, name)
 VALUES ($1, $2)

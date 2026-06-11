@@ -171,6 +171,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	tagsH := tags.NewHandler(tagsSvc)
 	protected.GET("/tags", tagsH.List)
 	protected.POST("/tags", tagsH.Create)
+	protected.DELETE("/tags/:id", tagsH.Delete)
 
 	// Notes
 	notesRepo := notes.NewRepository(queries)
@@ -186,6 +187,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	protected.POST("/notes/inbox/append", notesH.AppendToInbox)
 	protected.POST("/notes/inbox/organize/plan", notesH.PlanOrganization)
 	protected.POST("/notes/inbox/organize/apply", notesH.ApplyOrganization)
+	protected.POST("/notes/:id/tags", notesH.AddTag)
+	protected.DELETE("/notes/:id/tags/:tagId", notesH.RemoveTag)
 
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
@@ -244,7 +247,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	// Agent Loop (built before the runner so the runner and the
 	// gateway can both depend on it).
 	agentRepo := agent.NewRepository(queries)
-	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc)
+	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient)
 	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools)
 	agentH := agent.NewHandler(agentLoop, agentRepo)
 	protected.POST("/agent/chat", agentH.Chat)

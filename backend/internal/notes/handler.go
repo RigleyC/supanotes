@@ -261,6 +261,69 @@ func (h *Handler) AppendToInbox(c echo.Context) error {
 	return c.JSON(http.StatusOK, mapToNoteResponse(note))
 }
 
+type AddTagRequest struct {
+	TagID string `json:"tag_id" validate:"required"`
+}
+
+func (h *Handler) AddTag(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	noteID, err := uid.UUIDFromString(c.Param("id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid note id")
+	}
+
+	var req AddTagRequest
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+
+	tagID, err := uid.UUIDFromString(req.TagID)
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid tag_id")
+	}
+
+	if err := h.svc.AddTagToNote(c.Request().Context(), noteID, tagID, userID); err != nil {
+		if errors.Is(err, ErrNoteNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "note not found")
+		}
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to add tag to note")
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) RemoveTag(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	noteID, err := uid.UUIDFromString(c.Param("id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid note id")
+	}
+
+	tagID, err := uid.UUIDFromString(c.Param("tagId"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid tag id")
+	}
+
+	if err := h.svc.RemoveTagFromNote(c.Request().Context(), noteID, tagID, userID); err != nil {
+		if errors.Is(err, ErrNoteNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "note not found")
+		}
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to remove tag from note")
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
 type PlanOrganizationResponse struct {
 	PlanID string                 `json:"plan_id"`
 	Items  []PlanOrganizationItem `json:"items"`
