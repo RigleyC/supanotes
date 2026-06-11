@@ -13,8 +13,9 @@ import 'package:supanotes/features/notes/presentation/controllers/notes_provider
 import 'package:supanotes/features/agent/domain/destination_type.dart';
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/tasks/data/tasks_repository.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
@@ -27,6 +28,14 @@ class InboxScreen extends ConsumerStatefulWidget {
 
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   NoteEditorController? _controller;
+
+  Map<String, TaskModel> _taskMapForInbox(String? noteId) {
+    if (noteId == null) return const <String, TaskModel>{};
+    return ref.watch(tasksByNoteStreamProvider(noteId)).maybeWhen(
+          data: (tasks) => {for (final task in tasks) task.id: task},
+          orElse: () => const <String, TaskModel>{},
+        );
+  }
 
   NoteEditorController _controllerOrCreate() =>
       _controller ??= NoteEditorController(
@@ -55,10 +64,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     if (!mounted || result == null) return;
 
     final created = result.items
-        .where((i) => i.accepted && i.destinationType == DestinationType.newNote)
+        .where(
+          (i) => i.accepted && i.destinationType == DestinationType.newNote,
+        )
         .length;
     final moved = result.items
-        .where((i) => i.accepted && i.destinationType == DestinationType.existingNote)
+        .where(
+          (i) =>
+              i.accepted && i.destinationType == DestinationType.existingNote,
+        )
         .length;
     final kept = result.items
         .where((i) => i.accepted && i.destinationType == DestinationType.keep)
@@ -100,6 +114,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     }
 
     final hasContent = controller.document!.isNotEmpty;
+    final inboxId = asyncValue.asData?.value?.id;
+    final taskMetadataById = _taskMapForInbox(inboxId);
 
     return PopScope(
       canPop: false,
@@ -132,11 +148,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 editor: controller.editor!,
                 focusNode: controller.focusNode,
                 stylesheet: defaultStylesheet.copyWith(
-                 documentPadding:  EdgeInsets.zero,
+                  documentPadding: EdgeInsets.zero,
                 ),
                 componentBuilders: [
                   ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(controller.editor!),
+                  CustomTaskComponentBuilder(
+                    controller.editor!,
+                    taskMetadataById: taskMetadataById,
+                  ),
                 ],
               ),
             ),
