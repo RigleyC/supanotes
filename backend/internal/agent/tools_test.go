@@ -1,0 +1,315 @@
+package agent
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/pkg/llm"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+// stubQuerier panics on any method call.
+type stubQuerier struct {
+	searchByEmbedding func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error)
+}
+
+func (s *stubQuerier) SearchNotesByEmbedding(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error) {
+	if s.searchByEmbedding != nil {
+		return s.searchByEmbedding(ctx, arg)
+	}
+	panic("unimplemented")
+}
+
+// remaining Querier methods
+func (s *stubQuerier) AddTagToNote(ctx context.Context, arg sqlcgen.AddTagToNoteParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CleanupOldMessages(ctx context.Context) error { panic("unimplemented") }
+func (s *stubQuerier) CreateContext(ctx context.Context, arg sqlcgen.CreateContextParams) (sqlcgen.Context, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateDeviceToken(ctx context.Context, arg sqlcgen.CreateDeviceTokenParams) (sqlcgen.DeviceToken, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateMemory(ctx context.Context, arg sqlcgen.CreateMemoryParams) (sqlcgen.Memory, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateMessage(ctx context.Context, arg sqlcgen.CreateMessageParams) (sqlcgen.Message, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateNote(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateRefreshToken(ctx context.Context, arg sqlcgen.CreateRefreshTokenParams) (sqlcgen.RefreshToken, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateRoutine(ctx context.Context, arg sqlcgen.CreateRoutineParams) (sqlcgen.Routine, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateRoutineLog(ctx context.Context, arg sqlcgen.CreateRoutineLogParams) (sqlcgen.RoutineLog, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateTag(ctx context.Context, arg sqlcgen.CreateTagParams) (sqlcgen.Tag, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateTask(ctx context.Context, arg sqlcgen.CreateTaskParams) (sqlcgen.Task, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateTaskCompletion(ctx context.Context, arg sqlcgen.CreateTaskCompletionParams) (sqlcgen.TaskCompletion, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateUser(ctx context.Context, arg sqlcgen.CreateUserParams) (sqlcgen.User, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateUserSettings(ctx context.Context, arg sqlcgen.CreateUserSettingsParams) (sqlcgen.UserSetting, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteContext(ctx context.Context, arg sqlcgen.DeleteContextParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteDeviceToken(ctx context.Context, arg sqlcgen.DeleteDeviceTokenParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteMemory(ctx context.Context, arg sqlcgen.DeleteMemoryParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteNote(ctx context.Context, arg sqlcgen.DeleteNoteParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteSessionMessages(ctx context.Context, arg sqlcgen.DeleteSessionMessagesParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteTag(ctx context.Context, arg sqlcgen.DeleteTagParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteTask(ctx context.Context, arg sqlcgen.DeleteTaskParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetContexts(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Context, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetEnabledRoutines(ctx context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetLinkedNotes(ctx context.Context, arg sqlcgen.GetLinkedNotesParams) ([]sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesParams) ([]sqlcgen.Memory, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetMessages(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetPendingEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetPendingEmbeddingsRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetRefreshToken(ctx context.Context, tokenHash string) (sqlcgen.RefreshToken, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetRetryableEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetRetryableEmbeddingsRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetRoutineLogsByUser(ctx context.Context, arg sqlcgen.GetRoutineLogsByUserParams) ([]sqlcgen.RoutineLog, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetRoutinesByUser(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Routine, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetSoul(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetSyncContexts(ctx context.Context, arg sqlcgen.GetSyncContextsParams) ([]sqlcgen.Context, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetSyncNotes(ctx context.Context, arg sqlcgen.GetSyncNotesParams) ([]sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetSyncTags(ctx context.Context, arg sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetSyncTasks(ctx context.Context, arg sqlcgen.GetSyncTasksParams) ([]sqlcgen.Task, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Tag, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Tag, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetTaskByID(ctx context.Context, arg sqlcgen.GetTaskByIDParams) (sqlcgen.Task, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) ([]sqlcgen.Task, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetTasksByNoteID(ctx context.Context, arg sqlcgen.GetTasksByNoteIDParams) ([]sqlcgen.Task, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetTodayTasks(ctx context.Context, arg sqlcgen.GetTodayTasksParams) ([]sqlcgen.Task, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetUserByEmail(ctx context.Context, email string) (sqlcgen.User, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlcgen.User, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetUserSettings(ctx context.Context, userID pgtype.UUID) (sqlcgen.UserSetting, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) HardDeleteExpiredContexts(ctx context.Context) error { panic("unimplemented") }
+func (s *stubQuerier) HardDeleteExpiredNotes(ctx context.Context) error    { panic("unimplemented") }
+func (s *stubQuerier) HardDeleteExpiredTasks(ctx context.Context) error    { panic("unimplemented") }
+func (s *stubQuerier) ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.DeviceToken, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) RemoveTagFromNote(ctx context.Context, arg sqlcgen.RemoveTagFromNoteParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) SearchMemoriesByEmbedding(ctx context.Context, arg sqlcgen.SearchMemoriesByEmbeddingParams) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) SearchNotesFTS(ctx context.Context, arg sqlcgen.SearchNotesFTSParams) ([]sqlcgen.SearchNotesFTSRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) SearchNotesHybrid(ctx context.Context, arg sqlcgen.SearchNotesHybridParams) ([]sqlcgen.SearchNotesHybridRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) SearchNotesSemantic(ctx context.Context, arg sqlcgen.SearchNotesSemanticParams) ([]sqlcgen.SearchNotesSemanticRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpdateNoteEmbeddingStatus(ctx context.Context, arg sqlcgen.UpdateNoteEmbeddingStatusParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpdateRoutine(ctx context.Context, arg sqlcgen.UpdateRoutineParams) (sqlcgen.Routine, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpdateUserSettings(ctx context.Context, arg sqlcgen.UpdateUserSettingsParams) (sqlcgen.UserSetting, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertContext(ctx context.Context, arg sqlcgen.UpsertContextParams) (sqlcgen.Context, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertNote(ctx context.Context, arg sqlcgen.UpsertNoteParams) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertNoteEmbedding(ctx context.Context, arg sqlcgen.UpsertNoteEmbeddingParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertSoul(ctx context.Context, arg sqlcgen.UpsertSoulParams) (sqlcgen.Soul, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertTask(ctx context.Context, arg sqlcgen.UpsertTaskParams) (sqlcgen.Task, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
+	panic("unimplemented")
+}
+
+var _ sqlcgen.Querier = (*stubQuerier)(nil)
+
+func TestSearchNotesTool_Execute(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
+				{"embedding": make([]float64, 1536), "index": 0},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	q := &stubQuerier{
+		searchByEmbedding: func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error) {
+			return []sqlcgen.SearchNotesByEmbeddingRow{
+				{
+					ID:         pgtype.UUID{Bytes: [16]byte{1}, Valid: true},
+					Title:      pgtype.Text{String: "Test Note", Valid: true},
+					Content:    "content here",
+					Similarity: 85,
+				},
+			}, nil
+		},
+	}
+
+	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+	tool := &SearchNotesTool{q: q, embedCL: embedCL}
+
+	result, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"query":"test query"}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == "" {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestSearchNotesTool_EmptyResults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
+				{"embedding": make([]float64, 1536), "index": 0},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	q := &stubQuerier{
+		searchByEmbedding: func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error) {
+			return nil, nil
+		},
+	}
+
+	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+	tool := &SearchNotesTool{q: q, embedCL: embedCL}
+
+	result, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"query":"nothing"}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "No matching notes found" {
+		t.Fatalf("expected 'No matching notes found', got %q", result)
+	}
+}

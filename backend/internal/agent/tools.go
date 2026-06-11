@@ -17,6 +17,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
+	"github.com/pgvector/pgvector-go"
 )
 
 type ToolExecutor interface {
@@ -30,7 +31,7 @@ type ToolRegistry struct {
 	tools map[string]ToolExecutor
 }
 
-func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks.Service, memoriesSvc *memories.Service, routinesSvc *routines.Service, soulSvc *soul.Service) *ToolRegistry {
+func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks.Service, memoriesSvc *memories.Service, routinesSvc *routines.Service, soulSvc *soul.Service, embedCL *llm.EmbeddingClient) *ToolRegistry {
 	registry := &ToolRegistry{
 		tools: make(map[string]ToolExecutor),
 	}
@@ -44,7 +45,7 @@ func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks
 		&ListMemoriesTool{memoriesSvc: memoriesSvc},
 		&GetInboxNoteTool{notesSvc: notesSvc},
 		&AppendToInboxTool{notesSvc: notesSvc},
-		&SearchNotesTool{q: q},
+		&SearchNotesTool{q: q, embedCL: embedCL},
 		&GetSoulTool{q: q},
 		&ListRoutinesTool{routinesSvc: routinesSvc},
 		&TestDailyBriefTool{routinesSvc: routinesSvc},
@@ -144,7 +145,7 @@ func (t *AddTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON 
 	args, err := parseArgs[struct {
 		Title      string  `json:"title"`
 		NoteID     *string `json:"note_id"`
-		DueDate   *string `json:"due_date"`
+		DueDate    *string `json:"due_date"`
 		Recurrence *string `json:"recurrence"`
 	}](argsJSON)
 	if err != nil {
@@ -320,7 +321,8 @@ func (t *AppendToInboxTool) Execute(ctx context.Context, userID pgtype.UUID, arg
 
 // --- SearchNotesTool ---
 type SearchNotesTool struct {
-	q sqlcgen.Querier
+	q       sqlcgen.Querier
+	embedCL *llm.EmbeddingClient
 }
 
 func (t *SearchNotesTool) Name() string { return "search_notes" }
@@ -331,7 +333,36 @@ func (t *SearchNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`
 }
 func (t *SearchNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	return "", fmt.Errorf("semantic search requires a real embedding service")
+	args, err := parseArgs[struct {
+		Query string `json:"query"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+	emb, err := t.embedCL.GenerateEmbedding(ctx, args.Query)
+	if err != nil {
+		return "", fmt.Errorf("generate embedding: %w", err)
+	}
+	vec := make([]float32, len(emb))
+	for i := range emb {
+		vec[i] = float32(emb[i])
+	}
+	results, err := t.q.SearchNotesByEmbedding(ctx, sqlcgen.SearchNotesByEmbeddingParams{
+		UserID:  userID,
+		Column2: pgvector.NewVector(vec),
+		Limit:   10,
+	})
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, r := range results {
+		b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %d)\n", formatID(r.ID), r.Title.String, r.Similarity))
+	}
+	if b.Len() == 0 {
+		return "No matching notes found", nil
+	}
+	return b.String(), nil
 }
 
 // --- GetSoulTool ---
@@ -457,7 +488,7 @@ type GetNotesTool struct {
 	notesSvc *notes.Service
 }
 
-func (t *GetNotesTool) Name() string { return "get_notes" }
+func (t *GetNotesTool) Name() string        { return "get_notes" }
 func (t *GetNotesTool) Description() string { return "List notes in the vault" }
 func (t *GetNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"limit":{"type":"integer"}},"required":[]}`
@@ -491,7 +522,7 @@ type UpdateNoteTool struct {
 	notesSvc *notes.Service
 }
 
-func (t *UpdateNoteTool) Name() string { return "update_note" }
+func (t *UpdateNoteTool) Name() string        { return "update_note" }
 func (t *UpdateNoteTool) Description() string { return "Update title or content of a note" }
 func (t *UpdateNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"},"title":{"type":"string"},"content":{"type":"string"}},"required":["note_id"]}`
@@ -521,7 +552,7 @@ type AppendToNoteTool struct {
 	notesSvc *notes.Service
 }
 
-func (t *AppendToNoteTool) Name() string { return "append_to_note" }
+func (t *AppendToNoteTool) Name() string        { return "append_to_note" }
 func (t *AppendToNoteTool) Description() string { return "Append text to an existing note by ID" }
 func (t *AppendToNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"},"content":{"type":"string"}},"required":["note_id","content"]}`
@@ -555,7 +586,7 @@ type LinkNotesTool struct {
 	notesSvc *notes.Service
 }
 
-func (t *LinkNotesTool) Name() string { return "link_notes" }
+func (t *LinkNotesTool) Name() string        { return "link_notes" }
 func (t *LinkNotesTool) Description() string { return "Create a bi-directional link between two notes" }
 func (t *LinkNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"source_id":{"type":"string"},"target_id":{"type":"string"}},"required":["source_id","target_id"]}`
@@ -569,7 +600,7 @@ type DeleteMemoryTool struct {
 	memoriesSvc *memories.Service
 }
 
-func (t *DeleteMemoryTool) Name() string { return "delete_memory" }
+func (t *DeleteMemoryTool) Name() string        { return "delete_memory" }
 func (t *DeleteMemoryTool) Description() string { return "Delete a specific memory by ID" }
 func (t *DeleteMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"memory_id":{"type":"string"}},"required":["memory_id"]}`
@@ -596,7 +627,7 @@ type UpdateSoulTool struct {
 	soulSvc *soul.Service
 }
 
-func (t *UpdateSoulTool) Name() string { return "update_soul" }
+func (t *UpdateSoulTool) Name() string        { return "update_soul" }
 func (t *UpdateSoulTool) Description() string { return "Update the agent's personality (Soul)" }
 func (t *UpdateSoulTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
@@ -619,7 +650,7 @@ type GetTodayTasksTool struct {
 	tasksSvc *tasks.Service
 }
 
-func (t *GetTodayTasksTool) Name() string { return "get_today_tasks" }
+func (t *GetTodayTasksTool) Name() string        { return "get_today_tasks" }
 func (t *GetTodayTasksTool) Description() string { return "List today's tasks" }
 func (t *GetTodayTasksTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
@@ -645,7 +676,9 @@ type UpdateTaskTool struct {
 }
 
 func (t *UpdateTaskTool) Name() string { return "update_task" }
-func (t *UpdateTaskTool) Description() string { return "Update a task's title, due_date, or recurrence" }
+func (t *UpdateTaskTool) Description() string {
+	return "Update a task's title, due_date, or recurrence"
+}
 func (t *UpdateTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"task_id":{"type":"string"},"title":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date"},"recurrence":{"type":"string","enum":["daily","weekdays","weekly","monthly"]}},"required":["task_id"]}`
 }
