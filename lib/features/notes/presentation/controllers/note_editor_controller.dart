@@ -2,18 +2,18 @@
 ///
 /// Owns the [MutableDocument], [Editor], [MutableDocumentComposer],
 /// [FocusNode], [TextEditingController] (when a title is editable),
-/// and the [SaveThrottle] instances that back autosave and flush-on-pop.
+/// and a [SaveThrottle] instance that backs autosave and flush-on-pop.
 /// Concrete screens decide what UI to build around the document; the
 /// controller takes care of the lifecycle and the save path.
 ///
 /// The controller holds the **document and save plumbing**; the host
-/// screen provides the [WidgetRef] and target [noteId] at every save
-/// call so the controller never needs to cache either.
+/// screen provides the save callbacks and binds the [noteId] so the
+/// controller never needs to cache a Riverpod [WidgetRef].
 ///
 /// [flushBeforePop] evaluates the final document state: when both the
 /// title and markdown content are empty (after trimming), the row is
-/// deleted via [deleteNote] instead of saved. If the host did not wire
-/// a [deleteNote] callback (e.g. inbox screen), the delete is a no-op
+/// deleted via [emptyNoteExit] instead of saved. If the host did not wire
+/// an [emptyNoteExit] callback (e.g. inbox screen), the delete is a no-op
 /// and the old content is preserved. This keeps "open and back out"
 /// from leaving orphan blank notes behind without a separate flag.
 library;
@@ -30,28 +30,25 @@ import 'package:supanotes/features/notes/data/markdown_serializer.dart'
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/task_entry.dart';
 
-/// Signature for the content, title and delete operations.
+/// Signature for the snapshot save and empty-note exit operations.
 ///
 /// The host screen provides these so the controller does not depend on
 /// a particular [WidgetRef] or note id. Tests can supply a no-op or
 /// recording implementation.
-typedef ContentSave =
+typedef SnapshotSave =
     Future<void> Function(
-      WidgetRef ref,
       String noteId,
+      String title,
       String markdown,
       List<TaskEntry> tasks,
     );
-typedef TitleSave =
-    Future<void> Function(WidgetRef ref, String noteId, String title);
-typedef DeleteNote = Future<void> Function(WidgetRef ref, String noteId);
+typedef EmptyNoteExit = Future<void> Function(String noteId);
 
 class NoteEditorController {
   NoteEditorController({
     this.editableTitle = true,
-    required this.contentSave,
-    required this.titleSave,
-    this.deleteNote,
+    required this.snapshotSave,
+    this.emptyNoteExit,
   });
 
   /// Whether the host screen lets the user edit a title. Inbox notes
@@ -60,9 +57,8 @@ class NoteEditorController {
 
   /// Provided by the host. Keeps the controller free of [WidgetRef]
   /// references so it can be unit-tested in isolation.
-  final ContentSave contentSave;
-  final TitleSave titleSave;
-  final DeleteNote? deleteNote;
+  final SnapshotSave snapshotSave;
+  final EmptyNoteExit? emptyNoteExit;
 
   MutableDocument? document;
   Editor? editor;
@@ -70,12 +66,9 @@ class NoteEditorController {
   FocusNode? focusNode;
   TextEditingController? titleController;
 
-  final _contentThrottle = SaveThrottle();
-  final _titleThrottle = SaveThrottle();
+  final _saveThrottle = SaveThrottle();
 
-  /// The currently bound [WidgetRef] and [noteId]. Both are non-null
-  /// while the screen is mounted.
-  WidgetRef? _ref;
+  /// The currently bound [noteId]. Non-null while the screen is mounted.
   String? _noteId;
 
   /// Initializes the editor from the given [content] and optional
@@ -100,28 +93,34 @@ class NoteEditorController {
     document!.addListener(_onDocumentChanged);
   }
 
-  void bind(WidgetRef ref, String noteId) {
-    _ref = ref;
+  void bind(String noteId) {
     _noteId = noteId;
   }
 
-  void _onDocumentChanged(DocumentChangeLog _) {
+  void _onDocumentChanged(DocumentChangeLog _) => _scheduleSnapshotSave();
+
+  void _onTitleChanged() => _scheduleSnapshotSave();
+
+  void _scheduleSnapshotSave() {
     final doc = document;
     if (doc == null) return;
-    final markdown = serializeDocumentToMarkdown(doc);
-    final tasks = _extractTasks(doc);
-    _contentThrottle.schedule(
-      generation: _contentThrottle.nextGeneration(),
-      operation: () => _runContentSave(markdown, tasks),
+    final generation = _saveThrottle.nextGeneration();
+    _saveThrottle.schedule(
+      generation: generation,
+      operation: _runSnapshotSave,
     );
   }
 
-  void _onTitleChanged() {
-    final value = titleController?.text;
-    if (value == null) return;
-    _titleThrottle.schedule(
-      generation: _titleThrottle.nextGeneration(),
-      operation: () => _runTitleSave(value),
+  Future<void> _runSnapshotSave() async {
+    final noteId = _noteId;
+    final doc = document;
+    if (noteId == null || doc == null) return;
+
+    await snapshotSave(
+      noteId,
+      titleController?.text ?? '',
+      serializeDocumentToMarkdown(doc),
+      _extractTasks(doc),
     );
   }
 
@@ -131,73 +130,36 @@ class NoteEditorController {
   ///
   /// When both the title and markdown content are empty (after
   /// trimming), the row is deleted instead of saved. Screens that did
-  /// not wire a [deleteNote] callback (e.g. inbox) skip the delete,
+  /// not wire an [emptyNoteExit] callback (e.g. inbox) skip the delete,
   /// preserving the old content.
   Future<void> flushBeforePop() async {
+    final noteId = _noteId;
     final doc = document;
+    if (noteId == null || doc == null) return;
+
     final title = titleController?.text ?? '';
-    final markdown = doc != null ? serializeDocumentToMarkdown(doc) : '';
+    final markdown = serializeDocumentToMarkdown(doc);
+    final tasks = _extractTasks(doc);
 
     dev.log(
-      '[NoteEditorController] flushBeforePop: noteId=$_noteId, '
+      '[NoteEditorController] flushBeforePop: noteId=$noteId, '
       'markdownLength=${markdown.length}, titleLength=${title.length}',
       name: 'NoteEditor',
     );
 
-    if (deleteNote != null && markdown.trim().isEmpty && title.trim().isEmpty) {
+    final generation = _saveThrottle.nextGeneration();
+    await _saveThrottle.flush(
+      generation: generation,
+      operation: () => snapshotSave(noteId, title, markdown, tasks),
+    );
+
+    if (title.trim().isEmpty && markdown.trim().isEmpty) {
       dev.log(
         '[NoteEditorController] Deleting note (empty)',
         name: 'NoteEditor',
       );
-      await _runDelete();
-      return;
+      await emptyNoteExit?.call(noteId);
     }
-
-    final contentGen = _contentThrottle.nextGeneration();
-    final titleGen = _titleThrottle.nextGeneration();
-    if (doc != null) {
-      final tasks = _extractTasks(doc);
-      dev.log(
-        '[NoteEditorController] Saving content: noteId=$_noteId, tasks=${tasks.length}',
-        name: 'NoteEditor',
-      );
-      await _contentThrottle.flush(
-        generation: contentGen,
-        operation: () => _runContentSave(markdown, tasks),
-      );
-    }
-    if (title.isNotEmpty || editableTitle) {
-      dev.log(
-        '[NoteEditorController] Saving title: noteId=$_noteId, title=$title',
-        name: 'NoteEditor',
-      );
-      await _titleThrottle.flush(
-        generation: titleGen,
-        operation: () => _runTitleSave(title),
-      );
-    }
-  }
-
-  Future<void> _runContentSave(String markdown, List<TaskEntry> tasks) async {
-    final ref = _ref;
-    final noteId = _noteId;
-    if (ref == null || noteId == null) return;
-    await contentSave(ref, noteId, markdown, tasks);
-  }
-
-  Future<void> _runTitleSave(String title) async {
-    final ref = _ref;
-    final noteId = _noteId;
-    if (ref == null || noteId == null) return;
-    await titleSave(ref, noteId, title);
-  }
-
-  Future<void> _runDelete() async {
-    final ref = _ref;
-    final noteId = _noteId;
-    final delete = deleteNote;
-    if (ref == null || noteId == null || delete == null) return;
-    await delete(ref, noteId);
   }
 
   List<TaskEntry> _extractTasks(MutableDocument doc) {
@@ -217,8 +179,7 @@ class NoteEditorController {
   }
 
   void dispose() {
-    _contentThrottle.dispose();
-    _titleThrottle.dispose();
+    _saveThrottle.dispose();
     if (editableTitle) {
       titleController?.removeListener(_onTitleChanged);
       titleController?.dispose();
@@ -233,56 +194,37 @@ class NoteEditorController {
 /// Default save callbacks that write to the notes repository via
 /// Riverpod. Screens that don't need to customize the save path can
 /// pass these in directly.
-Future<void> defaultContentSave(
+Future<void> defaultSnapshotSave(
   WidgetRef ref,
   String noteId,
+  String title,
   String markdown,
   List<TaskEntry> tasks,
 ) async {
   dev.log(
-    '[defaultContentSave] noteId=$noteId, markdownLength=${markdown.length}, tasks=${tasks.length}, markdown="$markdown"',
+    '[defaultSnapshotSave] noteId=$noteId, markdownLength=${markdown.length}, tasks=${tasks.length}',
     name: 'NoteEditor',
   );
-  final repo = ref.read(notesRepositoryProvider);
-  await repo.syncTasksFromDocument(noteId, tasks);
-  final note = await repo.getNoteById(noteId);
+  await ref.read(notesRepositoryProvider).saveNoteSnapshot(
+        id: noteId,
+        title: title,
+        content: markdown,
+        tasks: tasks,
+      );
   dev.log(
-    '[defaultContentSave] noteId=$noteId, noteExists=${note != null}, currentContentLength=${note?.content.length}',
+    '[defaultSnapshotSave] Completed noteId=$noteId',
     name: 'NoteEditor',
   );
-  if (note == null) {
-    await repo.upsertNote(id: noteId, content: markdown);
-  } else {
-    await repo.updateNote(noteId, content: markdown);
-  }
-  dev.log('[defaultContentSave] Completed noteId=$noteId', name: 'NoteEditor');
 }
 
-Future<void> defaultTitleSave(
-  WidgetRef ref,
-  String noteId,
-  String title,
-) async {
+Future<void> defaultEmptyNoteExit(WidgetRef ref, String noteId) async {
   dev.log(
-    '[defaultTitleSave] noteId=$noteId, title=$title',
+    '[defaultEmptyNoteExit] noteId=$noteId',
     name: 'NoteEditor',
   );
-  final repo = ref.read(notesRepositoryProvider);
-  final note = await repo.getNoteById(noteId);
-  if (note == null) {
-    await repo.upsertNote(
-      id: noteId,
-      title: title.isEmpty ? null : title,
-      content: '',
-    );
-  } else {
-    await repo.updateNote(noteId, title: title.isEmpty ? null : title);
-  }
-  dev.log('[defaultTitleSave] Completed noteId=$noteId', name: 'NoteEditor');
-}
-
-Future<void> defaultDeleteNote(WidgetRef ref, String noteId) async {
-  dev.log('[defaultDeleteNote] noteId=$noteId', name: 'NoteEditor');
-  await ref.read(notesRepositoryProvider).softDelete(noteId);
-  dev.log('[defaultDeleteNote] Completed noteId=$noteId', name: 'NoteEditor');
+  await ref.read(notesRepositoryProvider).deleteIfEmptyOrTombstone(noteId);
+  dev.log(
+    '[defaultEmptyNoteExit] Completed noteId=$noteId',
+    name: 'NoteEditor',
+  );
 }

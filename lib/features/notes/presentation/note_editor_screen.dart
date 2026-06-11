@@ -30,25 +30,29 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
-  final _controller = NoteEditorController(
-    contentSave: defaultContentSave,
-    titleSave: defaultTitleSave,
-    deleteNote: defaultDeleteNote,
-  );
+  NoteEditorController? _controller;
+
+  NoteEditorController _controllerOrCreate() =>
+      _controller ??= NoteEditorController(
+        snapshotSave: (noteId, title, markdown, tasks) =>
+            defaultSnapshotSave(ref, noteId, title, markdown, tasks),
+        emptyNoteExit: (noteId) => defaultEmptyNoteExit(ref, noteId),
+      );
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    _controller.bind(ref, widget.noteId);
+    final controller = _controllerOrCreate();
+    controller.bind(widget.noteId);
 
     final asyncValue = ref.watch(noteProvider(widget.noteId));
 
-    if (_controller.document == null) {
+    if (controller.document == null) {
       dev.log(
         '[NoteEditor] noteId=${widget.noteId}, asyncValue=${asyncValue.runtimeType}, '
         'hasData=${asyncValue.hasValue}, isLoading=${asyncValue.isLoading}',
@@ -68,12 +72,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           body: Center(child: Text('Nota nao encontrada')),
         );
       }
-      _controller.init(content: note.content, title: note.title);
+      controller.init(content: note.content, title: note.title);
     }
 
-    if (_controller.document == null ||
-        _controller.editor == null ||
-        _controller.composer == null) {
+    if (controller.document == null ||
+        controller.editor == null ||
+        controller.composer == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -81,7 +85,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        await _controller.flushBeforePop();
+        await controller.flushBeforePop();
         if (!context.mounted) return;
         context.pop();
       },
@@ -89,7 +93,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         appBar: AppBar(
           centerTitle: true,
           title: TextField(
-            controller: _controller.titleController,
+            controller: controller.titleController,
             decoration: const InputDecoration(
               border: InputBorder.none,
               filled: false,
@@ -106,20 +110,20 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             NoteTagsChipBar(noteId: widget.noteId),
             Expanded(
               child: SuperEditor(
-                editor: _controller.editor!,
-                focusNode: _controller.focusNode,
+                editor: controller.editor!,
+                focusNode: controller.focusNode,
                 stylesheet: defaultStylesheet.copyWith(
                   documentPadding: const EdgeInsets.all(AppSpacing.md),
                 ),
                 componentBuilders: [
                   ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(_controller.editor!),
+                  CustomTaskComponentBuilder(controller.editor!),
                 ],
               ),
             ),
             NoteToolbar(
-              editor: _controller.editor!,
-              composer: _controller.composer!,
+              editor: controller.editor!,
+              composer: controller.composer!,
             ),
           ],
         ),

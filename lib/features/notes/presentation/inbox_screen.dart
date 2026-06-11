@@ -26,11 +26,14 @@ class InboxScreen extends ConsumerStatefulWidget {
 }
 
 class _InboxScreenState extends ConsumerState<InboxScreen> {
-  final _controller = NoteEditorController(
-    editableTitle: true,
-    contentSave: defaultContentSave,
-    titleSave: defaultTitleSave,
-  );
+  NoteEditorController? _controller;
+
+  NoteEditorController _controllerOrCreate() =>
+      _controller ??= NoteEditorController(
+        editableTitle: true,
+        snapshotSave: (noteId, title, markdown, tasks) =>
+            defaultSnapshotSave(ref, noteId, title, markdown, tasks),
+      );
 
   @override
   void initState() {
@@ -43,7 +46,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -72,8 +75,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     // Incondicional: o Riverpod exige que ref.watch seja chamado em
     // todo build() para manter a assinatura viva.
     final asyncValue = ref.watch(inboxProvider);
+    final controller = _controllerOrCreate();
 
-    if (_controller.document == null) {
+    if (controller.document == null) {
       if (asyncValue.isLoading) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
@@ -84,24 +88,24 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       }
       final inbox = asyncValue.asData?.value;
       if (inbox != null) {
-        _controller.bind(ref, inbox.id);
-        _controller.init(content: inbox.content, title: inbox.title);
+        controller.bind(inbox.id);
+        controller.init(content: inbox.content, title: inbox.title);
       }
     }
 
-    if (_controller.document == null ||
-        _controller.editor == null ||
-        _controller.composer == null) {
+    if (controller.document == null ||
+        controller.editor == null ||
+        controller.composer == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final hasContent = _controller.document!.isNotEmpty;
+    final hasContent = controller.document!.isNotEmpty;
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        await _controller.flushBeforePop();
+        await controller.flushBeforePop();
         if (!context.mounted) return;
         context.pop();
       },
@@ -109,7 +113,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         appBar: AppBar(
           centerTitle: true,
           title: TextField(
-            controller: _controller.titleController,
+            controller: controller.titleController,
             decoration: const InputDecoration(
               border: InputBorder.none,
               filled: false,
@@ -125,20 +129,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           children: [
             Expanded(
               child: SuperEditor(
-                editor: _controller.editor!,
-                focusNode: _controller.focusNode,
+                editor: controller.editor!,
+                focusNode: controller.focusNode,
                 stylesheet: defaultStylesheet.copyWith(
                   documentPadding: const EdgeInsets.all(AppSpacing.md),
                 ),
                 componentBuilders: [
                   ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(_controller.editor!),
+                  CustomTaskComponentBuilder(controller.editor!),
                 ],
               ),
             ),
             NoteToolbar(
-              editor: _controller.editor!,
-              composer: _controller.composer!,
+              editor: controller.editor!,
+              composer: controller.composer!,
             ),
           ],
         ),
