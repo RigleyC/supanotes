@@ -17,9 +17,7 @@ const _repositoryKey = 'test.repository';
 void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.getAccessToken()).thenAnswer((_) async => null);
   when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
-  when(() => storage.getUserId()).thenAnswer((_) async => null);
-  when(() => storage.getUserEmail()).thenAnswer((_) async => null);
-  when(() => storage.getUserName()).thenAnswer((_) async => null);
+  when(() => storage.getUser()).thenAnswer((_) async => null);
   when(() => storage.clear()).thenAnswer((_) async {});
 }
 
@@ -49,10 +47,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => null);
-      when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
-      when(() => storage.getUserId()).thenAnswer((_) async => null);
-      when(() => storage.getUserEmail()).thenAnswer((_) async => null);
-      when(() => storage.getUserName()).thenAnswer((_) async => null);
+      when(() => storage.getUser()).thenAnswer((_) async => null);
 
       final container = makeContainer(
         storage: storage,
@@ -67,9 +62,6 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => '');
-      when(() => storage.getUserId()).thenAnswer((_) async => null);
-      when(() => storage.getUserEmail()).thenAnswer((_) async => null);
-      when(() => storage.getUserName()).thenAnswer((_) async => null);
 
       final container = makeContainer(
         storage: storage,
@@ -84,9 +76,9 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
-      when(() => storage.getUserId()).thenAnswer((_) async => 'u-1');
-      when(() => storage.getUserEmail()).thenAnswer((_) async => 'a@b');
-      when(() => storage.getUserName()).thenAnswer((_) async => 'Alice');
+      when(() => storage.getUser()).thenAnswer(
+        (_) async => const User(id: 'u-1', email: 'a@b', name: 'Alice'),
+      );
 
       final container = makeContainer(
         storage: storage,
@@ -104,9 +96,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
-      when(() => storage.getUserId()).thenAnswer((_) async => 'u-1');
-      when(() => storage.getUserEmail()).thenAnswer((_) async => null);
-      when(() => storage.getUserName()).thenAnswer((_) async => null);
+      when(() => storage.getUser()).thenAnswer((_) async => null);
       when(() => storage.clear()).thenAnswer((_) async {});
 
       final container = makeContainer(

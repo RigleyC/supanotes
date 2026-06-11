@@ -12,23 +12,22 @@ import (
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
-// TaskCompletionInput is the shape the Flutter client pushes for each
-// completion row. We deliberately do not reuse sqlcgen.TaskCompletion
-// because the client only sends id / task_id / completed_at — status is
-// always 'completed' on the server side, and user_id is derived via the
-// task FK at insert time.
-type TaskCompletionInput struct {
-	ID          pgtype.UUID        `json:"id"`
-	TaskID      pgtype.UUID        `json:"task_id"`
-	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-}
-
+// SyncPayload is the wire shape for both push (client → server) and
+// pull (server → client). The asymmetry between directions lives in
+// the server logic, not the type:
+//   - On push, the server only reads id / task_id / completed_at from
+//     each completion; status is always hardcoded to 'completed' and
+//     user_id always comes from the auth context. The client may leave
+//     status unset (or set it) and the server ignores it.
+//   - On pull, the server returns the full row as stored. The Flutter
+//     client stamps user_id locally with the currently authenticated
+//     user because the table itself has no user_id column.
 type SyncPayload struct {
-	Notes           []sqlcgen.Note        `json:"notes"`
-	Tasks           []sqlcgen.Task        `json:"tasks"`
-	Contexts        []sqlcgen.Context     `json:"contexts"`
-	Tags            []sqlcgen.Tag         `json:"tags"`
-	TaskCompletions []TaskCompletionInput `json:"task_completions"`
+	Notes           []sqlcgen.Note           `json:"notes"`
+	Tasks           []sqlcgen.Task           `json:"tasks"`
+	Contexts        []sqlcgen.Context        `json:"contexts"`
+	Tags            []sqlcgen.Tag            `json:"tags"`
+	TaskCompletions []sqlcgen.TaskCompletion `json:"task_completions"`
 }
 
 type Service interface {
@@ -83,11 +82,20 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		tags = make([]sqlcgen.Tag, 0)
 	}
 
+	completions, err := s.repo.GetSyncTaskCompletions(ctx, userID, lastSyncedAt, limit)
+	if err != nil {
+		return nil, err
+	}
+	if completions == nil {
+		completions = make([]sqlcgen.TaskCompletion, 0)
+	}
+
 	return &SyncPayload{
-		Notes:    notes,
-		Tasks:    tasks,
-		Contexts: contexts,
-		Tags:     tags,
+		Notes:           notes,
+		Tasks:           tasks,
+		Contexts:        contexts,
+		Tags:            tags,
+		TaskCompletions: completions,
 	}, nil
 }
 

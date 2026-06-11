@@ -49,6 +49,22 @@ class MessageModel {
   final String content;
   final DateTime createdAt;
 
+  MessageModel copyWith({
+    String? id,
+    String? sessionId,
+    MessageRole? role,
+    String? content,
+    DateTime? createdAt,
+  }) {
+    return MessageModel(
+      id: id ?? this.id,
+      sessionId: sessionId ?? this.sessionId,
+      role: role ?? this.role,
+      content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
       id: (json['id'] ?? '') as String,
@@ -93,3 +109,5 @@ class ChatListState {
     );
   }
 }
+
+

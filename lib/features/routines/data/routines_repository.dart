@@ -22,6 +22,8 @@ abstract class IRoutinesRepository {
   Future<List<RoutineModel>> getRoutines();
   Future<List<RoutineLogModel>> getLogs();
   Future<RoutineModel> updateRoutine(String id, {String? cronExpr, bool? enabled});
+  Future<RoutineModel> updateDailyRoutine({required String cronExpr, bool? enabled});
+  Future<RoutineModel> updateWeeklyRoutine({required String cronExpr, bool? enabled});
   Future<String> testDaily();
   Future<String> testWeekly();
   Future<String> getLatestBrief(BriefType type);
@@ -99,6 +101,24 @@ class RoutinesRepository implements IRoutinesRepository {
     }
   }
 
+  /// `PATCH /routines/daily` → update the daily routine schedule.
+  /// Returns the updated routine.
+  @override
+  Future<RoutineModel> updateDailyRoutine({
+    required String cronExpr,
+    bool? enabled,
+  }) =>
+      _updateByType('daily', cronExpr: cronExpr, enabled: enabled);
+
+  /// `PATCH /routines/weekly` → update the weekly routine schedule.
+  /// Returns the updated routine.
+  @override
+  Future<RoutineModel> updateWeeklyRoutine({
+    required String cronExpr,
+    bool? enabled,
+  }) =>
+      _updateByType('weekly', cronExpr: cronExpr, enabled: enabled);
+
   /// `POST /routines/daily/test` → dry-run, returns the brief body
   /// the LLM produced for the user's current context.
   @override
@@ -118,6 +138,27 @@ class RoutinesRepository implements IRoutinesRepository {
         '/routines/brief/${type.testPath}',
       );
       return _extractContent(response);
+    } on DioException catch (e) {
+      throw fromDioError(e);
+    }
+  }
+
+  Future<RoutineModel> _updateByType(String type, {required String cronExpr, bool? enabled}) async {
+    final body = <String, dynamic>{'cron_expr': cronExpr};
+    if (enabled != null) body['enabled'] = enabled;
+    try {
+      final response = await _api.patch<Map<String, dynamic>>(
+        '/routines/$type',
+        data: body,
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const ServerException(
+          message: 'Resposta vazia do servidor',
+          statusCode: 500,
+        );
+      }
+      return RoutineModel.fromJson(data);
     } on DioException catch (e) {
       throw fromDioError(e);
     }

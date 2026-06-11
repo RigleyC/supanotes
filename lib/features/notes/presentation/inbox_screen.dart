@@ -132,7 +132,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 editor: controller.editor!,
                 focusNode: controller.focusNode,
                 stylesheet: defaultStylesheet.copyWith(
-                  documentPadding: const EdgeInsets.all(AppSpacing.md),
+                 documentPadding:  EdgeInsets.zero,
                 ),
                 componentBuilders: [
                   ...defaultComponentBuilders,

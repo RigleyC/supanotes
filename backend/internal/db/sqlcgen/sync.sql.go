@@ -443,3 +443,53 @@ func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskComple
 	)
 	return err
 }
+
+// HAND-ADDED — not generated because sqlc is not on the CI PATH at time
+// of writing. Run `sqlc generate` from backend/ to regenerate the full
+// file; if the generated output matches then this comment can be removed.
+const getSyncTaskCompletions = `-- name: GetSyncTaskCompletions :many
+SELECT tc.id, tc.task_id, tc.completed_at, tc.status
+FROM task_completions tc
+JOIN tasks t ON t.id = tc.task_id
+WHERE t.user_id = $1
+  AND tc.completed_at > $2
+ORDER BY tc.completed_at ASC
+LIMIT $3
+`
+
+type GetSyncTaskCompletionsParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	LastSyncedAt pgtype.Timestamptz `json:"last_synced_at"`
+	Limit        int32              `json:"limit"`
+}
+
+// Returns completion rows belonging to a user's tasks whose
+// `completed_at` is newer than the cursor. The table has no
+// `updated_at`, so we use `completed_at` as the pull cursor —
+// completions are append-only, so any new completion is guaranteed
+// to have a fresh timestamp. The join through `tasks` enforces the
+// per-user scope since `task_completions` itself has no `user_id`.
+func (q *Queries) GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error) {
+	rows, err := q.db.Query(ctx, getSyncTaskCompletions, arg.UserID, arg.LastSyncedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TaskCompletion
+	for rows.Next() {
+		var i TaskCompletion
+		if err := rows.Scan(
+			&i.ID,
+			&i.TaskID,
+			&i.CompletedAt,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

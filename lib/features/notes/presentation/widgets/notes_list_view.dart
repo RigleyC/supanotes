@@ -53,7 +53,7 @@ class NotesListView extends StatelessWidget {
               final note = notes[index];
               return Cue.onMount(
                 motion: .smooth(),
-                acts: [.fadeIn(), .slideX(from: -0.06)],
+                acts: [.fadeIn()],
                 child: NoteListRow(
                   note: note,
                   onTap: () => onTap(note),

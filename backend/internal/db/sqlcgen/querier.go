@@ -59,6 +59,7 @@ type Querier interface {
 	GetSyncContexts(ctx context.Context, arg GetSyncContextsParams) ([]Context, error)
 	GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]Note, error)
 	GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error)
+	GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error)
 	GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]Task, error)
 	GetTags(ctx context.Context, userID pgtype.UUID) ([]Tag, error)
 	GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]Tag, error)

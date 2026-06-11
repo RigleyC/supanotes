@@ -1,5 +1,5 @@
-/// Secure, on-device persistence of the JWT pair, the current user id,
-/// and the cached profile (email, name).
+/// Secure, on-device persistence of the JWT pair, the current user, and the
+/// cached session bootstrap (settings, soul, contexts, routines).
 ///
 /// Backed by [FlutterSecureStorage] which on Android uses the
 /// EncryptedSharedPreferences keystore and on iOS uses the Keychain. The
@@ -16,6 +16,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'package:supanotes/features/auth/domain/user.dart';
+
 class AuthLocalStorage {
   AuthLocalStorage({FlutterSecureStorage? storage})
       : _storage = storage ?? const FlutterSecureStorage();
@@ -24,49 +26,44 @@ class AuthLocalStorage {
 
   static const String _kAccessToken = 'access_token';
   static const String _kRefreshToken = 'refresh_token';
-  static const String _kUserId = 'user_id';
-  static const String _kUserEmail = 'user_email';
-  static const String _kUserName = 'user_name';
+  static const String _kUser = 'user';
   static const String _kSessionData = 'session_data';
 
-  /// Persists the JWT pair and the user id. The user profile (email/name)
-  /// is **not** touched — call [saveUserProfile] separately so the
-  /// [AuthInterceptor] can re-save tokens on a refresh without needing
-  /// the profile on hand.
+  /// Persists the JWT pair. The user profile is **not** touched — call
+  /// [saveUser] separately so the [AuthInterceptor] can re-save tokens on
+  /// a refresh without needing the profile on hand.
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
-    required String userId,
   }) async {
     await Future.wait<dynamic>([
       _storage.write(key: _kAccessToken, value: accessToken),
       _storage.write(key: _kRefreshToken, value: refreshToken),
-      _storage.write(key: _kUserId, value: userId),
     ]);
   }
 
   /// Persists the cached profile. Called by the auth repository on a
   /// successful login or register so the [AuthController] can restore
-  /// [AuthAuthenticated] on the next cold start without an extra /me call.
-  Future<void> saveUserProfile({
-    required String email,
-    required String name,
-  }) async {
-    await Future.wait<dynamic>([
-      _storage.write(key: _kUserEmail, value: email),
-      _storage.write(key: _kUserName, value: name),
-    ]);
+  /// the user on the next cold start without an extra /me call.
+  Future<void> saveUser({required User user}) async {
+    await _storage.write(key: _kUser, value: jsonEncode(user.toJson()));
   }
 
   Future<String?> getAccessToken() => _storage.read(key: _kAccessToken);
 
   Future<String?> getRefreshToken() => _storage.read(key: _kRefreshToken);
 
-  Future<String?> getUserId() => _storage.read(key: _kUserId);
-
-  Future<String?> getUserEmail() => _storage.read(key: _kUserEmail);
-
-  Future<String?> getUserName() => _storage.read(key: _kUserName);
+  /// Returns the cached profile, or `null` if missing or corrupt.
+  Future<User?> getUser() async {
+    final raw = await _storage.read(key: _kUser);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return User.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('getUser decode error: $e');
+      return null;
+    }
+  }
 
   /// Persists the raw session data (settings, soul, contexts, routines)
   /// as a JSON blob so controllers can hydrate from disk on cold start.
@@ -84,7 +81,7 @@ class AuthLocalStorage {
     try {
       return jsonDecode(raw) as Map<String, dynamic>;
     } catch (e) {
-      debugPrint('readLocalToken error: $e');
+      debugPrint('getSessionData decode error: $e');
       return const {};
     }
   }
@@ -94,9 +91,7 @@ class AuthLocalStorage {
     await Future.wait<dynamic>([
       _storage.delete(key: _kAccessToken),
       _storage.delete(key: _kRefreshToken),
-      _storage.delete(key: _kUserId),
-      _storage.delete(key: _kUserEmail),
-      _storage.delete(key: _kUserName),
+      _storage.delete(key: _kUser),
       _storage.delete(key: _kSessionData),
     ]);
   }

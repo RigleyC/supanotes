@@ -62,6 +62,20 @@ class SyncMapper {
         'completed_at': c.completedAt.toUtc().toIso8601String(),
       };
 
+  Map<String, dynamic> noteLinkToJson(NoteLinkData l) => {
+        'id': l.id,
+        'source_id': l.sourceId,
+        'target_id': l.targetId,
+        'relation': l.relation,
+        'created_at': l.createdAt.toUtc().toIso8601String(),
+        'updated_at': l.updatedAt.toUtc().toIso8601String(),
+      };
+
+  Map<String, dynamic> localNoteTagToJson(LocalNoteTagData t) => {
+        'note_id': t.noteId,
+        'tag_id': t.tagId,
+      };
+
   // ---------------------------------------------------------------------------
   // Pull direction — Map → typed
   // ---------------------------------------------------------------------------
@@ -83,6 +97,7 @@ class SyncMapper {
             ? DateTime.parse(json['deleted_at'] as String).toLocal()
             : null,
         isDirty: false,
+        hasRemoteCopy: true,
       );
 
   TaskData taskFromJson(Map<String, dynamic> json) => TaskData(
@@ -123,6 +138,40 @@ class SyncMapper {
         name: json['name'] as String,
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
         updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+        isDirty: false,
+      );
+
+  /// Pull-side completion mapper. Wire format omits `user_id` (server
+  /// derives ownership from the parent task) — caller stamps the row
+  /// with the current authenticated [userId]. `status` is dropped
+  /// because the local schema only stores the completion event.
+  LocalTaskCompletionData taskCompletionFromJson(
+    Map<String, dynamic> json, {
+    required String userId,
+  }) =>
+      LocalTaskCompletionData(
+        id: json['id'] as String,
+        taskId: json['task_id'] as String,
+        userId: userId,
+        completedAt:
+            DateTime.parse(json['completed_at'] as String).toLocal(),
+        isDirty: false,
+      );
+
+  NoteLinkData noteLinkFromJson(Map<String, dynamic> json) => NoteLinkData(
+        id: json['id'] as String,
+        sourceId: json['source_id'] as String,
+        targetId: json['target_id'] as String,
+        relation: (json['relation'] as String?) ?? 'related',
+        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+        updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+        isDirty: false,
+      );
+
+  LocalNoteTagData localNoteTagFromJson(Map<String, dynamic> json) =>
+      LocalNoteTagData(
+        noteId: json['note_id'] as String,
+        tagId: json['tag_id'] as String,
         isDirty: false,
       );
 }

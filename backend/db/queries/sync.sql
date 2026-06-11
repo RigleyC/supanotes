@@ -100,3 +100,18 @@ FROM tasks
 WHERE tasks.id = sqlc.arg('task_id')::uuid
   AND tasks.user_id = sqlc.arg('user_id')::uuid
 ON CONFLICT (id) DO NOTHING;
+
+-- name: GetSyncTaskCompletions :many
+-- Returns completion rows belonging to a user's tasks whose
+-- `completed_at` is newer than the cursor. The table has no
+-- `updated_at`, so we use `completed_at` as the pull cursor —
+-- completions are append-only, so any new completion is guaranteed
+-- to have a fresh timestamp. The join through `tasks` enforces the
+-- per-user scope since `task_completions` itself has no `user_id`.
+SELECT tc.id, tc.task_id, tc.completed_at, tc.status
+FROM task_completions tc
+JOIN tasks t ON t.id = tc.task_id
+WHERE t.user_id = $1
+  AND tc.completed_at > sqlc.arg('last_synced_at')
+ORDER BY tc.completed_at ASC
+LIMIT sqlc.arg('limit');

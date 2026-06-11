@@ -27,9 +27,7 @@ class _StubAuthController extends AuthController {
 void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.getAccessToken()).thenAnswer((_) async => null);
   when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
-  when(() => storage.getUserId()).thenAnswer((_) async => null);
-  when(() => storage.getUserEmail()).thenAnswer((_) async => null);
-  when(() => storage.getUserName()).thenAnswer((_) async => null);
+  when(() => storage.getUser()).thenAnswer((_) async => null);
   when(() => storage.clear()).thenAnswer((_) async {});
 }
 

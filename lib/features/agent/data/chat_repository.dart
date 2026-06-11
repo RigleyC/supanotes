@@ -41,7 +41,7 @@ class ChatRepository implements IChatRepository {
         '/agent/chat',
         data: <String, dynamic>{
           'session_id': sessionId,
-          'message': message,
+          'content': message,
         },
       );
       final data = response.data;

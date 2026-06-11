@@ -8,11 +8,14 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 import 'daos/contexts_dao.dart';
+import 'daos/note_links_dao.dart';
+import 'daos/note_tags_dao.dart';
 import 'daos/notes_dao.dart';
 import 'daos/tags_dao.dart';
 import 'daos/task_completions_dao.dart';
 import 'daos/tasks_dao.dart';
 import 'tables/contexts.dart';
+import 'tables/note_links.dart';
 import 'tables/note_tags.dart';
 import 'tables/notes.dart';
 import 'tables/tags.dart';
@@ -22,8 +25,8 @@ import 'tables/tasks.dart';
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions],
-  daos: [NotesDao, ContextsDao, TasksDao, TagsDao, TaskCompletionsDao],
+  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions, NoteLinks],
+  daos: [NotesDao, ContextsDao, TasksDao, TagsDao, TaskCompletionsDao, NoteLinksDao, NoteTagsDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());

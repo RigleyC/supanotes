@@ -16,6 +16,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../auth/current_user.dart';
 import '../database/database.dart';
 import '../di/providers.dart';
 import 'connectivity_monitor.dart';
@@ -27,7 +28,10 @@ import 'sync_state.dart';
 /// timestamp is persisted across app launches.
 const String _kLastSyncedAtPref = 'last_synced_at';
 
-final syncServiceProvider = Provider<SyncService>((ref) {
+final syncServiceProvider = Provider<SyncService?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
+
   final db = ref.watch(appDatabaseProvider);
   final apiClient = ref.watch(apiClientProvider);
   final connectivity = ref.watch(connectivityMonitorProvider);
@@ -42,6 +46,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     mapper: mapper,
     connectivity: connectivity,
     notifier: notifier,
+    userId: userId,
   );
   ref.onDispose(service.dispose);
   return service;
@@ -54,17 +59,20 @@ class SyncService {
     required SyncMapper mapper,
     required ConnectivityMonitor connectivity,
     required SyncStateNotifier notifier,
+    required String userId,
   })  : _db = db,
         _repo = repo,
         _mapper = mapper,
         _connectivity = connectivity,
-        _notifier = notifier;
+        _notifier = notifier,
+        _userId = userId;
 
   final AppDatabase _db;
   final ISyncRepository _repo;
   final SyncMapper _mapper;
   final ConnectivityMonitor _connectivity;
   final SyncStateNotifier _notifier;
+  final String _userId;
 
   StreamSubscription<bool>? _connectivitySub;
   Timer? _syncTimer;
@@ -114,12 +122,16 @@ class SyncService {
     final contexts = await _db.contextsDao.getDirtyContexts();
     final tags = await _db.tagsDao.getDirtyTags();
     final completions = await _db.taskCompletionsDao.getDirtyCompletions();
+    final noteLinks = await _db.noteLinksDao.getDirtyLinks();
+    final noteTags = await _db.noteTagsDao.getDirtyNoteTags();
 
     if (notes.isEmpty &&
         tasks.isEmpty &&
         contexts.isEmpty &&
         tags.isEmpty &&
-        completions.isEmpty) {
+        completions.isEmpty &&
+        noteLinks.isEmpty &&
+        noteTags.isEmpty) {
       return;
     }
 
@@ -130,6 +142,8 @@ class SyncService {
       'tags': tags.map(_mapper.tagToJson).toList(),
       'task_completions':
           completions.map(_mapper.taskCompletionToJson).toList(),
+      'note_links': noteLinks.map(_mapper.noteLinkToJson).toList(),
+      'note_tags': noteTags.map(_mapper.localNoteTagToJson).toList(),
     };
 
     await _repo.push(payload);
@@ -150,6 +164,12 @@ class SyncService {
       }
       for (final cmp in completions) {
         await _db.taskCompletionsDao.clearDirtyFlag(cmp.id);
+      }
+      for (final nl in noteLinks) {
+        await _db.noteLinksDao.clearDirtyFlag(nl.id);
+      }
+      for (final nt in noteTags) {
+        await _db.noteTagsDao.clearDirtyFlag(nt.noteId, nt.tagId);
       }
     });
   }
@@ -181,6 +201,24 @@ class SyncService {
       for (final raw in (data['tags'] as List? ?? [])) {
         await _db.tagsDao
             .upsertFromRemote(_mapper.tagFromJson(raw as Map<String, dynamic>));
+      }
+      for (final raw in (data['task_completions'] as List? ?? [])) {
+        await _db.taskCompletionsDao.upsertFromRemote(
+          _mapper.taskCompletionFromJson(
+            raw as Map<String, dynamic>,
+            userId: _userId,
+          ),
+        );
+      }
+      for (final raw in (data['note_links'] as List? ?? [])) {
+        await _db.noteLinksDao.upsertFromRemote(
+          _mapper.noteLinkFromJson(raw as Map<String, dynamic>),
+        );
+      }
+      for (final raw in (data['note_tags'] as List? ?? [])) {
+        await _db.noteTagsDao.upsertFromRemote(
+          _mapper.localNoteTagFromJson(raw as Map<String, dynamic>),
+        );
       }
     });
 

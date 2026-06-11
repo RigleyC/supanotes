@@ -204,11 +204,9 @@ void main() {
           .thenAnswer((_) async => 'old-access');
       when(() => storage.getRefreshToken())
           .thenAnswer((_) async => 'old-refresh');
-      when(() => storage.getUserId()).thenAnswer((_) async => 'user-1');
       when(() => storage.saveTokens(
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),
-            userId: any(named: 'userId'),
           )).thenAnswer((_) async {});
 
       var tokenReadCount = 0;
@@ -251,7 +249,6 @@ void main() {
       verify(() => storage.saveTokens(
             accessToken: 'new-access',
             refreshToken: 'new-refresh',
-            userId: 'user-1',
           )).called(1);
     });
 

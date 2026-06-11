@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
@@ -47,6 +48,7 @@ class AppTheme {
       scaffoldBackgroundColor: colorScheme.surface,
       textTheme: AppTypography.textTheme,
       visualDensity: VisualDensity.adaptivePlatformDensity,
+      fontFamily: GoogleFonts.bricolageGrotesque().fontFamily,
     );
 
     return base.copyWith(

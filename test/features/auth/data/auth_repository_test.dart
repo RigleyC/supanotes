@@ -10,6 +10,7 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
@@ -85,22 +86,14 @@ class _NoopStorage implements AuthLocalStorage {
   @override
   Future<String?> getRefreshToken() async => null;
   @override
-  Future<String?> getUserId() async => null;
-  @override
-  Future<String?> getUserEmail() async => null;
-  @override
-  Future<String?> getUserName() async => null;
+  Future<User?> getUser() async => null;
   @override
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
-    required String userId,
   }) async {}
   @override
-  Future<void> saveUserProfile({
-    required String email,
-    required String name,
-  }) async {}
+  Future<void> saveUser({required User user}) async {}
   @override
   Future<Map<String, dynamic>> getSessionData() async => const {};
   @override
@@ -112,20 +105,22 @@ void main() {
     registerFallbackValue(
       RequestOptions(path: '/', method: 'GET'),
     );
+    registerFallbackValue(
+      const User(id: '', email: '', name: ''),
+    );
   });
 
   group('AuthRepository.register', () {
     test('sends a POST to /auth/register and persists tokens', () async {
       final storage = _MockAuthLocalStorage();
+      when(() => storage.saveUser(
+            user: any(named: 'user'),
+          )).thenAnswer((_) async {});
       when(() => storage.saveTokens(
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),
-            userId: any(named: 'userId'),
           )).thenAnswer((_) async {});
-      when(() => storage.saveUserProfile(
-            email: any(named: 'email'),
-            name: any(named: 'name'),
-          )).thenAnswer((_) async {});
+      when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
 
       late _StubAdapter adapter;
       adapter = _StubAdapter((options) async {
@@ -158,14 +153,12 @@ void main() {
       expect(result.user.id, 'u-1');
       expect(result.accessToken, 'access-1');
       expect(result.refreshToken, 'refresh-1');
+      verify(() => storage.saveUser(
+            user: const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+          )).called(1);
       verify(() => storage.saveTokens(
             accessToken: 'access-1',
             refreshToken: 'refresh-1',
-            userId: 'u-1',
-          )).called(1);
-      verify(() => storage.saveUserProfile(
-            email: 'a@b.com',
-            name: 'Alice',
           )).called(1);
     });
 
@@ -187,14 +180,10 @@ void main() {
         ),
         throwsA(isA<ConflictException>()),
       );
+      verifyNever(() => storage.saveUser(user: any(named: 'user')));
       verifyNever(() => storage.saveTokens(
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),
-            userId: any(named: 'userId'),
-          ));
-      verifyNever(() => storage.saveUserProfile(
-            email: any(named: 'email'),
-            name: any(named: 'name'),
           ));
     });
   });
@@ -202,15 +191,14 @@ void main() {
   group('AuthRepository.login', () {
     test('sends a POST to /auth/login and persists tokens', () async {
       final storage = _MockAuthLocalStorage();
+      when(() => storage.saveUser(
+            user: any(named: 'user'),
+          )).thenAnswer((_) async {});
       when(() => storage.saveTokens(
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),
-            userId: any(named: 'userId'),
           )).thenAnswer((_) async {});
-      when(() => storage.saveUserProfile(
-            email: any(named: 'email'),
-            name: any(named: 'name'),
-          )).thenAnswer((_) async {});
+      when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
 
       final adapter = _StubAdapter((options) async {
         expect(options.path, '/auth/login');
@@ -232,14 +220,12 @@ void main() {
       );
 
       expect(result.user.email, 'b@c.com');
+      verify(() => storage.saveUser(
+            user: const User(id: 'u-2', email: 'b@c.com', name: 'Bob'),
+          )).called(1);
       verify(() => storage.saveTokens(
             accessToken: 'access-2',
             refreshToken: 'refresh-2',
-            userId: 'u-2',
-          )).called(1);
-      verify(() => storage.saveUserProfile(
-            email: 'b@c.com',
-            name: 'Bob',
           )).called(1);
     });
 

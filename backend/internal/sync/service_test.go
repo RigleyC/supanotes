@@ -47,6 +47,10 @@ func (m *mockRepository) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagPar
 	return sqlcgen.Tag{}, nil
 }
 
+func (m *mockRepository) GetSyncTaskCompletions(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.TaskCompletion, error) {
+	return nil, nil
+}
+
 func (m *mockRepository) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
 	return nil
 }

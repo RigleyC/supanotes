@@ -25,31 +25,101 @@ class ApiClient {
   /// [dio] is exposed for testing — when not provided the interceptor
   /// chain is built automatically by [_build].
   ApiClient({required AuthInterceptor authInterceptor, Dio? dio})
-      : _dio = dio ?? _build(authInterceptor);
+    : _dio = dio ?? _build(authInterceptor);
 
-  Future<Response<T>> get<T>(String path, {Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
-    return _dio.get<T>(path, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    return _dio.get<T>(
+      path,
+      queryParameters: queryParameters,
+      options: options,
+      cancelToken: cancelToken,
+    );
   }
 
-  Future<Response<T>> post<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
-    return _dio.post<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  Future<Response<T>> post<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    return _dio.post<T>(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: options,
+      cancelToken: cancelToken,
+    );
   }
 
-  Future<Response<T>> put<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
-    return _dio.put<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  Future<Response<T>> put<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    return _dio.put<T>(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: options,
+      cancelToken: cancelToken,
+    );
   }
 
-  Future<Response<T>> patch<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
-    return _dio.patch<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  Future<Response<T>> patch<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    return _dio.patch<T>(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: options,
+      cancelToken: cancelToken,
+    );
   }
 
-  Future<Response<T>> delete<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options, CancelToken? cancelToken}) async {
-    return _dio.delete<T>(path, data: data, queryParameters: queryParameters, options: options, cancelToken: cancelToken);
+  Future<Response<T>> delete<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    return _dio.delete<T>(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: options,
+      cancelToken: cancelToken,
+    );
   }
 
-  Future<Response<ResponseBody>> postStream(String path, {dynamic data, Options? options, CancelToken? cancelToken}) async {
-    final opts = (options ?? Options()).copyWith(responseType: ResponseType.stream);
-    return _dio.post<ResponseBody>(path, data: data, options: opts, cancelToken: cancelToken);
+  Future<Response<ResponseBody>> postStream(
+    String path, {
+    dynamic data,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    final opts = (options ?? Options()).copyWith(
+      responseType: ResponseType.stream,
+    );
+    return _dio.post<ResponseBody>(
+      path,
+      data: data,
+      options: opts,
+      cancelToken: cancelToken,
+    );
   }
 
   static Dio _build(AuthInterceptor authInterceptor) {
@@ -88,11 +158,11 @@ class _LogInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     dev.log(
-        '[ApiClient] ${err.requestOptions.method} '
-        '${err.requestOptions.uri} -> '
-        '${err.response?.statusCode ?? "no-response"} '
-        '${err.message ?? ""}',
-        name: 'ApiClient',
+      '[ApiClient] ${err.requestOptions.method} '
+      '${err.requestOptions.uri} -> '
+      '${err.response?.statusCode ?? "no-response"} '
+      '${err.message ?? ""}',
+      name: 'ApiClient',
     );
     handler.next(err);
   }

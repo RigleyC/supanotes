@@ -143,11 +143,9 @@ class AuthInterceptor extends Interceptor {
     final tokens = await _onRefresh(refreshToken);
     if (tokens == null) return false;
 
-    final userId = await tokenStorage.getUserId();
     await tokenStorage.saveTokens(
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      userId: userId ?? '',
     );
     return true;
   }

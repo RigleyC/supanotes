@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import 'core/api/backend_connectivity_hint.dart';
+import 'firebase_options.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
 import 'core/router/app_router.dart';
@@ -17,12 +18,16 @@ import 'features/auth/domain/user.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
@@ -69,13 +74,10 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<User?>>(authControllerProvider, (prev, next) {
-      final sync = ref.read(syncServiceProvider);
       next.when(
         data: (user) {
           if (user != null) {
-            sync.start();
-          } else {
-            sync.dispose();
+            ref.read(syncServiceProvider)?.start();
           }
         },
         loading: () {},

@@ -68,4 +68,13 @@ class TaskCompletionsDao extends DatabaseAccessor<AppDatabase>
     await (update(localTaskCompletions)..where((c) => c.id.equals(id)))
         .write(const LocalTaskCompletionsCompanion(isDirty: Value(false)));
   }
+
+  /// Stores a completion row that came back from the backend. Uses
+  /// `insertOnConflictUpdate` so a re-pulled row replaces the local copy
+  /// in place, and always sets [isDirty] to `false` so the row does not
+  /// get pushed back to the server.
+  Future<void> upsertFromRemote(LocalTaskCompletionData completion) async {
+    final incoming = completion.copyWith(isDirty: false);
+    await into(localTaskCompletions).insertOnConflictUpdate(incoming);
+  }
 }

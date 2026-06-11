@@ -11,6 +11,7 @@ abstract final class AppRoutes {
   static const telegram = '/telegram';
   static const chat = '/chat';
   static const search = '/search';
+  static const memories = '/memories';
 
   static const _noteBase = '/notes';
   static String note(String id) => '$_noteBase/$id';

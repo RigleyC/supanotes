@@ -26,27 +26,19 @@ class AuthController extends Notifier<AsyncValue<User?>> {
 
   Future<void> _restore() async {
     await _sessionCache.restore();
-    final results = await Future.wait([
-      _storage.getAccessToken(),
-      _storage.getUserId(),
-      _storage.getUserEmail(),
-      _storage.getUserName(),
-    ]);
-    final accessToken = results[0];
+    final accessToken = await _storage.getAccessToken();
     if (accessToken == null || accessToken.isEmpty) {
       state = const AsyncValue.data(null);
       return;
     }
-    final userId = results[1];
-    final email = results[2];
-    final name = results[3];
-    if (userId == null || email == null || name == null) {
+    final user = await _storage.getUser();
+    if (user == null) {
       await _storage.clear();
       _sessionCache.clear();
       state = const AsyncValue.data(null);
       return;
     }
-    state = AsyncValue.data(User(id: userId, email: email, name: name));
+    state = AsyncValue.data(user);
     await _registerFcmToken();
   }
 

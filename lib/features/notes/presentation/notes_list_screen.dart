@@ -159,11 +159,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 icon: Icon(Icons.search, color: iconColor),
                 onPressed: () => context.push(AppRoutes.search),
               ),
+              //Remover daqui a opção de exibir só favoritos
               NotesMoreMenu(
                 favoritesOnly: favoritesOnly,
                 onToggleFavorites: () =>
                     ref.read(favoritesFilterProvider.notifier).toggle(),
-                onSync: () => ref.read(syncServiceProvider).sync(),
+                onSync: () => ref.read(syncServiceProvider)?.sync(),
                 onOpenSettings: () => context.push(AppRoutes.settings),
                 onLogout: () =>
                     ref.read(authControllerProvider.notifier).logout(),

@@ -634,3 +634,7 @@ func (m *mockQuerier) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID
 func (m *mockQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
 	return nil
 }
+
+func (m *mockQuerier) GetSyncTaskCompletions(ctx context.Context, arg sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
+	return nil, nil
+}

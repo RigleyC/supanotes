@@ -10,7 +10,6 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_tags_chip_bar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
@@ -51,6 +50,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     controller.bind(widget.noteId);
 
     final asyncValue = ref.watch(noteProvider(widget.noteId));
+    
 
     if (controller.document == null) {
       dev.log(
@@ -68,9 +68,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       }
       final note = asyncValue.asData?.value;
       if (note == null) {
-        return const Scaffold(
-          body: Center(child: Text('Nota nao encontrada')),
-        );
+        return const Scaffold(body: Center(child: Text('Nota nao encontrada')));
       }
       controller.init(content: note.content, title: note.title);
     }
@@ -90,40 +88,38 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         context.pop();
       },
       child: Scaffold(
-        appBar: AppBar(
-          centerTitle: true,
-          title: TextField(
-            controller: controller.titleController,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              filled: false,
-              contentPadding: EdgeInsets.zero,
-              hintText: 'Sem titulo',
-            ),
-            style: AppTypography.textTheme.headlineMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        ),
-        body: Column(
-          children: [
-            NoteTagsChipBar(noteId: widget.noteId),
-            Expanded(
-              child: SuperEditor(
-                editor: controller.editor!,
-                focusNode: controller.focusNode,
-                stylesheet: defaultStylesheet.copyWith(
-                  documentPadding: const EdgeInsets.all(AppSpacing.md),
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar.medium(
+              title: TextField(
+                controller: controller.titleController,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                  hintText: 'Sem titulo',
                 ),
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(controller.editor!),
-                ],
+                style: AppTypography.textTheme.headlineMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ),
-            NoteToolbar(
+            SuperEditor(
               editor: controller.editor!,
-              composer: controller.composer!,
+              focusNode: controller.focusNode,
+              stylesheet: defaultStylesheet.copyWith(
+                documentPadding:  EdgeInsets.zero,
+              ),
+              componentBuilders: [
+                ...defaultComponentBuilders,
+                CustomTaskComponentBuilder(controller.editor!),
+              ],
+            ),
+            SliverToBoxAdapter(
+              child: NoteToolbar(
+                editor: controller.editor!,
+                composer: controller.composer!,
+              ),
             ),
           ],
         ),

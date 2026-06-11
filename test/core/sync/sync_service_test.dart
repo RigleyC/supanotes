@@ -14,6 +14,7 @@ import 'package:supanotes/core/sync/sync_state.dart';
 class FakeSyncRepository implements ISyncRepository {
   bool pushCalled = false;
   Map<String, dynamic>? lastPayload;
+  Map<String, dynamic> pullResponse = const {};
 
   @override
   Future<void> push(Map<String, dynamic> payload) async {
@@ -26,7 +27,7 @@ class FakeSyncRepository implements ISyncRepository {
     required String lastSyncedAt,
     int limit = 500,
   }) async {
-    return {};
+    return pullResponse;
   }
 }
 
@@ -75,6 +76,7 @@ void main() {
         mapper: mapper,
         connectivity: connectivity,
         notifier: notifier,
+        userId: 'test-user',
       );
 
       await service.push();
@@ -84,6 +86,58 @@ void main() {
       expect(note!.hasRemoteCopy, isTrue);
       expect(note.isDirty, isFalse);
       expect(fakeRepo.pushCalled, isTrue);
+
+      await db.close();
+    });
+  });
+
+  group('SyncService.pull', () {
+    test('persists task completions from the remote payload', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final db = AppDatabase.test();
+      final completionsDao = db.taskCompletionsDao;
+
+      final completedAt = DateTime.utc(2026, 6, 11, 12, 30);
+      final fakeRepo = FakeSyncRepository()
+        ..pullResponse = {
+          'notes': [],
+          'tasks': [],
+          'contexts': [],
+          'tags': [],
+          'task_completions': [
+            {
+              'id': 'cmp-remote-1',
+              'task_id': 'task-1',
+              'completed_at': completedAt.toIso8601String(),
+              'status': 'completed',
+            },
+          ],
+        };
+
+      final service = SyncService(
+        db: db,
+        repo: fakeRepo,
+        mapper: SyncMapper(),
+        connectivity: FakeConnectivityMonitor(),
+        notifier: SyncStateNotifier(),
+        userId: 'test-user',
+      );
+
+      await service.pull();
+
+      final rows =
+          await db.select(db.localTaskCompletions).get();
+      expect(rows, hasLength(1));
+      final row = rows.single;
+      expect(row.id, 'cmp-remote-1');
+      expect(row.taskId, 'task-1');
+      expect(row.userId, 'test-user');
+      expect(row.completedAt.toUtc(), completedAt);
+      expect(row.isDirty, isFalse);
+
+      // Sanity: the unused DAO ref should not leave dangling state.
+      expect(completionsDao, isNotNull);
 
       await db.close();
     });

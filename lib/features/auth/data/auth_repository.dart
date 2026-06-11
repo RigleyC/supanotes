@@ -60,14 +60,10 @@ class AuthRepository implements IAuthRepository {
         );
       }
       final result = AuthResult.fromJson(body);
+      await _storage.saveUser(user: result.user);
       await _storage.saveTokens(
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        userId: result.user.id,
-      );
-      await _storage.saveUserProfile(
-        email: result.user.email,
-        name: result.user.name,
       );
       await _storage.saveSessionData({
         'settings': result.session.settings,
@@ -103,14 +99,10 @@ class AuthRepository implements IAuthRepository {
         );
       }
       final result = AuthResult.fromJson(body);
+      await _storage.saveUser(user: result.user);
       await _storage.saveTokens(
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        userId: result.user.id,
-      );
-      await _storage.saveUserProfile(
-        email: result.user.email,
-        name: result.user.name,
       );
       await _storage.saveSessionData({
         'settings': result.session.settings,

@@ -121,7 +121,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: 0),
               child: TextComponent(
                 key: _textKey,
                 text: widget.viewModel.text,

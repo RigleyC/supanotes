@@ -295,6 +295,10 @@ func (s *stubQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.Upse
 	panic("unimplemented")
 }
 
+func (s *stubQuerier) GetSyncTaskCompletions(ctx context.Context, arg sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
+	panic("unimplemented")
+}
+
 var _ sqlcgen.Querier = (*stubQuerier)(nil)
 
 func TestSearchNotesTool_Execute(t *testing.T) {
