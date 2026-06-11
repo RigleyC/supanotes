@@ -4,12 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
+
+func parseInt32(s string) (int32, error) {
+	n, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int32(n), nil
+}
 
 type ChatRequest struct {
 	SessionID string `json:"session_id" validate:"required"`
@@ -103,7 +112,14 @@ func (h *Handler) ListMessages(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "invalid session_id")
 	}
 
-	messages, err := h.repo.GetMessages(c.Request().Context(), userID, sessionUUID, 50, 0)
+	limit := int32(50)
+	if l := c.QueryParam("limit"); l != "" {
+		if parsed, err := parseInt32(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	messages, err := h.repo.GetMessages(c.Request().Context(), userID, sessionUUID, limit, 0)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to list messages")
