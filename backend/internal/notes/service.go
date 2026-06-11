@@ -17,6 +17,7 @@ import (
 var (
 	ErrNoteNotFound = errors.New("note not found")
 	ErrInboxRule    = errors.New("operation not allowed on inbox note")
+	ErrEmptyNote    = errors.New("empty note")
 )
 
 type Service struct {
@@ -27,7 +28,14 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
+func isEmptyRegularNote(title *string, content string) bool {
+	return (title == nil || strings.TrimSpace(*title) == "") && strings.TrimSpace(content) == ""
+}
+
 func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, title *string, content string, contextID *pgtype.UUID, favorite, archived bool) (sqlcgen.Note, error) {
+	if isEmptyRegularNote(title, content) {
+		return sqlcgen.Note{}, ErrEmptyNote
+	}
 	arg := sqlcgen.CreateNoteParams{
 		UserID:          userID,
 		Content:         content,

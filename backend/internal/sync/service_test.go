@@ -55,6 +55,25 @@ func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }
 
+func TestSyncPushRejectsEmptyNewRegularNote(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo, nil)
+
+	err := svc.Push(context.Background(), pgtype.UUID{Valid: true}, &SyncPayload{
+		Notes: []sqlcgen.Note{{
+			ID:        pgtype.UUID{Valid: true},
+			Title:     pgtype.Text{Valid: false},
+			Content:   "   ",
+			IsInbox:   false,
+			DeletedAt: pgtype.Timestamptz{Valid: false},
+		}},
+	})
+
+	if !errors.Is(err, ErrEmptyNote) {
+		t.Fatalf("expected ErrEmptyNote, got %v", err)
+	}
+}
+
 func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
 	repo := &mockRepository{upsertNoteErr: pgx.ErrNoRows}
 	svc := NewService(repo, nil)

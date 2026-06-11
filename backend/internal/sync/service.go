@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -35,7 +36,10 @@ type Service interface {
 	Push(ctx context.Context, userID pgtype.UUID, payload *SyncPayload) error
 }
 
-var ErrSyncConflict = errors.New("sync conflict")
+var (
+	ErrSyncConflict = errors.New("sync conflict")
+	ErrEmptyNote    = errors.New("empty note")
+)
 
 type service struct {
 	repo Repository
@@ -87,6 +91,13 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 	}, nil
 }
 
+func isEmptyIncomingRegularNote(n sqlcgen.Note) bool {
+	return !n.IsInbox &&
+		!n.DeletedAt.Valid &&
+		(!n.Title.Valid || strings.TrimSpace(n.Title.String) == "") &&
+		strings.TrimSpace(n.Content) == ""
+}
+
 func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPayload) error {
 	r := s.repo
 	var tx pgx.Tx
@@ -102,6 +113,9 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	}
 
 	for _, n := range payload.Notes {
+		if isEmptyIncomingRegularNote(n) {
+			return ErrEmptyNote
+		}
 		_, err := r.UpsertNote(ctx, sqlcgen.UpsertNoteParams{
 			ID:              n.ID,
 			UserID:          userID,

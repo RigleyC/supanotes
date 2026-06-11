@@ -195,3 +195,14 @@ func TestService_RemoveTagFromNote_NoteNotFound(t *testing.T) {
 		t.Fatalf("want ErrNoteNotFound, got %v", err)
 	}
 }
+
+func TestCreateNoteRejectsEmptyRegularNote(t *testing.T) {
+	svc := NewService(&mockRepo{})
+	userID := pgtype.UUID{Valid: true}
+
+	_, err := svc.CreateNote(context.Background(), userID, nil, "   ", nil, false, false)
+
+	if !errors.Is(err, ErrEmptyNote) {
+		t.Fatalf("expected ErrEmptyNote, got %v", err)
+	}
+}
