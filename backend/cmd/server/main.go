@@ -224,7 +224,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	// Memories
 	memoriesRepo := memories.NewRepository(queries)
-	memoriesSvc := memories.NewService(memoriesRepo)
+	memoriesSvc := memories.NewService(memoriesRepo, embeddingClient)
 	memoriesH := memories.NewHandler(memoriesSvc)
 	protected.GET("/memories", memoriesH.List)
 	protected.POST("/memories", memoriesH.Create)
