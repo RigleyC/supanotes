@@ -38,9 +38,16 @@ func (t *TelegramClient) IsEnabled() bool {
 	return t.botToken != ""
 }
 
-func (t *TelegramClient) SendMessage(chatID int64, text string) error {
+type sendMessageResponse struct {
+	OK     bool `json:"ok"`
+	Result *struct {
+		MessageID int64 `json:"message_id"`
+	} `json:"result"`
+}
+
+func (t *TelegramClient) SendMessage(chatID int64, text string) (int64, error) {
 	if !t.IsEnabled() {
-		return nil
+		return 0, nil
 	}
 
 	payload, err := json.Marshal(map[string]any{
@@ -49,25 +56,33 @@ func (t *TelegramClient) SendMessage(chatID int64, text string) error {
 		"parse_mode": "Markdown",
 	})
 	if err != nil {
-		return fmt.Errorf("marshal payload: %w", err)
+		return 0, fmt.Errorf("marshal payload: %w", err)
 	}
 
 	req, err := http.NewRequest(http.MethodPost, t.baseURL+"/sendMessage", bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("build request: %w", err)
+		return 0, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := t.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("send request: %w", err)
+		return 0, fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("telegram returned status %d", resp.StatusCode)
+		return 0, fmt.Errorf("telegram returned status %d", resp.StatusCode)
 	}
-	return nil
+
+	var parsed sendMessageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return 0, fmt.Errorf("decode response: %w", err)
+	}
+	if !parsed.OK || parsed.Result == nil {
+		return 0, fmt.Errorf("telegram returned not ok")
+	}
+	return parsed.Result.MessageID, nil
 }
 
 func (t *TelegramClient) EditMessageText(chatID int64, messageID int64, text string) error {
@@ -107,5 +122,6 @@ func (t *TelegramClient) NotifyUser(ctx context.Context, userID pgtype.UUID, tex
 	if err != nil {
 		return err
 	}
-	return t.SendMessage(chatID, text)
+	_, err = t.SendMessage(chatID, text)
+	return err
 }

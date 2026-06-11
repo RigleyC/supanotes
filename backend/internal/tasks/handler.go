@@ -9,12 +9,13 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type CreateTaskRequest struct {
-	NoteID     string  `json:"note_id" validate:"required,uuid"`
+	NoteID     string  `json:"note_id" validate:"omitempty,uuid"`
 	Title      string  `json:"title" validate:"required"`
 	DueDate    *string `json:"due_date"`
 	Recurrence *string `json:"recurrence"`
@@ -42,11 +43,16 @@ type TaskResponse struct {
 }
 
 type Handler struct {
-	svc *Service
+	svc       *Service
+	notesSvc  *notes.Service  // optional — used for inbox note resolution
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, notesSvc ...*notes.Service) *Handler {
+	h := &Handler{svc: svc}
+	if len(notesSvc) > 0 {
+		h.notesSvc = notesSvc[0]
+	}
+	return h
 }
 
 func (h *Handler) Create(c echo.Context) error {
@@ -60,9 +66,19 @@ func (h *Handler) Create(c echo.Context) error {
 		return err
 	}
 
-	noteID, err := uid.UUIDFromString(req.NoteID)
-	if err != nil {
-		return web.JSONError(c, http.StatusBadRequest, "invalid note_id")
+	var noteID pgtype.UUID
+	if req.NoteID != "" {
+		n, err := uid.UUIDFromString(req.NoteID)
+		if err != nil {
+			return web.JSONError(c, http.StatusBadRequest, "invalid note_id")
+		}
+		noteID = n
+	} else if h.notesSvc != nil {
+		inbox, err := h.notesSvc.GetInboxNote(c.Request().Context(), userID)
+		if err != nil {
+			return web.JSONError(c, http.StatusBadRequest, "user has no inbox note")
+		}
+		noteID = inbox.ID
 	}
 
 	var dueDate *time.Time

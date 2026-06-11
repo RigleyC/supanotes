@@ -196,7 +196,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
 	tasksSvc := tasks.NewService(tasksRepo)
-	tasksH := tasks.NewHandler(tasksSvc)
+	tasksH := tasks.NewHandler(tasksSvc, notesSvc)
 	protected.POST("/tasks", tasksH.Create)
 	protected.GET("/tasks", tasksH.List)
 	protected.PATCH("/tasks/:id", tasksH.Update)

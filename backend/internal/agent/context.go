@@ -239,6 +239,26 @@ func (cb *ContextBuilder) BuildForRoutine(ctx context.Context, userID pgtype.UUI
 
 	now := time.Now()
 
+	var (
+		semanticResults []sqlcgen.SearchNotesByEmbeddingRow
+	)
+
+	query := fmt.Sprintf("routine %s context", routineType)
+	if emb, err := cb.embedCL.GenerateEmbedding(ctx, query); err != nil {
+		log.Warn().Err(err).Msg("generate routine embedding failed; skipping semantic search")
+	} else {
+		vec := pgvector.NewVector(float64ToFloat32(emb))
+		if results, err := cb.q.SearchNotesByEmbedding(ctx, sqlcgen.SearchNotesByEmbeddingParams{
+			UserID:  userID,
+			Column2: vec,
+			Limit:   5,
+		}); err == nil {
+			semanticResults = results
+		} else {
+			log.Warn().Err(err).Msg("routine semantic search failed")
+		}
+	}
+
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf(`META:
 Current User Time: %s
@@ -254,6 +274,13 @@ TODAY / OVERDUE TASKS:
 
 	b.WriteString("\nRECENT NOTES (Last 48h):\n")
 	writeNotesWithContent(&b, recentNotes, 500)
+
+	if len(semanticResults) > 0 {
+		b.WriteString("\nRELEVANT NOTES (via semantic search):\n")
+		for _, r := range semanticResults {
+			b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %d)\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity))
+		}
+	}
 
 	b.WriteString("\nMake the brief concise and actionable based on the above information.")
 	return b.String(), nil

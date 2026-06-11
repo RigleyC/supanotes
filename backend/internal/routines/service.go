@@ -3,6 +3,8 @@ package routines
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -40,10 +42,50 @@ func (s *Service) GetRoutines(ctx context.Context, userID pgtype.UUID) ([]sqlcge
 func (s *Service) UpdateRoutine(ctx context.Context, id, userID pgtype.UUID, cronExpr *string, enabled *bool) (sqlcgen.Routine, error) {
 	routine, err := s.repo.UpdateRoutine(ctx, id, userID, cronExpr, enabled)
 	if err != nil {
-		// In a real app we'd check pgx error for "no rows" and map to ErrRoutineNotFound
 		return sqlcgen.Routine{}, err
 	}
 	return routine, nil
+}
+
+func (s *Service) UpdateRoutineByType(ctx context.Context, userID pgtype.UUID, routineType string, timeOfDay *string, daysOfWeek *[]int, enabled *bool, timezone *string) (*sqlcgen.Routine, error) {
+	routines, err := s.GetRoutines(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var target *sqlcgen.Routine
+	for i := range routines {
+		if routines[i].Type == routineType {
+			target = &routines[i]
+			break
+		}
+	}
+	if target == nil {
+		return nil, ErrRoutineNotFound
+	}
+
+	// Build the UpdateRoutine call — convert new fields back to cron_expr
+	// for backward compatibility
+	expr := target.CronExpr
+	if timeOfDay != nil && daysOfWeek != nil {
+		t := *timeOfDay            // "HH:MM"
+		dow := *daysOfWeek         // [0..6]
+		minute := "0"
+		hour := strings.Split(t, ":")[0]
+		dowStr := strings.Trim(strings.Replace(fmt.Sprint(dow), " ", ",", -1), "[]")
+		expr = fmt.Sprintf("%s %s * * %s", minute, hour, dowStr)
+	}
+
+	var cronStr *string
+	if expr != target.CronExpr {
+		cronStr = &expr
+	}
+
+	_, err = s.repo.UpdateRoutine(ctx, target.ID, userID, cronStr, enabled)
+	if err != nil {
+		return nil, err
+	}
+	return target, nil
 }
 
 func (s *Service) GetRoutineLogs(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.RoutineLog, error) {

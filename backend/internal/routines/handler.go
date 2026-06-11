@@ -1,6 +1,7 @@
 package routines
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -12,6 +13,13 @@ import (
 type UpdateRoutineRequest struct {
 	CronExpr *string `json:"cron_expr"`
 	Enabled  *bool   `json:"enabled"`
+}
+
+type UpdateRoutineConfigRequest struct {
+	TimeOfDay  *string `json:"time_of_day"`  // "HH:MM"
+	DaysOfWeek *[]int  `json:"days_of_week"` // [0..6]
+	Enabled    *bool   `json:"enabled"`
+	Timezone   *string `json:"timezone"`
 }
 
 type TestRoutineResponse struct {
@@ -102,6 +110,37 @@ func (h *Handler) TestWeekly(c echo.Context) error {
 	return h.testRoutine(c, "weekly")
 }
 
+func (h *Handler) UpdateDaily(c echo.Context) error {
+	return h.updateByType(c, "daily")
+}
+
+func (h *Handler) UpdateWeekly(c echo.Context) error {
+	return h.updateByType(c, "weekly")
+}
+
+func (h *Handler) updateByType(c echo.Context, routineType string) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	var req UpdateRoutineConfigRequest
+	if err := c.Bind(&req); err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
+	}
+
+	routine, err := h.svc.UpdateRoutineByType(c.Request().Context(), userID, routineType, req.TimeOfDay, req.DaysOfWeek, req.Enabled, req.Timezone)
+	if err != nil {
+		if errors.Is(err, ErrRoutineNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "routine not found")
+		}
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to update routine")
+	}
+
+	return c.JSON(http.StatusOK, routine)
+}
+
 func (h *Handler) GetLatestBrief(c echo.Context) error {
 	userID, err := web.UserID(c)
 	if err != nil {
@@ -130,6 +169,8 @@ func RegisterRoutes(api *echo.Group, h *Handler) {
 	r.GET("/logs", h.Logs)
 	r.GET("/brief/:type", h.GetLatestBrief)
 	r.PATCH("/:id", h.Update)
+	r.PATCH("/daily", h.UpdateDaily)
+	r.PATCH("/weekly", h.UpdateWeekly)
 	r.POST("/daily/test", h.TestDaily)
 	r.POST("/weekly/test", h.TestWeekly)
 }

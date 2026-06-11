@@ -23,7 +23,7 @@ func parseInt32(s string) (int32, error) {
 
 type ChatRequest struct {
 	SessionID string `json:"session_id" validate:"required"`
-	Message   string `json:"message" validate:"required"`
+	Content   string `json:"content" validate:"required"`
 }
 
 type ChatResponse struct {
@@ -50,7 +50,7 @@ func (h *Handler) Chat(c echo.Context) error {
 		return err
 	}
 
-	resp, err := h.loop.Chat(c.Request().Context(), userID, req.SessionID, req.Message)
+	resp, err := h.loop.Chat(c.Request().Context(), userID, req.SessionID, req.Content)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, err.Error())
@@ -81,7 +81,7 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 				slog.Error("panic in ChatStream", "recover", r)
 			}
 		}()
-		if err := h.loop.ChatStream(c.Request().Context(), userID, req.SessionID, req.Message, events); err != nil {
+		if err := h.loop.ChatStream(c.Request().Context(), userID, req.SessionID, req.Content, events); err != nil {
 			events <- SSEEvent{Type: "error", Data: err.Error()}
 		}
 	}()
@@ -92,12 +92,16 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 	}
 
 	for event := range events {
-		data, marshalErr := json.Marshal(map[string]string{"type": event.Type, "data": event.Data})
-		if marshalErr != nil {
-			slog.Error("marshal sse event", "error", marshalErr)
-			continue
+		var payload []byte
+		switch event.Type {
+		case "content_delta":
+			payload, _ = json.Marshal(map[string]string{"delta": event.Data})
+		case "done":
+			payload, _ = json.Marshal(map[string]bool{"done": true})
+		default:
+			payload, _ = json.Marshal(map[string]string{"type": event.Type, "data": event.Data})
 		}
-		_, err := fmt.Fprintf(c.Response().Writer, "data: %s\n\n", data)
+		_, err := fmt.Fprintf(c.Response().Writer, "data: %s\n\n", payload)
 		if err != nil {
 			break
 		}
