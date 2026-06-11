@@ -43,7 +43,7 @@ class TasksLocalRepository {
     required String id,
     required String noteId,
     required String title,
-    String status = 'pending',
+    String status = 'open',
     int position = 0,
     String? recurrence,
     DateTime? dueDate,

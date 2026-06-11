@@ -125,7 +125,7 @@ class TasksRepository implements ITasksRepository {
       userId: _local.userId,
       noteId: noteId,
       title: title,
-      status: 'pending',
+      status: 'open',
       position: position,
       dueDate: dueDate,
       completedAt: null,

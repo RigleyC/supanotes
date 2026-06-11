@@ -56,7 +56,7 @@ class TaskModel {
   }
 
   bool get isCompleted => status == 'done' || status == 'completed';
-  bool get isPending => status == 'pending';
+  bool get isPending => status == 'open';
 
   bool get isRepeating =>
       recurrence != null && recurrence!.isNotEmpty;

@@ -259,7 +259,7 @@ class NotesRepository implements INotesRepository {
           TasksCompanion(
             id: Value(task.id),
             title: Value(task.text),
-            status: Value(task.isComplete ? 'done' : 'pending'),
+            status: Value(task.isComplete ? 'done' : 'open'),
           ),
         );
       } else {
@@ -268,7 +268,7 @@ class NotesRepository implements INotesRepository {
           noteId: noteId,
           title: task.text,
           position: 0,
-          status: task.isComplete ? 'done' : 'pending',
+          status: task.isComplete ? 'done' : 'open',
         );
       }
     }

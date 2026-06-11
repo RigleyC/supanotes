@@ -42,7 +42,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   /// to stream every user's tasks (useful for tests and admin tools).
   Stream<List<TaskData>> watchOpenTasks({String? userId}) {
     return (select(tasks)
-          ..where((t) => t.status.equals('pending'))
+          ..where((t) => t.status.equals('open'))
           ..where((t) => t.deletedAt.isNull())
           ..where((t) => userId == null ? const Constant(true) : t.userId.equals(userId))
           ..orderBy([
@@ -123,6 +123,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       await (update(tasks)..where((t) => t.id.equals(id))).write(
         TasksCompanion(
           status: const Value('done'),
+          completedAt: Value(now),
           updatedAt: Value(now),
           isDirty: const Value(true),
         ),
@@ -150,7 +151,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
             userId: task.userId,
             noteId: task.noteId,
             title: task.title,
-            status: 'pending',
+            status: 'open',
             position: task.position,
             recurrence: recurrence,
             dueDate: nextDue,
@@ -189,7 +190,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   Future<void> reopenTask(String id) async {
     await (update(tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(
-        status: const Value('pending'),
+        status: const Value('open'),
         completedAt: const Value(null),
         updatedAt: Value(DateTime.now()),
         isDirty: const Value(true),
