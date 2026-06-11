@@ -13,6 +13,11 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           ..where((t) => t.archived.equals(false))
           ..where((t) => t.deletedAt.isNull())
           ..where((t) => t.isInbox.equals(false))
+          ..where(
+            (t) => CustomExpression<bool>(
+              "(title IS NOT NULL AND trim(title) <> '') OR trim(content) <> ''",
+            ),
+          )
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)
@@ -49,6 +54,11 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           ..where((t) => t.contextId.equals(contextId))
           ..where((t) => t.archived.equals(false))
           ..where((t) => t.deletedAt.isNull())
+          ..where(
+            (t) => CustomExpression<bool>(
+              "(title IS NOT NULL AND trim(title) <> '') OR trim(content) <> ''",
+            ),
+          )
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
@@ -63,6 +73,11 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           ..where((t) => t.favorite.equals(true))
           ..where((t) => t.archived.equals(false))
           ..where((t) => t.deletedAt.isNull())
+          ..where(
+            (t) => CustomExpression<bool>(
+              "(title IS NOT NULL AND trim(title) <> '') OR trim(content) <> ''",
+            ),
+          )
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
@@ -105,9 +120,20 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
   }
 
-  /// Returns every note that has unsynced local changes.
+  /// Returns every note that has unsynced local changes and is eligible for
+  /// sync (has a remote copy, is deleted, is inbox, or has non-empty content).
   Future<List<NoteData>> getDirtyNotes() {
-    return (select(notes)..where((t) => t.isDirty.equals(true))).get();
+    return (select(notes)
+          ..where((t) => t.isDirty.equals(true))
+          ..where(
+            (t) => t.hasRemoteCopy.equals(true) |
+                t.deletedAt.isNotNull() |
+                t.isInbox.equals(true) |
+                CustomExpression<bool>(
+                  "(title IS NOT NULL AND trim(title) <> '') OR trim(content) <> ''",
+                ),
+          ))
+        .get();
   }
 
   /// Flips the dirty flag off without touching any other field — the
@@ -118,12 +144,25 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         .write(const NotesCompanion(isDirty: Value(false)));
   }
 
+  /// Permanently removes a note from the local database.
+  Future<void> hardDeleteNote(String id) async {
+    await (delete(notes)..where((t) => t.id.equals(id))).go();
+  }
+
+  /// Marks that the server holds a copy of this note so future sync
+  /// rounds know it can be pushed.
+  Future<void> markHasRemoteCopy(String id) async {
+    await (update(notes)..where((t) => t.id.equals(id))).write(
+      const NotesCompanion(hasRemoteCopy: Value(true)),
+    );
+  }
+
   /// Stores a note that came back from the backend. Uses
   /// [InsertMode.insertOrReplace] so a re-pulled row replaces the local
   /// copy in place, and always sets [isDirty] to `false` so the row does
   /// not get pushed back to the server.
   Future<void> upsertFromRemote(NoteData note) async {
-    final incoming = note.copyWith(isDirty: false);
+    final incoming = note.copyWith(isDirty: false, hasRemoteCopy: true);
     await into(notes).insertOnConflictUpdate(incoming);
   }
 }
