@@ -36,6 +36,9 @@ func (m *mockQuerier) CreateMemory(_ context.Context, _ sqlcgen.CreateMemoryPara
 func (m *mockQuerier) CreateMessage(_ context.Context, _ sqlcgen.CreateMessageParams) (sqlcgen.Message, error) {
 	return sqlcgen.Message{}, nil
 }
+func (m *mockQuerier) CreateNoteLink(_ context.Context, _ sqlcgen.CreateNoteLinkParams) error {
+	return nil
+}
 func (m *mockQuerier) CreateNote(_ context.Context, _ sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }

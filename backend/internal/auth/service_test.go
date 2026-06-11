@@ -168,11 +168,17 @@ func (m *mockQuerier) AddTagToNote(ctx context.Context, arg sqlcgen.AddTagToNote
 func (m *mockQuerier) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
+func (m *mockQuerier) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
+	return sqlcgen.Note{}, nil
+}
 func (m *mockQuerier) CreateContext(ctx context.Context, arg sqlcgen.CreateContextParams) (sqlcgen.Context, error) {
 	return sqlcgen.Context{}, nil
 }
 func (m *mockQuerier) CreateNote(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
+}
+func (m *mockQuerier) CreateNoteLink(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
+	return nil
 }
 func (m *mockQuerier) CreateTag(ctx context.Context, arg sqlcgen.CreateTagParams) (sqlcgen.Tag, error) {
 	return sqlcgen.Tag{}, nil
@@ -181,11 +187,15 @@ func (m *mockQuerier) DeleteContext(ctx context.Context, arg sqlcgen.DeleteConte
 	return nil
 }
 func (m *mockQuerier) DeleteNote(ctx context.Context, arg sqlcgen.DeleteNoteParams) error { return nil }
+func (m *mockQuerier) DeleteTag(ctx context.Context, arg sqlcgen.DeleteTagParams) error   { return nil }
 func (m *mockQuerier) GetContexts(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Context, error) {
 	return nil, nil
 }
 func (m *mockQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
+}
+func (m *mockQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
+	return sqlcgen.RoutineLog{}, nil
 }
 func (m *mockQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
@@ -241,8 +251,14 @@ func (m *mockQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesPa
 func (m *mockQuerier) GetPendingEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetPendingEmbeddingsRow, error) {
 	return nil, nil
 }
+func (m *mockQuerier) GetRetryableEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetRetryableEmbeddingsRow, error) {
+	return nil, nil
+}
 func (m *mockQuerier) GetSoul(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error) {
 	return sqlcgen.Soul{}, nil
+}
+func (m *mockQuerier) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
+	return sqlcgen.Note{}, nil
 }
 func (m *mockQuerier) UpdateNoteEmbeddingStatus(ctx context.Context, arg sqlcgen.UpdateNoteEmbeddingStatusParams) error {
 	return nil

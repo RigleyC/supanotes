@@ -236,7 +236,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	llmFactory := llm.NewFactory(cfg)
 
 	// Agent Context Builder
-	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc)
+	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc, memoriesRepo, embeddingClient)
 
 	// Routines
 	routinesRepo := routines.NewRepository(queries)

@@ -9,9 +9,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/pgvector/pgvector-go"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/tasks"
+	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -25,12 +28,14 @@ const (
 )
 
 type ContextBuilder struct {
-	q        sqlcgen.Querier
-	tasksSvc *tasks.Service
+	q            sqlcgen.Querier
+	tasksSvc     *tasks.Service
+	memoriesRepo memories.Repository
+	embedCL      *llm.EmbeddingClient
 }
 
-func NewContextBuilder(q sqlcgen.Querier, tasksSvc *tasks.Service) *ContextBuilder {
-	return &ContextBuilder{q: q, tasksSvc: tasksSvc}
+func NewContextBuilder(q sqlcgen.Querier, tasksSvc *tasks.Service, memoriesRepo memories.Repository, embedCL *llm.EmbeddingClient) *ContextBuilder {
+	return &ContextBuilder{q: q, tasksSvc: tasksSvc, memoriesRepo: memoriesRepo, embedCL: embedCL}
 }
 
 // Build compiles the tiered context RAG string by fetching data concurrently.
@@ -92,30 +97,34 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 	now := time.Now().Format(time.RFC1123)
 
 	var (
-		ftsResults  []sqlcgen.SearchNotesFTSRow
-		memories    []sqlcgen.Memory
-		linkedNotes []sqlcgen.Note
+		semanticResults []sqlcgen.SearchNotesByEmbeddingRow
+		memResults      []sqlcgen.SearchMemoriesByEmbeddingRow
+		linkedNotes     []sqlcgen.Note
 	)
 
 	g2, gCtx2 := errgroup.WithContext(ctx)
 
 	g2.Go(func() error {
-		var err error
-		ftsResults, err = cb.q.SearchNotesFTS(gCtx2, sqlcgen.SearchNotesFTSParams{
-			UserID: userID,
-			Query:  query,
-			Limit:  5,
+		emb, err := cb.embedCL.GenerateEmbedding(gCtx2, query)
+		if err != nil {
+			return fmt.Errorf("generate query embedding: %w", err)
+		}
+		vec := pgvector.NewVector(float64ToFloat32(emb))
+		semanticResults, err = cb.q.SearchNotesByEmbedding(gCtx2, sqlcgen.SearchNotesByEmbeddingParams{
+			UserID:  userID,
+			Column2: vec,
+			Limit:   5,
 		})
 		return err
 	})
 
 	g2.Go(func() error {
-		var err error
-		memories, err = cb.q.GetMemories(gCtx2, sqlcgen.GetMemoriesParams{
-			UserID: userID,
-			Limit:  5,
-			Offset: 0,
-		})
+		emb, err := cb.embedCL.GenerateEmbedding(gCtx2, query)
+		if err != nil {
+			return fmt.Errorf("generate memory embedding: %w", err)
+		}
+		vec := pgvector.NewVector(float64ToFloat32(emb))
+		memResults, err = cb.memoriesRepo.SearchMemories(gCtx2, userID, vec, 5)
 		return err
 	})
 
@@ -160,11 +169,11 @@ RECENT MESSAGES HISTORY (Up to 10):
 	b.WriteString(truncate(tier2.String(), MaxTier2Tokens))
 
 	tier3 := &strings.Builder{}
-	tier3.WriteString("\nSEARCH RESULTS:\n")
-	for _, r := range ftsResults {
-		tier3.WriteString(fmt.Sprintf("- %s (score: %.2f)\n", truncate(r.Content, 200), r.Score))
+	tier3.WriteString("\nSEMANTIC SEARCH RESULTS:\n")
+	for _, r := range semanticResults {
+		tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %d)\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity))
 	}
-	if len(ftsResults) == 0 {
+	if len(semanticResults) == 0 {
 		tier3.WriteString("(none)\n")
 	}
 	b.WriteString(truncate(tier3.String(), MaxTier3Tokens))
@@ -178,11 +187,11 @@ RECENT MESSAGES HISTORY (Up to 10):
 	b.WriteString(truncate(tier4.String(), MaxTier4Tokens))
 
 	tier5 := &strings.Builder{}
-	tier5.WriteString("\nRECENT MEMORIES:\n")
-	for _, m := range memories {
-		tier5.WriteString(fmt.Sprintf("- %s\n", m.Content))
+	tier5.WriteString("\nRELEVANT MEMORIES:\n")
+	for _, m := range memResults {
+		tier5.WriteString(fmt.Sprintf("- %s (similarity: %d)\n", m.Content, m.Similarity))
 	}
-	if len(memories) == 0 {
+	if len(memResults) == 0 {
 		tier5.WriteString("(none)\n")
 	}
 	b.WriteString(truncate(tier5.String(), MaxTier5Tokens))
@@ -271,6 +280,14 @@ func writeNotesWithID(b *strings.Builder, notes []sqlcgen.Note) {
 	for _, n := range notes {
 		b.WriteString(fmt.Sprintf("- ID: %s | Title: %s\n", uid.UUIDToString(n.ID), n.Title.String))
 	}
+}
+
+func float64ToFloat32(src []float64) []float32 {
+	dst := make([]float32, len(src))
+	for i := range src {
+		dst[i] = float32(src[i])
+	}
+	return dst
 }
 
 func writeNotesWithContent(b *strings.Builder, notes []sqlcgen.Note, maxContentLen int) {

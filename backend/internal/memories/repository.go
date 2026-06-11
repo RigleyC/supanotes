@@ -13,6 +13,7 @@ type Repository interface {
 	GetMemories(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.Memory, error)
 	CreateMemory(ctx context.Context, userID pgtype.UUID, content string, embedding pgvector.Vector) (sqlcgen.Memory, error)
 	DeleteMemory(ctx context.Context, id, userID pgtype.UUID) error
+	SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error)
 }
 
 type repository struct {
@@ -43,5 +44,13 @@ func (r *repository) DeleteMemory(ctx context.Context, id, userID pgtype.UUID) e
 	return r.q.DeleteMemory(ctx, sqlcgen.DeleteMemoryParams{
 		ID:     id,
 		UserID: userID,
+	})
+}
+
+func (r *repository) SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
+	return r.q.SearchMemoriesByEmbedding(ctx, sqlcgen.SearchMemoriesByEmbeddingParams{
+		UserID:  userID,
+		Column2: embedding,
+		Limit:   limit,
 	})
 }
