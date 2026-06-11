@@ -283,3 +283,12 @@ func (q *Queries) UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (R
 	)
 	return i, err
 }
+
+const updateRoutineLastRunAt = `-- name: UpdateRoutineLastRunAt :exec
+UPDATE routines SET last_run_at = NOW() WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, updateRoutineLastRunAt, id)
+	return err
+}

@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -75,6 +76,11 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 
 	events := make(chan SSEEvent, 10)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("panic in ChatStream", "recover", r)
+			}
+		}()
 		if err := h.loop.ChatStream(c.Request().Context(), userID, req.SessionID, req.Message, events); err != nil {
 			events <- SSEEvent{Type: "error", Data: err.Error()}
 		}
@@ -86,7 +92,11 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 	}
 
 	for event := range events {
-		data, _ := json.Marshal(map[string]string{"type": event.Type, "data": event.Data})
+		data, marshalErr := json.Marshal(map[string]string{"type": event.Type, "data": event.Data})
+		if marshalErr != nil {
+			slog.Error("marshal sse event", "error", marshalErr)
+			continue
+		}
 		_, err := fmt.Fprintf(c.Response().Writer, "data: %s\n\n", data)
 		if err != nil {
 			break

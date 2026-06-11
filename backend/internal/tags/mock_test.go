@@ -228,6 +228,10 @@ func (m *mockQuerier) UpsertTag(_ context.Context, _ sqlcgen.UpsertTagParams) (s
 func (m *mockQuerier) UpsertTask(_ context.Context, _ sqlcgen.UpsertTaskParams) (sqlcgen.Task, error) {
 	return sqlcgen.Task{}, nil
 }
+func (m *mockQuerier) UpdateRoutineLastRunAt(_ context.Context, _ pgtype.UUID) error {
+	return nil
+}
+
 func (m *mockQuerier) UpsertTaskCompletion(_ context.Context, _ sqlcgen.UpsertTaskCompletionParams) error {
 	return nil
 }

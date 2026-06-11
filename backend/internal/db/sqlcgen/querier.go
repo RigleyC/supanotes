@@ -81,6 +81,7 @@ type Querier interface {
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteEmbeddingStatus(ctx context.Context, arg UpdateNoteEmbeddingStatusParams) error
 	UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (Routine, error)
+	UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error)
 	UpsertContext(ctx context.Context, arg UpsertContextParams) (Context, error)

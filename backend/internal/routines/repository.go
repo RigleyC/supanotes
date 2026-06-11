@@ -105,10 +105,8 @@ func (r *repo) GetLatestBriefByType(ctx context.Context, userID pgtype.UUID, bri
 	return log, nil
 }
 
-// UpdateRoutineLastRunAt updates the last_run_at timestamp.
-// TODO: implement once last_run_at column is added via migration.
 func (r *repo) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error {
-	return nil
+	return r.q.UpdateRoutineLastRunAt(ctx, id)
 }
 
 func (r *repo) CleanupOldMessages(ctx context.Context) error {

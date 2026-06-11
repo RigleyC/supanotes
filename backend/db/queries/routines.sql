@@ -40,6 +40,9 @@ WHERE rl.user_id = $1 AND r.type = $2 AND rl.status = 'success'
 ORDER BY rl.created_at DESC
 LIMIT 1;
 
+-- name: UpdateRoutineLastRunAt :exec
+UPDATE routines SET last_run_at = NOW() WHERE id = $1 AND deleted_at IS NULL;
+
 -- name: CleanupOldMessages :exec
 DELETE FROM messages
 WHERE created_at < NOW() - INTERVAL '90 days';

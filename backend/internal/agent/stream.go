@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -75,7 +76,11 @@ func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr,
 
 		if len(res.ToolCalls) > 0 {
 			for _, tc := range res.ToolCalls {
-				tcJSON, _ := json.Marshal(tc)
+				tcJSON, marshalErr := json.Marshal(tc)
+				if marshalErr != nil {
+					slog.Error("marshal tool call", "error", marshalErr)
+					continue
+				}
 				events <- SSEEvent{Type: "tool_use", Data: string(tcJSON)}
 			}
 		}

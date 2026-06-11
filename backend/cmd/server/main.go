@@ -52,6 +52,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	cronCtx, cronCancel := context.WithCancel(context.Background())
+	defer cronCancel()
+
 	pool, err := connectDB(ctx, cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("database setup failed")
@@ -79,7 +82,7 @@ func main() {
 		log.Info().Strs("cors_origins", cfg.CORSOrigins).Msg("CORS enabled")
 	}
 
-	registerRoutes(e, cfg, pool)
+	registerRoutes(e, cfg, pool, cronCtx)
 
 	go func() {
 		log.Info().Str("addr", cfg.Addr()).Str("env", cfg.Environment).Msg("supanotes backend starting")
@@ -138,7 +141,7 @@ func connectDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
+func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCtx context.Context) {
 	api := e.Group("/api/v1")
 	api.GET("/health", handler.Health)
 
@@ -209,7 +212,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	embeddingsSvc := embeddings.NewService(embeddingsRepo, embeddingClient)
 	cronJob := cron.New(cron.WithSeconds())
 	cronJob.AddFunc(cfg.EmbeddingsCronInterval, func() {
-		embeddingsSvc.ProcessPending(context.Background())
+		embeddingsSvc.ProcessPending(cronCtx)
 	})
 	cronJob.Start()
 
@@ -266,7 +269,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool) {
 	gatewayBot := gateway.NewTelegramClient(cfg.TelegramBotToken)
 	gatewayBot.AttachRepo(gatewayRepo)
 
-	routinesRunner := routines.NewRunner(routinesRepo, agentCtxBldr, llmFactory, pushSender, gatewayBot)
+	routinesRunner := routines.NewRunner(cronCtx, routinesRepo, agentCtxBldr, llmFactory, pushSender, gatewayBot)
 	routinesRunner.Start()
 
 	// Settings

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 )
 
@@ -46,12 +47,12 @@ type anthropicTool struct {
 }
 
 type anthropicRequest struct {
-	Model       string              `json:"model"`
-	MaxTokens   int                `json:"max_tokens"`
+	Model       string                  `json:"model"`
+	MaxTokens   int                     `json:"max_tokens"`
 	System      []anthropicContentBlock `json:"system,omitempty"`
-	Messages    []anthropicMessage `json:"messages"`
-	Tools       []anthropicTool    `json:"tools,omitempty"`
-	Temperature float32            `json:"temperature"`
+	Messages    []anthropicMessage      `json:"messages"`
+	Tools       []anthropicTool         `json:"tools,omitempty"`
+	Temperature float32                 `json:"temperature"`
 }
 
 type anthropicResponse struct {
@@ -121,7 +122,10 @@ func (c *anthropicClient) Complete(ctx context.Context, req Request) (*Response,
 
 		for _, tc := range m.ToolCalls {
 			var args any
-			json.Unmarshal([]byte(tc.ArgsJSON), &args)
+			if err := json.Unmarshal([]byte(tc.ArgsJSON), &args); err != nil {
+				slog.Error("unmarshal tool call args", "error", err)
+				return nil, fmt.Errorf("anthropic: unmarshal tool call args: %w", err)
+			}
 			blocks = append(blocks, anthropicContentBlock{
 				Type:  "tool_use",
 				ID:    tc.ID,
@@ -138,7 +142,10 @@ func (c *anthropicClient) Complete(ctx context.Context, req Request) (*Response,
 
 	for _, t := range req.Tools {
 		var schema any
-		json.Unmarshal([]byte(t.SchemaJSON), &schema)
+		if err := json.Unmarshal([]byte(t.SchemaJSON), &schema); err != nil {
+			slog.Error("unmarshal tool schema", "error", err)
+			return nil, fmt.Errorf("anthropic: unmarshal tool schema: %w", err)
+		}
 		payload.Tools = append(payload.Tools, anthropicTool{
 			Name:        t.Name,
 			Description: t.Description,
@@ -168,7 +175,11 @@ func (c *anthropicClient) Complete(ctx context.Context, req Request) (*Response,
 	defer httpRes.Body.Close()
 
 	if httpRes.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(httpRes.Body)
+		respBody, readErr := io.ReadAll(httpRes.Body)
+		if readErr != nil {
+			slog.Error("read error response body", "error", readErr)
+			return nil, fmt.Errorf("anthropic API error %d", httpRes.StatusCode)
+		}
 		return nil, fmt.Errorf("anthropic API error %d: %s", httpRes.StatusCode, string(respBody))
 	}
 
@@ -184,7 +195,11 @@ func (c *anthropicClient) Complete(ctx context.Context, req Request) (*Response,
 		if block.Type == "text" {
 			content += block.Text
 		} else if block.Type == "tool_use" {
-			argsBytes, _ := json.Marshal(block.Input)
+			argsBytes, marshalErr := json.Marshal(block.Input)
+			if marshalErr != nil {
+				slog.Error("marshal tool use input", "error", marshalErr)
+				return nil, fmt.Errorf("anthropic: marshal tool use input: %w", marshalErr)
+			}
 			toolCalls = append(toolCalls, ToolCall{
 				ID:       block.ID,
 				Name:     block.Name,

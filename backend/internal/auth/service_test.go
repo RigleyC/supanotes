@@ -615,6 +615,10 @@ func (m *mockQuerier) HardDeleteExpiredContexts(ctx context.Context) error {
 	return nil
 }
 
+func (m *mockQuerier) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error {
+	return nil
+}
+
 func (m *mockQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
 	return nil
 }

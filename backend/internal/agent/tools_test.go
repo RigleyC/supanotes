@@ -275,6 +275,10 @@ func (s *stubQuerier) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams
 func (s *stubQuerier) UpsertTask(ctx context.Context, arg sqlcgen.UpsertTaskParams) (sqlcgen.Task, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error {
+	panic("unimplemented")
+}
+
 func (s *stubQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
 	panic("unimplemented")
 }

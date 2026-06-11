@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -402,7 +403,11 @@ func (t *ListRoutinesTool) Execute(ctx context.Context, userID pgtype.UUID, args
 	if err != nil {
 		return "", err
 	}
-	b, _ := json.Marshal(rs)
+	b, err := json.Marshal(rs)
+	if err != nil {
+		slog.Error("marshal routines response", "error", err)
+		return "", err
+	}
 	return string(b), nil
 }
 
@@ -476,7 +481,11 @@ func (t *SetDailyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.U
 			if err != nil {
 				return "", err
 			}
-			b, _ := json.Marshal(updated)
+			b, err := json.Marshal(updated)
+			if err != nil {
+				slog.Error("marshal updated daily routine", "error", err)
+				return "", err
+			}
 			return string(b), nil
 		}
 	}
@@ -852,7 +861,11 @@ func (t *SetWeeklyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.
 			if err != nil {
 				return "", err
 			}
-			b, _ := json.Marshal(updated)
+			b, err := json.Marshal(updated)
+			if err != nil {
+				slog.Error("marshal updated weekly routine", "error", err)
+				return "", err
+			}
 			return string(b), nil
 		}
 	}

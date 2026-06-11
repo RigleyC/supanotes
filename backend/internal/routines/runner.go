@@ -3,6 +3,7 @@ package routines
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -29,6 +30,7 @@ type TelegramNotifier interface {
 }
 
 type Runner struct {
+	ctx            context.Context
 	repo           Repository
 	agentCtxBldr   ContextBuilder
 	llmFactory     llm.Factory
@@ -42,6 +44,7 @@ type Runner struct {
 }
 
 func NewRunner(
+	ctx context.Context,
 	repo Repository,
 	agentCtxBldr ContextBuilder,
 	llmFactory llm.Factory,
@@ -49,6 +52,7 @@ func NewRunner(
 	telegram TelegramNotifier,
 ) *Runner {
 	return &Runner{
+		ctx:            ctx,
 		repo:           repo,
 		agentCtxBldr:   agentCtxBldr,
 		llmFactory:     llmFactory,
@@ -65,6 +69,11 @@ func (r *Runner) Start() {
 	r.reloadTicker = time.NewTicker(5 * time.Minute)
 	r.stopReload = make(chan struct{})
 	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				slog.Error("panic in routine reloader", "recover", rec)
+			}
+		}()
 		for {
 			select {
 			case <-r.reloadTicker.C:
@@ -76,11 +85,10 @@ func (r *Runner) Start() {
 	}()
 
 	r.maintenanceJob.AddFunc("0 0 * * *", func() {
-		ctx := context.Background()
-		if err := r.repo.CleanupOldMessages(ctx); err != nil {
+		if err := r.repo.CleanupOldMessages(r.ctx); err != nil {
 			log.Error().Err(err).Msg("failed to cleanup old messages")
 		}
-		if err := r.repo.HardDeleteExpired(ctx); err != nil {
+		if err := r.repo.HardDeleteExpired(r.ctx); err != nil {
 			log.Error().Err(err).Msg("failed to hard-delete expired records")
 		}
 	})
@@ -102,8 +110,7 @@ func (r *Runner) Stop() {
 }
 
 func (r *Runner) reload() {
-	ctx := context.Background()
-	routines, err := r.repo.GetEnabledRoutines(ctx)
+	routines, err := r.repo.GetEnabledRoutines(r.ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to load routines")
 		return
@@ -134,7 +141,7 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 	}
 	defer r.running.Delete(id)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(r.ctx, 5*time.Minute)
 	defer cancel()
 
 	log.Info().Str("routine_id", uid.UUIDToString(rt.ID)).Str("type", rt.Type).Msg("running routine")
@@ -142,7 +149,9 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 	ragContext, err := r.agentCtxBldr.BuildForRoutine(ctx, rt.UserID, rt.Type)
 	if err != nil {
 		errMsg := err.Error()
-		r.repo.CreateRoutineLog(ctx, rt.ID, rt.UserID, "failed", nil, &errMsg)
+		if _, logErr := r.repo.CreateRoutineLog(ctx, rt.ID, rt.UserID, "failed", nil, &errMsg); logErr != nil {
+			slog.Error("failed to create routine log", "error", logErr)
+		}
 		return
 	}
 
@@ -164,7 +173,9 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 	resp, err := llmClient.Complete(ctx, req)
 	if err != nil {
 		errMsg := err.Error()
-		r.repo.CreateRoutineLog(ctx, rt.ID, rt.UserID, "failed", nil, &errMsg)
+		if _, logErr := r.repo.CreateRoutineLog(ctx, rt.ID, rt.UserID, "failed", nil, &errMsg); logErr != nil {
+			slog.Error("failed to create routine log", "error", logErr)
+		}
 		return
 	}
 
@@ -174,7 +185,9 @@ func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
 		return
 	}
 
-	// TODO: update last_run_at on the routine once the column is added via migration
+	if err := r.repo.UpdateRoutineLastRunAt(ctx, rt.ID); err != nil {
+		log.Error().Err(err).Msg("failed to update routine last_run_at")
+	}
 
 	userIDStr := uid.UUIDToString(rt.UserID)
 

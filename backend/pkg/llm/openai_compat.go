@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 )
 
 type openAICompatClient struct {
-	apiKey string
+	apiKey  string
 	baseURL string
 	model   string
 	client  *http.Client
@@ -18,7 +19,7 @@ type openAICompatClient struct {
 
 func NewOpenAICompatClient(apiKey, baseURL, model string) Client {
 	return &openAICompatClient{
-		apiKey: apiKey,
+		apiKey:  apiKey,
 		baseURL: baseURL,
 		model:   model,
 		client:  &http.Client{},
@@ -118,7 +119,10 @@ func (c *openAICompatClient) Complete(ctx context.Context, req Request) (*Respon
 
 	for _, t := range req.Tools {
 		var params map[string]any
-		json.Unmarshal([]byte(t.SchemaJSON), &params)
+		if err := json.Unmarshal([]byte(t.SchemaJSON), &params); err != nil {
+			slog.Error("unmarshal tool schema", "error", err)
+			return nil, fmt.Errorf("openai_compat: unmarshal tool schema: %w", err)
+		}
 		payload.Tools = append(payload.Tools, openAITool{
 			Type: "function",
 			Function: openAIFunction{
@@ -149,7 +153,11 @@ func (c *openAICompatClient) Complete(ctx context.Context, req Request) (*Respon
 	defer httpRes.Body.Close()
 
 	if httpRes.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(httpRes.Body)
+		respBody, readErr := io.ReadAll(httpRes.Body)
+		if readErr != nil {
+			slog.Error("read error response body", "error", readErr)
+			return nil, fmt.Errorf("openai_compat API error %d", httpRes.StatusCode)
+		}
 		return nil, fmt.Errorf("openai_compat API error %d: %s", httpRes.StatusCode, string(respBody))
 	}
 
