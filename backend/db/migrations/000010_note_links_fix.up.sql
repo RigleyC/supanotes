@@ -3,10 +3,12 @@ DROP TRIGGER IF EXISTS trg_generate_note_excerpt ON notes;
 DROP FUNCTION IF EXISTS generate_note_excerpt();
 
 -- Replace notes_excerpt_update with fixed regex
+-- Excerpt strips markdown formatting chars: # * ` [ ] _ >
+-- Order matters: \] must come after [ to avoid escaping issues
 CREATE OR REPLACE FUNCTION notes_excerpt_update() RETURNS trigger AS $$
 BEGIN
   NEW.excerpt := substring(
-    regexp_replace(NEW.content, '[#*_>`\[\]]+', '', 'g')
+    regexp_replace(NEW.content, '[#*`\[\]_>]', '', 'g')
     FROM 1 FOR 200
   );
   RETURN NEW;
