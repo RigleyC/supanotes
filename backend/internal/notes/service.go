@@ -69,15 +69,15 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	}
 
 	arg := sqlcgen.UpdateNoteParams{
-		ID:              id,
-		UserID:          userID,
-		EmbeddingStatus: pgtype.Text{String: "pending", Valid: true},
+		ID:     id,
+		UserID: userID,
 	}
 	if title != nil {
 		arg.Title = pgtype.Text{String: *title, Valid: true}
 	}
 	if content != nil {
 		arg.Content = pgtype.Text{String: *content, Valid: true}
+		arg.EmbeddingStatus = pgtype.Text{String: "pending", Valid: true}
 	}
 	if contextID != nil {
 		arg.ContextID = *contextID
