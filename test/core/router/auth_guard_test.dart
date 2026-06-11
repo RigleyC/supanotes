@@ -13,7 +13,7 @@ void main() {
       expect(
           authGuardRedirect(currentLocation: AppRoutes.login, authState: loading),
           isNull);
-      expect(redirectFor(AppRoutes.splash, loading), isNull);
+      expect(redirectFor(AppRoutes.home, loading), isNull);
     });
 
     test('redirects to /login when unauthenticated user hits a protected route',
@@ -35,16 +35,9 @@ void main() {
           isNull);
     });
 
-    test('redirects to /login when an unauthenticated user lands on /', () {
+    test('redirects to /login when unauthenticated user lands on protected route', () {
       final unauth = AsyncValue<User?>.data(null);
-      expect(redirectFor(AppRoutes.splash, unauth), AppRoutes.login);
-    });
-
-    test('redirects to /home when an authenticated user lands on /', () {
-      final auth = AsyncValue<User?>.data(
-        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
-      );
-      expect(redirectFor(AppRoutes.splash, auth), AppRoutes.home);
+      expect(redirectFor(AppRoutes.home, unauth), AppRoutes.login);
     });
 
     test('redirects to /home when an authenticated user revisits /login', () {

@@ -22,8 +22,6 @@ import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart
 import 'package:supanotes/features/routines/presentation/brief_history_screen.dart';
 import 'package:supanotes/features/routines/presentation/routines_screen.dart';
 import 'package:supanotes/features/telegram/presentation/telegram_link_screen.dart';
-import 'package:supanotes/shared/widgets/splash_screen.dart';
-
 final goRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ValueNotifier<AsyncValue<User?>>(
     ref.read(authControllerProvider),
@@ -35,14 +33,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(notifier.dispose);
 
   return GoRouter(
-    initialLocation: AppRoutes.splash,
+    initialLocation: AppRoutes.login,
     debugLogDiagnostics: false,
     refreshListenable: notifier,
     routes: [
-      GoRoute(
-        path: AppRoutes.splash,
-        builder: (_, __) => const SplashScreen(),
-      ),
       GoRoute(
         path: AppRoutes.login,
         builder: (_, __) => const LoginScreen(),

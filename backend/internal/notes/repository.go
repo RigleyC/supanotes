@@ -16,6 +16,8 @@ type Repository interface {
 	GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error)
 	GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error)
 	AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error)
+	SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
+	AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error)
 }
 
 type repository struct {
@@ -52,4 +54,12 @@ func (r *repository) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlc
 
 func (r *repository) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
 	return r.q.AppendToInbox(ctx, arg)
+}
+
+func (r *repository) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
+	return r.q.SetInboxContent(ctx, arg)
+}
+
+func (r *repository) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
+	return r.q.AppendToNoteContent(ctx, arg)
 }

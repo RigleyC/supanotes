@@ -3,6 +3,7 @@ package routines
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"

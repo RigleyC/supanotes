@@ -59,7 +59,7 @@ func (s *Service) GenerateAndSave(ctx context.Context, noteID pgtype.UUID, conte
 }
 
 func (s *Service) ProcessPending(ctx context.Context) error {
-	rows, err := s.repo.GetPendingEmbeddings(ctx, 50)
+	rows, err := s.repo.GetRetryableEmbeddings(ctx, 50)
 	if err != nil {
 		return err
 	}

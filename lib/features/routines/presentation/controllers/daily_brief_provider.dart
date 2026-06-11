@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supanotes/core/api/api_exceptions.dart';
+
 import '../../data/routines_repository.dart';
 import '../../domain/routine_model.dart';
 

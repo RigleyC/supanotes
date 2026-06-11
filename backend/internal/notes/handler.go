@@ -16,6 +16,12 @@ import (
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
+const (
+	DestNewNote      = "new_note"
+	DestExistingNote = "existing_note"
+	DestKeep         = "keep"
+)
+
 type CreateNoteRequest struct {
 	Title     *string `json:"title"`
 	Content   string  `json:"content" validate:"required"`
@@ -255,22 +261,62 @@ func (h *Handler) AppendToInbox(c echo.Context) error {
 	return c.JSON(http.StatusOK, mapToNoteResponse(note))
 }
 
-type PlanOrganizationRequest struct{}
 type PlanOrganizationResponse struct {
-	PlanID string                `json:"plan_id"`
+	PlanID string                 `json:"plan_id"`
 	Items  []PlanOrganizationItem `json:"items"`
 }
 type PlanOrganizationItem struct {
-	ItemID           string  `json:"item_id"`
-	OriginalSnippet  string  `json:"original_snippet"`
-	DestinationType  string  `json:"destination_type"`
+	ItemID            string  `json:"item_id"`
+	OriginalSnippet   string  `json:"original_snippet"`
+	DestinationType   string  `json:"destination_type"`
 	DestinationNoteID *string `json:"destination_note_id,omitempty"`
 	DestinationTitle  *string `json:"destination_title,omitempty"`
+	Accepted          bool    `json:"accepted"`
 }
 
 type ApplyOrganizationRequest struct {
-	PlanID          string   `json:"plan_id" validate:"required"`
-	AcceptedItemIDs []string `json:"accepted_item_ids" validate:"required"`
+	PlanID string                 `json:"plan_id"`
+	Items  []PlanOrganizationItem `json:"items" validate:"required"`
+}
+
+type ApplyOrganizationResponse struct {
+	Status string `json:"status"`
+}
+
+func splitInboxItems(noteID pgtype.UUID, content string) []PlanOrganizationItem {
+	lines := strings.Split(content, "\n\n")
+	var items []PlanOrganizationItem
+	if len(lines) <= 1 {
+		trimmed := strings.TrimSpace(content)
+		if trimmed != "" {
+			items = append(items, PlanOrganizationItem{
+				ItemID:          uid.UUIDToString(noteID) + "-keep",
+				OriginalSnippet: trimmed,
+				DestinationType: DestKeep,
+				Accepted:        true,
+			})
+		}
+		return items
+	}
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		itemID := fmt.Sprintf("%s-%d", uid.UUIDToString(noteID), i)
+		snippet := trimmed
+		if len(snippet) > 100 {
+			snippet = snippet[:100] + "..."
+		}
+		items = append(items, PlanOrganizationItem{
+			ItemID:           itemID,
+			OriginalSnippet:  snippet,
+			DestinationType:  DestNewNote,
+			DestinationTitle: ptr(fmt.Sprintf("Nota %d", i+1)),
+			Accepted:         true,
+		})
+	}
+	return items
 }
 
 func (h *Handler) PlanOrganization(c echo.Context) error {
@@ -288,35 +334,7 @@ func (h *Handler) PlanOrganization(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get inbox note")
 	}
 
-	lines := strings.Split(note.Content, "\n\n")
-	var items []PlanOrganizationItem
-
-	if len(lines) <= 1 {
-		items = []PlanOrganizationItem{{
-			ItemID:          uid.UUIDToString(note.ID) + "-keep",
-			OriginalSnippet: note.Content,
-			DestinationType: "keep",
-		}}
-	} else {
-		for i, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if trimmed == "" {
-				continue
-			}
-			itemID := fmt.Sprintf("%s-%d", uid.UUIDToString(note.ID), i)
-			snippet := trimmed
-			if len(snippet) > 100 {
-				snippet = snippet[:100] + "..."
-			}
-			items = append(items, PlanOrganizationItem{
-				ItemID:          itemID,
-				OriginalSnippet: snippet,
-				DestinationType: "new_note",
-				DestinationTitle: ptr(fmt.Sprintf("Nota %d", i+1)),
-			})
-		}
-	}
-
+	items := splitInboxItems(note.ID, note.Content)
 	if items == nil {
 		items = []PlanOrganizationItem{}
 	}
@@ -339,25 +357,11 @@ func (h *Handler) ApplyOrganization(c echo.Context) error {
 		return err
 	}
 
-	if len(req.AcceptedItemIDs) == 0 {
-		return c.JSON(http.StatusOK, map[string]string{"status": "nothing_to_apply"})
+	if err := h.svc.ApplyOrganization(c.Request().Context(), userID, req.Items); err != nil {
+		return web.JSONError(c, http.StatusInternalServerError, err.Error())
 	}
 
-	_, err = h.svc.GetInboxNote(c.Request().Context(), userID)
-	if err != nil {
-		return web.JSONError(c, http.StatusInternalServerError, "failed to get inbox note")
-	}
-
-	summary := fmt.Sprintf("\n\n--- Organizado em %s ---\n%d itens processados.",
-		time.Now().Format("2006-01-02 15:04"),
-		len(req.AcceptedItemIDs))
-
-	_, err = h.svc.AppendToInbox(c.Request().Context(), userID, summary)
-	if err != nil {
-		return web.JSONError(c, http.StatusInternalServerError, "failed to update inbox")
-	}
-
-	return c.JSON(http.StatusOK, map[string]string{"status": "applied"})
+	return c.JSON(http.StatusOK, ApplyOrganizationResponse{Status: "applied"})
 }
 
 func ptr(s string) *string { return &s }

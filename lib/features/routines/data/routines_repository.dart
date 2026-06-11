@@ -18,14 +18,6 @@ import 'package:supanotes/core/di/providers.dart';
 import '../domain/routine_log_model.dart';
 import '../domain/routine_model.dart';
 
-/// 404 — the requested resource (e.g. a brief) does not exist yet.
-///
-/// Distinct from a generic [ApiException] so the caller can tell "no
-/// brief available" apart from a transport-level failure.
-class NotFoundException extends ApiException {
-  const NotFoundException({required super.message, super.statusCode = 404});
-}
-
 abstract class IRoutinesRepository {
   Future<List<RoutineModel>> getRoutines();
   Future<List<RoutineLogModel>> getLogs();
@@ -124,13 +116,7 @@ class RoutinesRepository implements IRoutinesRepository {
     try {
       final response = await _api.get<Map<String, dynamic>>(
         '/routines/brief/${type.testPath}',
-        options: Options(
-          validateStatus: (status) => status != null && status < 500,
-        ),
       );
-      if (response.statusCode == 404) {
-        throw const NotFoundException(message: 'no brief available yet');
-      }
       return _extractContent(response);
     } on DioException catch (e) {
       throw fromDioError(e);

@@ -45,17 +45,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Widget build(BuildContext context) {
     _controller.bind(ref, widget.noteId);
 
-    // Incondicional: o Riverpod exige que ref.watch seja chamado em
-    // todo build() para manter a assinatura viva. Se chamarmos dentro de
-    // um if (condicional), o provider nunca é ouvido e o widget não
-    // reconstrói quando a nota é atualizada por sync ou autosave.
     final asyncValue = ref.watch(noteProvider(widget.noteId));
 
-    // Initialise the editor exactly once, from the first snapshot of
-    // the note. After that the editor owns the document in memory; any
-    // local save or background sync that re-emits the stream would
-    // otherwise rebuild the editor and the surrounding widget tree on
-    // every keystroke, which manifests as visible flicker.
     if (_controller.document == null) {
       dev.log(
         '[NoteEditor] noteId=${widget.noteId}, asyncValue=${asyncValue.runtimeType}, '
@@ -84,7 +75,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final colorScheme = Theme.of(context).colorScheme;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -105,7 +95,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               hintText: 'Sem titulo',
             ),
             style: AppTypography.textTheme.headlineMedium?.copyWith(
-              color: colorScheme.onSurface,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ),

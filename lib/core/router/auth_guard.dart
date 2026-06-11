@@ -14,7 +14,7 @@ String? authGuardRedirect({
       final isAuthPage = currentLocation == AppRoutes.login ||
           currentLocation == AppRoutes.register;
       if (user != null) {
-        if (currentLocation == AppRoutes.splash || isAuthPage) {
+        if (isAuthPage) {
           return AppRoutes.home;
         }
         return null;

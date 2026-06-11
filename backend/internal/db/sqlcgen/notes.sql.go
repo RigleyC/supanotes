@@ -63,6 +63,41 @@ func (q *Queries) AppendToInbox(ctx context.Context, arg AppendToInboxParams) (N
 	return i, err
 }
 
+const appendToNoteContent = `-- name: AppendToNoteContent :one
+UPDATE notes
+SET content = content || E'\n\n' || $3, updated_at = NOW()
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND is_inbox = false
+RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status
+`
+
+type AppendToNoteContentParams struct {
+	ID      pgtype.UUID `json:"id"`
+	UserID  pgtype.UUID `json:"user_id"`
+	Content string      `json:"content"`
+}
+
+func (q *Queries) AppendToNoteContent(ctx context.Context, arg AppendToNoteContentParams) (Note, error) {
+	row := q.db.QueryRow(ctx, appendToNoteContent, arg.ID, arg.UserID, arg.Content)
+	var i Note
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ContextID,
+		&i.Title,
+		&i.Content,
+		&i.Excerpt,
+		&i.IsInbox,
+		&i.Favorite,
+		&i.Archived,
+		&i.SearchVector,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.EmbeddingStatus,
+	)
+	return i, err
+}
+
 const createContext = `-- name: CreateContext :one
 INSERT INTO contexts (user_id, slug, name)
 VALUES ($1, $2, $3)
@@ -516,6 +551,41 @@ type RemoveTagFromNoteParams struct {
 func (q *Queries) RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error {
 	_, err := q.db.Exec(ctx, removeTagFromNote, arg.NoteID, arg.TagID)
 	return err
+}
+
+const setInboxContent = `-- name: SetInboxContent :one
+UPDATE notes
+SET content = $3, updated_at = NOW()
+WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
+RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status
+`
+
+type SetInboxContentParams struct {
+	ID      pgtype.UUID `json:"id"`
+	UserID  pgtype.UUID `json:"user_id"`
+	Content string      `json:"content"`
+}
+
+func (q *Queries) SetInboxContent(ctx context.Context, arg SetInboxContentParams) (Note, error) {
+	row := q.db.QueryRow(ctx, setInboxContent, arg.ID, arg.UserID, arg.Content)
+	var i Note
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ContextID,
+		&i.Title,
+		&i.Content,
+		&i.Excerpt,
+		&i.IsInbox,
+		&i.Favorite,
+		&i.Archived,
+		&i.SearchVector,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.EmbeddingStatus,
+	)
+	return i, err
 }
 
 const updateNote = `-- name: UpdateNote :one

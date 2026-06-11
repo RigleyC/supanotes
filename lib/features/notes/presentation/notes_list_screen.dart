@@ -14,6 +14,7 @@ import 'package:supanotes/features/notes/presentation/widgets/brain_dump_tile.da
 import 'package:supanotes/features/notes/presentation/widgets/notes_grid_view.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_list_view.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_more_menu.dart';
+import 'package:supanotes/features/notes/presentation/widgets/daily_brief_panel.dart';
 import 'package:supanotes/features/notes/presentation/widgets/pull_down_brief_panel.dart';
 import 'package:supanotes/features/notes/presentation/widgets/section_title.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -42,7 +43,7 @@ class NotesListScreen extends ConsumerStatefulWidget {
 class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   static const double _fabClearance = 80;
   _NotesViewMode _viewMode = _NotesViewMode.list;
-  bool _isPanelOpen = false;
+  final ValueNotifier<double> _panelProgress = ValueNotifier(0);
 
   @override
   void initState() {
@@ -51,38 +52,51 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   }
 
   @override
+  void dispose() {
+    _panelProgress.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(activeNotesProvider);
     final favoritesOnly = ref.watch(favoritesFilterProvider);
 
-    return TweenAnimationBuilder<Color?>(
-      tween: ColorTween(
-        begin: Colors.transparent,
-        end: _isPanelOpen ? Colors.black : Colors.transparent,
+    final headerSlivers = [
+      const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
+      SliverToBoxAdapter(
+        child: BrainDumpTile(
+          title: _Strings.brainDump,
+          onTap: () => context.push(AppRoutes.inbox),
+        ),
       ),
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOut,
-      child: notesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) =>
-            AppErrorView(title: _Strings.errorTitle, subtitle: e.toString()),
-        data: (notes) {
-          final visibleNotes = favoritesOnly
-              ? notes.where((n) => n.favorite).toList()
-              : notes;
-          final headerSlivers = _buildHeaderSlivers();
+      const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
+      const SliverToBoxAdapter(child: SectionTitle(title: _Strings.notesSection)),
+    ];
 
-          return Stack(
-            children: [
-              PullDownBriefPanel(
-                onOpenChanged: (open) => setState(() => _isPanelOpen = open),
-                child: Cue.onChange(
+    final body = notesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) =>
+          AppErrorView(title: _Strings.errorTitle, subtitle: e.toString()),
+      data: (notes) {
+        final visibleNotes = favoritesOnly
+            ? notes.where((n) => n.favorite).toList()
+            : notes;
+
+        return Stack(
+          children: [
+            PullDownBriefPanel(
+              background: const DailyBriefPanel(),
+              onProgressChanged: (progress) => _panelProgress.value = progress,
+              builder: (context, scrollController) {
+                return Cue.onChange(
                   value: _viewMode,
                   motion: .smooth(),
                   acts: [.fadeIn()],
                   child: _viewMode == _NotesViewMode.grid
                       ? NotesGridView(
                           key: const ValueKey('grid'),
+                          controller: scrollController,
                           notes: visibleNotes,
                           headerSlivers: headerSlivers,
                           onTap: _openNote,
@@ -91,33 +105,47 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                         )
                       : NotesListView(
                           key: const ValueKey('list'),
+                          controller: scrollController,
                           notes: visibleNotes,
                           headerSlivers: headerSlivers,
                           onTap: _openNote,
                           onDelete: _deleteNote,
                           onToggleFavorite: _toggleFavorite,
                         ),
-                ),
-              ),
-              Positioned(
-                left: AppSpacing.md,
-                right: AppSpacing.md,
-                bottom: _fabClearance,
-                child: const OfflineIndicator(floating: true),
-              ),
-            ],
-          );
-        },
-      ),
-      builder: (context, animatedBgColor, child) {
-        final isDark = animatedBgColor!.computeLuminance() < 0.15;
-        final iconColor = isDark ? Colors.white : Colors.black;
+                );
+              },
+            ),
+            Positioned(
+              left: AppSpacing.md,
+              right: AppSpacing.md,
+              bottom: _fabClearance,
+              child: const OfflineIndicator(floating: true),
+            ),
+          ],
+        );
+      },
+    );
+
+    return ValueListenableBuilder<double>(
+      valueListenable: _panelProgress,
+      builder: (context, progress, _) {
+        final easedProgress = Curves.easeOut.transform(progress.clamp(0, 1));
+        final appBarColor = Color.lerp(
+          Colors.transparent,
+          Colors.black,
+          easedProgress,
+        )!;
+        final iconColor = Color.lerp(
+          Colors.black,
+          Colors.white,
+          easedProgress,
+        )!;
 
         return Scaffold(
           appBar: AppBar(
-            backgroundColor: animatedBgColor,
+            backgroundColor: appBarColor,
             foregroundColor: iconColor,
-            surfaceTintColor: animatedBgColor,
+            surfaceTintColor: Colors.transparent,
             shadowColor: Colors.transparent,
             animateColor: false,
             elevation: 0,
@@ -136,12 +164,13 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 onToggleFavorites: () =>
                     ref.read(favoritesFilterProvider.notifier).toggle(),
                 onSync: () => ref.read(syncServiceProvider).sync(),
+                onOpenSettings: () => context.push(AppRoutes.settings),
                 onLogout: () =>
                     ref.read(authControllerProvider.notifier).logout(),
               ),
             ],
           ),
-          body: child,
+          body: body,
           floatingActionButton: FloatingActionButton(
             onPressed: () => _openNewNote(context),
             shape: const CircleBorder(),
@@ -151,19 +180,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       },
     );
   }
-
-  //Isso aqui pode ficar fixo na pagina sem rebuildar, podemos rebuildar apenas a visualização das notas, alem de que nao precisa ta extraindo aqui embaixo
-  List<Widget> _buildHeaderSlivers() => [
-    const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
-    SliverToBoxAdapter(
-      child: BrainDumpTile(
-        title: _Strings.brainDump,
-        onTap: () => context.push(AppRoutes.inbox),
-      ),
-    ),
-    const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
-    const SliverToBoxAdapter(child: SectionTitle(title: _Strings.notesSection)),
-  ];
 
   void _openNote(NoteModel note) => context.push(AppRoutes.note(note.id));
 

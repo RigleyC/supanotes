@@ -101,3 +101,15 @@ WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.user_id = $2
   AND n.deleted_at IS NULL
 LIMIT 5;
+
+-- name: SetInboxContent :one
+UPDATE notes
+SET content = $3, updated_at = NOW()
+WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
+RETURNING *;
+
+-- name: AppendToNoteContent :one
+UPDATE notes
+SET content = content || E'\n\n' || $3, updated_at = NOW()
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND is_inbox = false
+RETURNING *;

@@ -53,7 +53,10 @@ func (s *Service) GetRoutineLogs(ctx context.Context, userID pgtype.UUID, limit,
 func (s *Service) GetLatestBrief(ctx context.Context, userID pgtype.UUID, briefType string) (string, error) {
 	log, err := s.repo.GetLatestBriefByType(ctx, userID, briefType)
 	if err != nil {
-		return "", ErrBriefNotFound
+		if errors.Is(err, ErrBriefNotFound) {
+			return "", ErrBriefNotFound
+		}
+		return "", err
 	}
 	if !log.Content.Valid {
 		return "", ErrBriefNotFound

@@ -2,7 +2,9 @@ package routines
 
 import (
 	"context"
+	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
@@ -90,10 +92,17 @@ func (r *repo) GetRoutineLogsByUser(ctx context.Context, userID pgtype.UUID, lim
 }
 
 func (r *repo) GetLatestBriefByType(ctx context.Context, userID pgtype.UUID, briefType string) (sqlcgen.RoutineLog, error) {
-	return r.q.GetLatestBriefByType(ctx, sqlcgen.GetLatestBriefByTypeParams{
+	log, err := r.q.GetLatestBriefByType(ctx, sqlcgen.GetLatestBriefByTypeParams{
 		UserID: userID,
 		Type:   briefType,
 	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlcgen.RoutineLog{}, ErrBriefNotFound
+		}
+		return sqlcgen.RoutineLog{}, err
+	}
+	return log, nil
 }
 
 // UpdateRoutineLastRunAt updates the last_run_at timestamp.

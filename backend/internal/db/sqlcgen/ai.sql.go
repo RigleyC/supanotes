@@ -128,6 +128,42 @@ func (q *Queries) GetPendingEmbeddings(ctx context.Context, limit int32) ([]GetP
 	return items, nil
 }
 
+const getRetryableEmbeddings = `-- name: GetRetryableEmbeddings :many
+SELECT n.id, n.content, n.user_id 
+FROM notes n
+WHERE (n.embedding_status = 'pending'
+   OR (n.embedding_status = 'failed' AND n.updated_at < NOW() - INTERVAL '5 minutes'))
+  AND n.deleted_at IS NULL
+  AND NOT n.is_inbox
+LIMIT $1
+`
+
+type GetRetryableEmbeddingsRow struct {
+	ID      pgtype.UUID `json:"id"`
+	Content string      `json:"content"`
+	UserID  pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetRetryableEmbeddings(ctx context.Context, limit int32) ([]GetRetryableEmbeddingsRow, error) {
+	rows, err := q.db.Query(ctx, getRetryableEmbeddings, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetRetryableEmbeddingsRow
+	for rows.Next() {
+		var i GetRetryableEmbeddingsRow
+		if err := rows.Scan(&i.ID, &i.Content, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSoul = `-- name: GetSoul :one
 SELECT id, user_id, personality, created_at, updated_at FROM souls
 WHERE user_id = $1

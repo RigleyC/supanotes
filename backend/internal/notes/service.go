@@ -3,12 +3,15 @@ package notes
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 var (
@@ -130,6 +133,31 @@ func (s *Service) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen
 	return note, nil
 }
 
+func (s *Service) SetInboxContent(ctx context.Context, userID pgtype.UUID, content string) (sqlcgen.Note, error) {
+	note, err := s.GetInboxNote(ctx, userID)
+	if err != nil {
+		return sqlcgen.Note{}, err
+	}
+	return s.repo.SetInboxContent(ctx, sqlcgen.SetInboxContentParams{
+		ID:      note.ID,
+		UserID:  userID,
+		Content: content,
+	})
+}
+
+func (s *Service) AppendToNoteContent(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID, content string) (sqlcgen.Note, error) {
+	// Verify note exists and belongs to user
+	_, err := s.GetNoteByID(ctx, noteID, userID)
+	if err != nil {
+		return sqlcgen.Note{}, err
+	}
+	return s.repo.AppendToNoteContent(ctx, sqlcgen.AppendToNoteContentParams{
+		ID:      noteID,
+		UserID:  userID,
+		Content: content,
+	})
+}
+
 func (s *Service) AppendToInbox(ctx context.Context, userID pgtype.UUID, content string) (sqlcgen.Note, error) {
 	note, err := s.GetInboxNote(ctx, userID)
 	if err != nil {
@@ -140,4 +168,54 @@ func (s *Service) AppendToInbox(ctx context.Context, userID pgtype.UUID, content
 		UserID:  userID,
 		Content: content,
 	})
+}
+
+func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, items []PlanOrganizationItem) error {
+	inbox, err := s.GetInboxNote(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	outgoing := make(map[string]PlanOrganizationItem, len(items))
+	for _, item := range items {
+		if item.Accepted {
+			outgoing[item.ItemID] = item
+		}
+	}
+
+	for _, item := range items {
+		if !item.Accepted {
+			continue
+		}
+		switch item.DestinationType {
+		case DestNewNote:
+			if _, err := s.CreateNote(ctx, userID, item.DestinationTitle, item.OriginalSnippet, nil, false, false); err != nil {
+				return fmt.Errorf("create note: %w", err)
+			}
+		case DestExistingNote:
+			if item.DestinationNoteID == nil {
+				continue
+			}
+			noteID, err := uid.UUIDFromString(*item.DestinationNoteID)
+			if err != nil {
+				return fmt.Errorf("invalid destination note id: %w", err)
+			}
+			if _, err := s.AppendToNoteContent(ctx, userID, noteID, item.OriginalSnippet); err != nil {
+				return fmt.Errorf("append to note: %w", err)
+			}
+		case DestKeep:
+		}
+	}
+
+	originalItems := splitInboxItems(inbox.ID, inbox.Content)
+	var keptLines []string
+	for _, orig := range originalItems {
+		reqItem, isOutgoing := outgoing[orig.ItemID]
+		if !isOutgoing || reqItem.DestinationType == DestKeep {
+			keptLines = append(keptLines, orig.OriginalSnippet)
+		}
+	}
+	newContent := strings.Join(keptLines, "\n\n")
+	_, err = s.SetInboxContent(ctx, userID, newContent)
+	return err
 }

@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	AddTagToNote(ctx context.Context, arg AddTagToNoteParams) error
 	AppendToInbox(ctx context.Context, arg AppendToInboxParams) (Note, error)
+	AppendToNoteContent(ctx context.Context, arg AppendToNoteContentParams) (Note, error)
 	CleanupOldMessages(ctx context.Context) error
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
 	CreateDeviceToken(ctx context.Context, arg CreateDeviceTokenParams) (DeviceToken, error)
@@ -35,8 +36,8 @@ type Querier interface {
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	GetContexts(ctx context.Context, userID pgtype.UUID) ([]Context, error)
 	GetEnabledRoutines(ctx context.Context) ([]GetEnabledRoutinesRow, error)
-	GetLatestBriefByType(ctx context.Context, arg GetLatestBriefByTypeParams) (RoutineLog, error)
 	GetInboxNote(ctx context.Context, userID pgtype.UUID) (Note, error)
+	GetLatestBriefByType(ctx context.Context, arg GetLatestBriefByTypeParams) (RoutineLog, error)
 	GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) ([]Note, error)
 	GetMemories(ctx context.Context, arg GetMemoriesParams) ([]Memory, error)
 	GetMessages(ctx context.Context, arg GetMessagesParams) ([]Message, error)
@@ -45,6 +46,7 @@ type Querier interface {
 	GetPendingEmbeddings(ctx context.Context, limit int32) ([]GetPendingEmbeddingsRow, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Note, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
+	GetRetryableEmbeddings(ctx context.Context, limit int32) ([]GetRetryableEmbeddingsRow, error)
 	GetRoutineLogsByUser(ctx context.Context, arg GetRoutineLogsByUserParams) ([]RoutineLog, error)
 	GetRoutinesByUser(ctx context.Context, userID pgtype.UUID) ([]Routine, error)
 	GetSoul(ctx context.Context, userID pgtype.UUID) (Soul, error)
@@ -73,6 +75,7 @@ type Querier interface {
 	SearchNotesFTS(ctx context.Context, arg SearchNotesFTSParams) ([]SearchNotesFTSRow, error)
 	SearchNotesHybrid(ctx context.Context, arg SearchNotesHybridParams) ([]SearchNotesHybridRow, error)
 	SearchNotesSemantic(ctx context.Context, arg SearchNotesSemanticParams) ([]SearchNotesSemanticRow, error)
+	SetInboxContent(ctx context.Context, arg SetInboxContentParams) (Note, error)
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteEmbeddingStatus(ctx context.Context, arg UpdateNoteEmbeddingStatusParams) error
 	UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (Routine, error)

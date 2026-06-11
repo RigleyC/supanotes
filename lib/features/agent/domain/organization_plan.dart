@@ -1,26 +1,6 @@
-/// Inbox organization plan returned by the agent backend.
-///
-/// The agent is asked to look at the user's inbox note and propose a set
-/// of moves — each item in the plan represents a snippet that should be
-/// routed to an existing note, a new note, or kept in the inbox.
-///
-/// The model is intentionally minimal: the backend is expected to return
-/// JSON shaped like
-///
-/// ```json
-/// {
-///   "plan_id": "uuid",
-///   "items": [
-///     {
-///       "item_id": "uuid",
-///       "original_snippet": "string",
-///       "destination_type": "new_note|existing_note|keep",
-///       "destination_note_id": "uuid|null",
-///       "destination_title": "string|null"
-///     }
-///   ]
-/// }
-/// ```
+library;
+
+import 'destination_type.dart';
 class OrganizationPlan {
   OrganizationPlan({required this.planId, required this.items});
 
@@ -37,6 +17,11 @@ class OrganizationPlan {
           .toList(growable: false),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'plan_id': planId,
+        'items': items.map((i) => i.toJson()).toList(),
+      };
 }
 
 /// One proposed move in an [OrganizationPlan].
@@ -55,27 +40,41 @@ class OrganizationPlanItem {
 
   final String itemId;
   final String originalSnippet;
-  final String destinationType;
+  final DestinationType destinationType;
   final String? destinationNoteId;
   final String? destinationTitle;
   final bool accepted;
 
-  OrganizationPlanItem copyWith({bool? accepted}) {
+  OrganizationPlanItem copyWith({
+    bool? accepted,
+    DestinationType? destinationType,
+  }) {
     return OrganizationPlanItem(
       itemId: itemId,
       originalSnippet: originalSnippet,
-      destinationType: destinationType,
+      destinationType: destinationType ?? this.destinationType,
       destinationNoteId: destinationNoteId,
       destinationTitle: destinationTitle,
       accepted: accepted ?? this.accepted,
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'item_id': itemId,
+        'original_snippet': originalSnippet,
+        'destination_type': destinationType.value,
+        'destination_note_id': destinationNoteId,
+        'destination_title': destinationTitle,
+        'accepted': accepted,
+      };
+
   factory OrganizationPlanItem.fromJson(Map<String, dynamic> json) {
     return OrganizationPlanItem(
       itemId: (json['item_id'] ?? '') as String,
       originalSnippet: (json['original_snippet'] ?? '') as String,
-      destinationType: (json['destination_type'] ?? 'keep') as String,
+      destinationType: DestinationType.fromJson(
+        (json['destination_type'] ?? 'keep') as String,
+      ),
       destinationNoteId: json['destination_note_id'] as String?,
       destinationTitle: json['destination_title'] as String?,
       accepted: true,

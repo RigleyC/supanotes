@@ -10,12 +10,12 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
+import 'package:supanotes/features/agent/domain/destination_type.dart';
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
-import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
@@ -48,19 +48,23 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   }
 
   Future<void> _onOrganizePressed() async {
-    try {
-      final applied = await showAppBottomSheet<bool>(
-        context: context,
-        builder: (_) => const InboxOrganizeSheet(),
-      );
-      if (!mounted) return;
-      if (applied == true) {
-        AppMessenger.showSuccess(context, 'Rascunho organizado');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      AppMessenger.showError(context, 'Erro ao organizar: $e');
-    }
+    final result = await showInboxOrganizeSheet(context);
+    if (!mounted || result == null) return;
+
+    final created = result.items
+        .where((i) => i.accepted && i.destinationType == DestinationType.newNote)
+        .length;
+    final moved = result.items
+        .where((i) => i.accepted && i.destinationType == DestinationType.existingNote)
+        .length;
+    final kept = result.items
+        .where((i) => i.accepted && i.destinationType == DestinationType.keep)
+        .length;
+
+    AppMessenger.showSuccess(
+      context,
+      '$created nota(s) criada(s), $moved atualizada(s), $kept mantida(s)',
+    );
   }
 
   @override
@@ -116,13 +120,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
-          actions: [
-            if (hasContent)
-              TextButton(
-                onPressed: _onOrganizePressed,
-                child: const Text('Organizar'),
-              ),
-          ],
         ),
         body: Column(
           children: [
@@ -145,7 +142,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             ),
           ],
         ),
+        floatingActionButton: _buildOrganizeFab(hasContent),
       ),
+    );
+  }
+
+  Widget? _buildOrganizeFab(bool show) {
+    if (!show) return null;
+    return FloatingActionButton(
+      onPressed: _onOrganizePressed,
+      child: const Icon(Icons.auto_awesome),
     );
   }
 }

@@ -6,6 +6,15 @@ WHERE n.embedding_status = 'pending'
   AND NOT n.is_inbox
 LIMIT $1;
 
+-- name: GetRetryableEmbeddings :many
+SELECT n.id, n.content, n.user_id 
+FROM notes n
+WHERE (n.embedding_status = 'pending'
+   OR (n.embedding_status = 'failed' AND n.updated_at < NOW() - INTERVAL '5 minutes'))
+  AND n.deleted_at IS NULL
+  AND NOT n.is_inbox
+LIMIT $1;
+
 -- name: UpdateNoteEmbeddingStatus :exec
 UPDATE notes
 SET embedding_status = $2,

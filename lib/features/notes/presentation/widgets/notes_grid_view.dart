@@ -21,6 +21,7 @@ class NotesGridView extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onToggleFavorite,
+    this.controller,
   });
 
   final List<NoteModel> notes;
@@ -28,11 +29,15 @@ class NotesGridView extends StatelessWidget {
   final void Function(NoteModel note) onTap;
   final void Function(NoteModel note) onDelete;
   final void Function(NoteModel note) onToggleFavorite;
+  final ScrollController? controller;
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
-      physics: const ClampingScrollPhysics(),
+      controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       slivers: [
         ...headerSlivers,
         SliverPadding(

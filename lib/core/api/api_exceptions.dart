@@ -38,6 +38,11 @@ class UnauthorizedException extends ApiException {
   const UnauthorizedException({required super.message, super.statusCode = 401});
 }
 
+/// 404 — the requested resource does not exist.
+class NotFoundException extends ApiException {
+  const NotFoundException({required super.message, super.statusCode = 404});
+}
+
 /// 409 — request could not be completed because of a conflict with the
 /// current state of the target resource (e.g. duplicate email on register).
 class ConflictException extends ApiException {
@@ -92,6 +97,11 @@ ApiException fromDioError(DioException error) {
       if (statusCode == 401) {
         return UnauthorizedException(
           message: parsed ?? _fallbackMessage(error, 'Unauthorized'),
+        );
+      }
+      if (statusCode == 404) {
+        return NotFoundException(
+          message: parsed ?? _fallbackMessage(error, 'Not found'),
         );
       }
       if (statusCode == 409) {

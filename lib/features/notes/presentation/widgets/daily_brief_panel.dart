@@ -14,7 +14,6 @@ class DailyBriefPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
     final briefAsync = ref.watch(dailyBriefProvider);
 
     return DecoratedBox(
@@ -57,7 +56,9 @@ class _BriefText extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Cue.onMount(
+    return Cue.onChange(
+      key: ValueKey(text),
+      value: text,
       motion: .smooth(),
       acts: [.fadeIn(), .slideY(from: -0.1)],
       child: Column(
@@ -67,7 +68,7 @@ class _BriefText extends StatelessWidget {
           Text(
             'Morning brief',
             style: textTheme.titleMedium?.copyWith(
-              color: Colors.black87,
+              color: Colors.white,
               fontWeight: FontWeight.w700,
             ),
           ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum _MenuAction { favoritesOnly, sync, logout }
+enum _MenuAction { favoritesOnly, sync, settings, logout }
 
 class NotesMoreMenu extends StatelessWidget {
   const NotesMoreMenu({
@@ -9,12 +9,14 @@ class NotesMoreMenu extends StatelessWidget {
     required this.onToggleFavorites,
     required this.onSync,
     required this.onLogout,
+    required this.onOpenSettings,
   });
 
   final bool favoritesOnly;
   final VoidCallback onToggleFavorites;
   final VoidCallback onSync;
   final VoidCallback onLogout;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +59,16 @@ class NotesMoreMenu extends StatelessWidget {
             title: Text('Sincronizar agora'),
           ),
         ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<_MenuAction>(
+          value: _MenuAction.settings,
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.settings_outlined),
+            title: Text('Configurações'),
+          ),
+        ),
         const PopupMenuItem<_MenuAction>(
           value: _MenuAction.logout,
           child: ListTile(
@@ -75,6 +87,8 @@ class NotesMoreMenu extends StatelessWidget {
         onToggleFavorites();
       case _MenuAction.sync:
         onSync();
+      case _MenuAction.settings:
+        onOpenSettings();
       case _MenuAction.logout:
         onLogout();
     }

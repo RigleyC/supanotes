@@ -10,7 +10,6 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
-import 'package:supanotes/shared/widgets/splash_screen.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
@@ -75,22 +74,21 @@ void main() {
     }
   }
 
-  testWidgets('starting on / with loading auth renders the splash', (tester) async {
+  testWidgets('starting on /login with loading auth stays on /login', (tester) async {
     final stub = AsyncValue<User?>.loading();
     final container = _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await tester.pump();
 
-    expect(find.byType(SplashScreen), findsOneWidget);
     final router = container.read(goRouterProvider);
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      AppRoutes.splash,
+      AppRoutes.login,
     );
   });
 
-  testWidgets('starting on / with unauth auth redirects to /login',
+  testWidgets('starting on /login with unauth auth stays on /login',
       (tester) async {
     final stub = AsyncValue<User?>.data(null);
     final container = _makeContainer(stub);
@@ -105,7 +103,7 @@ void main() {
     );
   });
 
-  testWidgets('starting on / with auth redirects to /home', (tester) async {
+  testWidgets('starting on /login with auth redirects to /home', (tester) async {
     final stub = AsyncValue<User?>.data(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );

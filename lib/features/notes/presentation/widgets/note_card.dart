@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
-import '../../../../shared/theme/app_spacing.dart';
-import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../domain/note_model.dart';
+
+enum _NoteCardAction { favorite, delete }
 
 class NoteCard extends StatelessWidget {
   const NoteCard({
@@ -27,7 +27,7 @@ class NoteCard extends StatelessWidget {
 
   static String titleHeroTag(String noteId) => 'note-title-$noteId';
 
-  String? _resolveExcerpt(NoteModel note) {
+  String? _resolveExcerpt() {
     if (note.excerpt != null && note.excerpt!.trim().isNotEmpty) {
       return note.excerpt!.trim();
     }
@@ -44,125 +44,100 @@ class NoteCard extends StatelessWidget {
     final title = note.title?.trim().isNotEmpty == true
         ? note.title!.trim()
         : _fallbackTitle;
-    final excerpt = _resolveExcerpt(note);
+    final excerpt = _resolveExcerpt();
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              //Abre um popupmenu com as ações de favoritar e deletar
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                splashColor: Colors.transparent,
-                onPressed: () {},
-                icon: Icon(Icons.more_vert_rounded),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Text(
-            title,
-            style: textTheme.titleMedium,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            note.content,
-            style: textTheme.bodyMedium,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-    /* 
-    return AppCard(
+    return GestureDetector(
       onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Hero(
-                  tag: titleHeroTag(note.id),
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: Text(
-                      title,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: scheme.onSurface,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
-                ),
-                icon: Icon(
-                  note.favorite ? Icons.star : Icons.star_border,
-                  size: 18,
-                  color: note.favorite
-                      ? scheme.tertiary
-                      : scheme.onSurfaceVariant,
-                ),
-                onPressed: onToggleFavorite,
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
-                ),
-                icon: Icon(
-                  Icons.delete_outline,
-                  size: 18,
-                  color: scheme.onSurfaceVariant,
-                ),
-                onPressed: () => _confirmDelete(context),
-              ),
-            ],
-          ),
-          if (excerpt != null && excerpt.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              excerpt,
-              style: textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                PopupMenuButton<_NoteCardAction>(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.more_vert_rounded),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _NoteCardAction.favorite:
+                        onToggleFavorite();
+                      case _NoteCardAction.delete:
+                        _confirmDelete(context);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: _NoteCardAction.favorite,
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          note.favorite
+                              ? Icons.star
+                              : Icons.star_border,
+                        ),
+                        title: Text(
+                          note.favorite
+                              ? 'Remover favorito'
+                              : 'Favoritar',
+                        ),
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: _NoteCardAction.delete,
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.delete_outline),
+                        title: const Text('Apagar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Hero(
+              tag: titleHeroTag(note.id),
+              child: Material(
+                type: MaterialType.transparency,
+                child: Text(
+                  title,
+                  style: textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            if (excerpt != null && excerpt.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                excerpt,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
       ),
-    ); */
+    );
   }
 
   Future<void> _confirmDelete(BuildContext context) async {

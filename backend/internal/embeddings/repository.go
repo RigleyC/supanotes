@@ -11,6 +11,7 @@ import (
 
 type Repository interface {
 	GetPendingEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetPendingEmbeddingsRow, error)
+	GetRetryableEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetRetryableEmbeddingsRow, error)
 	UpdateNoteEmbeddingStatus(ctx context.Context, id pgtype.UUID, embeddingStatus string) error
 	UpsertNoteEmbedding(ctx context.Context, noteID pgtype.UUID, embedding pgvector.Vector) error
 }
@@ -25,6 +26,10 @@ func NewRepository(q sqlcgen.Querier) Repository {
 
 func (r *repository) GetPendingEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetPendingEmbeddingsRow, error) {
 	return r.q.GetPendingEmbeddings(ctx, limit)
+}
+
+func (r *repository) GetRetryableEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetRetryableEmbeddingsRow, error) {
+	return r.q.GetRetryableEmbeddings(ctx, limit)
 }
 
 func (r *repository) UpdateNoteEmbeddingStatus(ctx context.Context, id pgtype.UUID, embeddingStatus string) error {

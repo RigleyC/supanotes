@@ -67,71 +67,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final account = ref.watch(authControllerProvider).asData?.value;
 
     return Scaffold(
-      appBar: AppBar(title: const Text(_SettingsStrings.title)),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-          children: [
-            const SettingsSectionHeader(
-              title: _SettingsStrings.accountSection,
-            ),
-            SettingsTile.action(
-              icon: Icons.alternate_email,
-              title: _SettingsStrings.emailTile,
-              subtitle: account?.email ?? _SettingsStrings.fallbackEmail,
-            ),
-            SettingsTile.action(
-              icon: Icons.person_outline,
-              title: _SettingsStrings.nameTile,
-              subtitle: account?.name ?? _SettingsStrings.fallbackName,
-            ),
-            SettingsTile.action(
-              icon: Icons.logout,
-              title: _SettingsStrings.logoutTile,
-              onTap: () => _confirmLogout(context, ref),
-              enabled: account != null,
-            ),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar.medium(title: const Text(_SettingsStrings.title)),
+          SliverPadding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                const SettingsSectionHeader(
+                  title: _SettingsStrings.accountSection,
+                ),
+                SettingsTile.action(
+                  icon: Icons.alternate_email,
+                  title: _SettingsStrings.emailTile,
+                  subtitle: account?.email ?? _SettingsStrings.fallbackEmail,
+                ),
+                SettingsTile.action(
+                  icon: Icons.person_outline,
+                  title: _SettingsStrings.nameTile,
+                  subtitle: account?.name ?? _SettingsStrings.fallbackName,
+                ),
+                SettingsTile.action(
+                  icon: Icons.logout,
+                  title: _SettingsStrings.logoutTile,
+                  onTap: () => _confirmLogout(context, ref),
+                  enabled: account != null,
+                ),
 
-            const SettingsSectionHeader(
-              title: _SettingsStrings.notificationsSection,
-            ),
-            SettingsTile.toggle(
-              icon: Icons.notifications_outlined,
-              title: _SettingsStrings.pushTile,
-              subtitle: _SettingsStrings.pushSubtitle,
-              value: _pushEnabled,
-              onChanged: (_) => setState(() => _pushEnabled = !_pushEnabled),
-            ),
+                const SettingsSectionHeader(
+                  title: _SettingsStrings.notificationsSection,
+                ),
+                SettingsTile.toggle(
+                  icon: Icons.notifications_outlined,
+                  title: _SettingsStrings.pushTile,
+                  subtitle: _SettingsStrings.pushSubtitle,
+                  value: _pushEnabled,
+                  onChanged: (_) => setState(() => _pushEnabled = !_pushEnabled),
+                ),
 
-            const SettingsSectionHeader(
-              title: _SettingsStrings.advancedSection,
+                const SettingsSectionHeader(
+                  title: _SettingsStrings.advancedSection,
+                ),
+                SettingsTile.navigation(
+                  icon: Icons.auto_awesome_outlined,
+                  title: _SettingsStrings.soulTile,
+                  subtitle: _SettingsStrings.soulSubtitle,
+                  onTap: () => context.push(AppRoutes.soul),
+                ),
+                SettingsTile.navigation(
+                  icon: Icons.folder_outlined,
+                  title: _SettingsStrings.contextsTile,
+                  subtitle: _SettingsStrings.contextsSubtitle,
+                  onTap: () => context.push(AppRoutes.contexts),
+                ),
+                SettingsTile.navigation(
+                  icon: Icons.send_outlined,
+                  title: _SettingsStrings.telegramTile,
+                  subtitle: _SettingsStrings.telegramSubtitle,
+                  onTap: () => context.push(AppRoutes.telegram),
+                ),
+                SettingsTile.navigation(
+                  icon: Icons.cloud_sync_outlined,
+                  title: _SettingsStrings.dataTile,
+                  subtitle: _SettingsStrings.dataSubtitle,
+                  onTap: () => _showSyncDialog(context, ref),
+                ),
+              ]),
             ),
-            SettingsTile.navigation(
-              icon: Icons.auto_awesome_outlined,
-              title: _SettingsStrings.soulTile,
-              subtitle: _SettingsStrings.soulSubtitle,
-              onTap: () => context.push(AppRoutes.soul),
-            ),
-            SettingsTile.navigation(
-              icon: Icons.folder_outlined,
-              title: _SettingsStrings.contextsTile,
-              subtitle: _SettingsStrings.contextsSubtitle,
-              onTap: () => context.push(AppRoutes.contexts),
-            ),
-            SettingsTile.navigation(
-              icon: Icons.send_outlined,
-              title: _SettingsStrings.telegramTile,
-              subtitle: _SettingsStrings.telegramSubtitle,
-              onTap: () => context.push(AppRoutes.telegram),
-            ),
-            SettingsTile.navigation(
-              icon: Icons.cloud_sync_outlined,
-              title: _SettingsStrings.dataTile,
-              subtitle: _SettingsStrings.dataSubtitle,
-              onTap: () => _showSyncDialog(context, ref),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

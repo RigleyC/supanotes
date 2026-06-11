@@ -96,12 +96,12 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final checkboxSize = 26.0;
+    final checkboxSize = 22.0;
 
     return Directionality(
       textDirection: widget.viewModel.textDirection,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
             width: defaultTaskIndentCalculator(
@@ -109,18 +109,15 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
               widget.viewModel.indent,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(left: 12, right: 6, top: 6),
-            child: _AnimatedTaskCheckbox(
-              size: checkboxSize,
-              value: _isComplete,
-              activeColor: colorScheme.primary,
-              inactiveColor: colorScheme.outline,
-              checkmarkColor: colorScheme.onPrimary,
-              onChanged: widget.viewModel.setComplete != null
-                  ? (_) => _onToggle()
-                  : null,
-            ),
+          _AnimatedTaskCheckbox(
+            size: checkboxSize,
+            value: _isComplete,
+            activeColor: colorScheme.primary,
+            inactiveColor: colorScheme.outline,
+            checkmarkColor: colorScheme.onPrimary,
+            onChanged: widget.viewModel.setComplete != null
+                ? (_) => _onToggle()
+                : null,
           ),
           Expanded(
             child: Padding(
@@ -219,45 +216,51 @@ class _AnimatedTaskCheckboxState extends State<_AnimatedTaskCheckbox>
   Widget build(BuildContext context) {
     final size = widget.size;
 
-    return GestureDetector(
-      onTap: widget.onChanged != null
-          ? () => widget.onChanged!(!widget.value)
-          : null,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 24,
-        height: 24,
-        child: Center(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final scale = 1.0 - (0.15 * (1.0 - _scaleAnim.value));
-              final checkProgress = _checkAnim.value;
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, right: 6, top: 6),
+      child: InkWell(
+        highlightColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        onTap: widget.onChanged != null
+            ? () => widget.onChanged!(!widget.value)
+            : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(9),
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                final scale = 1.0 - (0.15 * (1.0 - _scaleAnim.value));
+                final checkProgress = _checkAnim.value;
 
-              return Transform.scale(
-                scale: scale,
-                child: Container(
-                  width: size,
-                  height: size,
-                  decoration: BoxDecoration(
-                    color: widget.value
-                        ? widget.activeColor
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
+                return Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    width: size,
+                    height: size,
+                    decoration: BoxDecoration(
                       color: widget.value
                           ? widget.activeColor
-                          : widget.inactiveColor,
-                      width: 2,
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: widget.value
+                            ? widget.activeColor
+                            : widget.inactiveColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: _CheckmarkPainter(
+                      progress: checkProgress,
+                      color: widget.checkmarkColor,
                     ),
                   ),
-                  child: _CheckmarkPainter(
-                    progress: checkProgress,
-                    color: widget.checkmarkColor,
-                  ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),

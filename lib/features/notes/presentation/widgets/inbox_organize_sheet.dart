@@ -8,29 +8,63 @@
 ///   * plan    — scrollable list of plan items with toggles and footer
 ///
 /// `showInboxOrganizeSheet` is a convenience that wraps the sheet in a
-/// `showModalBottomSheet` and resolves to `true` when the user actually
-/// applied a plan so the caller knows to reload the inbox.
+/// `showModalBottomSheet` and resolves to the `OrganizationPlan` (with
+/// final accepted flags) when the user successfully applied a plan, or
+/// `null` if they cancelled.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/features/agent/data/agent_repository.dart';
+import 'package:supanotes/features/agent/data/inbox_organize_repository.dart';
 import 'package:supanotes/features/agent/domain/organization_plan.dart';
+import 'package:supanotes/features/agent/domain/destination_type.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 
-Future<bool> showInboxOrganizeSheet(BuildContext context) async {
-  final result = await showModalBottomSheet<bool>(
+// ---------------------------------------------------------------------------
+// Sheet state – sealed class for exhaustive handling
+// ---------------------------------------------------------------------------
+
+sealed class _SheetState {}
+
+class _Loading extends _SheetState {}
+
+class _Error extends _SheetState {
+  final String message;
+  _Error(this.message);
+}
+
+class _PlanReady extends _SheetState {
+  final OrganizationPlan plan;
+  _PlanReady(this.plan);
+}
+
+class _Applying extends _SheetState {
+  final OrganizationPlan plan;
+  _Applying(this.plan);
+}
+
+// ---------------------------------------------------------------------------
+// Convenience entry-point
+// ---------------------------------------------------------------------------
+
+Future<OrganizationPlan?> showInboxOrganizeSheet(
+    BuildContext context) async {
+  final result = await showModalBottomSheet<OrganizationPlan>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     builder: (_) => const InboxOrganizeSheet(),
   );
-  return result ?? false;
+  return result;
 }
+
+// ---------------------------------------------------------------------------
+// Sheet widget
+// ---------------------------------------------------------------------------
 
 class InboxOrganizeSheet extends ConsumerStatefulWidget {
   const InboxOrganizeSheet({super.key});
@@ -40,9 +74,24 @@ class InboxOrganizeSheet extends ConsumerStatefulWidget {
 }
 
 class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
-  OrganizationPlan? _plan;
-  String? _error;
-  bool _applying = false;
+  _SheetState _state = _Loading();
+
+  OrganizationPlan? _currentPlan() => switch (_state) {
+    _PlanReady(:final plan) => plan,
+    _Applying(:final plan) => plan,
+    _ => null,
+  };
+
+  bool get _canApply => switch (_state) {
+    _PlanReady(plan: final p) => p.items.any((i) => i.accepted),
+    _ => false,
+  };
+
+  int get _acceptedCount => switch (_state) {
+    _PlanReady(plan: final p) => p.items.where((i) => i.accepted).length,
+    _Applying(plan: final p) => p.items.where((i) => i.accepted).length,
+    _ => 0,
+  };
 
   @override
   void initState() {
@@ -51,69 +100,50 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
   }
 
   Future<void> _fetch() async {
-    setState(() {
-      _plan = null;
-      _error = null;
-    });
+    setState(() => _state = _Loading());
     try {
-      final plan = await ref.read(agentRepositoryProvider).planInboxOrganization();
+      final plan =
+          await ref.read(inboxOrganizeRepositoryProvider).planInboxOrganization();
       if (!mounted) return;
-      setState(() => _plan = plan);
+      setState(() => _state = _PlanReady(plan));
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _state = _Error(e.message));
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _state = _Error(e.toString()));
     }
   }
 
   Future<void> _apply() async {
-    final plan = _plan;
+    final plan = _currentPlan();
     if (plan == null) return;
-    final accepted = plan.items
-        .where((i) => i.accepted)
-        .map((i) => i.itemId)
-        .toList(growable: false);
-    if (accepted.isEmpty) {
-      Navigator.of(context).pop(false);
-      return;
-    }
-    setState(() => _applying = true);
+    setState(() => _state = _Applying(plan));
     try {
-      await ref.read(agentRepositoryProvider).applyOrganizationPlan(
-            planId: plan.planId,
-            acceptedItemIds: accepted,
-          );
+      await ref.read(inboxOrganizeRepositoryProvider).applyOrganizationPlan(plan);
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(_currentPlan());
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _applying = false;
-        _error = e.message;
-      });
+      setState(() => _state = _Error(e.message));
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _applying = false;
-        _error = e.toString();
-      });
+      setState(() => _state = _Error(e.toString()));
     }
   }
 
   void _toggle(int index, bool? value) {
-    final plan = _plan;
+    final plan = _currentPlan();
     if (plan == null) return;
     setState(() {
-      _plan = OrganizationPlan(
+      _state = _PlanReady(OrganizationPlan(
         planId: plan.planId,
         items: List<OrganizationPlanItem>.generate(plan.items.length, (i) {
           return i == index
               ? plan.items[i].copyWith(accepted: value ?? false)
               : plan.items[i];
         }),
-      );
+      ));
     });
   }
 
@@ -155,67 +185,78 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
   }
 
   Widget _buildBody(ColorScheme colorScheme) {
-    if (_error != null && _plan == null) {
+    return switch (_state) {
+      _Loading() => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Analisando rascunho…',
+              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      _Error(:final message) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, color: colorScheme.error, size: 32),
+              const SizedBox(height: AppSpacing.sm),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              FilledButton.tonal(
+                onPressed: _fetch,
+                child: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
+      _PlanReady(:final plan) => _buildPlanItems(plan, colorScheme),
+      _Applying(:final plan) => _buildPlanItems(plan, colorScheme),
+    };
+  }
+
+  Widget _buildPlanItems(OrganizationPlan plan, ColorScheme colorScheme) {
+    if (plan.items.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, color: colorScheme.error, size: 32),
+            Icon(Icons.inbox_outlined,
+                size: 48, color: colorScheme.onSurfaceVariant),
             const SizedBox(height: AppSpacing.sm),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: AppTypography.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface,
-                ),
+            Text(
+              'Nada para organizar no momento.',
+              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton.tonal(
-              onPressed: _applying ? null : _fetch,
-              child: const Text('Tentar novamente'),
             ),
           ],
         ),
       );
     }
-    if (_plan == null) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Analisando rascunho…',
-            style: AppTypography.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      );
-    }
-    final items = _plan!.items;
-    if (items.isEmpty) {
-      return Center(
-        child: Text(
-          'Nada para organizar no momento.',
-          style: AppTypography.textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-      );
-    }
     return ListView.separated(
       shrinkWrap: true,
-      itemCount: items.length,
-      separatorBuilder: (_, __) => Divider(
+      itemCount: plan.items.length,
+      separatorBuilder: (_, _) => Divider(
         height: 1,
         color: colorScheme.outlineVariant,
       ),
       itemBuilder: (context, index) {
-        final item = items[index];
+        final item = plan.items[index];
         return _PlanItemTile(
           item: item,
           onChanged: (v) => _toggle(index, v),
@@ -225,30 +266,28 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
   }
 
   Widget _buildFooter(ColorScheme colorScheme) {
-    final plan = _plan;
-    final acceptedCount =
-        plan == null ? 0 : plan.items.where((i) => i.accepted).length;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
         children: [
           TextButton(
-            onPressed:
-                _applying ? null : () => Navigator.of(context).pop(false),
+            onPressed: _state is _Applying ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancelar'),
           ),
           const Spacer(),
           FilledButton(
-            onPressed: (_applying || plan == null || acceptedCount == 0)
-                ? null
-                : _apply,
-            child: Text('Aplicar $acceptedCount selecionados'),
+            onPressed: _canApply ? _apply : null,
+            child: Text('Aplicar $_acceptedCount selecionados'),
           ),
         ],
       ),
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Plan item tile
+// ---------------------------------------------------------------------------
 
 class _PlanItemTile extends StatelessWidget {
   const _PlanItemTile({required this.item, required this.onChanged});
@@ -259,7 +298,7 @@ class _PlanItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final destination = _destinationLabel();
+    final style = _destinationStyle(colorScheme);
 
     return SwitchListTile(
       value: item.accepted,
@@ -280,16 +319,15 @@ class _PlanItemTile extends StatelessWidget {
         padding: const EdgeInsets.only(top: AppSpacing.xs),
         child: Row(
           children: [
-            Icon(_destinationIcon(),
-                size: 14, color: _destinationColor(colorScheme)),
+            Icon(style.icon, size: 14, color: style.color),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Text(
-                destination,
+                style.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.textTheme.labelSmall?.copyWith(
-                  color: _destinationColor(colorScheme),
+                  color: style.color,
                 ),
               ),
             ),
@@ -299,39 +337,24 @@ class _PlanItemTile extends StatelessWidget {
     );
   }
 
-  String _destinationLabel() {
-    switch (item.destinationType) {
-      case 'new_note':
-        return 'Nova nota: ${item.destinationTitle ?? "sem título"}';
-      case 'existing_note':
-        return 'Mover para: ${item.destinationTitle ?? "nota existente"}';
-      case 'keep':
-      default:
-        return 'Manter no rascunho';
-    }
-  }
-
-  IconData _destinationIcon() {
-    switch (item.destinationType) {
-      case 'new_note':
-        return Icons.note_add_outlined;
-      case 'existing_note':
-        return Icons.drive_file_move_outline;
-      case 'keep':
-      default:
-        return Icons.inbox_outlined;
-    }
-  }
-
-  Color _destinationColor(ColorScheme colorScheme) {
-    switch (item.destinationType) {
-      case 'new_note':
-        return AppColors.info;
-      case 'existing_note':
-        return colorScheme.primary;
-      case 'keep':
-      default:
-        return colorScheme.onSurfaceVariant;
-    }
+  ({String label, IconData icon, Color color}) _destinationStyle(
+      ColorScheme s) {
+    return switch (item.destinationType) {
+      DestinationType.newNote => (
+        label: 'Nova nota: ${item.destinationTitle ?? "sem título"}',
+        icon: Icons.note_add_outlined,
+        color: AppColors.info,
+      ),
+      DestinationType.existingNote => (
+        label: 'Mover para: ${item.destinationTitle ?? "nota existente"}',
+        icon: Icons.drive_file_move_outline,
+        color: s.primary,
+      ),
+      DestinationType.keep => (
+        label: 'Manter no rascunho',
+        icon: Icons.inbox_outlined,
+        color: s.onSurfaceVariant,
+      ),
+    };
   }
 }
