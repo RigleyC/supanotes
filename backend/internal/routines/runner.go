@@ -36,7 +36,7 @@ type Runner struct {
 	telegram       TelegramNotifier
 	cronJob        *cron.Cron
 	maintenanceJob *cron.Cron
-	sem            chan struct{}
+	running        sync.Map
 	reloadTicker   *time.Ticker
 	stopReload     chan struct{}
 }
@@ -56,7 +56,6 @@ func NewRunner(
 		telegram:       telegram,
 		cronJob:        cron.New(),
 		maintenanceJob: cron.New(),
-		sem:            make(chan struct{}, 10),
 	}
 }
 
@@ -115,11 +114,9 @@ func (r *Runner) reload() {
 	}
 
 	for _, rt := range routines {
-		expr := rt.CronExpr
+		expr := fmt.Sprintf("CRON_TZ=%s %s", rt.Timezone, rt.CronExpr)
 		routine := rt
 		_, err := r.cronJob.AddFunc(expr, func() {
-			r.sem <- struct{}{}
-			defer func() { <-r.sem }()
 			r.runRoutine(routine)
 		})
 		if err != nil {
@@ -129,6 +126,14 @@ func (r *Runner) reload() {
 }
 
 func (r *Runner) runRoutine(rt sqlcgen.GetEnabledRoutinesRow) {
+	id := uid.UUIDToString(rt.ID)
+	lock := make(chan struct{}, 1)
+	if _, loaded := r.running.LoadOrStore(id, lock); loaded {
+		log.Warn().Str("routine_id", id).Msg("routine already running, skipping")
+		return
+	}
+	defer r.running.Delete(id)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
