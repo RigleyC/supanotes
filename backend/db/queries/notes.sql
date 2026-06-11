@@ -117,3 +117,8 @@ UPDATE notes
 SET content = content || E'\n\n' || $3, updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND is_inbox = false
 RETURNING *;
+
+-- name: CreateNoteLink :exec
+INSERT INTO note_links (source_id, target_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
