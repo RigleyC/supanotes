@@ -50,7 +50,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 class SyncService {
   SyncService({
     required AppDatabase db,
-    required SyncRepository repo,
+    required ISyncRepository repo,
     required SyncMapper mapper,
     required ConnectivityMonitor connectivity,
     required SyncStateNotifier notifier,
@@ -61,7 +61,7 @@ class SyncService {
         _notifier = notifier;
 
   final AppDatabase _db;
-  final SyncRepository _repo;
+  final ISyncRepository _repo;
   final SyncMapper _mapper;
   final ConnectivityMonitor _connectivity;
   final SyncStateNotifier _notifier;
@@ -136,6 +136,7 @@ class SyncService {
 
     await _db.transaction(() async {
       for (final n in notes) {
+        await _db.notesDao.markHasRemoteCopy(n.id);
         await _db.notesDao.clearDirtyFlag(n.id);
       }
       for (final tsk in tasks) {

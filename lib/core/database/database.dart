@@ -28,6 +28,9 @@ part 'database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  AppDatabase.test({QueryExecutor? executor})
+      : super(executor ?? NativeDatabase.memory());
+
   /// Latest schema version. Bumped to `3` — the v2 wave added the
   /// `local_note_tags` and `local_task_completions` tables, the
   /// `updated_at` column on `tags`, and the `completed_at` column on
