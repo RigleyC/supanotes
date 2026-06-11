@@ -13,11 +13,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           ..where((t) => t.archived.equals(false))
           ..where((t) => t.deletedAt.isNull())
           ..where((t) => t.isInbox.equals(false))
-          ..where(
-            (t) => CustomExpression<bool>(
-              "(title IS NOT NULL AND trim(title) <> '') OR trim(content) <> ''",
-            ),
-          )
+          ..where(_nonEmptyNote)
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)
@@ -54,11 +50,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           ..where((t) => t.contextId.equals(contextId))
           ..where((t) => t.archived.equals(false))
           ..where((t) => t.deletedAt.isNull())
-          ..where(
-            (t) => CustomExpression<bool>(
-              "(title IS NOT NULL AND trim(title) <> '') OR trim(content) <> ''",
-            ),
-          )
+          ..where(_nonEmptyNote)
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
@@ -73,11 +65,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           ..where((t) => t.favorite.equals(true))
           ..where((t) => t.archived.equals(false))
           ..where((t) => t.deletedAt.isNull())
-          ..where(
-            (t) => CustomExpression<bool>(
-              "(title IS NOT NULL AND trim(title) <> '') OR trim(content) <> ''",
-            ),
-          )
+          ..where(_nonEmptyNote)
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
@@ -120,18 +108,25 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
   }
 
+  /// Shared filter: a note is non-empty when its trimmed title or content
+  /// is not blank. Used to hide empty local-only notes from lists and to
+  /// determine sync eligibility.
+  Expression<bool> Function($NotesTable) get _nonEmptyNote =>
+      (t) => CustomExpression<bool>(
+            "trim(title) <> '' OR trim(content) <> ''",
+          );
+
   /// Returns every note that has unsynced local changes and is eligible for
-  /// sync (has a remote copy, is deleted, is inbox, or has non-empty content).
+  /// sync (has a remote copy, is inbox, or has non-empty content).
+  /// Locally-created-then-deleted notes without a remote copy are excluded
+  /// to avoid wasted API calls.
   Future<List<NoteData>> getDirtyNotes() {
     return (select(notes)
           ..where((t) => t.isDirty.equals(true))
           ..where(
             (t) => t.hasRemoteCopy.equals(true) |
-                t.deletedAt.isNotNull() |
                 t.isInbox.equals(true) |
-                CustomExpression<bool>(
-                  "(title IS NOT NULL AND trim(title) <> '') OR trim(content) <> ''",
-                ),
+                _nonEmptyNote(t),
           ))
         .get();
   }
