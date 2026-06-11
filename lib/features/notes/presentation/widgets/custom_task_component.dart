@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
+
 class CustomTaskComponentBuilder implements ComponentBuilder {
-  CustomTaskComponentBuilder(this._editor);
+  CustomTaskComponentBuilder(
+    this._editor, {
+    this.taskMetadataById = const {},
+    this.onTaskLongPress,
+  });
 
   final Editor _editor;
+  final Map<String, TaskModel> taskMetadataById;
+  final ValueChanged<String>? onTaskLongPress;
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -42,14 +51,25 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     return CustomTaskComponent(
       key: componentContext.componentKey,
       viewModel: componentViewModel,
+      taskMetadata: taskMetadataById[componentViewModel.nodeId],
+      onLongPress: onTaskLongPress == null
+          ? null
+          : () => onTaskLongPress!(componentViewModel.nodeId),
     );
   }
 }
 
 class CustomTaskComponent extends StatefulWidget {
-  const CustomTaskComponent({super.key, required this.viewModel});
+  const CustomTaskComponent({
+    super.key,
+    required this.viewModel,
+    this.taskMetadata,
+    this.onLongPress,
+  });
 
   final TaskComponentViewModel viewModel;
+  final TaskModel? taskMetadata;
+  final VoidCallback? onLongPress;
 
   @override
   State<CustomTaskComponent> createState() => _CustomTaskComponentState();
@@ -120,21 +140,41 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                 : null,
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 0),
-              child: TextComponent(
-                key: _textKey,
-                text: widget.viewModel.text,
-                textDirection: widget.viewModel.textDirection,
-                textAlign: widget.viewModel.textAlignment,
-                maxLines: widget.viewModel.maxLines,
-                overflow: widget.viewModel.overflow,
-                textStyleBuilder: _computeStyles,
-                inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
-                textSelection: widget.viewModel.selection,
-                selectionColor: widget.viewModel.selectionColor,
-                highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                underlines: widget.viewModel.createUnderlines(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onLongPress: widget.onLongPress,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2, right: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextComponent(
+                      key: _textKey,
+                      text: widget.viewModel.text,
+                      textDirection: widget.viewModel.textDirection,
+                      textAlign: widget.viewModel.textAlignment,
+                      maxLines: widget.viewModel.maxLines,
+                      overflow: widget.viewModel.overflow,
+                      textStyleBuilder: _computeStyles,
+                      inlineWidgetBuilders:
+                          widget.viewModel.inlineWidgetBuilders,
+                      textSelection: widget.viewModel.selection,
+                      selectionColor: widget.viewModel.selectionColor,
+                      highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                      underlines: widget.viewModel.createUnderlines(),
+                    ),
+                    if (widget.taskMetadata?.dueDate != null ||
+                        (widget.taskMetadata?.recurrence != null &&
+                            widget.taskMetadata!.recurrence!.isNotEmpty)) ...[
+                      const SizedBox(height: 4),
+                      TaskMetadataBadges(
+                        dueDate: widget.taskMetadata?.dueDate,
+                        recurrence: widget.taskMetadata?.recurrence,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -216,51 +256,48 @@ class _AnimatedTaskCheckboxState extends State<_AnimatedTaskCheckbox>
   Widget build(BuildContext context) {
     final size = widget.size;
 
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, right: 6, top: 6),
-      child: InkWell(
-        highlightColor: Colors.transparent,
-        splashColor: Colors.transparent,
-        onTap: widget.onChanged != null
-            ? () => widget.onChanged!(!widget.value)
-            : null,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(9),
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                final scale = 1.0 - (0.15 * (1.0 - _scaleAnim.value));
-                final checkProgress = _checkAnim.value;
+    return InkWell(
+      highlightColor: Colors.transparent,
+      splashColor: Colors.transparent,
+      onTap: widget.onChanged != null
+          ? () => widget.onChanged!(!widget.value)
+          : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(9),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              final scale = 1.0 - (0.15 * (1.0 - _scaleAnim.value));
+              final checkProgress = _checkAnim.value;
 
-                return Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    width: size,
-                    height: size,
-                    decoration: BoxDecoration(
+              return Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: size,
+                  height: size,
+                  decoration: BoxDecoration(
+                    color: widget.value
+                        ? widget.activeColor
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
                       color: widget.value
                           ? widget.activeColor
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: widget.value
-                            ? widget.activeColor
-                            : widget.inactiveColor,
-                        width: 2,
-                      ),
-                    ),
-                    child: _CheckmarkPainter(
-                      progress: checkProgress,
-                      color: widget.checkmarkColor,
+                          : widget.inactiveColor,
+                      width: 2,
                     ),
                   ),
-                );
-              },
-            ),
+                  child: _CheckmarkPainter(
+                    progress: checkProgress,
+                    color: widget.checkmarkColor,
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
