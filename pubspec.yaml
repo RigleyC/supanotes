@@ -13,6 +13,10 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  # Firebase
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
+
   # Super Editor and clipboard from Flutter-Bounty-Hunters (upstream)
   super_editor:
     git:
@@ -81,6 +85,9 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
 
+  # Native splash screen
+  flutter_native_splash: ^2.4.8
+
   # Code generation
   riverpod_generator: ^4.0.3
   build_runner: ^2.4.13
@@ -138,3 +145,6 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/brand/
