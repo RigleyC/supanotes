@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
@@ -111,3 +112,9 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
 /// data(null) → unauthenticated, error → unauthenticated with feedback.
 final authControllerProvider =
     NotifierProvider<AuthController, AsyncValue<User?>>(AuthController.new);
+
+// ---------------------------------------------------------------------------
+// Database DAOs
+// ---------------------------------------------------------------------------
+
+final tagsDaoProvider = Provider((ref) => ref.watch(appDatabaseProvider).tagsDao);

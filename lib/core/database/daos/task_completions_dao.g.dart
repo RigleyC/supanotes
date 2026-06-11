@@ -14,5 +14,7 @@ class TaskCompletionsDaoManager {
   TaskCompletionsDaoManager(this._db);
   $$LocalTaskCompletionsTableTableManager get localTaskCompletions =>
       $$LocalTaskCompletionsTableTableManager(
-          _db.attachedDatabase, _db.localTaskCompletions);
+        _db.attachedDatabase,
+        _db.localTaskCompletions,
+      );
 }

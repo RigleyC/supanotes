@@ -10,6 +10,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/presentation/widgets/note_tags_chip_bar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
@@ -101,6 +102,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         ),
         body: Column(
           children: [
+            NoteTagsChipBar(noteId: widget.noteId),
             Expanded(
               child: SuperEditor(
                 editor: _controller.editor!,
