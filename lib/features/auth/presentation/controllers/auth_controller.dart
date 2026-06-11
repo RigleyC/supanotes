@@ -1,6 +1,7 @@
 library;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/di/providers.dart';
@@ -55,8 +56,8 @@ class AuthController extends Notifier<AsyncValue<User?>> {
       if (token != null) {
         await _repository.registerDeviceToken(token);
       }
-    } catch (_) {
-      // Non-fatal: push notifications may not work.
+    } catch (e) {
+      debugPrint('push notification registration failed: $e');
     }
   }
 
@@ -113,9 +114,8 @@ class AuthController extends Notifier<AsyncValue<User?>> {
     state = const AsyncValue.loading();
     try {
       await _repository.logout();
-    } catch (_) {
-      // Network errors during logout are non-fatal — the local session
-      // is still cleared on the next line.
+    } catch (e) {
+      debugPrint('logout error: $e');
     }
     await _storage.clear();
     _sessionCache.clear();

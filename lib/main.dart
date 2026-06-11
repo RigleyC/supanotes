@@ -46,17 +46,23 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
 
   void _setupFcmListeners() {
     FirebaseMessaging.onMessage.listen((message) {
+      if (!mounted) return;
       if (message.notification != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message.notification!.title ?? '')),
         );
       }
+    }, onError: (e) {
+      debugPrint('FCM onMessage error: $e');
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      if (!mounted) return;
       if (message.data['brief_type'] != null) {
         GoRouter.of(context).go(AppRoutes.routinesLogs);
       }
+    }, onError: (e) {
+      debugPrint('FCM onMessageOpenedApp error: $e');
     });
   }
 
@@ -82,9 +88,6 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
-      /*       theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark, */
       routerConfig: router,
       builder: (context, child) {
         if (kDebugMode) {

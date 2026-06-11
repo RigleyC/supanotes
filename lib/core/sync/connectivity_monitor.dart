@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final connectivityMonitorProvider = Provider<ConnectivityMonitor>((ref) {
@@ -14,18 +15,26 @@ class ConnectivityMonitor {
   final _controller = StreamController<bool>.broadcast();
   bool _isConnected = true;
 
+  late final StreamSubscription<List<ConnectivityResult>> _connectivitySub;
+
   ConnectivityMonitor() {
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+    _connectivitySub = _connectivity.onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
       final isConnected = !results.contains(ConnectivityResult.none);
       if (_isConnected != isConnected) {
         _isConnected = isConnected;
         _controller.add(isConnected);
       }
+    })..onError((e) {
+      debugPrint('connectivity stream error: $e');
     });
-    
+
     _connectivity.checkConnectivity().then((results) {
       _isConnected = !results.contains(ConnectivityResult.none);
       _controller.add(_isConnected);
+    }).catchError((e) {
+      debugPrint('connectivity check error: $e');
     });
   }
 
@@ -34,6 +43,7 @@ class ConnectivityMonitor {
   Stream<bool> get onConnectivityChanged => _controller.stream;
 
   void dispose() {
+    _connectivitySub.cancel();
     _controller.close();
   }
 }

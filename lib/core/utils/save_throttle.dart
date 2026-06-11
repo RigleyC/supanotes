@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 /// Concurrency-safe debounced save with retry.
 ///
 /// Apple Notes-style autosave requires that:
@@ -77,8 +79,11 @@ class SaveThrottle {
       try {
         await operation();
         return;
-      } catch (_) {
-        if (attempt == maxAttempts - 1) return;
+      } catch (e) {
+        if (attempt == maxAttempts - 1) {
+          debugPrint('saveThrottle: all retries failed: $e');
+          return;
+        }
         await Future.delayed(retryDelays[attempt]);
       }
     }

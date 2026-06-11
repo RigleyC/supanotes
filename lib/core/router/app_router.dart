@@ -39,27 +39,27 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: AppRoutes.login,
-        builder: (_, __) => const LoginScreen(),
+        builder: (_, _) => const LoginScreen(),
       ),
       GoRoute(
         path: AppRoutes.register,
-        builder: (_, __) => const RegisterScreen(),
+        builder: (_, _) => const RegisterScreen(),
       ),
       GoRoute(
         path: AppRoutes.home,
-        builder: (_, __) => const NotesListScreen(),
+        builder: (_, _) => const NotesListScreen(),
       ),
       GoRoute(
         path: AppRoutes.chat,
-        builder: (_, __) => const ChatScreen(),
+        builder: (_, _) => const ChatScreen(),
       ),
       GoRoute(
         path: AppRoutes.search,
-        builder: (_, __) => const SearchScreen(),
+        builder: (_, _) => const SearchScreen(),
       ),
       GoRoute(
         path: AppRoutes.inbox,
-        builder: (_, __) => const InboxScreen(),
+        builder: (_, _) => const InboxScreen(),
       ),
       GoRoute(
         path: AppRoutes.note(':id'),
@@ -68,27 +68,27 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.settings,
-        builder: (_, __) => const SettingsScreen(),
+        builder: (_, _) => const SettingsScreen(),
       ),
       GoRoute(
         path: AppRoutes.soul,
-        builder: (_, __) => const SoulEditorScreen(),
+        builder: (_, _) => const SoulEditorScreen(),
       ),
       GoRoute(
         path: AppRoutes.contexts,
-        builder: (_, __) => const ContextsScreen(),
+        builder: (_, _) => const ContextsScreen(),
       ),
       GoRoute(
         path: AppRoutes.routines,
-        builder: (_, __) => const RoutinesScreen(),
+        builder: (_, _) => const RoutinesScreen(),
       ),
       GoRoute(
         path: AppRoutes.routinesLogs,
-        builder: (_, __) => const BriefHistoryScreen(),
+        builder: (_, _) => const BriefHistoryScreen(),
       ),
       GoRoute(
         path: AppRoutes.telegram,
-        builder: (_, __) => const TelegramLinkScreen(),
+        builder: (_, _) => const TelegramLinkScreen(),
       ),
     ],
     redirect: (context, state) => authGuardRedirect(

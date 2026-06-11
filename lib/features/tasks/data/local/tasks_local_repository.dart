@@ -35,6 +35,10 @@ class TasksLocalRepository {
     return _dao.watchNoteTasks(noteId);
   }
 
+  Future<List<TaskData>> getNoteTasks(String noteId) {
+    return _dao.getNoteTasks(noteId);
+  }
+
   Future<void> createTask({
     required String id,
     required String noteId,

@@ -131,7 +131,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.md),
       itemCount: results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
       itemBuilder: (context, index) {
         final result = results[index];
         return SearchResultTile(
@@ -159,8 +159,8 @@ class _SkeletonList extends StatelessWidget {
           child: ListView.separated(
             padding: const EdgeInsets.all(AppSpacing.md),
             itemCount: 4,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (_, __) => _SkeletonCard(scheme: scheme),
+            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+            itemBuilder: (_, _) => _SkeletonCard(scheme: scheme),
           ),
         ),
       ],

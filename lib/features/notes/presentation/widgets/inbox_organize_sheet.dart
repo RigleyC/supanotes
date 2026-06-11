@@ -28,23 +28,27 @@ import 'package:supanotes/shared/theme/app_typography.dart';
 // Sheet state – sealed class for exhaustive handling
 // ---------------------------------------------------------------------------
 
-sealed class _SheetState {}
+sealed class _SheetState {
+  const _SheetState();
+}
 
-class _Loading extends _SheetState {}
+class _Loading extends _SheetState {
+  const _Loading();
+}
 
 class _Error extends _SheetState {
+  const _Error(this.message);
   final String message;
-  _Error(this.message);
 }
 
 class _PlanReady extends _SheetState {
+  const _PlanReady(this.plan);
   final OrganizationPlan plan;
-  _PlanReady(this.plan);
 }
 
 class _Applying extends _SheetState {
+  const _Applying(this.plan);
   final OrganizationPlan plan;
-  _Applying(this.plan);
 }
 
 // ---------------------------------------------------------------------------

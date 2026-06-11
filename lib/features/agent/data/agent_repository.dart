@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
@@ -41,7 +42,9 @@ class AgentRepository {
               // ignore: avoid_dynamic_calls
               final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
               yield SSEChatEvent.fromJson(decoded);
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('agent_repository: failed to parse SSE event: $e');
+            }
           }
         }
       }

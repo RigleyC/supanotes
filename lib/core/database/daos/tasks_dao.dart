@@ -66,6 +66,19 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .watch();
   }
 
+  Future<List<TaskData>> getNoteTasks(String noteId) {
+    return (select(tasks)
+          ..where((t) => t.noteId.equals(noteId))
+          ..orderBy([
+            (t) => OrderingTerm(
+                  expression: t.status.equals('done'),
+                  mode: OrderingMode.asc,
+                ),
+            (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
+          ]))
+        .get();
+  }
+
   Future<void> insertTask(TaskData task) async {
     await into(tasks).insert(task, mode: InsertMode.replace);
   }

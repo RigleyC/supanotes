@@ -115,6 +115,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
         navigator.pop(TaskEditResult(task: created, deleted: false));
       }
     } catch (e) {
+      if (!mounted) return;
       AppMessenger.showError(context, 'Erro ao salvar tarefa: $e');
       setState(() => _saving = false);
     }
@@ -130,6 +131,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
       await repo.deleteTask(task.id);
       navigator.pop(TaskEditResult(task: task, deleted: true));
     } catch (e) {
+      if (!mounted) return;
       AppMessenger.showError(context, 'Erro ao excluir tarefa: $e');
       setState(() => _saving = false);
     }

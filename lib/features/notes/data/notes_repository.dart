@@ -21,6 +21,7 @@ abstract class INotesRepository {
   });
   Stream<NoteModel?> watchInbox();
   Stream<NoteModel?> watchNoteById(String id);
+  Future<NoteModel?> getNoteById(String id);
   Future<NoteModel> upsertNote({
     required String id,
     String? title,
@@ -84,6 +85,12 @@ class NotesRepository implements INotesRepository {
     return _local
         .watchNoteById(id)
         .map((d) => d == null ? null : NoteModel.fromData(d));
+  }
+
+  @override
+  Future<NoteModel?> getNoteById(String id) async {
+    final d = await _local.getNoteById(id);
+    return d == null ? null : NoteModel.fromData(d);
   }
 
   /// Insert-or-update a note by [id]. When the row does not exist (lazy
@@ -188,7 +195,7 @@ class NotesRepository implements INotesRepository {
     String noteId,
     List<TaskEntry> tasks,
   ) async {
-    final currentTasks = await _tasksLocal.watchNoteTasks(noteId).first;
+    final currentTasks = await _tasksLocal.getNoteTasks(noteId);
     final currentIds = currentTasks.map((t) => t.id).toSet();
     final docIds = tasks.map((t) => t.id).toSet();
 

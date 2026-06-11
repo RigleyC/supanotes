@@ -93,7 +93,7 @@ class _ContextsList extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       itemCount: contexts.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final ctx = contexts[index];
         return Dismissible(

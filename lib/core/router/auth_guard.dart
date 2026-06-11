@@ -23,6 +23,6 @@ String? authGuardRedirect({
       return AppRoutes.login;
     },
     loading: () => null,
-    error: (_, __) => AppRoutes.login,
+    error: (_, _) => AppRoutes.login,
   );
 }

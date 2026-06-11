@@ -71,7 +71,7 @@ class _Body extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       itemCount: logs.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         return BriefLogTile(log: logs[index]);
       },

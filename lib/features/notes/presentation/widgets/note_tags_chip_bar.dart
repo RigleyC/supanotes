@@ -22,7 +22,7 @@ class NoteTagsChipBar extends ConsumerWidget {
     return tagsAsync.when(
       data: (tags) => _buildChipBar(context, ref, tags),
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 
@@ -59,7 +59,7 @@ class NoteTagsChipBar extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                border: Border.all(color: theme.colorScheme.outline.withAlpha(80)),
+                border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 80/255.0)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -85,8 +85,8 @@ class NoteTagsChipBar extends ConsumerWidget {
     if (userId == null) return;
 
     final tagsDao = ref.read(tagsDaoProvider);
-    final allTags = await tagsDao.watchTags(userId).first;
-    final noteTags = await tagsDao.watchTagsForNote(noteId).first;
+    final allTags = await tagsDao.getTags(userId);
+    final noteTags = await tagsDao.getTagsForNote(noteId);
     final attachedIds = noteTags.map((t) => t.id).toSet();
 
     if (!context.mounted) return;

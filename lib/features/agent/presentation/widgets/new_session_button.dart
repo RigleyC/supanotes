@@ -38,7 +38,8 @@ class NewSessionButton extends ConsumerWidget {
     final oldSessionId = ref.read(sessionManagerProvider);
     try {
       await ref.read(chatRepositoryProvider).clearHistory(oldSessionId);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('new session error: $e');
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Não foi possível limpar o histórico no servidor.'),

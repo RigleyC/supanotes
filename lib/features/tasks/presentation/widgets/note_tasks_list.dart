@@ -64,11 +64,10 @@ class _NoteTasksListBody extends ConsumerWidget {
           physics: const NeverScrollableScrollPhysics(),
           buildDefaultDragHandles: true,
           itemCount: tasks.length,
-          onReorder: (oldIndex, newIndex) {
-            final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
+          onReorderItem: (oldIndex, newIndex) {
             final mutable = [...tasks];
             final moved = mutable.removeAt(oldIndex);
-            mutable.insert(adjusted, moved);
+            mutable.insert(newIndex, moved);
             ref
                 .read(tasksRepositoryProvider)
                 .reorderTasks(noteId, mutable.map((t) => t.id).toList());

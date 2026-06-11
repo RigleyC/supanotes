@@ -13,6 +13,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthLocalStorage {
@@ -82,7 +83,8 @@ class AuthLocalStorage {
     if (raw == null || raw.isEmpty) return const {};
     try {
       return jsonDecode(raw) as Map<String, dynamic>;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('readLocalToken error: $e');
       return const {};
     }
   }

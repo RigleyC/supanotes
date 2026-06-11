@@ -245,7 +245,7 @@ Future<void> defaultContentSave(
   );
   final repo = ref.read(notesRepositoryProvider);
   await repo.syncTasksFromDocument(noteId, tasks);
-  final note = await repo.watchNoteById(noteId).first;
+  final note = await repo.getNoteById(noteId);
   dev.log(
     '[defaultContentSave] noteId=$noteId, noteExists=${note != null}, currentContentLength=${note?.content.length}',
     name: 'NoteEditor',
@@ -268,7 +268,7 @@ Future<void> defaultTitleSave(
     name: 'NoteEditor',
   );
   final repo = ref.read(notesRepositoryProvider);
-  final note = await repo.watchNoteById(noteId).first;
+  final note = await repo.getNoteById(noteId);
   if (note == null) {
     await repo.upsertNote(
       id: noteId,

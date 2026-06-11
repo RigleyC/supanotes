@@ -30,6 +30,16 @@ class TagsDao extends DatabaseAccessor<AppDatabase> with _$TagsDaoMixin {
         .watch();
   }
 
+  /// Returns every tag belonging to [userId] (non-streaming).
+  Future<List<TagData>> getTags(String userId) {
+    return (select(tags)
+          ..where((t) => t.userId.equals(userId))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+          ]))
+        .get();
+  }
+
   /// Streams the tags attached to the given [noteId], in the same
   /// alphabetical order as [watchTags].
   Stream<List<TagData>> watchTagsForNote(String noteId) {
@@ -43,6 +53,20 @@ class TagsDao extends DatabaseAccessor<AppDatabase> with _$TagsDaoMixin {
     return query
         .watch()
         .map((rows) => rows.map((r) => r.readTable(tags)).toList());
+  }
+
+  /// Returns the tags attached to [noteId] (non-streaming).
+  Future<List<TagData>> getTagsForNote(String noteId) {
+    final query = select(tags).join([
+      innerJoin(localNoteTags, localNoteTags.tagId.equalsExp(tags.id)),
+    ])
+      ..where(localNoteTags.noteId.equals(noteId))
+      ..orderBy([
+        OrderingTerm(expression: tags.name, mode: OrderingMode.asc),
+      ]);
+    return query
+        .get()
+        .then((rows) => rows.map((r) => r.readTable(tags)).toList());
   }
 
   /// Inserts a brand-new tag owned by [userId] and returns the resulting
