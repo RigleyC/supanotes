@@ -452,9 +452,3 @@ func (m *mockNotesRepo) AppendToNoteContent(ctx context.Context, arg sqlcgen.App
 func (m *mockNotesRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
 }
-func (m *mockNotesRepo) AddTagToNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error {
-	panic("unimplemented")
-}
-func (m *mockNotesRepo) RemoveTagFromNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error {
-	panic("unimplemented")
-}

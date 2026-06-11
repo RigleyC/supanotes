@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -102,49 +103,45 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		linkedNotes     []sqlcgen.Note
 	)
 
-	g2, gCtx2 := errgroup.WithContext(ctx)
-
-	g2.Go(func() error {
-		emb, err := cb.embedCL.GenerateEmbedding(gCtx2, query)
-		if err != nil {
-			return fmt.Errorf("generate query embedding: %w", err)
-		}
+	if emb, err := cb.embedCL.GenerateEmbedding(ctx, query); err != nil {
+		log.Warn().Err(err).Msg("generate query embedding failed; skipping semantic note search")
+	} else {
 		vec := pgvector.NewVector(float64ToFloat32(emb))
-		semanticResults, err = cb.q.SearchNotesByEmbedding(gCtx2, sqlcgen.SearchNotesByEmbeddingParams{
+		var sErr error
+		semanticResults, sErr = cb.q.SearchNotesByEmbedding(ctx, sqlcgen.SearchNotesByEmbeddingParams{
 			UserID:  userID,
 			Column2: vec,
 			Limit:   5,
 		})
-		return err
-	})
-
-	g2.Go(func() error {
-		emb, err := cb.embedCL.GenerateEmbedding(gCtx2, query)
-		if err != nil {
-			return fmt.Errorf("generate memory embedding: %w", err)
+		if sErr != nil {
+			log.Warn().Err(sErr).Msg("search notes by embedding failed; skipping semantic results")
 		}
+	}
+
+	if emb, err := cb.embedCL.GenerateEmbedding(ctx, query); err != nil {
+		log.Warn().Err(err).Msg("generate memory embedding failed; skipping semantic memory search")
+	} else {
 		vec := pgvector.NewVector(float64ToFloat32(emb))
-		memResults, err = cb.memoriesRepo.SearchMemories(gCtx2, userID, vec, 5)
-		return err
-	})
+		var mErr error
+		memResults, mErr = cb.memoriesRepo.SearchMemories(ctx, userID, vec, 5)
+		if mErr != nil {
+			log.Warn().Err(mErr).Msg("search memories by embedding failed; skipping semantic results")
+		}
+	}
 
 	noteIDs := make([]pgtype.UUID, 0, len(recentNotes))
 	for _, n := range recentNotes {
 		noteIDs = append(noteIDs, n.ID)
 	}
 	if len(noteIDs) > 0 {
-		g2.Go(func() error {
-			var err error
-			linkedNotes, err = cb.q.GetLinkedNotes(gCtx2, sqlcgen.GetLinkedNotesParams{
-				Column1: noteIDs,
-				UserID:  userID,
-			})
-			return err
+		var lErr error
+		linkedNotes, lErr = cb.q.GetLinkedNotes(ctx, sqlcgen.GetLinkedNotesParams{
+			Column1: noteIDs,
+			UserID:  userID,
 		})
-	}
-
-	if err := g2.Wait(); err != nil {
-		return "", err
+		if lErr != nil {
+			log.Warn().Err(lErr).Msg("get linked notes failed; skipping related notes")
+		}
 	}
 
 	var b strings.Builder

@@ -178,22 +178,6 @@ func (s *Service) AppendToInbox(ctx context.Context, userID pgtype.UUID, content
 	})
 }
 
-func (s *Service) AddTagToNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID, userID pgtype.UUID) error {
-	// Verify note exists and belongs to user
-	if _, err := s.GetNoteByID(ctx, noteID, userID); err != nil {
-		return err
-	}
-	return s.repo.AddTagToNote(ctx, noteID, tagID)
-}
-
-func (s *Service) RemoveTagFromNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID, userID pgtype.UUID) error {
-	// Verify note exists and belongs to user
-	if _, err := s.GetNoteByID(ctx, noteID, userID); err != nil {
-		return err
-	}
-	return s.repo.RemoveTagFromNote(ctx, noteID, tagID)
-}
-
 func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, items []PlanOrganizationItem) error {
 	inbox, err := s.GetInboxNote(ctx, userID)
 	if err != nil {

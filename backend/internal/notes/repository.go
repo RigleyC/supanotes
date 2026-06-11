@@ -18,8 +18,6 @@ type Repository interface {
 	AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error)
 	SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
 	AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error)
-	AddTagToNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error
-	RemoveTagFromNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
 }
 
@@ -69,18 +67,4 @@ func (r *repository) AppendToNoteContent(ctx context.Context, arg sqlcgen.Append
 
 func (r *repository) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return r.q.CountNotes(ctx, userID)
-}
-
-func (r *repository) AddTagToNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error {
-	return r.q.AddTagToNote(ctx, sqlcgen.AddTagToNoteParams{
-		NoteID: noteID,
-		TagID:  tagID,
-	})
-}
-
-func (r *repository) RemoveTagFromNote(ctx context.Context, noteID pgtype.UUID, tagID pgtype.UUID) error {
-	return r.q.RemoveTagFromNote(ctx, sqlcgen.RemoveTagFromNoteParams{
-		NoteID: noteID,
-		TagID:  tagID,
-	})
 }

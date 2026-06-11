@@ -175,6 +175,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.GET("/tags", tagsH.List)
 	protected.POST("/tags", tagsH.Create)
 	protected.DELETE("/tags/:id", tagsH.Delete)
+	protected.POST("/notes/:id/tags", tagsH.AddTag)
+	protected.DELETE("/notes/:id/tags/:tagId", tagsH.RemoveTag)
 
 	// Notes
 	notesRepo := notes.NewRepository(queries)
@@ -190,8 +192,6 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/notes/inbox/append", notesH.AppendToInbox)
 	protected.POST("/notes/inbox/organize/plan", notesH.PlanOrganization)
 	protected.POST("/notes/inbox/organize/apply", notesH.ApplyOrganization)
-	protected.POST("/notes/:id/tags", notesH.AddTag)
-	protected.DELETE("/notes/:id/tags/:tagId", notesH.RemoveTag)
 
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
