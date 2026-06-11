@@ -44,6 +44,10 @@ Referências: Granola, Mem, Motion — com foco em **IA proativa**, não só rea
 | Banco local (app) | Drift (SQLite) | Type-safe, reativo com streams, espelha schema do PostgreSQL |
 | Logger | zerolog | Structured logger para performance |
 
+### Riverpod no Flutter
+
+O app usa Riverpod com providers manuais. Codegen (`@riverpod`, `riverpod_generator`, `.g.dart` de Riverpod) não faz parte do v1. Providers de feature usam `.autoDispose` por padrão; exceções são providers globais de infraestrutura/sessão. Estados assíncronos compartilhados usam `AsyncValue` para loading/error em vez de duplicar campos `isLoading` e `error`.
+
 ---
 
 ## 4. ESTRUTURA DO PROJETO
@@ -390,6 +394,10 @@ CREATE TABLE task_completions (
 
 CREATE INDEX task_completions_task_idx ON task_completions (task_id, completed_at DESC);
 
+No v1, `tasks.status` é binário: `open` ou `done`. Estados como `pending`, `in_progress` e `completed` não fazem parte do contrato. Atraso é derivado: uma task `open` com `due_date` anterior à data atual é considerada atrasada/overdue, mas não muda de status automaticamente.
+
+`tasks.completed_at` representa a última conclusão da task. Para uma task recorrente, completar a ocorrência cria um registro em `task_completions`, grava a `due_date` da ocorrência concluída, calcula a próxima `due_date` e mantém a mesma task como `open` para a próxima ocorrência.
+
 -- Rotinas agendadas
 CREATE TABLE routines (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -498,6 +506,8 @@ PATCH  /api/v1/routines/weekly      ajusta dia, horário e enabled do brief sema
 POST   /api/v1/routines/daily/test  dry-run do brief diário, sem salvar nem notificar
 POST   /api/v1/routines/weekly/test dry-run do brief semanal, sem salvar nem notificar
 ```
+
+O contrato de sync v1 inclui `notes`, `tasks`, `contexts`, `tags`, `note_tags`, `note_links` e `task_completions`.
 
 ---
 
@@ -1496,9 +1506,10 @@ trechos aplicados são removidos do rascunho
 
 O plano pode propor:
 - anexar trecho a uma nota existente;
-- criar nova seção em uma nota existente;
 - criar nova nota;
 - manter trecho no rascunho quando o destino for ambíguo.
+
+Criar nova seção dentro de uma nota existente fica fora do v1. A ação pode ser adicionada depois, quando a UI/editor e o serializer de Markdown estiverem maduros o suficiente para controlar heading, posição e estrutura do documento sem ambiguidade.
 
 No v1, o agent não organiza o rascunho automaticamente sem confirmação. Após aplicar o plano, apenas os trechos organizados são removidos da inbox; trechos ambíguos continuam no rascunho.
 
@@ -1519,10 +1530,6 @@ func (s *NoteService) ApplyOrganizationPlan(ctx context.Context, userID uuid.UUI
                 if err := s.repo.CreateWithTx(ctx, tx, userID, item.TargetTitle, item.ProposedText); err != nil {
                     return err
                 }
-            case "create_section":
-                if err := s.repo.AppendSectionTx(ctx, tx, item.TargetNoteID, item.SectionHeading, item.ProposedText); err != nil {
-                    return err
-                }
             // "keep_in_inbox" → não faz nada, trecho permanece
             }
         }
@@ -1541,9 +1548,9 @@ func (s *NoteService) ApplyOrganizationPlan(ctx context.Context, userID uuid.UUI
 
 **Dentro do app**
 - FAB (floating action button) sempre visível
-- Tap → campo de texto imediato, sem navegar pra nenhuma tela
+- Tap → cria uma nova nota local e abre o editor dessa nota
 
-O usuário captura primeiro, organiza depois — ou deixa o agent organizar.
+No v1, o FAB principal do app cria uma nota nova diretamente. A inbox continua existindo como braindump especial para captura não estruturada e organização posterior, mas não é o destino padrão do FAB.
 
 ---
 
@@ -1619,12 +1626,12 @@ class LocalNotes extends Table {
 
 ### Sync incremental
 
-A sync usa cursor baseado em `updated_at`:
+A sync usa `updated_at` como marcador incremental:
 
 1. **Push**: app envia registros com `isDirty=true` para `POST /api/v1/sync/push`. O servidor atribui `updated_at = NOW()` — timestamps são definidos pelo servidor, não pelo client. Isso elimina problemas de relógio desincronizado entre dispositivos
-2. **Pull**: app pede registros com `updated_at > último_sync` via `POST /api/v1/sync/pull`. Suporta `limit` + `cursor` para paginação (importante na primeira abertura)
+2. **Pull**: app pede registros com `updated_at > último_sync` via `POST /api/v1/sync/pull`. No v1, o pull pode ser não paginado porque o produto inicial é pessoal e de baixo volume; `limit` + `cursor` ficam adiados até o volume de dados justificar
 3. **Resolução de conflitos**: last-write-wins **por registro** — o registro com `updated_at` mais recente (atribuído pelo servidor) vence inteiro. Field-level merge fica para v2+ se necessário
-4. **Primeira abertura**: full sync paginado (pull com cursor, não baixa tudo de uma vez)
+4. **Primeira abertura**: full sync incremental simples a partir de `last_synced_at` inicial. Paginação/cursor entram em uma evolução futura
 
 > **Por que LWW por registro e não por campo?** LWW por campo requer timestamps individuais por coluna ou CRDTs — complexidade desproporcional para o v1. Como tasks são entidades separadas (não embarcadas no Markdown da nota), o caso mais comum de conflito (editar nota + completar task) já é resolvido naturalmente: são registros diferentes.
 
@@ -1656,15 +1663,16 @@ Todas as queries (sqlc) no backend filtram por `WHERE deleted_at IS NULL` para n
 - [ ] SOUL seed no registro (default hardcoded no backend)
 - [ ] Agent loop (Tiered context + tool calling + max 5 iterações + retry com backoff)
 - [ ] SSE endpoint `/api/v1/agent/chat/stream`
+- [ ] Organização da inbox com plano gerado pelo agent + confirmação do usuário + apply transacional
 - [ ] Migration 005: routines + routine_logs
 - [ ] Rotinas: runner + timezone + lock + entrega Telegram + FCM push
-- [ ] Gateway Telegram integrado (módulo no backend Go)
+- [ ] Gateway Telegram integrado (link por `telegram_user_id` + streaming progressivo por edição de mensagem)
 - [ ] Busca híbrida (FTS + semântica + RRF)
 - [ ] FCM push notifications
-- [ ] Endpoints de sync: POST /api/v1/sync/pull e /api/v1/sync/push (LWW por registro, server timestamps)
+- [ ] Endpoints de sync: POST /api/v1/sync/pull e /api/v1/sync/push (LWW por registro, server timestamps, incluindo note_tags e note_links)
 - [ ] Flutter: Drift database local (schema espelhado do PostgreSQL)
 - [ ] Flutter: SyncService + ConnectivityMonitor (push dirty → pull remoto)
-- [ ] Flutter: auth + notas + editor (super_editor com widgets customizados para tasks, headings, listas etc.) + agent chat + captura rápida (FAB) + Go Router + Riverpod + Dio
+- [ ] Flutter: auth + notas + editor (super_editor com widgets customizados para tasks, headings, listas etc.) + agent chat + FAB criando nova nota + organização da inbox + Go Router + Riverpod manual + Dio
 
 ---
 
