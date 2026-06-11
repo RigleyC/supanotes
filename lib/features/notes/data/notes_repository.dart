@@ -41,6 +41,15 @@ abstract class INotesRepository {
   Future<NoteModel> ensureInbox();
   Future<void> appendToInbox(String text);
   Future<void> syncTasksFromDocument(String noteId, List<TaskEntry> tasks);
+  Future<NoteModel> createLocalNote({required String id});
+  Future<void> saveNoteSnapshot({
+    required String id,
+    required String title,
+    required String content,
+    required List<TaskEntry> tasks,
+  });
+  Future<void> deleteIfEmptyOrTombstone(String id);
+  Future<void> markHasRemoteCopy(String id);
 }
 
 class NotesRepository implements INotesRepository {
@@ -187,9 +196,54 @@ class NotesRepository implements INotesRepository {
     await _local.updateNoteContent(existing.id, newContent);
   }
 
-  /// Syncs the tasks extracted from a note document with the tasks
-  /// database. Creates new tasks, updates matching ones, and removes
-  /// tasks that were deleted from the document.
+  @override
+  Future<NoteModel> createLocalNote({required String id}) async {
+    final existing = await _local.getNoteById(id);
+    if (existing != null) return NoteModel.fromData(existing);
+    final created = await _local.createNoteWithId(id);
+    return NoteModel.fromData(created);
+  }
+
+  @override
+  Future<void> saveNoteSnapshot({
+    required String id,
+    required String title,
+    required String content,
+    required List<TaskEntry> tasks,
+  }) async {
+    await syncTasksFromDocument(id, tasks);
+    final normalizedTitle = title.trim().isEmpty ? null : title;
+    final current = await _local.getNoteById(id);
+    if (current == null) return;
+
+    await updateNote(
+      id,
+      title: normalizedTitle,
+      content: content,
+    );
+  }
+
+  @override
+  Future<void> deleteIfEmptyOrTombstone(String id) async {
+    final note = await _local.getNoteById(id);
+    if (note == null) return;
+    if (!_isTextEmpty(note)) return;
+
+    final tasks = await _tasksLocal.getNoteTasks(id);
+    if (tasks.isNotEmpty) return;
+
+    if (note.hasRemoteCopy) {
+      await _local.softDeleteNote(id);
+    } else {
+      await _local.hardDeleteNote(id);
+    }
+  }
+
+  @override
+  Future<void> markHasRemoteCopy(String id) {
+    return _local.markHasRemoteCopy(id);
+  }
+
   @override
   Future<void> syncTasksFromDocument(
     String noteId,
@@ -230,6 +284,11 @@ class NotesRepository implements INotesRepository {
     final flat = content.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (flat.length <= 120) return flat;
     return '${flat.substring(0, 120)}…';
+  }
+
+  bool _isTextEmpty(NoteData note) {
+    return (note.title == null || note.title!.trim().isEmpty) &&
+        note.content.trim().isEmpty;
   }
 }
 

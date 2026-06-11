@@ -81,6 +81,30 @@ class NotesLocalRepository {
 
   /// Soft-delete the row with [id]. Marks `deletedAt` and flips
   /// `isDirty` so the tombstone reaches the backend on the next sync.
+  Future<NoteData> createNoteWithId(String id,
+      {String? title, String content = ''}) async {
+    final now = DateTime.now().toUtc();
+    final companion = NotesCompanion.insert(
+      id: id,
+      userId: _userId,
+      content: content,
+      createdAt: now,
+      updatedAt: now,
+      isDirty: const Value(false),
+      hasRemoteCopy: const Value(false),
+    );
+    await _dao.createNote(companion);
+    return (await _dao.getNoteById(id))!;
+  }
+
+  Future<void> hardDeleteNote(String id) {
+    return _dao.hardDeleteNote(id);
+  }
+
+  Future<void> markHasRemoteCopy(String id) {
+    return _dao.markHasRemoteCopy(id);
+  }
+
   Future<void> softDeleteNote(String id) {
     return _dao.softDeleteNote(id);
   }
