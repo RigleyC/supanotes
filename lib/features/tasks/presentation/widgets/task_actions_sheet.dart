@@ -58,24 +58,6 @@ class _TaskActionsSheetState extends ConsumerState<TaskActionsSheet> {
     }
   }
 
-  Future<void> _toggleComplete() async {
-    setState(() => _saving = true);
-    final navigator = Navigator.of(context);
-    try {
-      final repo = ref.read(tasksRepositoryProvider);
-      if (widget.task.isCompleted) {
-        await repo.reopenTask(widget.task.id);
-      } else {
-        await repo.completeTask(widget.task.id);
-      }
-      navigator.pop();
-    } catch (e) {
-      if (!mounted) return;
-      AppMessenger.showError(context, 'Erro ao atualizar tarefa: $e');
-      setState(() => _saving = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -118,15 +100,8 @@ class _TaskActionsSheetState extends ConsumerState<TaskActionsSheet> {
           ),
           const SizedBox(height: AppSpacing.lg),
           Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              IntrinsicWidth(
-                child: AppButton(
-                  text: widget.task.isCompleted ? 'Reabrir' : 'Concluir',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: _saving ? null : _toggleComplete,
-                ),
-              ),
-              const Spacer(),
               IntrinsicWidth(
                 child: AppButton(
                   text: 'Cancelar',

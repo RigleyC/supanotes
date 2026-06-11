@@ -15,7 +15,7 @@ import 'package:supanotes/features/notes/presentation/widgets/custom_task_compon
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
-import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/theme/app_typography.dart';
 
 final noteProvider = StreamProvider.autoDispose.family<NoteModel?, String>((
   ref,
@@ -37,7 +37,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   NoteEditorController? _controller;
 
   Map<String, TaskModel> _taskMapForNote(String noteId) {
-    return ref.watch(tasksByNoteStreamProvider(noteId)).maybeWhen(
+    return ref
+        .watch(tasksByNoteStreamProvider(noteId))
+        .maybeWhen(
           data: (tasks) => {for (final task in tasks) task.id: task},
           orElse: () => const <String, TaskModel>{},
         );
@@ -52,21 +54,19 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   Future<void> _openTaskActions(
     NoteEditorController controller,
-    Map<String, TaskModel> taskMetadataById,
     String taskId,
   ) async {
     await controller.persistSnapshotNow();
     if (!mounted) return;
 
-    final task = taskMetadataById[taskId];
-    if (task == null) {
-      AppMessenger.showInfo(
-        context,
-        'A tarefa acabou de ser criada. Tente novamente em instantes.',
-      );
-      return;
-    }
+    ref.invalidate(tasksByNoteStreamProvider(widget.noteId));
+    final freshTasks =
+        await ref.read(tasksByNoteStreamProvider(widget.noteId).future);
+    final freshMap = {for (final t in freshTasks) t.id: t};
+    final task = freshMap[taskId];
+    if (task == null) return;
 
+    if (!mounted) return;
     await TaskActionsSheet.show(context, task: task);
   }
 
@@ -121,58 +121,49 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         context.pop();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: TextField(
-            controller: controller.titleController,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              filled: false,
-              contentPadding: EdgeInsets.zero,
-              hintText: 'Sem titulo',
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.check),
-              onPressed: () {
-                FocusNode().unfocus();
-              },
-            ),
-          ],
-        ),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 88),
-                child: SuperEditor(
-                  editor: controller.editor!,
-                  focusNode: controller.focusNode,
-                  stylesheet: defaultStylesheet.copyWith(
-                    documentPadding: EdgeInsets.zero,
-                  ),
-                  componentBuilders: [
-                    ...defaultComponentBuilders,
-                    CustomTaskComponentBuilder(
-                      controller.editor!,
-                      taskMetadataById: taskMetadataById,
-                      onTaskLongPress: (taskId) =>
-                          _openTaskActions(controller, taskMetadataById, taskId),
-                    ),
-                  ],
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar.medium(
+              title: TextField(
+                controller: controller.titleController,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                  hintText: 'Sem titulo',
+                ),
+                style: AppTypography.textTheme.headlineMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: SafeArea(
-                top: false,
-                child: NoteToolbar(
-                  editor: controller.editor!,
-                  composer: controller.composer!,
-                ),
+            SliverFillRemaining(
+              hasScrollBody: true,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SuperEditor(
+                      editor: controller.editor!,
+                      focusNode: controller.focusNode,
+                      stylesheet: defaultStylesheet.copyWith(
+                        documentPadding: EdgeInsets.zero,
+                      ),
+                      componentBuilders: [
+                        ...defaultComponentBuilders,
+                        CustomTaskComponentBuilder(
+                          controller.editor!,
+                          taskMetadataById: taskMetadataById,
+                          onTaskLongPress: (taskId) =>
+                              _openTaskActions(controller, taskId),
+                        ),
+                      ],
+                    ),
+                  ),
+                  NoteToolbar(
+                    editor: controller.editor!,
+                    composer: controller.composer!,
+                  ),
+                ],
               ),
             ),
           ],

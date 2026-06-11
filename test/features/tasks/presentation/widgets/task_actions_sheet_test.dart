@@ -35,7 +35,6 @@ void main() {
     expect(find.text('Comprar caf\u00e9'), findsOneWidget);
     expect(find.text('Data de vencimento'), findsOneWidget);
     expect(find.text('Repeti\u00e7\u00e3o'), findsOneWidget);
-    expect(find.text('Concluir'), findsOneWidget);
     expect(find.text('Salvar'), findsOneWidget);
   });
 }

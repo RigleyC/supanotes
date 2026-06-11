@@ -29,10 +29,13 @@ class InboxScreen extends ConsumerStatefulWidget {
 
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   NoteEditorController? _controller;
+  String? _inboxNoteId;
 
   Map<String, TaskModel> _taskMapForInbox(String? noteId) {
     if (noteId == null) return const <String, TaskModel>{};
-    return ref.watch(tasksByNoteStreamProvider(noteId)).maybeWhen(
+    return ref
+        .watch(tasksByNoteStreamProvider(noteId))
+        .maybeWhen(
           data: (tasks) => {for (final task in tasks) task.id: task},
           orElse: () => const <String, TaskModel>{},
         );
@@ -56,21 +59,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   Future<void> _openTaskActions(
     NoteEditorController controller,
-    Map<String, TaskModel> taskMetadataById,
     String taskId,
   ) async {
     await controller.persistSnapshotNow();
     if (!mounted) return;
 
-    final task = taskMetadataById[taskId];
-    if (task == null) {
-      AppMessenger.showInfo(
-        context,
-        'A tarefa acabou de ser criada. Tente novamente em instantes.',
-      );
-      return;
-    }
+    final noteId = _inboxNoteId;
+    if (noteId == null) return;
 
+    ref.invalidate(tasksByNoteStreamProvider(noteId));
+    final freshTasks =
+        await ref.read(tasksByNoteStreamProvider(noteId).future);
+    final freshMap = {for (final t in freshTasks) t.id: t};
+    final task = freshMap[taskId];
+    if (task == null) return;
+
+    if (!mounted) return;
     await TaskActionsSheet.show(context, task: task);
   }
 
@@ -136,6 +140,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
     final hasContent = controller.document!.isNotEmpty;
     final inboxId = asyncValue.asData?.value?.id;
+    _inboxNoteId = inboxId;
     final taskMetadataById = _taskMapForInbox(inboxId);
 
     return PopScope(
@@ -177,7 +182,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     controller.editor!,
                     taskMetadataById: taskMetadataById,
                     onTaskLongPress: (taskId) =>
-                        _openTaskActions(controller, taskMetadataById, taskId),
+                        _openTaskActions(controller, taskId),
                   ),
                 ],
               ),
