@@ -22,11 +22,11 @@ import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:super_editor/super_editor.dart';
+import 'package:super_editor/super_editor.dart'
+    hide serializeDocumentToMarkdown;
 
 import 'package:supanotes/core/utils/save_throttle.dart';
-import 'package:supanotes/features/notes/data/markdown_serializer.dart'
-    hide serializeDocumentToMarkdown;
+import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/task_entry.dart';
 
@@ -121,6 +121,23 @@ class NoteEditorController {
       titleController?.text ?? '',
       serializeDocumentToMarkdown(doc),
       _extractTasks(doc),
+    );
+  }
+
+  /// Forces a snapshot save immediately, bypassing the debounce.
+  ///
+  /// Unlike [flushBeforePop], this method does NOT call [emptyNoteExit].
+  /// Use this before opening the task actions sheet so a newly typed
+  /// checklist item exists in the tasks table.
+  Future<void> persistSnapshotNow() async {
+    final noteId = _noteId;
+    final doc = document;
+    if (noteId == null || doc == null) return;
+
+    final generation = _saveThrottle.nextGeneration();
+    await _saveThrottle.flush(
+      generation: generation,
+      operation: _runSnapshotSave,
     );
   }
 
