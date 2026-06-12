@@ -2,43 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "setup-dev-env",
+            "label": "dev:prepare",
             "type": "shell",
             "command": "python",
             "args": [
                 "${workspaceFolder}/scripts/setup-dev-env.py"
             ],
-            "presentation": {
-                "reveal": "silent",
-                "close": false
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "health-check",
-            "type": "shell",
-            "command": "powershell",
-            "args": [
-                "-NoProfile",
-                "-Command",
-                "for ($i = 0; $i -lt 30; $i++) { try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://127.0.0.1:8080/healthz; if ($r.StatusCode -eq 200) { Write-Host '[health-check] backend up'; exit 0 } } catch { Start-Sleep -Milliseconds 500 } }; Write-Host '[health-check] backend did not respond on :8080'; exit 1"
-            ],
-            "presentation": {
-                "reveal": "silent",
-                "close": false
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "flutter-stop",
-            "type": "shell",
-            "command": "taskkill",
-            "args": [
-                "/F",
-                "/IM",
-                "flutter.exe"
-            ],
-            "cwd": "${workspaceFolder}",
             "presentation": {
                 "reveal": "silent",
                 "close": false

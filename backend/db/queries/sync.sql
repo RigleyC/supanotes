@@ -108,10 +108,45 @@ ON CONFLICT (id) DO NOTHING;
 -- completions are append-only, so any new completion is guaranteed
 -- to have a fresh timestamp. The join through `tasks` enforces the
 -- per-user scope since `task_completions` itself has no `user_id`.
-SELECT tc.id, tc.task_id, tc.completed_at, tc.status
+SELECT tc.id, tc.task_id, tc.completed_at, tc.due_date
 FROM task_completions tc
 JOIN tasks t ON t.id = tc.task_id
 WHERE t.user_id = $1
   AND tc.completed_at > sqlc.arg('last_synced_at')
 ORDER BY tc.completed_at ASC
 LIMIT sqlc.arg('limit');
+
+-- name: GetSyncNoteTags :many
+SELECT nt.note_id, nt.tag_id
+FROM note_tags nt
+JOIN notes n ON n.id = nt.note_id
+WHERE n.user_id = $1;
+
+-- name: UpsertNoteTag :exec
+INSERT INTO note_tags (note_id, tag_id)
+SELECT sqlc.arg('note_id')::uuid, sqlc.arg('tag_id')::uuid
+WHERE EXISTS (
+  SELECT 1 FROM notes WHERE id = sqlc.arg('note_id')::uuid AND user_id = sqlc.arg('user_id')::uuid
+)
+ON CONFLICT (note_id, tag_id) DO NOTHING;
+
+-- name: GetSyncNoteLinks :many
+SELECT nl.*
+FROM note_links nl
+JOIN notes n ON n.id = nl.source_id
+WHERE n.user_id = $1;
+
+-- name: UpsertNoteLink :exec
+INSERT INTO note_links (id, source_id, target_id, relation, created_at, updated_at)
+SELECT sqlc.arg('id')::uuid,
+       sqlc.arg('source_id')::uuid,
+       sqlc.arg('target_id')::uuid,
+       sqlc.arg('relation')::varchar,
+       sqlc.arg('created_at')::timestamptz,
+       NOW()
+WHERE EXISTS (
+  SELECT 1 FROM notes WHERE id = sqlc.arg('source_id')::uuid AND user_id = sqlc.arg('user_id')::uuid
+)
+ON CONFLICT (id) DO UPDATE
+SET relation = EXCLUDED.relation,
+    updated_at = NOW();

@@ -66,7 +66,7 @@ type Note struct {
 	IsInbox         bool               `json:"is_inbox"`
 	Favorite        bool               `json:"favorite"`
 	Archived        bool               `json:"archived"`
-	SearchVector    interface{}        `json:"search_vector"`
+	SearchVector    string             `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
@@ -82,6 +82,7 @@ type NoteEmbedding struct {
 }
 
 type NoteLink struct {
+	ID       pgtype.UUID `json:"id"`
 	SourceID pgtype.UUID `json:"source_id"`
 	TargetID pgtype.UUID `json:"target_id"`
 	Relation string      `json:"relation"`
@@ -157,13 +158,14 @@ type TaskCompletion struct {
 	ID          pgtype.UUID        `json:"id"`
 	TaskID      pgtype.UUID        `json:"task_id"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	Status      string             `json:"status"`
+	DueDate     pgtype.Date        `json:"due_date"`
 }
 
 type TelegramLink struct {
 	ID               pgtype.UUID        `json:"id"`
 	UserID           pgtype.UUID        `json:"user_id"`
 	TelegramChatID   int64              `json:"telegram_chat_id"`
+	TelegramUserID   pgtype.Int8        `json:"telegram_user_id"`
 	TelegramUsername pgtype.Text        `json:"telegram_username"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }

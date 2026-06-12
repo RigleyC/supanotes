@@ -59,14 +59,15 @@ func (r *Repository) UseLinkCode(ctx context.Context, code string) error {
 	return err
 }
 
-func (r *Repository) CreateLink(ctx context.Context, userID pgtype.UUID, chatID int64, username string) error {
+func (r *Repository) CreateLink(ctx context.Context, userID pgtype.UUID, telegramUserID, chatID int64, username string) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO telegram_links (user_id, telegram_chat_id, telegram_username)
-		VALUES ($1, $2, $3)
+		INSERT INTO telegram_links (user_id, telegram_user_id, telegram_chat_id, telegram_username)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (user_id) DO UPDATE
-		SET telegram_chat_id = EXCLUDED.telegram_chat_id,
+		SET telegram_user_id = EXCLUDED.telegram_user_id,
+		    telegram_chat_id = EXCLUDED.telegram_chat_id,
 		    telegram_username = EXCLUDED.telegram_username`,
-		userID, chatID, username)
+		userID, telegramUserID, chatID, username)
 	return err
 }
 
@@ -99,6 +100,29 @@ func (r *Repository) GetLinkByChatID(ctx context.Context, chatID int64) (pgtype.
 		return pgtype.UUID{}, err
 	}
 	return userID, nil
+}
+
+func (r *Repository) GetLinkByTelegramUserID(ctx context.Context, telegramUserID int64) (pgtype.UUID, int64, error) {
+	var userID pgtype.UUID
+	var chatID int64
+	err := r.pool.QueryRow(ctx, `
+		SELECT user_id, telegram_chat_id FROM telegram_links
+		WHERE telegram_user_id = $1`, telegramUserID,
+	).Scan(&userID, &chatID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return pgtype.UUID{}, 0, ErrLinkNotFound
+		}
+		return pgtype.UUID{}, 0, err
+	}
+	return userID, chatID, nil
+}
+
+func (r *Repository) UpdateDeliveryChat(ctx context.Context, userID pgtype.UUID, chatID int64) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE telegram_links SET telegram_chat_id = $2
+		WHERE user_id = $1`, userID, chatID)
+	return err
 }
 
 func (r *Repository) DeleteLink(ctx context.Context, userID pgtype.UUID) error {

@@ -230,7 +230,7 @@ class TasksRepository implements ITasksRepository {
 /// Riverpod entry point for the feature-level [TasksRepository]. Reads
 /// [tasksLocalRepositoryProvider] which already gates on the signed-in
 /// user, so this provider is itself safe to read only when authenticated.
-final tasksRepositoryProvider = Provider<ITasksRepository>((ref) {
+final tasksRepositoryProvider = Provider.autoDispose<ITasksRepository>((ref) {
   final local = ref.watch(tasksLocalRepositoryProvider);
   return TasksRepository(local);
 });
@@ -242,23 +242,23 @@ final tasksRepositoryProvider = Provider<ITasksRepository>((ref) {
 
 /// Stream of every task visible on the "Hoje" surface (overdue + today +
 /// undated), used by the today screen for the global empty-state check.
-final todayTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
+final todayTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
   return ref.watch(tasksRepositoryProvider).watchTodayTasks();
 });
 
-final overdueTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
+final overdueTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
   return ref.watch(tasksRepositoryProvider).watchOverdueTasks();
 });
 
-final todayDueTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
+final todayDueTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
   return ref.watch(tasksRepositoryProvider).watchTodayDueTasks();
 });
 
-final undatedOpenTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
+final undatedOpenTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
   return ref.watch(tasksRepositoryProvider).watchUndatedOpenTasks();
 });
 
 final tasksByNoteStreamProvider =
-    StreamProvider.family<List<TaskModel>, String>((ref, noteId) {
+    StreamProvider.autoDispose.family<List<TaskModel>, String>((ref, noteId) {
   return ref.watch(tasksRepositoryProvider).watchByNote(noteId);
 });

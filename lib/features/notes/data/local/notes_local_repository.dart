@@ -6,7 +6,7 @@ import '../../../../core/auth/current_user.dart';
 import '../../../../core/database/database.dart';
 import '../../../../core/database/daos/notes_dao.dart';
 
-final notesLocalRepositoryProvider = Provider<NotesLocalRepository>((ref) {
+final notesLocalRepositoryProvider = Provider.autoDispose<NotesLocalRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
   final userId = ref.watch(currentUserIdProvider)!;
   return NotesLocalRepository(db.notesDao, userId);

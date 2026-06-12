@@ -195,6 +195,6 @@ func SyncTaskCompletionFromSQLC(tc sqlcgen.TaskCompletion) dto.SyncTaskCompletio
 		ID:          UUID(tc.ID),
 		TaskID:      UUID(tc.TaskID),
 		CompletedAt: Time(tc.CompletedAt),
-		Status:      tc.Status,
+		DueDate:     Date(tc.DueDate),
 	}
 }

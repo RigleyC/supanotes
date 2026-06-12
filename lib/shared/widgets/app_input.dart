@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class AppInput extends StatelessWidget {
+class AppInput extends StatefulWidget {
   const AppInput({
     super.key,
     this.controller,
@@ -8,6 +8,7 @@ class AppInput extends StatelessWidget {
     this.hintText,
     this.errorText,
     this.obscureText = false,
+    this.enableObscureToggle = false,
     this.prefixIcon,
     this.suffixIcon,
     this.keyboardType,
@@ -25,6 +26,7 @@ class AppInput extends StatelessWidget {
   final String? hintText;
   final String? errorText;
   final bool obscureText;
+  final bool enableObscureToggle;
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
@@ -37,25 +39,57 @@ class AppInput extends StatelessWidget {
   final List<String>? autofillHints;
 
   @override
+  State<AppInput> createState() => _AppInputState();
+}
+
+class _AppInputState extends State<AppInput> {
+  late bool _obscured;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscured = widget.obscureText;
+  }
+
+  @override
+  void didUpdateWidget(covariant AppInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.obscureText != widget.obscureText) {
+      _obscured = widget.obscureText;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      onFieldSubmitted: onSubmitted,
-      maxLines: maxLines,
-      autofocus: autofocus,
-      textInputAction: textInputAction,
-      autofillHints: autofillHints,
+      controller: widget.controller,
+      obscureText: _obscured,
+      keyboardType: widget.keyboardType,
+      onChanged: widget.onChanged,
+      onFieldSubmitted: widget.onSubmitted,
+      maxLines: widget.maxLines,
+      autofocus: widget.autofocus,
+      textInputAction: widget.textInputAction,
+      autofillHints: widget.autofillHints,
       decoration: InputDecoration(
-        labelText: labelText,
-        hintText: hintText,
-        errorText: errorText,
-        prefixIcon: prefixIcon,
-        suffixIcon: suffixIcon,
+        labelText: widget.labelText,
+        hintText: widget.hintText,
+        errorText: widget.errorText,
+        prefixIcon: widget.prefixIcon,
+        suffixIcon: _suffixIcon,
       ),
-      validator: validator,
+      validator: widget.validator,
+    );
+  }
+
+  Widget? get _suffixIcon {
+    if (!widget.enableObscureToggle) return widget.suffixIcon;
+
+    return IconButton(
+      icon: Icon(
+        _obscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+      ),
+      onPressed: () => setState(() => _obscured = !_obscured),
     );
   }
 }

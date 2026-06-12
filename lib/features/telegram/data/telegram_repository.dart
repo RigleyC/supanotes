@@ -143,6 +143,6 @@ class TelegramRepository implements ITelegramRepository {
 /// Single shared [TelegramRepository] wired to the app-wide
 /// [apiClientProvider]. Stateless and safe to read from any consumer
 /// that is authenticated.
-final telegramRepositoryProvider = Provider<ITelegramRepository>((ref) {
+final telegramRepositoryProvider = Provider.autoDispose<ITelegramRepository>((ref) {
   return TelegramRepository(apiClient: ref.watch(apiClientProvider));
 });

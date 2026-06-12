@@ -67,8 +67,6 @@ class SyncMapper {
         'source_id': l.sourceId,
         'target_id': l.targetId,
         'relation': l.relation,
-        'created_at': l.createdAt.toUtc().toIso8601String(),
-        'updated_at': l.updatedAt.toUtc().toIso8601String(),
       };
 
   Map<String, dynamic> localNoteTagToJson(LocalNoteTagData t) => {
@@ -163,8 +161,12 @@ class SyncMapper {
         sourceId: json['source_id'] as String,
         targetId: json['target_id'] as String,
         relation: (json['relation'] as String?) ?? 'related',
-        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-        updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+        createdAt: json['created_at'] != null
+            ? DateTime.parse(json['created_at'] as String).toLocal()
+            : DateTime.now(),
+        updatedAt: json['updated_at'] != null
+            ? DateTime.parse(json['updated_at'] as String).toLocal()
+            : DateTime.now(),
         isDirty: false,
       );
 

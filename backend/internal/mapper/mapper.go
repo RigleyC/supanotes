@@ -33,3 +33,10 @@ func OptTime(t pgtype.Timestamptz) *string {
 	s := t.Time.Format(time.RFC3339)
 	return &s
 }
+
+func Date(d pgtype.Date) string {
+	if !d.Valid {
+		return ""
+	}
+	return d.Time.Format(time.RFC3339)
+}

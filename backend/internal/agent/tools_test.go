@@ -298,6 +298,18 @@ func (s *stubQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.Upse
 func (s *stubQuerier) GetSyncTaskCompletions(ctx context.Context, arg sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) GetSyncNoteTags(ctx context.Context, arg sqlcgen.GetSyncNoteTagsParams) ([]sqlcgen.NoteTag, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetSyncNoteLinks(ctx context.Context, arg sqlcgen.GetSyncNoteLinksParams) ([]sqlcgen.NoteLink, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
+	panic("unimplemented")
+}
 
 var _ sqlcgen.Querier = (*stubQuerier)(nil)
 

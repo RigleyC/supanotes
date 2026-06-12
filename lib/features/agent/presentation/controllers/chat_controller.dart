@@ -11,12 +11,15 @@ import 'package:supanotes/features/agent/domain/session_manager.dart';
 
 typedef ChatState = ({
   List<MessageModel> messages,
-  bool isLoading,
+  bool loaded,
+  bool streaming,
   String? error,
 });
 
 final chatControllerProvider =
-    NotifierProvider<ChatController, ChatState>(ChatController.new);
+    NotifierProvider.autoDispose<ChatController, ChatState>(
+  ChatController.new,
+);
 
 class ChatController extends Notifier<ChatState> {
   @override
@@ -24,19 +27,18 @@ class ChatController extends Notifier<ChatState> {
     final sessionId = ref.watch(sessionManagerProvider);
     ref.onDispose(() => _sseSub?.cancel());
     Future.microtask(() => _loadHistory(sessionId));
-    return (messages: [], isLoading: true, error: null);
+    return (messages: const [], loaded: false, streaming: false, error: null);
   }
 
   Future<void> _loadHistory(String sessionId) async {
-    state = (messages: state.messages, isLoading: true, error: null);
     try {
       final messages =
           await ref.read(chatRepositoryProvider).getHistory(sessionId);
       if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = (messages: messages, isLoading: false, error: null);
+      state = (messages: messages, loaded: true, streaming: false, error: null);
     } on ApiException catch (e) {
       if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = (messages: state.messages, isLoading: false, error: e.message);
+      state = (messages: state.messages, loaded: true, streaming: false, error: e.message);
     }
   }
 
@@ -71,7 +73,8 @@ class ChatController extends Notifier<ChatState> {
 
     state = (
       messages: [...state.messages, pending, initialAssistant],
-      isLoading: true,
+      loaded: true,
+      streaming: true,
       error: null,
     );
 
@@ -98,7 +101,8 @@ class ChatController extends Notifier<ChatState> {
             updated,
             ...messages.sublist(idx + 1),
           ],
-          isLoading: true,
+          loaded: true,
+          streaming: true,
           error: null,
         );
       },
@@ -107,13 +111,14 @@ class ChatController extends Notifier<ChatState> {
         state = (
           messages:
               state.messages.where((m) => m.id != assistantId).toList(growable: false),
-          isLoading: false,
+          loaded: true,
+          streaming: false,
           error: e is ApiException ? e.message : e.toString(),
         );
       },
       onDone: () {
         if (ref.read(sessionManagerProvider) != sessionId) return;
-        state = (messages: state.messages, isLoading: false, error: null);
+        state = (messages: state.messages, loaded: true, streaming: false, error: null);
       },
     );
   }

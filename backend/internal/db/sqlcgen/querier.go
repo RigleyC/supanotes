@@ -61,6 +61,8 @@ type Querier interface {
 	GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error)
 	GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error)
 	GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]Task, error)
+	GetSyncNoteTags(ctx context.Context, arg GetSyncNoteTagsParams) ([]NoteTag, error)
+	GetSyncNoteLinks(ctx context.Context, arg GetSyncNoteLinksParams) ([]NoteLink, error)
 	GetTags(ctx context.Context, userID pgtype.UUID) ([]Tag, error)
 	GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]Tag, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
@@ -99,6 +101,8 @@ type Querier interface {
 	// (the SELECT returns 0 rows otherwise, making the INSERT a no-op).
 	// Completions are append-only history; existing rows are never updated.
 	UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error
+	UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error
+	UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error
 }
 
 var _ Querier = (*Queries)(nil)

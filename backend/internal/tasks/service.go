@@ -100,7 +100,11 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 		return sqlcgen.Task{}, err
 	}
 
-	if _, err := s.repo.CreateTaskCompletion(ctx, id, "completed"); err != nil {
+	dueDate := pgtype.Date{}
+	if task.DueDate.Valid {
+		dueDate = pgtype.Date{Time: task.DueDate.Time, Valid: true}
+	}
+	if _, err := s.repo.CreateTaskCompletion(ctx, id, dueDate); err != nil {
 		return sqlcgen.Task{}, err
 	}
 
@@ -123,10 +127,12 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 	}
 
 	// Non-recurring: mark completed
+	now := time.Now()
 	task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
-		ID:     id,
-		UserID: userID,
-		Status: pgtype.Text{String: "done", Valid: true},
+		ID:          id,
+		UserID:      userID,
+		Status:      pgtype.Text{String: "done", Valid: true},
+		CompletedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

@@ -60,8 +60,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (!mounted) return;
 
     ref.invalidate(tasksByNoteStreamProvider(widget.noteId));
-    final freshTasks =
-        await ref.read(tasksByNoteStreamProvider(widget.noteId).future);
+    final freshTasks = await ref.read(
+      tasksByNoteStreamProvider(widget.noteId).future,
+    );
     final freshMap = {for (final t in freshTasks) t.id: t};
     final task = freshMap[taskId];
     if (task == null) return;

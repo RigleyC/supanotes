@@ -413,11 +413,10 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, e
 }
 
 const upsertTaskCompletion = `-- name: UpsertTaskCompletion :exec
-INSERT INTO task_completions (id, task_id, completed_at, status)
+INSERT INTO task_completions (id, task_id, completed_at)
 SELECT $1::uuid,
        $2::uuid,
-       $3::timestamptz,
-       'completed'
+       $3::timestamptz
 FROM tasks
 WHERE tasks.id = $2::uuid
   AND tasks.user_id = $4::uuid
@@ -448,7 +447,7 @@ func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskComple
 // of writing. Run `sqlc generate` from backend/ to regenerate the full
 // file; if the generated output matches then this comment can be removed.
 const getSyncTaskCompletions = `-- name: GetSyncTaskCompletions :many
-SELECT tc.id, tc.task_id, tc.completed_at, tc.status
+SELECT tc.id, tc.task_id, tc.completed_at, tc.due_date
 FROM task_completions tc
 JOIN tasks t ON t.id = tc.task_id
 WHERE t.user_id = $1
@@ -482,7 +481,7 @@ func (q *Queries) GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCom
 			&i.ID,
 			&i.TaskID,
 			&i.CompletedAt,
-			&i.Status,
+			&i.DueDate,
 		); err != nil {
 			return nil, err
 		}
@@ -492,4 +491,120 @@ func (q *Queries) GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCom
 		return nil, err
 	}
 	return items, nil
+}
+
+const getSyncNoteTags = `-- name: GetSyncNoteTags :many
+SELECT nt.note_id, nt.tag_id
+FROM note_tags nt
+JOIN notes n ON n.id = nt.note_id
+WHERE n.user_id = $1
+`
+
+type GetSyncNoteTagsParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetSyncNoteTags(ctx context.Context, arg GetSyncNoteTagsParams) ([]NoteTag, error) {
+	rows, err := q.db.Query(ctx, getSyncNoteTags, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NoteTag
+	for rows.Next() {
+		var i NoteTag
+		if err := rows.Scan(
+			&i.NoteID,
+			&i.TagID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertNoteTag = `-- name: UpsertNoteTag :exec
+INSERT INTO note_tags (note_id, tag_id)
+SELECT $1::uuid, $2::uuid
+WHERE EXISTS (
+  SELECT 1 FROM notes WHERE id = $1::uuid AND user_id = $3::uuid
+)
+ON CONFLICT (note_id, tag_id) DO NOTHING
+`
+
+type UpsertNoteTagParams struct {
+	NoteID pgtype.UUID `json:"note_id"`
+	TagID  pgtype.UUID `json:"tag_id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error {
+	_, err := q.db.Exec(ctx, upsertNoteTag, arg.NoteID, arg.TagID, arg.UserID)
+	return err
+}
+
+const getSyncNoteLinks = `-- name: GetSyncNoteLinks :many
+SELECT nl.id, nl.source_id, nl.target_id, nl.relation
+FROM note_links nl
+JOIN notes n ON n.id = nl.source_id
+WHERE n.user_id = $1
+`
+
+type GetSyncNoteLinksParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetSyncNoteLinks(ctx context.Context, arg GetSyncNoteLinksParams) ([]NoteLink, error) {
+	rows, err := q.db.Query(ctx, getSyncNoteLinks, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NoteLink
+	for rows.Next() {
+		var i NoteLink
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.TargetID,
+			&i.Relation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertNoteLink = `-- name: UpsertNoteLink :exec
+INSERT INTO note_links (id, source_id, target_id, relation)
+SELECT $1::uuid,
+       $2::uuid,
+       $3::uuid,
+       $4::varchar
+WHERE EXISTS (
+  SELECT 1 FROM notes WHERE id = $2::uuid AND user_id = $5::uuid
+)
+ON CONFLICT (id) DO UPDATE
+SET relation = EXCLUDED.relation
+`
+
+type UpsertNoteLinkParams struct {
+	ID       pgtype.UUID `json:"id"`
+	SourceID pgtype.UUID `json:"source_id"`
+	TargetID pgtype.UUID `json:"target_id"`
+	Relation string      `json:"relation"`
+	UserID   pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error {
+	_, err := q.db.Exec(ctx, upsertNoteLink, arg.ID, arg.SourceID, arg.TargetID, arg.Relation, arg.UserID)
+	return err
 }

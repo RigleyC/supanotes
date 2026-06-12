@@ -9,8 +9,7 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+  
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -21,9 +20,8 @@ class SectionTitle extends StatelessWidget {
       ),
       child: Text(
         title.toUpperCase(),
-        style: textTheme.titleSmall?.copyWith(
-          color: scheme.onSurfaceVariant,
-          fontWeight: FontWeight.w600,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
         ),
       ),

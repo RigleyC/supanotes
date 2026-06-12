@@ -10,33 +10,50 @@
             "env": {
                 "PORT": "8080",
                 "DATABASE_URL": "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable",
-                "PATH": "C:\\Users\\rigleyc\\go\\bin;${env:PATH}"
+                "PATH": "C:\\Users\\rigleyc\\go\\bin;C:\\Users\\rigleyc\\go-sdk\\bin;${env:PATH}"
             },
             "cwd": "${workspaceFolder}/backend",
-            "console": "integratedTerminal",
+            "console": "internalConsole",
             "logOutput": "rpc"
         },
         {
-            "name": "Frontend (Flutter)",
+            "name": "Frontend (Flutter - Selected Device/Desktop)",
             "type": "dart",
             "request": "launch",
             "program": "${workspaceFolder}/lib/main.dart",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "preLaunchTask": "setup-dev-env",
             "args": [
-                "--dart-define-from-file=${workspaceFolder}/.vscode/.dart-define.json"
+                "--dart-define-from-file=${workspaceFolder}/.vscode/.dart-define.local.json"
+            ]
+        },
+        {
+            "name": "Frontend (Flutter - Selected Emulator)",
+            "type": "dart",
+            "request": "launch",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": [
+                "--dart-define-from-file=${workspaceFolder}/.vscode/.dart-define.emulator.json"
             ]
         }
     ],
     "compounds": [
         {
-            "name": "Backend + Frontend (Compound)",
-            "preLaunchTask": "setup-dev-env",
-            "postDebugTask": "flutter-stop",
+            "name": "SupaNotes Dev (Device/Desktop)",
+            "preLaunchTask": "dev:prepare",
             "configurations": [
                 "Backend (Go Server)",
-                "Frontend (Flutter)"
+                "Frontend (Flutter - Selected Device/Desktop)"
+            ]
+        },
+        {
+            "name": "SupaNotes Dev (Emulator)",
+            "preLaunchTask": "dev:prepare",
+            "configurations": [
+                "Backend (Go Server)",
+                "Frontend (Flutter - Selected Emulator)"
             ]
         }
     ]

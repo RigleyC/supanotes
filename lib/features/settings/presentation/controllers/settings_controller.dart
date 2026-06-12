@@ -8,7 +8,7 @@ class SettingsState {
   const SettingsState({this.timezone = 'UTC'});
 }
 
-final settingsProvider = FutureProvider<SettingsState>((ref) async {
+final settingsProvider = FutureProvider.autoDispose<SettingsState>((ref) async {
   final cache = ref.read(sessionCacheProvider);
   if (cache.settings.isNotEmpty) {
     return SettingsState(

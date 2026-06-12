@@ -3,6 +3,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supanotes/features/memories/domain/memory_model.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
 
@@ -13,42 +14,47 @@ class MemoriesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(memoriesControllerProvider);
+    final asyncValue = ref.watch(memoriesControllerProvider);
 
-    ref.listen<MemoriesState>(memoriesControllerProvider, (prev, next) {
-      if (next.error != null && next.error != prev?.error) {
-        AppMessenger.showError(context, next.error!);
-      }
-    });
+    ref.listen<AsyncValue<List<MemoryModel>>>(
+      memoriesControllerProvider,
+      (prev, next) {
+        if (next.hasError && (prev == null || !prev.hasError)) {
+          AppMessenger.showError(context, next.error.toString());
+        }
+      },
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Memórias')),
-      body: state.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : state.memories.isEmpty
-              ? const EmptyState(
-                  icon: Icons.auto_awesome,
-                  title: 'Nenhuma memória',
-                  subtitle: 'Memórias serão exibidas aqui.',
-                )
-              : ListView.builder(
-                  itemCount: state.memories.length,
-                  itemBuilder: (context, index) {
-                    final memory = state.memories[index];
-                    return ListTile(
-                      title: Text(memory.content),
-                      subtitle: memory.contextSlug != null
-                          ? Text(memory.contextSlug!)
-                          : null,
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => ref
-                            .read(memoriesControllerProvider.notifier)
-                            .deleteMemory(memory.id),
-                      ),
-                    );
-                  },
-                ),
+      body: asyncValue.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('$e')),
+        data: (memories) => memories.isEmpty
+            ? const EmptyState(
+                icon: Icons.auto_awesome,
+                title: 'Nenhuma memória',
+                subtitle: 'Memórias serão exibidas aqui.',
+              )
+            : ListView.builder(
+                itemCount: memories.length,
+                itemBuilder: (context, index) {
+                  final memory = memories[index];
+                  return ListTile(
+                    title: Text(memory.content),
+                    subtitle: memory.contextSlug != null
+                        ? Text(memory.contextSlug!)
+                        : null,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => ref
+                          .read(memoriesControllerProvider.notifier)
+                          .deleteMemory(memory.id),
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 }

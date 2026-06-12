@@ -68,8 +68,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     if (noteId == null) return;
 
     ref.invalidate(tasksByNoteStreamProvider(noteId));
-    final freshTasks =
-        await ref.read(tasksByNoteStreamProvider(noteId).future);
+    final freshTasks = await ref.read(tasksByNoteStreamProvider(noteId).future);
     final freshMap = {for (final t in freshTasks) t.id: t};
     final task = freshMap[taskId];
     if (task == null) return;

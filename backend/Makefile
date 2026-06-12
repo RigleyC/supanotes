@@ -1,8 +1,6 @@
-.PHONY: help run build test lint tidy migrate-up migrate-down migrate-create sqlc dev-db-up dev-db-down
+.PHONY: help run build test lint tidy migrate-up sqlc dev-db-up dev-db-down
 
 GO ?= go
-MIGRATE ?= migrate
-DATABASE_URL ?= postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable
 
 help:
 	@echo "SupaNotes backend - available targets:"
@@ -12,8 +10,6 @@ help:
 	@echo "  lint            - run go vet ./..."
 	@echo "  tidy            - run go mod tidy"
 	@echo "  migrate-up      - apply all pending DB migrations"
-	@echo "  migrate-down    - roll back the last DB migration"
-	@echo "  migrate-create  - create a new migration: make migrate-create name=foo"
 	@echo "  sqlc            - regenerate typed Go from db/queries (requires sqlc)"
 	@echo "  dev-db-up       - start the local Postgres container"
 	@echo "  dev-db-down     - stop the local Postgres container"
@@ -34,14 +30,7 @@ tidy:
 	$(GO) mod tidy
 
 migrate-up:
-	$(MIGRATE) -path db/migrations -database "$(DATABASE_URL)" up
-
-migrate-down:
-	$(MIGRATE) -path db/migrations -database "$(DATABASE_URL)" down 1
-
-migrate-create:
-	@test -n "$(name)" || (echo "usage: make migrate-create name=foo" && exit 1)
-	$(MIGRATE) create -ext sql -dir db/migrations -seq $(name)
+	$(GO) run ./cmd/migrate
 
 sqlc:
 	sqlc generate

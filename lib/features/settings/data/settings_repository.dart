@@ -217,6 +217,6 @@ String slugifyContextName(String name) {
 
 /// Single shared [SettingsRepository] wired to the app-wide
 /// [apiClientProvider].
-final settingsRepositoryProvider = Provider<ISettingsRepository>((ref) {
+final settingsRepositoryProvider = Provider.autoDispose<ISettingsRepository>((ref) {
   return SettingsRepository(apiClient: ref.watch(apiClientProvider));
 });

@@ -4,6 +4,7 @@
   },
   "go.goroot": "C:\\Users\\rigleyc\\go-sdk",
   "terminal.integrated.env.windows": {
-    "PATH": "C:\\Users\\rigleyc\\go-sdk\\bin;${env:PATH}"
-  }
+    "PATH": "C:\\Users\\rigleyc\\go\\bin;C:\\Users\\rigleyc\\go-sdk\\bin;${env:PATH}"
+  },
+  "dart.showTodos": false
 }

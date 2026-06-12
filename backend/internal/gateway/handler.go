@@ -44,11 +44,20 @@ type WebhookUpdate struct {
 	EditedMessage *TgMsg `json:"edited_message,omitempty"`
 }
 
+type TgUser struct {
+	ID           int64  `json:"id"`
+	IsBot        bool   `json:"is_bot,omitempty"`
+	FirstName    string `json:"first_name,omitempty"`
+	Username     string `json:"username,omitempty"`
+	LanguageCode string `json:"language_code,omitempty"`
+}
+
 type TgMsg struct {
-	MessageID int64  `json:"message_id"`
-	Chat      TgChat `json:"chat"`
-	Text      string `json:"text"`
-	Date      int64  `json:"date"`
+	MessageID int64   `json:"message_id"`
+	From      *TgUser `json:"from,omitempty"`
+	Chat      TgChat  `json:"chat"`
+	Text      string  `json:"text"`
+	Date      int64   `json:"date"`
 }
 
 type TgChat struct {
@@ -174,7 +183,13 @@ func (h *Handler) Webhook(c echo.Context) error {
 	}
 
 	// Free-form text — route to agent.
-	linked, err := h.repo.GetLinkByChatID(ctx, msg.Chat.ID)
+	// Identify the Telegram user via message.from.id (stable), not chat.id (delivery target).
+	if msg.From == nil {
+		return c.NoContent(http.StatusOK)
+	}
+	telegramUserID := msg.From.ID
+
+	userID, deliveryChatID, err := h.repo.GetLinkByTelegramUserID(ctx, telegramUserID)
 	if err != nil {
 		if errors.Is(err, ErrLinkNotFound) {
 			h.respond(ctx, msg.Chat.ID,
@@ -185,30 +200,38 @@ func (h *Handler) Webhook(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	}
 
+	// Update delivery chat if the user is messaging from a different chat.
+	if deliveryChatID != msg.Chat.ID {
+		if err := h.repo.UpdateDeliveryChat(ctx, userID, msg.Chat.ID); err != nil {
+			c.Logger().Error(err)
+		}
+		deliveryChatID = msg.Chat.ID
+	}
+
 	if h.agent == nil {
 		// Dev mode without the agent loop wired in.
-		h.respond(ctx, msg.Chat.ID, "Agent is not configured on this server.")
+		h.respond(ctx, deliveryChatID, "Agent is not configured on this server.")
 		return c.NoContent(http.StatusOK)
 	}
 
-	sessionIDStr, err := h.sessionIDForChat(ctx, msg.Chat.ID)
+	sessionIDStr, err := h.sessionIDForUser(ctx, telegramUserID)
 	if err != nil {
 		c.Logger().Error(err)
 		// Non-fatal — fall back to a fresh session per message.
 		sessionIDStr = uuid.New().String()
 	}
 
-	reply, err := h.agent.Chat(ctx, linked, sessionIDStr, text)
+	reply, err := h.agent.Chat(ctx, userID, sessionIDStr, text)
 	if err != nil {
 		c.Logger().Error(err)
-		h.respond(ctx, msg.Chat.ID, "Something went wrong. Try again in a moment.")
+		h.respond(ctx, deliveryChatID, "Something went wrong. Try again in a moment.")
 		return c.NoContent(http.StatusOK)
 	}
 
 	if reply == "" {
 		return c.NoContent(http.StatusOK)
 	}
-	h.respond(ctx, msg.Chat.ID, reply)
+	h.respond(ctx, deliveryChatID, reply)
 	return c.NoContent(http.StatusOK)
 }
 
@@ -220,7 +243,11 @@ func (h *Handler) handleStart(ctx context.Context, msg *TgMsg, code string) erro
 	if used || time.Now().After(expiresAt) {
 		return ErrLinkCodeExpired
 	}
-	if err := h.repo.CreateLink(ctx, userID, msg.Chat.ID, msg.Chat.Username); err != nil {
+	telegramUserID := int64(0)
+	if msg.From != nil {
+		telegramUserID = msg.From.ID
+	}
+	if err := h.repo.CreateLink(ctx, userID, telegramUserID, msg.Chat.ID, msg.Chat.Username); err != nil {
 		return fmt.Errorf("create link: %w", err)
 	}
 	if err := h.repo.UseLinkCode(ctx, code); err != nil {
@@ -231,12 +258,10 @@ func (h *Handler) handleStart(ctx context.Context, msg *TgMsg, code string) erro
 	return nil
 }
 
-func (h *Handler) sessionIDForChat(_ context.Context, chatID int64) (string, error) {
-	// One session per linked chat. Stable across messages, regenerated
-	// only when the user explicitly starts a new conversation from
-	// the app. For the gateway we just derive a deterministic UUID
-	// from the chat_id so reloads reuse the same session row.
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprintf("tg:%d", chatID))).String(), nil
+func (h *Handler) sessionIDForUser(_ context.Context, telegramUserID int64) (string, error) {
+	// One session per Telegram user (message.from.id), stable across
+	// chats. Reloads reuse the same session row.
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprintf("tg:%d", telegramUserID))).String(), nil
 }
 
 // respond best-effort sends a message back to the chat. Errors are

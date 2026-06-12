@@ -1,5 +1,4 @@
-/// Domain model for a single chat message exchanged with the agent, plus
-/// the immutable [ChatListState] snapshot exposed by the chat controller.
+/// Domain model for a single chat message exchanged with the agent.
 ///
 /// Wire shape (from `backend/internal/db/sqlcgen/models.go::Message` and
 /// the JSON returned by `GET /api/v1/agent/messages`):
@@ -77,37 +76,5 @@ class MessageModel {
   }
 }
 
-/// Snapshot of the chat screen's visible state.
-///
-/// The controller ([ChatController] in `chat_screen.dart`) emits new
-/// instances of this on every relevant change. Consumers should treat
-/// instances as immutable.
-class ChatListState {
-  const ChatListState({
-    required this.messages,
-    required this.isLoading,
-    this.error,
-  });
-
-  final List<MessageModel> messages;
-  final bool isLoading;
-  final String? error;
-
-  static const empty =
-      ChatListState(messages: <MessageModel>[], isLoading: false);
-
-  ChatListState copyWith({
-    List<MessageModel>? messages,
-    bool? isLoading,
-    String? error,
-    bool clearError = false,
-  }) {
-    return ChatListState(
-      messages: messages ?? this.messages,
-      isLoading: isLoading ?? this.isLoading,
-      error: clearError ? null : (error ?? this.error),
-    );
-  }
-}
 
 

@@ -55,6 +55,22 @@ func (m *mockRepository) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.U
 	return nil
 }
 
+func (m *mockRepository) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
+	return nil, nil
+}
+
+func (m *mockRepository) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error {
+	return nil
+}
+
+func (m *mockRepository) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error) {
+	return nil, nil
+}
+
+func (m *mockRepository) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
+	return nil
+}
+
 func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }

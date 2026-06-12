@@ -28,6 +28,8 @@ type SyncPayload struct {
 	Contexts        []sqlcgen.Context        `json:"contexts"`
 	Tags            []sqlcgen.Tag            `json:"tags"`
 	TaskCompletions []sqlcgen.TaskCompletion `json:"task_completions"`
+	NoteTags        []sqlcgen.NoteTag        `json:"note_tags"`
+	NoteLinks       []sqlcgen.NoteLink       `json:"note_links"`
 }
 
 type Service interface {
@@ -90,13 +92,42 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		completions = make([]sqlcgen.TaskCompletion, 0)
 	}
 
+	noteTags, err := s.repo.GetSyncNoteTags(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if noteTags == nil {
+		noteTags = make([]sqlcgen.NoteTag, 0)
+	}
+
+	noteLinks, err := s.repo.GetSyncNoteLinks(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if noteLinks == nil {
+		noteLinks = make([]sqlcgen.NoteLink, 0)
+	}
+
 	return &SyncPayload{
 		Notes:           notes,
 		Tasks:           tasks,
 		Contexts:        contexts,
 		Tags:            tags,
 		TaskCompletions: completions,
+		NoteTags:        noteTags,
+		NoteLinks:       noteLinks,
 	}, nil
+}
+
+func sanitizeTaskStatus(status string) string {
+	switch status {
+	case "open", "done":
+		return status
+	case "completed":
+		return "done"
+	default:
+		return "open"
+	}
 }
 
 func isEmptyIncomingRegularNote(n sqlcgen.Note) bool {
@@ -146,12 +177,13 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	}
 
 	for _, t := range payload.Tasks {
+		status := sanitizeTaskStatus(t.Status)
 		_, err := r.UpsertTask(ctx, sqlcgen.UpsertTaskParams{
 			ID:         t.ID,
 			UserID:     userID,
 			NoteID:     t.NoteID,
 			Title:      t.Title,
-			Status:     t.Status,
+			Status:     status,
 			Position:   t.Position,
 			Recurrence: t.Recurrence,
 			DueDate:    t.DueDate,
@@ -203,6 +235,30 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			TaskID:      c.TaskID,
 			CompletedAt: c.CompletedAt,
 			UserID:      userID,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, nt := range payload.NoteTags {
+		err := r.UpsertNoteTag(ctx, sqlcgen.UpsertNoteTagParams{
+			NoteID: nt.NoteID,
+			TagID:  nt.TagID,
+			UserID: userID,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, nl := range payload.NoteLinks {
+		err := r.UpsertNoteLink(ctx, sqlcgen.UpsertNoteLinkParams{
+			ID:       nl.ID,
+			SourceID: nl.SourceID,
+			TargetID: nl.TargetID,
+			Relation: nl.Relation,
+			UserID:   userID,
 		})
 		if err != nil {
 			return err

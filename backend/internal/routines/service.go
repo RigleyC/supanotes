@@ -3,8 +3,6 @@ package routines
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -47,7 +45,7 @@ func (s *Service) UpdateRoutine(ctx context.Context, id, userID pgtype.UUID, cro
 	return routine, nil
 }
 
-func (s *Service) UpdateRoutineByType(ctx context.Context, userID pgtype.UUID, routineType string, timeOfDay *string, daysOfWeek *[]int, enabled *bool, timezone *string) (*sqlcgen.Routine, error) {
+func (s *Service) UpdateRoutineByType(ctx context.Context, userID pgtype.UUID, routineType string, timeOfDay *string, daysOfWeek *string, enabled *bool, timezone *string) (*sqlcgen.Routine, error) {
 	routines, err := s.GetRoutines(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -64,16 +62,9 @@ func (s *Service) UpdateRoutineByType(ctx context.Context, userID pgtype.UUID, r
 		return nil, ErrRoutineNotFound
 	}
 
-	// Build the UpdateRoutine call — convert new fields back to cron_expr
-	// for backward compatibility
 	expr := target.CronExpr
 	if timeOfDay != nil && daysOfWeek != nil {
-		t := *timeOfDay            // "HH:MM"
-		dow := *daysOfWeek         // [0..6]
-		minute := "0"
-		hour := strings.Split(t, ":")[0]
-		dowStr := strings.Trim(strings.Replace(fmt.Sprint(dow), " ", ",", -1), "[]")
-		expr = fmt.Sprintf("%s %s * * %s", minute, hour, dowStr)
+		expr = daysAndTimeToCron(*daysOfWeek, *timeOfDay)
 	}
 
 	var cronStr *string

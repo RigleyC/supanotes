@@ -14,9 +14,10 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/validators/input_validators.dart';
-import 'package:supanotes/features/auth/presentation/widgets/auth_button.dart';
-import 'package:supanotes/features/auth/presentation/widgets/auth_form_field.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
+import 'package:supanotes/shared/widgets/app_input.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -29,7 +30,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -39,17 +39,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (ref.read(authControllerProvider).isLoading) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     try {
-      await ref.read(authControllerProvider.notifier).login(
+      await ref
+          .read(authControllerProvider.notifier)
+          .login(
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      AppMessenger.showError(context, e.message);
     }
   }
 
@@ -57,7 +58,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final isLoading = ref.watch(authControllerProvider.select((s) => s.isLoading));
+    final isLoading = ref.watch(
+      authControllerProvider.select((s) => s.isLoading),
+    );
 
     return Scaffold(
       body: SafeArea(
@@ -86,9 +89,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    AuthFormField(
-                      label: 'Email',
-                      hint: 'you@example.com',
+                    AppInput(
+                      labelText: 'Email',
+                      hintText: 'you@example.com',
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
                       textInputAction: TextInputAction.next,
@@ -96,38 +99,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIcon: const Icon(Icons.email_outlined),
                       validator: (v) => EmailValidator.validate(v),
                     ),
-                    AuthFormField(
-                      label: 'Password',
-                      obscureText: _obscurePassword,
+                    const SizedBox(height: AppSpacing.md),
+                    AppInput(
+                      labelText: 'Password',
+                      obscureText: true,
+                      enableObscureToggle: true,
                       autofillHints: const [AutofillHints.password],
                       textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
+                      onSubmitted: (_) => _submit(),
                       controller: _passwordController,
                       prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword,
-                        ),
-                      ),
                       validator: (v) => PasswordValidator.validate(v),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    AuthButton(
-                      label: 'Sign in',
+                    AppButton(
+                      text: 'Sign in',
                       isLoading: isLoading,
                       onPressed: _submit,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    TextButton(
+                    AppButton(
+                      text: "Don't have an account? Create one",
+                      variant: AppButtonVariant.secondary,
                       onPressed: isLoading
                           ? null
                           : () => context.go(AppRoutes.register),
-                      child: const Text("Don't have an account? Create one"),
                     ),
                   ],
                 ),

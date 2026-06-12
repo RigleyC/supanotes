@@ -3,18 +3,84 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from datetime import datetime, timezone
 
 # Configuração
 BACKEND_PORT = 8080
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable",
+)
 WORKSPACE_ROOT = Path(__file__).parent.parent
+BACKEND_DIR = WORKSPACE_ROOT / "backend"
 DART_DEFINE_FILE = WORKSPACE_ROOT / ".vscode" / ".dart-define.json"
+LOCAL_DART_DEFINE_FILE = WORKSPACE_ROOT / ".vscode" / ".dart-define.local.json"
+EMULATOR_DART_DEFINE_FILE = WORKSPACE_ROOT / ".vscode" / ".dart-define.emulator.json"
 DEV_TARGET_FILE = WORKSPACE_ROOT / ".vscode" / ".dev-target.json"
 
 
 def log(msg):
     print(f"[setup-dev-env] {msg}", flush=True)
+
+
+def run(cmd, cwd=WORKSPACE_ROOT, timeout=60, env=None):
+    log("$ " + " ".join(cmd))
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
+    return subprocess.run(
+        cmd,
+        cwd=cwd,
+        env=merged_env,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def ensure_postgres():
+    log("Subindo Postgres de desenvolvimento...")
+    result = run(["docker", "compose", "up", "-d", "postgres"], timeout=120)
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+    log("Aguardando Postgres ficar pronto...")
+    for _ in range(30):
+        result = run(
+            [
+                "docker",
+                "compose",
+                "exec",
+                "-T",
+                "postgres",
+                "pg_isready",
+                "-U",
+                "supanotes",
+                "-d",
+                "supanotes",
+            ],
+            timeout=10,
+        )
+        if result.returncode == 0:
+            log("Postgres pronto.")
+            return
+        time.sleep(1)
+
+    log("Postgres nao ficou pronto em 30s.")
+    sys.exit(1)
+
+
+def run_migrations():
+    log("Verificando migrations pendentes do backend...")
+    result = run(
+        ["go", "run", "./cmd/migrate"],
+        cwd=BACKEND_DIR,
+        timeout=120,
+        env={"DATABASE_URL": DATABASE_URL},
+    )
+    if result.returncode != 0:
+        sys.exit(result.returncode)
 
 
 def find_adb():
@@ -82,120 +148,97 @@ def run_adb(adb_path, args, timeout=5):
         return None
 
 
-def get_dev_target():
+def setup_android_reverse_for_physical_devices():
     adb_path = find_adb()
     if not adb_path:
-        log("adb nao encontrado. Assumindo desktop/web.")
+        log("adb nao encontrado. Pulando adb reverse.")
         return {
-            "type": "desktop",
-            "apiBaseUrl": f"http://localhost:{BACKEND_PORT}/api/v1",
             "adbAvailable": False,
-            "deviceId": None,
+            "physicalDevices": [],
+            "emulators": [],
             "adbPath": None,
         }
 
-    log(f"adb encontrado: {adb_path}")
-
-    # adb devices com timeout
     devices_output = run_adb(adb_path, ["devices"], timeout=5)
     if devices_output is None:
-        log("adb devices travou (timeout). Assumindo desktop/web.")
+        log("adb devices travou (timeout). Pulando adb reverse.")
         return {
-            "type": "desktop",
-            "apiBaseUrl": f"http://localhost:{BACKEND_PORT}/api/v1",
             "adbAvailable": True,
-            "deviceId": None,
+            "physicalDevices": [],
+            "emulators": [],
             "adbPath": adb_path,
         }
 
-    # Parse dispositivos
-    device_lines = []
+    physical_devices = []
+    emulators = []
     for line in devices_output.splitlines():
-        if re.match(r"^\S+\s+device$", line):
-            device_lines.append(line)
+        if not re.match(r"^\S+\s+device$", line):
+            continue
 
-    if not device_lines:
-        log("Nenhum dispositivo Android conectado. Assumindo desktop/web.")
-        return {
-            "type": "desktop",
-            "apiBaseUrl": f"http://localhost:{BACKEND_PORT}/api/v1",
-            "adbAvailable": True,
-            "deviceId": None,
-            "adbPath": adb_path,
-        }
-
-    for line in device_lines:
-        parts = line.split()
-        device_id = parts[0]
-
+        device_id = line.split()[0]
         is_emulator = "emulator" in device_id
-
         if not is_emulator:
             hw = run_adb(adb_path, ["-s", device_id, "shell", "getprop", "ro.hardware"], timeout=3)
             if hw and re.search(r"goldfish|ranchu|qemu|virtio", hw):
                 is_emulator = True
 
         if is_emulator:
-            log(f"Emulador detectado: {device_id}")
-            return {
-                "type": "emulator",
-                "apiBaseUrl": f"http://10.0.2.2:{BACKEND_PORT}/api/v1",
-                "adbAvailable": True,
-                "deviceId": device_id,
-                "adbPath": adb_path,
-            }
+            emulators.append(device_id)
+            continue
+
+        physical_devices.append(device_id)
+        log(f"Executando adb reverse tcp:{BACKEND_PORT} tcp:{BACKEND_PORT} em {device_id} ...")
+        reverse_out = run_adb(
+            adb_path,
+            ["-s", device_id, "reverse", f"tcp:{BACKEND_PORT}", f"tcp:{BACKEND_PORT}"],
+            timeout=5,
+        )
+        if reverse_out is not None:
+            log(f"adb reverse OK para {device_id}")
         else:
-            log(f"Dispositivo fisico detectado: {device_id}")
-            log(f"Executando adb reverse tcp:{BACKEND_PORT} tcp:{BACKEND_PORT} ...")
-            reverse_out = run_adb(
-                adb_path,
-                ["-s", device_id, "reverse", f"tcp:{BACKEND_PORT}", f"tcp:{BACKEND_PORT}"],
-                timeout=5,
-            )
-            if reverse_out is not None:
-                log(f"adb reverse OK para {device_id}")
-            else:
-                log(f"adb reverse falhou ou timeout para {device_id}")
-            return {
-                "type": "device",
-                "apiBaseUrl": f"http://localhost:{BACKEND_PORT}/api/v1",
-                "adbAvailable": True,
-                "deviceId": device_id,
-                "adbPath": adb_path,
-            }
+            log(f"adb reverse falhou ou timeout para {device_id}")
 
     return {
-        "type": "unknown",
-        "apiBaseUrl": f"http://localhost:{BACKEND_PORT}/api/v1",
         "adbAvailable": True,
-        "deviceId": None,
+        "physicalDevices": physical_devices,
+        "emulators": emulators,
         "adbPath": adb_path,
     }
 
 
-def main():
-    target = get_dev_target()
+def write_dart_define(path, api_base_url):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"API_BASE_URL": api_base_url}, f, indent=4)
 
-    # Gera .dart-define.json
-    dart_define = {"API_BASE_URL": target["apiBaseUrl"]}
-    with open(DART_DEFINE_FILE, "w", encoding="utf-8") as f:
-        json.dump(dart_define, f, indent=4)
+
+def main():
+    ensure_postgres()
+    run_migrations()
+
+    android = setup_android_reverse_for_physical_devices()
+    local_api_base_url = f"http://localhost:{BACKEND_PORT}/api/v1"
+    emulator_api_base_url = f"http://10.0.2.2:{BACKEND_PORT}/api/v1"
+
+    write_dart_define(DART_DEFINE_FILE, local_api_base_url)
+    write_dart_define(LOCAL_DART_DEFINE_FILE, local_api_base_url)
+    write_dart_define(EMULATOR_DART_DEFINE_FILE, emulator_api_base_url)
 
     # Gera .dev-target.json
     dev_target = {
-        "type": target["type"],
-        "apiBaseUrl": target["apiBaseUrl"],
-        "adbAvailable": target["adbAvailable"],
-        "deviceId": target["deviceId"],
-        "adbPath": target["adbPath"],
+        "apiBaseUrl": local_api_base_url,
+        "emulatorApiBaseUrl": emulator_api_base_url,
+        "adbAvailable": android["adbAvailable"],
+        "physicalDevices": android["physicalDevices"],
+        "emulators": android["emulators"],
+        "adbPath": android["adbPath"],
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }
     with open(DEV_TARGET_FILE, "w", encoding="utf-8") as f:
         json.dump(dev_target, f, indent=4)
 
-    log(f"Target: {target['type']}")
-    log(f"API_BASE_URL: {target['apiBaseUrl']}")
-    log(f"Arquivos gerados: .vscode/.dart-define.json, .vscode/.dev-target.json")
+    log(f"API_BASE_URL local/device: {local_api_base_url}")
+    log(f"API_BASE_URL emulador: {emulator_api_base_url}")
+    log("Arquivos gerados: .vscode/.dart-define*.json, .vscode/.dev-target.json")
 
 
 if __name__ == "__main__":

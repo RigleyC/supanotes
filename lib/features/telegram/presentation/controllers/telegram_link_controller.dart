@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/telegram/data/telegram_repository.dart';
 
-final telegramStatusProvider = FutureProvider<TelegramLinkStatus>((ref) async {
+final telegramStatusProvider = FutureProvider.autoDispose<TelegramLinkStatus>((ref) async {
   return ref.read(telegramRepositoryProvider).getLinkStatus();
 });
 

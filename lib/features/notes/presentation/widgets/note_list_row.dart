@@ -34,7 +34,7 @@ class NoteListRow extends StatelessWidget {
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Icon(
-          note.favorite ? Icons.star : Icons.star_border,
+          note.favorite ? Icons.star_border_rounded : Icons.star_border,
           color: scheme.onPrimaryContainer,
         ),
       ),
@@ -42,10 +42,7 @@ class NoteListRow extends StatelessWidget {
         color: scheme.errorContainer,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Icon(
-          Icons.delete_outline,
-          color: scheme.onErrorContainer,
-        ),
+        child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
       ),
       confirmDismiss: (direction) async {
         if (direction != DismissDirection.endToStart) return true;
@@ -62,16 +59,26 @@ class NoteListRow extends StatelessWidget {
       onDismissed: (direction) {
         if (direction == DismissDirection.startToEnd) onToggleFavorite();
       },
-      child: ListTile(
-        title: Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: note.favorite
-            ? Icon(Icons.star, size: 18, color: scheme.tertiary)
-            : null,
+      child: InkWell(
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
         onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (note.favorite)
+                Icon(Icons.star_rate_rounded, size: 18, color: scheme.tertiary),
+            ],
+          ),
+        ),
       ),
     );
   }

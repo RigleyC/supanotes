@@ -2,28 +2,47 @@ package routines
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type UpdateRoutineRequest struct {
-	CronExpr *string `json:"cron_expr"`
-	Enabled  *bool   `json:"enabled"`
+	DaysOfWeek *string `json:"days_of_week"` // "mon,wed,fri"
+	TimeOfDay  *string `json:"time_of_day"`  // "HH:MM"
+	Enabled    *bool   `json:"enabled"`
 }
 
 type UpdateRoutineConfigRequest struct {
 	TimeOfDay  *string `json:"time_of_day"`  // "HH:MM"
-	DaysOfWeek *[]int  `json:"days_of_week"` // [0..6]
+	DaysOfWeek *string `json:"days_of_week"` // "mon,wed,fri"
 	Enabled    *bool   `json:"enabled"`
 	Timezone   *string `json:"timezone"`
 }
 
 type TestRoutineResponse struct {
 	Content string `json:"content"`
+}
+
+type RoutineResponse struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	Type       string             `json:"type"`
+	DaysOfWeek string             `json:"days_of_week"`
+	TimeOfDay  string             `json:"time_of_day"`
+	Enabled    bool               `json:"enabled"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	Name       string             `json:"name"`
+	LastRunAt  pgtype.Timestamptz `json:"last_run_at"`
+	BriefType  string             `json:"brief_type"`
 }
 
 type Handler struct {
@@ -45,7 +64,12 @@ func (h *Handler) List(c echo.Context) error {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get routines")
 	}
-	return c.JSON(http.StatusOK, routines)
+
+	resp := make([]RoutineResponse, len(routines))
+	for i, r := range routines {
+		resp[i] = routineToResponse(r)
+	}
+	return c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) Update(c echo.Context) error {
@@ -64,13 +88,19 @@ func (h *Handler) Update(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	routine, err := h.svc.UpdateRoutine(c.Request().Context(), id, userID, req.CronExpr, req.Enabled)
+	var cronExpr *string
+	if req.DaysOfWeek != nil && req.TimeOfDay != nil {
+		expr := daysAndTimeToCron(*req.DaysOfWeek, *req.TimeOfDay)
+		cronExpr = &expr
+	}
+
+	routine, err := h.svc.UpdateRoutine(c.Request().Context(), id, userID, cronExpr, req.Enabled)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to update routine")
 	}
 
-	return c.JSON(http.StatusOK, routine)
+	return c.JSON(http.StatusOK, routineToResponse(routine))
 }
 
 func (h *Handler) Logs(c echo.Context) error {
@@ -138,7 +168,7 @@ func (h *Handler) updateByType(c echo.Context, routineType string) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to update routine")
 	}
 
-	return c.JSON(http.StatusOK, routine)
+	return c.JSON(http.StatusOK, routineToResponse(*routine))
 }
 
 func (h *Handler) GetLatestBrief(c echo.Context) error {
@@ -161,6 +191,80 @@ func (h *Handler) GetLatestBrief(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get latest brief")
 	}
 	return c.JSON(http.StatusOK, TestRoutineResponse{Content: content})
+}
+
+var dayAbbrToNum = map[string]string{
+	"sun": "0",
+	"mon": "1",
+	"tue": "2",
+	"wed": "3",
+	"thu": "4",
+	"fri": "5",
+	"sat": "6",
+}
+
+var dayNumToAbbr = map[string]string{
+	"0": "sun",
+	"1": "mon",
+	"2": "tue",
+	"3": "wed",
+	"4": "thu",
+	"5": "fri",
+	"6": "sat",
+}
+
+func daysAndTimeToCron(daysOfWeek, timeOfDay string) string {
+	parts := strings.Split(timeOfDay, ":")
+	minute := "0"
+	if len(parts) == 2 {
+		minute = parts[1]
+	}
+	hour := parts[0]
+
+	dayAbbrs := strings.Split(daysOfWeek, ",")
+	dayNums := make([]string, len(dayAbbrs))
+	for i, abbr := range dayAbbrs {
+		dayNums[i] = dayAbbrToNum[strings.ToLower(strings.TrimSpace(abbr))]
+	}
+
+	return fmt.Sprintf("%s %s * * %s", minute, hour, strings.Join(dayNums, ","))
+}
+
+func cronToDaysAndTime(cronExpr string) (string, string) {
+	parts := strings.Split(cronExpr, " ")
+	if len(parts) < 5 {
+		return "", ""
+	}
+
+	hour := parts[1]
+	minute := parts[0]
+	dayNums := strings.Split(parts[4], ",")
+
+	timeOfDay := fmt.Sprintf("%s:%s", hour, minute)
+
+	dayAbbrs := make([]string, len(dayNums))
+	for i, num := range dayNums {
+		dayAbbrs[i] = dayNumToAbbr[strings.TrimSpace(num)]
+	}
+
+	return strings.Join(dayAbbrs, ","), timeOfDay
+}
+
+func routineToResponse(r sqlcgen.Routine) RoutineResponse {
+	daysOfWeek, timeOfDay := cronToDaysAndTime(r.CronExpr)
+	return RoutineResponse{
+		ID:        r.ID,
+		UserID:    r.UserID,
+		Type:      r.Type,
+		DaysOfWeek: daysOfWeek,
+		TimeOfDay: timeOfDay,
+		Enabled:   r.Enabled,
+		CreatedAt: r.CreatedAt,
+		UpdatedAt: r.UpdatedAt,
+		Name:      r.Name,
+		LastRunAt: r.LastRunAt,
+		BriefType: r.BriefType,
+	}
 }
 
 func RegisterRoutes(api *echo.Group, h *Handler) {

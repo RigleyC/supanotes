@@ -181,17 +181,6 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// Notes
 	notesRepo := notes.NewRepository(queries)
 	notesSvc := notes.NewService(notesRepo)
-	notesH := notes.NewHandler(notesSvc)
-	protected.POST("/notes", notesH.Create)
-	protected.GET("/notes", notesH.List)
-	protected.GET("/notes/:id", notesH.Get)
-	protected.PATCH("/notes/:id", notesH.Update)
-	protected.DELETE("/notes/:id", notesH.Delete)
-
-	protected.GET("/notes/inbox", notesH.GetInbox)
-	protected.POST("/notes/inbox/append", notesH.AppendToInbox)
-	protected.POST("/notes/inbox/organize/plan", notesH.PlanOrganization)
-	protected.POST("/notes/inbox/organize/apply", notesH.ApplyOrganization)
 
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
@@ -237,6 +226,19 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	// LLM Factory
 	llmFactory := llm.NewFactory(cfg)
+
+	// Notes (needs llmFactory for inbox organization)
+	notesH := notes.NewHandler(notesSvc, llmFactory.For(llm.TaskTypeInboxOrganize))
+	protected.POST("/notes", notesH.Create)
+	protected.GET("/notes", notesH.List)
+	protected.GET("/notes/:id", notesH.Get)
+	protected.PATCH("/notes/:id", notesH.Update)
+	protected.DELETE("/notes/:id", notesH.Delete)
+
+	protected.GET("/notes/inbox", notesH.GetInbox)
+	protected.POST("/notes/inbox/append", notesH.AppendToInbox)
+	protected.POST("/notes/inbox/organize/plan", notesH.PlanOrganization)
+	protected.POST("/notes/inbox/organize/apply", notesH.ApplyOrganization)
 
 	// Agent Context Builder
 	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc, memoriesRepo, embeddingClient)

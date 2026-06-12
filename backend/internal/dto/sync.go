@@ -50,7 +50,19 @@ type SyncTaskCompletion struct {
 	ID          string `json:"id"`
 	TaskID      string `json:"task_id"`
 	CompletedAt string `json:"completed_at"`
-	Status      string `json:"status"`
+	DueDate     string `json:"due_date"`
+}
+
+type SyncNoteTag struct {
+	NoteID string `json:"note_id"`
+	TagID  string `json:"tag_id"`
+}
+
+type SyncNoteLink struct {
+	ID       string `json:"id"`
+	SourceID string `json:"source_id"`
+	TargetID string `json:"target_id"`
+	Relation string `json:"relation"`
 }
 
 type SyncPayload struct {
@@ -59,4 +71,6 @@ type SyncPayload struct {
 	Contexts        []SyncContext        `json:"contexts"`
 	Tags            []SyncTag            `json:"tags"`
 	TaskCompletions []SyncTaskCompletion `json:"task_completions"`
+	NoteTags        []SyncNoteTag        `json:"note_tags"`
+	NoteLinks       []SyncNoteLink       `json:"note_links"`
 }

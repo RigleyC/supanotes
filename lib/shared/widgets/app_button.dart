@@ -32,29 +32,27 @@ class AppButton extends StatelessWidget {
           )
         : Text(text);
 
-    final size = Size(width ?? double.infinity, 48);
+    const size = Size(0, 48);
 
-    switch (variant) {
-      case AppButtonVariant.primary:
-        return FilledButton(
+    return SizedBox(
+      width: width ?? double.infinity,
+      child: switch (variant) {
+        AppButtonVariant.primary => FilledButton(
           onPressed: isLoading ? null : onPressed,
           style: FilledButton.styleFrom(minimumSize: size),
           child: child,
-        );
-      case AppButtonVariant.secondary:
-        return OutlinedButton(
+        ),
+        AppButtonVariant.secondary => OutlinedButton(
           onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(minimumSize: size),
           child: child,
-        );
-      case AppButtonVariant.tonal:
-        return FilledButton.tonal(
+        ),
+        AppButtonVariant.tonal => FilledButton.tonal(
           onPressed: isLoading ? null : onPressed,
           style: FilledButton.styleFrom(minimumSize: size),
           child: child,
-        );
-      case AppButtonVariant.danger:
-        return FilledButton(
+        ),
+        AppButtonVariant.danger => FilledButton(
           onPressed: isLoading ? null : onPressed,
           style: FilledButton.styleFrom(
             minimumSize: size,
@@ -62,8 +60,9 @@ class AppButton extends StatelessWidget {
             foregroundColor: scheme.onError,
           ),
           child: child,
-        );
-    }
+        ),
+      },
+    );
   }
 
   Color _foregroundColor(ColorScheme scheme) {

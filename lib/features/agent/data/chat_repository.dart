@@ -90,6 +90,6 @@ class ChatRepository implements IChatRepository {
   }
 }
 
-final chatRepositoryProvider = Provider<IChatRepository>((ref) {
+final chatRepositoryProvider = Provider.autoDispose<IChatRepository>((ref) {
   return ChatRepository(apiClient: ref.watch(apiClientProvider));
 });

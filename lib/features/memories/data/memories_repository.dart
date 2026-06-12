@@ -91,6 +91,6 @@ class MemoriesRepository implements IMemoriesRepository {
   }
 }
 
-final memoriesRepositoryProvider = Provider<IMemoriesRepository>((ref) {
+final memoriesRepositoryProvider = Provider.autoDispose<IMemoriesRepository>((ref) {
   return MemoriesRepository(apiClient: ref.watch(apiClientProvider));
 });

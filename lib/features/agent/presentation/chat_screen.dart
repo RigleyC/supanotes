@@ -55,8 +55,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     ref.listen<ChatState>(chatControllerProvider, (prev, next) {
       final messageCountChanged = prev?.messages.length != next.messages.length;
-      final loadingChanged = prev?.isLoading != next.isLoading;
-      if (messageCountChanged || loadingChanged) {
+      final streamingChanged = prev?.streaming != next.streaming;
+      if (messageCountChanged || streamingChanged) {
         _scrollToBottom();
       }
       if (next.error != null && next.error != prev?.error) {
@@ -65,7 +65,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     final state = ref.watch(chatControllerProvider);
-    final isLoading = state.isLoading;
 
     return Scaffold(
       appBar: AppBar(
@@ -77,10 +76,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: Column(
           children: <Widget>[
             Expanded(
-              child: _buildBody(state, isLoading),
+              child: _buildBody(state),
             ),
             ChatInput(
-              enabled: !isLoading,
+              enabled: !state.streaming,
               onSend: (text) =>
                   ref.read(chatControllerProvider.notifier).sendMessage(text),
             ),
@@ -90,21 +89,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildBody(ChatState state, bool isLoading) {
-    if (state.messages.isEmpty && !isLoading) {
+  Widget _buildBody(ChatState state) {
+    if (state.messages.isEmpty && state.loaded) {
       return const EmptyState(
         icon: Icons.chat_bubble_outline,
         title: 'Comece uma conversa',
         subtitle: 'Pergunte algo ao agent e a resposta aparecerá aqui.',
       );
     }
-    if (state.messages.isEmpty && isLoading) {
+    if (state.messages.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      itemCount: state.messages.length + (isLoading ? 1 : 0),
+      itemCount: state.messages.length + (state.streaming ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == state.messages.length) {
           return const TypingIndicator();

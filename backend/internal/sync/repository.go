@@ -19,6 +19,10 @@ type Repository interface {
 	UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error)
 	GetSyncTaskCompletions(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.TaskCompletion, error)
 	UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error
+	GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error)
+	UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error
+	GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error)
+	UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error
 	WithQuerier(q sqlcgen.Querier) Repository
 }
 
@@ -88,6 +92,22 @@ func (r *repo) GetSyncTaskCompletions(ctx context.Context, userID pgtype.UUID, l
 		LastSyncedAt: lastSyncedAt,
 		Limit:        limit,
 	})
+}
+
+func (r *repo) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
+	return r.q.GetSyncNoteTags(ctx, sqlcgen.GetSyncNoteTagsParams{UserID: userID})
+}
+
+func (r *repo) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error {
+	return r.q.UpsertNoteTag(ctx, arg)
+}
+
+func (r *repo) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error) {
+	return r.q.GetSyncNoteLinks(ctx, sqlcgen.GetSyncNoteLinksParams{UserID: userID})
+}
+
+func (r *repo) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
+	return r.q.UpsertNoteLink(ctx, arg)
 }
 
 func (r *repo) WithQuerier(q sqlcgen.Querier) Repository {

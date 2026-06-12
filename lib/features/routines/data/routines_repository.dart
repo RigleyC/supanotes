@@ -197,6 +197,6 @@ class RoutinesRepository implements IRoutinesRepository {
 /// Single shared [RoutinesRepository] wired to the app-wide
 /// [apiClientProvider]. Reading this provider is the entry point used
 /// by every routines widget.
-final routinesRepositoryProvider = Provider<IRoutinesRepository>((ref) {
+final routinesRepositoryProvider = Provider.autoDispose<IRoutinesRepository>((ref) {
   return RoutinesRepository(apiClient: ref.watch(apiClientProvider));
 });

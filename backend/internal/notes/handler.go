@@ -1,6 +1,8 @@
 package notes
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
+	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -56,11 +59,12 @@ type NoteResponse struct {
 }
 
 type Handler struct {
-	svc *Service
+	svc       *Service
+	llmClient llm.Client
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, llmClient llm.Client) *Handler {
+	return &Handler{svc: svc, llmClient: llmClient}
 }
 
 func (h *Handler) Create(c echo.Context) error {
@@ -283,40 +287,46 @@ type ApplyOrganizationResponse struct {
 	Status string `json:"status"`
 }
 
-func splitInboxItems(noteID pgtype.UUID, content string) []PlanOrganizationItem {
-	lines := strings.Split(content, "\n\n")
-	var items []PlanOrganizationItem
-	if len(lines) <= 1 {
-		trimmed := strings.TrimSpace(content)
-		if trimmed != "" {
-			items = append(items, PlanOrganizationItem{
-				ItemID:          uid.UUIDToString(noteID) + "-keep",
-				OriginalSnippet: trimmed,
-				DestinationType: DestKeep,
-				Accepted:        true,
-			})
-		}
-		return items
+type llmPlanItem struct {
+	Snippet     string `json:"snippet"`
+	Destination string `json:"destination"`
+	Title       string `json:"title,omitempty"`
+}
+
+func (h *Handler) planWithLLM(ctx context.Context, noteContent string) ([]llmPlanItem, error) {
+	systemPrompt := `Você é um organizador de notas. Analise o conteúdo do inbox abaixo e organize cada item.
+
+O inbox contém várias anotações separadas por linhas em branco. Para cada anotação, decida o destino:
+- "new_note": virar uma nova nota → forneça um título descritivo curto
+- "keep": permanecer no inbox (anotações vagas, lembretes rápidos, ideas não desenvolvidas)
+
+Responda APENAS com um JSON array válido. Exemplo:
+[{"snippet": "primeira anotação", "destination": "new_note", "title": "Título Descritivo"},
+ {"snippet": "segunda anotação", "destination": "keep"}]`
+
+	resp, err := h.llmClient.Complete(ctx, llm.Request{
+		System: systemPrompt,
+		Messages: []llm.Message{
+			{Role: llm.RoleUser, Content: "Aqui está meu inbox:\n\n" + noteContent},
+		},
+		MaxTokens:   2000,
+		Temperature: 0.3,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("llm planning failed: %w", err)
 	}
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		itemID := fmt.Sprintf("%s-%d", uid.UUIDToString(noteID), i)
-		snippet := trimmed
-		if len(snippet) > 100 {
-			snippet = snippet[:100] + "..."
-		}
-		items = append(items, PlanOrganizationItem{
-			ItemID:           itemID,
-			OriginalSnippet:  snippet,
-			DestinationType:  DestNewNote,
-			DestinationTitle: ptr(fmt.Sprintf("Nota %d", i+1)),
-			Accepted:         true,
-		})
+
+	content := strings.TrimSpace(resp.Content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var planItems []llmPlanItem
+	if err := json.Unmarshal([]byte(content), &planItems); err != nil {
+		return nil, fmt.Errorf("failed to parse llm plan: %w", err)
 	}
-	return items
+	return planItems, nil
 }
 
 func (h *Handler) PlanOrganization(c echo.Context) error {
@@ -334,9 +344,40 @@ func (h *Handler) PlanOrganization(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get inbox note")
 	}
 
-	items := splitInboxItems(note.ID, note.Content)
-	if items == nil {
-		items = []PlanOrganizationItem{}
+	llmItems, err := h.planWithLLM(c.Request().Context(), note.Content)
+	if err != nil {
+		c.Logger().Errorf("ai planning failed, falling back to mechanical split: %v", err)
+		llmItems = h.fallbackPlan(note.Content)
+	}
+
+	items := make([]PlanOrganizationItem, 0, len(llmItems))
+	noteIDStr := uid.UUIDToString(note.ID)
+
+	snippetIndex := 0
+
+	for _, li := range llmItems {
+		trimmedSnippet := strings.TrimSpace(li.Snippet)
+		if trimmedSnippet == "" {
+			continue
+		}
+		itemID := fmt.Sprintf("%s-%d", noteIDStr, snippetIndex)
+		snippetIndex++
+
+		displaySnippet := trimmedSnippet
+		if len(displaySnippet) > 150 {
+			displaySnippet = displaySnippet[:150] + "..."
+		}
+
+		item := PlanOrganizationItem{
+			ItemID:          itemID,
+			OriginalSnippet: displaySnippet,
+			DestinationType: li.Destination,
+			Accepted:        true,
+		}
+		if li.Destination == DestNewNote && li.Title != "" {
+			item.DestinationTitle = &li.Title
+		}
+		items = append(items, item)
 	}
 
 	planID := uuid.New().String()
@@ -344,6 +385,31 @@ func (h *Handler) PlanOrganization(c echo.Context) error {
 		PlanID: planID,
 		Items:  items,
 	})
+}
+
+func (h *Handler) fallbackPlan(noteContent string) []llmPlanItem {
+	lines := strings.Split(noteContent, "\n\n")
+	var items []llmPlanItem
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		items = append(items, llmPlanItem{
+			Snippet:     trimmed,
+			Destination: DestNewNote,
+		})
+	}
+	if len(items) == 0 {
+		trimmed := strings.TrimSpace(noteContent)
+		if trimmed != "" {
+			items = append(items, llmPlanItem{
+				Snippet:     trimmed,
+				Destination: DestKeep,
+			})
+		}
+	}
+	return items
 }
 
 func (h *Handler) ApplyOrganization(c echo.Context) error {

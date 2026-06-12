@@ -4,7 +4,7 @@ import '../../../../core/auth/current_user.dart';
 import '../../../../core/database/database.dart';
 import '../../../../core/database/daos/tasks_dao.dart';
 
-final tasksLocalRepositoryProvider = Provider<TasksLocalRepository>((ref) {
+final tasksLocalRepositoryProvider = Provider.autoDispose<TasksLocalRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) {

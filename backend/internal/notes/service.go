@@ -215,12 +215,18 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 		}
 	}
 
-	originalItems := splitInboxItems(inbox.ID, inbox.Content)
+	noteIDStr := uid.UUIDToString(inbox.ID)
+	lines := strings.Split(inbox.Content, "\n\n")
 	var keptLines []string
-	for _, orig := range originalItems {
-		reqItem, isOutgoing := outgoing[orig.ItemID]
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		itemID := fmt.Sprintf("%s-%d", noteIDStr, i)
+		reqItem, isOutgoing := outgoing[itemID]
 		if !isOutgoing || reqItem.DestinationType == DestKeep {
-			keptLines = append(keptLines, orig.OriginalSnippet)
+			keptLines = append(keptLines, trimmed)
 		}
 	}
 	newContent := strings.Join(keptLines, "\n\n")

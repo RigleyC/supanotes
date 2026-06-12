@@ -34,20 +34,16 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to `3` — the v2 wave added the
-  /// `local_note_tags` and `local_task_completions` tables, the
-  /// `updated_at` column on `tags`, and the `completed_at` column on
-  /// `tasks`; v3 adds the `has_remote_copy` column on `notes`.
+  /// Latest schema version. Bumped to `4` — v4 adds the `note_links`
+  /// table for cross-note references.
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
           if (from < 2) {
-            // v1 → v2: introduce the v2-only tables and add the
-            // missing columns on existing tables.
             await m.createTable(localNoteTags);
             await m.createTable(localTaskCompletions);
             await m.addColumn(tags, tags.updatedAt);
@@ -55,6 +51,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 3) {
             await m.addColumn(notes, notes.hasRemoteCopy);
+          }
+          if (from < 4) {
+            await m.createTable(noteLinks);
           }
         },
       );

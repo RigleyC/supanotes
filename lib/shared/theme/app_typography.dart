@@ -17,7 +17,7 @@ class AppTypography {
   // Font family
   // ---------------------------------------------------------------------------
 
-  static const String fontFamily = 'Inter';
+ // static const String fontFamily = 'Inter';
 
   /// Monospace style for inline code and code blocks.
   static TextStyle get codeStyle => const TextStyle(
@@ -78,7 +78,7 @@ class AppTypography {
   static final TextTheme textTheme = _buildTextTheme();
 
   static TextTheme _buildTextTheme() {
-    final base = GoogleFonts.interTextTheme();
+    final base = GoogleFonts.bricolageGrotesqueTextTheme();
     return base.copyWith(
       displayLarge: base.displayLarge?.copyWith(
         fontSize: displayLargeSize,

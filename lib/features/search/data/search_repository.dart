@@ -75,6 +75,6 @@ class SearchRepository implements ISearchRepository {
 
 /// Single shared [SearchRepository] wired to the app-wide
 /// [apiClientProvider].
-final searchRepositoryProvider = Provider<ISearchRepository>((ref) {
+final searchRepositoryProvider = Provider.autoDispose<ISearchRepository>((ref) {
   return SearchRepository(apiClient: ref.watch(apiClientProvider));
 });

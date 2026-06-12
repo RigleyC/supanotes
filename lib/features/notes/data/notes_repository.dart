@@ -295,7 +295,7 @@ class NotesRepository implements INotesRepository {
 /// Riverpod entry point for the feature-level [NotesRepository]. Reads
 /// [notesLocalRepositoryProvider] which already gates on the signed-in
 /// user, so this provider is itself safe to read only when authenticated.
-final notesRepositoryProvider = Provider<INotesRepository>((ref) {
+final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   final local = ref.watch(notesLocalRepositoryProvider);
   final tasksLocal = ref.watch(tasksLocalRepositoryProvider);
   return NotesRepository(local, tasksLocal);

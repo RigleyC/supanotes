@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "307443296345",
+    "project_id": "supanotes-2bb99",
+    "storage_bucket": "supanotes-2bb99.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:307443296345:android:51cc478b9c085021006948",
+        "android_client_info": {
+          "package_name": "com.example.supanotes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3C5hXWmRWNQQrGn1SjxHYmbnEHI31c48"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

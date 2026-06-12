@@ -55,6 +55,6 @@ class InboxOrganizeRepository {
   }
 }
 
-final inboxOrganizeRepositoryProvider = Provider<InboxOrganizeRepository>((ref) {
+final inboxOrganizeRepositoryProvider = Provider.autoDispose<InboxOrganizeRepository>((ref) {
   return InboxOrganizeRepository(apiClient: ref.watch(apiClientProvider));
 });

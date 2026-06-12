@@ -245,3 +245,15 @@ func (m *mockQuerier) UpsertTaskCompletion(_ context.Context, _ sqlcgen.UpsertTa
 func (m *mockQuerier) GetSyncTaskCompletions(_ context.Context, _ sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
 	return nil, nil
 }
+func (m *mockQuerier) GetSyncNoteTags(_ context.Context, _ sqlcgen.GetSyncNoteTagsParams) ([]sqlcgen.NoteTag, error) {
+	return nil, nil
+}
+func (m *mockQuerier) UpsertNoteTag(_ context.Context, _ sqlcgen.UpsertNoteTagParams) error {
+	return nil
+}
+func (m *mockQuerier) GetSyncNoteLinks(_ context.Context, _ sqlcgen.GetSyncNoteLinksParams) ([]sqlcgen.NoteLink, error) {
+	return nil, nil
+}
+func (m *mockQuerier) UpsertNoteLink(_ context.Context, _ sqlcgen.UpsertNoteLinkParams) error {
+	return nil
+}

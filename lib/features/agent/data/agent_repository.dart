@@ -55,6 +55,6 @@ class AgentRepository {
 }
 
 /// Single shared [AgentRepository] wired to the app-wide [apiClientProvider].
-final agentRepositoryProvider = Provider<AgentRepository>((ref) {
+final agentRepositoryProvider = Provider.autoDispose<AgentRepository>((ref) {
   return AgentRepository(apiClient: ref.watch(apiClientProvider));
 });

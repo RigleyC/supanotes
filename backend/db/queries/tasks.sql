@@ -14,6 +14,7 @@ SET title = COALESCE(sqlc.narg('title'), title),
     due_date = COALESCE(sqlc.narg('due_date'), due_date),
     recurrence = COALESCE(sqlc.narg('recurrence'), recurrence),
     position = COALESCE(sqlc.narg('position'), position),
+    completed_at = COALESCE(sqlc.narg('completed_at'), completed_at),
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 RETURNING *;
@@ -49,8 +50,8 @@ WHERE user_id = $1 AND note_id = $2 AND deleted_at IS NULL
 ORDER BY position ASC, created_at ASC;
 
 -- name: CreateTaskCompletion :one
-INSERT INTO task_completions (task_id, status)
-VALUES ($1, $2)
+INSERT INTO task_completions (task_id, completed_at, due_date)
+VALUES ($1, NOW(), $2)
 RETURNING *;
 
 -- name: CountTasks :one
@@ -60,4 +61,4 @@ SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL;
 SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open';
 
 -- name: CountCompletedTasks :one
-SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'completed';
+SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'done';

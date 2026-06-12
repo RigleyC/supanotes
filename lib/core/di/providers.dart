@@ -117,4 +117,4 @@ final authControllerProvider =
 // Database DAOs
 // ---------------------------------------------------------------------------
 
-final tagsDaoProvider = Provider((ref) => ref.watch(appDatabaseProvider).tagsDao);
+final tagsDaoProvider = Provider.autoDispose((ref) => ref.watch(appDatabaseProvider).tagsDao);

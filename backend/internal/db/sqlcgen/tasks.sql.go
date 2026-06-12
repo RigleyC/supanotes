@@ -12,7 +12,7 @@ import (
 )
 
 const countCompletedTasks = `-- name: CountCompletedTasks :one
-SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'completed'
+SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'done'
 `
 
 func (q *Queries) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
@@ -86,24 +86,24 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 }
 
 const createTaskCompletion = `-- name: CreateTaskCompletion :one
-INSERT INTO task_completions (task_id, status)
-VALUES ($1, $2)
-RETURNING id, task_id, completed_at, status
+INSERT INTO task_completions (task_id, completed_at, due_date)
+VALUES ($1, NOW(), $2)
+RETURNING id, task_id, completed_at, due_date
 `
 
 type CreateTaskCompletionParams struct {
-	TaskID pgtype.UUID `json:"task_id"`
-	Status string      `json:"status"`
+	TaskID  pgtype.UUID `json:"task_id"`
+	DueDate pgtype.Date `json:"due_date"`
 }
 
 func (q *Queries) CreateTaskCompletion(ctx context.Context, arg CreateTaskCompletionParams) (TaskCompletion, error) {
-	row := q.db.QueryRow(ctx, createTaskCompletion, arg.TaskID, arg.Status)
+	row := q.db.QueryRow(ctx, createTaskCompletion, arg.TaskID, arg.DueDate)
 	var i TaskCompletion
 	err := row.Scan(
 		&i.ID,
 		&i.TaskID,
 		&i.CompletedAt,
-		&i.Status,
+		&i.DueDate,
 	)
 	return i, err
 }
@@ -312,19 +312,21 @@ SET title = COALESCE($3, title),
     due_date = COALESCE($5, due_date),
     recurrence = COALESCE($6, recurrence),
     position = COALESCE($7, position),
+    completed_at = COALESCE($8, completed_at),
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at
 `
 
 type UpdateTaskParams struct {
-	ID         pgtype.UUID        `json:"id"`
-	UserID     pgtype.UUID        `json:"user_id"`
-	Title      pgtype.Text        `json:"title"`
-	Status     pgtype.Text        `json:"status"`
-	DueDate    pgtype.Timestamptz `json:"due_date"`
-	Recurrence pgtype.Text        `json:"recurrence"`
-	Position   pgtype.Int4        `json:"position"`
+	ID          pgtype.UUID        `json:"id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	Title       pgtype.Text        `json:"title"`
+	Status      pgtype.Text        `json:"status"`
+	DueDate     pgtype.Timestamptz `json:"due_date"`
+	Recurrence  pgtype.Text        `json:"recurrence"`
+	Position    pgtype.Int4        `json:"position"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error) {
@@ -336,6 +338,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		arg.DueDate,
 		arg.Recurrence,
 		arg.Position,
+		arg.CompletedAt,
 	)
 	var i Task
 	err := row.Scan(
