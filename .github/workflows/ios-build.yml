@@ -232,6 +232,10 @@ jobs:
               fi
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
             else
+              echo "Regenerating Flutter iOS configuration to fix SPM plugin deployment target..."
+              cd "${GITHUB_WORKSPACE}/${FLUTTER_PATH}"
+              flutter build ios --config-only --no-codesign || true
+              
               echo "Building Flutter iOS ($CONFIGURATION) via xcodebuild (unsigned)..."
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
 
