@@ -64,6 +64,7 @@ dependencies:
 
   # UI
   cue: ^0.1.0
+  adaptive_platform_ui: ^0.1.107
   flutter_staggered_grid_view: ^0.7.0
   flutter_svg: ^2.0.17
 
@@ -73,8 +74,6 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
 
-  # Native splash screen
-  flutter_native_splash: ^2.4.8
 
   # Code generation
   build_runner: ^2.4.13
