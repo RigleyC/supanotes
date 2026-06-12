@@ -3,7 +3,7 @@ name: iOS Build
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
     inputs:
       build_id:
@@ -35,11 +35,11 @@ on:
         required: false
         type: string
         default: '3.44.1'
-      server_url:
-        description: 'Backend base URL passed to Flutter as --dart-define=SERVER_URL'
+      api_base_url:
+        description: 'Backend base URL passed to Flutter as --dart-define=API_BASE_URL'
         required: false
         type: string
-        default: ''
+        default: 'https://backend-winter-waterfall-5807.fly.dev/api/v1'
 
 jobs:
   build:
@@ -173,7 +173,7 @@ jobs:
           PROJECT_TYPE: ${{ steps.detect.outputs.type }}
           USE_SIGNING: ${{ inputs.use_signing || false }}
           CONFIGURATION: ${{ inputs.configuration || 'Release' }}
-          SERVER_URL: ${{ inputs.server_url || '' }}
+          API_BASE_URL: ${{ inputs.api_base_url || 'https://backend-winter-waterfall-5807.fly.dev/api/v1' }}
         run: |
           set -e
 
@@ -217,8 +217,8 @@ jobs:
             if [ "$USE_SIGNING" = "true" ]; then
               cd "${GITHUB_WORKSPACE}/${FLUTTER_PATH}"
               FLUTTER_BUILD_ARGS=()
-              if [ -n "$SERVER_URL" ]; then
-                FLUTTER_BUILD_ARGS+=(--dart-define=SERVER_URL="$SERVER_URL")
+              if [ -n "$API_BASE_URL" ]; then
+                FLUTTER_BUILD_ARGS+=(--dart-define=API_BASE_URL="$API_BASE_URL")
               fi
               if [ "$CONFIGURATION" = "Debug" ]; then
                 echo "Building Flutter iOS Debug (signed)..."
@@ -247,8 +247,8 @@ jobs:
               BUILD_CMD="$BUILD_CMD DEVELOPMENT_TEAM=\"\""
               BUILD_CMD="$BUILD_CMD COMPILER_INDEX_STORE_ENABLE=NO"
 
-              if [ -n "$SERVER_URL" ]; then
-                BUILD_CMD="$BUILD_CMD FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS=\"--dart-define=SERVER_URL=$SERVER_URL\""
+              if [ -n "$API_BASE_URL" ]; then
+                BUILD_CMD="$BUILD_CMD FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS=\"--dart-define=API_BASE_URL=$API_BASE_URL\""
               fi
 
               BUILD_CMD="$BUILD_CMD build"
