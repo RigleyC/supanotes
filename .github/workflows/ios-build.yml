@@ -232,15 +232,17 @@ jobs:
               fi
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
             else
-              echo "Regenerating Flutter iOS configuration to fix SPM plugin deployment target..."
+              echo "Building Flutter iOS to guarantee Dart code compilation (ignoring signing errors)..."
               cd "${GITHUB_WORKSPACE}/${FLUTTER_PATH}"
               FLUTTER_BUILD_ARGS=()
               if [ -n "$API_BASE_URL" ]; then
                 FLUTTER_BUILD_ARGS+=(--dart-define=API_BASE_URL="$API_BASE_URL")
               fi
-              flutter build ios --config-only --no-codesign "${FLUTTER_BUILD_ARGS[@]}" || true
+              # Run full release build to force 'flutter assemble' to generate App.framework.
+              # It will fail at the end due to lack of signing certificates, but that's expected.
+              flutter build ios --release "${FLUTTER_BUILD_ARGS[@]}" || true
               
-              echo "Building Flutter iOS ($CONFIGURATION) via xcodebuild (unsigned)..."
+              echo "Packaging unsigned IPA via xcodebuild..."
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
 
               BUILD_CMD="xcodebuild"
