@@ -335,6 +335,7 @@ WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.id != ALL($1::uuid[])
   AND n.user_id = $2
   AND n.deleted_at IS NULL
+  AND n.is_inbox = false
 LIMIT 5
 `
 

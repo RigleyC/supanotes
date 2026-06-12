@@ -11,7 +11,6 @@ abstract final class AppRoutes {
   static const routinesLogs = '/routines/logs';
   static const telegram = '/telegram';
   static const chat = '/chat';
-  static const search = '/search';
   static const memories = '/memories';
 
   static const _noteBase = '/notes';

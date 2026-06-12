@@ -16,7 +16,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           ..where(_nonEmptyNote)
           ..orderBy([
             (t) =>
-                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)
+                OrderingTerm(expression: t.favorite, mode: OrderingMode.desc),
+            (t) =>
+                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
           ]))
         .watch();
   }

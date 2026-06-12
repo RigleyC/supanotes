@@ -49,7 +49,7 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       final store = LastRouteStore(prefs);
 
-      await store.save(AppRoutes.search);
+      await store.save(AppRoutes.settings);
       await store.clear();
 
       expect(store.initialLocation(), AppRoutes.splash);

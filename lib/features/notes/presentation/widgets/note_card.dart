@@ -65,8 +65,17 @@ class NoteCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                const Spacer(),
+                if (note.favorite)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(
+                      Icons.star_rate_rounded,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
+                  ),
                 PopupMenuButton<_NoteCardAction>(
                   padding: EdgeInsets.zero,
                   icon: const Icon(Icons.more_vert_rounded),

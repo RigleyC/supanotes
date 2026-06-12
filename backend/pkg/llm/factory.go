@@ -19,39 +19,51 @@ type Factory interface {
 }
 
 type factory struct {
-	anthropic     Client
+	agent         Client
 	generate      Client
 	inboxOrganize Client
 }
 
 func NewFactory(cfg *config.Config) Factory {
-	anthropicBase := NewAnthropicClient(cfg.AnthropicAPIKey)
-	anthropicWithRetry := WithRetry(anthropicBase, 3)
+	var agentClient Client
+	if cfg.AgentBaseURL != "" {
+		apiKey := cfg.AgentAPIKey
+		if apiKey == "" {
+			apiKey = cfg.AnthropicAPIKey
+		}
+		model := defaultIfEmpty(cfg.AgentModel, "gpt-4o")
+		agentBase := NewOpenAICompatClient(apiKey, cfg.AgentBaseURL, model)
+		agentClient = WithRetry(agentBase, 3)
+	} else {
+		anthropicBase := NewAnthropicClient(cfg.AnthropicAPIKey)
+		agentClient = WithRetry(anthropicBase, 3)
+	}
 
-	generateBase := NewOpenAICompatClient(cfg.DeepSeekAPIKey, "https://api.deepseek.com/v1/chat/completions", "deepseek-chat")
-	generateWithRetry := WithRetry(generateBase, 3)
-
-	// Inbox-organize uses the OpenAI-compatible client configured via
-	// env. Both key fields fall back to a no-op "mock" path in
-	// openai_compat.go so leaving them empty is safe in dev.
-	openAICompatBase := NewOpenAICompatClient(
-		cfg.OpenAIAPIKey,
-		defaultIfEmpty(cfg.OpenAICompatBaseURL, "https://api.openai.com/v1/chat/completions"),
-		defaultIfEmpty(cfg.OpenAICompatModel, "gpt-4o-mini"),
+	briefBase := NewOpenAICompatClient(
+		cfg.DeepSeekAPIKey,
+		defaultIfEmpty(cfg.BriefBaseURL, "https://api.deepseek.com/v1/chat/completions"),
+		defaultIfEmpty(cfg.BriefModel, "deepseek-chat"),
 	)
-	openAICompatWithRetry := WithRetry(openAICompatBase, 3)
+	briefWithRetry := WithRetry(briefBase, 3)
+
+	organizeBase := NewOpenAICompatClient(
+		cfg.OpenAIAPIKey,
+		defaultIfEmpty(cfg.OrganizeBaseURL, "https://api.openai.com/v1/chat/completions"),
+		defaultIfEmpty(cfg.OrganizeModel, "gpt-4o-mini"),
+	)
+	organizeWithRetry := WithRetry(organizeBase, 3)
 
 	return &factory{
-		anthropic:     anthropicWithRetry,
-		generate:      generateWithRetry,
-		inboxOrganize: openAICompatWithRetry,
+		agent:         agentClient,
+		generate:      briefWithRetry,
+		inboxOrganize: organizeWithRetry,
 	}
 }
 
 func (f *factory) For(task TaskType) Client {
 	switch task {
 	case TaskTypeAgentic:
-		return f.anthropic
+		return f.agent
 	case TaskTypeInboxOrganize:
 		return f.inboxOrganize
 	default:

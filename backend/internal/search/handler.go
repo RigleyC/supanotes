@@ -18,7 +18,6 @@ func NewHandler(svc *Service) *Handler {
 
 type SearchRequest struct {
 	Query string `json:"query" validate:"required"`
-	Mode  string `json:"mode"`
 	Limit int32  `json:"limit"`
 }
 
@@ -33,16 +32,12 @@ func (h *Handler) HandleSearch(c echo.Context) error {
 		return err
 	}
 
-	mode := req.Mode
-	if mode == "" {
-		mode = "hybrid"
-	}
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 10
 	}
 
-	results, err := h.svc.Search(c.Request().Context(), userID, req.Query, mode, limit)
+	results, err := h.svc.Search(c.Request().Context(), userID, req.Query, limit)
 	if err != nil {
 		return web.JSONError(c, http.StatusInternalServerError, err.Error())
 	}

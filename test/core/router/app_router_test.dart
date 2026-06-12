@@ -282,11 +282,11 @@ void main() {
     await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
-    router.go(AppRoutes.search);
+    router.go(AppRoutes.settings);
     await settleRedirect(tester);
 
     final store = container.read(lastRouteStoreProvider);
-    expect(store.initialLocation(), AppRoutes.search);
+    expect(store.initialLocation(), AppRoutes.settings);
   });
 
   testWidgets('router does not persist login or register routes', (tester) async {

@@ -45,7 +45,10 @@ class NoteListRow extends StatelessWidget {
         child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
       ),
       confirmDismiss: (direction) async {
-        if (direction != DismissDirection.endToStart) return true;
+        if (direction == DismissDirection.startToEnd) {
+          onToggleFavorite();
+          return false;
+        }
         final confirmed = await showConfirmDialog(
           context: context,
           title: 'Apagar nota?',
@@ -55,9 +58,6 @@ class NoteListRow extends StatelessWidget {
         );
         if (confirmed) onDelete();
         return confirmed;
-      },
-      onDismissed: (direction) {
-        if (direction == DismissDirection.startToEnd) onToggleFavorite();
       },
       child: InkWell(
         splashColor: Colors.transparent,

@@ -271,27 +271,24 @@ func (h *Handler) respond(_ context.Context, chatID int64, text string) {
 	if h.bot == nil || !h.bot.IsEnabled() {
 		return
 	}
+	placeholder, err := h.bot.SendMessage(chatID, "Pensando...")
+	if err != nil {
+		log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram placeholder failed")
+		return
+	}
 	if len(text) > 4096 {
-		for i := 0; i < len(text); i += 4096 {
+		if err := h.bot.EditMessageText(chatID, placeholder, text[:4096]); err != nil {
+			log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram edit first chunk failed")
+		}
+		for i := 4096; i < len(text); i += 4096 {
 			end := i + 4096
 			if end > len(text) {
 				end = len(text)
 			}
-			if i == 0 {
-				placeholder, err := h.bot.SendMessage(chatID, text[i:end])
-				if err != nil {
-					log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram send failed")
-				}
-				_ = placeholder
-			} else {
-				h.bot.SendMessage(chatID, text[i:end])
+			if _, err := h.bot.SendMessage(chatID, text[i:end]); err != nil {
+				log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram send chunk failed")
 			}
 		}
-		return
-	}
-	placeholder, err := h.bot.SendMessage(chatID, "Pensando...")
-	if err != nil {
-		log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram placeholder failed")
 		return
 	}
 	if err := h.bot.EditMessageText(chatID, placeholder, text); err != nil {

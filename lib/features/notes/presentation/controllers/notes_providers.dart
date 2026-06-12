@@ -11,14 +11,3 @@ final activeNotesProvider = StreamProvider.autoDispose<List<NoteModel>>((ref) {
   return ref.watch(notesRepositoryProvider).watchNotes();
 });
 
-final favoritesFilterProvider =
-    NotifierProvider.autoDispose<FavoritesFilterNotifier, bool>(
-  FavoritesFilterNotifier.new,
-);
-
-class FavoritesFilterNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  void toggle() => state = !state;
-}

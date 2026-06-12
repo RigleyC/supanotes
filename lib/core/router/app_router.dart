@@ -20,7 +20,6 @@ import 'package:supanotes/features/memories/presentation/memories_screen.dart';
 import 'package:supanotes/features/notes/presentation/inbox_screen.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
-import 'package:supanotes/features/search/presentation/search_screen.dart';
 import 'package:supanotes/features/settings/presentation/contexts_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart';
@@ -63,10 +62,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.chat,
         builder: (_, _) => const ChatScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.search,
-        builder: (_, _) => const SearchScreen(),
       ),
       GoRoute(
         path: AppRoutes.inbox,
@@ -112,7 +107,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 
-  void _onRouteChanged() {
+  void onRouteChanged() {
     final authState = notifier.value;
     if (authState is! AsyncData<User?>) return;
     if (authState.value == null) return;
@@ -120,8 +115,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     unawaited(lastRouteStore.save(location));
   }
 
-  router.routerDelegate.addListener(_onRouteChanged);
-  ref.onDispose(() => router.routerDelegate.removeListener(_onRouteChanged));
+  router.routerDelegate.addListener(onRouteChanged);
+  ref.onDispose(() => router.routerDelegate.removeListener(onRouteChanged));
 
   return router;
 });

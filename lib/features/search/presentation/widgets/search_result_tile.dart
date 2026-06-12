@@ -1,18 +1,3 @@
-/// Card-styled row representing a single [SearchResultModel].
-///
-/// Composition:
-///   * **Title** — bold, single line, truncated with ellipsis.
-///   * **Excerpt** — two-line preview with every case-insensitive match
-///     of [query] painted on a yellow highlight strip via [RichText].
-///   * **Footer** — a coloured chip carrying the search mode and a
-///     sutile score read-out.
-///
-/// All visual choices come from the theme (`scheme.*` / `textTheme.*`)
-/// so the row picks up dark mode automatically. The highlight colour is
-/// intentionally hard-coded to a yellow tint because the design system
-/// does not yet expose a dedicated "highlight" token and Material's
-/// `tertiary` / `secondary` swatches would muddle with the chip behind
-/// it.
 library;
 
 import 'package:flutter/material.dart';
@@ -34,8 +19,6 @@ class SearchResultTile extends StatelessWidget {
   final VoidCallback onTap;
 
   static const _fallbackTitle = 'Sem título';
-
-  /// Highlight strip behind matching substrings.
 
   @override
   Widget build(BuildContext context) {
@@ -89,19 +72,6 @@ class SearchResultTile extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  _ModeBadge(mode: result.mode),
-                  const Spacer(),
-                  Text(
-                    'score ${result.score.toStringAsFixed(2)}',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -171,51 +141,4 @@ class _HighlightedText extends StatelessWidget {
   }
 }
 
-/// Coloured chip indicating which search strategy produced the hit.
-class _ModeBadge extends StatelessWidget {
-  const _ModeBadge({required this.mode});
 
-  final SearchMode mode;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    final (background, foreground, label) = switch (mode) {
-      SearchMode.fts => (
-          scheme.secondaryContainer,
-          scheme.onSecondaryContainer,
-          'FTS',
-        ),
-      SearchMode.semantic => (
-          scheme.tertiaryContainer,
-          scheme.onTertiaryContainer,
-          'Sem',
-        ),
-      SearchMode.hybrid => (
-          scheme.primaryContainer,
-          scheme.onPrimaryContainer,
-          'Híbrida',
-        ),
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
-      ),
-      child: Text(
-        label,
-        style: textTheme.labelSmall?.copyWith(
-          color: foreground,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}

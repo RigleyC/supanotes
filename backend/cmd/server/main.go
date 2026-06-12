@@ -197,7 +197,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	// Embeddings worker
 	embeddingsRepo := embeddings.NewRepository(queries)
-	embeddingClient := llm.NewEmbeddingClient(cfg.OpenAIEmbeddingsAPIKey, cfg.OpenAICompatBaseURL, cfg.OpenAIEmbeddingsModel)
+	embeddingClient := llm.NewEmbeddingClient(cfg.OpenAIEmbeddingsAPIKey, cfg.EmbeddingsBaseURL, cfg.EmbeddingsModel)
 	embeddingsSvc := embeddings.NewService(embeddingsRepo, embeddingClient)
 	cronJob := cron.New(cron.WithSeconds())
 	cronJob.AddFunc(cfg.EmbeddingsCronInterval, func() {
