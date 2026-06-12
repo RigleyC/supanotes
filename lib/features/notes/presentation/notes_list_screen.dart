@@ -26,6 +26,8 @@ class _Strings {
   static const String notesSection = 'Notas';
   static const String noteDeleted = 'Nota movida para a lixeira';
   static const String errorTitle = 'Erro ao carregar as notas';
+  static const String newNoteTooltip = 'Criar nota';
+  static const String chatTooltip = 'Conversar com o assistente';
 }
 
 enum _NotesViewMode { list, grid }
@@ -74,7 +76,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         ],
       ),
       body: notesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => _NotesLoadingView(headerSlivers: headerSlivers),
         error: (e, _) =>
             AppErrorView(title: _Strings.errorTitle, subtitle: e.toString()),
         data: (notes) {
@@ -103,11 +105,9 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         },
       ),
       bottomSheet: const _OfflineStatusBottomSheet(),
-      floatingActionButton: FloatingActionButton(
-        
-        onPressed: () => _openNewNote(context),
-        shape: const CircleBorder(),
-        child: const Icon(Icons.edit_outlined, size: 22),
+      floatingActionButton: _HomeActionButtons(
+        onOpenChat: () => context.push(AppRoutes.chat),
+        onCreateNote: () => _openNewNote(context),
       ),
     );
   }
@@ -140,6 +140,43 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   }
 }
 
+class _HomeActionButtons extends StatelessWidget {
+  const _HomeActionButtons({
+    required this.onOpenChat,
+    required this.onCreateNote,
+  });
+
+  final VoidCallback onOpenChat;
+  final VoidCallback onCreateNote;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Criar componentes pra esses botões igual o appbutton.dart, pode adicionar no mesmo arquivo ele recebe as mesmas propriedaes, e fazer eles seguirem o tema, botão preto pra tema dar e botao branco pra tema escuro
+        FloatingActionButton.small(
+          key: const ValueKey('home-chat-fab'),
+          heroTag: 'home-chat-fab',
+          tooltip: _Strings.chatTooltip,
+          onPressed: onOpenChat,
+          shape: const CircleBorder(),
+          child: const Icon(Icons.auto_awesome_outlined, size: 20),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        FloatingActionButton(
+          key: const ValueKey('home-create-note-fab'),
+          heroTag: 'home-create-note-fab',
+          tooltip: _Strings.newNoteTooltip,
+          onPressed: onCreateNote,
+          shape: const CircleBorder(),
+          child: const Icon(Icons.edit_outlined, size: 22),
+        ),
+      ],
+    );
+  }
+}
+
 class _OfflineStatusBottomSheet extends ConsumerWidget {
   const _OfflineStatusBottomSheet();
 
@@ -162,6 +199,25 @@ class _OfflineStatusBottomSheet extends ConsumerWidget {
         ),
         child: OfflineIndicator(floating: true),
       ),
+    );
+  }
+}
+
+class _NotesLoadingView extends StatelessWidget {
+  const _NotesLoadingView({required this.headerSlivers});
+
+  final List<Widget> headerSlivers;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        ...headerSlivers,
+        const SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ],
     );
   }
 }

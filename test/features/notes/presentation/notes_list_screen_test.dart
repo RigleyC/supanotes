@@ -1,0 +1,179 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/features/notes/data/notes_repository.dart';
+import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/task_entry.dart';
+import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
+import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
+import 'package:supanotes/shared/theme/app_theme.dart';
+
+class _FakeNotesRepository implements INotesRepository {
+  final List<NoteModel> createdNotes = [];
+
+  @override
+  Stream<List<NoteModel>> watchNotes({
+    String? contextId,
+    bool favoritesOnly = false,
+  }) {
+    return Stream<List<NoteModel>>.value(const []);
+  }
+
+  @override
+  Stream<NoteModel?> watchInbox() => Stream<NoteModel?>.value(null);
+
+  @override
+  Stream<NoteModel?> watchNoteById(String id) => Stream<NoteModel?>.value(null);
+
+  @override
+  Future<NoteModel?> getNoteById(String id) async => null;
+
+  @override
+  Future<NoteModel> upsertNote({
+    required String id,
+    String? title,
+    String content = '',
+    String? contextId,
+  }) async {
+    final note = _note(id: id, title: title, content: content);
+    createdNotes.add(note);
+    return note;
+  }
+
+  @override
+  Future<void> updateNote(
+    String id, {
+    String? title,
+    String? content,
+    bool? favorite,
+    bool? archived,
+    String? contextId,
+  }) async {}
+
+  @override
+  Future<void> toggleFavorite(String id) async {}
+
+  @override
+  Future<void> softDelete(String id) async {}
+
+  @override
+  Future<NoteModel> ensureInbox() async => _note(id: 'inbox', isInbox: true);
+
+  @override
+  Future<void> appendToInbox(String text) async {}
+
+  @override
+  Future<void> syncTasksFromDocument(
+    String noteId,
+    List<TaskEntry> tasks,
+  ) async {}
+
+  @override
+  Future<NoteModel> createLocalNote({required String id}) async {
+    final note = _note(id: id);
+    createdNotes.add(note);
+    return note;
+  }
+
+  @override
+  Future<void> saveNoteSnapshot({
+    required String id,
+    required String title,
+    required String content,
+    required List<TaskEntry> tasks,
+  }) async {}
+
+  @override
+  Future<void> deleteIfEmptyOrTombstone(String id) async {}
+
+  @override
+  Future<void> markHasRemoteCopy(String id) async {}
+
+  NoteModel _note({
+    required String id,
+    String? title,
+    String content = '',
+    bool isInbox = false,
+  }) {
+    final now = DateTime.utc(2026, 6, 12);
+    return NoteModel(
+      id: id,
+      userId: 'user-1',
+      title: title,
+      excerpt: null,
+      content: content,
+      isInbox: isInbox,
+      favorite: false,
+      archived: false,
+      contextId: null,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+}
+
+void main() {
+  testWidgets('assistant FAB opens chat from notes home', (tester) async {
+    final notesRepository = _FakeNotesRepository();
+    final router = GoRouter(
+      initialLocation: AppRoutes.home,
+      routes: [
+        GoRoute(
+          path: AppRoutes.home,
+          builder: (_, _) => const NotesListScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.chat,
+          builder: (_, _) => const Scaffold(body: Text('Assistant chat')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [notesRepositoryProvider.overrideWithValue(notesRepository)],
+        child: MaterialApp.router(
+          theme: AppTheme.lightTheme,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Conversar com o assistente'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('home-chat-fab')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Assistant chat'), findsOneWidget);
+  });
+
+  testWidgets('loading notes keeps the home shell visible', (tester) async {
+    final router = GoRouter(
+      initialLocation: AppRoutes.home,
+      routes: [
+        GoRoute(
+          path: AppRoutes.home,
+          builder: (_, _) => const NotesListScreen(),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeNotesProvider.overrideWith((ref) => const Stream<List<NoteModel>>.empty()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Brain Dump'), findsOneWidget);
+    expect(find.text('NOTAS'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+}
