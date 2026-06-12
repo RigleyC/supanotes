@@ -60,9 +60,9 @@ jobs:
         id: cache-deriveddata
         with:
           path: DerivedData
-          key: deriveddata-${{ github.run_id }}
+          key: deriveddata-v2-${{ github.run_id }}
           restore-keys: |
-            deriveddata-
+            deriveddata-v2-
 
       - name: Detect project type
         id: detect
@@ -378,7 +378,7 @@ jobs:
         if: always()
         with:
           path: DerivedData
-          key: deriveddata-${{ github.run_id }}
+          key: deriveddata-v2-${{ github.run_id }}
 
       - name: Cleanup signing
         if: always() && inputs.use_signing
