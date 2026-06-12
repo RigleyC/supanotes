@@ -76,13 +76,13 @@ func (q *Queries) SearchNotesFTS(ctx context.Context, arg SearchNotesFTSParams) 
 const searchNotesHybrid = `-- name: SearchNotesHybrid :many
 WITH fts AS (
   SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
-         row_number() OVER (ORDER BY ts_rank(n.search_vector, plainto_tsquery('simple', $2::text)) DESC) as rank
+         row_number() OVER (ORDER BY ts_rank(n.search_vector, to_tsquery('simple', $2::text)) DESC) as rank
   FROM notes n
   WHERE n.user_id = $3
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
     AND n.archived = false
-    AND n.search_vector @@ plainto_tsquery('simple', $2::text)
+    AND n.search_vector @@ to_tsquery('simple', $2::text)
   LIMIT $4::int
 ),
 semantic AS (

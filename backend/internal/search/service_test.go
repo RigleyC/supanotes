@@ -32,8 +32,8 @@ func TestService_Search(t *testing.T) {
 			if arg.UserID != userID {
 				t.Errorf("expected userID %v, got %v", userID, arg.UserID)
 			}
-			if arg.Query != "test" {
-				t.Errorf("expected query 'test', got %q", arg.Query)
+			if arg.Query != "test:*" {
+				t.Errorf("expected query 'test:*', got %q", arg.Query)
 			}
 			if arg.Limit != 10 {
 				t.Errorf("expected limit 10, got %d", arg.Limit)

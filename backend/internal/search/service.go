@@ -3,6 +3,7 @@ package search
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/pkg/llm"
@@ -42,9 +43,11 @@ func (s *Service) Search(ctx context.Context, userID pgtype.UUID, query string, 
 	}
 	vec := pgvector.NewVector(emb)
 
+	ftsQuery := toPrefixTsQuery(query)
+
 	rows, err := s.q.SearchNotesHybrid(ctx, sqlcgen.SearchNotesHybridParams{
 		UserID:        userID,
-		Query:         query,
+		Query:         ftsQuery,
 		Limit:         limit,
 		FtsLimit:      limit * 2,
 		Embedding:     vec,
@@ -69,4 +72,19 @@ func (s *Service) Search(ctx context.Context, userID pgtype.UUID, query string, 
 		}
 	}
 	return res, nil
+}
+
+// toPrefixTsQuery converts a plain-text query into a tsquery with
+// prefix matching on each word so "tes" matches "teste".
+func toPrefixTsQuery(query string) string {
+	words := strings.Fields(query)
+	if len(words) == 0 {
+		return ""
+	}
+	parts := make([]string, len(words))
+	for i, w := range words {
+		safe := strings.ReplaceAll(w, "'", "''")
+		parts[i] = safe + ":*"
+	}
+	return strings.Join(parts, " & ")
 }
