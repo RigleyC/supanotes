@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:supanotes/shared/widgets/theme_svg.dart';
+
 class BrainDumpTile extends StatelessWidget {
   const BrainDumpTile({super.key, required this.title, required this.onTap});
 
@@ -8,10 +10,8 @@ class BrainDumpTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return ListTile(
-      leading: Icon(Icons.inbox_outlined, color: scheme.onSurfaceVariant),
+      leading: const ThemeSvg('assets/icons/IconTrashPaper.svg'),
       title: Text(title),
       onTap: onTap,
     );

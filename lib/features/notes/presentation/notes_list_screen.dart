@@ -18,6 +18,7 @@ import 'package:supanotes/features/notes/presentation/widgets/section_title.dart
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/widgets/theme_svg.dart';
 import 'package:supanotes/shared/widgets/offline_indicator.dart';
 
 class _Strings {
@@ -63,13 +64,13 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     return Scaffold(
       appBar: AppBar(
         actions: [
-          _ViewModeToggle(viewMode: _viewMode, onToggle: _toggleViewMode),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () => context.push(AppRoutes.search),
           ),
-          //Remover daqui a opcao de exibir so favoritos.
           NotesMoreMenu(
+            isListView: _viewMode == _NotesViewMode.list,
+            onToggleViewMode: _toggleViewMode,
             onOpenSettings: () => context.push(AppRoutes.settings),
             onLogout: () => ref.read(authControllerProvider.notifier).logout(),
           ),
@@ -151,17 +152,20 @@ class _HomeActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? Colors.white : Colors.black;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Criar componentes pra esses botões igual o appbutton.dart, pode adicionar no mesmo arquivo ele recebe as mesmas propriedaes, e fazer eles seguirem o tema, botão preto pra tema dar e botao branco pra tema escuro
         FloatingActionButton.small(
           key: const ValueKey('home-chat-fab'),
           heroTag: 'home-chat-fab',
           tooltip: _Strings.chatTooltip,
           onPressed: onOpenChat,
+          backgroundColor: bgColor,
           shape: const CircleBorder(),
-          child: const Icon(Icons.auto_awesome_outlined, size: 20),
+          child: ThemeSvg('assets/icons/agent.svg', size: 20),
         ),
         const SizedBox(height: AppSpacing.sm),
         FloatingActionButton(
@@ -169,8 +173,9 @@ class _HomeActionButtons extends StatelessWidget {
           heroTag: 'home-create-note-fab',
           tooltip: _Strings.newNoteTooltip,
           onPressed: onCreateNote,
+          backgroundColor: bgColor,
           shape: const CircleBorder(),
-          child: const Icon(Icons.edit_outlined, size: 22),
+          child: ThemeSvg('assets/icons/feather.svg', size: 22),
         ),
       ],
     );
@@ -222,26 +227,4 @@ class _NotesLoadingView extends StatelessWidget {
   }
 }
 
-class _ViewModeToggle extends StatelessWidget {
-  const _ViewModeToggle({required this.viewMode, required this.onToggle});
 
-  final _NotesViewMode viewMode;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Cue.onToggle(
-      toggled: viewMode == _NotesViewMode.grid,
-      motion: .snappy(),
-      acts: [.rotate(to: 90)],
-      child: IconButton(
-        icon: Icon(
-          viewMode == _NotesViewMode.grid
-              ? Icons.list_rounded
-              : Icons.grid_view_rounded,
-        ),
-        onPressed: onToggle,
-      ),
-    );
-  }
-}
