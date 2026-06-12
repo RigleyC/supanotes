@@ -165,6 +165,9 @@ jobs:
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           echo "Certificate and provisioning profile installed"
 
+      - name: Clean SPM cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
+
       - name: Build IPA
         env:
           BUILD_ID: ${{ inputs.build_id || github.run_id }}
