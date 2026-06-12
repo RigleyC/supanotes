@@ -1,5 +1,7 @@
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -36,7 +38,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   final lastRouteStore = ref.watch(lastRouteStoreProvider);
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: lastRouteStore.initialLocation(),
     debugLogDiagnostics: false,
     refreshListenable: notifier,
@@ -104,4 +106,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       authState: notifier.value,
     ),
   );
+
+  router.routerDelegate.addListener(() {
+    final authState = notifier.value;
+    if (authState is! AsyncData<User?>) return;
+    if (authState.value == null) return;
+    final location = router.routerDelegate.currentConfiguration.uri.toString();
+    unawaited(lastRouteStore.save(location));
+  });
+
+  return router;
 });

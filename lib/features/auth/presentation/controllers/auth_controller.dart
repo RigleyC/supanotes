@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/router/last_route_store.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/data/session_cache.dart';
@@ -111,6 +112,7 @@ class AuthController extends Notifier<AsyncValue<User?>> {
     }
     await _storage.clear();
     _sessionCache.clear();
+    await ref.read(lastRouteStoreProvider).clear();
     state = const AsyncValue.data(null);
   }
 
@@ -118,6 +120,7 @@ class AuthController extends Notifier<AsyncValue<User?>> {
   Future<void> onSessionExpired() async {
     await _storage.clear();
     _sessionCache.clear();
+    await ref.read(lastRouteStoreProvider).clear();
     state = const AsyncValue.data(null);
   }
 }

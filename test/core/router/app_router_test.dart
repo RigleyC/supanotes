@@ -1,17 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/router/app_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/core/router/last_route_store.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
-import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
-import 'package:supanotes/core/router/last_route_store.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
@@ -237,5 +239,37 @@ void main() {
       router.routerDelegate.currentConfiguration.uri.toString(),
       '/notes/note-1',
     );
+  });
+
+  testWidgets('router persists protected route navigation', (tester) async {
+    final stub = AsyncValue<User?>.data(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+    final container = await _makeContainer(stub);
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    router.go(AppRoutes.search);
+    await settleRedirect(tester);
+
+    final store = container.read(lastRouteStoreProvider);
+    expect(store.initialLocation(), AppRoutes.search);
+  });
+
+  testWidgets('router does not persist login or register routes', (tester) async {
+    final stub = AsyncValue<User?>.data(null);
+    final container = await _makeContainer(stub);
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    router.go(AppRoutes.register);
+    await settleRedirect(tester);
+
+    final store = container.read(lastRouteStoreProvider);
+    expect(store.initialLocation(), AppRoutes.home);
   });
 }
