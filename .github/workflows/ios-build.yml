@@ -319,10 +319,10 @@ jobs:
 
             if [ "$USE_SIGNING" = "true" ]; then
               # For signed builds, use archive
-              BUILD_CMD="$BUILD_CMD -archivePath ../build/App.xcarchive archive"
+              BUILD_CMD="$BUILD_CMD -archivePath ../build/App.xcarchive clean archive"
             else
               # For unsigned builds, use faster 'build' action
-              BUILD_CMD="$BUILD_CMD CODE_SIGNING_ALLOWED=NO build"
+              BUILD_CMD="$BUILD_CMD CODE_SIGNING_ALLOWED=NO clean build"
             fi
 
             echo "Running: $BUILD_CMD"
