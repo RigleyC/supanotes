@@ -15,14 +15,14 @@ import 'package:supanotes/features/notes/presentation/widgets/notes_grid_view.da
 import 'package:supanotes/features/notes/presentation/widgets/notes_list_view.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_more_menu.dart';
 import 'package:supanotes/features/notes/presentation/widgets/section_title.dart';
-import 'package:supanotes/features/search/domain/search_result_model.dart';
 import 'package:supanotes/features/search/presentation/controllers/search_controller.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_bar.dart';
-import 'package:supanotes/features/search/presentation/widgets/search_result_tile.dart';
+import 'package:supanotes/features/search/presentation/widgets/search_error_view.dart';
+import 'package:supanotes/features/search/presentation/widgets/search_loading_view.dart';
+import 'package:supanotes/features/search/presentation/widgets/search_results_view.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:supanotes/shared/widgets/empty_state.dart';
 import 'package:supanotes/shared/widgets/offline_indicator.dart';
 import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
 
@@ -37,9 +37,7 @@ class _Strings {
   static const String searchTooltip = 'Buscar notas';
   static const String closeSearchTooltip = 'Fechar busca';
   static const String searchHint = 'Buscar notas';
-  static const String searchErrorTitle = 'Erro na busca';
-  static const String emptySearchTitle = 'Nenhum resultado';
-  static const String emptySearchSubtitle = 'Tente outro termo.';
+
 }
 
 enum _NotesViewMode { list, grid }
@@ -136,12 +134,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
               data: (notes) => _buildNotesBody(notes, headerSlivers),
             )
           : searchAsync!.when(
-              loading: () => _SearchLoadingView(headerSlivers: headerSlivers),
-              error: (e, _) => _SearchErrorView(
+              loading: () => SearchLoadingView(headerSlivers: headerSlivers),
+              error: (e, _) => SearchErrorView(
                 headerSlivers: headerSlivers,
                 error: e.toString(),
               ),
-              data: (results) => _SearchResultsView(
+              data: (results) => SearchResultsView(
                 headerSlivers: headerSlivers,
                 query: trimmedSearchQuery,
                 results: results,
@@ -262,99 +260,4 @@ class _NotesLoadingView extends StatelessWidget {
   }
 }
 
-class _SearchLoadingView extends StatelessWidget {
-  const _SearchLoadingView({required this.headerSlivers});
 
-  final List<Widget> headerSlivers;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        ...headerSlivers,
-        const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 2)),
-      ],
-    );
-  }
-}
-
-class _SearchErrorView extends StatelessWidget {
-  const _SearchErrorView({
-    required this.headerSlivers,
-    required this.error,
-  });
-
-  final List<Widget> headerSlivers;
-  final String error;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        ...headerSlivers,
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: EmptyState(
-            icon: Icons.cloud_off,
-            title: _Strings.searchErrorTitle,
-            subtitle: error,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SearchResultsView extends StatelessWidget {
-  const _SearchResultsView({
-    required this.headerSlivers,
-    required this.query,
-    required this.results,
-    required this.onTap,
-  });
-
-  final List<Widget> headerSlivers;
-  final String query;
-  final List<SearchResultModel> results;
-  final ValueChanged<SearchResultModel> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    if (results.isEmpty) {
-      return CustomScrollView(
-        slivers: [
-          ...headerSlivers,
-          const SliverFillRemaining(
-            hasScrollBody: false,
-            child: EmptyState(
-              icon: Icons.search_off,
-              title: _Strings.emptySearchTitle,
-              subtitle: _Strings.emptySearchSubtitle,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return CustomScrollView(
-      slivers: [
-        ...headerSlivers,
-        SliverPadding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          sliver: SliverList.separated(
-            itemCount: results.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (context, index) {
-              final result = results[index];
-              return SearchResultTile(
-                result: result,
-                query: query,
-                onTap: () => onTap(result),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
