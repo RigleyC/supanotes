@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/router/last_route_store.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/di/providers.dart';
@@ -21,12 +23,15 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.clear()).thenAnswer((_) async {});
 }
 
-ProviderContainer makeContainer({
+Future<ProviderContainer> makeContainer({
   required AuthLocalStorage storage,
   required AuthRepository repository,
-}) {
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
   final container = ProviderContainer(
     overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
       authLocalStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWithValue(repository),
     ],
@@ -49,7 +54,7 @@ void main() {
       when(() => storage.getAccessToken()).thenAnswer((_) async => null);
       when(() => storage.getUser()).thenAnswer((_) async => null);
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -63,7 +68,7 @@ void main() {
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => '');
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -80,7 +85,7 @@ void main() {
         (_) async => const User(id: 'u-1', email: 'a@b', name: 'Alice'),
       );
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -99,7 +104,7 @@ void main() {
       when(() => storage.getUser()).thenAnswer((_) async => null);
       when(() => storage.clear()).thenAnswer((_) async {});
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -130,7 +135,7 @@ void main() {
             ),
           ));
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -159,7 +164,7 @@ void main() {
         const UnauthorizedException(message: 'wrong password'),
       );
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -199,7 +204,7 @@ void main() {
             ),
           ));
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -224,7 +229,7 @@ void main() {
       _stubEmptySession(storage);
       when(() => repository.logout()).thenAnswer((_) async {});
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -244,7 +249,7 @@ void main() {
         const NetworkException(message: 'offline'),
       );
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );
@@ -263,7 +268,7 @@ void main() {
       _stubEmptySession(storage);
       when(() => storage.clear()).thenAnswer((_) async {});
 
-      final container = makeContainer(
+      final container = await makeContainer(
         storage: storage,
         repository: repository,
       );

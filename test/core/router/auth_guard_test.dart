@@ -6,14 +6,17 @@ import 'package:supanotes/core/router/auth_guard.dart';
 
 void main() {
   group('authGuardRedirect', () {
-    test('returns null while auth is still loading (do not bounce)', () {
+    test('redirects to /login while auth is loading on a protected route', () {
       const loading = AsyncValue<User?>.loading();
-      expect(authGuardRedirect(currentLocation: AppRoutes.home, authState: loading),
-          isNull);
       expect(
-          authGuardRedirect(currentLocation: AppRoutes.login, authState: loading),
-          isNull);
-      expect(redirectFor(AppRoutes.home, loading), isNull);
+        authGuardRedirect(currentLocation: AppRoutes.home, authState: loading),
+        AppRoutes.login,
+      );
+      expect(
+        authGuardRedirect(currentLocation: AppRoutes.login, authState: loading),
+        isNull,
+      );
+      expect(redirectFor(AppRoutes.home, loading), AppRoutes.login);
     });
 
     test('redirects to /login when unauthenticated user hits a protected route',
