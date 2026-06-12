@@ -60,9 +60,9 @@ jobs:
         id: cache-deriveddata
         with:
           path: DerivedData
-          key: deriveddata-v2-${{ github.run_id }}
+          key: deriveddata-v3-${{ github.run_id }}
           restore-keys: |
-            deriveddata-v2-
+            deriveddata-v3-
 
       - name: Detect project type
         id: detect
@@ -126,9 +126,9 @@ jobs:
           path: |
             ${{ inputs.ios_path || 'ios' }}/Pods
             ~/.cocoapods/repos
-          key: pods-${{ runner.os }}-${{ hashFiles(format('{0}/Podfile.lock', inputs.ios_path || 'ios')) }}
+          key: pods-v2-${{ runner.os }}-${{ hashFiles(format('{0}/Podfile.lock', inputs.ios_path || 'ios')) }}
           restore-keys: |
-            pods-${{ runner.os }}-
+            pods-v2-${{ runner.os }}-
 
       - name: Install certificate and provisioning profile
         if: inputs.use_signing
@@ -381,7 +381,7 @@ jobs:
         if: always()
         with:
           path: DerivedData
-          key: deriveddata-v2-${{ github.run_id }}
+          key: deriveddata-v3-${{ github.run_id }}
 
       - name: Cleanup signing
         if: always() && inputs.use_signing
