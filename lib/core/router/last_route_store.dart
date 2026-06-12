@@ -25,25 +25,8 @@ class LastRouteStore {
 
   Future<void> clear() => _prefs.remove(_key);
 
-  static bool _isPersistable(String location) {
-    if (location == AppRoutes.login || location == AppRoutes.register) {
-      return false;
-    }
-    if (location == AppRoutes.home ||
-        location == AppRoutes.inbox ||
-        location == AppRoutes.settings ||
-        location == AppRoutes.soul ||
-        location == AppRoutes.contexts ||
-        location == AppRoutes.routines ||
-        location == AppRoutes.routinesLogs ||
-        location == AppRoutes.telegram ||
-        location == AppRoutes.chat ||
-        location == AppRoutes.search ||
-        location == AppRoutes.memories) {
-      return true;
-    }
-    return location.startsWith('/notes/') && location.length > '/notes/'.length;
-  }
+  static bool _isPersistable(String location) =>
+      location != AppRoutes.login && location != AppRoutes.register;
 }
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {

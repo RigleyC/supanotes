@@ -35,13 +35,13 @@ void main() {
       expect(store.initialLocation(), AppRoutes.home);
     });
 
-    test('does not persist unsupported routes', () async {
+    test('persists any non-auth route', () async {
       final prefs = await SharedPreferences.getInstance();
       final store = LastRouteStore(prefs);
 
       await store.save('/unknown');
 
-      expect(store.initialLocation(), AppRoutes.home);
+      expect(store.initialLocation(), '/unknown');
     });
 
     test('clear removes the persisted route', () async {

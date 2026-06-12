@@ -107,13 +107,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 
-  router.routerDelegate.addListener(() {
+  void _onRouteChanged() {
     final authState = notifier.value;
     if (authState is! AsyncData<User?>) return;
     if (authState.value == null) return;
     final location = router.routerDelegate.currentConfiguration.uri.toString();
     unawaited(lastRouteStore.save(location));
-  });
+  }
+
+  router.routerDelegate.addListener(_onRouteChanged);
+  ref.onDispose(() => router.routerDelegate.removeListener(_onRouteChanged));
 
   return router;
 });

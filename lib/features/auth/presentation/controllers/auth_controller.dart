@@ -103,6 +103,13 @@ class AuthController extends Notifier<AsyncValue<User?>> {
     }
   }
 
+  Future<void> _clearSession() async {
+    await _storage.clear();
+    _sessionCache.clear();
+    await ref.read(lastRouteStoreProvider).clear();
+    state = const AsyncValue.data(null);
+  }
+
   Future<void> logout() async {
     state = const AsyncValue.loading();
     try {
@@ -110,17 +117,11 @@ class AuthController extends Notifier<AsyncValue<User?>> {
     } catch (e) {
       debugPrint('logout error: $e');
     }
-    await _storage.clear();
-    _sessionCache.clear();
-    await ref.read(lastRouteStoreProvider).clear();
-    state = const AsyncValue.data(null);
+    await _clearSession();
   }
 
   /// Called by the [AuthInterceptor] when a refresh has failed.
   Future<void> onSessionExpired() async {
-    await _storage.clear();
-    _sessionCache.clear();
-    await ref.read(lastRouteStoreProvider).clear();
-    state = const AsyncValue.data(null);
+    await _clearSession();
   }
 }
