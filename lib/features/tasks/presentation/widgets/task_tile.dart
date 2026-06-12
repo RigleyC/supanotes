@@ -33,6 +33,8 @@ class TaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final semantics = theme.extension<AppSemanticColors>();
+    final taskColor = semantics?.task ?? AppColors.taskAccent;
     final isCompleted = task.isCompleted;
 
     final titleColor = isCompleted
@@ -66,7 +68,7 @@ class TaskTile extends StatelessWidget {
         return false;
       },
       child: Material(
-        color: scheme.surfaceContainerLow,
+        color: taskColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -82,6 +84,7 @@ class TaskTile extends StatelessWidget {
                 TaskCheckbox(
                   checked: isCompleted,
                   onChanged: (v) => onToggleComplete?.call(v),
+                  accentColor: taskColor,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(

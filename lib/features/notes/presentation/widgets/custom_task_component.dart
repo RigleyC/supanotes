@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/shared/theme/app_colors.dart';
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
@@ -207,7 +208,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final checkboxSize = 22.0;
+    final semantics = Theme.of(context).extension<AppSemanticColors>();
+    final taskColor = semantics?.task ?? AppColors.taskAccent;
+    const checkboxSize = 22.0;
 
     return Listener(
       behavior: HitTestBehavior.translucent,
@@ -230,16 +233,16 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
               key: _checkboxKey,
               size: checkboxSize,
               value: _isComplete,
-              activeColor: colorScheme.primary,
+              activeColor: taskColor,
               inactiveColor: colorScheme.outline,
-              checkmarkColor: colorScheme.onPrimary,
+              checkmarkColor: Colors.white,
               onChanged: widget.viewModel.setComplete != null
                   ? (_) => _onToggle()
                   : null,
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.only(top: 2, right: 12),
+                padding: const EdgeInsets.only(right: 12),
                 child: TextComponent(
                   key: _textKey,
                   text: widget.viewModel.text,

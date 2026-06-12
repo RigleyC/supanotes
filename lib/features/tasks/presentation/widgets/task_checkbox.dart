@@ -12,18 +12,22 @@ class TaskCheckbox extends StatelessWidget {
     required this.checked,
     required this.onChanged,
     this.size = 24.0,
+    this.accentColor,
   });
 
   final bool checked;
   final ValueChanged<bool> onChanged;
   final double size;
+  /// When provided, overrides [ColorScheme.primary] as the active colour.
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final fillColor = checked ? scheme.primary : Colors.transparent;
+    final active = accentColor ?? scheme.primary;
+    final fillColor = checked ? active : Colors.transparent;
     final borderColor = checked
-        ? scheme.primary
+        ? active
         : scheme.outline.withValues(alpha: 0.6);
 
     return Semantics(
@@ -50,7 +54,7 @@ class TaskCheckbox extends StatelessWidget {
               child: Icon(
                 Icons.check,
                 size: size * 0.65,
-                color: scheme.onPrimary,
+                color: Colors.white,
               ),
             ),
           ),

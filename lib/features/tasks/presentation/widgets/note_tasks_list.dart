@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 import '../../data/tasks_repository.dart';
@@ -116,15 +117,17 @@ class _AddTaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final semantics = theme.extension<AppSemanticColors>();
+    final taskColor = semantics?.task ?? AppColors.taskAccent;
     return Builder(
       builder: (innerContext) {
         return ListTile(
-          leading: Icon(Icons.add, color: scheme.primary),
+          leading: Icon(Icons.add, color: taskColor),
           title: Text(
             'Adicionar tarefa',
             style: TextStyle(
-              color: scheme.primary,
+              color: taskColor,
               fontWeight: FontWeight.w500,
             ),
           ),

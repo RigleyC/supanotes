@@ -48,6 +48,15 @@ class AppColors {
   static const Color warning = Color(0xFFF59E0B);
   static const Color info = Color(0xFF3B82F6);
   static const Color muted = Color(0xFF6B7280);
+
+  // ---------------------------------------------------------------------------
+  // Task accent — #7047EB (violet-purple used for all task-related UI).
+  // ---------------------------------------------------------------------------
+
+  /// The primary brand colour for tasks.
+  /// On dark surfaces this value is used directly; on light surfaces the
+  /// [AppSemanticColors.task] token provides a slightly adjusted variant.
+  static const Color taskAccent = Color(0xFF7047EB);
 }
 
 /// Semantic color tokens exposed as a [ThemeExtension] so they participate
@@ -59,6 +68,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color highlightBackground;
   final Color highlightForeground;
   final Color overlay;
+  final Color task;
 
   const AppSemanticColors({
     required this.success,
@@ -67,6 +77,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     required this.highlightBackground,
     required this.highlightForeground,
     required this.overlay,
+    required this.task,
   });
 
   @override
@@ -77,6 +88,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     Color? highlightBackground,
     Color? highlightForeground,
     Color? overlay,
+    Color? task,
   }) {
     return AppSemanticColors(
       success: success ?? this.success,
@@ -85,6 +97,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       highlightBackground: highlightBackground ?? this.highlightBackground,
       highlightForeground: highlightForeground ?? this.highlightForeground,
       overlay: overlay ?? this.overlay,
+      task: task ?? this.task,
     );
   }
 
@@ -100,6 +113,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       highlightForeground:
           Color.lerp(highlightForeground, other.highlightForeground, t)!,
       overlay: Color.lerp(overlay, other.overlay, t)!,
+      task: Color.lerp(task, other.task, t)!,
     );
   }
 
@@ -110,6 +124,8 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     highlightBackground: Color(0xFFFFF59D),
     highlightForeground: Color(0xFF1F1B16),
     overlay: Color(0x1A000000),
+    // Slightly darker purple to maintain contrast on light surfaces.
+    task: Color(0xFF5B2FD4),
   );
 
   static const dark = AppSemanticColors(
@@ -119,5 +135,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     highlightBackground: Color(0xFF3E2723),
     highlightForeground: Color(0xFFFFF59D),
     overlay: Color(0x33FFFFFF),
+    // Full brand purple on dark backgrounds — pops without feeling harsh.
+    task: Color(0xFF7047EB),
   );
 }

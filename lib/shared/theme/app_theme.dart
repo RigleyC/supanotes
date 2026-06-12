@@ -54,10 +54,9 @@ class AppTheme {
     return base.copyWith(
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
         surfaceTintColor: colorScheme.surfaceTint,
         elevation: 0,
-        scrolledUnderElevation: AppSpacing.elevationSm,
+        scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: AppTypography.textTheme.titleLarge?.copyWith(
           color: colorScheme.onSurface,
