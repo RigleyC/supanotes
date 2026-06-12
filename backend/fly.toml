@@ -28,4 +28,7 @@ primary_region = 'gru'
   EMBEDDINGS_CRON_INTERVAL = "*/30 * * * * *"
   AGENT_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
   AGENT_MODEL = "minimaxai/minimax-m3"
-
+  BRIEF_BASE_URL = "https://api.deepseek.com/chat/completions"
+  BRIEF_MODEL = "deepseek-chat"
+  EMBEDDINGS_MODEL = "text-embedding-3-small"
+  ORGANIZE_MODEL = "gpt-4o-mini"
