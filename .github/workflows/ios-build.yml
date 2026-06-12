@@ -234,7 +234,11 @@ jobs:
             else
               echo "Regenerating Flutter iOS configuration to fix SPM plugin deployment target..."
               cd "${GITHUB_WORKSPACE}/${FLUTTER_PATH}"
-              flutter build ios --config-only --no-codesign || true
+              FLUTTER_BUILD_ARGS=()
+              if [ -n "$API_BASE_URL" ]; then
+                FLUTTER_BUILD_ARGS+=(--dart-define=API_BASE_URL="$API_BASE_URL")
+              fi
+              flutter build ios --config-only --no-codesign "${FLUTTER_BUILD_ARGS[@]}" || true
               
               echo "Building Flutter iOS ($CONFIGURATION) via xcodebuild (unsigned)..."
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
