@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/core/router/last_route_store.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
 import 'package:supanotes/core/di/providers.dart';
@@ -33,8 +34,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
   ref.onDispose(notifier.dispose);
 
+  final lastRouteStore = ref.watch(lastRouteStoreProvider);
+
   return GoRouter(
-    initialLocation: AppRoutes.login,
+    initialLocation: lastRouteStore.initialLocation(),
     debugLogDiagnostics: false,
     refreshListenable: notifier,
     routes: [

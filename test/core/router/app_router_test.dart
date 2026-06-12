@@ -10,6 +10,8 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
+import 'package:supanotes/core/router/last_route_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
@@ -31,12 +33,18 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.clear()).thenAnswer((_) async {});
 }
 
-ProviderContainer _makeContainer(AsyncValue<User?> stub) {
+Future<ProviderContainer> _makeContainer(
+  AsyncValue<User?> stub, {
+  Map<String, Object> prefs = const {},
+}) async {
+  SharedPreferences.setMockInitialValues(prefs);
+  final sharedPreferences = await SharedPreferences.getInstance();
   final storage = _MockAuthLocalStorage();
   final repository = _MockAuthRepository();
   _stubEmptySession(storage);
   final container = ProviderContainer(
     overrides: [
+      sharedPreferencesProvider.overrideWithValue(sharedPreferences),
       authLocalStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWithValue(repository),
       authControllerProvider.overrideWith(() => _StubAuthController(stub)),
@@ -72,12 +80,12 @@ void main() {
     }
   }
 
-  testWidgets('starting on /login with loading auth stays on /login', (tester) async {
+  testWidgets('starting with loading auth redirects to /login', (tester) async {
     final stub = AsyncValue<User?>.loading();
-    final container = _makeContainer(stub);
+    final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
-    await tester.pump();
+    await settleRedirect(tester);
 
     final router = container.read(goRouterProvider);
     expect(
@@ -89,7 +97,7 @@ void main() {
   testWidgets('starting on /login with unauth auth stays on /login',
       (tester) async {
     final stub = AsyncValue<User?>.data(null);
-    final container = _makeContainer(stub);
+    final container = await await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await settleRedirect(tester);
@@ -105,7 +113,7 @@ void main() {
     final stub = AsyncValue<User?>.data(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
-    final container = _makeContainer(stub);
+    final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await settleRedirect(tester);
@@ -120,7 +128,7 @@ void main() {
   testWidgets('unauthenticated user on /home is redirected to /login',
       (tester) async {
     final stub = AsyncValue<User?>.data(null);
-    final container = _makeContainer(stub);
+    final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await settleRedirect(tester);
@@ -138,7 +146,7 @@ void main() {
   testWidgets('unauthenticated user on /register is left at /register',
       (tester) async {
     final stub = AsyncValue<User?>.data(null);
-    final container = _makeContainer(stub);
+    final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await settleRedirect(tester);
@@ -158,7 +166,7 @@ void main() {
     final stub = AsyncValue<User?>.data(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
-    final container = _makeContainer(stub);
+    final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await settleRedirect(tester);
@@ -178,7 +186,7 @@ void main() {
     final stub = AsyncValue<User?>.data(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
-    final container = _makeContainer(stub);
+    final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await settleRedirect(tester);
@@ -197,7 +205,7 @@ void main() {
     final stub = AsyncValue<User?>.data(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
-    final container = _makeContainer(stub);
+    final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await settleRedirect(tester);
@@ -209,6 +217,25 @@ void main() {
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
       AppRoutes.home,
+    );
+  });
+
+  testWidgets('authenticated startup opens the persisted note route', (tester) async {
+    final stub = AsyncValue<User?>.data(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+    final container = await _makeContainer(
+      stub,
+      prefs: {'last_route': '/notes/note-1'},
+    );
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      '/notes/note-1',
     );
   });
 }

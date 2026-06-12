@@ -22,7 +22,12 @@ String? authGuardRedirect({
       if (isAuthPage) return null;
       return AppRoutes.login;
     },
-    loading: () => null,
+    loading: () {
+      final isAuthPage = currentLocation == AppRoutes.login ||
+          currentLocation == AppRoutes.register;
+      if (isAuthPage) return null;
+      return AppRoutes.login;
+    },
     error: (_, _) => AppRoutes.login,
   );
 }

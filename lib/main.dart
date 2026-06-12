@@ -4,10 +4,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import 'core/api/backend_connectivity_hint.dart';
+import 'core/router/last_route_store.dart';
 import 'firebase_options.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
@@ -26,9 +28,18 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+  final sharedPreferences = await SharedPreferences.getInstance();
+
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
   warnIfAndroidBackendUnreachable();
-  runApp(const ProviderScope(child: SupaNotesApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const SupaNotesApp(),
+    ),
+  );
 }
 
 class SupaNotesApp extends ConsumerStatefulWidget {
