@@ -15,7 +15,6 @@ import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_she
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -30,16 +29,6 @@ class InboxScreen extends ConsumerStatefulWidget {
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   NoteEditorController? _controller;
   String? _inboxNoteId;
-
-  Map<String, TaskModel> _taskMapForInbox(String? noteId) {
-    if (noteId == null) return const <String, TaskModel>{};
-    return ref
-        .watch(tasksByNoteStreamProvider(noteId))
-        .maybeWhen(
-          data: (tasks) => {for (final task in tasks) task.id: task},
-          orElse: () => const <String, TaskModel>{},
-        );
-  }
 
   NoteEditorController _controllerOrCreate() =>
       _controller ??= NoteEditorController(
@@ -140,7 +129,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     final hasContent = controller.document!.isNotEmpty;
     final inboxId = asyncValue.asData?.value?.id;
     _inboxNoteId = inboxId;
-    final taskMetadataById = _taskMapForInbox(inboxId);
 
     return PopScope(
       canPop: false,
@@ -151,46 +139,73 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         context.pop();
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
-          centerTitle: true,
-          title: TextField(
-            controller: controller.titleController,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              filled: false,
-              contentPadding: EdgeInsets.zero,
-              hintText: 'Sem título',
-            ),
-            style: AppTypography.textTheme.headlineMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        ),
-        body: Column(
-          children: [
-            Expanded(
-              child: SuperEditor(
-                editor: controller.editor!,
-                focusNode: controller.focusNode,
-                stylesheet: defaultStylesheet.copyWith(
-                  documentPadding: EdgeInsets.zero,
-                ),
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(
-                    controller.editor!,
-                    taskMetadataById: taskMetadataById,
-                    onTaskLongPress: (taskId) =>
-                        _openTaskActions(controller, taskId),
-                  ),
-                ],
-              ),
-            ),
-            NoteToolbar(
-              editor: controller.editor!,
-              composer: controller.composer!,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: () => controller.focusNode?.unfocus(),
             ),
           ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: AnimatedPadding(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: TextField(
+                            controller: controller.titleController,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              filled: false,
+                              contentPadding: EdgeInsets.zero,
+                              hintText: 'Sem título',
+                            ),
+                            style: AppTypography.textTheme.headlineMedium
+                                ?.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                          ),
+                        ),
+                      ),
+                      SuperEditor(
+                    editor: controller.editor!,
+                    focusNode: controller.focusNode,
+                    stylesheet: defaultStylesheet.copyWith(
+                      documentPadding: EdgeInsets.zero,
+                    ),
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(
+                        controller.editor!,
+                        focusNode: controller.focusNode,
+                        onTaskLongPress: (taskId) =>
+                            _openTaskActions(controller, taskId),
+                      ),
+                    ],
+                      ),
+                    ],
+                  ),
+                ),
+                NoteToolbar(
+                  editor: controller.editor!,
+                  composer: controller.composer!,
+                ),
+              ],
+            ),
+          ),
         ),
         floatingActionButton: _buildOrganizeFab(hasContent),
       ),

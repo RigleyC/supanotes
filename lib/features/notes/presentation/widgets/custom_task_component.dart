@@ -1,18 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
-
-import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
     this._editor, {
-    this.taskMetadataById = const {},
+    this.focusNode,
     this.onTaskLongPress,
   });
 
   final Editor _editor;
-  final Map<String, TaskModel> taskMetadataById;
+  final FocusNode? focusNode;
   final ValueChanged<String>? onTaskLongPress;
 
   @override
@@ -50,8 +49,9 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     return CustomTaskComponent(
       key: componentContext.componentKey,
+      editor: _editor,
+      focusNode: focusNode,
       viewModel: componentViewModel,
-      taskMetadata: taskMetadataById[componentViewModel.nodeId],
       onLongPress: onTaskLongPress == null
           ? null
           : () => onTaskLongPress!(componentViewModel.nodeId),
@@ -62,13 +62,15 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 class CustomTaskComponent extends StatefulWidget {
   const CustomTaskComponent({
     super.key,
+    this.editor,
+    this.focusNode,
     required this.viewModel,
-    this.taskMetadata,
     this.onLongPress,
   });
 
+  final Editor? editor;
+  final FocusNode? focusNode;
   final TaskComponentViewModel viewModel;
-  final TaskModel? taskMetadata;
   final VoidCallback? onLongPress;
 
   @override
@@ -77,8 +79,15 @@ class CustomTaskComponent extends StatefulWidget {
 
 class _CustomTaskComponentState extends State<CustomTaskComponent>
     with ProxyDocumentComponent<CustomTaskComponent>, ProxyTextComposable {
+  static const _longPressDelay = Duration(milliseconds: 500);
+  static const _tapSlop = 8.0;
+
+  final _checkboxKey = GlobalKey();
   final _textKey = GlobalKey();
   late bool _isComplete;
+  Timer? _longPressTimer;
+  Offset? _pointerDownPosition;
+  bool _didLongPress = false;
 
   @override
   void initState() {
@@ -92,6 +101,12 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
       setState(() => _isComplete = widget.viewModel.isComplete);
     }
+  }
+
+  @override
+  void dispose() {
+    _longPressTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -113,72 +128,136 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     widget.viewModel.setComplete?.call(!_isComplete);
   }
 
+  void _placeCaretAt(Offset globalOffset) {
+    final editor = widget.editor;
+    final textContext = _textKey.currentContext;
+    if (editor == null || textContext == null) return;
+
+    final textBox = textContext.findRenderObject() as RenderBox?;
+    if (textBox == null || !textBox.hasSize) return;
+
+    final textComponent = childTextComposable as DocumentComponent;
+    final nodePosition = textComponent.getPositionAtOffset(
+      textBox.globalToLocal(globalOffset),
+    );
+    if (nodePosition == null) return;
+
+    widget.focusNode?.requestFocus();
+    editor.execute([
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: widget.viewModel.nodeId,
+            nodePosition: nodePosition,
+          ),
+        ),
+        SelectionChangeType.placeCaret,
+        SelectionReason.userInteraction,
+      ),
+    ]);
+  }
+
+  bool _isOverCheckbox(Offset globalOffset) {
+    final checkboxContext = _checkboxKey.currentContext;
+    final checkboxBox = checkboxContext?.findRenderObject() as RenderBox?;
+    if (checkboxBox == null || !checkboxBox.hasSize) return false;
+
+    final localOffset = checkboxBox.globalToLocal(globalOffset);
+    return (Offset.zero & checkboxBox.size).contains(localOffset);
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    _didLongPress = false;
+    _pointerDownPosition = event.position;
+    _longPressTimer?.cancel();
+    _longPressTimer = Timer(_longPressDelay, () {
+      _didLongPress = true;
+      widget.onLongPress?.call();
+    });
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    final downPosition = _pointerDownPosition;
+    if (downPosition == null) return;
+
+    if ((event.position - downPosition).distance > _tapSlop) {
+      _longPressTimer?.cancel();
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    _longPressTimer?.cancel();
+    final downPosition = _pointerDownPosition;
+    _pointerDownPosition = null;
+    if (_didLongPress ||
+        downPosition == null ||
+        (event.position - downPosition).distance > _tapSlop ||
+        _isOverCheckbox(event.position)) {
+      return;
+    }
+
+    _placeCaretAt(event.position);
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    _longPressTimer?.cancel();
+    _pointerDownPosition = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final checkboxSize = 22.0;
 
-    return Directionality(
-      textDirection: widget.viewModel.textDirection,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: defaultTaskIndentCalculator(
-              widget.viewModel.textStyleBuilder({}),
-              widget.viewModel.indent,
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: _onPointerUp,
+      onPointerCancel: widget.onLongPress == null ? null : _onPointerCancel,
+      child: Directionality(
+        textDirection: widget.viewModel.textDirection,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: defaultTaskIndentCalculator(
+                widget.viewModel.textStyleBuilder({}),
+                widget.viewModel.indent,
+              ),
             ),
-          ),
-          _AnimatedTaskCheckbox(
-            size: checkboxSize,
-            value: _isComplete,
-            activeColor: colorScheme.primary,
-            inactiveColor: colorScheme.outline,
-            checkmarkColor: colorScheme.onPrimary,
-            onChanged: widget.viewModel.setComplete != null
-                ? (_) => _onToggle()
-                : null,
-          ),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onLongPress: widget.onLongPress,
+            _AnimatedTaskCheckbox(
+              key: _checkboxKey,
+              size: checkboxSize,
+              value: _isComplete,
+              activeColor: colorScheme.primary,
+              inactiveColor: colorScheme.outline,
+              checkmarkColor: colorScheme.onPrimary,
+              onChanged: widget.viewModel.setComplete != null
+                  ? (_) => _onToggle()
+                  : null,
+            ),
+            Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: 2, right: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextComponent(
-                      key: _textKey,
-                      text: widget.viewModel.text,
-                      textDirection: widget.viewModel.textDirection,
-                      textAlign: widget.viewModel.textAlignment,
-                      maxLines: widget.viewModel.maxLines,
-                      overflow: widget.viewModel.overflow,
-                      textStyleBuilder: _computeStyles,
-                      inlineWidgetBuilders:
-                          widget.viewModel.inlineWidgetBuilders,
-                      textSelection: widget.viewModel.selection,
-                      selectionColor: widget.viewModel.selectionColor,
-                      highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                      underlines: widget.viewModel.createUnderlines(),
-                    ),
-                    if (widget.taskMetadata?.dueDate != null ||
-                        (widget.taskMetadata?.recurrence != null &&
-                            widget.taskMetadata!.recurrence!.isNotEmpty)) ...[
-                      const SizedBox(height: 4),
-                      TaskMetadataBadges(
-                        dueDate: widget.taskMetadata?.dueDate,
-                        recurrence: widget.taskMetadata?.recurrence,
-                      ),
-                    ],
-                  ],
+                child: TextComponent(
+                  key: _textKey,
+                  text: widget.viewModel.text,
+                  textDirection: widget.viewModel.textDirection,
+                  textAlign: widget.viewModel.textAlignment,
+                  maxLines: widget.viewModel.maxLines,
+                  overflow: widget.viewModel.overflow,
+                  textStyleBuilder: _computeStyles,
+                  inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
+                  textSelection: widget.viewModel.selection,
+                  selectionColor: widget.viewModel.selectionColor,
+                  highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                  underlines: widget.viewModel.createUnderlines(),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -186,6 +265,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
 class _AnimatedTaskCheckbox extends StatefulWidget {
   const _AnimatedTaskCheckbox({
+    super.key,
     required this.size,
     required this.value,
     required this.activeColor,

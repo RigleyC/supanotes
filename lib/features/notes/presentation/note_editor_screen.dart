@@ -13,7 +13,6 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_co
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 
@@ -35,15 +34,6 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   NoteEditorController? _controller;
-
-  Map<String, TaskModel> _taskMapForNote(String noteId) {
-    return ref
-        .watch(tasksByNoteStreamProvider(noteId))
-        .maybeWhen(
-          data: (tasks) => {for (final task in tasks) task.id: task},
-          orElse: () => const <String, TaskModel>{},
-        );
-  }
 
   NoteEditorController _controllerOrCreate() =>
       _controller ??= NoteEditorController(
@@ -111,8 +101,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final taskMetadataById = _taskMapForNote(widget.noteId);
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -122,52 +110,73 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         context.pop();
       },
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            SliverAppBar.medium(
-              title: TextField(
-                controller: controller.titleController,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  filled: false,
-                  contentPadding: EdgeInsets.zero,
-                  hintText: 'Sem titulo',
-                ),
-                style: AppTypography.textTheme.headlineMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-            SliverFillRemaining(
-              hasScrollBody: true,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SuperEditor(
-                      editor: controller.editor!,
-                      focusNode: controller.focusNode,
-                      stylesheet: defaultStylesheet.copyWith(
-                        documentPadding: EdgeInsets.zero,
-                      ),
-                      componentBuilders: [
-                        ...defaultComponentBuilders,
-                        CustomTaskComponentBuilder(
-                          controller.editor!,
-                          taskMetadataById: taskMetadataById,
-                          onTaskLongPress: (taskId) =>
-                              _openTaskActions(controller, taskId),
-                        ),
-                      ],
-                    ),
-                  ),
-                  NoteToolbar(
-                    editor: controller.editor!,
-                    composer: controller.composer!,
-                  ),
-                ],
-              ),
+        resizeToAvoidBottomInset: false,
+        appBar: AppBar(
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: () => controller.focusNode?.unfocus(),
             ),
           ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: AnimatedPadding(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: TextField(
+                            controller: controller.titleController,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              filled: false,
+                              contentPadding: EdgeInsets.zero,
+                              hintText: 'Sem titulo',
+                            ),
+                            style: AppTypography.textTheme.headlineMedium
+                                ?.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                          ),
+                        ),
+                      ),
+                      SuperEditor(
+                        editor: controller.editor!,
+                        focusNode: controller.focusNode,
+                        stylesheet: defaultStylesheet.copyWith(
+                          documentPadding: EdgeInsets.zero,
+                        ),
+                        componentBuilders: [
+                          ...defaultComponentBuilders,
+                          CustomTaskComponentBuilder(
+                            controller.editor!,
+                            focusNode: controller.focusNode,
+                            onTaskLongPress: (taskId) =>
+                                _openTaskActions(controller, taskId),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                NoteToolbar(
+                  editor: controller.editor!,
+                  composer: controller.composer!,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
