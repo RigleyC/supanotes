@@ -1,6 +1,5 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
-
-enum _MenuAction { toggleView, settings, logout }
 
 class NotesMoreMenu extends StatelessWidget {
   const NotesMoreMenu({
@@ -18,45 +17,39 @@ class NotesMoreMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<_MenuAction>(
-      icon: const Icon(Icons.more_horiz),
-      onSelected: (selection) {
-        switch (selection) {
-          case _MenuAction.toggleView:
+    return AdaptivePopupMenuButton.icon<String>(
+      icon: PlatformInfo.isIOS26OrHigher() ? 'ellipsis' : Icons.more_horiz,
+      onSelected: (index, entry) {
+        switch (entry.value) {
+          case 'toggleView':
             onToggleViewMode();
-          case _MenuAction.settings:
+          case 'settings':
             onOpenSettings();
-          case _MenuAction.logout:
+          case 'logout':
             onLogout();
         }
       },
-      itemBuilder: (_) => [
-        PopupMenuItem<_MenuAction>(
-          value: _MenuAction.toggleView,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(isListView ? Icons.grid_view_rounded : Icons.list_rounded),
-            title: Text(isListView ? 'Ver como galeria' : 'Ver como lista'),
-          ),
+      items: [
+        AdaptivePopupMenuItem<String>(
+          label: isListView ? 'Ver como galeria' : 'Ver como lista',
+          icon: PlatformInfo.isIOS26OrHigher()
+              ? (isListView ? 'square.grid.2x2' : 'list.bullet')
+              : (isListView ? Icons.grid_view_rounded : Icons.list_rounded),
+          value: 'toggleView',
         ),
-        const PopupMenuItem<_MenuAction>(
-          value: _MenuAction.settings,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.settings_outlined),
-            title: Text('Configurações'),
-          ),
+        AdaptivePopupMenuItem<String>(
+          label: 'Configurações',
+          icon: PlatformInfo.isIOS26OrHigher()
+              ? 'gear'
+              : Icons.settings_outlined,
+          value: 'settings',
         ),
-        const PopupMenuItem<_MenuAction>(
-          value: _MenuAction.logout,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.logout),
-            title: Text('Sair'),
-          ),
+        AdaptivePopupMenuItem<String>(
+          label: 'Sair',
+          icon: PlatformInfo.isIOS26OrHigher()
+              ? 'rectangle.portrait.and.arrow.right'
+              : Icons.logout,
+          value: 'logout',
         ),
       ],
     );

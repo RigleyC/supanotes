@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:follow_the_leader/follow_the_leader.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/data/notes_repository.dart';
@@ -14,6 +15,7 @@ import 'package:supanotes/features/agent/domain/destination_type.dart';
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
@@ -29,6 +31,9 @@ class InboxScreen extends ConsumerStatefulWidget {
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   NoteEditorController? _controller;
   String? _inboxNoteId;
+  final _docLayoutKey = GlobalKey();
+  late final SuperEditorIosControlsController _iosController;
+  CommonEditorOperations? _commonOps;
 
   NoteEditorController _controllerOrCreate() =>
       _controller ??= NoteEditorController(
@@ -40,10 +45,39 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   @override
   void initState() {
     super.initState();
+    _iosController = SuperEditorIosControlsController(
+      toolbarBuilder: _buildIosToolbar,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(ref.read(notesRepositoryProvider).ensureInbox());
     });
+  }
+
+  void _ensureCommonOps() {
+    if (_commonOps != null) return;
+    final ctrl = _controller;
+    if (ctrl == null || ctrl.editor == null || ctrl.composer == null) return;
+    _commonOps = CommonEditorOperations(
+      editor: ctrl.editor!,
+      document: ctrl.editor!.document,
+      composer: ctrl.composer!,
+      documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+    );
+  }
+
+  Widget _buildIosToolbar(BuildContext context, Key toolbarKey, LeaderLink focalPoint) {
+    _ensureCommonOps();
+    final ops = _commonOps;
+    if (ops == null) return const SizedBox();
+
+    return iOSSystemPopoverEditorToolbarWithFallbackBuilder(
+      context,
+      toolbarKey,
+      focalPoint,
+      ops,
+      SuperEditorIosControlsScope.rootOf(context),
+    );
   }
 
   Future<void> _openTaskActions(
@@ -68,6 +102,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   @override
   void dispose() {
+    _iosController.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -180,12 +215,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                           ),
                         ),
                       ),
-                      SuperEditor(
+                      SuperEditorIosControlsScope(
+                        controller: _iosController,
+                        child: SuperEditor(
                     editor: controller.editor!,
                     focusNode: controller.focusNode,
-                    stylesheet: defaultStylesheet.copyWith(
-                      documentPadding: EdgeInsets.zero,
-                    ),
+                    documentLayoutKey: _docLayoutKey,
+                    stylesheet: noteStylesheet(context),
                     componentBuilders: [
                       ...defaultComponentBuilders,
                       CustomTaskComponentBuilder(
@@ -195,6 +231,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                             _openTaskActions(controller, taskId),
                       ),
                     ],
+                        ),
                       ),
                     ],
                   ),

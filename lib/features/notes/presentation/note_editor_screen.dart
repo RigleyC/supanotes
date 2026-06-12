@@ -5,6 +5,7 @@ import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:follow_the_leader/follow_the_leader.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/data/notes_repository.dart';
@@ -12,6 +13,7 @@ import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
@@ -34,6 +36,45 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   NoteEditorController? _controller;
+  final _docLayoutKey = GlobalKey();
+  // Initialized in initState because toolbarBuilder needs access to the editor
+  // and document layout, which are only available after the controller is set up.
+  late final SuperEditorIosControlsController _iosController;
+
+  @override
+  void initState() {
+    super.initState();
+    _iosController = SuperEditorIosControlsController(
+      toolbarBuilder: _buildIosToolbar,
+    );
+  }
+
+  /// Builds the iOS floating toolbar.
+  ///
+  /// Uses the native iOS system context menu on iOS 16+ (avoids the annoying
+  /// paste-permission warning). Falls back to the standard Flutter-drawn
+  /// Cut/Copy/Paste toolbar on older iOS versions.
+  Widget _buildIosToolbar(
+    BuildContext context,
+    Key toolbarKey,
+    LeaderLink focalPoint,
+  ) {
+    final ctrl = _controller;
+    if (ctrl?.editor == null) return const SizedBox.shrink();
+
+    return iOSSystemPopoverEditorToolbarWithFallbackBuilder(
+      context,
+      toolbarKey,
+      focalPoint,
+      CommonEditorOperations(
+        editor: ctrl!.editor!,
+        document: ctrl.editor!.document,
+        composer: ctrl.composer!,
+        documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+      ),
+      SuperEditorIosControlsScope.rootOf(context),
+    );
+  }
 
   NoteEditorController _controllerOrCreate() =>
       _controller ??= NoteEditorController(
@@ -63,6 +104,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   @override
   void dispose() {
+    _iosController.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -151,21 +193,23 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           ),
                         ),
                       ),
-                      SuperEditor(
-                        editor: controller.editor!,
-                        focusNode: controller.focusNode,
-                        stylesheet: defaultStylesheet.copyWith(
-                          documentPadding: EdgeInsets.zero,
+                      SuperEditorIosControlsScope(
+                        controller: _iosController,
+                        child: SuperEditor(
+                          editor: controller.editor!,
+                          focusNode: controller.focusNode,
+                          documentLayoutKey: _docLayoutKey,
+                          stylesheet: noteStylesheet(context),
+                          componentBuilders: [
+                            ...defaultComponentBuilders,
+                            CustomTaskComponentBuilder(
+                              controller.editor!,
+                              focusNode: controller.focusNode,
+                              onTaskLongPress: (taskId) =>
+                                  _openTaskActions(controller, taskId),
+                            ),
+                          ],
                         ),
-                        componentBuilders: [
-                          ...defaultComponentBuilders,
-                          CustomTaskComponentBuilder(
-                            controller.editor!,
-                            focusNode: controller.focusNode,
-                            onTaskLongPress: (taskId) =>
-                                _openTaskActions(controller, taskId),
-                          ),
-                        ],
                       ),
                     ],
                   ),

@@ -1,10 +1,9 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../domain/note_model.dart';
-
-enum _NoteCardAction { favorite, delete }
 
 class NoteCard extends StatelessWidget {
   const NoteCard({
@@ -76,44 +75,38 @@ class NoteCard extends StatelessWidget {
                       color: Theme.of(context).colorScheme.tertiary,
                     ),
                   ),
-                PopupMenuButton<_NoteCardAction>(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(Icons.more_vert_rounded),
-                  onSelected: (action) {
-                    switch (action) {
-                      case _NoteCardAction.favorite:
+                AdaptivePopupMenuButton.icon<String>(
+                  icon: PlatformInfo.isIOS26OrHigher()
+                      ? 'ellipsis.vertical'
+                      : Icons.more_vert_rounded,
+                  onSelected: (index, entry) {
+                    switch (entry.value) {
+                      case 'favorite':
                         onToggleFavorite();
-                      case _NoteCardAction.delete:
+                      case 'delete':
                         _confirmDelete(context);
                     }
                   },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: _NoteCardAction.favorite,
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          note.favorite
+                  size: 38,
+                  items: [
+                    AdaptivePopupMenuItem<String>(
+                      label: note.favorite
+                          ? 'Remover favorito'
+                          : 'Favoritar',
+                      icon: PlatformInfo.isIOS26OrHigher()
+                          ? 'star'
+                          : (note.favorite
                               ? Icons.star
-                              : Icons.star_border,
-                        ),
-                        title: Text(
-                          note.favorite
-                              ? 'Remover favorito'
-                              : 'Favoritar',
-                        ),
-                      ),
+                              : Icons.star_border),
+                      value: 'favorite',
                     ),
-                    const PopupMenuDivider(),
-                    PopupMenuItem(
-                      value: _NoteCardAction.delete,
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.delete_outline),
-                        title: const Text('Apagar'),
-                      ),
+                    const AdaptivePopupMenuDivider(),
+                    AdaptivePopupMenuItem<String>(
+                      label: 'Apagar',
+                      icon: PlatformInfo.isIOS26OrHigher()
+                          ? 'trash'
+                          : Icons.delete_outline,
+                      value: 'delete',
                     ),
                   ],
                 ),
