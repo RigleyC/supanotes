@@ -25,26 +25,116 @@ class NoteToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ValueListenableBuilder<DocumentSelection?>(
       valueListenable: composer.selectionNotifier,
       builder: (context, selection, child) {
         final activeNodeId = _activeNodeId(selection);
         final blockType = _activeBlockType(activeNodeId);
-        return _ToolbarContainer(
-          isBold: _selectionHasAttribution(selection, boldAttribution),
-          isItalic: _selectionHasAttribution(selection, italicsAttribution),
-          blockType: blockType,
-          onToggleBold: () => _toggleInline(boldAttribution),
-          onToggleItalic: () => _toggleInline(italicsAttribution),
-          onSetH1: () => _setBlockType(header1Attribution),
-          onSetH2: () => _setBlockType(header2Attribution),
-          onSetH3: () => _setBlockType(header3Attribution),
-          onConvertToUnorderedList: () =>
-              _convertToListItem(ListItemType.unordered),
-          onConvertToOrderedList: () =>
-              _convertToListItem(ListItemType.ordered),
-          onConvertToTask: _convertToTask,
-          onConvertToQuote: () => _setBlockType(blockquoteAttribution),
+        final isListItem = blockType == listItemAttribution;
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: 6,
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ToolbarButton(
+                  icon: Icons.format_bold,
+                  tooltip: 'Negrito',
+                  isActive: _selectionHasAttribution(selection, boldAttribution),
+                  onPressed: () => _toggleInline(boldAttribution),
+                ),
+                _ToolbarButton(
+                  icon: Icons.format_italic,
+                  tooltip: 'Itálico',
+                  isActive: _selectionHasAttribution(selection, italicsAttribution),
+                  onPressed: () => _toggleInline(italicsAttribution),
+                ),
+                _ToolbarButton(
+                  icon: Icons.format_strikethrough,
+                  tooltip: 'Tachado',
+                  isActive: _selectionHasAttribution(selection, strikethroughAttribution),
+                  onPressed: () => _toggleInline(strikethroughAttribution),
+                ),
+                const _ToolbarDivider(),
+                _LabeledToolbarButton(
+                  label: 'H1',
+                  isActive: blockType == header1Attribution,
+                  onPressed: () => _setBlockType(header1Attribution),
+                ),
+                _LabeledToolbarButton(
+                  label: 'H2',
+                  isActive: blockType == header2Attribution,
+                  onPressed: () => _setBlockType(header2Attribution),
+                ),
+                _LabeledToolbarButton(
+                  label: 'H3',
+                  isActive: blockType == header3Attribution,
+                  onPressed: () => _setBlockType(header3Attribution),
+                ),
+                const _ToolbarDivider(),
+                _ToolbarButton(
+                  icon: Icons.format_list_bulleted,
+                  tooltip: 'Lista',
+                  isActive: blockType == listItemAttribution,
+                  onPressed: () => _convertToListItem(ListItemType.unordered),
+                ),
+                _ToolbarButton(
+                  icon: Icons.format_list_numbered,
+                  tooltip: 'Lista numerada',
+                  isActive: false,
+                  onPressed: () => _convertToListItem(ListItemType.ordered),
+                ),
+                // Indent/unindent: enabled whenever the current node is a list
+                // item. The actual indent cap is enforced by super_editor's
+                // IndentListItemCommand — we don't duplicate that knowledge here.
+                _ToolbarButton(
+                  icon: Icons.format_indent_increase,
+                  tooltip: 'Aumentar indentação',
+                  isActive: false,
+                  onPressed: isListItem ? _indentListItem : null,
+                ),
+                _ToolbarButton(
+                  icon: Icons.format_indent_decrease,
+                  tooltip: 'Diminuir indentação',
+                  isActive: false,
+                  onPressed: isListItem ? _unindentListItem : null,
+                ),
+                _ToolbarButton(
+                  icon: Icons.check_box_outlined,
+                  tooltip: 'Tarefa',
+                  isActive: false,
+                  onPressed: _convertToTask,
+                ),
+                _ToolbarButton(
+                  icon: Icons.format_quote,
+                  tooltip: 'Citação',
+                  isActive: blockType == blockquoteAttribution,
+                  onPressed: () => _setBlockType(blockquoteAttribution),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -143,125 +233,23 @@ class NoteToolbar extends StatelessWidget {
     if (node is! ParagraphNode) return;
     editor.execute([ConvertParagraphToTaskRequest(nodeId: nodeId)]);
   }
-}
 
-/// Pure presentational widget — receives only the resolved state and
-/// callbacks. Decoupling it from the [NoteToolbar] shell allows it to
-/// be rebuilt in isolation by [ValueListenableBuilder].
-class _ToolbarContainer extends StatelessWidget {
-  const _ToolbarContainer({
-    required this.isBold,
-    required this.isItalic,
-    required this.blockType,
-    required this.onToggleBold,
-    required this.onToggleItalic,
-    required this.onSetH1,
-    required this.onSetH2,
-    required this.onSetH3,
-    required this.onConvertToUnorderedList,
-    required this.onConvertToOrderedList,
-    required this.onConvertToTask,
-    required this.onConvertToQuote,
-  });
+  void _indentListItem() {
+    final nodeId = _activeNodeId(composer.selection);
+    if (nodeId == null) return;
+    final node = editor.context.document.getNodeById(nodeId);
+    if (node is ListItemNode) {
+      editor.execute([IndentListItemRequest(nodeId: nodeId)]);
+    }
+  }
 
-  final bool isBold;
-  final bool isItalic;
-  final Attribution? blockType;
-  final VoidCallback onToggleBold;
-  final VoidCallback onToggleItalic;
-  final VoidCallback onSetH1;
-  final VoidCallback onSetH2;
-  final VoidCallback onSetH3;
-  final VoidCallback onConvertToUnorderedList;
-  final VoidCallback onConvertToOrderedList;
-  final VoidCallback onConvertToTask;
-  final VoidCallback onConvertToQuote;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(8, 0, 8, 24),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: 6,
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ToolbarButton(
-              icon: Icons.format_bold,
-              tooltip: 'Negrito',
-              isActive: isBold,
-              onPressed: onToggleBold,
-            ),
-            _ToolbarButton(
-              icon: Icons.format_italic,
-              tooltip: 'Itálico',
-              isActive: isItalic,
-              onPressed: onToggleItalic,
-            ),
-            const _ToolbarDivider(),
-            _LabeledToolbarButton(
-              label: 'H1',
-              isActive: blockType == header1Attribution,
-              onPressed: onSetH1,
-            ),
-            _LabeledToolbarButton(
-              label: 'H2',
-              isActive: blockType == header2Attribution,
-              onPressed: onSetH2,
-            ),
-            _LabeledToolbarButton(
-              label: 'H3',
-              isActive: blockType == header3Attribution,
-              onPressed: onSetH3,
-            ),
-            const _ToolbarDivider(),
-            _ToolbarButton(
-              icon: Icons.format_list_bulleted,
-              tooltip: 'Lista',
-              isActive: blockType == listItemAttribution,
-              onPressed: onConvertToUnorderedList,
-            ),
-            _ToolbarButton(
-              icon: Icons.format_list_numbered,
-              tooltip: 'Lista numerada',
-              isActive: false,
-              onPressed: onConvertToOrderedList,
-            ),
-            _ToolbarButton(
-              icon: Icons.check_box_outlined,
-              tooltip: 'Tarefa',
-              isActive: false,
-              onPressed: onConvertToTask,
-            ),
-            _ToolbarButton(
-              icon: Icons.format_quote,
-              tooltip: 'Citação',
-              isActive: blockType == blockquoteAttribution,
-              onPressed: onConvertToQuote,
-            ),
-          ],
-        ),
-      ),
-    );
+  void _unindentListItem() {
+    final nodeId = _activeNodeId(composer.selection);
+    if (nodeId == null) return;
+    final node = editor.context.document.getNodeById(nodeId);
+    if (node is ListItemNode) {
+      editor.execute([UnIndentListItemRequest(nodeId: nodeId)]);
+    }
   }
 }
 
@@ -270,13 +258,13 @@ class _ToolbarButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.isActive,
-    required this.onPressed,
+    this.onPressed,
   });
 
   final IconData icon;
   final String tooltip;
   final bool isActive;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
