@@ -14,7 +14,7 @@
 /// Round-tripping is best-effort but stable for the supported syntax set:
 ///   * `# H1`, `## H2`, `### H3` → `ParagraphNode` with the matching
 ///     header block attribution
-///   * `**bold**` and `*italic*` → inline `AttributedSpans` (bold / italic)
+///   * `**bold**`, `*italic*`, `~strikethrough~` → inline `AttributedSpans`
 ///   * `- bullet` → `ListItemNode` (unordered)
 ///   * `1. numbered` → `ListItemNode` (ordered)
 ///   * `> quote` → `ParagraphNode` with the block-quote attribution
@@ -172,9 +172,9 @@ String serializeDocumentToMarkdown(MutableDocument doc) {
       final marker = node.isComplete ? 'x' : ' ';
       final idMarker =
           ' $_kTaskIdMarkerPrefix${node.id}$_kTaskIdMarkerSuffix';
-      buffer.writeln('- [$marker] ${node.text.toPlainText()}$idMarker');
+      buffer.writeln('- [$marker] ${_serializeInlineFormatting(node.text)}$idMarker');
     } else if (node is ListItemNode) {
-      final plain = node.text.toPlainText();
+      final plain = _serializeInlineFormatting(node.text);
       switch (node.type) {
         case ListItemType.unordered:
           buffer.writeln('- $plain');
@@ -182,7 +182,7 @@ String serializeDocumentToMarkdown(MutableDocument doc) {
           buffer.writeln('1. $plain');
       }
     } else if (node is ParagraphNode) {
-      final plain = node.text.toPlainText();
+      final plain = _serializeInlineFormatting(node.text);
       final blockType = node.getMetadataValue('blockType');
       if (blockType == header1Attribution) {
         buffer.writeln('# $plain');
@@ -200,13 +200,86 @@ String serializeDocumentToMarkdown(MutableDocument doc) {
       }
     } else if (node is TextNode) {
       // Generic fallback for any other text-bearing node we might add.
-      buffer.writeln(node.text.toPlainText());
+      buffer.writeln(_serializeInlineFormatting(node.text));
     }
   }
 
   // Trim trailing newlines so callers can store the result directly.
   final result = buffer.toString().trimRight();
   return result;
+}
+
+/// Serializes inline attributions (bold, italic, strikethrough) in [text]
+/// back to their markdown markers: `**bold**`, `*italic*`, `~strikethrough~`.
+///
+/// The algorithm works in a single pass over character positions:
+/// 1. For each position, collect which attributions start or end there.
+/// 2. Emit closing markers for attributions that end (in reverse open order).
+/// 3. Emit opening markers for attributions that start.
+/// 4. Write the plain character.
+///
+/// Overlapping spans (e.g. bold+italic on the same range) are handled
+/// correctly because each attribution's open/close markers are tracked
+/// independently.
+String _serializeInlineFormatting(AttributedText text) {
+  final plain = text.toPlainText();
+  if (plain.isEmpty) return plain;
+
+  // Collect all spans for the three supported attributions.
+  final range = SpanRange(0, plain.length);
+  final boldSpans = text.getAttributionSpansInRange(
+    attributionFilter: (a) => a == boldAttribution,
+    range: range,
+  );
+  final italicSpans = text.getAttributionSpansInRange(
+    attributionFilter: (a) => a == italicsAttribution,
+    range: range,
+  );
+  final strikeSpans = text.getAttributionSpansInRange(
+    attributionFilter: (a) => a == strikethroughAttribution,
+    range: range,
+  );
+
+  if (boldSpans.isEmpty && italicSpans.isEmpty && strikeSpans.isEmpty) {
+    return plain;
+  }
+
+  // Build a map of position → list of (marker, isOpen) events.
+  // Events at the same position are sorted: closes before opens so that
+  // `**bold *bold-italic***` doesn't produce malformed nesting.
+  final events = <int, List<(String, bool)>>{};
+  void addEvent(int pos, String marker, bool isOpen) {
+    events.putIfAbsent(pos, () => []).add((marker, isOpen));
+  }
+
+  for (final s in boldSpans) {
+    addEvent(s.start, '**', true);
+    addEvent(s.end, '**', false);
+  }
+  for (final s in italicSpans) {
+    addEvent(s.start, '*', true);
+    addEvent(s.end, '*', false);
+  }
+  for (final s in strikeSpans) {
+    addEvent(s.start, '~', true);
+    addEvent(s.end, '~', false);
+  }
+
+  final buffer = StringBuffer();
+  for (var i = 0; i <= plain.length; i++) {
+    final evs = events[i];
+    if (evs != null) {
+      // Emit closes first, then opens.
+      for (final (marker, _) in evs.where((e) => !e.$2)) {
+        buffer.write(marker);
+      }
+      for (final (marker, _) in evs.where((e) => e.$2)) {
+        buffer.write(marker);
+      }
+    }
+    if (i < plain.length) buffer.write(plain[i]);
+  }
+  return buffer.toString();
 }
 
 /// Applies the supported inline formatting (`**bold**`, `*italic*`) to
@@ -220,15 +293,19 @@ AttributedText _applyInlineFormatting(String source) {
   var i = 0;
   var bold = false;
   var italic = false;
+  var strikethrough = false;
 
-  // Build attributed text by walking the source character by character.
-  // We track open `*` and `**` runs and toggle attributes accordingly.
   while (i < source.length) {
     final remaining = source.substring(i);
 
     if (remaining.startsWith('**')) {
       bold = !bold;
       i += 2;
+      continue;
+    }
+    if (remaining.startsWith('~')) {
+      strikethrough = !strikethrough;
+      i += 1;
       continue;
     }
     if (remaining.startsWith('*')) {
@@ -250,6 +327,13 @@ AttributedText _applyInlineFormatting(String source) {
     if (italic) {
       spans.addAttribution(
         newAttribution: italicsAttribution,
+        start: start,
+        end: end,
+      );
+    }
+    if (strikethrough) {
+      spans.addAttribution(
+        newAttribution: strikethroughAttribution,
         start: start,
         end: end,
       );

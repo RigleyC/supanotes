@@ -142,6 +142,44 @@ void main() {
       );
       expect(spans, isEmpty);
     });
+
+    test('~strikethrough~ is recognised as strikethrough', () {
+      final doc = parseMarkdownToDocument('this is ~strikethrough~ text');
+
+      final text = (doc.first as ParagraphNode).text;
+      final spans = text.getAttributionSpansInRange(
+        attributionFilter: (a) => a == strikethroughAttribution,
+        range: SpanRange(0, text.toPlainText().length),
+      );
+      expect(spans, isNotEmpty);
+      expect(text.toPlainText(), 'this is strikethrough text');
+    });
+
+    test('serializer outputs ~strikethrough~ syntax', () {
+      final text = AttributedText(
+        'hello world',
+        AttributedSpans(
+          attributions: [
+            const SpanMarker(
+              attribution: strikethroughAttribution,
+              offset: 0,
+              markerType: SpanMarkerType.start,
+            ),
+            const SpanMarker(
+              attribution: strikethroughAttribution,
+              offset: 5,
+              markerType: SpanMarkerType.end,
+            ),
+          ],
+        ),
+      );
+      final doc = MutableDocument(nodes: [
+        ParagraphNode(id: Editor.createNodeId(), text: text),
+      ]);
+
+      final out = serializeDocumentToMarkdown(doc);
+      expect(out, '~hello~ world');
+    });
   });
 
   group('serializeDocumentToMarkdown', () {
@@ -174,6 +212,58 @@ void main() {
       final doc = parseMarkdownToDocument(original);
       final out = serializeDocumentToMarkdown(doc);
       expect(out, original);
+    });
+
+    test('strikethrough round-trips', () {
+      const original = 'text with ~strikethrough~ inside';
+      final doc = parseMarkdownToDocument(original);
+      expect(serializeDocumentToMarkdown(doc), original);
+    });
+
+    test('bold round-trips', () {
+      const original = 'text with **bold** inside';
+      final doc = parseMarkdownToDocument(original);
+      expect(serializeDocumentToMarkdown(doc), original);
+    });
+
+    test('italic round-trips', () {
+      const original = 'text with *italic* inside';
+      final doc = parseMarkdownToDocument(original);
+      expect(serializeDocumentToMarkdown(doc), original);
+    });
+
+    test('bold and italic on separate spans round-trip', () {
+      const original = '**bold** and *italic* text';
+      final doc = parseMarkdownToDocument(original);
+      expect(serializeDocumentToMarkdown(doc), original);
+    });
+
+    test('bold inside strikethrough round-trips', () {
+      // ~**bold-strike**~ — strikethrough wrapping bold.
+      // Both attributions are preserved through parse → serialize.
+      const original = '~**bold-strike**~';
+      final doc = parseMarkdownToDocument(original);
+      final out = serializeDocumentToMarkdown(doc);
+      // The plain text must survive.
+      expect(
+        (doc.first as ParagraphNode).text.toPlainText(),
+        'bold-strike',
+      );
+      // Both attributions must be present after parse.
+      final text = (doc.first as ParagraphNode).text;
+      final boldSpans = text.getAttributionSpansInRange(
+        attributionFilter: (a) => a == boldAttribution,
+        range: SpanRange(0, text.toPlainText().length),
+      );
+      final strikeSpans = text.getAttributionSpansInRange(
+        attributionFilter: (a) => a == strikethroughAttribution,
+        range: SpanRange(0, text.toPlainText().length),
+      );
+      expect(boldSpans, isNotEmpty, reason: 'bold attribution must survive parse');
+      expect(strikeSpans, isNotEmpty, reason: 'strikethrough attribution must survive parse');
+      // The serialized form must contain the markers for both attributions.
+      expect(out, contains('**'), reason: 'bold marker must appear in output');
+      expect(out, contains('~'), reason: 'strikethrough marker must appear in output');
     });
   });
 }
