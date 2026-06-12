@@ -9,11 +9,11 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('returns /home when there is no persisted route', () async {
+    test('returns /splash when there is no persisted route', () async {
       final prefs = await SharedPreferences.getInstance();
       final store = LastRouteStore(prefs);
 
-      expect(store.initialLocation(), AppRoutes.home);
+      expect(store.initialLocation(), AppRoutes.splash);
     });
 
     test('persists and restores a safe note route', () async {
@@ -31,8 +31,9 @@ void main() {
 
       await store.save(AppRoutes.login);
       await store.save(AppRoutes.register);
+      await store.save(AppRoutes.splash);
 
-      expect(store.initialLocation(), AppRoutes.home);
+      expect(store.initialLocation(), AppRoutes.splash);
     });
 
     test('persists any non-auth route', () async {
@@ -51,7 +52,7 @@ void main() {
       await store.save(AppRoutes.search);
       await store.clear();
 
-      expect(store.initialLocation(), AppRoutes.home);
+      expect(store.initialLocation(), AppRoutes.splash);
     });
   });
 }

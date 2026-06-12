@@ -82,8 +82,23 @@ void main() {
     }
   }
 
-  testWidgets('starting with loading auth redirects to /login', (tester) async {
+  testWidgets('starting with loading auth lands on /splash', (tester) async {
     final stub = AsyncValue<User?>.loading();
+    final container = await _makeContainer(stub);
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      AppRoutes.splash,
+    );
+  });
+
+  testWidgets('starting on /splash with unauth auth redirects to /login',
+      (tester) async {
+    final stub = AsyncValue<User?>.data(null);
     final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -96,10 +111,26 @@ void main() {
     );
   });
 
+  testWidgets('starting on /splash with auth redirects to /home', (tester) async {
+    final stub = AsyncValue<User?>.data(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+    final container = await _makeContainer(stub);
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      AppRoutes.home,
+    );
+  });
+
   testWidgets('starting on /login with unauth auth stays on /login',
       (tester) async {
     final stub = AsyncValue<User?>.data(null);
-    final container = await await _makeContainer(stub);
+    final container = await _makeContainer(stub);
 
     await tester.pumpWidget(_wrapRouter(container));
     await settleRedirect(tester);
@@ -270,6 +301,6 @@ void main() {
     await settleRedirect(tester);
 
     final store = container.read(lastRouteStoreProvider);
-    expect(store.initialLocation(), AppRoutes.home);
+    expect(store.initialLocation(), AppRoutes.splash);
   });
 }

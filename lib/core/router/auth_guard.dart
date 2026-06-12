@@ -11,6 +11,9 @@ String? authGuardRedirect({
 }) {
   return authState.when(
     data: (user) {
+      if (currentLocation == AppRoutes.splash) {
+        return user != null ? AppRoutes.home : AppRoutes.login;
+      }
       final isAuthPage = currentLocation == AppRoutes.login ||
           currentLocation == AppRoutes.register;
       if (user != null) {
@@ -23,10 +26,8 @@ String? authGuardRedirect({
       return AppRoutes.login;
     },
     loading: () {
-      final isAuthPage = currentLocation == AppRoutes.login ||
-          currentLocation == AppRoutes.register;
-      if (isAuthPage) return null;
-      return AppRoutes.login;
+      if (currentLocation == AppRoutes.splash) return null;
+      return AppRoutes.splash;
     },
     error: (_, _) => AppRoutes.login,
   );

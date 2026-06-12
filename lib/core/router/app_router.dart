@@ -15,6 +15,7 @@ import 'package:supanotes/core/router/auth_guard.dart';
 import 'package:supanotes/features/agent/presentation/chat_screen.dart';
 import 'package:supanotes/features/auth/presentation/login_screen.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
+import 'package:supanotes/features/auth/presentation/splash_screen.dart';
 import 'package:supanotes/features/memories/presentation/memories_screen.dart';
 import 'package:supanotes/features/notes/presentation/inbox_screen.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
@@ -43,6 +44,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     debugLogDiagnostics: false,
     refreshListenable: notifier,
     routes: [
+      GoRoute(
+        path: AppRoutes.splash,
+        builder: (_, _) => const SplashScreen(),
+      ),
       GoRoute(
         path: AppRoutes.login,
         builder: (_, _) => const LoginScreen(),

@@ -6,17 +6,43 @@ import 'package:supanotes/core/router/auth_guard.dart';
 
 void main() {
   group('authGuardRedirect', () {
-    test('redirects to /login while auth is loading on a protected route', () {
+    test('redirects to /splash while auth is loading on a protected route', () {
       const loading = AsyncValue<User?>.loading();
       expect(
         authGuardRedirect(currentLocation: AppRoutes.home, authState: loading),
-        AppRoutes.login,
+        AppRoutes.splash,
       );
       expect(
         authGuardRedirect(currentLocation: AppRoutes.login, authState: loading),
+        AppRoutes.splash,
+      );
+      expect(redirectFor(AppRoutes.home, loading), AppRoutes.splash);
+    });
+
+    test('leaves the user on /splash while loading', () {
+      const loading = AsyncValue<User?>.loading();
+      expect(
+        authGuardRedirect(currentLocation: AppRoutes.splash, authState: loading),
         isNull,
       );
-      expect(redirectFor(AppRoutes.home, loading), AppRoutes.login);
+    });
+
+    test('redirects from /splash to /home when authenticated', () {
+      final auth = AsyncValue<User?>.data(
+        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      );
+      expect(
+        authGuardRedirect(currentLocation: AppRoutes.splash, authState: auth),
+        AppRoutes.home,
+      );
+    });
+
+    test('redirects from /splash to /login when unauthenticated', () {
+      final unauth = AsyncValue<User?>.data(null);
+      expect(
+        authGuardRedirect(currentLocation: AppRoutes.splash, authState: unauth),
+        AppRoutes.login,
+      );
     });
 
     test('redirects to /login when unauthenticated user hits a protected route',

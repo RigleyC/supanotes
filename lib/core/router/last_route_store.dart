@@ -13,7 +13,7 @@ class LastRouteStore {
   String initialLocation() {
     final route = _prefs.getString(_key);
     if (route == null || !_isPersistable(route)) {
-      return AppRoutes.home;
+      return AppRoutes.splash;
     }
     return route;
   }
@@ -26,7 +26,9 @@ class LastRouteStore {
   Future<void> clear() => _prefs.remove(_key);
 
   static bool _isPersistable(String location) =>
-      location != AppRoutes.login && location != AppRoutes.register;
+      location != AppRoutes.login &&
+      location != AppRoutes.register &&
+      location != AppRoutes.splash;
 }
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
