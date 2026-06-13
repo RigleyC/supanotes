@@ -60,9 +60,10 @@ jobs:
         id: cache-deriveddata
         with:
           path: DerivedData
-          key: deriveddata-v3-${{ github.run_id }}
+          key: deriveddata-v4-${{ hashFiles('lib/**', 'pubspec.lock') }}-${{ github.run_id }}
           restore-keys: |
-            deriveddata-v3-
+            deriveddata-v4-${{ hashFiles('lib/**', 'pubspec.lock') }}-
+            deriveddata-v4-
 
       - name: Detect project type
         id: detect
@@ -232,16 +233,21 @@ jobs:
               fi
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
             else
-              echo "Building Flutter iOS to guarantee Dart code compilation (ignoring signing errors)..."
+              echo "Compiling Dart code via flutter assemble (does NOT invoke Xcode)..."
               cd "${GITHUB_WORKSPACE}/${FLUTTER_PATH}"
-              FLUTTER_BUILD_ARGS=()
+              FLUTTER_ASSEMBLE_ARGS=(
+                --output=build/ios/Release-iphoneos/App.framework
+                -dTargetPlatform=ios
+                -dBuildMode=release
+                -dDartObfuscation=false
+                -dTreeShakeIcons=true
+              )
               if [ -n "$API_BASE_URL" ]; then
-                FLUTTER_BUILD_ARGS+=(--dart-define=API_BASE_URL="$API_BASE_URL")
+                FLUTTER_ASSEMBLE_ARGS+=(-dDartDefines="$(echo -n "API_BASE_URL=$API_BASE_URL" | base64)")
               fi
-              # Run full release build to force 'flutter assemble' to generate App.framework.
-              # It will fail at the end due to lack of signing certificates, but that's expected.
-              flutter build ios --release "${FLUTTER_BUILD_ARGS[@]}" || true
-              
+              flutter assemble release_ios_bundle_flutter_assets "${FLUTTER_ASSEMBLE_ARGS[@]}" || \
+              flutter assemble ios_release_bundle "${FLUTTER_ASSEMBLE_ARGS[@]}" || true
+
               echo "Packaging unsigned IPA via xcodebuild..."
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
 
@@ -391,7 +397,7 @@ jobs:
         if: always()
         with:
           path: DerivedData
-          key: deriveddata-v3-${{ github.run_id }}
+          key: deriveddata-v4-${{ hashFiles('lib/**', 'pubspec.lock') }}-${{ github.run_id }}
 
       - name: Cleanup signing
         if: always() && inputs.use_signing

@@ -27,12 +27,41 @@ void main() {
       );
     });
 
-    test('redirects from /splash to /home when authenticated', () {
+    test('redirects from /splash to /home when authenticated (no persisted route)',
+        () {
       final auth = AsyncValue<User?>.data(
         const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
       expect(
         authGuardRedirect(currentLocation: AppRoutes.splash, authState: auth),
+        AppRoutes.home,
+      );
+    });
+
+    test('redirects from /splash to the persisted route when authenticated', () {
+      final auth = AsyncValue<User?>.data(
+        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      );
+      expect(
+        authGuardRedirect(
+          currentLocation: AppRoutes.splash,
+          authState: auth,
+          persistedLocation: '/notes/note-1',
+        ),
+        '/notes/note-1',
+      );
+    });
+
+    test('falls back to /home when persisted route is /splash', () {
+      final auth = AsyncValue<User?>.data(
+        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      );
+      expect(
+        authGuardRedirect(
+          currentLocation: AppRoutes.splash,
+          authState: auth,
+          persistedLocation: AppRoutes.splash,
+        ),
         AppRoutes.home,
       );
     });

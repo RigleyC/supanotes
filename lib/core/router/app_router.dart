@@ -104,6 +104,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) => authGuardRedirect(
       currentLocation: state.matchedLocation,
       authState: notifier.value,
+      persistedLocation: lastRouteStore.initialLocation(),
     ),
   );
 

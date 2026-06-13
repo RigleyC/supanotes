@@ -8,17 +8,29 @@ import 'package:supanotes/features/auth/domain/user.dart';
 String? authGuardRedirect({
   required String currentLocation,
   required AsyncValue<User?> authState,
+  /// The last persisted route from [LastRouteStore], if any.
+  /// When provided and auth resolves on the splash, navigates here instead
+  /// of always going to [AppRoutes.home].
+  String? persistedLocation,
 }) {
   return authState.when(
     data: (user) {
       if (currentLocation == AppRoutes.splash) {
-        return user != null ? AppRoutes.home : AppRoutes.login;
+        if (user == null) return AppRoutes.login;
+        // Restore last route, falling back to /home.
+        final destination = (persistedLocation != null &&
+                persistedLocation != AppRoutes.splash &&
+                persistedLocation != AppRoutes.login &&
+                persistedLocation != AppRoutes.register)
+            ? persistedLocation
+            : AppRoutes.home;
+        return destination;
       }
       final isAuthPage = currentLocation == AppRoutes.login ||
           currentLocation == AppRoutes.register;
       if (user != null) {
         if (isAuthPage) {
-          return AppRoutes.home;
+          return persistedLocation ?? AppRoutes.home;
         }
         return null;
       }
