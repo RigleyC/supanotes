@@ -233,22 +233,16 @@ jobs:
               fi
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
             else
-              echo "Compiling Dart code via flutter assemble (does NOT invoke Xcode)..."
+              echo "Generating Flutter iOS config..."
               cd "${GITHUB_WORKSPACE}/${FLUTTER_PATH}"
-              FLUTTER_ASSEMBLE_ARGS=(
-                --output=build/ios/Release-iphoneos/App.framework
-                -dTargetPlatform=ios
-                -dBuildMode=release
-                -dDartObfuscation=false
-                -dTreeShakeIcons=true
-              )
+              FLUTTER_BUILD_ARGS=()
               if [ -n "$API_BASE_URL" ]; then
-                FLUTTER_ASSEMBLE_ARGS+=(-dDartDefines="$(echo -n "API_BASE_URL=$API_BASE_URL" | base64)")
+                FLUTTER_BUILD_ARGS+=(--dart-define=API_BASE_URL="$API_BASE_URL")
               fi
-              flutter assemble release_ios_bundle_flutter_assets "${FLUTTER_ASSEMBLE_ARGS[@]}" || \
-              flutter assemble ios_release_bundle "${FLUTTER_ASSEMBLE_ARGS[@]}" || true
+              # Generate Package.swift and Flutter config files without compiling
+              flutter build ios --config-only "${FLUTTER_BUILD_ARGS[@]}" || true
 
-              echo "Packaging unsigned IPA via xcodebuild..."
+              echo "Building and packaging unsigned IPA via xcodebuild..."
               cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
 
               BUILD_CMD="xcodebuild"
@@ -265,12 +259,14 @@ jobs:
               BUILD_CMD="$BUILD_CMD CODE_SIGNING_ALLOWED=NO"
               BUILD_CMD="$BUILD_CMD DEVELOPMENT_TEAM=\"\""
               BUILD_CMD="$BUILD_CMD COMPILER_INDEX_STORE_ENABLE=NO"
+              # Override deployment target to fix Firebase SPM package requiring iOS 15.0
+              BUILD_CMD="$BUILD_CMD IPHONEOS_DEPLOYMENT_TARGET=15.0"
 
               if [ -n "$API_BASE_URL" ]; then
                 BUILD_CMD="$BUILD_CMD FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS=\"--dart-define=API_BASE_URL=$API_BASE_URL\""
               fi
 
-              BUILD_CMD="$BUILD_CMD build"
+              BUILD_CMD="$BUILD_CMD clean build"
 
               echo "Running: $BUILD_CMD"
               eval $BUILD_CMD
