@@ -67,6 +67,8 @@ class SyncMapper {
         'source_id': l.sourceId,
         'target_id': l.targetId,
         'relation': l.relation,
+        'created_at': l.createdAt.toUtc().toIso8601String(),
+        'updated_at': l.updatedAt.toUtc().toIso8601String(),
       };
 
   Map<String, dynamic> localNoteTagToJson(LocalNoteTagData t) => {

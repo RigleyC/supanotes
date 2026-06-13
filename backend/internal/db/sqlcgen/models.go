@@ -82,10 +82,12 @@ type NoteEmbedding struct {
 }
 
 type NoteLink struct {
-	SourceID pgtype.UUID `json:"source_id"`
-	TargetID pgtype.UUID `json:"target_id"`
-	Relation string      `json:"relation"`
-	ID       pgtype.UUID `json:"id"`
+	SourceID  pgtype.UUID        `json:"source_id"`
+	TargetID  pgtype.UUID        `json:"target_id"`
+	Relation  string             `json:"relation"`
+	ID        pgtype.UUID        `json:"id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type NoteTag struct {

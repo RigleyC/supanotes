@@ -52,7 +52,7 @@ func (q *Queries) GetSyncContexts(ctx context.Context, arg GetSyncContextsParams
 }
 
 const getSyncNoteLinks = `-- name: GetSyncNoteLinks :many
-SELECT nl.source_id, nl.target_id, nl.relation, nl.id
+SELECT nl.source_id, nl.target_id, nl.relation, nl.id, nl.created_at, nl.updated_at
 FROM note_links nl
 JOIN notes n ON n.id = nl.source_id
 WHERE n.user_id = $1
@@ -72,6 +72,8 @@ func (q *Queries) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]N
 			&i.TargetID,
 			&i.Relation,
 			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

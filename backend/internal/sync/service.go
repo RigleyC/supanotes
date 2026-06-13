@@ -281,11 +281,12 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 
 	for _, nl := range payload.NoteLinks {
 		err := r.UpsertNoteLink(ctx, sqlcgen.UpsertNoteLinkParams{
-			ID:       nl.ID,
-			SourceID: nl.SourceID,
-			TargetID: nl.TargetID,
-			Relation: nl.Relation,
-			UserID:   userID,
+			ID:        nl.ID,
+			SourceID:  nl.SourceID,
+			TargetID:  nl.TargetID,
+			Relation:  nl.Relation,
+			CreatedAt: nl.CreatedAt,
+			UserID:    userID,
 		})
 		if err != nil {
 			return err
