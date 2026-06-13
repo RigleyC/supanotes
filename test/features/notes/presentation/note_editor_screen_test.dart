@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/task_entry.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 
 class _FakeNotesRepository implements INotesRepository {
@@ -14,6 +15,17 @@ class _FakeNotesRepository implements INotesRepository {
 
   @override
   Stream<NoteModel?> watchNoteById(String id) => controller.stream;
+
+  @override
+  Future<void> saveNoteSnapshot({
+    required String id,
+    required String title,
+    required String content,
+    required List<TaskEntry> tasks,
+  }) async {}
+
+  @override
+  Future<void> deleteIfEmptyOrTombstone(String id) async {}
 
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
