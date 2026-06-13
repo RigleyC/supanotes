@@ -43,7 +43,7 @@ void main() {
       controller.init(content: '', title: '');
       controller.bind('empty-note');
 
-      await controller.flushBeforePop();
+      controller.dispose();
       expect(deletedNoteId, 'empty-note');
     });
   });

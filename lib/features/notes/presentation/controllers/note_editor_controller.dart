@@ -212,7 +212,7 @@ class NoteEditorController {
 /// Screens that don't need to customize the save path can
 /// pass these in directly.
 Future<void> defaultSnapshotSave(
-  NotesRepository repo,
+  INotesRepository repo,
   String noteId,
   String title,
   String markdown,
@@ -234,7 +234,7 @@ Future<void> defaultSnapshotSave(
   );
 }
 
-Future<void> defaultEmptyNoteExit(NotesRepository repo, String noteId) async {
+Future<void> defaultEmptyNoteExit(INotesRepository repo, String noteId) async {
   dev.log(
     '[defaultEmptyNoteExit] noteId=$noteId',
     name: 'NoteEditor',
