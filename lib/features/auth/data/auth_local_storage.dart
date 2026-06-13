@@ -16,6 +16,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
 class AuthLocalStorage {
@@ -96,3 +97,7 @@ class AuthLocalStorage {
     ]);
   }
 }
+
+final authLocalStorageProvider = Provider<AuthLocalStorage>((ref) {
+  return AuthLocalStorage();
+});

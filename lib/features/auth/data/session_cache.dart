@@ -11,12 +11,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_local_storage.dart';
 
-/// Local provider for [AuthLocalStorage] to avoid an upward dependency
-/// on `core/di/providers.dart`.
-final _authLocalStorageProvider = Provider<AuthLocalStorage>((ref) {
-  return AuthLocalStorage();
-});
-
 /// The cached subset of the session payload that is small enough to keep
 /// in memory and on secure storage.
 class SessionCache {
@@ -57,7 +51,7 @@ class SessionCacheNotifier extends Notifier<SessionCache> {
 
   @override
   SessionCache build() {
-    _storage = ref.read(_authLocalStorageProvider);
+    _storage = ref.read(authLocalStorageProvider);
     return const SessionCache();
   }
 

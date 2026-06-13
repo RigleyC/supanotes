@@ -20,15 +20,6 @@ import 'package:supanotes/features/auth/presentation/controllers/auth_controller
 import 'package:supanotes/features/auth/domain/user.dart';
 
 // ---------------------------------------------------------------------------
-// Auth local storage
-// ---------------------------------------------------------------------------
-
-/// Singleton [AuthLocalStorage] for the lifetime of the app.
-final authLocalStorageProvider = Provider<AuthLocalStorage>((ref) {
-  return AuthLocalStorage();
-});
-
-// ---------------------------------------------------------------------------
 // Raw Dio (no auth interceptor) for refresh + replay calls
 // ---------------------------------------------------------------------------
 

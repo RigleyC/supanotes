@@ -20,6 +20,8 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.getAccessToken()).thenAnswer((_) async => null);
   when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
   when(() => storage.getUser()).thenAnswer((_) async => null);
+  when(() => storage.getSessionData()).thenAnswer((_) async => const {});
+  when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
   when(() => storage.clear()).thenAnswer((_) async {});
 }
 
@@ -47,12 +49,14 @@ Future<void> waitForBuild(ProviderContainer container) async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('AuthController.build', () {
     test('sets null when no access token is stored', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => null);
       when(() => storage.getUser()).thenAnswer((_) async => null);
+      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
 
       final container = await makeContainer(
         storage: storage,
@@ -67,6 +71,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => '');
+      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
 
       final container = await makeContainer(
         storage: storage,
@@ -81,6 +86,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
+      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
       when(() => storage.getUser()).thenAnswer(
         (_) async => const User(id: 'u-1', email: 'a@b', name: 'Alice'),
       );
@@ -102,6 +108,7 @@ void main() {
       final repository = _MockAuthRepository();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
       when(() => storage.getUser()).thenAnswer((_) async => null);
+      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
       when(() => storage.clear()).thenAnswer((_) async {});
 
       final container = await makeContainer(
