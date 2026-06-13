@@ -49,7 +49,6 @@ type Querier interface {
 	GetMessages(ctx context.Context, arg GetMessagesParams) ([]Message, error)
 	GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (Note, error)
 	GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, error)
-	GetPendingEmbeddings(ctx context.Context, limit int32) ([]GetPendingEmbeddingsRow, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Note, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRetryableEmbeddings(ctx context.Context, limit int32) ([]GetRetryableEmbeddingsRow, error)
@@ -57,12 +56,18 @@ type Querier interface {
 	GetRoutinesByUser(ctx context.Context, userID pgtype.UUID) ([]Routine, error)
 	GetSoul(ctx context.Context, userID pgtype.UUID) (Soul, error)
 	GetSyncContexts(ctx context.Context, arg GetSyncContextsParams) ([]Context, error)
+	GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]NoteLink, error)
+	GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]NoteTag, error)
 	GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]Note, error)
 	GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error)
+	// Returns completion rows belonging to a user's tasks whose
+	// `completed_at` is newer than the cursor. The table has no
+	// `updated_at`, so we use `completed_at` as the pull cursor —
+	// completions are append-only, so any new completion is guaranteed
+	// to have a fresh timestamp. The join through `tasks` enforces the
+	// per-user scope since `task_completions` itself has no `user_id`.
 	GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error)
 	GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]Task, error)
-	GetSyncNoteTags(ctx context.Context, arg GetSyncNoteTagsParams) ([]NoteTag, error)
-	GetSyncNoteLinks(ctx context.Context, arg GetSyncNoteLinksParams) ([]NoteLink, error)
 	GetTags(ctx context.Context, userID pgtype.UUID) ([]Tag, error)
 	GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]Tag, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
@@ -94,6 +99,8 @@ type Querier interface {
 	UpsertContext(ctx context.Context, arg UpsertContextParams) (Context, error)
 	UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, error)
 	UpsertNoteEmbedding(ctx context.Context, arg UpsertNoteEmbeddingParams) error
+	UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error
+	UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error
 	UpsertSoul(ctx context.Context, arg UpsertSoulParams) (Soul, error)
 	UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, error)
 	UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, error)
@@ -101,8 +108,6 @@ type Querier interface {
 	// (the SELECT returns 0 rows otherwise, making the INSERT a no-op).
 	// Completions are append-only history; existing rows are never updated.
 	UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error
-	UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error
-	UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error
 }
 
 var _ Querier = (*Queries)(nil)

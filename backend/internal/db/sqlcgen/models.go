@@ -66,7 +66,7 @@ type Note struct {
 	IsInbox         bool               `json:"is_inbox"`
 	Favorite        bool               `json:"favorite"`
 	Archived        bool               `json:"archived"`
-	SearchVector    string             `json:"search_vector"`
+	SearchVector    interface{}        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
@@ -82,10 +82,10 @@ type NoteEmbedding struct {
 }
 
 type NoteLink struct {
-	ID       pgtype.UUID `json:"id"`
 	SourceID pgtype.UUID `json:"source_id"`
 	TargetID pgtype.UUID `json:"target_id"`
 	Relation string      `json:"relation"`
+	ID       pgtype.UUID `json:"id"`
 }
 
 type NoteTag struct {
@@ -103,26 +103,29 @@ type RefreshToken struct {
 }
 
 type Routine struct {
-	ID        pgtype.UUID        `json:"id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	Type      string             `json:"type"`
-	CronExpr  string             `json:"cron_expr"`
-	Enabled   bool               `json:"enabled"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	Name      string             `json:"name"`
-	LastRunAt pgtype.Timestamptz `json:"last_run_at"`
-	BriefType string             `json:"brief_type"`
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	Type       string             `json:"type"`
+	CronExpr   string             `json:"cron_expr"`
+	Enabled    bool               `json:"enabled"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	Name       string             `json:"name"`
+	LastRunAt  pgtype.Timestamptz `json:"last_run_at"`
+	BriefType  string             `json:"brief_type"`
+	TimeOfDay  pgtype.Time        `json:"time_of_day"`
+	DaysOfWeek []int16            `json:"days_of_week"`
 }
 
 type RoutineLog struct {
-	ID        pgtype.UUID        `json:"id"`
-	RoutineID pgtype.UUID        `json:"routine_id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	Status    string             `json:"status"`
-	Content   pgtype.Text        `json:"content"`
-	ErrorMsg  pgtype.Text        `json:"error_msg"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID             pgtype.UUID        `json:"id"`
+	RoutineID      pgtype.UUID        `json:"routine_id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	Status         string             `json:"status"`
+	Content        pgtype.Text        `json:"content"`
+	ErrorMsg       pgtype.Text        `json:"error_msg"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	TelegramSentAt pgtype.Timestamptz `json:"telegram_sent_at"`
 }
 
 type Soul struct {
@@ -141,17 +144,18 @@ type Tag struct {
 }
 
 type Task struct {
-	ID         pgtype.UUID        `json:"id"`
-	NoteID     pgtype.UUID        `json:"note_id"`
-	UserID     pgtype.UUID        `json:"user_id"`
-	Title      string             `json:"title"`
-	Status     string             `json:"status"`
-	DueDate    pgtype.Timestamptz `json:"due_date"`
-	Recurrence pgtype.Text        `json:"recurrence"`
-	Position   int32              `json:"position"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+	ID          pgtype.UUID        `json:"id"`
+	NoteID      pgtype.UUID        `json:"note_id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	Title       string             `json:"title"`
+	Status      string             `json:"status"`
+	DueDate     pgtype.Timestamptz `json:"due_date"`
+	Recurrence  pgtype.Text        `json:"recurrence"`
+	Position    int32              `json:"position"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 }
 
 type TaskCompletion struct {
@@ -165,9 +169,9 @@ type TelegramLink struct {
 	ID               pgtype.UUID        `json:"id"`
 	UserID           pgtype.UUID        `json:"user_id"`
 	TelegramChatID   int64              `json:"telegram_chat_id"`
-	TelegramUserID   pgtype.Int8        `json:"telegram_user_id"`
 	TelegramUsername pgtype.Text        `json:"telegram_username"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	TelegramUserID   pgtype.Int8        `json:"telegram_user_id"`
 }
 
 type TelegramLinkCode struct {

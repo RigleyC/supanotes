@@ -51,6 +51,65 @@ func (q *Queries) GetSyncContexts(ctx context.Context, arg GetSyncContextsParams
 	return items, nil
 }
 
+const getSyncNoteLinks = `-- name: GetSyncNoteLinks :many
+SELECT nl.source_id, nl.target_id, nl.relation, nl.id
+FROM note_links nl
+JOIN notes n ON n.id = nl.source_id
+WHERE n.user_id = $1
+`
+
+func (q *Queries) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]NoteLink, error) {
+	rows, err := q.db.Query(ctx, getSyncNoteLinks, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NoteLink
+	for rows.Next() {
+		var i NoteLink
+		if err := rows.Scan(
+			&i.SourceID,
+			&i.TargetID,
+			&i.Relation,
+			&i.ID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSyncNoteTags = `-- name: GetSyncNoteTags :many
+SELECT nt.note_id, nt.tag_id
+FROM note_tags nt
+JOIN notes n ON n.id = nt.note_id
+WHERE n.user_id = $1
+`
+
+func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]NoteTag, error) {
+	rows, err := q.db.Query(ctx, getSyncNoteTags, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NoteTag
+	for rows.Next() {
+		var i NoteTag
+		if err := rows.Scan(&i.NoteID, &i.TagID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSyncNotes = `-- name: GetSyncNotes :many
 SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status FROM notes
 WHERE user_id = $1 AND updated_at > $2
@@ -138,8 +197,55 @@ func (q *Queries) GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag
 	return items, nil
 }
 
+const getSyncTaskCompletions = `-- name: GetSyncTaskCompletions :many
+SELECT tc.id, tc.task_id, tc.completed_at, tc.due_date
+FROM task_completions tc
+JOIN tasks t ON t.id = tc.task_id
+WHERE t.user_id = $1
+  AND tc.completed_at > $2
+ORDER BY tc.completed_at ASC
+LIMIT $3
+`
+
+type GetSyncTaskCompletionsParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	LastSyncedAt pgtype.Timestamptz `json:"last_synced_at"`
+	Limit        int32              `json:"limit"`
+}
+
+// Returns completion rows belonging to a user's tasks whose
+// `completed_at` is newer than the cursor. The table has no
+// `updated_at`, so we use `completed_at` as the pull cursor —
+// completions are append-only, so any new completion is guaranteed
+// to have a fresh timestamp. The join through `tasks` enforces the
+// per-user scope since `task_completions` itself has no `user_id`.
+func (q *Queries) GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error) {
+	rows, err := q.db.Query(ctx, getSyncTaskCompletions, arg.UserID, arg.LastSyncedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TaskCompletion
+	for rows.Next() {
+		var i TaskCompletion
+		if err := rows.Scan(
+			&i.ID,
+			&i.TaskID,
+			&i.CompletedAt,
+			&i.DueDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSyncTasks = `-- name: GetSyncTasks :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
 WHERE user_id = $1 AND updated_at > $2
 ORDER BY updated_at ASC
 LIMIT $3
@@ -172,6 +278,7 @@ func (q *Queries) GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]T
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.CompletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -320,6 +427,63 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 	return i, err
 }
 
+const upsertNoteLink = `-- name: UpsertNoteLink :exec
+INSERT INTO note_links (id, source_id, target_id, relation, created_at, updated_at)
+SELECT $1::uuid,
+       $2::uuid,
+       $3::uuid,
+       $4::varchar,
+       $5::timestamptz,
+       NOW()
+WHERE EXISTS (
+  SELECT 1 FROM notes WHERE id = $2::uuid AND user_id = $6::uuid
+)
+ON CONFLICT (id) DO UPDATE
+SET relation = EXCLUDED.relation,
+    updated_at = NOW()
+`
+
+type UpsertNoteLinkParams struct {
+	ID        pgtype.UUID        `json:"id"`
+	SourceID  pgtype.UUID        `json:"source_id"`
+	TargetID  pgtype.UUID        `json:"target_id"`
+	Relation  string             `json:"relation"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UserID    pgtype.UUID        `json:"user_id"`
+}
+
+func (q *Queries) UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error {
+	_, err := q.db.Exec(ctx, upsertNoteLink,
+		arg.ID,
+		arg.SourceID,
+		arg.TargetID,
+		arg.Relation,
+		arg.CreatedAt,
+		arg.UserID,
+	)
+	return err
+}
+
+const upsertNoteTag = `-- name: UpsertNoteTag :exec
+INSERT INTO note_tags (note_id, tag_id)
+SELECT $1::uuid, $2::uuid
+WHERE EXISTS (
+  SELECT 1 FROM notes WHERE id = $1::uuid AND user_id = $3::uuid
+)
+ON CONFLICT (note_id, tag_id) DO NOTHING
+`
+
+type UpsertNoteTagParams struct {
+	NoteID pgtype.UUID `json:"note_id"`
+	TagID  pgtype.UUID `json:"tag_id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error {
+	_, err := q.db.Exec(ctx, upsertNoteTag, arg.NoteID, arg.TagID, arg.UserID)
+	return err
+}
+
 const upsertTag = `-- name: UpsertTag :one
 INSERT INTO tags (id, user_id, name, created_at)
 VALUES ($1, $2, $3, $4)
@@ -366,7 +530,7 @@ SET note_id = EXCLUDED.note_id,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 WHERE tasks.user_id = EXCLUDED.user_id
-RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at
+RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at
 `
 
 type UpsertTaskParams struct {
@@ -408,15 +572,17 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.CompletedAt,
 	)
 	return i, err
 }
 
 const upsertTaskCompletion = `-- name: UpsertTaskCompletion :exec
-INSERT INTO task_completions (id, task_id, completed_at)
+INSERT INTO task_completions (id, task_id, completed_at, status)
 SELECT $1::uuid,
        $2::uuid,
-       $3::timestamptz
+       $3::timestamptz,
+       'completed'
 FROM tasks
 WHERE tasks.id = $2::uuid
   AND tasks.user_id = $4::uuid
@@ -440,171 +606,5 @@ func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskComple
 		arg.CompletedAt,
 		arg.UserID,
 	)
-	return err
-}
-
-// HAND-ADDED — not generated because sqlc is not on the CI PATH at time
-// of writing. Run `sqlc generate` from backend/ to regenerate the full
-// file; if the generated output matches then this comment can be removed.
-const getSyncTaskCompletions = `-- name: GetSyncTaskCompletions :many
-SELECT tc.id, tc.task_id, tc.completed_at, tc.due_date
-FROM task_completions tc
-JOIN tasks t ON t.id = tc.task_id
-WHERE t.user_id = $1
-  AND tc.completed_at > $2
-ORDER BY tc.completed_at ASC
-LIMIT $3
-`
-
-type GetSyncTaskCompletionsParams struct {
-	UserID       pgtype.UUID        `json:"user_id"`
-	LastSyncedAt pgtype.Timestamptz `json:"last_synced_at"`
-	Limit        int32              `json:"limit"`
-}
-
-// Returns completion rows belonging to a user's tasks whose
-// `completed_at` is newer than the cursor. The table has no
-// `updated_at`, so we use `completed_at` as the pull cursor —
-// completions are append-only, so any new completion is guaranteed
-// to have a fresh timestamp. The join through `tasks` enforces the
-// per-user scope since `task_completions` itself has no `user_id`.
-func (q *Queries) GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error) {
-	rows, err := q.db.Query(ctx, getSyncTaskCompletions, arg.UserID, arg.LastSyncedAt, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []TaskCompletion
-	for rows.Next() {
-		var i TaskCompletion
-		if err := rows.Scan(
-			&i.ID,
-			&i.TaskID,
-			&i.CompletedAt,
-			&i.DueDate,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getSyncNoteTags = `-- name: GetSyncNoteTags :many
-SELECT nt.note_id, nt.tag_id
-FROM note_tags nt
-JOIN notes n ON n.id = nt.note_id
-WHERE n.user_id = $1
-`
-
-type GetSyncNoteTagsParams struct {
-	UserID pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) GetSyncNoteTags(ctx context.Context, arg GetSyncNoteTagsParams) ([]NoteTag, error) {
-	rows, err := q.db.Query(ctx, getSyncNoteTags, arg.UserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []NoteTag
-	for rows.Next() {
-		var i NoteTag
-		if err := rows.Scan(
-			&i.NoteID,
-			&i.TagID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const upsertNoteTag = `-- name: UpsertNoteTag :exec
-INSERT INTO note_tags (note_id, tag_id)
-SELECT $1::uuid, $2::uuid
-WHERE EXISTS (
-  SELECT 1 FROM notes WHERE id = $1::uuid AND user_id = $3::uuid
-)
-ON CONFLICT (note_id, tag_id) DO NOTHING
-`
-
-type UpsertNoteTagParams struct {
-	NoteID pgtype.UUID `json:"note_id"`
-	TagID  pgtype.UUID `json:"tag_id"`
-	UserID pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error {
-	_, err := q.db.Exec(ctx, upsertNoteTag, arg.NoteID, arg.TagID, arg.UserID)
-	return err
-}
-
-const getSyncNoteLinks = `-- name: GetSyncNoteLinks :many
-SELECT nl.id, nl.source_id, nl.target_id, nl.relation
-FROM note_links nl
-JOIN notes n ON n.id = nl.source_id
-WHERE n.user_id = $1
-`
-
-type GetSyncNoteLinksParams struct {
-	UserID pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) GetSyncNoteLinks(ctx context.Context, arg GetSyncNoteLinksParams) ([]NoteLink, error) {
-	rows, err := q.db.Query(ctx, getSyncNoteLinks, arg.UserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []NoteLink
-	for rows.Next() {
-		var i NoteLink
-		if err := rows.Scan(
-			&i.ID,
-			&i.SourceID,
-			&i.TargetID,
-			&i.Relation,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const upsertNoteLink = `-- name: UpsertNoteLink :exec
-INSERT INTO note_links (id, source_id, target_id, relation)
-SELECT $1::uuid,
-       $2::uuid,
-       $3::uuid,
-       $4::varchar
-WHERE EXISTS (
-  SELECT 1 FROM notes WHERE id = $2::uuid AND user_id = $5::uuid
-)
-ON CONFLICT (id) DO UPDATE
-SET relation = EXCLUDED.relation
-`
-
-type UpsertNoteLinkParams struct {
-	ID       pgtype.UUID `json:"id"`
-	SourceID pgtype.UUID `json:"source_id"`
-	TargetID pgtype.UUID `json:"target_id"`
-	Relation string      `json:"relation"`
-	UserID   pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error {
-	_, err := q.db.Exec(ctx, upsertNoteLink, arg.ID, arg.SourceID, arg.TargetID, arg.Relation, arg.UserID)
 	return err
 }

@@ -24,7 +24,7 @@ func (q *Queries) CleanupOldMessages(ctx context.Context) error {
 const createRoutine = `-- name: CreateRoutine :one
 INSERT INTO routines (user_id, type, cron_expr, enabled, name, brief_type)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type
+RETURNING id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type, time_of_day, days_of_week
 `
 
 type CreateRoutineParams struct {
@@ -57,6 +57,8 @@ func (q *Queries) CreateRoutine(ctx context.Context, arg CreateRoutineParams) (R
 		&i.Name,
 		&i.LastRunAt,
 		&i.BriefType,
+		&i.TimeOfDay,
+		&i.DaysOfWeek,
 	)
 	return i, err
 }
@@ -64,7 +66,7 @@ func (q *Queries) CreateRoutine(ctx context.Context, arg CreateRoutineParams) (R
 const createRoutineLog = `-- name: CreateRoutineLog :one
 INSERT INTO routine_logs (routine_id, user_id, status, content, error_msg)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, routine_id, user_id, status, content, error_msg, created_at
+RETURNING id, routine_id, user_id, status, content, error_msg, created_at, telegram_sent_at
 `
 
 type CreateRoutineLogParams struct {
@@ -92,6 +94,7 @@ func (q *Queries) CreateRoutineLog(ctx context.Context, arg CreateRoutineLogPara
 		&i.Content,
 		&i.ErrorMsg,
 		&i.CreatedAt,
+		&i.TelegramSentAt,
 	)
 	return i, err
 }
@@ -140,7 +143,7 @@ func (q *Queries) GetEnabledRoutines(ctx context.Context) ([]GetEnabledRoutinesR
 }
 
 const getLatestBriefByType = `-- name: GetLatestBriefByType :one
-SELECT rl.id, rl.routine_id, rl.user_id, rl.status, rl.content, rl.error_msg, rl.created_at FROM routine_logs rl
+SELECT rl.id, rl.routine_id, rl.user_id, rl.status, rl.content, rl.error_msg, rl.created_at, rl.telegram_sent_at FROM routine_logs rl
 JOIN routines r ON rl.routine_id = r.id
 WHERE rl.user_id = $1 AND r.type = $2 AND rl.status = 'success'
 ORDER BY rl.created_at DESC
@@ -163,12 +166,13 @@ func (q *Queries) GetLatestBriefByType(ctx context.Context, arg GetLatestBriefBy
 		&i.Content,
 		&i.ErrorMsg,
 		&i.CreatedAt,
+		&i.TelegramSentAt,
 	)
 	return i, err
 }
 
 const getRoutineLogsByUser = `-- name: GetRoutineLogsByUser :many
-SELECT id, routine_id, user_id, status, content, error_msg, created_at FROM routine_logs
+SELECT id, routine_id, user_id, status, content, error_msg, created_at, telegram_sent_at FROM routine_logs
 WHERE user_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -197,6 +201,7 @@ func (q *Queries) GetRoutineLogsByUser(ctx context.Context, arg GetRoutineLogsBy
 			&i.Content,
 			&i.ErrorMsg,
 			&i.CreatedAt,
+			&i.TelegramSentAt,
 		); err != nil {
 			return nil, err
 		}
@@ -209,7 +214,7 @@ func (q *Queries) GetRoutineLogsByUser(ctx context.Context, arg GetRoutineLogsBy
 }
 
 const getRoutinesByUser = `-- name: GetRoutinesByUser :many
-SELECT id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type FROM routines
+SELECT id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type, time_of_day, days_of_week FROM routines
 WHERE user_id = $1
 ORDER BY created_at ASC
 `
@@ -234,6 +239,8 @@ func (q *Queries) GetRoutinesByUser(ctx context.Context, userID pgtype.UUID) ([]
 			&i.Name,
 			&i.LastRunAt,
 			&i.BriefType,
+			&i.TimeOfDay,
+			&i.DaysOfWeek,
 		); err != nil {
 			return nil, err
 		}
@@ -251,7 +258,7 @@ SET cron_expr = COALESCE($3, cron_expr),
     enabled = COALESCE($4, enabled),
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type
+RETURNING id, user_id, type, cron_expr, enabled, created_at, updated_at, name, last_run_at, brief_type, time_of_day, days_of_week
 `
 
 type UpdateRoutineParams struct {
@@ -280,6 +287,8 @@ func (q *Queries) UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (R
 		&i.Name,
 		&i.LastRunAt,
 		&i.BriefType,
+		&i.TimeOfDay,
+		&i.DaysOfWeek,
 	)
 	return i, err
 }

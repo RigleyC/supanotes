@@ -47,7 +47,7 @@ func (q *Queries) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, er
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at
+RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at
 `
 
 type CreateTaskParams struct {
@@ -81,6 +81,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.CompletedAt,
 	)
 	return i, err
 }
@@ -125,7 +126,7 @@ func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
 }
 
 const getTaskByID = `-- name: GetTaskByID :one
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 `
 
@@ -149,12 +150,13 @@ func (q *Queries) GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.CompletedAt,
 	)
 	return i, err
 }
 
 const getTasks = `-- name: GetTasks :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
 WHERE user_id = $1
   AND deleted_at IS NULL
   AND ($4::uuid IS NULL OR note_id = $4)
@@ -204,6 +206,7 @@ func (q *Queries) GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, err
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.CompletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -216,7 +219,7 @@ func (q *Queries) GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, err
 }
 
 const getTasksByNoteID = `-- name: GetTasksByNoteID :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
 WHERE user_id = $1 AND note_id = $2 AND deleted_at IS NULL
 ORDER BY position ASC, created_at ASC
 `
@@ -247,6 +250,7 @@ func (q *Queries) GetTasksByNoteID(ctx context.Context, arg GetTasksByNoteIDPara
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.CompletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -259,7 +263,7 @@ func (q *Queries) GetTasksByNoteID(ctx context.Context, arg GetTasksByNoteIDPara
 }
 
 const getTodayTasks = `-- name: GetTodayTasks :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
 WHERE user_id = $1
   AND deleted_at IS NULL
   AND status = 'open'
@@ -294,6 +298,7 @@ func (q *Queries) GetTodayTasks(ctx context.Context, arg GetTodayTasksParams) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.CompletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -315,7 +320,7 @@ SET title = COALESCE($3, title),
     completed_at = COALESCE($8, completed_at),
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at
+RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at
 `
 
 type UpdateTaskParams struct {
@@ -353,6 +358,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.CompletedAt,
 	)
 	return i, err
 }

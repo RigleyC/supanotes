@@ -356,7 +356,7 @@ func (t *SearchNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJ
 	}
 	var b strings.Builder
 	for _, r := range results {
-		b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %d)\n", formatID(r.ID), r.Title.String, r.Similarity))
+		b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f)\n", formatID(r.ID), r.Title.String, r.Similarity))
 	}
 	if b.Len() == 0 {
 		return "No matching notes found", nil

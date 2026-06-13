@@ -170,9 +170,6 @@ func (s *stubQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesPa
 func (s *stubQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetPendingEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetPendingEmbeddingsRow, error) {
-	panic("unimplemented")
-}
 func (s *stubQuerier) GetRefreshToken(ctx context.Context, tokenHash string) (sqlcgen.RefreshToken, error) {
 	panic("unimplemented")
 }
@@ -298,13 +295,13 @@ func (s *stubQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.Upse
 func (s *stubQuerier) GetSyncTaskCompletions(ctx context.Context, arg sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetSyncNoteTags(ctx context.Context, arg sqlcgen.GetSyncNoteTagsParams) ([]sqlcgen.NoteTag, error) {
+func (s *stubQuerier) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetSyncNoteLinks(ctx context.Context, arg sqlcgen.GetSyncNoteLinksParams) ([]sqlcgen.NoteLink, error) {
+func (s *stubQuerier) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {

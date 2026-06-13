@@ -248,9 +248,6 @@ func (m *mockQuerier) DeleteMemory(ctx context.Context, arg sqlcgen.DeleteMemory
 func (m *mockQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesParams) ([]sqlcgen.Memory, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetPendingEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetPendingEmbeddingsRow, error) {
-	return nil, nil
-}
 func (m *mockQuerier) GetRetryableEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetRetryableEmbeddingsRow, error) {
 	return nil, nil
 }
@@ -638,13 +635,13 @@ func (m *mockQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.Upse
 func (m *mockQuerier) GetSyncTaskCompletions(ctx context.Context, arg sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetSyncNoteTags(ctx context.Context, arg sqlcgen.GetSyncNoteTagsParams) ([]sqlcgen.NoteTag, error) {
+func (m *mockQuerier) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	return nil, nil
 }
 func (m *mockQuerier) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error {
 	return nil
 }
-func (m *mockQuerier) GetSyncNoteLinks(ctx context.Context, arg sqlcgen.GetSyncNoteLinksParams) ([]sqlcgen.NoteLink, error) {
+func (m *mockQuerier) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error) {
 	return nil, nil
 }
 func (m *mockQuerier) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {

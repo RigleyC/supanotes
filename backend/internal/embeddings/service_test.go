@@ -16,10 +16,6 @@ type mockRepo struct {
 	upsertEmbedding func(ctx context.Context, noteID pgtype.UUID, embedding pgvector.Vector) error
 }
 
-func (m *mockRepo) GetPendingEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetPendingEmbeddingsRow, error) {
-	return nil, nil
-}
-
 func (m *mockRepo) GetRetryableEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetRetryableEmbeddingsRow, error) {
 	return m.getRetryable(ctx, limit)
 }

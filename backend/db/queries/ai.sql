@@ -1,11 +1,3 @@
--- name: GetPendingEmbeddings :many
-SELECT n.id, n.content, n.user_id 
-FROM notes n
-WHERE n.embedding_status = 'pending'
-  AND n.deleted_at IS NULL
-  AND NOT n.is_inbox
-LIMIT $1;
-
 -- name: GetRetryableEmbeddings :many
 SELECT n.id, n.content, n.user_id 
 FROM notes n
@@ -56,7 +48,7 @@ DELETE FROM memories
 WHERE id = $1 AND user_id = $2;
 
 -- name: SearchNotesByEmbedding :many
-SELECT n.id, n.title, n.content, n.updated_at, 1 - (ne.embedding <=> $2::vector) AS similarity
+SELECT n.id, n.title, n.content, n.updated_at, (1 - (ne.embedding <=> $2::vector))::real AS similarity
 FROM notes n
 JOIN note_embeddings ne ON n.id = ne.note_id
 WHERE n.user_id = $1 AND n.deleted_at IS NULL AND NOT n.is_inbox
@@ -64,7 +56,7 @@ ORDER BY ne.embedding <=> $2::vector
 LIMIT $3;
 
 -- name: SearchMemoriesByEmbedding :many
-SELECT m.id, m.content, m.created_at, 1 - (m.embedding <=> $2::vector) AS similarity
+SELECT m.id, m.content, m.created_at, (1 - (m.embedding <=> $2::vector))::real AS similarity
 FROM memories m
 WHERE m.user_id = $1
 ORDER BY m.embedding <=> $2::vector

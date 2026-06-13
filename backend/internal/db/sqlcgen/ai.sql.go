@@ -93,41 +93,6 @@ func (q *Queries) GetMemories(ctx context.Context, arg GetMemoriesParams) ([]Mem
 	return items, nil
 }
 
-const getPendingEmbeddings = `-- name: GetPendingEmbeddings :many
-SELECT n.id, n.content, n.user_id 
-FROM notes n
-WHERE n.embedding_status = 'pending'
-  AND n.deleted_at IS NULL
-  AND NOT n.is_inbox
-LIMIT $1
-`
-
-type GetPendingEmbeddingsRow struct {
-	ID      pgtype.UUID `json:"id"`
-	Content string      `json:"content"`
-	UserID  pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) GetPendingEmbeddings(ctx context.Context, limit int32) ([]GetPendingEmbeddingsRow, error) {
-	rows, err := q.db.Query(ctx, getPendingEmbeddings, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetPendingEmbeddingsRow
-	for rows.Next() {
-		var i GetPendingEmbeddingsRow
-		if err := rows.Scan(&i.ID, &i.Content, &i.UserID); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getRetryableEmbeddings = `-- name: GetRetryableEmbeddings :many
 SELECT n.id, n.content, n.user_id 
 FROM notes n
@@ -183,7 +148,7 @@ func (q *Queries) GetSoul(ctx context.Context, userID pgtype.UUID) (Soul, error)
 }
 
 const searchMemoriesByEmbedding = `-- name: SearchMemoriesByEmbedding :many
-SELECT m.id, m.content, m.created_at, 1 - (m.embedding <=> $2::vector) AS similarity
+SELECT m.id, m.content, m.created_at, (1 - (m.embedding <=> $2::vector))::real AS similarity
 FROM memories m
 WHERE m.user_id = $1
 ORDER BY m.embedding <=> $2::vector
@@ -200,7 +165,7 @@ type SearchMemoriesByEmbeddingRow struct {
 	ID         pgtype.UUID        `json:"id"`
 	Content    string             `json:"content"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	Similarity int32              `json:"similarity"`
+	Similarity float32            `json:"similarity"`
 }
 
 func (q *Queries) SearchMemoriesByEmbedding(ctx context.Context, arg SearchMemoriesByEmbeddingParams) ([]SearchMemoriesByEmbeddingRow, error) {
@@ -229,7 +194,7 @@ func (q *Queries) SearchMemoriesByEmbedding(ctx context.Context, arg SearchMemor
 }
 
 const searchNotesByEmbedding = `-- name: SearchNotesByEmbedding :many
-SELECT n.id, n.title, n.content, n.updated_at, 1 - (ne.embedding <=> $2::vector) AS similarity
+SELECT n.id, n.title, n.content, n.updated_at, (1 - (ne.embedding <=> $2::vector))::real AS similarity
 FROM notes n
 JOIN note_embeddings ne ON n.id = ne.note_id
 WHERE n.user_id = $1 AND n.deleted_at IS NULL AND NOT n.is_inbox
@@ -248,7 +213,7 @@ type SearchNotesByEmbeddingRow struct {
 	Title      pgtype.Text        `json:"title"`
 	Content    string             `json:"content"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	Similarity int32              `json:"similarity"`
+	Similarity float32            `json:"similarity"`
 }
 
 func (q *Queries) SearchNotesByEmbedding(ctx context.Context, arg SearchNotesByEmbeddingParams) ([]SearchNotesByEmbeddingRow, error) {

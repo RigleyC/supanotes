@@ -103,10 +103,12 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		linkedNotes     []sqlcgen.Note
 	)
 
-	if emb, err := cb.embedCL.GenerateEmbedding(ctx, query); err != nil {
-		log.Warn().Err(err).Msg("generate query embedding failed; skipping semantic note search")
+	emb, embErr := cb.embedCL.GenerateEmbedding(ctx, query)
+	if embErr != nil {
+		log.Warn().Err(embErr).Msg("generate query embedding failed; skipping semantic search")
 	} else {
 		vec := pgvector.NewVector(float64ToFloat32(emb))
+
 		var sErr error
 		semanticResults, sErr = cb.q.SearchNotesByEmbedding(ctx, sqlcgen.SearchNotesByEmbeddingParams{
 			UserID:  userID,
@@ -116,12 +118,7 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		if sErr != nil {
 			log.Warn().Err(sErr).Msg("search notes by embedding failed; skipping semantic results")
 		}
-	}
 
-	if emb, err := cb.embedCL.GenerateEmbedding(ctx, query); err != nil {
-		log.Warn().Err(err).Msg("generate memory embedding failed; skipping semantic memory search")
-	} else {
-		vec := pgvector.NewVector(float64ToFloat32(emb))
 		var mErr error
 		memResults, mErr = cb.memoriesRepo.SearchMemories(ctx, userID, vec, 5)
 		if mErr != nil {
@@ -168,7 +165,7 @@ RECENT MESSAGES HISTORY (Up to 10):
 	tier3 := &strings.Builder{}
 	tier3.WriteString("\nSEMANTIC SEARCH RESULTS:\n")
 	for _, r := range semanticResults {
-		tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %d)\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity))
+		tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f)\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity))
 	}
 	if len(semanticResults) == 0 {
 		tier3.WriteString("(none)\n")
@@ -186,7 +183,7 @@ RECENT MESSAGES HISTORY (Up to 10):
 	tier5 := &strings.Builder{}
 	tier5.WriteString("\nRELEVANT MEMORIES:\n")
 	for _, m := range memResults {
-		tier5.WriteString(fmt.Sprintf("- %s (similarity: %d)\n", m.Content, m.Similarity))
+		tier5.WriteString(fmt.Sprintf("- %s (similarity: %.4f)\n", m.Content, m.Similarity))
 	}
 	if len(memResults) == 0 {
 		tier5.WriteString("(none)\n")
@@ -278,7 +275,7 @@ TODAY / OVERDUE TASKS:
 	if len(semanticResults) > 0 {
 		b.WriteString("\nRELEVANT NOTES (via semantic search):\n")
 		for _, r := range semanticResults {
-			b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %d)\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity))
+			b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f)\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity))
 		}
 	}
 

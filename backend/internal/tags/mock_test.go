@@ -112,9 +112,6 @@ func (m *mockQuerier) GetNoteByID(_ context.Context, _ sqlcgen.GetNoteByIDParams
 func (m *mockQuerier) GetNotes(_ context.Context, _ sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetPendingEmbeddings(_ context.Context, _ int32) ([]sqlcgen.GetPendingEmbeddingsRow, error) {
-	return nil, nil
-}
 func (m *mockQuerier) GetRecentNotes(_ context.Context, _ pgtype.UUID) ([]sqlcgen.Note, error) {
 	return nil, nil
 }
@@ -245,13 +242,13 @@ func (m *mockQuerier) UpsertTaskCompletion(_ context.Context, _ sqlcgen.UpsertTa
 func (m *mockQuerier) GetSyncTaskCompletions(_ context.Context, _ sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetSyncNoteTags(_ context.Context, _ sqlcgen.GetSyncNoteTagsParams) ([]sqlcgen.NoteTag, error) {
+func (m *mockQuerier) GetSyncNoteTags(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	return nil, nil
 }
 func (m *mockQuerier) UpsertNoteTag(_ context.Context, _ sqlcgen.UpsertNoteTagParams) error {
 	return nil
 }
-func (m *mockQuerier) GetSyncNoteLinks(_ context.Context, _ sqlcgen.GetSyncNoteLinksParams) ([]sqlcgen.NoteLink, error) {
+func (m *mockQuerier) GetSyncNoteLinks(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteLink, error) {
 	return nil, nil
 }
 func (m *mockQuerier) UpsertNoteLink(_ context.Context, _ sqlcgen.UpsertNoteLinkParams) error {

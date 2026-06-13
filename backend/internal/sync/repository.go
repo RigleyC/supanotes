@@ -100,7 +100,7 @@ func (r *repo) GetSyncTaskCompletions(ctx context.Context, userID pgtype.UUID, l
 }
 
 func (r *repo) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
-	return r.q.GetSyncNoteTags(ctx, sqlcgen.GetSyncNoteTagsParams{UserID: userID})
+	return r.q.GetSyncNoteTags(ctx, userID)
 }
 
 func (r *repo) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error {
@@ -108,7 +108,7 @@ func (r *repo) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParam
 }
 
 func (r *repo) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error) {
-	return r.q.GetSyncNoteLinks(ctx, sqlcgen.GetSyncNoteLinksParams{UserID: userID})
+	return r.q.GetSyncNoteLinks(ctx, userID)
 }
 
 func (r *repo) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
