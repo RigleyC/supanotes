@@ -32,6 +32,10 @@ class NoteToolbar extends StatelessWidget {
         final activeNodeId = _activeNodeId(selection);
         final blockType = _activeBlockType(activeNodeId);
         final isListItem = blockType == listItemAttribution;
+        final activeNode = activeNodeId != null
+            ? editor.context.document.getNodeById(activeNodeId)
+            : null;
+        final isTask = activeNode is TaskNode;
 
         return Container(
           margin: const EdgeInsets.fromLTRB(8, 0, 8, 24),
@@ -123,7 +127,7 @@ class NoteToolbar extends StatelessWidget {
                 _ToolbarButton(
                   icon: Icons.check_box_outlined,
                   tooltip: 'Tarefa',
-                  isActive: false,
+                  isActive: isTask,
                   onPressed: _convertToTask,
                 ),
                 _ToolbarButton(
