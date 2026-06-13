@@ -194,57 +194,42 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 		}
 	}
 
-	for _, item := range items {
-		if !item.Accepted {
-			continue
-		}
-
-		fullSnippet := item.OriginalSnippet
-		parts := strings.Split(item.ItemID, "-")
-		if len(parts) >= 2 {
-			var idx int
-			_, scanErr := fmt.Sscanf(parts[len(parts)-1], "%d", &idx)
-			if scanErr == nil && idx >= 0 && idx < len(lines) {
-				candidate := strings.TrimSpace(lines[idx])
-				prefix := strings.TrimSuffix(item.OriginalSnippet, "...")
-				if strings.HasPrefix(candidate, prefix) {
-					fullSnippet = candidate
-				}
-			}
-		}
-
-		switch item.DestinationType {
-		case DestNewNote:
-			if _, err := s.CreateNote(ctx, userID, item.DestinationTitle, fullSnippet, nil, false, false); err != nil {
-				return fmt.Errorf("create note: %w", err)
-			}
-		case DestExistingNote:
-			if item.DestinationNoteID == nil {
-				continue
-			}
-			noteID, err := uid.UUIDFromString(*item.DestinationNoteID)
-			if err != nil {
-				return fmt.Errorf("invalid destination note id: %w", err)
-			}
-			if _, err := s.AppendToNoteContent(ctx, userID, noteID, fullSnippet); err != nil {
-				return fmt.Errorf("append to note: %w", err)
-			}
-		case DestKeep:
-		}
-	}
-
 	var keptLines []string
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
+
 		itemID := fmt.Sprintf("%s-%d", noteIDStr, i)
 		reqItem, isOutgoing := outgoing[itemID]
-		if !isOutgoing || reqItem.DestinationType == DestKeep {
+
+		if !isOutgoing {
+			keptLines = append(keptLines, trimmed)
+			continue
+		}
+
+		switch reqItem.DestinationType {
+		case DestNewNote:
+			if _, err := s.CreateNote(ctx, userID, reqItem.DestinationTitle, trimmed, nil, false, false); err != nil {
+				return fmt.Errorf("create note: %w", err)
+			}
+		case DestExistingNote:
+			if reqItem.DestinationNoteID != nil {
+				noteID, err := uid.UUIDFromString(*reqItem.DestinationNoteID)
+				if err == nil {
+					if _, err := s.AppendToNoteContent(ctx, userID, noteID, trimmed); err != nil {
+						return fmt.Errorf("append to note: %w", err)
+					}
+				} else {
+					return fmt.Errorf("invalid destination note id: %w", err)
+				}
+			}
+		case DestKeep:
 			keptLines = append(keptLines, trimmed)
 		}
 	}
+
 	newContent := strings.Join(keptLines, "\n\n")
 	_, err = s.SetInboxContent(ctx, userID, newContent)
 	return err
