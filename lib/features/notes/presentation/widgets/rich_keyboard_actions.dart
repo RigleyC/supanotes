@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 
+/// A [SuperEditor] keyboard action that cuts the document selection as rich text
+/// with plain text fallback when CMD + X (Mac) or CTRL + X (Windows/Linux) is pressed.
 ExecutionInstruction cutAsRichTextWhenCmdXOrCtrlXIsPressed({
   required SuperEditorContext editContext,
   required KeyEvent keyEvent,
@@ -29,6 +31,7 @@ ExecutionInstruction cutAsRichTextWhenCmdXOrCtrlXIsPressed({
   return ExecutionInstruction.haltExecution;
 }
 
+/// Prepends rich copy, cut, and paste actions to the list of [baseActions].
 List<SuperEditorKeyboardAction> buildRichKeyboardActions({
   required List<SuperEditorKeyboardAction> baseActions,
 }) {
