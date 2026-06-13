@@ -46,7 +46,10 @@ class AppTheme {
       brightness: brightness,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colorScheme.surface,
-      textTheme: AppTypography.textTheme,
+      textTheme: AppTypography.textTheme.apply(
+        bodyColor: colorScheme.onSurface,
+        displayColor: colorScheme.onSurface,
+      ),
       visualDensity: VisualDensity.adaptivePlatformDensity,
       fontFamily: GoogleFonts.bricolageGrotesque().fontFamily,
     );
