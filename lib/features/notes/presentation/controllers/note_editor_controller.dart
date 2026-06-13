@@ -142,14 +142,13 @@ class NoteEditorController {
   }
 
   /// Captures the current final state and persists it immediately,
-  /// bypassing the debounce. Call from the [PopScope] handler before
-  /// navigating away.
+  /// bypassing the debounce. Call from [dispose] before cleaning up.
   ///
   /// When both the title and markdown content are empty (after
   /// trimming), the row is deleted instead of saved. Screens that did
   /// not wire an [emptyNoteExit] callback (e.g. inbox) skip the delete,
   /// preserving the old content.
-  Future<void> flushBeforePop() async {
+  void _flushAndSaveFinalState() {
     final noteId = _noteId;
     final doc = document;
     if (noteId == null || doc == null) return;
@@ -159,15 +158,9 @@ class NoteEditorController {
     final tasks = _extractTasks(doc);
 
     dev.log(
-      '[NoteEditorController] flushBeforePop: noteId=$noteId, '
+      '[NoteEditorController] _flushAndSaveFinalState: noteId=$noteId, '
       'markdownLength=${markdown.length}, titleLength=${title.length}',
       name: 'NoteEditor',
-    );
-
-    final generation = _saveThrottle.nextGeneration();
-    await _saveThrottle.flush(
-      generation: generation,
-      operation: () => snapshotSave(noteId, title, markdown, tasks),
     );
 
     if (title.trim().isEmpty && markdown.trim().isEmpty) {
@@ -175,7 +168,13 @@ class NoteEditorController {
         '[NoteEditorController] Deleting note (empty)',
         name: 'NoteEditor',
       );
-      await emptyNoteExit?.call(noteId);
+      emptyNoteExit?.call(noteId);
+    } else {
+      final generation = _saveThrottle.nextGeneration();
+      _saveThrottle.flush(
+        generation: generation,
+        operation: () => snapshotSave(noteId, title, markdown, tasks),
+      );
     }
   }
 
@@ -196,6 +195,7 @@ class NoteEditorController {
   }
 
   void dispose() {
+    _flushAndSaveFinalState();
     _saveThrottle.dispose();
     if (editableTitle) {
       titleController?.removeListener(_onTitleChanged);
@@ -208,11 +208,11 @@ class NoteEditorController {
   }
 }
 
-/// Default save callbacks that write to the notes repository via
-/// Riverpod. Screens that don't need to customize the save path can
+/// Default save callbacks that write to the notes repository.
+/// Screens that don't need to customize the save path can
 /// pass these in directly.
 Future<void> defaultSnapshotSave(
-  WidgetRef ref,
+  NotesRepository repo,
   String noteId,
   String title,
   String markdown,
@@ -222,7 +222,7 @@ Future<void> defaultSnapshotSave(
     '[defaultSnapshotSave] noteId=$noteId, markdownLength=${markdown.length}, tasks=${tasks.length}',
     name: 'NoteEditor',
   );
-  await ref.read(notesRepositoryProvider).saveNoteSnapshot(
+  await repo.saveNoteSnapshot(
         id: noteId,
         title: title,
         content: markdown,
@@ -234,12 +234,12 @@ Future<void> defaultSnapshotSave(
   );
 }
 
-Future<void> defaultEmptyNoteExit(WidgetRef ref, String noteId) async {
+Future<void> defaultEmptyNoteExit(NotesRepository repo, String noteId) async {
   dev.log(
     '[defaultEmptyNoteExit] noteId=$noteId',
     name: 'NoteEditor',
   );
-  await ref.read(notesRepositoryProvider).deleteIfEmptyOrTombstone(noteId);
+  await repo.deleteIfEmptyOrTombstone(noteId);
   dev.log(
     '[defaultEmptyNoteExit] Completed noteId=$noteId',
     name: 'NoteEditor',

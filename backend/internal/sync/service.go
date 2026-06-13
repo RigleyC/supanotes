@@ -155,6 +155,10 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		if isEmptyIncomingRegularNote(n) {
 			return ErrEmptyNote
 		}
+		embStatus := n.EmbeddingStatus
+		if embStatus == "" {
+			embStatus = "pending"
+		}
 		_, err := r.UpsertNote(ctx, sqlcgen.UpsertNoteParams{
 			ID:              n.ID,
 			UserID:          userID,
@@ -164,7 +168,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			IsInbox:         n.IsInbox,
 			Favorite:        n.Favorite,
 			Archived:        n.Archived,
-			EmbeddingStatus: n.EmbeddingStatus,
+			EmbeddingStatus: embStatus,
 			CreatedAt:       n.CreatedAt,
 			DeletedAt:       n.DeletedAt,
 		})

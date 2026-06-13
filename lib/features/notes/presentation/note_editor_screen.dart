@@ -76,12 +76,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  NoteEditorController _controllerOrCreate() =>
-      _controller ??= NoteEditorController(
-        snapshotSave: (noteId, title, markdown, tasks) =>
-            defaultSnapshotSave(ref, noteId, title, markdown, tasks),
-        emptyNoteExit: (noteId) => defaultEmptyNoteExit(ref, noteId),
-      );
+  NoteEditorController _controllerOrCreate() {
+    if (_controller != null) return _controller!;
+    final repo = ref.read(notesRepositoryProvider);
+    return _controller = NoteEditorController(
+      snapshotSave: (noteId, title, markdown, tasks) =>
+          defaultSnapshotSave(repo, noteId, title, markdown, tasks),
+      emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
+    );
+  }
 
   Future<void> _openTaskActions(
     NoteEditorController controller,
@@ -141,85 +144,74 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         controller.editor == null ||
         controller.composer == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        await controller.flushBeforePop();
-        if (!context.mounted) return;
-        context.pop();
-      },
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        appBar: AppBar(
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.check),
-              onPressed: () => controller.focusNode?.unfocus(),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: AnimatedPadding(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: Column(
-              children: [
-                Expanded(
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: TextField(
-                            controller: controller.titleController,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              filled: false,
-                              contentPadding: EdgeInsets.zero,
-                              hintText: 'Sem titulo',
-                            ),
-                            style: AppTypography.textTheme.headlineMedium
-                                ?.copyWith(
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
-                                ),
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.check),
+            onPressed: () => controller.focusNode?.unfocus(),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: TextField(
+                          controller: controller.titleController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            filled: false,
+                            contentPadding: EdgeInsets.zero,
+                            hintText: 'Sem titulo',
                           ),
+                          style: AppTypography.textTheme.headlineMedium
+                              ?.copyWith(
+                                color:
+                                    Theme.of(context).colorScheme.onSurface,
+                              ),
                         ),
                       ),
-                      SuperEditorIosControlsScope(
-                        controller: _iosController,
-                        child: SuperEditor(
-                          editor: controller.editor!,
-                          focusNode: controller.focusNode,
-                          documentLayoutKey: _docLayoutKey,
-                          stylesheet: noteStylesheet(context),
-                          componentBuilders: [
-                            ...defaultComponentBuilders,
-                            CustomTaskComponentBuilder(
-                              controller.editor!,
-                              focusNode: controller.focusNode,
-                              onTaskLongPress: (taskId) =>
-                                  _openTaskActions(controller, taskId),
-                            ),
-                          ],
-                        ),
+                    ),
+                    SuperEditorIosControlsScope(
+                      controller: _iosController,
+                      child: SuperEditor(
+                        editor: controller.editor!,
+                        focusNode: controller.focusNode,
+                        documentLayoutKey: _docLayoutKey,
+                        stylesheet: noteStylesheet(context),
+                        componentBuilders: [
+                          ...defaultComponentBuilders,
+                          CustomTaskComponentBuilder(
+                            controller.editor!,
+                            focusNode: controller.focusNode,
+                            onTaskLongPress: (taskId) =>
+                                _openTaskActions(controller, taskId),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                NoteToolbar(
-                  editor: controller.editor!,
-                  composer: controller.composer!,
-                ),
-              ],
-            ),
+              ),
+              NoteToolbar(
+                editor: controller.editor!,
+                composer: controller.composer!,
+              ),
+            ],
           ),
         ),
       ),
