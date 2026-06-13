@@ -119,10 +119,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
   TextStyle _computeStyles(Set<Attribution> attributions) {
     final style = widget.viewModel.textStyleBuilder(attributions);
-    final muted = style.color?.withValues(alpha: _isComplete ? 0.5 : 1.0);
+    final baseColor = style.color ?? Theme.of(context).colorScheme.onSurface;
+    final muted = baseColor.withValues(alpha: _isComplete ? 0.5 : 1.0);
     return _isComplete
         ? style.copyWith(decoration: TextDecoration.lineThrough, color: muted)
-        : style;
+        : style.copyWith(color: baseColor);
   }
 
   void _onToggle() {

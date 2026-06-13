@@ -49,11 +49,12 @@ class _Body extends StatelessWidget {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(AppSpacing.lg),
-        children: const [
-          SizedBox(height: 80),
-          Icon(Icons.history_toggle_off, size: 56, color: Colors.grey),
-          SizedBox(height: AppSpacing.md),
-          Text(
+        children: [
+          const SizedBox(height: 80),
+          Icon(Icons.history_toggle_off,
+              size: 56, color: Theme.of(context).colorScheme.outline),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
             BriefHistoryScreen._emptyTitle,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),

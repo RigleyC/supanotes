@@ -53,15 +53,15 @@ class _Body extends StatelessWidget {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(AppSpacing.lg),
-        children: const [
-          SizedBox(height: 80),
+        children: [
+          const SizedBox(height: 80),
           Icon(
             Icons.event_note_outlined,
             size: 56,
-            color: Colors.grey,
+            color: Theme.of(context).colorScheme.outline,
           ),
-          SizedBox(height: AppSpacing.md),
-          Text(
+          const SizedBox(height: AppSpacing.md),
+          const Text(
             'Nenhuma rotina cadastrada',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
