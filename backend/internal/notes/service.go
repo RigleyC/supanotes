@@ -184,6 +184,9 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 		return err
 	}
 
+	noteIDStr := uid.UUIDToString(inbox.ID)
+	lines := strings.Split(inbox.Content, "\n\n")
+
 	outgoing := make(map[string]PlanOrganizationItem, len(items))
 	for _, item := range items {
 		if item.Accepted {
@@ -195,9 +198,24 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 		if !item.Accepted {
 			continue
 		}
+
+		fullSnippet := item.OriginalSnippet
+		parts := strings.Split(item.ItemID, "-")
+		if len(parts) >= 2 {
+			var idx int
+			_, scanErr := fmt.Sscanf(parts[len(parts)-1], "%d", &idx)
+			if scanErr == nil && idx >= 0 && idx < len(lines) {
+				candidate := strings.TrimSpace(lines[idx])
+				prefix := strings.TrimSuffix(item.OriginalSnippet, "...")
+				if strings.HasPrefix(candidate, prefix) {
+					fullSnippet = candidate
+				}
+			}
+		}
+
 		switch item.DestinationType {
 		case DestNewNote:
-			if _, err := s.CreateNote(ctx, userID, item.DestinationTitle, item.OriginalSnippet, nil, false, false); err != nil {
+			if _, err := s.CreateNote(ctx, userID, item.DestinationTitle, fullSnippet, nil, false, false); err != nil {
 				return fmt.Errorf("create note: %w", err)
 			}
 		case DestExistingNote:
@@ -208,15 +226,13 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 			if err != nil {
 				return fmt.Errorf("invalid destination note id: %w", err)
 			}
-			if _, err := s.AppendToNoteContent(ctx, userID, noteID, item.OriginalSnippet); err != nil {
+			if _, err := s.AppendToNoteContent(ctx, userID, noteID, fullSnippet); err != nil {
 				return fmt.Errorf("append to note: %w", err)
 			}
 		case DestKeep:
 		}
 	}
 
-	noteIDStr := uid.UUIDToString(inbox.ID)
-	lines := strings.Split(inbox.Content, "\n\n")
 	var keptLines []string
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
