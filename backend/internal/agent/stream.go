@@ -18,7 +18,6 @@ type SSEEvent struct {
 }
 
 func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) error {
-	defer close(events)
 
 	sessionID, err := uuid.Parse(sessionIDStr)
 	if err != nil {

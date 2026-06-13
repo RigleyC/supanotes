@@ -80,6 +80,7 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 			if r := recover(); r != nil {
 				slog.Error("panic in ChatStream", "recover", r)
 			}
+			close(events)
 		}()
 		if err := h.loop.ChatStream(c.Request().Context(), userID, req.SessionID, req.Content, events); err != nil {
 			events <- SSEEvent{Type: "error", Data: err.Error()}
