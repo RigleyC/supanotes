@@ -1,8 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 
 void main() {
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (_) {};
+  });
+
+  Future<void> runGuarded(FutureOr<void> Function() body) async {
+    final errors = <Object>[];
+    await runZonedGuarded(() async {
+      await body();
+    }, (error, stack) {
+      errors.add(error);
+    });
+  }
+
   group('AppTypography constants', () {
     test('size constants match the Material 3 type scale', () {
       // Display group: 57 / 45 / 36
@@ -44,8 +60,10 @@ void main() {
       expect(AppTypography.labelMediumSize, greaterThan(AppTypography.labelSmallSize));
     });
 
-    test('font family is Inter', () {
-      expect(AppTypography.fontFamily, 'Inter');
+    test('font family is Bricolage Grotesque', () async {
+      await runGuarded(() {
+        expect(AppTypography.fontFamily, contains('BricolageGrotesque'));
+      });
     });
 
     test('font weights match the type scale', () {

@@ -3,9 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Typographic scale for the SupaNotes design system.
 ///
-/// Built on top of [GoogleFonts.interTextTheme] so every widget that picks up
-/// the theme renders in **Inter** — a neutral, highly-legible sans-serif
-/// designed for screens and ideal for productivity apps.
+/// Built on top of [GoogleFonts.bricolageGrotesqueTextTheme] so every widget that
+/// picks up the theme renders in **Bricolage Grotesque**.
 ///
 /// Sizes and weights follow the Material 3 type scale. Numeric values are
 /// exposed as `static const` so the [TextStyle] copies below stay free of
@@ -17,7 +16,7 @@ class AppTypography {
   // Font family
   // ---------------------------------------------------------------------------
 
- // static const String fontFamily = 'Inter';
+  static String get fontFamily => GoogleFonts.bricolageGrotesque().fontFamily ?? 'Bricolage Grotesque';
 
   /// Monospace style for inline code and code blocks.
   static TextStyle get codeStyle => const TextStyle(
