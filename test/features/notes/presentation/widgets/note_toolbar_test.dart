@@ -272,4 +272,102 @@ void main() {
       );
     });
   });
+
+  group('_convertToListItem', () {
+    testWidgets('converts TaskNode to unordered ListItemNode', (tester) async {
+      final document = MutableDocument(nodes: [
+        TaskNode(
+          id: 'node-1',
+          text: AttributedText('Buy milk'),
+          isComplete: false,
+        ),
+      ]);
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Column(children: [
+            Expanded(
+              child: SuperEditor(
+                editor: editor,
+                componentBuilders: [
+                  ...defaultComponentBuilders,
+                  CustomTaskComponentBuilder(editor),
+                ],
+              ),
+            ),
+            NoteToolbar(editor: editor, composer: composer),
+          ]),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.format_list_bulleted));
+      await tester.pumpAndSettle();
+
+      expect(document.first, isA<ListItemNode>());
+      final item = document.first as ListItemNode;
+      expect(item.text.toPlainText(), 'Buy milk');
+      expect(item.type, ListItemType.unordered);
+    });
+
+    testWidgets('converts TaskNode to ordered ListItemNode', (tester) async {
+      final document = MutableDocument(nodes: [
+        TaskNode(
+          id: 'node-1',
+          text: AttributedText('Buy milk'),
+          isComplete: false,
+        ),
+      ]);
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Column(children: [
+            Expanded(
+              child: SuperEditor(
+                editor: editor,
+                componentBuilders: [
+                  ...defaultComponentBuilders,
+                  CustomTaskComponentBuilder(editor),
+                ],
+              ),
+            ),
+            NoteToolbar(editor: editor, composer: composer),
+          ]),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.format_list_numbered));
+      await tester.pumpAndSettle();
+
+      expect(document.first, isA<ListItemNode>());
+      final item = document.first as ListItemNode;
+      expect(item.text.toPlainText(), 'Buy milk');
+      expect(item.type, ListItemType.ordered);
+    });
+  });
 }

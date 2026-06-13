@@ -224,6 +224,21 @@ class NoteToolbar extends StatelessWidget {
       ]);
       return;
     }
+    if (node is TaskNode) {
+      final listItemNode = ListItemNode(
+        id: node.id,
+        itemType: type,
+        text: node.text,
+        indent: node.indent,
+      );
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: node.id,
+          newNode: listItemNode,
+        ),
+      ]);
+      return;
+    }
     if (node is! ParagraphNode) return;
     editor.execute([
       ConvertParagraphToListItemRequest(nodeId: nodeId, type: type),
