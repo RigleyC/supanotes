@@ -234,8 +234,26 @@ class NoteToolbar extends StatelessWidget {
     final nodeId = _activeNodeId(composer.selection);
     if (nodeId == null) return;
     final node = editor.context.document.getNodeById(nodeId);
-    if (node is! ParagraphNode) return;
-    editor.execute([ConvertParagraphToTaskRequest(nodeId: nodeId)]);
+    if (node is ParagraphNode) {
+      editor.execute([ConvertParagraphToTaskRequest(nodeId: nodeId)]);
+    } else if (node is ListItemNode) {
+      final taskNode = TaskNode(
+        id: node.id,
+        text: node.text,
+        isComplete: false,
+        indent: node.indent,
+      );
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: node.id,
+          newNode: taskNode,
+        ),
+      ]);
+    } else if (node is TaskNode) {
+      editor.execute([
+        ConvertTaskToParagraphRequest(nodeId: nodeId),
+      ]);
+    }
   }
 
   void _indentListItem() {
