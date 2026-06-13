@@ -12,18 +12,20 @@ class RichCommonEditorOperations extends CommonEditorOperations {
 
   @override
   void copy() {
-    if (composer.selection != null && !composer.selection!.isCollapsed) {
+    final selection = composer.selection;
+    if (selection != null && !selection.isCollapsed) {
       document.copyAsRichTextWithPlainTextFallback(
-        selection: composer.selection!,
+        selection: selection,
       );
     }
   }
 
   @override
   void cut() {
-    if (composer.selection != null && !composer.selection!.isCollapsed) {
+    final selection = composer.selection;
+    if (selection != null && !selection.isCollapsed) {
       document.copyAsRichTextWithPlainTextFallback(
-        selection: composer.selection!,
+        selection: selection,
       );
       deleteSelection(TextAffinity.downstream);
     }
