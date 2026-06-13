@@ -1,0 +1,104 @@
+# codemagic.yaml
+workflows:
+  ios-unsigned:
+    name: iOS Unsigned Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      groups:
+        - api_config
+      vars:
+        API_BASE_URL: "https://backend-winter-waterfall-5807.fly.dev/api/v1"
+      flutter: 3.44.1
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'master'
+          include: true
+    scripts:
+      - name: Flutter pub get
+        script: |
+          flutter pub get
+      - name: Flutter build config-only
+        script: |
+          flutter build ios --config-only --dart-define=API_BASE_URL="$API_BASE_URL"
+      - name: Clean Swift Package Manager artifacts
+        script: |
+          rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
+      - name: Build iOS project with xcodebuild
+        script: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ../DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS="--dart-define=API_BASE_URL=$API_BASE_URL" \
+            clean build
+      - name: Package Unsigned IPA
+        script: |
+          APP_PATH=$(find DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Could not find .app"
+            exit 1
+          fi
+          mkdir -p build/Payload
+          cp -R "$APP_PATH" build/Payload/
+          cd build
+          zip -rq supanotes-unsigned.ipa Payload
+          rm -rf Payload
+    artifacts:
+      - build/*.ipa
+
+  ios-signed:
+    name: iOS Signed Release Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      groups:
+        - api_config
+        - app_store_credentials
+      vars:
+        API_BASE_URL: "https://backend-winter-waterfall-5807.fly.dev/api/v1"
+        APP_STORE_APP_ID: 6440000000
+      flutter: 3.44.1
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'master'
+          include: true
+    scripts:
+      - name: Flutter pub get
+        script: |
+          flutter pub get
+      - name: Set up keychain
+        script: |
+          keychain initialize
+      - name: Fetch signing certificates and profiles
+        script: |
+          app-store-connect fetch-signing-files "com.example.supanotes" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --certificate-key "$APP_STORE_CONNECT_CERTIFICATE_PRIVATE_KEY" \
+            --create
+      - name: Use profiles
+        script: |
+          xcode-project use-profiles
+      - name: Build iOS IPA
+        script: |
+          flutter build ipa --release \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
