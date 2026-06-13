@@ -153,7 +153,7 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> registerDeviceToken(String token) async {
     try {
-      await _api.post('/api/v1/device-tokens', data: {'token': token});
+      await _api.post('/device-tokens', data: {'token': token});
     } on DioException {
       // Non-fatal — push will simply not work until the next registration.
     }

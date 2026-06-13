@@ -425,6 +425,10 @@ class _CheckmarkPaint extends CustomPainter {
     path.lineTo(mid.dx, mid.dy);
     path.lineTo(end.dx, end.dy);
 
+    // Guard: progress == 0 means fully unchecked. With StrokeCap.round,
+    // extractPath(0, 0) would render a tiny dot at the start point — skip.
+    if (progress <= 0.0) return;
+
     final metrics = path.computeMetrics();
     for (final metric in metrics) {
       final extractPath = metric.extractPath(0.0, metric.length * progress);

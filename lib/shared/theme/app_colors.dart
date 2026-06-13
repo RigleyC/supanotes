@@ -37,6 +37,16 @@ class AppColors {
   static final ColorScheme darkColorScheme = ColorScheme.fromSeed(
     seedColor: primarySeed,
     brightness: Brightness.dark,
+  ).copyWith(
+    // OLED-friendly true black surfaces so text is always visible.
+    surface: const Color(0xFF000000),
+    onSurface: const Color(0xFFFFFFFF),
+    surfaceContainerLowest: const Color(0xFF0A0A0A),
+    surfaceContainerLow: const Color(0xFF111111),
+    surfaceContainer: const Color(0xFF1A1A1A),
+    surfaceContainerHigh: const Color(0xFF222222),
+    surfaceContainerHighest: const Color(0xFF2A2A2A),
+    onSurfaceVariant: const Color(0xFFCCCCCC),
   );
 
   // ---------------------------------------------------------------------------
