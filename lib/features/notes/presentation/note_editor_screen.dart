@@ -2,10 +2,9 @@ library;
 
 import 'dart:developer' as dev;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:follow_the_leader/follow_the_leader.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/data/notes_repository.dart';
@@ -14,6 +13,9 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_co
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
+import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
+import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
+import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
@@ -37,44 +39,8 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   NoteEditorController? _controller;
   final _docLayoutKey = GlobalKey();
-  // Initialized in initState because toolbarBuilder needs access to the editor
-  // and document layout, which are only available after the controller is set up.
-  late final SuperEditorIosControlsController _iosController;
-
-  @override
-  void initState() {
-    super.initState();
-    _iosController = SuperEditorIosControlsController(
-      toolbarBuilder: _buildIosToolbar,
-    );
-  }
-
-  /// Builds the iOS floating toolbar.
-  ///
-  /// Uses the native iOS system context menu on iOS 16+ (avoids the annoying
-  /// paste-permission warning). Falls back to the standard Flutter-drawn
-  /// Cut/Copy/Paste toolbar on older iOS versions.
-  Widget _buildIosToolbar(
-    BuildContext context,
-    Key toolbarKey,
-    LeaderLink focalPoint,
-  ) {
-    final ctrl = _controller;
-    if (ctrl?.editor == null) return const SizedBox.shrink();
-
-    return iOSSystemPopoverEditorToolbarWithFallbackBuilder(
-      context,
-      toolbarKey,
-      focalPoint,
-      CommonEditorOperations(
-        editor: ctrl!.editor!,
-        document: ctrl.editor!.document,
-        composer: ctrl.composer!,
-        documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
-      ),
-      SuperEditorIosControlsScope.rootOf(context),
-    );
-  }
+  SuperEditorIosControlsController? _iosController;
+  SuperEditorAndroidControlsController? _androidController;
 
   NoteEditorController _controllerOrCreate() {
     if (_controller != null) return _controller!;
@@ -107,7 +73,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   @override
   void dispose() {
-    _iosController.dispose();
+    _iosController?.dispose();
+    _androidController?.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -144,6 +111,29 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         controller.editor == null ||
         controller.composer == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    _iosController ??= RichSuperEditorIosControlsController(
+      editor: controller.editor!,
+      documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+    );
+
+    _androidController ??= SuperEditorAndroidControlsController(
+      toolbarBuilder: (overlayContext, mobileToolbarKey, focalPoint) => defaultAndroidEditorToolbarBuilder(
+        overlayContext,
+        mobileToolbarKey,
+        RichCommonEditorOperations(
+          editor: controller.editor!,
+          document: controller.editor!.document,
+          composer: controller.composer!,
+          documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+        ),
+        SuperEditorAndroidControlsScope.rootOf(overlayContext),
+        controller.composer!.selectionNotifier,
+        focalPoint,
+      ),
+    );
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
@@ -186,22 +176,31 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         ),
                       ),
                     ),
-                    SuperEditorIosControlsScope(
-                      controller: _iosController,
-                      child: SuperEditor(
-                        editor: controller.editor!,
-                        focusNode: controller.focusNode,
-                        documentLayoutKey: _docLayoutKey,
-                        stylesheet: noteStylesheet(context),
-                        componentBuilders: [
-                          ...defaultComponentBuilders,
-                          CustomTaskComponentBuilder(
-                            controller.editor!,
-                            focusNode: controller.focusNode,
-                            onTaskLongPress: (taskId) =>
-                                _openTaskActions(controller, taskId),
+                    SuperEditorAndroidControlsScope(
+                      controller: _androidController!,
+                      child: SuperEditorIosControlsScope(
+                        controller: _iosController!,
+                        child: SuperEditor(
+                          editor: controller.editor!,
+                          focusNode: controller.focusNode,
+                          documentLayoutKey: _docLayoutKey,
+                          stylesheet: noteStylesheet(context),
+                          keyboardActions: buildRichKeyboardActions(
+                            baseActions: defaultTargetPlatform == TargetPlatform.iOS ||
+                                    defaultTargetPlatform == TargetPlatform.android
+                                ? defaultImeKeyboardActions
+                                : defaultKeyboardActions,
                           ),
-                        ],
+                          componentBuilders: [
+                            ...defaultComponentBuilders,
+                            CustomTaskComponentBuilder(
+                              controller.editor!,
+                              focusNode: controller.focusNode,
+                              onTaskLongPress: (taskId) =>
+                                  _openTaskActions(controller, taskId),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
