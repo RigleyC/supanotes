@@ -41,6 +41,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   final _docLayoutKey = GlobalKey();
   SuperEditorIosControlsController? _iosController;
   SuperEditorAndroidControlsController? _androidController;
+  RichCommonEditorOperations? _richOps;
 
   NoteEditorController _controllerOrCreate() {
     if (_controller != null) return _controller!;
@@ -113,21 +114,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    _richOps ??= RichCommonEditorOperations(
+      editor: controller.editor!,
+      document: controller.editor!.document,
+      composer: controller.composer!,
+      documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+    );
+
     _iosController ??= RichSuperEditorIosControlsController(
       editor: controller.editor!,
       documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+      operations: _richOps!,
     );
 
     _androidController ??= SuperEditorAndroidControlsController(
       toolbarBuilder: (overlayContext, mobileToolbarKey, focalPoint) => defaultAndroidEditorToolbarBuilder(
         overlayContext,
         mobileToolbarKey,
-        RichCommonEditorOperations(
-          editor: controller.editor!,
-          document: controller.editor!.document,
-          composer: controller.composer!,
-          documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
-        ),
+        _richOps!,
         SuperEditorAndroidControlsScope.rootOf(overlayContext),
         controller.composer!.selectionNotifier,
         focalPoint,
