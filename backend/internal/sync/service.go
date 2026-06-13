@@ -151,7 +151,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		r = s.repo.WithQuerier(sqlcgen.New(tx))
 	}
 
-	for _, n := range payload.Notes {
+	for i, n := range payload.Notes {
 		if isEmptyIncomingRegularNote(n) {
 			return ErrEmptyNote
 		}
@@ -159,8 +159,31 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		if embStatus == "" {
 			embStatus = "pending"
 		}
+		noteID := n.ID
+
+		if n.IsInbox {
+			existing, err := r.GetInboxNote(ctx, userID)
+			if err == nil && existing.ID != n.ID {
+				noteID = existing.ID
+				payload.Notes[i].ID = existing.ID
+				for j, t := range payload.Tasks {
+					if t.NoteID == n.ID {
+						payload.Tasks[j].NoteID = existing.ID
+					}
+				}
+				for j, nl := range payload.NoteLinks {
+					if nl.SourceID == n.ID {
+						payload.NoteLinks[j].SourceID = existing.ID
+					}
+					if nl.TargetID == n.ID {
+						payload.NoteLinks[j].TargetID = existing.ID
+					}
+				}
+			}
+		}
+
 		_, err := r.UpsertNote(ctx, sqlcgen.UpsertNoteParams{
-			ID:              n.ID,
+			ID:              noteID,
 			UserID:          userID,
 			ContextID:       n.ContextID,
 			Title:           n.Title,

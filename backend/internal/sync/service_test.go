@@ -23,6 +23,10 @@ func (m *mockRepository) UpsertNote(ctx context.Context, arg sqlcgen.UpsertNoteP
 	return sqlcgen.Note{}, m.upsertNoteErr
 }
 
+func (m *mockRepository) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+	return sqlcgen.Note{}, pgx.ErrNoRows
+}
+
 func (m *mockRepository) GetSyncTasks(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
