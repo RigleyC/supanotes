@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,7 +39,6 @@ class _Strings {
   static const String searchTooltip = 'Buscar notas';
   static const String closeSearchTooltip = 'Fechar busca';
   static const String searchHint = 'Buscar notas';
-
 }
 
 enum _NotesViewMode { list, grid }
@@ -118,19 +119,23 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 : _Strings.searchTooltip,
             onPressed: _isSearching ? _closeSearch : _openSearch,
           ),
+
           NotesMoreMenu(
             isListView: _viewMode == _NotesViewMode.list,
             onToggleViewMode: _toggleViewMode,
             onOpenSettings: () => context.push(AppRoutes.settings),
             onLogout: () => ref.read(authControllerProvider.notifier).logout(),
           ),
+          if (Platform.isIOS) SizedBox(width: 24),
         ],
       ),
       body: trimmedSearchQuery.isEmpty
           ? notesAsync.when(
               loading: () => _NotesLoadingView(headerSlivers: headerSlivers),
-              error: (e, _) =>
-                  AppErrorView(title: _Strings.errorTitle, subtitle: e.toString()),
+              error: (e, _) => AppErrorView(
+                title: _Strings.errorTitle,
+                subtitle: e.toString(),
+              ),
               data: (notes) => _buildNotesBody(notes, headerSlivers),
             )
           : searchAsync!.when(
@@ -259,5 +264,3 @@ class _NotesLoadingView extends StatelessWidget {
     );
   }
 }
-
-
