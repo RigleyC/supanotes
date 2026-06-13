@@ -10,35 +10,55 @@ String? authGuardRedirect({
   required AsyncValue<User?> authState,
   String? persistedLocation,
 }) {
+  final isAuthPage = currentLocation == AppRoutes.login ||
+      currentLocation == AppRoutes.register;
+
+  String resolveDestination() {
+    if (persistedLocation != null &&
+        persistedLocation != AppRoutes.splash &&
+        persistedLocation != AppRoutes.login &&
+        persistedLocation != AppRoutes.register) {
+      return persistedLocation;
+    }
+    return AppRoutes.home;
+  }
+
   return authState.when(
     data: (user) {
+      // Coming from the splash screen — decide where to go.
       if (currentLocation == AppRoutes.splash) {
         if (user == null) return AppRoutes.login;
         // Restore last route, falling back to /home.
-        final destination = (persistedLocation != null &&
-                persistedLocation != AppRoutes.splash &&
-                persistedLocation != AppRoutes.login &&
-                persistedLocation != AppRoutes.register)
-            ? persistedLocation
-            : AppRoutes.home;
-        return destination;
+        return resolveDestination();
       }
 
-      final isAuthPage = currentLocation == AppRoutes.login ||
-          currentLocation == AppRoutes.register;
-
       if (user != null) {
-        if (isAuthPage) return persistedLocation ?? AppRoutes.home;
+        // Authenticated user on login/register → go to destination.
+        if (isAuthPage) return resolveDestination();
+        // Authenticated user anywhere else → stay.
         return null;
       }
 
+      // Unauthenticated user on a public page → stay.
       if (isAuthPage) return null;
+      // Unauthenticated user on a protected page → login.
       return AppRoutes.login;
     },
     loading: () {
-      if (currentLocation == AppRoutes.splash) return null;
+      // While auth is resolving, stay on login/register or splash so we don't
+      // interrupt an active login attempt or the splash screen.
+      if (isAuthPage || currentLocation == AppRoutes.splash) {
+        return null;
+      }
+      // If we are on a protected route during cold start loading, go to splash.
+      // This prevents UI providers from crashing due to missing user id.
+      // Once auth resolves, we will restore the route using persistedLocation.
       return AppRoutes.splash;
     },
-    error: (_, _) => AppRoutes.login,
+    error: (_, _) {
+      // If on login/register, stay there to show the error snackbar.
+      if (isAuthPage) return null;
+      return AppRoutes.login;
+    },
   );
 }
