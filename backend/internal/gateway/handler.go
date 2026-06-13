@@ -67,16 +67,18 @@ type TgChat struct {
 }
 
 type Handler struct {
-	repo  *Repository
-	bot   *TelegramClient
-	agent AgentBridge
+	repo          *Repository
+	bot           *TelegramClient
+	agent         AgentBridge
+	webhookSecret string
 }
 
-func NewHandler(repo *Repository, bot *TelegramClient, agent AgentBridge) *Handler {
+func NewHandler(repo *Repository, bot *TelegramClient, agent AgentBridge, webhookSecret string) *Handler {
 	return &Handler{
-		repo:  repo,
-		bot:   bot,
-		agent: agent,
+		repo:          repo,
+		bot:           bot,
+		agent:         agent,
+		webhookSecret: webhookSecret,
 	}
 }
 
@@ -145,6 +147,12 @@ func (h *Handler) DeleteLink(c echo.Context) error {
 // user's agent session. The response is always 200 OK so Telegram
 // doesn't retry — errors are only logged, never surfaced.
 func (h *Handler) Webhook(c echo.Context) error {
+	if h.webhookSecret != "" {
+		if c.Request().Header.Get("X-Telegram-Bot-Api-Secret-Token") != h.webhookSecret {
+			return c.NoContent(http.StatusUnauthorized)
+		}
+	}
+
 	var update WebhookUpdate
 	if err := c.Bind(&update); err != nil {
 		return web.JSONError(c, http.StatusBadRequest, "invalid update")

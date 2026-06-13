@@ -289,7 +289,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// Telegram gateway (uses the agent loop as a bridge for free-form
 	// messages; the public webhook is mounted on the unauthenticated
 	// `api` group because Telegram's servers do not send our JWT).
-	gatewayH := gateway.NewHandler(gatewayRepo, gatewayBot, agentLoop)
+	gatewayH := gateway.NewHandler(gatewayRepo, gatewayBot, agentLoop, cfg.TelegramWebhookSecret)
 	gateway.RegisterRoutes(protected, gatewayH)
 	api.POST("/gateway/telegram/webhook", gatewayH.Webhook)
 

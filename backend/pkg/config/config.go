@@ -20,6 +20,7 @@ type Config struct {
 	AnthropicAPIKey        string
 	DeepSeekAPIKey         string
 	TelegramBotToken       string
+	TelegramWebhookSecret  string
 	FCMCredentialsFile     string
 	EmbeddingsCronInterval string
 	Environment            string
@@ -82,6 +83,7 @@ func Load() (*Config, error) {
 		AnthropicAPIKey:        os.Getenv("ANTHROPIC_API_KEY"),
 		DeepSeekAPIKey:         os.Getenv("DEEPSEEK_API_KEY"),
 		TelegramBotToken:       os.Getenv("TELEGRAM_BOT_TOKEN"),
+		TelegramWebhookSecret:  os.Getenv("TELEGRAM_WEBHOOK_SECRET"),
 		FCMCredentialsFile:     os.Getenv("FCM_CREDENTIALS_FILE"),
 		EmbeddingsCronInterval: defaultIfEmpty(os.Getenv("EMBEDDINGS_CRON_INTERVAL"), "*/30 * * * * *"),
 		AgentBaseURL:           os.Getenv("AGENT_BASE_URL"),
