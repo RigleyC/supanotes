@@ -370,4 +370,155 @@ void main() {
       expect(item.type, ListItemType.ordered);
     });
   });
+
+  group('_setBlockType', () {
+    testWidgets('converts ListItemNode to H1', (tester) async {
+      final document = MutableDocument(nodes: [
+        ListItemNode.unordered(
+          id: 'node-1',
+          text: AttributedText('Heading text'),
+        ),
+      ]);
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Column(children: [
+            Expanded(
+              child: SuperEditor(
+                editor: editor,
+                componentBuilders: defaultComponentBuilders,
+              ),
+            ),
+            NoteToolbar(editor: editor, composer: composer),
+          ]),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('H1'));
+      await tester.pumpAndSettle();
+
+      expect(document.first, isA<ParagraphNode>());
+      final para = document.first as ParagraphNode;
+      expect(para.text.toPlainText(), 'Heading text');
+      expect(
+        para.getMetadataValue('blockType'),
+        header1Attribution,
+      );
+    });
+
+    testWidgets('converts TaskNode to H2', (tester) async {
+      final document = MutableDocument(nodes: [
+        TaskNode(
+          id: 'node-1',
+          text: AttributedText('Heading text'),
+          isComplete: false,
+        ),
+      ]);
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Column(children: [
+            Expanded(
+              child: SuperEditor(
+                editor: editor,
+                componentBuilders: [
+                  ...defaultComponentBuilders,
+                  CustomTaskComponentBuilder(editor),
+                ],
+              ),
+            ),
+            NoteToolbar(editor: editor, composer: composer),
+          ]),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('H2'));
+      await tester.pumpAndSettle();
+
+      expect(document.first, isA<ParagraphNode>());
+      final para = document.first as ParagraphNode;
+      expect(para.text.toPlainText(), 'Heading text');
+      expect(
+        para.getMetadataValue('blockType'),
+        header2Attribution,
+      );
+    });
+
+    testWidgets('converts TaskNode to Blockquote', (tester) async {
+      final document = MutableDocument(nodes: [
+        TaskNode(
+          id: 'node-1',
+          text: AttributedText('Quoted text'),
+          isComplete: false,
+        ),
+      ]);
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Column(children: [
+            Expanded(
+              child: SuperEditor(
+                editor: editor,
+                componentBuilders: [
+                  ...defaultComponentBuilders,
+                  CustomTaskComponentBuilder(editor),
+                ],
+              ),
+            ),
+            NoteToolbar(editor: editor, composer: composer),
+          ]),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.format_quote));
+      await tester.pumpAndSettle();
+
+      expect(document.first, isA<ParagraphNode>());
+      final para = document.first as ParagraphNode;
+      expect(para.text.toPlainText(), 'Quoted text');
+      expect(
+        para.getMetadataValue('blockType'),
+        blockquoteAttribution,
+      );
+    });
+  });
 }

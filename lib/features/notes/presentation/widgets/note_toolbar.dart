@@ -208,10 +208,35 @@ class NoteToolbar extends StatelessWidget {
     final nodeId = _activeNodeId(composer.selection);
     if (nodeId == null) return;
     final node = editor.context.document.getNodeById(nodeId);
-    if (node is! ParagraphNode) return;
-    editor.execute([
-      ChangeParagraphBlockTypeRequest(nodeId: nodeId, blockType: blockType),
-    ]);
+    if (node is ParagraphNode) {
+      editor.execute([
+        ChangeParagraphBlockTypeRequest(nodeId: nodeId, blockType: blockType),
+      ]);
+    } else if (node is ListItemNode) {
+      editor.execute([
+        ConvertListItemToParagraphRequest(
+          nodeId: nodeId,
+          paragraphMetadata: {
+            'blockType': blockType,
+          },
+        ),
+      ]);
+    } else if (node is TaskNode) {
+      final metadata = blockType != null
+          ? {'blockType': blockType}
+          : <String, dynamic>{};
+      final paragraphNode = ParagraphNode(
+        id: node.id,
+        text: node.text,
+        metadata: metadata,
+      );
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: node.id,
+          newNode: paragraphNode,
+        ),
+      ]);
+    }
   }
 
   void _convertToListItem(ListItemType type) {
