@@ -204,96 +204,95 @@ class NoteToolbar extends StatelessWidget {
     ]);
   }
 
-  void _setBlockType(Attribution? blockType) {
-    final nodeId = _activeNodeId(composer.selection);
-    if (nodeId == null) return;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is ParagraphNode) {
-      editor.execute([
-        ChangeParagraphBlockTypeRequest(nodeId: nodeId, blockType: blockType),
-      ]);
-    } else if (node is ListItemNode) {
-      editor.execute([
-        ConvertListItemToParagraphRequest(
-          nodeId: nodeId,
-          paragraphMetadata: {
-            'blockType': blockType,
-          },
-        ),
-      ]);
-    } else if (node is TaskNode) {
-      final metadata = blockType != null
-          ? {'blockType': blockType}
-          : <String, dynamic>{};
-      final paragraphNode = ParagraphNode(
-        id: node.id,
-        text: node.text,
-        metadata: metadata,
-      );
-      editor.execute([
-        ReplaceNodeRequest(
-          existingNodeId: node.id,
-          newNode: paragraphNode,
-        ),
-      ]);
+  List<DocumentNode> _selectedNodes(DocumentSelection? selection) {
+    if (selection == null) return [];
+    if (selection.isCollapsed) {
+      final node = editor.context.document.getNodeById(selection.extent.nodeId);
+      return node != null ? [node] : [];
     }
+    return editor.context.document
+        .getNodesInside(selection.start, selection.end)
+        .toList();
+  }
+
+  void _setBlockType(Attribution? blockType) {
+    final nodes = _selectedNodes(composer.selection);
+    final requests = <EditRequest>[];
+    for (final node in nodes) {
+      if (node is ParagraphNode) {
+        requests.add(ChangeParagraphBlockTypeRequest(
+          nodeId: node.id,
+          blockType: blockType,
+        ));
+      } else if (node is ListItemNode) {
+        requests.add(ConvertListItemToParagraphRequest(
+          nodeId: node.id,
+          paragraphMetadata: {'blockType': blockType},
+        ));
+      } else if (node is TaskNode) {
+        final metadata = blockType != null
+            ? {'blockType': blockType}
+            : <String, dynamic>{};
+        requests.add(ReplaceNodeRequest(
+          existingNodeId: node.id,
+          newNode: ParagraphNode(
+            id: node.id,
+            text: node.text,
+            metadata: metadata,
+          ),
+        ));
+      }
+    }
+    if (requests.isNotEmpty) editor.execute(requests);
   }
 
   void _convertToListItem(ListItemType type) {
-    final nodeId = _activeNodeId(composer.selection);
-    if (nodeId == null) return;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is ListItemNode) {
-      editor.execute([
-        ChangeListItemTypeRequest(nodeId: nodeId, newType: type),
-      ]);
-      return;
-    }
-    if (node is TaskNode) {
-      final listItemNode = ListItemNode(
-        id: node.id,
-        itemType: type,
-        text: node.text,
-        indent: node.indent,
-      );
-      editor.execute([
-        ReplaceNodeRequest(
+    final nodes = _selectedNodes(composer.selection);
+    final requests = <EditRequest>[];
+    for (final node in nodes) {
+      if (node is ListItemNode) {
+        requests.add(ChangeListItemTypeRequest(nodeId: node.id, newType: type));
+      } else if (node is TaskNode) {
+        requests.add(ReplaceNodeRequest(
           existingNodeId: node.id,
-          newNode: listItemNode,
-        ),
-      ]);
-      return;
+          newNode: ListItemNode(
+            id: node.id,
+            itemType: type,
+            text: node.text,
+            indent: node.indent,
+          ),
+        ));
+      } else if (node is ParagraphNode) {
+        requests.add(ConvertParagraphToListItemRequest(
+          nodeId: node.id,
+          type: type,
+        ));
+      }
     }
-    if (node is! ParagraphNode) return;
-    editor.execute([
-      ConvertParagraphToListItemRequest(nodeId: nodeId, type: type),
-    ]);
+    if (requests.isNotEmpty) editor.execute(requests);
   }
 
   void _convertToTask() {
-    final nodeId = _activeNodeId(composer.selection);
-    if (nodeId == null) return;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is ParagraphNode) {
-      editor.execute([ConvertParagraphToTaskRequest(nodeId: nodeId)]);
-    } else if (node is ListItemNode) {
-      final taskNode = TaskNode(
-        id: node.id,
-        text: node.text,
-        isComplete: false,
-        indent: node.indent,
-      );
-      editor.execute([
-        ReplaceNodeRequest(
+    final nodes = _selectedNodes(composer.selection);
+    final requests = <EditRequest>[];
+    for (final node in nodes) {
+      if (node is ParagraphNode) {
+        requests.add(ConvertParagraphToTaskRequest(nodeId: node.id));
+      } else if (node is ListItemNode) {
+        requests.add(ReplaceNodeRequest(
           existingNodeId: node.id,
-          newNode: taskNode,
-        ),
-      ]);
-    } else if (node is TaskNode) {
-      editor.execute([
-        ConvertTaskToParagraphRequest(nodeId: nodeId),
-      ]);
+          newNode: TaskNode(
+            id: node.id,
+            text: node.text,
+            isComplete: false,
+            indent: node.indent,
+          ),
+        ));
+      } else if (node is TaskNode) {
+        requests.add(ConvertTaskToParagraphRequest(nodeId: node.id));
+      }
     }
+    if (requests.isNotEmpty) editor.execute(requests);
   }
 
   void _indentListItem() {
