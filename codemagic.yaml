@@ -27,7 +27,9 @@ workflows:
           flutter pub get
       - name: Flutter build config-only
         script: |
-          flutter build ios --config-only --dart-define=API_BASE_URL="$API_BASE_URL" || true
+          set +e
+          flutter build ios --config-only --no-codesign --dart-define=API_BASE_URL="$API_BASE_URL"
+          exit 0
       - name: Build iOS project with xcodebuild
         script: |
           cd ios
@@ -90,7 +92,7 @@ workflows:
           keychain initialize
       - name: Fetch signing certificates and profiles
         script: |
-          app-store-connect fetch-signing-files "com.rigley.supanotes" \
+          app-store-connect fetch-signing-files "com.example.supanotes" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
