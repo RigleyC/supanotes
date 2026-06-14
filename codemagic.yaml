@@ -8,6 +8,7 @@ workflows:
         - api_config
       vars:
         API_BASE_URL: "https://backend-winter-waterfall-5807.fly.dev/api/v1"
+        GOOGLE_SERVICE_INFO_B64: "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPCFET0NUWVBFIHBsaXN0IFBVQkxJQyAiLS8vQXBwbGUvL0RURCBQTElTVCAxLjAvL0VOIiAiaHR0cDovL3d3dy5hcHBsZS5jb20vRFREcy9Qcm9wZXJ0eUxpc3QtMS4wLmR0ZCI+CjxwbGlzdCB2ZXJzaW9uPSIxLjAiPgo8ZGljdD4KCTxrZXk+QVBJX0tFWTwva2V5PgoJPHN0cmluZz5BSXphU3lBY2k5TlpnQkJpSUJqSzFuM29pTXRrVFdUZl9QbXJlVHc8L3N0cmluZz4KCTxrZXk+R0NNX1NFTkRFUl9JRDwva2V5PgoJPHN0cmluZz4zMDc0NDMyOTYzNDU8L3N0cmluZz4KCTxrZXk+UExJU1RfVkVSU0lPTjwva2V5PgoJPHN0cmluZz4xPC9zdHJpbmc+Cgk8a2V5PkJVTkRMRV9JRDwva2V5PgoJPHN0cmluZz5jb20uZXhhbXBsZS5zdXBhbm90ZXM8L3N0cmluZz4KCTxrZXk+UFJPSkVDVF9JRDwva2V5PgoJPHN0cmluZz5zdXBhbm90ZXMtMmJiOTk8L3N0cmluZz4KCTxrZXk+U1RPUkFHRV9CVUNLRVQ8L2tleT4KCTxzdHJpbmc+c3VwYW5vdGVzLTJiYjk5LmZpcmViYXNlc3RvcmFnZS5hcHA8L3N0cmluZz4KCTxrZXk+SVNfQURTX0VOQUJMRUQ8L2tleT4KCTxmYWxzZT48L2ZhbHNlPgoJPGtleT5JU19BTkFMWVRJQ1NfRU5BQkxFRDwva2V5PgoJPGZhbHNlPjwvZmFsc2U+Cgk8a2V5PklTX0FQUElOVklURV9FTkFCTEVEPC9rZXk+Cgk8dHJ1ZT48L3RydWU+Cgk8a2V5PklTX0dDTV9FTkFCTEVEPC9rZXk+Cgk8dHJ1ZT48L3RydWU+Cgk8a2V5PklTX1NJR05JTl9FTkFCTEVEPC9rZXk+Cgk8dHJ1ZT48L3RydWU+Cgk8a2V5PkdPT0dMRV9BUFBfSUQ8L2tleT4KCTxzdHJpbmc+MTozMDc0NDMyOTYzNDU6aW9zOmQ1Y2M4ZGYxZjI0YmUxZjIwMDY5NDg8L3N0cmluZz4KPC9kaWN0Pgo8L3BsaXN0Pg=="
       flutter: 3.44.1
       xcode: latest
       cocoapods: default
@@ -20,11 +21,7 @@ workflows:
     scripts:
       - name: Decode GoogleService-Info.plist
         script: |
-          if [ -z "$GOOGLE_SERVICE_INFO_B64" ] || [ "$GOOGLE_SERVICE_INFO_B64" == "base64-encoded-GoogleService-Info.plist" ]; then
-            echo "Skipping GoogleService-Info.plist decode"
-          else
-            echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
-          fi
+          echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
       - name: Flutter pub get
         script: |
           flutter pub get
@@ -72,6 +69,7 @@ workflows:
         - app_store_credentials
       vars:
         API_BASE_URL: "https://backend-winter-waterfall-5807.fly.dev/api/v1"
+        GOOGLE_SERVICE_INFO_B64: "base64-encoded-GoogleService-Info.plist"
         APP_STORE_APP_ID: 6440000000
       flutter: 3.44.1
       xcode: latest
@@ -85,11 +83,7 @@ workflows:
     scripts:
       - name: Decode GoogleService-Info.plist
         script: |
-          if [ -z "$GOOGLE_SERVICE_INFO_B64" ] || [ "$GOOGLE_SERVICE_INFO_B64" == "base64-encoded-GoogleService-Info.plist" ]; then
-            echo "Skipping GoogleService-Info.plist decode"
-          else
-            echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
-          fi
+          echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
       - name: Flutter pub get
         script: |
           flutter pub get
