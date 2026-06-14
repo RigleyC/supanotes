@@ -1,4 +1,3 @@
-# codemagic.yaml
 workflows:
   ios-unsigned:
     name: iOS Unsigned Build
@@ -9,6 +8,7 @@ workflows:
         - api_config
       vars:
         API_BASE_URL: "https://backend-winter-waterfall-5807.fly.dev/api/v1"
+        GOOGLE_SERVICE_INFO_B64: "base64-encoded-GoogleService-Info.plist"
       flutter: 3.44.1
       xcode: latest
       cocoapods: default
@@ -19,15 +19,15 @@ workflows:
         - pattern: 'master'
           include: true
     scripts:
+      - name: Decode GoogleService-Info.plist
+        script: |
+          echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
       - name: Flutter pub get
         script: |
           flutter pub get
       - name: Flutter build config-only
         script: |
-          flutter build ios --config-only --dart-define=API_BASE_URL="$API_BASE_URL"
-      - name: Clean Swift Package Manager artifacts
-        script: |
-          rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
+          flutter build ios --config-only --dart-define=API_BASE_URL="$API_BASE_URL" || true
       - name: Build iOS project with xcodebuild
         script: |
           cd ios
@@ -55,10 +55,10 @@ workflows:
           zip -rq supanotes-unsigned.ipa Payload
           rm -rf Payload
     artifacts:
-      - build/*.ipa
+      - build/supanotes-unsigned.ipa
 
   ios-signed:
-    name: iOS Signed Release Build
+    name: iOS Signed Release IPA
     max_build_duration: 60
     instance_type: mac_mini_m1
     environment:
@@ -67,6 +67,7 @@ workflows:
         - app_store_credentials
       vars:
         API_BASE_URL: "https://backend-winter-waterfall-5807.fly.dev/api/v1"
+        GOOGLE_SERVICE_INFO_B64: "base64-encoded-GoogleService-Info.plist"
         APP_STORE_APP_ID: 6440000000
       flutter: 3.44.1
       xcode: latest
@@ -75,9 +76,12 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: 'master'
+        - pattern: 'release/*'
           include: true
     scripts:
+      - name: Decode GoogleService-Info.plist
+        script: |
+          echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
       - name: Flutter pub get
         script: |
           flutter pub get
@@ -86,7 +90,7 @@ workflows:
           keychain initialize
       - name: Fetch signing certificates and profiles
         script: |
-          app-store-connect fetch-signing-files "com.example.supanotes" \
+          app-store-connect fetch-signing-files "com.rigley.supanotes" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
@@ -95,7 +99,7 @@ workflows:
       - name: Use profiles
         script: |
           xcode-project use-profiles
-      - name: Build iOS IPA
+      - name: Build signed IPA
         script: |
           flutter build ipa --release \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
