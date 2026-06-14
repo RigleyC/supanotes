@@ -11,4 +11,8 @@ sql:
         emit_json_tags: true
         emit_interface: true
         emit_exact_table_names: false
-        overrides: []
+        overrides:
+          - column: "notes.search_vector"
+            go_type:
+              import: "github.com/jackc/pgx/v5/pgtype"
+              type: "Text"

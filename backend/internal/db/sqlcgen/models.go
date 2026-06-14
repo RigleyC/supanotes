@@ -66,7 +66,7 @@ type Note struct {
 	IsInbox         bool               `json:"is_inbox"`
 	Favorite        bool               `json:"favorite"`
 	Archived        bool               `json:"archived"`
-	SearchVector    interface{}        `json:"search_vector"`
+	SearchVector    pgtype.Text        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`

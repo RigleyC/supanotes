@@ -3184,7 +3184,8 @@ class $NoteLinksTable extends NoteLinks
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
   );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
@@ -3195,7 +3196,8 @@ class $NoteLinksTable extends NoteLinks
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
   );
   static const VerificationMeta _isDirtyMeta = const VerificationMeta(
     'isDirty',
@@ -3266,16 +3268,12 @@ class $NoteLinksTable extends NoteLinks
         _createdAtMeta,
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
     }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
-    } else if (isInserting) {
-      context.missing(_updatedAtMeta);
     }
     if (data.containsKey('is_dirty')) {
       context.handle(
@@ -3490,15 +3488,13 @@ class NoteLinksCompanion extends UpdateCompanion<NoteLinkData> {
     required String sourceId,
     required String targetId,
     this.relation = const Value.absent(),
-    required DateTime createdAt,
-    required DateTime updatedAt,
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.isDirty = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        sourceId = Value(sourceId),
-       targetId = Value(targetId),
-       createdAt = Value(createdAt),
-       updatedAt = Value(updatedAt);
+       targetId = Value(targetId);
   static Insertable<NoteLinkData> custom({
     Expression<String>? id,
     Expression<String>? sourceId,
@@ -5614,8 +5610,8 @@ typedef $$NoteLinksTableCreateCompanionBuilder =
       required String sourceId,
       required String targetId,
       Value<String> relation,
-      required DateTime createdAt,
-      required DateTime updatedAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
       Value<bool> isDirty,
       Value<int> rowid,
     });
@@ -5957,8 +5953,8 @@ class $$NoteLinksTableTableManager
                 required String sourceId,
                 required String targetId,
                 Value<String> relation = const Value.absent(),
-                required DateTime createdAt,
-                required DateTime updatedAt,
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> isDirty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NoteLinksCompanion.insert(

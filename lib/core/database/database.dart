@@ -34,10 +34,9 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to `4` — v4 adds the `note_links`
-  /// table for cross-note references.
+  /// Latest schema version. Bumped to `5` — v5 adds timestamps to `note_links`.
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -54,6 +53,10 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await m.createTable(noteLinks);
+          }
+          if (from < 5) {
+            await m.addColumn(noteLinks, noteLinks.createdAt);
+            await m.addColumn(noteLinks, noteLinks.updatedAt);
           }
         },
       );
