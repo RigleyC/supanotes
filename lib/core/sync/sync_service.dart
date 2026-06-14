@@ -13,6 +13,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -111,7 +112,10 @@ class SyncService {
         syncedAt.toUtc().toIso8601String(),
       );
       _notifier.markSynced(syncedAt);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('[SyncService] Error: $e\n$stackTrace');
+      }
       _notifier.markError(e.toString());
     }
   }

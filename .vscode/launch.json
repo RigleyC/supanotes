@@ -37,6 +37,17 @@
             "args": [
                 "--dart-define-from-file=${workspaceFolder}/.vscode/.dart-define.emulator.json"
             ]
+        },
+        {
+            "name": "Frontend (Flutter - Prod Backend)",
+            "type": "dart",
+            "request": "launch",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": [
+                "--dart-define-from-file=${workspaceFolder}/.vscode/.dart-define.prod.json"
+            ]
         }
     ],
     "compounds": [

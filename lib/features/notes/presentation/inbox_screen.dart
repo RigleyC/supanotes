@@ -32,7 +32,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   NoteEditorController? _controller;
   String? _inboxNoteId;
   final _docLayoutKey = GlobalKey();
-  late final SuperEditorIosControlsController _iosController;
+  SuperEditorIosControlsController? _iosController;
+  SuperEditorAndroidControlsController? _androidController;
   CommonEditorOperations? _commonOps;
 
   NoteEditorController _controllerOrCreate() {
@@ -48,9 +49,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   @override
   void initState() {
     super.initState();
-    _iosController = SuperEditorIosControlsController(
-      toolbarBuilder: _buildIosToolbar,
-    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(ref.read(notesRepositoryProvider).ensureInbox());
@@ -65,11 +63,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       editor: ctrl.editor!,
       document: ctrl.editor!.document,
       composer: ctrl.composer!,
-      documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+      documentLayoutResolver: () =>
+          _docLayoutKey.currentState as DocumentLayout,
     );
   }
 
-  Widget _buildIosToolbar(BuildContext context, Key toolbarKey, LeaderLink focalPoint) {
+  Widget _buildIosToolbar(
+    BuildContext context,
+    Key toolbarKey,
+    LeaderLink focalPoint,
+  ) {
     _ensureCommonOps();
     final ops = _commonOps;
     if (ops == null) return const SizedBox();
@@ -105,7 +108,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   @override
   void dispose() {
-    _iosController.dispose();
+    _iosController?.dispose();
+    _androidController?.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -167,6 +171,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     final hasContent = controller.document!.isNotEmpty;
     final inboxId = asyncValue.asData?.value?.id;
     _inboxNoteId = inboxId;
+    final editorControlsColor = Theme.of(context).colorScheme.primary;
+
+    _iosController ??= SuperEditorIosControlsController(
+      handleColor: editorControlsColor,
+      toolbarBuilder: _buildIosToolbar,
+    );
+    _androidController ??= SuperEditorAndroidControlsController(
+      controlsColor: editorControlsColor,
+    );
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -204,28 +217,31 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                           ),
                           style: AppTypography.textTheme.headlineMedium
                               ?.copyWith(
-                                color:
-                                    Theme.of(context).colorScheme.onSurface,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                         ),
                       ),
                     ),
-                    SuperEditorIosControlsScope(
-                      controller: _iosController,
-                      child: SuperEditor(
-                        editor: controller.editor!,
-                        focusNode: controller.focusNode,
-                        documentLayoutKey: _docLayoutKey,
-                        stylesheet: noteStylesheet(context),
-                        componentBuilders: [
-                          ...defaultComponentBuilders,
-                          CustomTaskComponentBuilder(
-                            controller.editor!,
-                            focusNode: controller.focusNode,
-                            onTaskLongPress: (taskId) =>
-                                _openTaskActions(controller, taskId),
-                          ),
-                        ],
+                    SuperEditorAndroidControlsScope(
+                      controller: _androidController!,
+                      child: SuperEditorIosControlsScope(
+                        controller: _iosController!,
+                        child: SuperEditor(
+                          editor: controller.editor!,
+                          focusNode: controller.focusNode,
+                          documentLayoutKey: _docLayoutKey,
+                          stylesheet: noteStylesheet(context),
+
+                          componentBuilders: [
+                            ...defaultComponentBuilders,
+                            CustomTaskComponentBuilder(
+                              controller.editor!,
+                              focusNode: controller.focusNode,
+                              onTaskLongPress: (taskId) =>
+                                  _openTaskActions(controller, taskId),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

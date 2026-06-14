@@ -114,28 +114,35 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final editorControlsColor = Theme.of(context).colorScheme.primary;
+
     _richOps ??= RichCommonEditorOperations(
       editor: controller.editor!,
       document: controller.editor!.document,
       composer: controller.composer!,
-      documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+      documentLayoutResolver: () =>
+          _docLayoutKey.currentState as DocumentLayout,
     );
 
     _iosController ??= RichSuperEditorIosControlsController(
       editor: controller.editor!,
-      documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+      documentLayoutResolver: () =>
+          _docLayoutKey.currentState as DocumentLayout,
       operations: _richOps!,
+      handleColor: editorControlsColor,
     );
 
     _androidController ??= SuperEditorAndroidControlsController(
-      toolbarBuilder: (overlayContext, mobileToolbarKey, focalPoint) => defaultAndroidEditorToolbarBuilder(
-        overlayContext,
-        mobileToolbarKey,
-        _richOps!,
-        SuperEditorAndroidControlsScope.rootOf(overlayContext),
-        controller.composer!.selectionNotifier,
-        focalPoint,
-      ),
+      controlsColor: editorControlsColor,
+      toolbarBuilder: (overlayContext, mobileToolbarKey, focalPoint) =>
+          defaultAndroidEditorToolbarBuilder(
+            overlayContext,
+            mobileToolbarKey,
+            _richOps!,
+            SuperEditorAndroidControlsScope.rootOf(overlayContext),
+            controller.composer!.selectionNotifier,
+            focalPoint,
+          ),
     );
 
     return Scaffold(
@@ -174,8 +181,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           ),
                           style: AppTypography.textTheme.headlineMedium
                               ?.copyWith(
-                                color:
-                                    Theme.of(context).colorScheme.onSurface,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                         ),
                       ),
@@ -190,11 +196,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           documentLayoutKey: _docLayoutKey,
                           stylesheet: noteStylesheet(context),
                           keyboardActions: buildRichKeyboardActions(
-                            baseActions: defaultTargetPlatform == TargetPlatform.iOS ||
-                                    defaultTargetPlatform == TargetPlatform.android
+                            baseActions:
+                                defaultTargetPlatform == TargetPlatform.iOS ||
+                                    defaultTargetPlatform ==
+                                        TargetPlatform.android
                                 ? defaultImeKeyboardActions
                                 : defaultKeyboardActions,
                           ),
+
                           componentBuilders: [
                             ...defaultComponentBuilders,
                             CustomTaskComponentBuilder(

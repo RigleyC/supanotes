@@ -15,6 +15,7 @@ library;
 import 'dart:developer' as dev;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
@@ -149,6 +150,7 @@ class ApiClient {
 /// In production this is a no-op; we only print when the host asserts
 /// `kDebugMode` or when a request fails (so production crashes leave a
 /// breadcrumb in `flutter logs`).
+
 class _LogInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -157,6 +159,13 @@ class _LogInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (kDebugMode) {
+      debugPrint('[ApiClient Error] ${err.toString()}');
+      if (err.response?.data != null) {
+        debugPrint('[ApiClient Response Data] ${err.response?.data}');
+      }
+    }
+    
     dev.log(
       '[ApiClient] ${err.requestOptions.method} '
       '${err.requestOptions.uri} -> '

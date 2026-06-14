@@ -65,19 +65,28 @@ class NoteToolbar extends StatelessWidget {
                 _ToolbarButton(
                   icon: Icons.format_bold,
                   tooltip: 'Negrito',
-                  isActive: _selectionHasAttribution(selection, boldAttribution),
+                  isActive: _selectionHasAttribution(
+                    selection,
+                    boldAttribution,
+                  ),
                   onPressed: () => _toggleInline(boldAttribution),
                 ),
                 _ToolbarButton(
                   icon: Icons.format_italic,
                   tooltip: 'Itálico',
-                  isActive: _selectionHasAttribution(selection, italicsAttribution),
+                  isActive: _selectionHasAttribution(
+                    selection,
+                    italicsAttribution,
+                  ),
                   onPressed: () => _toggleInline(italicsAttribution),
                 ),
                 _ToolbarButton(
                   icon: Icons.format_strikethrough,
                   tooltip: 'Tachado',
-                  isActive: _selectionHasAttribution(selection, strikethroughAttribution),
+                  isActive: _selectionHasAttribution(
+                    selection,
+                    strikethroughAttribution,
+                  ),
                   onPressed: () => _toggleInline(strikethroughAttribution),
                 ),
                 const _ToolbarDivider(),
@@ -190,6 +199,17 @@ class NoteToolbar extends StatelessWidget {
     return false;
   }
 
+  List<DocumentNode> _selectedNodes(DocumentSelection? selection) {
+    if (selection == null) return [];
+    if (selection.isCollapsed) {
+      final node = editor.context.document.getNodeById(selection.extent.nodeId);
+      return node != null ? [node] : [];
+    }
+    return editor.context.document
+        .getNodesInside(selection.start, selection.end)
+        .toList();
+  }
+
   void _toggleInline(Attribution attribution) {
     final selection = composer.selection;
     if (selection == null) return;
@@ -204,90 +224,85 @@ class NoteToolbar extends StatelessWidget {
     ]);
   }
 
-  List<DocumentNode> _selectedNodes(DocumentSelection? selection) {
-    if (selection == null) return [];
-    if (selection.isCollapsed) {
-      final node = editor.context.document.getNodeById(selection.extent.nodeId);
-      return node != null ? [node] : [];
-    }
-    return editor.context.document
-        .getNodesInside(selection.start, selection.end)
-        .toList();
-  }
-
   void _setBlockType(Attribution? blockType) {
-    final nodes = _selectedNodes(composer.selection);
     final requests = <EditRequest>[];
-    for (final node in nodes) {
+    for (final node in _selectedNodes(composer.selection)) {
       if (node is ParagraphNode) {
-        requests.add(ChangeParagraphBlockTypeRequest(
-          nodeId: node.id,
-          blockType: blockType,
-        ));
+        requests.add(
+          ChangeParagraphBlockTypeRequest(
+            nodeId: node.id,
+            blockType: blockType,
+          ),
+        );
       } else if (node is ListItemNode) {
-        requests.add(ConvertListItemToParagraphRequest(
-          nodeId: node.id,
-          paragraphMetadata: {'blockType': blockType},
-        ));
+        requests.add(
+          ConvertListItemToParagraphRequest(
+            nodeId: node.id,
+            paragraphMetadata: {'blockType': blockType},
+          ),
+        );
       } else if (node is TaskNode) {
         final metadata = blockType != null
             ? {'blockType': blockType}
             : <String, dynamic>{};
-        requests.add(ReplaceNodeRequest(
-          existingNodeId: node.id,
-          newNode: ParagraphNode(
-            id: node.id,
-            text: node.text,
-            metadata: metadata,
+        requests.add(
+          ReplaceNodeRequest(
+            existingNodeId: node.id,
+            newNode: ParagraphNode(
+              id: node.id,
+              text: node.text,
+              metadata: metadata,
+            ),
           ),
-        ));
+        );
       }
     }
     if (requests.isNotEmpty) editor.execute(requests);
   }
 
   void _convertToListItem(ListItemType type) {
-    final nodes = _selectedNodes(composer.selection);
     final requests = <EditRequest>[];
-    for (final node in nodes) {
+    for (final node in _selectedNodes(composer.selection)) {
       if (node is ListItemNode) {
         requests.add(ChangeListItemTypeRequest(nodeId: node.id, newType: type));
       } else if (node is TaskNode) {
-        requests.add(ReplaceNodeRequest(
-          existingNodeId: node.id,
-          newNode: ListItemNode(
-            id: node.id,
-            itemType: type,
-            text: node.text,
-            indent: node.indent,
+        requests.add(
+          ReplaceNodeRequest(
+            existingNodeId: node.id,
+            newNode: ListItemNode(
+              id: node.id,
+              itemType: type,
+              text: node.text,
+              indent: node.indent,
+            ),
           ),
-        ));
+        );
       } else if (node is ParagraphNode) {
-        requests.add(ConvertParagraphToListItemRequest(
-          nodeId: node.id,
-          type: type,
-        ));
+        requests.add(
+          ConvertParagraphToListItemRequest(nodeId: node.id, type: type),
+        );
       }
     }
     if (requests.isNotEmpty) editor.execute(requests);
   }
 
   void _convertToTask() {
-    final nodes = _selectedNodes(composer.selection);
     final requests = <EditRequest>[];
-    for (final node in nodes) {
+    for (final node in _selectedNodes(composer.selection)) {
       if (node is ParagraphNode) {
         requests.add(ConvertParagraphToTaskRequest(nodeId: node.id));
       } else if (node is ListItemNode) {
-        requests.add(ReplaceNodeRequest(
-          existingNodeId: node.id,
-          newNode: TaskNode(
-            id: node.id,
-            text: node.text,
-            isComplete: false,
-            indent: node.indent,
+        requests.add(
+          ReplaceNodeRequest(
+            existingNodeId: node.id,
+            newNode: TaskNode(
+              id: node.id,
+              text: node.text,
+              isComplete: false,
+              indent: node.indent,
+            ),
           ),
-        ));
+        );
       } else if (node is TaskNode) {
         requests.add(ConvertTaskToParagraphRequest(nodeId: node.id));
       }

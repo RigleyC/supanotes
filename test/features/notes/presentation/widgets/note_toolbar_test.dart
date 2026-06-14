@@ -9,9 +9,7 @@ Widget buildEditorHarness({
   DocumentSelection? selection,
 }) {
   final document = MutableDocument(nodes: nodes);
-  final composer = MutableDocumentComposer(
-    initialSelection: selection,
-  );
+  final composer = MutableDocumentComposer(initialSelection: selection);
   final editor = createDefaultDocumentEditor(
     document: document,
     composer: composer,
@@ -46,9 +44,7 @@ Widget buildConversionHarness({
   DocumentSelection? selection,
 }) {
   final document = MutableDocument(nodes: nodes);
-  final composer = MutableDocumentComposer(
-    initialSelection: selection,
-  );
+  final composer = MutableDocumentComposer(initialSelection: selection);
   final editor = createDefaultDocumentEditor(
     document: document,
     composer: composer,
@@ -81,12 +77,7 @@ void main() {
     ) async {
       await tester.pumpWidget(
         buildEditorHarness(
-          nodes: [
-            ParagraphNode(
-              id: 'node-1',
-              text: AttributedText('Hello'),
-            ),
-          ],
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
           selection: const DocumentSelection.collapsed(
             position: DocumentPosition(
               nodeId: 'node-1',
@@ -134,9 +125,9 @@ void main() {
 
   group('_convertToTask', () {
     testWidgets('converts ParagraphNode to TaskNode', (tester) async {
-      final document = MutableDocument(nodes: [
-        ParagraphNode(id: 'node-1', text: AttributedText('Buy milk')),
-      ]);
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Buy milk'))],
+      );
       final composer = MutableDocumentComposer(
         initialSelection: const DocumentSelection.collapsed(
           position: DocumentPosition(
@@ -150,38 +141,44 @@ void main() {
         composer: composer,
       );
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            Expanded(
-              child: SuperEditor(
-                editor: editor,
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(editor),
-                ],
-              ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(editor),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
             ),
-            NoteToolbar(editor: editor, composer: composer),
-          ]),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.check_box_outlined));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<TaskNode>());
-      expect(
-        (document.first as TaskNode).text.toPlainText(),
-        'Buy milk',
-      );
+      expect((document.first as TaskNode).text.toPlainText(), 'Buy milk');
     });
 
     testWidgets('converts ListItemNode to TaskNode', (tester) async {
-      final document = MutableDocument(nodes: [
-        ListItemNode.unordered(id: 'node-1', text: AttributedText('Buy milk')),
-      ]);
+      final document = MutableDocument(
+        nodes: [
+          ListItemNode.unordered(
+            id: 'node-1',
+            text: AttributedText('Buy milk'),
+          ),
+        ],
+      );
       final composer = MutableDocumentComposer(
         initialSelection: const DocumentSelection.collapsed(
           position: DocumentPosition(
@@ -195,42 +192,118 @@ void main() {
         composer: composer,
       );
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            Expanded(
-              child: SuperEditor(
-                editor: editor,
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(editor),
-                ],
-              ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(editor),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
             ),
-            NoteToolbar(editor: editor, composer: composer),
-          ]),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.check_box_outlined));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<TaskNode>());
-      expect(
-        (document.first as TaskNode).text.toPlainText(),
-        'Buy milk',
+      expect((document.first as TaskNode).text.toPlainText(), 'Buy milk');
+    });
+
+    testWidgets('converts selected ListItemNodes to TaskNodes', (tester) async {
+      final document = MutableDocument(
+        nodes: [
+          ListItemNode.unordered(
+            id: 'node-1',
+            text: AttributedText('Buy milk'),
+          ),
+          ListItemNode.unordered(
+            id: 'node-2',
+            text: AttributedText('Pay rent'),
+          ),
+          ListItemNode.unordered(
+            id: 'node-3',
+            text: AttributedText('Call mom'),
+          ),
+        ],
       );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-3',
+            nodePosition: TextNodePosition(offset: 8),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(editor),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.check_box_outlined));
+      await tester.pumpAndSettle();
+
+      final nodes = [
+        document.getNodeById('node-1'),
+        document.getNodeById('node-2'),
+        document.getNodeById('node-3'),
+      ];
+
+      expect(nodes, everyElement(isA<TaskNode>()));
+      expect(nodes.map((node) => (node as TaskNode).text.toPlainText()), [
+        'Buy milk',
+        'Pay rent',
+        'Call mom',
+      ]);
     });
 
     testWidgets('converts TaskNode back to ParagraphNode', (tester) async {
-      final document = MutableDocument(nodes: [
-        TaskNode(
-          id: 'node-1',
-          text: AttributedText('Buy milk'),
-          isComplete: false,
-        ),
-      ]);
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Buy milk'),
+            isComplete: false,
+          ),
+        ],
+      );
       final composer = MutableDocumentComposer(
         initialSelection: const DocumentSelection.collapsed(
           position: DocumentPosition(
@@ -244,44 +317,47 @@ void main() {
         composer: composer,
       );
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            Expanded(
-              child: SuperEditor(
-                editor: editor,
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(editor),
-                ],
-              ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(editor),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
             ),
-            NoteToolbar(editor: editor, composer: composer),
-          ]),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.check_box_outlined));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
-      expect(
-        (document.first as ParagraphNode).text.toPlainText(),
-        'Buy milk',
-      );
+      expect((document.first as ParagraphNode).text.toPlainText(), 'Buy milk');
     });
   });
 
   group('_convertToListItem', () {
     testWidgets('converts TaskNode to unordered ListItemNode', (tester) async {
-      final document = MutableDocument(nodes: [
-        TaskNode(
-          id: 'node-1',
-          text: AttributedText('Buy milk'),
-          isComplete: false,
-        ),
-      ]);
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Buy milk'),
+            isComplete: false,
+          ),
+        ],
+      );
       final composer = MutableDocumentComposer(
         initialSelection: const DocumentSelection.collapsed(
           position: DocumentPosition(
@@ -295,22 +371,26 @@ void main() {
         composer: composer,
       );
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            Expanded(
-              child: SuperEditor(
-                editor: editor,
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(editor),
-                ],
-              ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(editor),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
             ),
-            NoteToolbar(editor: editor, composer: composer),
-          ]),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.format_list_bulleted));
@@ -323,13 +403,15 @@ void main() {
     });
 
     testWidgets('converts TaskNode to ordered ListItemNode', (tester) async {
-      final document = MutableDocument(nodes: [
-        TaskNode(
-          id: 'node-1',
-          text: AttributedText('Buy milk'),
-          isComplete: false,
-        ),
-      ]);
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Buy milk'),
+            isComplete: false,
+          ),
+        ],
+      );
       final composer = MutableDocumentComposer(
         initialSelection: const DocumentSelection.collapsed(
           position: DocumentPosition(
@@ -343,22 +425,26 @@ void main() {
         composer: composer,
       );
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            Expanded(
-              child: SuperEditor(
-                editor: editor,
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(editor),
-                ],
-              ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(editor),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
             ),
-            NoteToolbar(editor: editor, composer: composer),
-          ]),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.format_list_numbered));
@@ -373,12 +459,14 @@ void main() {
 
   group('_setBlockType', () {
     testWidgets('converts ListItemNode to H1', (tester) async {
-      final document = MutableDocument(nodes: [
-        ListItemNode.unordered(
-          id: 'node-1',
-          text: AttributedText('Heading text'),
-        ),
-      ]);
+      final document = MutableDocument(
+        nodes: [
+          ListItemNode.unordered(
+            id: 'node-1',
+            text: AttributedText('Heading text'),
+          ),
+        ],
+      );
       final composer = MutableDocumentComposer(
         initialSelection: const DocumentSelection.collapsed(
           position: DocumentPosition(
@@ -392,19 +480,23 @@ void main() {
         composer: composer,
       );
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            Expanded(
-              child: SuperEditor(
-                editor: editor,
-                componentBuilders: defaultComponentBuilders,
-              ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: defaultComponentBuilders,
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
             ),
-            NoteToolbar(editor: editor, composer: composer),
-          ]),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('H1'));
@@ -413,20 +505,19 @@ void main() {
       expect(document.first, isA<ParagraphNode>());
       final para = document.first as ParagraphNode;
       expect(para.text.toPlainText(), 'Heading text');
-      expect(
-        para.getMetadataValue('blockType'),
-        header1Attribution,
-      );
+      expect(para.getMetadataValue('blockType'), header1Attribution);
     });
 
     testWidgets('converts TaskNode to H2', (tester) async {
-      final document = MutableDocument(nodes: [
-        TaskNode(
-          id: 'node-1',
-          text: AttributedText('Heading text'),
-          isComplete: false,
-        ),
-      ]);
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Heading text'),
+            isComplete: false,
+          ),
+        ],
+      );
       final composer = MutableDocumentComposer(
         initialSelection: const DocumentSelection.collapsed(
           position: DocumentPosition(
@@ -440,22 +531,26 @@ void main() {
         composer: composer,
       );
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            Expanded(
-              child: SuperEditor(
-                editor: editor,
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(editor),
-                ],
-              ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(editor),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
             ),
-            NoteToolbar(editor: editor, composer: composer),
-          ]),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('H2'));
@@ -464,20 +559,19 @@ void main() {
       expect(document.first, isA<ParagraphNode>());
       final para = document.first as ParagraphNode;
       expect(para.text.toPlainText(), 'Heading text');
-      expect(
-        para.getMetadataValue('blockType'),
-        header2Attribution,
-      );
+      expect(para.getMetadataValue('blockType'), header2Attribution);
     });
 
     testWidgets('converts TaskNode to Blockquote', (tester) async {
-      final document = MutableDocument(nodes: [
-        TaskNode(
-          id: 'node-1',
-          text: AttributedText('Quoted text'),
-          isComplete: false,
-        ),
-      ]);
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Quoted text'),
+            isComplete: false,
+          ),
+        ],
+      );
       final composer = MutableDocumentComposer(
         initialSelection: const DocumentSelection.collapsed(
           position: DocumentPosition(
@@ -491,22 +585,26 @@ void main() {
         composer: composer,
       );
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            Expanded(
-              child: SuperEditor(
-                editor: editor,
-                componentBuilders: [
-                  ...defaultComponentBuilders,
-                  CustomTaskComponentBuilder(editor),
-                ],
-              ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(editor),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
             ),
-            NoteToolbar(editor: editor, composer: composer),
-          ]),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.format_quote));
@@ -515,10 +613,7 @@ void main() {
       expect(document.first, isA<ParagraphNode>());
       final para = document.first as ParagraphNode;
       expect(para.text.toPlainText(), 'Quoted text');
-      expect(
-        para.getMetadataValue('blockType'),
-        blockquoteAttribution,
-      );
+      expect(para.getMetadataValue('blockType'), blockquoteAttribution);
     });
   });
 }

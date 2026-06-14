@@ -53,8 +53,7 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await m.createTable(noteLinks);
-          }
-          if (from < 5) {
+          } else if (from == 4) {
             await m.addColumn(noteLinks, noteLinks.createdAt);
             await m.addColumn(noteLinks, noteLinks.updatedAt);
           }
