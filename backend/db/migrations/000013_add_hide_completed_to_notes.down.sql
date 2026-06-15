@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE notes
+  DROP COLUMN IF EXISTS hide_completed;
+
+COMMIT;

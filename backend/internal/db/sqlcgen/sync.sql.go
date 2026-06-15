@@ -113,7 +113,7 @@ func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]No
 }
 
 const getSyncNotes = `-- name: GetSyncNotes :many
-SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status FROM notes
+SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
 WHERE user_id = $1 AND updated_at > $2
 ORDER BY updated_at ASC
 LIMIT $3
@@ -149,6 +149,7 @@ func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]N
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
+			&i.HideCompleted,
 		); err != nil {
 			return nil, err
 		}
@@ -365,8 +366,8 @@ func (q *Queries) UpsertContext(ctx context.Context, arg UpsertContextParams) (C
 }
 
 const upsertNote = `-- name: UpsertNote :one
-INSERT INTO notes (id, user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
+INSERT INTO notes (id, user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status, hide_completed, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)
 ON CONFLICT (id) DO UPDATE
 SET context_id = EXCLUDED.context_id,
     title = EXCLUDED.title,
@@ -375,10 +376,11 @@ SET context_id = EXCLUDED.context_id,
     favorite = EXCLUDED.favorite,
     archived = EXCLUDED.archived,
     embedding_status = EXCLUDED.embedding_status,
+    hide_completed = EXCLUDED.hide_completed,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 WHERE notes.user_id = EXCLUDED.user_id
-RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status
+RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 
 type UpsertNoteParams struct {
@@ -391,6 +393,7 @@ type UpsertNoteParams struct {
 	Favorite        bool               `json:"favorite"`
 	Archived        bool               `json:"archived"`
 	EmbeddingStatus string             `json:"embedding_status"`
+	HideCompleted   bool               `json:"hide_completed"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 }
@@ -406,6 +409,7 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 		arg.Favorite,
 		arg.Archived,
 		arg.EmbeddingStatus,
+		arg.HideCompleted,
 		arg.CreatedAt,
 		arg.DeletedAt,
 	)
@@ -425,6 +429,7 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
+		&i.HideCompleted,
 	)
 	return i, err
 }

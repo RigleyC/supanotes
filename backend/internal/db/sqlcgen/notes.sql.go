@@ -32,7 +32,7 @@ UPDATE notes
 SET content = content || E'\n\n' || $3,
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
-RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status
+RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 
 type AppendToInboxParams struct {
@@ -59,6 +59,7 @@ func (q *Queries) AppendToInbox(ctx context.Context, arg AppendToInboxParams) (N
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
+		&i.HideCompleted,
 	)
 	return i, err
 }
@@ -67,7 +68,7 @@ const appendToNoteContent = `-- name: AppendToNoteContent :one
 UPDATE notes
 SET content = content || E'\n\n' || $3, updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND is_inbox = false
-RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status
+RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 
 type AppendToNoteContentParams struct {
@@ -94,6 +95,7 @@ func (q *Queries) AppendToNoteContent(ctx context.Context, arg AppendToNoteConte
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
+		&i.HideCompleted,
 	)
 	return i, err
 }
@@ -136,9 +138,9 @@ func (q *Queries) CreateContext(ctx context.Context, arg CreateContextParams) (C
 }
 
 const createNote = `-- name: CreateNote :one
-INSERT INTO notes (user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status
+INSERT INTO notes (user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status, hide_completed)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 
 type CreateNoteParams struct {
@@ -150,6 +152,7 @@ type CreateNoteParams struct {
 	Favorite        bool        `json:"favorite"`
 	Archived        bool        `json:"archived"`
 	EmbeddingStatus string      `json:"embedding_status"`
+	HideCompleted   bool        `json:"hide_completed"`
 }
 
 func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error) {
@@ -162,6 +165,7 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		arg.Favorite,
 		arg.Archived,
 		arg.EmbeddingStatus,
+		arg.HideCompleted,
 	)
 	var i Note
 	err := row.Scan(
@@ -179,6 +183,7 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
+		&i.HideCompleted,
 	)
 	return i, err
 }
@@ -302,7 +307,7 @@ func (q *Queries) GetContexts(ctx context.Context, userID pgtype.UUID) ([]Contex
 }
 
 const getInboxNote = `-- name: GetInboxNote :one
-SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status FROM notes
+SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
 WHERE user_id = $1 AND is_inbox = true AND deleted_at IS NULL
 `
 
@@ -324,12 +329,13 @@ func (q *Queries) GetInboxNote(ctx context.Context, userID pgtype.UUID) (Note, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
+		&i.HideCompleted,
 	)
 	return i, err
 }
 
 const getLinkedNotes = `-- name: GetLinkedNotes :many
-SELECT DISTINCT n.id, n.user_id, n.context_id, n.title, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status FROM notes n
+SELECT DISTINCT n.id, n.user_id, n.context_id, n.title, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed FROM notes n
 JOIN note_links nl ON (n.id = nl.source_id OR n.id = nl.target_id)
 WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.id != ALL($1::uuid[])
@@ -368,6 +374,7 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
+			&i.HideCompleted,
 		); err != nil {
 			return nil, err
 		}
@@ -380,7 +387,7 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 }
 
 const getNoteByID = `-- name: GetNoteByID :one
-SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status FROM notes
+SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 `
 
@@ -407,12 +414,13 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (Note,
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
+		&i.HideCompleted,
 	)
 	return i, err
 }
 
 const getNotes = `-- name: GetNotes :many
-SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status FROM notes
+SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
 WHERE user_id = $1
   AND is_inbox = false
   AND deleted_at IS NULL
@@ -463,6 +471,7 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, err
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
+			&i.HideCompleted,
 		); err != nil {
 			return nil, err
 		}
@@ -475,7 +484,7 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, err
 }
 
 const getRecentNotes = `-- name: GetRecentNotes :many
-SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status FROM notes
+SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
 WHERE user_id = $1
   AND is_inbox = false
   AND deleted_at IS NULL
@@ -508,6 +517,7 @@ func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Not
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
+			&i.HideCompleted,
 		); err != nil {
 			return nil, err
 		}
@@ -600,7 +610,7 @@ const setInboxContent = `-- name: SetInboxContent :one
 UPDATE notes
 SET content = $3, updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
-RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status
+RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 
 type SetInboxContentParams struct {
@@ -627,6 +637,7 @@ func (q *Queries) SetInboxContent(ctx context.Context, arg SetInboxContentParams
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
+		&i.HideCompleted,
 	)
 	return i, err
 }
@@ -639,9 +650,10 @@ SET title = COALESCE($3, title),
     favorite = COALESCE($6, favorite),
     archived = COALESCE($7, archived),
     embedding_status = COALESCE($8, embedding_status),
+    hide_completed = COALESCE($9, hide_completed),
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status
+RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 
 type UpdateNoteParams struct {
@@ -653,6 +665,7 @@ type UpdateNoteParams struct {
 	Favorite        pgtype.Bool `json:"favorite"`
 	Archived        pgtype.Bool `json:"archived"`
 	EmbeddingStatus pgtype.Text `json:"embedding_status"`
+	HideCompleted   pgtype.Bool `json:"hide_completed"`
 }
 
 func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error) {
@@ -665,6 +678,7 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		arg.Favorite,
 		arg.Archived,
 		arg.EmbeddingStatus,
+		arg.HideCompleted,
 	)
 	var i Note
 	err := row.Scan(
@@ -682,6 +696,7 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
+		&i.HideCompleted,
 	)
 	return i, err
 }
