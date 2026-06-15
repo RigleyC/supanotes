@@ -110,20 +110,22 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 
 	// Recurring task: calculate next due_date, keep 'open'
 	if task.Recurrence.Valid && task.Recurrence.String != "" && task.DueDate.Valid {
-		nextDue := calculateNextDueDate(task.DueDate.Time, task.Recurrence.String)
-		task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
-			ID:      id,
-			UserID:  userID,
-			DueDate: pgtype.Timestamptz{Time: nextDue, Valid: true},
-			Status:  pgtype.Text{String: "open", Valid: true},
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return sqlcgen.Task{}, ErrTaskNotFound
+		nextDue, ok := calculateNextDueDate(task.DueDate.Time, task.Recurrence.String)
+		if ok {
+			task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
+				ID:      id,
+				UserID:  userID,
+				DueDate: pgtype.Timestamptz{Time: nextDue, Valid: true},
+				Status:  pgtype.Text{String: "open", Valid: true},
+			})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return sqlcgen.Task{}, ErrTaskNotFound
+				}
+				return sqlcgen.Task{}, err
 			}
-			return sqlcgen.Task{}, err
+			return task, nil
 		}
-		return task, nil
 	}
 
 	// Non-recurring: mark completed
@@ -188,21 +190,21 @@ func (s *Service) GetTodayTasks(ctx context.Context, userID pgtype.UUID) ([]sqlc
 	return s.repo.GetTodayTasks(ctx, userID, pgtype.Timestamptz{Time: upTo, Valid: true})
 }
 
-func calculateNextDueDate(current time.Time, recurrence string) time.Time {
+func calculateNextDueDate(current time.Time, recurrence string) (time.Time, bool) {
 	switch recurrence {
 	case "daily":
-		return current.AddDate(0, 0, 1)
+		return current.AddDate(0, 0, 1), true
 	case "weekdays":
 		next := current.AddDate(0, 0, 1)
 		for next.Weekday() == time.Saturday || next.Weekday() == time.Sunday {
 			next = next.AddDate(0, 0, 1)
 		}
-		return next
+		return next, true
 	case "weekly":
-		return current.AddDate(0, 0, 7)
+		return current.AddDate(0, 0, 7), true
 	case "monthly":
-		return current.AddDate(0, 1, 0)
+		return current.AddDate(0, 1, 0), true
 	default:
-		return current // Não suportado
+		return time.Time{}, false
 	}
 }
