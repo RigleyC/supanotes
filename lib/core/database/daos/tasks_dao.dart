@@ -239,18 +239,18 @@ DateTime? _nextDueDate({
 }) {
   switch (recurrence) {
     case TaskRecurrence.daily:
-      return DateTime(from.year, from.month, from.day + 1);
+      return from.add(const Duration(days: 1));
     case TaskRecurrence.weekdays:
-      var day = DateTime(from.year, from.month, from.day + 1);
+      var day = from.add(const Duration(days: 1));
       // Skip Saturday (6) and Sunday (7) — Dart's DateTime.weekday is
       // 1-based with Monday=1.
       while (day.weekday == DateTime.saturday ||
           day.weekday == DateTime.sunday) {
-        day = DateTime(day.year, day.month, day.day + 1);
+        day = day.add(const Duration(days: 1));
       }
       return day;
     case TaskRecurrence.weekly:
-      return DateTime(from.year, from.month, from.day + 7);
+      return from.add(const Duration(days: 7));
     case TaskRecurrence.monthly:
       final desiredMonth = from.month + 1;
       final overflow = desiredMonth > 12;

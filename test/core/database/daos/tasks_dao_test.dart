@@ -98,10 +98,47 @@ void main() {
     final task = tasks.single;
     expect(task.status, 'open');
     expect(task.completedAt, isNull);
-    // _nextDueDate(from: DateTime.now(), daily) → today + 1 day
+    // _nextDueDate(from: DateTime.now(), daily) → today + 1 day, preserving time-of-day.
+    // Drift stores DateTime with second precision, so compare field-by-field.
     final today = DateTime.now();
-    final expectedDue = DateTime(today.year, today.month, today.day + 1);
-    expect(task.dueDate, expectedDue);
+    final expectedDue = today.add(const Duration(days: 1));
+    expect(task.dueDate!.year, expectedDue.year);
+    expect(task.dueDate!.month, expectedDue.month);
+    expect(task.dueDate!.day, expectedDue.day);
+    expect(task.dueDate!.hour, expectedDue.hour);
+    expect(task.dueDate!.minute, expectedDue.minute);
+
+    await db.close();
+  });
+
+  test('completing a monthly recurring task clamps to last valid day', () async {
+    final db = AppDatabase.test();
+    db.tasksDao.completionsDao = db.taskCompletionsDao;
+    final due = DateTime(2026, 1, 31);  // last day of January
+    await db.tasksDao.insertTask(TaskData(
+      id: 'task-4',
+      userId: 'user-1',
+      noteId: 'note-1',
+      title: 'Monthly review',
+      status: 'open',
+      position: 0,
+      recurrence: TaskRecurrence.monthly,
+      dueDate: due,
+      completedAt: null,
+      createdAt: due,
+      updatedAt: due,
+      deletedAt: null,
+      isDirty: true,
+    ));
+
+    await db.tasksDao.completeTask('task-4');
+
+    final tasks = await db.select(db.tasks).get();
+    final task = tasks.single;
+    expect(task.status, 'open');
+    expect(task.dueDate!.year, 2026);
+    expect(task.dueDate!.month, 2);
+    expect(task.dueDate!.day, 28);  // Feb has 28 days in 2026
 
     await db.close();
   });
