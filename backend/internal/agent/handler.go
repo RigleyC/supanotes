@@ -50,10 +50,15 @@ func (h *Handler) Chat(c echo.Context) error {
 		return err
 	}
 
-	resp, err := h.loop.Chat(c.Request().Context(), userID, req.SessionID, req.Content)
+	ch, err := h.loop.Chat(c.Request().Context(), userID, req.SessionID, req.Content)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, err.Error())
+	}
+
+	resp := ""
+	for chunk := range ch {
+		resp = chunk
 	}
 
 	return c.JSON(http.StatusOK, ChatResponse{Response: resp})

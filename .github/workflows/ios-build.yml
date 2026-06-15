@@ -100,6 +100,16 @@ jobs:
         working-directory: ${{ steps.detect.outputs.flutter_path }}
         run: flutter pub get
 
+      - name: Flutter analyze
+        if: steps.detect.outputs.type == 'flutter'
+        working-directory: ${{ steps.detect.outputs.flutter_path }}
+        run: flutter analyze --no-fatal-infos
+
+      - name: Flutter test
+        if: steps.detect.outputs.type == 'flutter'
+        working-directory: ${{ steps.detect.outputs.flutter_path }}
+        run: flutter test
+
       - name: Setup Node.js
         if: steps.detect.outputs.type == 'reactnative' || steps.detect.outputs.type == 'expo'
         uses: actions/setup-node@v4

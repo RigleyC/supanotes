@@ -82,7 +82,7 @@ class SaveThrottle {
       } catch (e) {
         if (attempt == maxAttempts - 1) {
           debugPrint('saveThrottle: all retries failed: $e');
-          return;
+          rethrow;
         }
         await Future.delayed(retryDelays[attempt]);
       }

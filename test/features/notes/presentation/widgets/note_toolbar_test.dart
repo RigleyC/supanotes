@@ -616,4 +616,197 @@ void main() {
       expect(para.getMetadataValue('blockType'), blockquoteAttribution);
     });
   });
+
+  group('Numbered list button isActive', () {
+    testWidgets('is active on ordered list item', (tester) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [
+            ListItemNode.ordered(id: 'node-1', text: AttributedText('Ordered')),
+          ],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final numberedBtn = iconButtonWithIcon(Icons.format_list_numbered);
+      expect(numberedBtn, findsOneWidget);
+      final btnWidget = tester.widget<IconButton>(numberedBtn);
+      expect(btnWidget.isSelected, isTrue);
+    });
+
+    testWidgets('is inactive on unordered list item', (tester) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [
+            ListItemNode.unordered(
+              id: 'node-1',
+              text: AttributedText('Unordered'),
+            ),
+          ],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final numberedBtn = iconButtonWithIcon(Icons.format_list_numbered);
+      expect(numberedBtn, findsOneWidget);
+      final btnWidget = tester.widget<IconButton>(numberedBtn);
+      expect(btnWidget.isSelected, isFalse);
+    });
+  });
+
+  group('Indent / unindent', () {
+    testWidgets('indent button is enabled on a list item', (tester) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [
+            ListItemNode.unordered(id: 'node-1', text: AttributedText('Item')),
+          ],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
+      expect(indentBtn, findsOneWidget);
+      expect(tester.widget<IconButton>(indentBtn).onPressed, isNotNull);
+    });
+
+    testWidgets('indent button is disabled on a non-list item', (tester) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [
+            ParagraphNode(id: 'node-1', text: AttributedText('Para')),
+          ],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
+      expect(indentBtn, findsOneWidget);
+      expect(tester.widget<IconButton>(indentBtn).onPressed, isNull);
+    });
+
+    testWidgets('unindent button is enabled on a list item', (tester) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [
+            ListItemNode.unordered(id: 'node-1', text: AttributedText('Item')),
+          ],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final unindentBtn = iconButtonWithIcon(Icons.format_indent_decrease);
+      expect(unindentBtn, findsOneWidget);
+      expect(tester.widget<IconButton>(unindentBtn).onPressed, isNotNull);
+    });
+
+    testWidgets('unindent button is disabled on a non-list item', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [
+            ParagraphNode(id: 'node-1', text: AttributedText('Para')),
+          ],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final unindentBtn = iconButtonWithIcon(Icons.format_indent_decrease);
+      expect(unindentBtn, findsOneWidget);
+      expect(tester.widget<IconButton>(unindentBtn).onPressed, isNull);
+    });
+
+    testWidgets('indent works with multi-node selection of list items', (
+      tester,
+    ) async {
+      final document = MutableDocument(
+        nodes: [
+          ListItemNode.unordered(id: 'node-1', text: AttributedText('Item 1')),
+          ListItemNode.unordered(id: 'node-2', text: AttributedText('Item 2')),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-2',
+            nodePosition: TextNodePosition(offset: 6),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: defaultComponentBuilders,
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
+      expect(indentBtn, findsOneWidget);
+      expect(tester.widget<IconButton>(indentBtn).onPressed, isNotNull);
+
+      await tester.tap(indentBtn);
+      await tester.pumpAndSettle();
+
+      final node1 = document.getNodeById('node-1') as ListItemNode;
+      expect(node1.indent, greaterThan(0));
+    });
+  });
 }

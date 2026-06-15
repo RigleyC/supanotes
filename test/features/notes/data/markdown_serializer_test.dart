@@ -1,22 +1,17 @@
-/// Unit tests for the markdown ↔ super_editor bridge.
-///
-/// The serializer is the only thing that knows how to translate the rich
-/// document the user edits back into the markdown blob stored in
-/// `notes.content`. Every behaviour the editor and inbox depend on has
-/// to be covered here so that regressions in the parser are caught
-/// before they corrupt a note.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart'
-    hide serializeDocumentToMarkdown;
+import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 
 void main() {
-  group('parseMarkdownToDocument', () {
+  // ---------------------------------------------------------------------------
+  // parseNoteToMarkdown
+  // ---------------------------------------------------------------------------
+  group('parseNoteToMarkdown', () {
     test('empty input returns a single empty paragraph', () {
-      final doc = parseMarkdownToDocument('');
+      final doc = parseNoteToMarkdown('');
 
       expect(doc.nodeCount, 1);
       expect(doc.first, isA<ParagraphNode>());
@@ -24,14 +19,14 @@ void main() {
     });
 
     test('a plain line is a paragraph', () {
-      final doc = parseMarkdownToDocument('hello world');
+      final doc = parseNoteToMarkdown('hello world');
 
       expect(doc.nodeCount, 1);
       expect((doc.first as ParagraphNode).text.toPlainText(), 'hello world');
     });
 
     test('H1, H2, H3 are parsed with the matching block attribution', () {
-      final doc = parseMarkdownToDocument('# Title\n## Sub\n### SubSub');
+      final doc = parseNoteToMarkdown('# Title\n## Sub\n### SubSub');
 
       expect(doc.nodeCount, 3);
       expect(_blockType(doc.getNodeAt(0)!), header1Attribution);
@@ -40,7 +35,7 @@ void main() {
     });
 
     test('block quote is parsed with the quote attribution', () {
-      final doc = parseMarkdownToDocument('> quoted');
+      final doc = parseNoteToMarkdown('> quoted');
 
       expect(doc.nodeCount, 1);
       expect(_blockType(doc.first), blockquoteAttribution);
@@ -48,7 +43,7 @@ void main() {
     });
 
     test('unordered list item is a ListItemNode', () {
-      final doc = parseMarkdownToDocument('- item');
+      final doc = parseNoteToMarkdown('- item');
 
       expect(doc.nodeCount, 2);
       expect(doc.first, isA<ListItemNode>());
@@ -56,7 +51,7 @@ void main() {
     });
 
     test('ordered list item is a ListItemNode', () {
-      final doc = parseMarkdownToDocument('1. first');
+      final doc = parseNoteToMarkdown('1. first');
 
       expect(doc.nodeCount, 2);
       expect(doc.first, isA<ListItemNode>());
@@ -64,39 +59,46 @@ void main() {
     });
 
     test('open task is a TaskNode marked incomplete', () {
-      final doc = parseMarkdownToDocument('- [ ] buy milk');
+      final doc = parseNoteToMarkdown('- [ ] buy milk');
 
       expect(doc.first, isA<TaskNode>());
       expect((doc.first as TaskNode).isComplete, isFalse);
-      expect(
-        (doc.first as TaskNode).text.toPlainText(),
-        'buy milk',
-      );
+      expect((doc.first as TaskNode).text.toPlainText(), 'buy milk');
     });
 
     test('completed task is a TaskNode marked complete', () {
-      final doc = parseMarkdownToDocument('- [x] pay rent');
+      final doc = parseNoteToMarkdown('- [x] pay rent');
 
       expect(doc.first, isA<TaskNode>());
       expect((doc.first as TaskNode).isComplete, isTrue);
     });
 
     test('task id marker is preserved across the parse step', () {
-      final doc = parseMarkdownToDocument(
-        '- [ ] call doctor <!-- task:abc-123 -->',
-      );
+      final doc = parseNoteToMarkdown('- [ ] call doctor <!-- task:abc-123 -->');
 
       expect((doc.first as TaskNode).id, 'abc-123');
-      expect(
-        (doc.first as TaskNode).text.toPlainText(),
-        'call doctor',
-      );
+      expect((doc.first as TaskNode).text.toPlainText(), 'call doctor');
+    });
+
+    test('horizontal rule is parsed with preserved id and metadata', () {
+      final doc = parseNoteToMarkdown('--- <!-- divider:hr-123|index:5 -->');
+      expect(doc.first, isA<HorizontalRuleNode>());
+      expect((doc.first as HorizontalRuleNode).id, 'hr-123');
+      expect((doc.first as HorizontalRuleNode).getMetadataValue('dividerIndex'), 5);
+    });
+
+    test('plain horizontal rule creates a HorizontalRuleNode', () {
+      final doc = parseNoteToMarkdown('---');
+      expect(doc.first, isA<HorizontalRuleNode>());
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // inline formatting
+  // ---------------------------------------------------------------------------
   group('inline formatting', () {
     test('**bold** is recognised as bold', () {
-      final doc = parseMarkdownToDocument('this is **bold** text');
+      final doc = parseNoteToMarkdown('this is **bold** text');
 
       final text = (doc.first as ParagraphNode).text;
       final spans = text.getAttributionSpansInRange(
@@ -108,7 +110,7 @@ void main() {
     });
 
     test('*italic* is recognised as italic', () {
-      final doc = parseMarkdownToDocument('this is *italic* text');
+      final doc = parseNoteToMarkdown('this is *italic* text');
 
       final text = (doc.first as ParagraphNode).text;
       final spans = text.getAttributionSpansInRange(
@@ -120,7 +122,7 @@ void main() {
     });
 
     test('math expression 2*3 does not toggle italic', () {
-      final doc = parseMarkdownToDocument('2*3=6');
+      final doc = parseNoteToMarkdown('2*3=6');
 
       final text = (doc.first as ParagraphNode).text;
       final spans = text.getAttributionSpansInRange(
@@ -132,7 +134,7 @@ void main() {
     });
 
     test('escaped asterisk is treated as a literal', () {
-      final doc = parseMarkdownToDocument(r'a \* b');
+      final doc = parseNoteToMarkdown(r'a \* b');
 
       final text = (doc.first as ParagraphNode).text;
       expect(text.toPlainText(), 'a * b');
@@ -144,7 +146,7 @@ void main() {
     });
 
     test('~strikethrough~ is recognised as strikethrough', () {
-      final doc = parseMarkdownToDocument('this is ~strikethrough~ text');
+      final doc = parseNoteToMarkdown('this is ~strikethrough~ text');
 
       final text = (doc.first as ParagraphNode).text;
       final spans = text.getAttributionSpansInRange(
@@ -167,7 +169,7 @@ void main() {
             ),
             const SpanMarker(
               attribution: strikethroughAttribution,
-              offset: 5,
+              offset: 4,
               markerType: SpanMarkerType.end,
             ),
           ],
@@ -177,79 +179,77 @@ void main() {
         ParagraphNode(id: Editor.createNodeId(), text: text),
       ]);
 
-      final out = serializeDocumentToMarkdown(doc);
+      final out = serializeNoteToMarkdown(doc);
       expect(out, '~hello~ world');
     });
   });
 
-  group('serializeDocumentToMarkdown', () {
+  // ---------------------------------------------------------------------------
+  // serializeNoteToMarkdown
+  // ---------------------------------------------------------------------------
+  group('serializeNoteToMarkdown', () {
     test('round-trips a single paragraph', () {
-      final doc = parseMarkdownToDocument('a simple note');
-      expect(serializeDocumentToMarkdown(doc), 'a simple note');
+      final doc = parseNoteToMarkdown('a simple note');
+      expect(serializeNoteToMarkdown(doc), 'a simple note');
     });
 
     test('round-trips a heading', () {
-      final doc = parseMarkdownToDocument('# Big Title');
-      expect(serializeDocumentToMarkdown(doc), '# Big Title');
+      final doc = parseNoteToMarkdown('# Big Title');
+      expect(serializeNoteToMarkdown(doc), '# Big Title');
     });
 
     test('round-trips a task and keeps the id marker', () {
       const id = 'task-xyz';
-      final original = '- [ ] write tests <!-- task:$id -->';
-      final doc = parseMarkdownToDocument(original);
-      expect(serializeDocumentToMarkdown(doc), original);
+      const original = '- [ ] write tests <!-- task:$id -->';
+      final doc = parseNoteToMarkdown(original);
+      expect(serializeNoteToMarkdown(doc), original);
     });
 
-    test('blank line between blocks is preserved on round-trip', () {
+    test('round-trips multiple blocks with blank lines', () {
       const original = '# Title\n\nA paragraph after a blank line.';
-      final doc = parseMarkdownToDocument(original);
-      final out = serializeDocumentToMarkdown(doc);
+      final doc = parseNoteToMarkdown(original);
+      final out = serializeNoteToMarkdown(doc);
       expect(out, original);
     });
 
     test('multiple paragraphs separated by blank lines are preserved', () {
       const original = 'first paragraph\n\nsecond paragraph\n\nthird';
-      final doc = parseMarkdownToDocument(original);
-      final out = serializeDocumentToMarkdown(doc);
+      final doc = parseNoteToMarkdown(original);
+      final out = serializeNoteToMarkdown(doc);
       expect(out, original);
     });
 
     test('strikethrough round-trips', () {
       const original = 'text with ~strikethrough~ inside';
-      final doc = parseMarkdownToDocument(original);
-      expect(serializeDocumentToMarkdown(doc), original);
+      final doc = parseNoteToMarkdown(original);
+      expect(serializeNoteToMarkdown(doc), original);
     });
 
     test('bold round-trips', () {
       const original = 'text with **bold** inside';
-      final doc = parseMarkdownToDocument(original);
-      expect(serializeDocumentToMarkdown(doc), original);
+      final doc = parseNoteToMarkdown(original);
+      expect(serializeNoteToMarkdown(doc), original);
     });
 
     test('italic round-trips', () {
       const original = 'text with *italic* inside';
-      final doc = parseMarkdownToDocument(original);
-      expect(serializeDocumentToMarkdown(doc), original);
+      final doc = parseNoteToMarkdown(original);
+      expect(serializeNoteToMarkdown(doc), original);
     });
 
     test('bold and italic on separate spans round-trip', () {
       const original = '**bold** and *italic* text';
-      final doc = parseMarkdownToDocument(original);
-      expect(serializeDocumentToMarkdown(doc), original);
+      final doc = parseNoteToMarkdown(original);
+      expect(serializeNoteToMarkdown(doc), original);
     });
 
     test('bold inside strikethrough round-trips', () {
-      // ~**bold-strike**~ — strikethrough wrapping bold.
-      // Both attributions are preserved through parse → serialize.
       const original = '~**bold-strike**~';
-      final doc = parseMarkdownToDocument(original);
-      final out = serializeDocumentToMarkdown(doc);
-      // The plain text must survive.
-      expect(
-        (doc.first as ParagraphNode).text.toPlainText(),
-        'bold-strike',
-      );
-      // Both attributions must be present after parse.
+      final doc = parseNoteToMarkdown(original);
+      final out = serializeNoteToMarkdown(doc);
+
+      expect((doc.first as ParagraphNode).text.toPlainText(), 'bold-strike');
+
       final text = (doc.first as ParagraphNode).text;
       final boldSpans = text.getAttributionSpansInRange(
         attributionFilter: (a) => a == boldAttribution,
@@ -261,9 +261,20 @@ void main() {
       );
       expect(boldSpans, isNotEmpty, reason: 'bold attribution must survive parse');
       expect(strikeSpans, isNotEmpty, reason: 'strikethrough attribution must survive parse');
-      // The serialized form must contain the markers for both attributions.
       expect(out, contains('**'), reason: 'bold marker must appear in output');
       expect(out, contains('~'), reason: 'strikethrough marker must appear in output');
+    });
+
+    test('horizontal rule round-trips and keeps the id marker and index', () {
+      const original = '--- <!-- divider:hr-123|index:5 -->';
+      final doc = parseNoteToMarkdown(original);
+      expect(serializeNoteToMarkdown(doc), original);
+    });
+
+    test('link round-trips', () {
+      const original = 'a [link](https://example.com) here';
+      final doc = parseNoteToMarkdown(original);
+      expect(serializeNoteToMarkdown(doc), original);
     });
   });
 }

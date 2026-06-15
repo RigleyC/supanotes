@@ -205,11 +205,12 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return (select(tasks)..where((t) => t.isDirty.equals(true))).get();
   }
 
-  /// Flips the dirty flag off without touching any other field — the
-  /// [updatedAt] stays exactly as the backend returned it so the next
-  /// pull can detect remote edits.
-  Future<void> clearDirtyFlag(String id) async {
-    await (update(tasks)..where((t) => t.id.equals(id)))
+  /// Flips the dirty flag off only if the row's [updatedAt] still matches
+  /// [pushedUpdatedAt] — if the user edited while the push was in flight
+  /// the flag stays on so the next sync round picks up the new change.
+  Future<void> clearDirtyFlag(String id, DateTime pushedUpdatedAt) async {
+    await (update(tasks)
+          ..where((t) => t.id.equals(id) & t.updatedAt.equals(pushedUpdatedAt)))
         .write(const TasksCompanion(isDirty: Value(false)));
   }
 

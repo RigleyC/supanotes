@@ -51,8 +51,9 @@ class NoteLinksDao extends DatabaseAccessor<AppDatabase>
     return (select(noteLinks)..where((t) => t.isDirty.equals(true))).get();
   }
 
-  Future<void> clearDirtyFlag(String id) async {
-    await (update(noteLinks)..where((t) => t.id.equals(id)))
+  Future<void> clearDirtyFlag(String id, DateTime pushedUpdatedAt) async {
+    await (update(noteLinks)
+          ..where((t) => t.id.equals(id) & t.updatedAt.equals(pushedUpdatedAt)))
         .write(const NoteLinksCompanion(isDirty: Value(false)));
   }
 

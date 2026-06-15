@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -40,8 +41,33 @@ func sendEvent(events chan<- SSEEvent, typ, data string) {
 	}
 }
 
-func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string) (string, error) {
-	return l.doChat(ctx, userID, sessionIDStr, userMessage, nil)
+func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string) (<-chan string, error) {
+	ch := make(chan string, 10)
+
+	go func() {
+		defer close(ch)
+
+		events := make(chan SSEEvent, 20)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for evt := range events {
+				if evt.Type == "content_delta" || evt.Type == "done" {
+					ch <- evt.Data
+				}
+			}
+		}()
+
+		_, err := l.doChat(ctx, userID, sessionIDStr, userMessage, events)
+		if err != nil {
+			slog.Error("chat failed", "error", err)
+		}
+		close(events)
+		wg.Wait()
+	}()
+
+	return ch, nil
 }
 
 func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) error {

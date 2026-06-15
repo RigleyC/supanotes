@@ -22,8 +22,7 @@ import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:super_editor/super_editor.dart'
-    hide serializeDocumentToMarkdown;
+import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/utils/save_throttle.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
@@ -71,7 +70,7 @@ class NoteEditorController {
       '[NoteEditorController.init] contentLength=${content.length}, content="$content"',
       name: 'NoteEditor',
     );
-    document = parseMarkdownToDocument(content);
+    document = parseNoteToMarkdown(content);
     composer = MutableDocumentComposer();
     editor = createDefaultDocumentEditor(
       document: document!,
@@ -117,7 +116,7 @@ class NoteEditorController {
     await snapshotSave(
       noteId,
       _extractTitle(doc),
-      serializeDocumentToMarkdown(doc),
+      serializeNoteToMarkdown(doc),
       _extractTasks(doc),
     );
   }
@@ -160,7 +159,7 @@ class NoteEditorController {
     if (noteId == null || doc == null) return;
 
     final title = _extractTitle(doc);
-    final markdown = serializeDocumentToMarkdown(doc);
+    final markdown = serializeNoteToMarkdown(doc);
     final tasks = _extractTasks(doc);
 
     dev.log(

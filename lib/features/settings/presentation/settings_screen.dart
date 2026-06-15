@@ -60,11 +60,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _pushEnabled = false;
-
   @override
   Widget build(BuildContext context) {
     final account = ref.watch(authControllerProvider).asData?.value;
+    final pushEnabled = ref.watch(pushServiceProvider);
 
     return Scaffold(
       body: CustomScrollView(
@@ -101,8 +100,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: Icons.notifications_outlined,
                   title: _SettingsStrings.pushTile,
                   subtitle: _SettingsStrings.pushSubtitle,
-                  value: _pushEnabled,
-                  onChanged: (_) => setState(() => _pushEnabled = !_pushEnabled),
+                  value: pushEnabled,
+                  onChanged: (v) =>
+                      ref.read(pushServiceProvider.notifier).toggle(v),
                 ),
 
                 const SettingsSectionHeader(

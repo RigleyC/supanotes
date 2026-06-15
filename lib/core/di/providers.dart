@@ -14,6 +14,7 @@ import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/notifications/push_service.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
@@ -55,7 +56,13 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   final storage = ref.watch(authLocalStorageProvider);
   final rawDio = ref.watch(_rawDioProvider);
   final interceptor = AuthInterceptor(
-    tokenStorage: storage,
+    getAccessToken: () => storage.getAccessToken(),
+    getRefreshToken: () => storage.getRefreshToken(),
+    saveTokens: ({required String accessToken, required String refreshToken}) =>
+        storage.saveTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    ),
     onAuthFailure: () async {
       ref.read(authControllerProvider.notifier).onSessionExpired();
     },
@@ -109,3 +116,10 @@ final authControllerProvider =
 // ---------------------------------------------------------------------------
 
 final tagsDaoProvider = Provider.autoDispose((ref) => ref.watch(appDatabaseProvider).tagsDao);
+
+// ---------------------------------------------------------------------------
+// Push notification service
+// ---------------------------------------------------------------------------
+
+final pushServiceProvider =
+    NotifierProvider<PushService, bool>(PushService.new);

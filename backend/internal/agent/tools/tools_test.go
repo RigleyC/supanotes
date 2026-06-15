@@ -1,4 +1,4 @@
-package agent
+package tools
 
 import (
 	"context"
@@ -515,7 +515,8 @@ func TestGetNoteTool_InvalidUUID(t *testing.T) {
 }
 
 func TestApplyInboxOrganizationTool_Execute(t *testing.T) {
-	inboxID := pgtype.UUID{Bytes: [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, Valid: true}
+	// [16]byte{15: 1} = last byte=1 → UUID string "00000000-0000-0000-0000-000000000001"
+	inboxID := pgtype.UUID{Bytes: [16]byte{15: 1}, Valid: true}
 	q := &stubQuerier{
 		getInboxNote: func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
 			return sqlcgen.Note{

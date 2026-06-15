@@ -37,9 +37,12 @@ class ContextsDao extends DatabaseAccessor<AppDatabase>
     return (select(contexts)..where((t) => t.isDirty.equals(true))).get();
   }
 
-  /// Flips the dirty flag off after a successful push.
-  Future<void> clearDirtyFlag(String id) async {
-    await (update(contexts)..where((t) => t.id.equals(id)))
+  /// Flips the dirty flag off only if the row's [updatedAt] still matches
+  /// [pushedUpdatedAt] — if the user edited while the push was in flight
+  /// the flag stays on so the next sync round picks up the new change.
+  Future<void> clearDirtyFlag(String id, DateTime pushedUpdatedAt) async {
+    await (update(contexts)
+          ..where((t) => t.id.equals(id) & t.updatedAt.equals(pushedUpdatedAt)))
         .write(const ContextsCompanion(isDirty: Value(false)));
   }
 

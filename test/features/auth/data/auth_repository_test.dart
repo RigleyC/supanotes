@@ -67,7 +67,13 @@ ApiClient _apiClient(_StubAdapter adapter) {
   // the auth flow. The interceptor must still be present because the
   // ApiClient constructor requires it.
   final interceptor = AuthInterceptor(
-    tokenStorage: _NoopStorage(),
+    getAccessToken: () => _NoopStorage().getAccessToken(),
+    getRefreshToken: () => _NoopStorage().getRefreshToken(),
+    saveTokens: ({required accessToken, required refreshToken}) =>
+        _NoopStorage().saveTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    ),
     onAuthFailure: () async {},
     onRefresh: (_) async => null,
     replay: (_) => throw UnimplementedError('not used in repository test'),

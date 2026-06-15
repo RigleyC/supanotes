@@ -13,6 +13,7 @@ library;
 
 import 'dart:async';
 
+import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,6 +76,8 @@ class SyncService {
   final SyncStateNotifier _notifier;
   final String _userId;
 
+  bool _isSyncing = false;
+
   StreamSubscription<bool>? _connectivitySub;
   Timer? _syncTimer;
 
@@ -97,12 +100,14 @@ class SyncService {
   }
 
   Future<void> sync() async {
-    if (!_connectivity.isConnected) {
-      _notifier.markOffline();
-      return;
-    }
-    _notifier.markSyncing();
+    if (_isSyncing) return;
+    _isSyncing = true;
     try {
+      if (!_connectivity.isConnected) {
+        _notifier.markOffline();
+        return;
+      }
+      _notifier.markSyncing();
       await push();
       await pull();
       final syncedAt = DateTime.now();
@@ -117,6 +122,8 @@ class SyncService {
         debugPrint('[SyncService] Error: $e\n$stackTrace');
       }
       _notifier.markError(e.toString());
+    } finally {
+      _isSyncing = false;
     }
   }
 
@@ -155,22 +162,22 @@ class SyncService {
     await _db.transaction(() async {
       for (final n in notes) {
         await _db.notesDao.markHasRemoteCopy(n.id);
-        await _db.notesDao.clearDirtyFlag(n.id);
+        await _db.notesDao.clearDirtyFlag(n.id, n.updatedAt);
       }
       for (final tsk in tasks) {
-        await _db.tasksDao.clearDirtyFlag(tsk.id);
+        await _db.tasksDao.clearDirtyFlag(tsk.id, tsk.updatedAt);
       }
       for (final c in contexts) {
-        await _db.contextsDao.clearDirtyFlag(c.id);
+        await _db.contextsDao.clearDirtyFlag(c.id, c.updatedAt);
       }
       for (final tg in tags) {
-        await _db.tagsDao.clearDirtyFlag(tg.id);
+        await _db.tagsDao.clearDirtyFlag(tg.id, tg.updatedAt);
       }
       for (final cmp in completions) {
         await _db.taskCompletionsDao.clearDirtyFlag(cmp.id);
       }
       for (final nl in noteLinks) {
-        await _db.noteLinksDao.clearDirtyFlag(nl.id);
+        await _db.noteLinksDao.clearDirtyFlag(nl.id, nl.updatedAt);
       }
       for (final nt in noteTags) {
         await _db.noteTagsDao.clearDirtyFlag(nt.noteId, nt.tagId);
@@ -189,39 +196,66 @@ class SyncService {
       lastSyncedAt: lastSyncedAt.toUtc().toIso8601String(),
     );
 
-    await _db.transaction(() async {
+    await _db.batch((batch) {
       for (final raw in (data['notes'] as List? ?? [])) {
-        await _db.notesDao
-            .upsertFromRemote(_mapper.noteFromJson(raw as Map<String, dynamic>));
+        final note = _mapper
+            .noteFromJson(raw as Map<String, dynamic>)
+            .copyWith(isDirty: false, hasRemoteCopy: true);
+        batch.insert(_db.notes, note, onConflict: DoUpdate((_) => note));
       }
       for (final raw in (data['tasks'] as List? ?? [])) {
-        await _db.tasksDao
-            .upsertFromRemote(_mapper.taskFromJson(raw as Map<String, dynamic>));
+        final task = _mapper
+            .taskFromJson(raw as Map<String, dynamic>)
+            .copyWith(isDirty: false);
+        batch.insert(_db.tasks, task, onConflict: DoUpdate((_) => task));
       }
       for (final raw in (data['contexts'] as List? ?? [])) {
-        await _db.contextsDao
-            .upsertFromRemote(_mapper.contextFromJson(raw as Map<String, dynamic>));
+        final context = _mapper
+            .contextFromJson(raw as Map<String, dynamic>)
+            .copyWith(isDirty: false);
+        batch.insert(
+          _db.contexts,
+          context,
+          onConflict: DoUpdate((_) => context),
+        );
       }
       for (final raw in (data['tags'] as List? ?? [])) {
-        await _db.tagsDao
-            .upsertFromRemote(_mapper.tagFromJson(raw as Map<String, dynamic>));
+        final tag = _mapper
+            .tagFromJson(raw as Map<String, dynamic>)
+            .copyWith(isDirty: false);
+        batch.insert(_db.tags, tag, onConflict: DoUpdate((_) => tag));
       }
       for (final raw in (data['task_completions'] as List? ?? [])) {
-        await _db.taskCompletionsDao.upsertFromRemote(
-          _mapper.taskCompletionFromJson(
-            raw as Map<String, dynamic>,
-            userId: _userId,
-          ),
+        final completion = _mapper
+            .taskCompletionFromJson(
+              raw as Map<String, dynamic>,
+              userId: _userId,
+            )
+            .copyWith(isDirty: false);
+        batch.insert(
+          _db.localTaskCompletions,
+          completion,
+          onConflict: DoUpdate((_) => completion),
         );
       }
       for (final raw in (data['note_links'] as List? ?? [])) {
-        await _db.noteLinksDao.upsertFromRemote(
-          _mapper.noteLinkFromJson(raw as Map<String, dynamic>),
+        final link = _mapper
+            .noteLinkFromJson(raw as Map<String, dynamic>)
+            .copyWith(isDirty: false);
+        batch.insert(
+          _db.noteLinks,
+          link,
+          onConflict: DoUpdate((_) => link),
         );
       }
       for (final raw in (data['note_tags'] as List? ?? [])) {
-        await _db.noteTagsDao.upsertFromRemote(
-          _mapper.localNoteTagFromJson(raw as Map<String, dynamic>),
+        final noteTag = _mapper
+            .localNoteTagFromJson(raw as Map<String, dynamic>)
+            .copyWith(isDirty: false);
+        batch.insert(
+          _db.localNoteTags,
+          noteTag,
+          onConflict: DoUpdate((_) => noteTag),
         );
       }
     });

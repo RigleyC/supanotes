@@ -21,7 +21,7 @@ import (
 // the concrete *agent.Loop so the gateway package has no upward
 // import on the agent package.
 type AgentBridge interface {
-	Chat(ctx context.Context, userID pgtype.UUID, sessionID, message string) (string, error)
+	Chat(ctx context.Context, userID pgtype.UUID, sessionID, message string) (<-chan string, error)
 }
 
 type LinkCodeResponse struct {
@@ -147,10 +147,8 @@ func (h *Handler) DeleteLink(c echo.Context) error {
 // user's agent session. The response is always 200 OK so Telegram
 // doesn't retry — errors are only logged, never surfaced.
 func (h *Handler) Webhook(c echo.Context) error {
-	if h.webhookSecret != "" {
-		if c.Request().Header.Get("X-Telegram-Bot-Api-Secret-Token") != h.webhookSecret {
-			return c.NoContent(http.StatusUnauthorized)
-		}
+	if c.Request().Header.Get("X-Telegram-Bot-Api-Secret-Token") != h.webhookSecret {
+		return c.NoContent(http.StatusUnauthorized)
 	}
 
 	var update WebhookUpdate
@@ -229,17 +227,47 @@ func (h *Handler) Webhook(c echo.Context) error {
 		sessionIDStr = uuid.New().String()
 	}
 
-	reply, err := h.agent.Chat(ctx, userID, sessionIDStr, text)
+	ch, err := h.agent.Chat(ctx, userID, sessionIDStr, text)
 	if err != nil {
 		c.Logger().Error(err)
 		h.respond(ctx, deliveryChatID, "Something went wrong. Try again in a moment.")
 		return c.NoContent(http.StatusOK)
 	}
 
-	if reply == "" {
+	if h.bot == nil || !h.bot.IsEnabled() {
 		return c.NoContent(http.StatusOK)
 	}
-	h.respond(ctx, deliveryChatID, reply)
+
+	placeholderID, err := h.bot.SendMessage(deliveryChatID, "...")
+	if err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusOK)
+	}
+
+	buf := ""
+	lastSent := ""
+	ticker := time.NewTicker(600 * time.Millisecond)
+	defer ticker.Stop()
+
+loop:
+	for {
+		select {
+		case chunk, ok := <-ch:
+			if !ok {
+				break loop
+			}
+			buf = chunk
+		case <-ticker.C:
+		}
+		if buf != "" && buf != lastSent {
+			h.safeEdit(ctx, deliveryChatID, placeholderID, buf)
+			lastSent = buf
+		}
+	}
+	// Final update after channel closes
+	if buf != "" && buf != lastSent {
+		h.safeEdit(ctx, deliveryChatID, placeholderID, buf)
+	}
 	return c.NoContent(http.StatusOK)
 }
 
@@ -301,6 +329,18 @@ func (h *Handler) respond(_ context.Context, chatID int64, text string) {
 	}
 	if err := h.bot.EditMessageText(chatID, placeholder, text); err != nil {
 		log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram edit failed")
+	}
+}
+
+// safeEdit best-effort edits a Telegram message, truncating to 4096
+// chars if needed. Errors are only logged.
+func (h *Handler) safeEdit(_ context.Context, chatID, messageID int64, text string) {
+	display := text
+	if len(display) > 4096 {
+		display = display[:4096]
+	}
+	if err := h.bot.EditMessageText(chatID, messageID, display); err != nil {
+		log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram streaming edit failed")
 	}
 }
 

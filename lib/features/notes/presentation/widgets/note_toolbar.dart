@@ -14,6 +14,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 
@@ -31,7 +32,8 @@ class NoteToolbar extends StatelessWidget {
       builder: (context, selection, child) {
         final activeNodeId = _activeNodeId(selection);
         final blockType = _activeBlockType(activeNodeId);
-        final isListItem = blockType == listItemAttribution;
+        final selectedListType = _selectedListType(selection);
+        final isListItem = selectedListType != null;
         final activeNode = activeNodeId != null
             ? editor.context.document.getNodeById(activeNodeId)
             : null;
@@ -109,13 +111,13 @@ class NoteToolbar extends StatelessWidget {
                 _ToolbarButton(
                   icon: Icons.format_list_bulleted,
                   tooltip: 'Lista',
-                  isActive: blockType == listItemAttribution,
+                  isActive: selectedListType == ListItemType.unordered,
                   onPressed: () => _convertToListItem(ListItemType.unordered),
                 ),
                 _ToolbarButton(
                   icon: Icons.format_list_numbered,
                   tooltip: 'Lista numerada',
-                  isActive: false,
+                  isActive: selectedListType == ListItemType.ordered,
                   onPressed: () => _convertToListItem(ListItemType.ordered),
                 ),
                 // Indent/unindent: enabled whenever the current node is a list
@@ -144,6 +146,13 @@ class NoteToolbar extends StatelessWidget {
                   tooltip: 'Citação',
                   isActive: blockType == blockquoteAttribution,
                   onPressed: () => _setBlockType(blockquoteAttribution),
+                ),
+                const _ToolbarDivider(),
+                _ToolbarButton(
+                  icon: Icons.horizontal_rule,
+                  tooltip: 'Divisor',
+                  isActive: false,
+                  onPressed: _insertDivider,
                 ),
               ],
             ),
@@ -199,125 +208,34 @@ class NoteToolbar extends StatelessWidget {
     return false;
   }
 
-  List<DocumentNode> _selectedNodes(DocumentSelection? selection) {
-    if (selection == null) return [];
-    if (selection.isCollapsed) {
-      final node = editor.context.document.getNodeById(selection.extent.nodeId);
-      return node != null ? [node] : [];
+  ListItemType? _selectedListType(DocumentSelection? selection) {
+    if (selection == null) return null;
+    for (final node
+        in NoteEditorCommands.selectedNodes(editor.context.document, selection)) {
+      if (node is ListItemNode) return node.type;
     }
-    return editor.context.document
-        .getNodesInside(selection.start, selection.end)
-        .toList();
+    return null;
   }
 
-  void _toggleInline(Attribution attribution) {
-    final selection = composer.selection;
-    if (selection == null) return;
-    final range = selection.isCollapsed
-        ? DocumentRange(start: selection.extent, end: selection.extent)
-        : selection;
-    editor.execute([
-      ToggleTextAttributionsRequest(
-        documentRange: range,
-        attributions: {attribution},
-      ),
-    ]);
-  }
+  void _toggleInline(Attribution attribution) =>
+      NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
 
-  void _setBlockType(Attribution? blockType) {
-    final requests = <EditRequest>[];
-    for (final node in _selectedNodes(composer.selection)) {
-      if (node is ParagraphNode) {
-        requests.add(
-          ChangeParagraphBlockTypeRequest(
-            nodeId: node.id,
-            blockType: blockType,
-          ),
-        );
-      } else if (node is ListItemNode) {
-        requests.add(
-          ConvertListItemToParagraphRequest(
-            nodeId: node.id,
-            paragraphMetadata: {'blockType': blockType},
-          ),
-        );
-      } else if (node is TaskNode) {
-        final metadata = blockType != null
-            ? {'blockType': blockType}
-            : <String, dynamic>{};
-        requests.add(
-          ReplaceNodeRequest(
-            existingNodeId: node.id,
-            newNode: ParagraphNode(
-              id: node.id,
-              text: node.text,
-              metadata: metadata,
-            ),
-          ),
-        );
-      }
-    }
-    if (requests.isNotEmpty) editor.execute(requests);
-  }
+  void _setBlockType(Attribution? blockType) =>
+      NoteEditorCommands.setBlockType(editor, composer, blockType);
 
-  void _convertToListItem(ListItemType type) {
-    final requests = <EditRequest>[];
-    for (final node in _selectedNodes(composer.selection)) {
-      if (node is ListItemNode) {
-        requests.add(ChangeListItemTypeRequest(nodeId: node.id, newType: type));
-      } else if (node is TaskNode) {
-        requests.add(
-          ReplaceNodeRequest(
-            existingNodeId: node.id,
-            newNode: ListItemNode(
-              id: node.id,
-              itemType: type,
-              text: node.text,
-              indent: node.indent,
-            ),
-          ),
-        );
-      } else if (node is ParagraphNode) {
-        requests.add(
-          ConvertParagraphToListItemRequest(nodeId: node.id, type: type),
-        );
-      }
-    }
-    if (requests.isNotEmpty) editor.execute(requests);
-  }
+  void _convertToListItem(ListItemType type) =>
+      NoteEditorCommands.convertToListItem(editor, composer, type);
 
-  void _convertToTask() {
-    final requests = <EditRequest>[];
-    for (final node in _selectedNodes(composer.selection)) {
-      if (node is ParagraphNode) {
-        requests.add(ConvertParagraphToTaskRequest(nodeId: node.id));
-      } else if (node is ListItemNode) {
-        requests.add(ConvertListItemToParagraphRequest(nodeId: node.id));
-        requests.add(ConvertParagraphToTaskRequest(nodeId: node.id));
-      } else if (node is TaskNode) {
-        requests.add(ConvertTaskToParagraphRequest(nodeId: node.id));
-      }
-    }
-    if (requests.isNotEmpty) editor.execute(requests);
-  }
+  void _convertToTask() => NoteEditorCommands.convertToTask(editor, composer);
 
-  void _indentListItem() {
-    final nodeId = _activeNodeId(composer.selection);
-    if (nodeId == null) return;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is ListItemNode) {
-      editor.execute([IndentListItemRequest(nodeId: nodeId)]);
-    }
-  }
+  void _indentListItem() =>
+      NoteEditorCommands.indentListItems(editor, composer);
 
-  void _unindentListItem() {
-    final nodeId = _activeNodeId(composer.selection);
-    if (nodeId == null) return;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is ListItemNode) {
-      editor.execute([UnIndentListItemRequest(nodeId: nodeId)]);
-    }
-  }
+  void _unindentListItem() =>
+      NoteEditorCommands.unindentListItems(editor, composer);
+
+  void _insertDivider() =>
+      NoteEditorCommands.insertDivider(editor, dividerCount: 35);
 }
 
 class _ToolbarButton extends StatelessWidget {

@@ -1,4 +1,6 @@
+// ignore_for_file: invalid_use_of_internal_member
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +10,7 @@ import 'package:supanotes/features/agent/data/chat_repository.dart';
 import 'package:supanotes/features/agent/data/chat_sse.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/domain/session_manager.dart';
+import 'package:supanotes/features/agent/domain/sse_chat_event.dart';
 
 typedef ChatState = ({
   List<MessageModel> messages,
@@ -19,7 +22,7 @@ final chatControllerProvider = NotifierProvider<ChatController, AsyncValue<ChatS
 );
 
 class ChatController extends Notifier<AsyncValue<ChatState>> {
-  StreamSubscription<String>? _sseSub;
+  StreamSubscription<SSEChatEvent>? _sseSub;
 
   @override
   AsyncValue<ChatState> build() {
@@ -76,32 +79,78 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
 
     final messagesWithoutAssistant = [...currentMessages, pending];
     final buffer = StringBuffer();
+    String currentToolStatus = '';
 
     _sseSub = sse.streamChat(
       sessionId: sessionId,
       message: trimmed,
     ).listen(
-      (delta) {
-        buffer.write(delta);
-        final updatedAssistant = initialAssistant.copyWith(
-          content: buffer.toString(),
-        );
-        state = AsyncValue.data((
-          messages: [...messagesWithoutAssistant, updatedAssistant],
-          isStreaming: true,
-        ));
+      (event) {
+        if (event.type == 'content_delta' && event.delta != null) {
+          buffer.write(event.delta);
+          currentToolStatus = ''; // Clear tool status when text response starts
+          final updatedAssistant = initialAssistant.copyWith(
+            content: buffer.toString(),
+          );
+          state = AsyncValue.data((
+            messages: [...messagesWithoutAssistant, updatedAssistant],
+            isStreaming: true,
+          ));
+        } else if (event.type == 'tool_use' && event.data != null) {
+          try {
+            final toolCall = jsonDecode(event.data!) as Map<String, dynamic>;
+            final toolName = toolCall['name'] as String? ?? 'processamento';
+            
+            currentToolStatus = '\n\n*(Pensando... executando ação: $toolName)*';
+            final updatedAssistant = initialAssistant.copyWith(
+              content: buffer.toString() + currentToolStatus,
+            );
+            state = AsyncValue.data((
+              messages: [...messagesWithoutAssistant, updatedAssistant],
+              isStreaming: true,
+            ));
+          } catch (_) {}
+        } else if (event.type == 'tool_result') {
+          currentToolStatus = '\n\n*(Pensando... processando resultado)*';
+          final updatedAssistant = initialAssistant.copyWith(
+            content: buffer.toString() + currentToolStatus,
+          );
+          state = AsyncValue.data((
+            messages: [...messagesWithoutAssistant, updatedAssistant],
+            isStreaming: true,
+          ));
+        } else if (event.type == 'done') {
+          final current = state.value;
+          if (current != null) {
+            final finalAssistant = initialAssistant.copyWith(
+              content: buffer.toString(),
+            );
+            state = AsyncValue.data((
+              messages: [...messagesWithoutAssistant, finalAssistant],
+              isStreaming: false,
+            ));
+          }
+        }
       },
       onError: (Object e, StackTrace st) {
-        state = AsyncValue.error(
+        final messages = state.value?.messages ?? currentMessages;
+        final errorState = AsyncValue<ChatState>.data((
+          messages: messages,
+          isStreaming: false,
+        ));
+        state = AsyncError<ChatState>(
           e is ApiException ? e.message : e.toString(),
           st,
-        );
+        ).copyWithPrevious(errorState);
       },
       onDone: () {
         final current = state.value;
         if (current != null) {
+          final finalAssistant = initialAssistant.copyWith(
+            content: buffer.toString(),
+          );
           state = AsyncValue.data((
-            messages: current.messages,
+            messages: [...messagesWithoutAssistant, finalAssistant],
             isStreaming: false,
           ));
         }

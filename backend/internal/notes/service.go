@@ -180,6 +180,17 @@ func (s *Service) AppendToInbox(ctx context.Context, userID pgtype.UUID, content
 	})
 }
 
+const (
+	batchCreateNoteSQL = `INSERT INTO notes (user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id`
+
+	batchAppendToNoteContentSQL = `UPDATE notes
+SET content = content || E'\n\n' || $3, updated_at = NOW()
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND is_inbox = false
+RETURNING id`
+)
+
 func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, items []PlanOrganizationItem) error {
 	r := s.repo
 	var tx pgx.Tx
@@ -208,7 +219,21 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 		}
 	}
 
-	var keptLines []string
+	type createOp struct {
+		title   pgtype.Text
+		content string
+	}
+	type appendOp struct {
+		noteID  pgtype.UUID
+		content string
+	}
+
+	var (
+		creates   []createOp
+		appends   []appendOp
+		keptLines []string
+	)
+
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
@@ -229,17 +254,7 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 			if reqItem.DestinationTitle != nil {
 				titleText = pgtype.Text{String: *reqItem.DestinationTitle, Valid: true}
 			}
-			if _, err := r.CreateNote(ctx, sqlcgen.CreateNoteParams{
-				UserID:          userID,
-				Title:           titleText,
-				Content:         trimmed,
-				IsInbox:         false,
-				Favorite:        false,
-				Archived:        false,
-				EmbeddingStatus: "pending",
-			}); err != nil {
-				return fmt.Errorf("create note: %w", err)
-			}
+			creates = append(creates, createOp{title: titleText, content: trimmed})
 		case DestExistingNote:
 			if reqItem.DestinationNoteID != nil {
 				noteID, err := uid.UUIDFromString(*reqItem.DestinationNoteID)
@@ -247,13 +262,7 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 					if _, err := r.GetNoteByID(ctx, noteID, userID); err != nil {
 						return fmt.Errorf("destination note not found: %w", err)
 					}
-					if _, err := r.AppendToNoteContent(ctx, sqlcgen.AppendToNoteContentParams{
-						ID:      noteID,
-						UserID:  userID,
-						Content: trimmed,
-					}); err != nil {
-						return fmt.Errorf("append to note: %w", err)
-					}
+					appends = append(appends, appendOp{noteID: noteID, content: trimmed})
 				} else {
 					return fmt.Errorf("invalid destination note id: %w", err)
 				}
@@ -264,6 +273,71 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 	}
 
 	newContent := strings.Join(keptLines, "\n\n")
+
+	if len(creates) > 0 || len(appends) > 0 {
+		if s.pool != nil {
+			var batch pgx.Batch
+			for _, op := range creates {
+				batch.Queue(batchCreateNoteSQL,
+					userID,
+					pgtype.UUID{},
+					op.title,
+					op.content,
+					false,
+					false,
+					false,
+					"pending",
+				)
+			}
+			for _, op := range appends {
+				batch.Queue(batchAppendToNoteContentSQL, op.noteID, userID, op.content)
+			}
+
+			br := tx.SendBatch(ctx, &batch)
+
+			for range creates {
+				var id pgtype.UUID
+				if err := br.QueryRow().Scan(&id); err != nil {
+					br.Close()
+					return fmt.Errorf("batch create note: %w", err)
+				}
+			}
+			for range appends {
+				var id pgtype.UUID
+				if err := br.QueryRow().Scan(&id); err != nil {
+					br.Close()
+					return fmt.Errorf("batch append to note: %w", err)
+				}
+			}
+			if err := br.Close(); err != nil {
+				return err
+			}
+		} else {
+			for _, op := range creates {
+				if _, err := r.CreateNote(ctx, sqlcgen.CreateNoteParams{
+					UserID:          userID,
+					Title:           op.title,
+					Content:         op.content,
+					IsInbox:         false,
+					Favorite:        false,
+					Archived:        false,
+					EmbeddingStatus: "pending",
+				}); err != nil {
+					return fmt.Errorf("create note: %w", err)
+				}
+			}
+			for _, op := range appends {
+				if _, err := r.AppendToNoteContent(ctx, sqlcgen.AppendToNoteContentParams{
+					ID:      op.noteID,
+					UserID:  userID,
+					Content: op.content,
+				}); err != nil {
+					return fmt.Errorf("append to note: %w", err)
+				}
+			}
+		}
+	}
+
 	if _, err = r.SetInboxContent(ctx, sqlcgen.SetInboxContentParams{
 		ID:      inbox.ID,
 		UserID:  userID,

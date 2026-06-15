@@ -22,8 +22,6 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
-import 'package:supanotes/features/auth/data/auth_local_storage.dart';
-
 /// Signature of the callback invoked when a token refresh has failed and
 /// the user must be considered signed out.
 typedef AuthFailureHandler = Future<void> Function();
@@ -39,14 +37,27 @@ typedef ReplayHandler = Future<Response<dynamic>> Function(RequestOptions option
 
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
-    required this.tokenStorage,
+    required Future<String?> Function() getAccessToken,
+    required Future<String?> Function() getRefreshToken,
+    required Future<void> Function({
+      required String accessToken,
+      required String refreshToken,
+    }) saveTokens,
     required this.onAuthFailure,
     required RefreshHandler onRefresh,
     required ReplayHandler replay,
-  })  : _onRefresh = onRefresh,
+  })  : _getAccessToken = getAccessToken,
+        _getRefreshToken = getRefreshToken,
+        _saveTokens = saveTokens,
+        _onRefresh = onRefresh,
         _replay = replay;
 
-  final AuthLocalStorage tokenStorage;
+  final Future<String?> Function() _getAccessToken;
+  final Future<String?> Function() _getRefreshToken;
+  final Future<void> Function({
+    required String accessToken,
+    required String refreshToken,
+  }) _saveTokens;
   final AuthFailureHandler onAuthFailure;
   final RefreshHandler _onRefresh;
   final ReplayHandler _replay;
@@ -59,7 +70,7 @@ class AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = await tokenStorage.getAccessToken();
+    final token = await _getAccessToken();
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -92,7 +103,7 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    final newToken = await tokenStorage.getAccessToken();
+    final newToken = await _getAccessToken();
     if (newToken == null) {
       await _notifyFailureOnce();
       handler.next(err);
@@ -137,13 +148,13 @@ class AuthInterceptor extends Interceptor {
   }
 
   Future<bool> _doRefresh() async {
-    final refreshToken = await tokenStorage.getRefreshToken();
+    final refreshToken = await _getRefreshToken();
     if (refreshToken == null) return false;
 
     final tokens = await _onRefresh(refreshToken);
     if (tokens == null) return false;
 
-    await tokenStorage.saveTokens(
+    await _saveTokens(
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     );

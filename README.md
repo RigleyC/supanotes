@@ -1,17 +1,51 @@
-# supanotes
+# SupaNotes
 
-A new Flutter project.
+Personal notes app with proactive AI capabilities.
 
-## Getting Started
+## Prerequisites
 
-This project is a starting point for a Flutter application.
+- Docker & Docker Compose
+- Go 1.22+
+- Flutter 3.44+
+- PostgreSQL 16 (via Docker)
 
-A few resources to get you started if this is your first Flutter project:
+## Setup
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+### 1. Clone and enter the repo
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+git clone https://github.com/RigleyC/supanotes
+cd supanotes
+```
+
+### 2. Start the database
+
+```bash
+docker compose up -d
+```
+
+### 3. Configure environment
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Edit `backend/.env` with your API keys.
+
+### 4. Run database migrations
+
+```bash
+make -C backend migrate-up
+```
+
+### 5. Start the backend
+
+```bash
+make -C backend run
+```
+
+### 6. Run the Flutter app
+
+```bash
+flutter run
+```

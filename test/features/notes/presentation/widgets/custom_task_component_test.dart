@@ -45,31 +45,11 @@ void main() {
     );
 
     await tester.longPress(
-      find
-          .ancestor(
-            of: find.byType(TextComponent),
-            matching: find.byType(Listener),
-          )
-          .first,
-    );
-    await tester.pump();
-
-    expect(openedActions, isTrue);
-  });
-
-  testWidgets('opens task actions from checkbox long press', (tester) async {
-    var openedActions = false;
-
-    await tester.pumpWidget(
-      wrap(
-        CustomTaskComponent(
-          viewModel: viewModel(),
-          onLongPress: () => openedActions = true,
-        ),
+      find.ancestor(
+        of: find.byType(TextComponent),
+        matching: find.byType(GestureDetector),
       ),
     );
-
-    await tester.longPress(find.byType(InkWell));
     await tester.pump();
 
     expect(openedActions, isTrue);
@@ -77,7 +57,7 @@ void main() {
 
   testWidgets('toggles completion from checkbox tap', (tester) async {
     bool? completed;
-    final viewModel = TaskComponentViewModel(
+    final vm = TaskComponentViewModel(
       nodeId: 'task-1',
       padding: EdgeInsets.zero,
       indent: 0,
@@ -90,7 +70,7 @@ void main() {
       selectionColor: Colors.transparent,
     );
 
-    await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: viewModel)));
+    await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: vm)));
 
     await tester.tap(find.byType(InkWell));
     await tester.pump();

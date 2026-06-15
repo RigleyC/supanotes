@@ -3,6 +3,7 @@ package search
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
@@ -77,7 +78,9 @@ func (s *Service) Search(ctx context.Context, userID pgtype.UUID, query string, 
 // toPrefixTsQuery converts a plain-text query into a tsquery with
 // prefix matching on each word so "tes" matches "teste".
 func toPrefixTsQuery(query string) string {
-	words := strings.Fields(query)
+	var re = regexp.MustCompile(`[^a-zA-Z0-9\s]`)
+	safeQuery := re.ReplaceAllString(query, "")
+	words := strings.Fields(safeQuery)
 	if len(words) == 0 {
 		return ""
 	}
