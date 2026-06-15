@@ -10,6 +10,7 @@ import 'package:supanotes/core/sync/sync_mapper.dart';
 import 'package:supanotes/core/sync/sync_repository.dart';
 import 'package:supanotes/core/sync/sync_service.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 class FakeSyncRepository implements ISyncRepository {
   bool pushCalled = false;
@@ -46,6 +47,79 @@ class FakeConnectivityMonitor implements ConnectivityMonitor {
 }
 
 void main() {
+  group('SyncMapper.taskToJson', () {
+    test('serializes recurrence enum as a string', () {
+      final now = DateTime.utc(2026, 6, 15, 12, 0);
+      final task = TaskData(
+        id: 'task-1',
+        userId: 'user-1',
+        noteId: 'note-1',
+        title: 'Buy coffee',
+        status: 'open',
+        position: 0,
+        recurrence: TaskRecurrence.weekly,
+        dueDate: now,
+        completedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: null,
+        isDirty: true,
+      );
+
+      final json = SyncMapper().taskToJson(task);
+
+      expect(json['recurrence'], 'weekly');
+      expect(json['due_date'], now.toIso8601String());
+    });
+
+    test('serializes null recurrence as null', () {
+      final now = DateTime.utc(2026, 6, 15, 12, 0);
+      final task = TaskData(
+        id: 'task-1',
+        userId: 'user-1',
+        noteId: 'note-1',
+        title: 'Buy coffee',
+        status: 'open',
+        position: 0,
+        recurrence: null,
+        dueDate: null,
+        completedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: null,
+        isDirty: true,
+      );
+
+      final json = SyncMapper().taskToJson(task);
+
+      expect(json['recurrence'], isNull);
+      expect(json['due_date'], isNull);
+    });
+  });
+
+  group('SyncMapper.taskFromJson', () {
+    test('treats unknown recurrence strings as null', () {
+      final json = {
+        'id': 'task-1',
+        'user_id': 'user-1',
+        'note_id': 'note-1',
+        'title': 'Buy coffee',
+        'status': 'open',
+        'position': 0,
+        'recurrence': 'yearly',
+        'due_date': null,
+        'completed_at': null,
+        'created_at': '2026-06-15T12:00:00.000Z',
+        'updated_at': '2026-06-15T12:00:00.000Z',
+        'deleted_at': null,
+      };
+
+      final task = SyncMapper().taskFromJson(json);
+
+      expect(task.recurrence, isNull);
+    });
+  });
+
   group('SyncService.push', () {
     test('marks pushed notes as having a remote copy and clears dirty flag',
         () async {
