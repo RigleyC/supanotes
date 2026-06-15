@@ -2,6 +2,7 @@ library;
 
 import 'dart:async';
 
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -82,6 +83,32 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         actions: [
+          AdaptivePopupMenuButton.icon<String>(
+            icon: PlatformInfo.isIOS26OrHigher()
+                ? 'ellipsis'
+                : Icons.more_vert,
+            onSelected: (index, entry) async {
+              if (entry.value == 'hide_completed') {
+                await repo.updateNote(
+                  widget.noteId,
+                  hideCompleted: !note.hideCompleted,
+                );
+              }
+            },
+            items: [
+              AdaptivePopupMenuItem<String>(
+                label: note.hideCompleted
+                    ? 'Mostrar concluídas'
+                    : 'Ocultar concluídas',
+                icon: PlatformInfo.isIOS26OrHigher()
+                    ? (note.hideCompleted ? 'eye' : 'eye.slash')
+                    : (note.hideCompleted
+                        ? Icons.visibility
+                        : Icons.visibility_off),
+                value: 'hide_completed',
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.check),
             onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -95,6 +122,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           content: note.content,
           title: note.title,
           taskMetadata: tasksMap,
+          hideCompleted: note.hideCompleted,
           snapshotSave: (noteId, title, markdown, tasks) =>
               defaultSnapshotSave(repo, noteId, title, markdown, tasks),
           emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
