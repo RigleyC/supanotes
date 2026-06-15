@@ -452,7 +452,7 @@ func (m *mockNotesRepo) WithQuerier(q sqlcgen.Querier) notes.Repository {
 }
 
 func (m *mockNotesRepo) CreateNote(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
-	panic("unimplemented")
+	return m.q.CreateNote(ctx, arg)
 }
 func (m *mockNotesRepo) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Note, error) {
 	return m.q.GetNoteByID(ctx, sqlcgen.GetNoteByIDParams{ID: id, UserID: userID})
@@ -467,16 +467,16 @@ func (m *mockNotesRepo) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams
 	panic("unimplemented")
 }
 func (m *mockNotesRepo) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
-	panic("unimplemented")
+	return m.q.GetInboxNote(ctx, userID)
 }
 func (m *mockNotesRepo) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
-	panic("unimplemented")
+	return m.q.AppendToInbox(ctx, arg)
 }
 func (m *mockNotesRepo) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
-	panic("unimplemented")
+	return m.q.SetInboxContent(ctx, arg)
 }
 func (m *mockNotesRepo) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
-	panic("unimplemented")
+	return m.q.AppendToNoteContent(ctx, arg)
 }
 func (m *mockNotesRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
