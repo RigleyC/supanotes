@@ -108,11 +108,7 @@ class SyncMapper {
         title: json['title'] as String,
         status: json['status'] as String,
         position: (json['position'] as int?) ?? 0,
-        recurrence: json['recurrence'] != null
-          ? TaskRecurrence.values
-              .where((e) => e.name == json['recurrence'])
-              .firstOrNull
-          : null,
+        recurrence: TaskRecurrence.parse(json['recurrence'] as String?),
         dueDate: json['due_date'] != null
             ? DateTime.parse(json['due_date'] as String).toLocal()
             : null,
