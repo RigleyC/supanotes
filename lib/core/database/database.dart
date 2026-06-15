@@ -22,6 +22,8 @@ import 'tables/tags.dart';
 import 'tables/task_completions.dart';
 import 'tables/tasks.dart';
 
+import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNameConverter in tasks.dart
+
 part 'database.g.dart';
 
 @DriftDatabase(

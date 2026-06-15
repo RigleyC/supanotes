@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../features/tasks/domain/task_recurrence.dart';
+
 import '../database.dart';
 import '../tables/tasks.dart';
 import 'task_completions_dao.dart';
@@ -140,7 +142,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
       // 3. If the task is recurring, schedule the next occurrence.
       final recurrence = task.recurrence;
-      if (recurrence != null && recurrence.isNotEmpty) {
+      if (recurrence != null) {
         final nextDue = _nextDueDate(
           from: task.dueDate ?? now,
           recurrence: recurrence,
@@ -219,6 +221,18 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     final incoming = task.copyWith(isDirty: false);
     await into(tasks).insertOnConflictUpdate(incoming);
   }
+
+  Future<void> reorderTasksBatch(List<String> orderedIds) async {
+    await batch((b) {
+      for (var i = 0; i < orderedIds.length; i++) {
+        b.update(
+          tasks,
+          TasksCompanion(position: Value(i)),
+          where: (t) => t.id.equals(orderedIds[i]),
+        );
+      }
+    });
+  }
 }
 
 /// Pure helper that returns the next due date for a given [recurrence]
@@ -227,12 +241,12 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 /// without scheduling a follow-up.
 DateTime? _nextDueDate({
   required DateTime from,
-  required String recurrence,
+  required TaskRecurrence recurrence,
 }) {
   switch (recurrence) {
-    case 'daily':
+    case TaskRecurrence.daily:
       return DateTime(from.year, from.month, from.day + 1);
-    case 'weekdays':
+    case TaskRecurrence.weekdays:
       var day = DateTime(from.year, from.month, from.day + 1);
       // Skip Saturday (6) and Sunday (7) — Dart's DateTime.weekday is
       // 1-based with Monday=1.
@@ -241,9 +255,9 @@ DateTime? _nextDueDate({
         day = DateTime(day.year, day.month, day.day + 1);
       }
       return day;
-    case 'weekly':
+    case TaskRecurrence.weekly:
       return DateTime(from.year, from.month, from.day + 7);
-    case 'monthly':
+    case TaskRecurrence.monthly:
       final desiredMonth = from.month + 1;
       final overflow = desiredMonth > 12;
       final year = from.year + (overflow ? 1 : 0);
@@ -254,7 +268,5 @@ DateTime? _nextDueDate({
       final lastDayOfTarget = DateTime(year, month + 1, 0).day;
       final day = from.day <= lastDayOfTarget ? from.day : lastDayOfTarget;
       return DateTime(year, month, day);
-    default:
-      return null;
   }
 }

@@ -8,6 +8,7 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 import '../../data/tasks_repository.dart';
 import '../../domain/task_model.dart';
+import '../../domain/task_recurrence.dart';
 import 'due_date_picker.dart';
 import 'recurrence_picker.dart';
 
@@ -45,7 +46,7 @@ class TaskEditSheet extends ConsumerStatefulWidget {
 class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
   late final TextEditingController _titleController;
   late DateTime? _dueDate;
-  late String? _recurrence;
+  late TaskRecurrence? _recurrence;
   bool _saving = false;
 
   bool get _isEdit => widget.task != null;
@@ -85,7 +86,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
           dueDate: _dueDate,
           recurrence: _recurrence,
           clearDueDate: _dueDate == null,
-          clearRecurrence: (_recurrence == null || _recurrence!.isEmpty),
+          clearRecurrence: _recurrence == null,
         );
         navigator.pop(
           TaskEditResult(

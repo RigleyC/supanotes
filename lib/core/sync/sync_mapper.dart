@@ -5,6 +5,7 @@
 /// Pull direction (fromJson): raw Map   → typed data for the DAOs.
 library;
 
+import '../../features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/core/database/database.dart';
 
 class SyncMapper {
@@ -107,7 +108,12 @@ class SyncMapper {
         title: json['title'] as String,
         status: json['status'] as String,
         position: (json['position'] as int?) ?? 0,
-        recurrence: json['recurrence'] as String?,
+        recurrence: json['recurrence'] != null
+          ? TaskRecurrence.values.firstWhere(
+              (e) => e.name == json['recurrence'],
+              orElse: () => TaskRecurrence.daily, // fallback, though it shouldn't hit if backend is strictly strings we defined
+            )
+          : null,
         dueDate: json['due_date'] != null
             ? DateTime.parse(json['due_date'] as String).toLocal()
             : null,

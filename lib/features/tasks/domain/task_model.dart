@@ -1,4 +1,6 @@
 import '../../../core/database/database.dart';
+import '../../../core/utils/date_time_extensions.dart';
+import 'task_recurrence.dart';
 
 /// Immutable view-model for a task shown in the presentation layer.
 ///
@@ -33,7 +35,7 @@ class TaskModel {
   final int position;
   final DateTime? dueDate;
   final DateTime? completedAt;
-  final String? recurrence;
+  final TaskRecurrence? recurrence;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -58,21 +60,15 @@ class TaskModel {
   bool get isCompleted => status == 'done' || status == 'completed';
   bool get isPending => status == 'open';
 
-  bool get isRepeating =>
-      recurrence != null && recurrence!.isNotEmpty;
+  bool get isRepeating => recurrence != null;
 
   bool get isOverdue {
     if (isCompleted || dueDate == null) return false;
-    final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day);
-    return dueDate!.isBefore(startOfToday);
+    return dueDate!.isBefore(DateTime.now().startOfDay);
   }
 
   bool get isDueToday {
     if (dueDate == null) return false;
-    final now = DateTime.now();
-    return dueDate!.year == now.year &&
-        dueDate!.month == now.month &&
-        dueDate!.day == now.day;
+    return dueDate!.isSameDayAs(DateTime.now());
   }
 }

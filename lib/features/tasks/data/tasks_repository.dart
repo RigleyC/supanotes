@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/database.dart';
+import '../../../core/utils/date_time_extensions.dart';
 import '../domain/task_model.dart';
+import '../domain/task_recurrence.dart';
 import 'local/tasks_local_repository.dart';
 
 /// Presentation-facing facade over the local tasks database.
@@ -19,10 +21,10 @@ abstract class ITasksRepository {
   Stream<List<TaskModel>> watchTodayDueTasks();
   Stream<List<TaskModel>> watchUndatedOpenTasks();
   Stream<List<TaskModel>> watchByNote(String noteId);
-  Future<TaskModel> createTask({required String noteId, required String title, DateTime? dueDate, String? recurrence, int position = 0});
+  Future<TaskModel> createTask({required String noteId, required String title, DateTime? dueDate, TaskRecurrence? recurrence, int position = 0});
   Future<void> completeTask(String id);
   Future<void> reopenTask(String id);
-  Future<void> updateTask(String id, {String? title, DateTime? dueDate, String? recurrence, int? position, bool clearDueDate = false, bool clearRecurrence = false});
+  Future<void> updateTask(String id, {String? title, DateTime? dueDate, TaskRecurrence? recurrence, int? position, bool clearDueDate = false, bool clearRecurrence = false});
   Future<void> deleteTask(String id);
   Future<void> reorderTasks(String noteId, List<String> orderedIds);
 }
@@ -55,7 +57,7 @@ class TasksRepository implements ITasksRepository {
   Stream<List<TaskModel>> watchOverdueTasks() {
     return _local.watchOpenTasks().map((rows) {
       return rows
-          .where((t) => t.dueDate != null && !_isSameDay(t.dueDate!, _today()))
+          .where((t) => t.dueDate != null && !t.dueDate!.isSameDayAs(DateTime.now()))
           .map(TaskModel.fromData)
           .toList()
         ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
@@ -67,7 +69,7 @@ class TasksRepository implements ITasksRepository {
   Stream<List<TaskModel>> watchTodayDueTasks() {
     return _local.watchOpenTasks().map((rows) {
       return rows
-          .where((t) => t.dueDate != null && _isSameDay(t.dueDate!, _today()))
+          .where((t) => t.dueDate != null && t.dueDate!.isSameDayAs(DateTime.now()))
           .map(TaskModel.fromData)
           .toList()
         ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
@@ -108,7 +110,7 @@ class TasksRepository implements ITasksRepository {
     required String noteId,
     required String title,
     DateTime? dueDate,
-    String? recurrence,
+    TaskRecurrence? recurrence,
     int position = 0,
   }) async {
     final id = _uuid.v4();
@@ -154,7 +156,7 @@ class TasksRepository implements ITasksRepository {
     String id, {
     String? title,
     DateTime? dueDate,
-    String? recurrence,
+    TaskRecurrence? recurrence,
     int? position,
     bool clearDueDate = false,
     bool clearRecurrence = false,
@@ -182,16 +184,12 @@ class TasksRepository implements ITasksRepository {
   Future<void> deleteTask(String id) => _local.softDeleteTask(id);
 
   /// Rewrites the `position` of every task in [noteId] to match
-  /// [orderedIds]. Wrapped in a single transaction so a crash mid-reorder
-  /// does not leave the list half-ordered.
+  /// [orderedIds]. Wrapped in a single transaction via DAO's batch update.
   @override
   Future<void> reorderTasks(String noteId, List<String> orderedIds) async {
-    for (var i = 0; i < orderedIds.length; i++) {
-      await _local.updateTask(TasksCompanion(
-        id: Value(orderedIds[i]),
-        position: Value(i),
-      ));
-    }
+    // Requires exposing DAO from local repo, or passing down orderedIds.
+    // Let's call a new method on local repo:
+    await _local.reorderTasksBatch(orderedIds);
   }
 
   // ---------------------------------------------------------------------------
@@ -215,15 +213,6 @@ class TasksRepository implements ITasksRepository {
       return aDue.compareTo(bDue);
     });
     return tasks;
-  }
-
-  static DateTime _today() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
-
-  static bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/auth/current_user.dart';
 import '../../../../core/database/database.dart';
 import '../../../../core/database/daos/tasks_dao.dart';
+import '../../domain/task_recurrence.dart';
 
 final tasksLocalRepositoryProvider = Provider.autoDispose<TasksLocalRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
@@ -45,7 +46,7 @@ class TasksLocalRepository {
     required String title,
     String status = 'open',
     int position = 0,
-    String? recurrence,
+    TaskRecurrence? recurrence,
     DateTime? dueDate,
   }) async {
     final now = DateTime.now().toUtc();
@@ -79,6 +80,10 @@ class TasksLocalRepository {
 
   Future<void> softDeleteTask(String id) async {
     await _dao.softDeleteTask(id);
+  }
+
+  Future<void> reorderTasksBatch(List<String> orderedIds) async {
+    await _dao.reorderTasksBatch(orderedIds);
   }
 
   Future<void> deleteTask(String id) async {

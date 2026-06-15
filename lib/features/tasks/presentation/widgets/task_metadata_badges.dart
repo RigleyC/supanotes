@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
+import '../../domain/task_recurrence.dart';
 import 'recurrence_picker.dart';
 
 class TaskMetadataBadges extends StatelessWidget {
   const TaskMetadataBadges({super.key, this.dueDate, this.recurrence});
 
   final DateTime? dueDate;
-  final String? recurrence;
+  final TaskRecurrence? recurrence;
 
-  bool get _hasRecurrence => recurrence != null && recurrence!.isNotEmpty;
+  bool get _hasRecurrence => recurrence != null;
   bool get _hasDueDate => dueDate != null;
 
   @override
@@ -45,11 +47,10 @@ class TaskMetadataBadges extends StatelessWidget {
   }
 
   String _dueDateLabel(DateTime dueDate) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final today = DateTime.now().startOfDay;
+    final date = dueDate.startOfDay;
 
-    if (date == today) return 'Hoje';
+    if (date.isSameDayAs(today)) return 'Hoje';
     if (date.isBefore(today)) {
       return 'Atrasada \u00b7 ${DateFormat('d MMM').format(dueDate)}';
     }
@@ -57,11 +58,11 @@ class TaskMetadataBadges extends StatelessWidget {
   }
 
   Color _dueDateColor(BuildContext context, DateTime dueDate) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final today = DateTime.now().startOfDay;
+    final date = dueDate.startOfDay;
+    
     if (date.isBefore(today)) return Theme.of(context).colorScheme.error;
-    if (date == today) return AppColors.success;
+    if (date.isSameDayAs(today)) return AppColors.success;
     return Theme.of(context).colorScheme.onSurfaceVariant;
   }
 }

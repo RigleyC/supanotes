@@ -930,17 +930,15 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
-  static const VerificationMeta _recurrenceMeta = const VerificationMeta(
-    'recurrence',
-  );
   @override
-  late final GeneratedColumn<String> recurrence = GeneratedColumn<String>(
+  late final GeneratedColumnWithTypeConverter<TaskRecurrence?, String>
+  recurrence = GeneratedColumn<String>(
     'recurrence',
     aliasedName,
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-  );
+  ).withConverter<TaskRecurrence?>($TasksTable.$converterrecurrencen);
   static const VerificationMeta _dueDateMeta = const VerificationMeta(
     'dueDate',
   );
@@ -1082,12 +1080,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         position.isAcceptableOrUnknown(data['position']!, _positionMeta),
       );
     }
-    if (data.containsKey('recurrence')) {
-      context.handle(
-        _recurrenceMeta,
-        recurrence.isAcceptableOrUnknown(data['recurrence']!, _recurrenceMeta),
-      );
-    }
     if (data.containsKey('due_date')) {
       context.handle(
         _dueDateMeta,
@@ -1164,9 +1156,11 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         DriftSqlType.int,
         data['${effectivePrefix}position'],
       )!,
-      recurrence: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}recurrence'],
+      recurrence: $TasksTable.$converterrecurrencen.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}recurrence'],
+        ),
       ),
       dueDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -1199,6 +1193,11 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
   $TasksTable createAlias(String alias) {
     return $TasksTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<TaskRecurrence, String, String>
+  $converterrecurrence = const EnumNameConverter(TaskRecurrence.values);
+  static JsonTypeConverter2<TaskRecurrence?, String?, String?>
+  $converterrecurrencen = JsonTypeConverter2.asNullable($converterrecurrence);
 }
 
 class TaskData extends DataClass implements Insertable<TaskData> {
@@ -1208,7 +1207,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final String title;
   final String status;
   final int position;
-  final String? recurrence;
+  final TaskRecurrence? recurrence;
   final DateTime? dueDate;
   final DateTime? completedAt;
   final DateTime createdAt;
@@ -1240,7 +1239,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     map['status'] = Variable<String>(status);
     map['position'] = Variable<int>(position);
     if (!nullToAbsent || recurrence != null) {
-      map['recurrence'] = Variable<String>(recurrence);
+      map['recurrence'] = Variable<String>(
+        $TasksTable.$converterrecurrencen.toSql(recurrence),
+      );
     }
     if (!nullToAbsent || dueDate != null) {
       map['due_date'] = Variable<DateTime>(dueDate);
@@ -1295,7 +1296,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       title: serializer.fromJson<String>(json['title']),
       status: serializer.fromJson<String>(json['status']),
       position: serializer.fromJson<int>(json['position']),
-      recurrence: serializer.fromJson<String?>(json['recurrence']),
+      recurrence: $TasksTable.$converterrecurrencen.fromJson(
+        serializer.fromJson<String?>(json['recurrence']),
+      ),
       dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -1314,7 +1317,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'title': serializer.toJson<String>(title),
       'status': serializer.toJson<String>(status),
       'position': serializer.toJson<int>(position),
-      'recurrence': serializer.toJson<String?>(recurrence),
+      'recurrence': serializer.toJson<String?>(
+        $TasksTable.$converterrecurrencen.toJson(recurrence),
+      ),
       'dueDate': serializer.toJson<DateTime?>(dueDate),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -1331,7 +1336,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     String? title,
     String? status,
     int? position,
-    Value<String?> recurrence = const Value.absent(),
+    Value<TaskRecurrence?> recurrence = const Value.absent(),
     Value<DateTime?> dueDate = const Value.absent(),
     Value<DateTime?> completedAt = const Value.absent(),
     DateTime? createdAt,
@@ -1437,7 +1442,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<String> title;
   final Value<String> status;
   final Value<int> position;
-  final Value<String?> recurrence;
+  final Value<TaskRecurrence?> recurrence;
   final Value<DateTime?> dueDate;
   final Value<DateTime?> completedAt;
   final Value<DateTime> createdAt;
@@ -1524,7 +1529,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Value<String>? title,
     Value<String>? status,
     Value<int>? position,
-    Value<String?>? recurrence,
+    Value<TaskRecurrence?>? recurrence,
     Value<DateTime?>? dueDate,
     Value<DateTime?>? completedAt,
     Value<DateTime>? createdAt,
@@ -1573,7 +1578,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       map['position'] = Variable<int>(position.value);
     }
     if (recurrence.present) {
-      map['recurrence'] = Variable<String>(recurrence.value);
+      map['recurrence'] = Variable<String>(
+        $TasksTable.$converterrecurrencen.toSql(recurrence.value),
+      );
     }
     if (dueDate.present) {
       map['due_date'] = Variable<DateTime>(dueDate.value);
@@ -4121,7 +4128,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       required String title,
       required String status,
       Value<int> position,
-      Value<String?> recurrence,
+      Value<TaskRecurrence?> recurrence,
       Value<DateTime?> dueDate,
       Value<DateTime?> completedAt,
       required DateTime createdAt,
@@ -4138,7 +4145,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String> status,
       Value<int> position,
-      Value<String?> recurrence,
+      Value<TaskRecurrence?> recurrence,
       Value<DateTime?> dueDate,
       Value<DateTime?> completedAt,
       Value<DateTime> createdAt,
@@ -4186,9 +4193,10 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get recurrence => $composableBuilder(
+  ColumnWithTypeConverterFilters<TaskRecurrence?, TaskRecurrence, String>
+  get recurrence => $composableBuilder(
     column: $table.recurrence,
-    builder: (column) => ColumnFilters(column),
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnFilters<DateTime> get dueDate => $composableBuilder(
@@ -4324,10 +4332,11 @@ class $$TasksTableAnnotationComposer
   GeneratedColumn<int> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
 
-  GeneratedColumn<String> get recurrence => $composableBuilder(
-    column: $table.recurrence,
-    builder: (column) => column,
-  );
+  GeneratedColumnWithTypeConverter<TaskRecurrence?, String> get recurrence =>
+      $composableBuilder(
+        column: $table.recurrence,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<DateTime> get dueDate =>
       $composableBuilder(column: $table.dueDate, builder: (column) => column);
@@ -4384,7 +4393,7 @@ class $$TasksTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<int> position = const Value.absent(),
-                Value<String?> recurrence = const Value.absent(),
+                Value<TaskRecurrence?> recurrence = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -4416,7 +4425,7 @@ class $$TasksTableTableManager
                 required String title,
                 required String status,
                 Value<int> position = const Value.absent(),
-                Value<String?> recurrence = const Value.absent(),
+                Value<TaskRecurrence?> recurrence = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
                 required DateTime createdAt,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/due_date_picker.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/recurrence_picker.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -27,7 +28,7 @@ class TaskActionsSheet extends ConsumerStatefulWidget {
 
 class _TaskActionsSheetState extends ConsumerState<TaskActionsSheet> {
   late DateTime? _dueDate;
-  late String? _recurrence;
+  late TaskRecurrence? _recurrence;
   bool _saving = false;
 
   @override
@@ -48,7 +49,7 @@ class _TaskActionsSheetState extends ConsumerState<TaskActionsSheet> {
             dueDate: _dueDate,
             recurrence: _recurrence,
             clearDueDate: _dueDate == null,
-            clearRecurrence: _recurrence == null || _recurrence!.isEmpty,
+            clearRecurrence: _recurrence == null,
           );
       navigator.pop();
     } catch (e) {

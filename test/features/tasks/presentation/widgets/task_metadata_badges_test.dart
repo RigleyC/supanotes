@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 
 void main() {
@@ -28,7 +29,7 @@ void main() {
 
   testWidgets('shows recurrence label', (tester) async {
     await tester.pumpWidget(
-      wrap(const TaskMetadataBadges(recurrence: 'weekly')),
+      wrap(const TaskMetadataBadges(recurrence: TaskRecurrence.weekly)),
     );
 
     expect(find.byIcon(Icons.refresh), findsOneWidget);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/shared/widgets/app_choice_chip.dart';
 
 /// Quick-pick chips for setting a task's `dueDate`.
@@ -23,23 +24,15 @@ class DueDatePicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = now.startOfDay;
     final tomorrow = DateTime(now.year, now.month, now.day + 1);
 
-    DateTime nextMonday() {
-      var d = DateTime(now.year, now.month, now.day + 1);
-      while (d.weekday != DateTime.monday) {
-        d = DateTime(d.year, d.month, d.day + 1);
-      }
-      return d;
-    }
+    final nextMonday = today.add(Duration(days: 8 - today.weekday));
 
     bool isSelected(DateTime? value) {
       if (value == null && initialDate == null) return true;
       if (value == null || initialDate == null) return false;
-      return value.year == initialDate!.year &&
-          value.month == initialDate!.month &&
-          value.day == initialDate!.day;
+      return value.isSameDayAs(initialDate!);
     }
 
     Future<void> pickCustomDate() async {
@@ -70,16 +63,16 @@ class DueDatePicker extends StatelessWidget {
         ),
         AppChoiceChip(
           label: 'Próx. segunda',
-          isSelected: isSelected(nextMonday()),
+          isSelected: isSelected(nextMonday),
           selectedColor: scheme.primary,
-          onTap: () => onChanged(nextMonday()),
+          onTap: () => onChanged(nextMonday),
         ),
         AppChoiceChip(
-          label: initialDate != null && !_isQuickPick(initialDate!, today, tomorrow, nextMonday())
+          label: initialDate != null && !_isQuickPick(initialDate!, today, tomorrow, nextMonday)
               ? DateFormat('d MMM').format(initialDate!)
               : 'Escolher data',
           isSelected: initialDate != null &&
-              !_isQuickPick(initialDate!, today, tomorrow, nextMonday()),
+              !_isQuickPick(initialDate!, today, tomorrow, nextMonday),
           selectedColor: scheme.primary,
           icon: Icons.calendar_today_outlined,
           onTap: pickCustomDate,
@@ -101,11 +94,9 @@ class DueDatePicker extends StatelessWidget {
     DateTime tomorrow,
     DateTime nextMonday,
   ) {
-    bool same(DateTime a, DateTime b) =>
-        a.year == b.year && a.month == b.month && a.day == b.day;
-    return same(value, today) ||
-        same(value, tomorrow) ||
-        same(value, nextMonday);
+    return value.isSameDayAs(today) ||
+        value.isSameDayAs(tomorrow) ||
+        value.isSameDayAs(nextMonday);
   }
 }
 

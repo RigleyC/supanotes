@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
 
+import '../../../features/tasks/domain/task_recurrence.dart';
+
 @DataClassName('TaskData')
 class Tasks extends Table {
   TextColumn get id => text()();
@@ -8,7 +10,7 @@ class Tasks extends Table {
   TextColumn get title => text()();
   TextColumn get status => text()();
   IntColumn get position => integer().withDefault(const Constant(0))();
-  TextColumn get recurrence => text().nullable()();
+  TextColumn get recurrence => text().map(const EnumNameConverter(TaskRecurrence.values)).nullable()();
   DateTimeColumn get dueDate => dateTime().nullable()();
   DateTimeColumn get completedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();

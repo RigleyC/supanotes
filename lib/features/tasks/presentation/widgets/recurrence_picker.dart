@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supanotes/shared/widgets/app_choice_chip.dart';
 
+import '../../domain/task_recurrence.dart';
+
 /// Chip-based picker for the `recurrence` column.
 ///
 /// Renders five options ("Nenhuma", "Diária", "Dias úteis", "Semanal",
-/// "Mensal") and emits the lowercase English string the DAO expects on
-/// the backend: `null`, `daily`, `weekdays`, `weekly`, `monthly`. The
+/// "Mensal") and emits the corresponding enum value. The
 /// selected chip is highlighted with the theme primary color and a
 /// check icon.
 class RecurrencePicker extends StatelessWidget {
@@ -15,15 +16,15 @@ class RecurrencePicker extends StatelessWidget {
     required this.onChanged,
   });
 
-  final String? initialRecurrence;
-  final ValueChanged<String?> onChanged;
+  final TaskRecurrence? initialRecurrence;
+  final ValueChanged<TaskRecurrence?> onChanged;
 
   static const _options = <_RecurrenceOption>[
     _RecurrenceOption(value: null, label: 'Nenhuma', icon: Icons.do_not_disturb_on_outlined),
-    _RecurrenceOption(value: 'daily', label: 'Diária', icon: Icons.today_outlined),
-    _RecurrenceOption(value: 'weekdays', label: 'Dias úteis', icon: Icons.work_outline),
-    _RecurrenceOption(value: 'weekly', label: 'Semanal', icon: Icons.calendar_view_week_outlined),
-    _RecurrenceOption(value: 'monthly', label: 'Mensal', icon: Icons.calendar_month_outlined),
+    _RecurrenceOption(value: TaskRecurrence.daily, label: 'Diária', icon: Icons.today_outlined),
+    _RecurrenceOption(value: TaskRecurrence.weekdays, label: 'Dias úteis', icon: Icons.work_outline),
+    _RecurrenceOption(value: TaskRecurrence.weekly, label: 'Semanal', icon: Icons.calendar_view_week_outlined),
+    _RecurrenceOption(value: TaskRecurrence.monthly, label: 'Mensal', icon: Icons.calendar_month_outlined),
   ];
 
   @override
@@ -48,22 +49,22 @@ class RecurrencePicker extends StatelessWidget {
 
 class _RecurrenceOption {
   const _RecurrenceOption({required this.value, required this.label, required this.icon});
-  final String? value;
+  final TaskRecurrence? value;
   final String label;
   final IconData icon;
 }
 
 /// Human-readable label for a recurrence string. Used in the task tile
 /// subtitle so the picker doesn't have to expose its internal map.
-String recurrenceLabel(String? recurrence) {
+String recurrenceLabel(TaskRecurrence? recurrence) {
   switch (recurrence) {
-    case 'daily':
+    case TaskRecurrence.daily:
       return 'Diariamente';
-    case 'weekdays':
+    case TaskRecurrence.weekdays:
       return 'Dias úteis';
-    case 'weekly':
+    case TaskRecurrence.weekly:
       return 'Semanalmente';
-    case 'monthly':
+    case TaskRecurrence.monthly:
       return 'Mensalmente';
     default:
       return '';
