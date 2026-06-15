@@ -118,6 +118,30 @@ void main() {
 
       expect(task.recurrence, isNull);
     });
+
+    test('parses YYYY-MM-DD as local midnight (not UTC)', () {
+      final json = {
+        'id': 'task-1',
+        'user_id': 'user-1',
+        'note_id': 'note-1',
+        'title': 'Buy coffee',
+        'status': 'open',
+        'position': 0,
+        'recurrence': null,
+        'due_date': '2026-06-15',
+        'completed_at': null,
+        'created_at': '2026-06-15T12:00:00.000Z',
+        'updated_at': '2026-06-15T12:00:00.000Z',
+        'deleted_at': null,
+      };
+
+      final task = SyncMapper().taskFromJson(json);
+
+      expect(task.dueDate!.year, 2026);
+      expect(task.dueDate!.month, 6);
+      expect(task.dueDate!.day, 15);
+      expect(task.dueDate!.hour, 0);
+    });
   });
 
   group('SyncService.push', () {

@@ -8,6 +8,19 @@ library;
 import '../../features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/core/database/database.dart';
 
+DateTime? _parseDueDate(String? s) {
+  if (s == null) return null;
+  if (s.length == 10 && !s.contains('T')) {
+    final parts = s.split('-');
+    return DateTime(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
+    );
+  }
+  return DateTime.parse(s).toLocal();
+}
+
 class SyncMapper {
   // ---------------------------------------------------------------------------
   // Push direction — typed → Map
@@ -111,9 +124,7 @@ class SyncMapper {
         status: json['status'] as String,
         position: (json['position'] as int?) ?? 0,
         recurrence: TaskRecurrence.parse(json['recurrence'] as String?),
-        dueDate: json['due_date'] != null
-            ? DateTime.parse(json['due_date'] as String).toLocal()
-            : null,
+        dueDate: _parseDueDate(json['due_date'] as String?),
         completedAt: json['completed_at'] != null
             ? DateTime.parse(json['completed_at'] as String).toLocal()
             : null,

@@ -24,7 +24,7 @@ import (
 //     user because the table itself has no user_id column.
 type SyncPayload struct {
 	Notes           []sqlcgen.Note           `json:"notes"`
-	Tasks           []sqlcgen.Task           `json:"tasks"`
+	Tasks           []SyncTask               `json:"tasks"`
 	Contexts        []sqlcgen.Context        `json:"contexts"`
 	Tags            []sqlcgen.Tag            `json:"tags"`
 	TaskCompletions []sqlcgen.TaskCompletion `json:"task_completions"`
@@ -66,6 +66,10 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 	}
 	if tasks == nil {
 		tasks = make([]sqlcgen.Task, 0)
+	}
+	syncTasks := make([]SyncTask, len(tasks))
+	for i, t := range tasks {
+		syncTasks[i] = toSyncTask(t)
 	}
 
 	contexts, err := s.repo.GetSyncContexts(ctx, userID, lastSyncedAt, limit)
@@ -110,7 +114,7 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 
 	return &SyncPayload{
 		Notes:           notes,
-		Tasks:           tasks,
+		Tasks:           syncTasks,
 		Contexts:        contexts,
 		Tags:            tags,
 		TaskCompletions: completions,
@@ -203,7 +207,8 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		}
 	}
 
-	for _, t := range payload.Tasks {
+	for _, st := range payload.Tasks {
+		t := fromSyncTask(st)
 		status := sanitizeTaskStatus(t.Status)
 		_, err := r.UpsertTask(ctx, sqlcgen.UpsertTaskParams{
 			ID:         t.ID,
