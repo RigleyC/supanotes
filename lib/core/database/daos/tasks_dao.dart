@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../features/tasks/domain/task_recurrence.dart';
 
@@ -12,8 +11,6 @@ part 'tasks_dao.g.dart';
 @DriftAccessor(tables: [Tasks])
 class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   TasksDao(super.db);
-
-  final Uuid _uuid = const Uuid();
 
   /// Optional reference to the completions DAO. Set by the database
   /// during construction (see `database.dart`).
@@ -121,17 +118,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     final now = DateTime.now();
 
     await transaction(() async {
-      // 1. Mark the current row as completed.
-      await (update(tasks)..where((t) => t.id.equals(id))).write(
-        TasksCompanion(
-          status: const Value('done'),
-          completedAt: Value(now),
-          updatedAt: Value(now),
-          isDirty: const Value(true),
-        ),
-      );
-
-      // 2. Append a row to the completion history.
+      // 1. Record the completion event.
       if (completionsDao != null) {
         await completionsDao!.recordCompletion(
           taskId: task.id,
@@ -140,7 +127,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         );
       }
 
-      // 3. If the task is recurring, schedule the next occurrence.
+      // 2. If recurring, schedule the next occurrence on the same row.
       final recurrence = task.recurrence;
       if (recurrence != null) {
         final nextDue = _nextDueDate(
@@ -148,23 +135,28 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
           recurrence: recurrence,
         );
         if (nextDue != null) {
-          final next = TaskData(
-            id: _uuid.v4(),
-            userId: task.userId,
-            noteId: task.noteId,
-            title: task.title,
-            status: 'open',
-            position: task.position,
-            recurrence: recurrence,
-            dueDate: nextDue,
-            createdAt: now,
-            updatedAt: now,
-            deletedAt: null,
-            isDirty: true,
+          await (update(tasks)..where((t) => t.id.equals(id))).write(
+            TasksCompanion(
+              dueDate: Value(nextDue),
+              completedAt: const Value(null),
+              status: const Value('open'),
+              updatedAt: Value(now),
+              isDirty: const Value(true),
+            ),
           );
-          await into(tasks).insert(next, mode: InsertMode.insertOrReplace);
+          return;
         }
       }
+
+      // 3. Non-recurring or unsupported recurrence: mark completed.
+      await (update(tasks)..where((t) => t.id.equals(id))).write(
+        TasksCompanion(
+          status: const Value('done'),
+          completedAt: Value(now),
+          updatedAt: Value(now),
+          isDirty: const Value(true),
+        ),
+      );
     });
   }
 
