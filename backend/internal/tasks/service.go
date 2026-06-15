@@ -15,6 +15,33 @@ var (
 	ErrTaskNotFound = errors.New("task not found")
 )
 
+// UpdateTaskOpts expresses the tri-state (set / clear / leave alone)
+// for each nullable field on a task. The pointer fields default to
+// "leave alone"; setting a pointer to a non-nil value means "set"; the
+// Clear* bool fields mean "explicitly clear" (must not be combined with
+// a non-nil value for the same field).
+type UpdateTaskOpts struct {
+	Title           *string
+	Status          *string
+	DueDate         *time.Time
+	ClearDueDate    bool
+	Recurrence      *string
+	ClearRecurrence bool
+	Position        *int
+}
+
+// Validate catches conflicting "set" + "clear" inputs early so callers
+// can't accidentally pass both DueDate != nil and ClearDueDate = true.
+func (o UpdateTaskOpts) Validate() error {
+	if o.DueDate != nil && o.ClearDueDate {
+		return errors.New("due_date and clear_due_date are mutually exclusive")
+	}
+	if o.Recurrence != nil && o.ClearRecurrence {
+		return errors.New("recurrence and clear_recurrence are mutually exclusive")
+	}
+	return nil
+}
+
 type Service struct {
 	repo Repository
 }
@@ -50,36 +77,39 @@ func (s *Service) GetTaskByID(ctx context.Context, id pgtype.UUID, userID pgtype
 	return task, nil
 }
 
-func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, title *string, status *string, dueDate *time.Time, clearDueDate bool, recurrence *string, clearRecurrence bool, position *int) (sqlcgen.Task, error) {
+func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts UpdateTaskOpts) (sqlcgen.Task, error) {
+	if err := opts.Validate(); err != nil {
+		return sqlcgen.Task{}, err
+	}
 	arg := sqlcgen.UpdateTaskParams{
 		ID:     id,
 		UserID: userID,
 	}
-	if title != nil {
+	if opts.Title != nil {
 		arg.SetTitle = pgtype.Bool{Bool: true, Valid: true}
-		arg.Title = pgtype.Text{String: *title, Valid: true}
+		arg.Title = pgtype.Text{String: *opts.Title, Valid: true}
 	}
-	if status != nil {
+	if opts.Status != nil {
 		arg.SetStatus = pgtype.Bool{Bool: true, Valid: true}
-		arg.Status = pgtype.Text{String: *status, Valid: true}
+		arg.Status = pgtype.Text{String: *opts.Status, Valid: true}
 	}
-	if dueDate != nil {
+	if opts.DueDate != nil {
 		arg.SetDueDate = pgtype.Bool{Bool: true, Valid: true}
-		arg.DueDate = pgtype.Date{Time: *dueDate, Valid: true}
-	} else if clearDueDate {
+		arg.DueDate = pgtype.Date{Time: *opts.DueDate, Valid: true}
+	} else if opts.ClearDueDate {
 		arg.SetDueDate = pgtype.Bool{Bool: true, Valid: true}
 		// arg.DueDate stays as zero value, Valid: false -> SQL receives NULL
 	}
-	if recurrence != nil {
+	if opts.Recurrence != nil {
 		arg.SetRecurrence = pgtype.Bool{Bool: true, Valid: true}
-		arg.Recurrence = pgtype.Text{String: *recurrence, Valid: true}
-	} else if clearRecurrence {
+		arg.Recurrence = pgtype.Text{String: *opts.Recurrence, Valid: true}
+	} else if opts.ClearRecurrence {
 		arg.SetRecurrence = pgtype.Bool{Bool: true, Valid: true}
 		// arg.Recurrence stays as zero value -> NULL
 	}
-	if position != nil {
+	if opts.Position != nil {
 		arg.SetPosition = pgtype.Bool{Bool: true, Valid: true}
-		arg.Position = pgtype.Int4{Int32: int32(*position), Valid: true}
+		arg.Position = pgtype.Int4{Int32: int32(*opts.Position), Valid: true}
 	}
 
 	task, err := s.repo.UpdateTask(ctx, arg)

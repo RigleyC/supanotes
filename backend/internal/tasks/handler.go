@@ -22,6 +22,12 @@ type CreateTaskRequest struct {
 	Position   int     `json:"position"`
 }
 
+// UpdateTaskRequest expresses a partial update. For each nullable field
+// (Title, Status, DueDate, Recurrence, Position), pass a non-nil value to
+// set it; omit (nil) to leave it unchanged. To clear a nullable column
+// (DueDate, Recurrence), set the corresponding Clear* bool to true; the
+// pointer for that field must be nil. Sending both DueDate != nil and
+// ClearDueDate = true is rejected by UpdateTaskOpts.Validate().
 type UpdateTaskRequest struct {
 	Title           *string `json:"title"`
 	Status          *string `json:"status"`
@@ -85,9 +91,9 @@ func (h *Handler) Create(c echo.Context) error {
 
 	var dueDate *time.Time
 	if req.DueDate != nil {
-		t, err := time.Parse("2006-01-02", *req.DueDate)
+		t, err := ParseDueDate(*req.DueDate)
 		if err != nil {
-			return web.JSONError(c, http.StatusBadRequest, "invalid due_date format, expected YYYY-MM-DD")
+			return web.JSONError(c, http.StatusBadRequest, err.Error())
 		}
 		dueDate = &t
 	}
@@ -153,14 +159,22 @@ func (h *Handler) Update(c echo.Context) error {
 
 	var dueDate *time.Time
 	if req.DueDate != nil {
-		t, err := time.Parse("2006-01-02", *req.DueDate)
+		t, err := ParseDueDate(*req.DueDate)
 		if err != nil {
-			return web.JSONError(c, http.StatusBadRequest, "invalid due_date format, expected YYYY-MM-DD")
+			return web.JSONError(c, http.StatusBadRequest, err.Error())
 		}
 		dueDate = &t
 	}
 
-	task, err := h.svc.UpdateTask(c.Request().Context(), userID, id, req.Title, req.Status, dueDate, req.ClearDueDate, req.Recurrence, req.ClearRecurrence, req.Position)
+	task, err := h.svc.UpdateTask(c.Request().Context(), userID, id, UpdateTaskOpts{
+		Title:           req.Title,
+		Status:          req.Status,
+		DueDate:         dueDate,
+		ClearDueDate:    req.ClearDueDate,
+		Recurrence:      req.Recurrence,
+		ClearRecurrence: req.ClearRecurrence,
+		Position:        req.Position,
+	})
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "task not found")
@@ -278,23 +292,13 @@ func (h *Handler) Today(c echo.Context) error {
 }
 
 func mapToTaskResponse(t sqlcgen.Task) TaskResponse {
-	var due *string
-	if t.DueDate.Valid {
-		d := t.DueDate.Time.Format("2006-01-02")
-		due = &d
-	}
-	var rec *string
-	if t.Recurrence.Valid {
-		r := t.Recurrence.String
-		rec = &r
-	}
 	return TaskResponse{
 		ID:         uid.UUIDToString(t.ID),
 		NoteID:     uid.UUIDToString(t.NoteID),
 		Title:      t.Title,
 		Status:     t.Status,
-		DueDate:    due,
-		Recurrence: rec,
+		DueDate:    FormatDate(t.DueDate),
+		Recurrence: FormatText(t.Recurrence),
 		Position:   int(t.Position),
 		CreatedAt:  t.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:  t.UpdatedAt.Time.Format(time.RFC3339),

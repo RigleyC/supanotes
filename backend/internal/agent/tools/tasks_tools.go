@@ -164,7 +164,13 @@ func (t *UpdateTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJS
 		}
 		dueDateTime = &t
 	}
-	updated, err := t.tasksSvc.UpdateTask(ctx, userID, tid, args.Title, nil, dueDateTime, args.ClearDueDate, args.Recurrence, args.ClearRecurrence, nil)
+	updated, err := t.tasksSvc.UpdateTask(ctx, userID, tid, tasks.UpdateTaskOpts{
+		Title:           args.Title,
+		DueDate:         dueDateTime,
+		ClearDueDate:    args.ClearDueDate,
+		Recurrence:      args.Recurrence,
+		ClearRecurrence: args.ClearRecurrence,
+	})
 	if err != nil {
 		return "", err
 	}
