@@ -7,7 +7,7 @@ import 'task_recurrence.dart';
 /// Mirrors the Drift-generated [TaskData] one-to-one but exposes only the
 /// fields the UI cares about and adds convenience predicates
 /// ([isCompleted], [isOverdue], [isDueToday], [isRepeating]) so widgets
-/// never have to repeat the same `status == 'completed'` / date math.
+/// never have to repeat the same `status == 'done'` / date math.
 ///
 /// One-way conversion only — there is no `toData()` because every write
 /// goes through the repository, which is in charge of bumping `updatedAt`
@@ -57,7 +57,7 @@ class TaskModel {
     );
   }
 
-  bool get isCompleted => status == 'done' || status == 'completed';
+  bool get isCompleted => status == 'done';
   bool get isPending => status == 'open';
 
   bool get isRepeating => recurrence != null;
