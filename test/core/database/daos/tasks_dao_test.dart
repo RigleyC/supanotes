@@ -30,6 +30,7 @@ void main() {
     final task = tasks.single;
     expect(task.id, 'task-1');
     expect(task.status, 'open');
+    expect(task.completedAt, isNull);
     expect(task.dueDate, DateTime(2026, 6, 16));
     expect(task.recurrence, TaskRecurrence.daily);
 
@@ -96,6 +97,11 @@ void main() {
     expect(tasks, hasLength(1));
     final task = tasks.single;
     expect(task.status, 'open');
+    expect(task.completedAt, isNull);
+    // _nextDueDate(from: DateTime.now(), daily) → today + 1 day
+    final today = DateTime.now();
+    final expectedDue = DateTime(today.year, today.month, today.day + 1);
+    expect(task.dueDate, expectedDue);
 
     await db.close();
   });

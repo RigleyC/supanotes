@@ -106,10 +106,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   ///   * anything else (or empty / null) → task is left as "completed"
   ///     and no new row is inserted
   ///
-  /// The completed row stays in the table for history; the next
-  /// occurrence is inserted as a brand-new row with a fresh UUID and
-  /// `status = 'pending'`. Both rows are marked dirty so the sync layer
-  /// pushes them to the backend.
+  /// For recurring tasks the same row is updated in place: the `dueDate`
+  /// advances to the next occurrence, `completedAt` is cleared, and
+  /// `status` stays `open`. Non-recurring tasks are marked `done`. The
+  /// completion event is recorded in [LocalTaskCompletions]. Dirty flags
+  /// are set so the sync layer propagates the change to the backend.
   Future<void> completeTask(String id) async {
     final task = await (select(tasks)..where((t) => t.id.equals(id)))
         .getSingleOrNull();
