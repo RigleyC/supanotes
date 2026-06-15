@@ -26,19 +26,21 @@ const (
 )
 
 type CreateNoteRequest struct {
-	Title     *string `json:"title"`
-	Content   string  `json:"content" validate:"required"`
-	ContextID *string `json:"context_id"`
-	Favorite  bool    `json:"favorite"`
-	Archived  bool    `json:"archived"`
+	Title         *string `json:"title"`
+	Content       string  `json:"content" validate:"required"`
+	ContextID     *string `json:"context_id"`
+	Favorite      bool    `json:"favorite"`
+	Archived      bool    `json:"archived"`
+	HideCompleted bool    `json:"hide_completed"`
 }
 
 type UpdateNoteRequest struct {
-	Title     *string `json:"title"`
-	Content   *string `json:"content"`
-	ContextID *string `json:"context_id"`
-	Favorite  *bool   `json:"favorite"`
-	Archived  *bool   `json:"archived"`
+	Title         *string `json:"title"`
+	Content       *string `json:"content"`
+	ContextID     *string `json:"context_id"`
+	Favorite      *bool   `json:"favorite"`
+	Archived      *bool   `json:"archived"`
+	HideCompleted *bool   `json:"hide_completed"`
 }
 
 type AppendToInboxRequest struct {
@@ -46,16 +48,17 @@ type AppendToInboxRequest struct {
 }
 
 type NoteResponse struct {
-	ID        string  `json:"id"`
-	ContextID *string `json:"context_id,omitempty"`
-	Title     *string `json:"title,omitempty"`
-	Content   string  `json:"content"`
-	Excerpt   *string `json:"excerpt,omitempty"`
-	IsInbox   bool    `json:"is_inbox"`
-	Favorite  bool    `json:"favorite"`
-	Archived  bool    `json:"archived"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID            string  `json:"id"`
+	ContextID     *string `json:"context_id,omitempty"`
+	Title         *string `json:"title,omitempty"`
+	Content       string  `json:"content"`
+	Excerpt       *string `json:"excerpt,omitempty"`
+	IsInbox       bool    `json:"is_inbox"`
+	Favorite      bool    `json:"favorite"`
+	Archived      bool    `json:"archived"`
+	HideCompleted bool    `json:"hide_completed"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
 }
 
 type Handler struct {
@@ -86,7 +89,7 @@ func (h *Handler) Create(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Title, req.Content, ctxID, req.Favorite, req.Archived)
+	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Title, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create note")
@@ -186,7 +189,7 @@ func (h *Handler) Update(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Title, req.Content, ctxID, req.Favorite, req.Archived)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Title, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
@@ -449,15 +452,16 @@ func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
 		excerpt = &e
 	}
 	return NoteResponse{
-		ID:        uid.UUIDToString(n.ID),
-		ContextID: ctxID,
-		Title:     title,
-		Content:   n.Content,
-		Excerpt:   excerpt,
-		IsInbox:   n.IsInbox,
-		Favorite:  n.Favorite,
-		Archived:  n.Archived,
-		CreatedAt: n.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: n.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		ID:            uid.UUIDToString(n.ID),
+		ContextID:     ctxID,
+		Title:         title,
+		Content:       n.Content,
+		Excerpt:       excerpt,
+		IsInbox:       n.IsInbox,
+		Favorite:      n.Favorite,
+		Archived:      n.Archived,
+		HideCompleted: n.HideCompleted,
+		CreatedAt:     n.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:     n.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
