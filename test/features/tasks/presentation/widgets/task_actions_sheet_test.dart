@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
 
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+
 void main() {
   TaskModel task() {
     final now = DateTime.utc(2026, 6, 11);
@@ -16,7 +18,7 @@ void main() {
       position: 0,
       dueDate: now,
       completedAt: null,
-      recurrence: 'daily',
+      recurrence: const TaskRecurrence(type: TaskRecurrenceType.daily),
       createdAt: now,
       updatedAt: now,
     );

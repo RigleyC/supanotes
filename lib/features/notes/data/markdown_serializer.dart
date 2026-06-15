@@ -49,6 +49,7 @@ MutableDocument parseMarkdownToDocument(String markdown) {
         ParagraphNode(
           id: Editor.createNodeId(),
           text: AttributedText(''),
+          metadata: const {'blockType': header1Attribution},
         ),
       ],
     );

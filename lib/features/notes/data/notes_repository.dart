@@ -281,7 +281,18 @@ class NotesRepository implements INotesRepository {
 
   String? _excerptFrom(String content) {
     if (content.isEmpty) return null;
-    final flat = content.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final lines = content.split('\n');
+    int firstNonEmptyIdx = -1;
+    for (int i = 0; i < lines.length; i++) {
+      if (lines[i].trim().isNotEmpty) {
+        firstNonEmptyIdx = i;
+        break;
+      }
+    }
+    if (firstNonEmptyIdx == -1) return null;
+    final restOfLines = lines.skip(firstNonEmptyIdx + 1).join('\n');
+    final flat = restOfLines.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (flat.isEmpty) return null;
     if (flat.length <= 120) return flat;
     return '${flat.substring(0, 120)}…';
   }

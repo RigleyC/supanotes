@@ -5,42 +5,45 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_co
 
 void main() {
   group('NoteEditorController snapshot save', () {
-    test('title and document changes schedule one snapshot save', () async {
+    test('document changes schedule one snapshot save with extracted title', () async {
       final savedCalls = <(String, String, String, List<TaskEntry>)>[];
       final controller = NoteEditorController(
-        editableTitle: true,
         snapshotSave: (noteId, title, markdown, tasks) async {
           savedCalls.add((noteId, title, markdown, tasks));
         },
       );
 
-      controller.init(content: 'hello', title: 'world');
+      controller.init(content: 'hello');
       controller.bind('test-note');
       expect(savedCalls, isEmpty);
 
-      controller.titleController?.text = 'new title';
-      controller.titleController?.notifyListeners();
-
-      controller.document?.insertNodeAt(0, ParagraphNode(
-        id: Editor.createNodeId(),
-        text: AttributedText(' more'),
-      ));
+      controller.composer!.setSelectionWithReason(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: controller.document!.first.id,
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      controller.editor!.execute([
+        const InsertPlainTextAtCaretRequest('new title'),
+      ]);
 
       await Future.delayed(const Duration(milliseconds: 600));
       expect(savedCalls.length, 1);
+      expect(savedCalls.first.$2, 'new titlehello');
     });
 
     test('flushBeforePop deletes empty regular note through lifecycle callback', () async {
       String? deletedNoteId;
       final controller = NoteEditorController(
-        editableTitle: true,
         snapshotSave: (noteId, title, markdown, tasks) async {},
         emptyNoteExit: (noteId) async {
           deletedNoteId = noteId;
         },
       );
 
-      controller.init(content: '', title: '');
+      controller.init(content: '');
       controller.bind('empty-note');
 
       controller.dispose();

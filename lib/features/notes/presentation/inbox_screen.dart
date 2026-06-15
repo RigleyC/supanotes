@@ -18,7 +18,6 @@ import 'package:supanotes/features/notes/presentation/widgets/custom_task_compon
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
-import 'package:supanotes/shared/theme/app_typography.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
@@ -40,7 +39,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     if (_controller != null) return _controller!;
     final repo = ref.read(notesRepositoryProvider);
     return _controller = NoteEditorController(
-      editableTitle: true,
       snapshotSave: (noteId, title, markdown, tasks) =>
           defaultSnapshotSave(repo, noteId, title, markdown, tasks),
     );
@@ -204,24 +202,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               Expanded(
                 child: CustomScrollView(
                   slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: TextField(
-                          controller: controller.titleController,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            filled: false,
-                            contentPadding: EdgeInsets.zero,
-                            hintText: 'Sem título',
-                          ),
-                          style: AppTypography.textTheme.headlineMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                        ),
-                      ),
-                    ),
                     SuperEditorAndroidControlsScope(
                       controller: _androidController!,
                       child: SuperEditorIosControlsScope(

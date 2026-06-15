@@ -46,14 +46,9 @@ typedef EmptyNoteExit = Future<void> Function(String noteId);
 
 class NoteEditorController {
   NoteEditorController({
-    this.editableTitle = true,
     required this.snapshotSave,
     this.emptyNoteExit,
   });
-
-  /// Whether the host screen lets the user edit a title. Inbox notes
-  /// pass `false` because they have no title.
-  final bool editableTitle;
 
   /// Provided by the host. Keeps the controller free of [WidgetRef]
   /// references so it can be unit-tested in isolation.
@@ -64,16 +59,13 @@ class NoteEditorController {
   Editor? editor;
   MutableDocumentComposer? composer;
   FocusNode? focusNode;
-  TextEditingController? titleController;
 
   final _saveThrottle = SaveThrottle();
 
   /// The currently bound [noteId]. Non-null while the screen is mounted.
   String? _noteId;
 
-  /// Initializes the editor from the given [content] and optional
-  /// [title]. Wires the document listener and, if [editableTitle],
-  /// the title controller listener.
+  /// Initializes the editor from the given [content]. Wires the document listener.
   void init({required String content, String? title}) {
     dev.log(
       '[NoteEditorController.init] contentLength=${content.length}, content="$content"',
@@ -86,10 +78,6 @@ class NoteEditorController {
       composer: composer!,
     );
     focusNode = FocusNode();
-    if (editableTitle) {
-      titleController = TextEditingController(text: title ?? '');
-      titleController!.addListener(_onTitleChanged);
-    }
     document!.addListener(_onDocumentChanged);
   }
 
@@ -98,8 +86,6 @@ class NoteEditorController {
   }
 
   void _onDocumentChanged(DocumentChangeLog _) => _scheduleSnapshotSave();
-
-  void _onTitleChanged() => _scheduleSnapshotSave();
 
   void _scheduleSnapshotSave() {
     final doc = document;
@@ -111,6 +97,18 @@ class NoteEditorController {
     );
   }
 
+  String _extractTitle(MutableDocument doc) {
+    for (final node in doc) {
+      if (node is TextNode) {
+        final text = node.text.toPlainText().trim();
+        if (text.isNotEmpty) {
+          return text;
+        }
+      }
+    }
+    return '';
+  }
+
   Future<void> _runSnapshotSave() async {
     final noteId = _noteId;
     final doc = document;
@@ -118,7 +116,7 @@ class NoteEditorController {
 
     await snapshotSave(
       noteId,
-      titleController?.text ?? '',
+      _extractTitle(doc),
       serializeDocumentToMarkdown(doc),
       _extractTasks(doc),
     );
@@ -141,19 +139,27 @@ class NoteEditorController {
     );
   }
 
+  bool _isDocEmpty(MutableDocument doc) {
+    for (final node in doc) {
+      if (node is TextNode && node.text.toPlainText().trim().isNotEmpty) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /// Captures the current final state and persists it immediately,
   /// bypassing the debounce. Call from [dispose] before cleaning up.
   ///
-  /// When both the title and markdown content are empty (after
-  /// trimming), the row is deleted instead of saved. Screens that did
-  /// not wire an [emptyNoteExit] callback (e.g. inbox) skip the delete,
-  /// preserving the old content.
+  /// When the markdown content is empty (after trimming), the row is
+  /// deleted instead of saved. Screens that did not wire an [emptyNoteExit]
+  /// callback (e.g. inbox) skip the delete, preserving the old content.
   void _flushAndSaveFinalState() {
     final noteId = _noteId;
     final doc = document;
     if (noteId == null || doc == null) return;
 
-    final title = titleController?.text ?? '';
+    final title = _extractTitle(doc);
     final markdown = serializeDocumentToMarkdown(doc);
     final tasks = _extractTasks(doc);
 
@@ -163,7 +169,7 @@ class NoteEditorController {
       name: 'NoteEditor',
     );
 
-    if (title.trim().isEmpty && markdown.trim().isEmpty) {
+    if (_isDocEmpty(doc)) {
       dev.log(
         '[NoteEditorController] Deleting note (empty)',
         name: 'NoteEditor',
@@ -197,10 +203,6 @@ class NoteEditorController {
   void dispose() {
     _flushAndSaveFinalState();
     _saveThrottle.dispose();
-    if (editableTitle) {
-      titleController?.removeListener(_onTitleChanged);
-      titleController?.dispose();
-    }
     document?.removeListener(_onDocumentChanged);
     document?.dispose();
     composer?.dispose();

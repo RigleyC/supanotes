@@ -18,7 +18,7 @@ import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_
 import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
-import 'package:supanotes/shared/theme/app_typography.dart';
+
 
 final noteProvider = StreamProvider.autoDispose.family<NoteModel?, String>((
   ref,
@@ -105,7 +105,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       if (note == null) {
         return const Scaffold(body: Center(child: Text('Nota nao encontrada')));
       }
-      controller.init(content: note.content, title: note.title);
+      String content = note.content;
+      if (note.title != null && note.title!.isNotEmpty) {
+        final title = note.title!.trim();
+        final startsWithH1Title = content.trimLeft().startsWith('# $title') ||
+            content.trimLeft().startsWith('#  $title');
+        if (!startsWithH1Title) {
+          content = '# $title\n\n$content';
+        }
+      }
+      controller.init(content: content);
     }
 
     if (controller.document == null ||
@@ -168,24 +177,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               Expanded(
                 child: CustomScrollView(
                   slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: TextField(
-                          controller: controller.titleController,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            filled: false,
-                            contentPadding: EdgeInsets.zero,
-                            hintText: 'Sem titulo',
-                          ),
-                          style: AppTypography.textTheme.headlineMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                        ),
-                      ),
-                    ),
                     SuperEditorAndroidControlsScope(
                       controller: _androidController!,
                       child: SuperEditorIosControlsScope(

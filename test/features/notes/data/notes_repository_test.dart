@@ -4,6 +4,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 void main() {
   group('NotesRepository lifecycle', () {
@@ -201,9 +202,12 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
     required String title,
     String status = 'pending',
     int position = 0,
-    String? recurrence,
+    TaskRecurrence? recurrence,
     DateTime? dueDate,
   }) async {}
+
+  @override
+  Future<void> reorderTasksBatch(List<TaskData> tasks) async {}
 
   @override
   Future<void> updateTask(TasksCompanion companion) async {
