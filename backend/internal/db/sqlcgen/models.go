@@ -151,7 +151,7 @@ type Task struct {
 	UserID      pgtype.UUID        `json:"user_id"`
 	Title       string             `json:"title"`
 	Status      string             `json:"status"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
+	DueDate     pgtype.Date        `json:"due_date"`
 	Recurrence  pgtype.Text        `json:"recurrence"`
 	Position    int32              `json:"position"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`

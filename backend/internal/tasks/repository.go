@@ -14,7 +14,7 @@ type Repository interface {
 	UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error)
 	DeleteTask(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) error
 	GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) ([]sqlcgen.Task, error)
-	GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo pgtype.Timestamptz) ([]sqlcgen.Task, error)
+	GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo pgtype.Date) ([]sqlcgen.Task, error)
 	GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error)
 	CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, dueDate pgtype.Date) (sqlcgen.TaskCompletion, error)
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
@@ -50,7 +50,7 @@ func (r *repository) GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) (
 	return r.q.GetTasks(ctx, arg)
 }
 
-func (r *repository) GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo pgtype.Timestamptz) ([]sqlcgen.Task, error) {
+func (r *repository) GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo pgtype.Date) ([]sqlcgen.Task, error) {
 	return r.q.GetTodayTasks(ctx, sqlcgen.GetTodayTasksParams{UserID: userID, Column2: upTo})
 }
 

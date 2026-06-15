@@ -30,8 +30,8 @@ WHERE user_id = $1
   AND deleted_at IS NULL
   AND (sqlc.narg('note_id')::uuid IS NULL OR note_id = sqlc.narg('note_id'))
   AND (sqlc.narg('status')::varchar IS NULL OR status = sqlc.narg('status'))
-  AND (sqlc.narg('due_after')::timestamptz IS NULL OR due_date >= sqlc.narg('due_after'))
-  AND (sqlc.narg('due_before')::timestamptz IS NULL OR due_date <= sqlc.narg('due_before'))
+  AND (sqlc.narg('due_after')::date IS NULL OR due_date >= sqlc.narg('due_after')::date)
+  AND (sqlc.narg('due_before')::date IS NULL OR due_date <= sqlc.narg('due_before')::date)
 ORDER BY due_date ASC NULLS LAST, position ASC, created_at ASC
 LIMIT $2 OFFSET $3;
 
@@ -41,7 +41,7 @@ WHERE user_id = $1
   AND deleted_at IS NULL
   AND status = 'open'
   AND due_date IS NOT NULL
-  AND due_date <= $2::timestamptz
+  AND due_date <= $2::date
 ORDER BY due_date ASC, position ASC, created_at ASC;
 
 -- name: GetTasksByNoteID :many

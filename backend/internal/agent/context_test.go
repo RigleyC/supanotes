@@ -32,7 +32,7 @@ func (s *stubTasksRepo) UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskPa
 func (s *stubTasksRepo) DeleteTask(ctx context.Context, id, userID pgtype.UUID) error {
 	panic("unimplemented")
 }
-func (s *stubTasksRepo) GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo pgtype.Timestamptz) ([]sqlcgen.Task, error) {
+func (s *stubTasksRepo) GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo pgtype.Date) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
 func (s *stubTasksRepo) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error) {

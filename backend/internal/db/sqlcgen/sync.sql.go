@@ -543,7 +543,7 @@ type UpsertTaskParams struct {
 	Status     string             `json:"status"`
 	Position   int32              `json:"position"`
 	Recurrence pgtype.Text        `json:"recurrence"`
-	DueDate    pgtype.Timestamptz `json:"due_date"`
+	DueDate    pgtype.Date        `json:"due_date"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }

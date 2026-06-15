@@ -72,7 +72,7 @@ func fromSyncTask(t SyncTask) sqlcgen.Task {
 	}
 	if t.DueDate != nil {
 		if d, err := time.Parse("2006-01-02", *t.DueDate); err == nil {
-			out.DueDate = pgtype.Timestamptz{Time: d, Valid: true}
+			out.DueDate = pgtype.Date{Time: d, Valid: true}
 		}
 	}
 	if t.CompletedAt != nil {

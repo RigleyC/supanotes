@@ -31,7 +31,7 @@ func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, ti
 		Position: int32(position),
 	}
 	if dueDate != nil {
-		arg.DueDate = pgtype.Timestamptz{Time: *dueDate, Valid: true}
+		arg.DueDate = pgtype.Date{Time: *dueDate, Valid: true}
 	}
 	if recurrence != nil {
 		arg.Recurrence = pgtype.Text{String: *recurrence, Valid: true}
@@ -65,7 +65,7 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, title 
 	}
 	if dueDate != nil {
 		arg.SetDueDate = pgtype.Bool{Bool: true, Valid: true}
-		arg.DueDate = pgtype.Timestamptz{Time: *dueDate, Valid: true}
+		arg.DueDate = pgtype.Date{Time: *dueDate, Valid: true}
 	} else if clearDueDate {
 		arg.SetDueDate = pgtype.Bool{Bool: true, Valid: true}
 		// arg.DueDate stays as zero value, Valid: false -> SQL receives NULL
@@ -127,7 +127,7 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 				ID:         id,
 				UserID:     userID,
 				SetDueDate: pgtype.Bool{Bool: true, Valid: true},
-				DueDate:    pgtype.Timestamptz{Time: nextDue, Valid: true},
+				DueDate:    pgtype.Date{Time: nextDue, Valid: true},
 				SetStatus:  pgtype.Bool{Bool: true, Valid: true},
 				Status:     pgtype.Text{String: "open", Valid: true},
 			})
@@ -189,10 +189,10 @@ func (s *Service) GetTasks(ctx context.Context, userID pgtype.UUID, noteID *pgty
 		arg.Status = pgtype.Text{String: *status, Valid: true}
 	}
 	if dueAfter != nil {
-		arg.DueAfter = pgtype.Timestamptz{Time: *dueAfter, Valid: true}
+		arg.DueAfter = pgtype.Date{Time: *dueAfter, Valid: true}
 	}
 	if dueBefore != nil {
-		arg.DueBefore = pgtype.Timestamptz{Time: *dueBefore, Valid: true}
+		arg.DueBefore = pgtype.Date{Time: *dueBefore, Valid: true}
 	}
 
 	return s.repo.GetTasks(ctx, arg)
@@ -200,10 +200,9 @@ func (s *Service) GetTasks(ctx context.Context, userID pgtype.UUID, noteID *pgty
 
 func (s *Service) GetTodayTasks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Task, error) {
 	// Em produção real, este `now` deve estar no timezone do usuário.
-	// Por simplicidade aqui, usando a hora atual no final do dia.
 	now := time.Now()
-	upTo := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, now.Location())
-	return s.repo.GetTodayTasks(ctx, userID, pgtype.Timestamptz{Time: upTo, Valid: true})
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	return s.repo.GetTodayTasks(ctx, userID, pgtype.Date{Time: today, Valid: true})
 }
 
 func calculateNextDueDate(current time.Time, recurrence string) (time.Time, bool) {

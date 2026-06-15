@@ -51,12 +51,12 @@ RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, c
 `
 
 type CreateTaskParams struct {
-	NoteID     pgtype.UUID        `json:"note_id"`
-	UserID     pgtype.UUID        `json:"user_id"`
-	Title      string             `json:"title"`
-	DueDate    pgtype.Timestamptz `json:"due_date"`
-	Recurrence pgtype.Text        `json:"recurrence"`
-	Position   int32              `json:"position"`
+	NoteID     pgtype.UUID `json:"note_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	Title      string      `json:"title"`
+	DueDate    pgtype.Date `json:"due_date"`
+	Recurrence pgtype.Text `json:"recurrence"`
+	Position   int32       `json:"position"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error) {
@@ -161,20 +161,20 @@ WHERE user_id = $1
   AND deleted_at IS NULL
   AND ($4::uuid IS NULL OR note_id = $4)
   AND ($5::varchar IS NULL OR status = $5)
-  AND ($6::timestamptz IS NULL OR due_date >= $6)
-  AND ($7::timestamptz IS NULL OR due_date <= $7)
+  AND ($6::date IS NULL OR due_date >= $6::date)
+  AND ($7::date IS NULL OR due_date <= $7::date)
 ORDER BY due_date ASC NULLS LAST, position ASC, created_at ASC
 LIMIT $2 OFFSET $3
 `
 
 type GetTasksParams struct {
-	UserID    pgtype.UUID        `json:"user_id"`
-	Limit     int32              `json:"limit"`
-	Offset    int32              `json:"offset"`
-	NoteID    pgtype.UUID        `json:"note_id"`
-	Status    pgtype.Text        `json:"status"`
-	DueAfter  pgtype.Timestamptz `json:"due_after"`
-	DueBefore pgtype.Timestamptz `json:"due_before"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Limit     int32       `json:"limit"`
+	Offset    int32       `json:"offset"`
+	NoteID    pgtype.UUID `json:"note_id"`
+	Status    pgtype.Text `json:"status"`
+	DueAfter  pgtype.Date `json:"due_after"`
+	DueBefore pgtype.Date `json:"due_before"`
 }
 
 func (q *Queries) GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, error) {
@@ -268,13 +268,13 @@ WHERE user_id = $1
   AND deleted_at IS NULL
   AND status = 'open'
   AND due_date IS NOT NULL
-  AND due_date <= $2::timestamptz
+  AND due_date <= $2::date
 ORDER BY due_date ASC, position ASC, created_at ASC
 `
 
 type GetTodayTasksParams struct {
-	UserID  pgtype.UUID        `json:"user_id"`
-	Column2 pgtype.Timestamptz `json:"column_2"`
+	UserID  pgtype.UUID `json:"user_id"`
+	Column2 pgtype.Date `json:"column_2"`
 }
 
 func (q *Queries) GetTodayTasks(ctx context.Context, arg GetTodayTasksParams) ([]Task, error) {
@@ -331,7 +331,7 @@ type UpdateTaskParams struct {
 	SetStatus      pgtype.Bool        `json:"set_status"`
 	Status         pgtype.Text        `json:"status"`
 	SetDueDate     pgtype.Bool        `json:"set_due_date"`
-	DueDate        pgtype.Timestamptz `json:"due_date"`
+	DueDate        pgtype.Date        `json:"due_date"`
 	SetRecurrence  pgtype.Bool        `json:"set_recurrence"`
 	Recurrence     pgtype.Text        `json:"recurrence"`
 	SetPosition    pgtype.Bool        `json:"set_position"`
