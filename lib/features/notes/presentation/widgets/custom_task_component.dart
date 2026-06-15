@@ -2,17 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
     this._editor, {
+    this.taskMetadataById = const {},
     this.focusNode,
     this.onTaskLongPress,
   });
 
   final Editor _editor;
   final FocusNode? focusNode;
+  final Map<String, TaskModel> taskMetadataById;
   final ValueChanged<String>? onTaskLongPress;
 
   @override
@@ -53,6 +57,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       editor: _editor,
       focusNode: focusNode,
       viewModel: componentViewModel,
+      taskMetadata: taskMetadataById[componentViewModel.nodeId],
       onLongPress: onTaskLongPress == null
           ? null
           : () => onTaskLongPress!(componentViewModel.nodeId),
@@ -66,12 +71,14 @@ class CustomTaskComponent extends StatefulWidget {
     this.editor,
     this.focusNode,
     required this.viewModel,
+    this.taskMetadata,
     this.onLongPress,
   });
 
   final Editor? editor;
   final FocusNode? focusNode;
   final TaskComponentViewModel viewModel;
+  final TaskModel? taskMetadata;
   final VoidCallback? onLongPress;
 
   @override
@@ -242,21 +249,39 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   : null,
             ),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: TextComponent(
-                  key: _textKey,
-                  text: widget.viewModel.text,
-                  textDirection: widget.viewModel.textDirection,
-                  textAlign: widget.viewModel.textAlignment,
-                  maxLines: widget.viewModel.maxLines,
-                  overflow: widget.viewModel.overflow,
-                  textStyleBuilder: _computeStyles,
-                  inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
-                  textSelection: widget.viewModel.selection,
-                  selectionColor: widget.viewModel.selectionColor,
-                  highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                  underlines: widget.viewModel.createUnderlines(),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onLongPress: widget.onLongPress,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextComponent(
+                        key: _textKey,
+                        text: widget.viewModel.text,
+                        textDirection: widget.viewModel.textDirection,
+                        textAlign: widget.viewModel.textAlignment,
+                        maxLines: widget.viewModel.maxLines,
+                        overflow: widget.viewModel.overflow,
+                        textStyleBuilder: _computeStyles,
+                        inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
+                        textSelection: widget.viewModel.selection,
+                        selectionColor: widget.viewModel.selectionColor,
+                        highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                        underlines: widget.viewModel.createUnderlines(),
+                      ),
+                      if (widget.taskMetadata?.dueDate != null ||
+                          widget.taskMetadata?.recurrence != null) ...[
+                        const SizedBox(height: 4),
+                        TaskMetadataBadges(
+                          dueDate: widget.taskMetadata?.dueDate,
+                          recurrence: widget.taskMetadata?.recurrence,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),

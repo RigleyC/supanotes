@@ -17,6 +17,7 @@ import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_acti
 import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
 
 
@@ -86,6 +87,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     controller.bind(widget.noteId);
 
     final asyncValue = ref.watch(noteProvider(widget.noteId));
+    final tasksAsync = ref.watch(tasksByNoteStreamProvider(widget.noteId));
+    final tasksMap = tasksAsync.asData?.value != null
+        ? {for (final t in tasksAsync.asData!.value) t.id: t}
+        : const <String, TaskModel>{};
 
     if (controller.document == null) {
       dev.log(
@@ -200,6 +205,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             CustomTaskComponentBuilder(
                               controller.editor!,
                               focusNode: controller.focusNode,
+                              taskMetadataById: tasksMap,
                               onTaskLongPress: (taskId) =>
                                   _openTaskActions(controller, taskId),
                             ),

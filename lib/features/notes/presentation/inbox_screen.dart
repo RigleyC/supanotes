@@ -16,6 +16,8 @@ import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_she
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
+import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -169,6 +171,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     final hasContent = controller.document!.isNotEmpty;
     final inboxId = asyncValue.asData?.value?.id;
     _inboxNoteId = inboxId;
+    final tasksAsync = inboxId != null
+        ? ref.watch(tasksByNoteStreamProvider(inboxId))
+        : null;
+    final tasksMap = tasksAsync?.asData?.value != null
+        ? {for (final t in tasksAsync!.asData!.value) t.id: t}
+        : const <String, TaskModel>{};
     final editorControlsColor = Theme.of(context).colorScheme.primary;
 
     _iosController ??= SuperEditorIosControlsController(
@@ -217,6 +225,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                             CustomTaskComponentBuilder(
                               controller.editor!,
                               focusNode: controller.focusNode,
+                              taskMetadataById: tasksMap,
                               onTaskLongPress: (taskId) =>
                                   _openTaskActions(controller, taskId),
                             ),
