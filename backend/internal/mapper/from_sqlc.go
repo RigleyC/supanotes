@@ -130,13 +130,18 @@ func SyncTaskFromSQLC(t sqlcgen.Task) dto.SyncTask {
 		s := t.Recurrence.String
 		recurrence = &s
 	}
+	var dueDate *string
+	if t.DueDate.Valid {
+		s := t.DueDate.Time.Format("2006-01-02")
+		dueDate = &s
+	}
 	return dto.SyncTask{
 		ID:         UUID(t.ID),
 		NoteID:     UUID(t.NoteID),
 		UserID:     UUID(t.UserID),
 		Title:      t.Title,
 		Status:     t.Status,
-		DueDate:    OptTime(t.DueDate),
+		DueDate:    dueDate,
 		Recurrence: recurrence,
 		Position:   int(t.Position),
 		CreatedAt:  Time(t.CreatedAt),

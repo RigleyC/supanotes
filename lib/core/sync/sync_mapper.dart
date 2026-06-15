@@ -35,7 +35,9 @@ class SyncMapper {
         'status': t.status,
         'position': t.position,
         'recurrence': t.recurrence?.name,
-        'due_date': t.dueDate?.toUtc().toIso8601String(),
+        'due_date': t.dueDate != null
+            ? '${t.dueDate!.year.toString().padLeft(4, '0')}-${t.dueDate!.month.toString().padLeft(2, '0')}-${t.dueDate!.day.toString().padLeft(2, '0')}'
+            : null,
         'completed_at': t.completedAt?.toUtc().toIso8601String(),
         'created_at': t.createdAt.toUtc().toIso8601String(),
         'updated_at': t.updatedAt.toUtc().toIso8601String(),

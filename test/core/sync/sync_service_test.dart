@@ -69,7 +69,7 @@ void main() {
       final json = SyncMapper().taskToJson(task);
 
       expect(json['recurrence'], 'weekly');
-      expect(json['due_date'], now.toIso8601String());
+      expect(json['due_date'], '2026-06-15');
     });
 
     test('serializes null recurrence as null', () {
