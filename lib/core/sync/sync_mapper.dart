@@ -5,20 +5,24 @@
 /// Pull direction (fromJson): raw Map   → typed data for the DAOs.
 library;
 
+import 'package:intl/intl.dart';
+
 import '../../features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/core/database/database.dart';
 
 DateTime? _parseDueDate(String? s) {
   if (s == null) return null;
-  if (s.length == 10 && !s.contains('T')) {
-    final parts = s.split('-');
-    return DateTime(
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-      int.parse(parts[2]),
-    );
+  // Server contract: always YYYY-MM-DD. We construct a local DateTime
+  // at midnight so isSameDayAs() comparisons work without UTC drift.
+  final parts = s.split('-');
+  if (parts.length != 3) {
+    throw FormatException('expected YYYY-MM-DD, got: $s');
   }
-  return DateTime.parse(s).toLocal();
+  return DateTime(
+    int.parse(parts[0]),
+    int.parse(parts[1]),
+    int.parse(parts[2]),
+  );
 }
 
 class SyncMapper {
@@ -48,9 +52,7 @@ class SyncMapper {
         'status': t.status,
         'position': t.position,
         'recurrence': t.recurrence?.name,
-        'due_date': t.dueDate != null
-            ? '${t.dueDate!.year.toString().padLeft(4, '0')}-${t.dueDate!.month.toString().padLeft(2, '0')}-${t.dueDate!.day.toString().padLeft(2, '0')}'
-            : null,
+        'due_date': t.dueDate != null ? DateFormat('yyyy-MM-dd').format(t.dueDate!) : null,
         'completed_at': t.completedAt?.toUtc().toIso8601String(),
         'created_at': t.createdAt.toUtc().toIso8601String(),
         'updated_at': t.updatedAt.toUtc().toIso8601String(),
