@@ -35,25 +35,6 @@ func NoteFromSQLC(n sqlcgen.Note) dto.NoteResponse {
 	}
 }
 
-func TaskFromSQLC(t sqlcgen.Task) dto.TaskResponse {
-	var recurrence *string
-	if t.Recurrence.Valid {
-		s := t.Recurrence.String
-		recurrence = &s
-	}
-	return dto.TaskResponse{
-		ID:         UUID(t.ID),
-		NoteID:     UUID(t.NoteID),
-		Title:      t.Title,
-		Status:     t.Status,
-		DueDate:    OptTime(t.DueDate),
-		Recurrence: recurrence,
-		Position:   int(t.Position),
-		CreatedAt:  Time(t.CreatedAt),
-		UpdatedAt:  Time(t.UpdatedAt),
-	}
-}
-
 func ContextFromSQLC(c sqlcgen.Context) dto.ContextResponse {
 	return dto.ContextResponse{
 		ID:        UUID(c.ID),
