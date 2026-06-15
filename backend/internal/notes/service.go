@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/pkg/uid"
@@ -22,10 +23,11 @@ var (
 
 type Service struct {
 	repo Repository
+	pool *pgxpool.Pool
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo Repository, pool *pgxpool.Pool) *Service {
+	return &Service{repo: repo, pool: pool}
 }
 
 func isEmptyRegularNote(title *string, content string) bool {
@@ -179,7 +181,19 @@ func (s *Service) AppendToInbox(ctx context.Context, userID pgtype.UUID, content
 }
 
 func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, items []PlanOrganizationItem) error {
-	inbox, err := s.GetInboxNote(ctx, userID)
+	r := s.repo
+	var tx pgx.Tx
+	if s.pool != nil {
+		var err error
+		tx, err = s.pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
+		r = s.repo.WithQuerier(sqlcgen.New(tx))
+	}
+
+	inbox, err := r.GetInboxNote(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -211,14 +225,33 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 
 		switch reqItem.DestinationType {
 		case DestNewNote:
-			if _, err := s.CreateNote(ctx, userID, reqItem.DestinationTitle, trimmed, nil, false, false); err != nil {
+			titleText := pgtype.Text{}
+			if reqItem.DestinationTitle != nil {
+				titleText = pgtype.Text{String: *reqItem.DestinationTitle, Valid: true}
+			}
+			if _, err := r.CreateNote(ctx, sqlcgen.CreateNoteParams{
+				UserID:          userID,
+				Title:           titleText,
+				Content:         trimmed,
+				IsInbox:         false,
+				Favorite:        false,
+				Archived:        false,
+				EmbeddingStatus: "pending",
+			}); err != nil {
 				return fmt.Errorf("create note: %w", err)
 			}
 		case DestExistingNote:
 			if reqItem.DestinationNoteID != nil {
 				noteID, err := uid.UUIDFromString(*reqItem.DestinationNoteID)
 				if err == nil {
-					if _, err := s.AppendToNoteContent(ctx, userID, noteID, trimmed); err != nil {
+					if _, err := r.GetNoteByID(ctx, noteID, userID); err != nil {
+						return fmt.Errorf("destination note not found: %w", err)
+					}
+					if _, err := r.AppendToNoteContent(ctx, sqlcgen.AppendToNoteContentParams{
+						ID:      noteID,
+						UserID:  userID,
+						Content: trimmed,
+					}); err != nil {
 						return fmt.Errorf("append to note: %w", err)
 					}
 				} else {
@@ -231,6 +264,16 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 	}
 
 	newContent := strings.Join(keptLines, "\n\n")
-	_, err = s.SetInboxContent(ctx, userID, newContent)
-	return err
+	if _, err = r.SetInboxContent(ctx, sqlcgen.SetInboxContentParams{
+		ID:      inbox.ID,
+		UserID:  userID,
+		Content: newContent,
+	}); err != nil {
+		return err
+	}
+
+	if tx != nil {
+		return tx.Commit(ctx)
+	}
+	return nil
 }

@@ -180,7 +180,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	// Notes
 	notesRepo := notes.NewRepository(queries)
-	notesSvc := notes.NewService(notesRepo)
+	notesSvc := notes.NewService(notesRepo, pool)
 
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)

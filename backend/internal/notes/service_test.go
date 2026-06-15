@@ -34,7 +34,7 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 			capturedArg = arg
 			return sqlcgen.Note{ID: arg.ID}, nil
 		},
-	})
+	}, nil)
 
 	newContent := "updated content"
 	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, nil, &newContent, nil, nil, nil)
@@ -60,7 +60,7 @@ func TestService_UpdateNote_DoesNotSetEmbeddingPendingOnTitleOnly(t *testing.T) 
 			capturedArg = arg
 			return sqlcgen.Note{ID: arg.ID}, nil
 		},
-	})
+	}, nil)
 
 	newTitle := "new title"
 	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newTitle, nil, nil, nil, nil)
@@ -84,7 +84,7 @@ func TestService_UpdateNote_DoesNotSetEmbeddingPendingOnFavoriteOnly(t *testing.
 			capturedArg = arg
 			return sqlcgen.Note{ID: arg.ID}, nil
 		},
-	})
+	}, nil)
 
 	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, nil, nil, nil, &fav, nil)
 	if err != nil {
@@ -97,7 +97,7 @@ func TestService_UpdateNote_DoesNotSetEmbeddingPendingOnFavoriteOnly(t *testing.
 }
 
 func TestCreateNoteRejectsEmptyRegularNote(t *testing.T) {
-	svc := NewService(&mockRepo{})
+	svc := NewService(&mockRepo{}, nil)
 	userID := pgtype.UUID{Valid: true}
 
 	_, err := svc.CreateNote(context.Background(), userID, nil, "   ", nil, false, false)

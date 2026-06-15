@@ -19,6 +19,7 @@ type Repository interface {
 	SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
 	AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
+	WithQuerier(q sqlcgen.Querier) Repository
 }
 
 type repository struct {
@@ -26,6 +27,10 @@ type repository struct {
 }
 
 func NewRepository(q sqlcgen.Querier) Repository {
+	return &repository{q: q}
+}
+
+func (r *repository) WithQuerier(q sqlcgen.Querier) Repository {
 	return &repository{q: q}
 }
 
