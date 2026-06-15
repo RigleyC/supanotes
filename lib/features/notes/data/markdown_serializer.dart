@@ -186,22 +186,22 @@ String serializeDocumentToMarkdown(MutableDocument doc) {
       final plain = _serializeInlineFormatting(node.text);
       final blockType = node.getMetadataValue('blockType');
       if (blockType == header1Attribution) {
-        buffer.writeln('# $plain');
+        buffer.writeln('# $plain\n');
       } else if (blockType == header2Attribution) {
-        buffer.writeln('## $plain');
+        buffer.writeln('## $plain\n');
       } else if (blockType == header3Attribution) {
-        buffer.writeln('### $plain');
+        buffer.writeln('### $plain\n');
       } else if (blockType == blockquoteAttribution) {
-        buffer.writeln('> $plain');
+        buffer.writeln('> $plain\n');
       } else if (plain.isEmpty) {
         // Skip empty paragraphs to keep the document compact.
         continue;
       } else {
-        buffer.writeln(plain);
+        buffer.writeln('$plain\n');
       }
     } else if (node is TextNode) {
       // Generic fallback for any other text-bearing node we might add.
-      buffer.writeln(_serializeInlineFormatting(node.text));
+      buffer.writeln('${_serializeInlineFormatting(node.text)}\n');
     }
   }
 
@@ -299,20 +299,89 @@ AttributedText _applyInlineFormatting(String source) {
   while (i < source.length) {
     final remaining = source.substring(i);
 
-    if (remaining.startsWith('**')) {
-      bold = !bold;
+    if (remaining.startsWith(r'\*')) {
+      final start = text.length;
+      text.write('*');
+      final end = text.length;
+      if (bold) {
+        spans.addAttribution(
+          newAttribution: boldAttribution,
+          start: start,
+          end: end,
+        );
+      }
+      if (italic) {
+        spans.addAttribution(
+          newAttribution: italicsAttribution,
+          start: start,
+          end: end,
+        );
+      }
+      if (strikethrough) {
+        spans.addAttribution(
+          newAttribution: strikethroughAttribution,
+          start: start,
+          end: end,
+        );
+      }
       i += 2;
       continue;
     }
+
+    if (remaining.startsWith('**')) {
+      if (!bold) {
+        final nextIndex = source.indexOf('**', i + 2);
+        if (nextIndex != -1) {
+          bold = true;
+          i += 2;
+          continue;
+        }
+      } else {
+        bold = false;
+        i += 2;
+        continue;
+      }
+    }
     if (remaining.startsWith('~')) {
-      strikethrough = !strikethrough;
-      i += 1;
-      continue;
+      if (!strikethrough) {
+        final nextIndex = source.indexOf('~', i + 1);
+        if (nextIndex != -1) {
+          strikethrough = true;
+          i += 1;
+          continue;
+        }
+      } else {
+        strikethrough = false;
+        i += 1;
+        continue;
+      }
     }
     if (remaining.startsWith('*')) {
-      italic = !italic;
-      i += 1;
-      continue;
+      if (!italic) {
+        var nextIndex = i + 1;
+        var foundMatch = false;
+        while (nextIndex < source.length) {
+          final idx = source.indexOf('*', nextIndex);
+          if (idx == -1) break;
+          final isBoldMarker = (idx + 1 < source.length && source[idx + 1] == '*') || 
+                               (idx - 1 >= 0 && source[idx - 1] == '*');
+          final isEscaped = idx - 1 >= 0 && source[idx - 1] == '\\';
+          if (!isBoldMarker && !isEscaped) {
+            foundMatch = true;
+            break;
+          }
+          nextIndex = idx + 1;
+        }
+        if (foundMatch) {
+          italic = true;
+          i += 1;
+          continue;
+        }
+      } else {
+        italic = false;
+        i += 1;
+        continue;
+      }
     }
 
     final start = text.length;

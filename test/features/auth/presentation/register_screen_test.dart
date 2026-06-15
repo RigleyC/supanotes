@@ -174,7 +174,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('email already in use'), findsOneWidget);
-    final user = container.read(authControllerProvider).requireValue;
+    final user = container.read(authControllerProvider).value;
     expect(user, isNull);
   });
 

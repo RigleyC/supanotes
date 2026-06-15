@@ -207,7 +207,7 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
   }) async {}
 
   @override
-  Future<void> reorderTasksBatch(List<TaskData> tasks) async {}
+  Future<void> reorderTasksBatch(List<String> orderedIds) async {}
 
   @override
   Future<void> updateTask(TasksCompanion companion) async {

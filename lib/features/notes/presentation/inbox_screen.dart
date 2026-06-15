@@ -16,7 +16,6 @@ import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_she
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
-import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';

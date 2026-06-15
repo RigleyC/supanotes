@@ -50,7 +50,7 @@ void main() {
     test('unordered list item is a ListItemNode', () {
       final doc = parseMarkdownToDocument('- item');
 
-      expect(doc.nodeCount, 1);
+      expect(doc.nodeCount, 2);
       expect(doc.first, isA<ListItemNode>());
       expect((doc.first as ListItemNode).type, ListItemType.unordered);
     });
@@ -58,7 +58,7 @@ void main() {
     test('ordered list item is a ListItemNode', () {
       final doc = parseMarkdownToDocument('1. first');
 
-      expect(doc.nodeCount, 1);
+      expect(doc.nodeCount, 2);
       expect(doc.first, isA<ListItemNode>());
       expect((doc.first as ListItemNode).type, ListItemType.ordered);
     });

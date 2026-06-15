@@ -18,7 +18,7 @@ void main() {
       position: 0,
       dueDate: now,
       completedAt: null,
-      recurrence: const TaskRecurrence(type: TaskRecurrenceType.daily),
+      recurrence: TaskRecurrence.daily,
       createdAt: now,
       updatedAt: now,
     );

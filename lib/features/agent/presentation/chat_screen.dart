@@ -5,7 +5,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:supanotes/features/agent/domain/session_manager.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 import 'package:supanotes/features/agent/presentation/widgets/agent_chat_view.dart';
 import 'package:supanotes/features/agent/presentation/widgets/new_session_button.dart';
