@@ -9,13 +9,13 @@ WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 
 -- name: UpdateTask :one
 UPDATE tasks
-SET title = COALESCE(sqlc.narg('title'), title),
-    status = COALESCE(sqlc.narg('status'), status),
-    due_date = COALESCE(sqlc.narg('due_date'), due_date),
-    recurrence = COALESCE(sqlc.narg('recurrence'), recurrence),
-    position = COALESCE(sqlc.narg('position'), position),
-    completed_at = COALESCE(sqlc.narg('completed_at'), completed_at),
-    updated_at = NOW()
+SET title        = CASE WHEN sqlc.narg('set_title')::bool        THEN sqlc.narg('title')        ELSE title        END,
+    status       = CASE WHEN sqlc.narg('set_status')::bool       THEN sqlc.narg('status')       ELSE status       END,
+    due_date     = CASE WHEN sqlc.narg('set_due_date')::bool     THEN sqlc.narg('due_date')     ELSE due_date     END,
+    recurrence   = CASE WHEN sqlc.narg('set_recurrence')::bool   THEN sqlc.narg('recurrence')   ELSE recurrence   END,
+    position     = CASE WHEN sqlc.narg('set_position')::bool     THEN sqlc.narg('position')     ELSE position     END,
+    completed_at = CASE WHEN sqlc.narg('set_completed_at')::bool THEN sqlc.narg('completed_at') ELSE completed_at END,
+    updated_at   = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 RETURNING *;
 

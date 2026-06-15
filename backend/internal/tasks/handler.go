@@ -23,11 +23,13 @@ type CreateTaskRequest struct {
 }
 
 type UpdateTaskRequest struct {
-	Title      *string `json:"title"`
-	Status     *string `json:"status"`
-	DueDate    *string `json:"due_date"`
-	Recurrence *string `json:"recurrence"`
-	Position   *int    `json:"position"`
+	Title           *string `json:"title"`
+	Status          *string `json:"status"`
+	DueDate         *string `json:"due_date"`
+	ClearDueDate    bool    `json:"clear_due_date"`
+	Recurrence      *string `json:"recurrence"`
+	ClearRecurrence bool    `json:"clear_recurrence"`
+	Position        *int    `json:"position"`
 }
 
 type TaskResponse struct {
@@ -156,7 +158,7 @@ func (h *Handler) Update(c echo.Context) error {
 		}
 	}
 
-	task, err := h.svc.UpdateTask(c.Request().Context(), userID, id, req.Title, req.Status, dueDate, req.Recurrence, req.Position)
+	task, err := h.svc.UpdateTask(c.Request().Context(), userID, id, req.Title, req.Status, dueDate, req.DueDate == nil && req.ClearDueDate, req.Recurrence, req.Recurrence == nil && req.ClearRecurrence, req.Position)
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "task not found")

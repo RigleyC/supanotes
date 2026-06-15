@@ -312,37 +312,49 @@ func (q *Queries) GetTodayTasks(ctx context.Context, arg GetTodayTasksParams) ([
 
 const updateTask = `-- name: UpdateTask :one
 UPDATE tasks
-SET title = COALESCE($3, title),
-    status = COALESCE($4, status),
-    due_date = COALESCE($5, due_date),
-    recurrence = COALESCE($6, recurrence),
-    position = COALESCE($7, position),
-    completed_at = COALESCE($8, completed_at),
-    updated_at = NOW()
+SET title        = CASE WHEN $3::bool        THEN $4        ELSE title        END,
+    status       = CASE WHEN $5::bool       THEN $6       ELSE status       END,
+    due_date     = CASE WHEN $7::bool     THEN $8     ELSE due_date     END,
+    recurrence   = CASE WHEN $9::bool   THEN $10   ELSE recurrence   END,
+    position     = CASE WHEN $11::bool     THEN $12     ELSE position     END,
+    completed_at = CASE WHEN $13::bool THEN $14 ELSE completed_at END,
+    updated_at   = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at
 `
 
 type UpdateTaskParams struct {
-	ID          pgtype.UUID        `json:"id"`
-	UserID      pgtype.UUID        `json:"user_id"`
-	Title       pgtype.Text        `json:"title"`
-	Status      pgtype.Text        `json:"status"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
-	Recurrence  pgtype.Text        `json:"recurrence"`
-	Position    pgtype.Int4        `json:"position"`
-	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	SetTitle       pgtype.Bool        `json:"set_title"`
+	Title          pgtype.Text        `json:"title"`
+	SetStatus      pgtype.Bool        `json:"set_status"`
+	Status         pgtype.Text        `json:"status"`
+	SetDueDate     pgtype.Bool        `json:"set_due_date"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
+	SetRecurrence  pgtype.Bool        `json:"set_recurrence"`
+	Recurrence     pgtype.Text        `json:"recurrence"`
+	SetPosition    pgtype.Bool        `json:"set_position"`
+	Position       pgtype.Int4        `json:"position"`
+	SetCompletedAt pgtype.Bool        `json:"set_completed_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error) {
 	row := q.db.QueryRow(ctx, updateTask,
 		arg.ID,
 		arg.UserID,
+		arg.SetTitle,
 		arg.Title,
+		arg.SetStatus,
 		arg.Status,
+		arg.SetDueDate,
 		arg.DueDate,
+		arg.SetRecurrence,
 		arg.Recurrence,
+		arg.SetPosition,
 		arg.Position,
+		arg.SetCompletedAt,
 		arg.CompletedAt,
 	)
 	var i Task
