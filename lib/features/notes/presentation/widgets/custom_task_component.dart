@@ -9,11 +9,13 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
     this._editor, {
     this.taskMetadataById = const {},
+    this.hideCompleted = false,
     this.onTaskLongPress,
   });
 
   final Editor _editor;
   final Map<String, TaskModel> taskMetadataById;
+  final bool hideCompleted;
   final ValueChanged<String>? onTaskLongPress;
 
   @override
@@ -53,6 +55,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       key: componentContext.componentKey,
       viewModel: componentViewModel,
       taskMetadata: taskMetadataById[componentViewModel.nodeId],
+      hideCompleted: hideCompleted,
       onLongPress: onTaskLongPress == null
           ? null
           : () => onTaskLongPress!(componentViewModel.nodeId),
@@ -65,11 +68,13 @@ class CustomTaskComponent extends StatefulWidget {
     super.key,
     required this.viewModel,
     this.taskMetadata,
+    this.hideCompleted = false,
     this.onLongPress,
   });
 
   final TaskComponentViewModel viewModel;
   final TaskModel? taskMetadata;
+  final bool hideCompleted;
   final VoidCallback? onLongPress;
 
   @override
@@ -94,9 +99,15 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final taskColor = semantics?.task ?? AppColors.taskAccent;
     const checkboxSize = 22.0;
 
-    return Directionality(
-      textDirection: widget.viewModel.textDirection,
-      child: Row(
+    final shouldHide =
+        widget.viewModel.isComplete && widget.hideCompleted;
+
+    return Visibility(
+      visible: !shouldHide,
+      maintainState: true,
+      child: Directionality(
+        textDirection: widget.viewModel.textDirection,
+        child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
@@ -154,7 +165,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   TextStyle _computeStyles(Set<Attribution> attributions, BuildContext context) {

@@ -19,6 +19,7 @@ class NoteEditor extends StatefulWidget {
   final String content;
   final String? title;
   final Map<String, TaskModel> taskMetadata;
+  final bool hideCompleted;
   final SnapshotSave snapshotSave;
   final EmptyNoteExit? emptyNoteExit;
   final ValueChanged<bool>? onHasContentChanged;
@@ -33,6 +34,7 @@ class NoteEditor extends StatefulWidget {
     required this.content,
     this.title,
     required this.taskMetadata,
+    this.hideCompleted = false,
     required this.snapshotSave,
     this.emptyNoteExit,
     this.onHasContentChanged,
@@ -163,6 +165,7 @@ class _NoteEditorState extends State<NoteEditor> {
                         CustomTaskComponentBuilder(
                           controller.editor!,
                           taskMetadataById: widget.taskMetadata,
+                          hideCompleted: widget.hideCompleted,
                           onTaskLongPress: (taskId) =>
                               widget.onTaskLongPress?.call(
                                 taskId,

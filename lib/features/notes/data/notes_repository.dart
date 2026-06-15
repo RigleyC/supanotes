@@ -34,6 +34,7 @@ abstract class INotesRepository {
     String? content,
     bool? favorite,
     bool? archived,
+    bool? hideCompleted,
     String? contextId,
   });
   Future<void> toggleFavorite(String id);
@@ -140,6 +141,7 @@ class NotesRepository implements INotesRepository {
     String? content,
     bool? favorite,
     bool? archived,
+    bool? hideCompleted,
     String? contextId,
   }) async {
     final current = await _local.getNoteById(id);
@@ -155,6 +157,8 @@ class NotesRepository implements INotesRepository {
           : Value(_excerptFrom(nextContent)),
       favorite: favorite == null ? const Value.absent() : Value(favorite),
       archived: archived == null ? const Value.absent() : Value(archived),
+      hideCompleted:
+          hideCompleted == null ? const Value.absent() : Value(hideCompleted),
       contextId: contextId == null ? const Value.absent() : Value(contextId),
       updatedAt: Value(DateTime.now().toUtc()),
       isDirty: const Value(true),

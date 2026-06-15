@@ -295,6 +295,7 @@ func seedUserDefaults(ctx context.Context, q sqlcgen.Querier, userID pgtype.UUID
 		Favorite:        false,
 		Archived:        false,
 		EmbeddingStatus: "pending",
+		HideCompleted:   false,
 	}); err != nil {
 		return fmt.Errorf("auth: seed inbox note: %w", err)
 	}
