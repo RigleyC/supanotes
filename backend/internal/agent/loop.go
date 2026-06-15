@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -28,7 +29,27 @@ func NewLoop(repo Repository, llmFact llm.Factory, ctxBldr *ContextBuilder, tool
 	}
 }
 
+type SSEEvent struct {
+	Type string
+	Data string
+}
+
+func sendEvent(events chan<- SSEEvent, typ, data string) {
+	if events != nil {
+		events <- SSEEvent{Type: typ, Data: data}
+	}
+}
+
 func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string) (string, error) {
+	return l.doChat(ctx, userID, sessionIDStr, userMessage, nil)
+}
+
+func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) error {
+	_, err := l.doChat(ctx, userID, sessionIDStr, userMessage, events)
+	return err
+}
+
+func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) (string, error) {
 	sessionID, err := uuid.Parse(sessionIDStr)
 	if err != nil {
 		return "", fmt.Errorf("invalid session id: %w", err)
@@ -85,8 +106,24 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 			return "", fmt.Errorf("save assistant msg: %w", err)
 		}
 
+		if res.Content != "" {
+			sendEvent(events, "content_delta", res.Content)
+		}
+
+		if len(res.ToolCalls) > 0 {
+			for _, tc := range res.ToolCalls {
+				tcJSON, marshalErr := json.Marshal(tc)
+				if marshalErr != nil {
+					slog.Error("marshal tool call", "error", marshalErr)
+					continue
+				}
+				sendEvent(events, "tool_use", string(tcJSON))
+			}
+		}
+
 		if len(res.ToolCalls) == 0 {
 			finalContent = res.Content
+			sendEvent(events, "done", finalContent)
 			break
 		}
 
@@ -106,11 +143,14 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 			if _, err := l.persistTurn(ctx, userID, sessionUUID, toolMsg); err != nil {
 				return "", fmt.Errorf("save tool msg: %w", err)
 			}
+
+			sendEvent(events, "tool_result", resultStr)
 		}
 	}
 
 	if finalContent == "" {
 		finalContent = "Agent reached maximum iterations without final answer."
+		sendEvent(events, "done", finalContent)
 	}
 
 	return finalContent, nil

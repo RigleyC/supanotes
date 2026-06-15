@@ -13,7 +13,7 @@ class _TestChatController extends ChatController {
   final sent = <String>[];
 
   @override
-  ChatState build() => initialState;
+  AsyncValue<ChatState> build() => AsyncValue.data(initialState);
 
   @override
   Future<void> sendMessage(String content) async {
@@ -25,9 +25,7 @@ void main() {
   testWidgets('chat screen renders package chat view and sends through controller', (tester) async {
     final controller = _TestChatController(
       (
-        loaded: true,
-        streaming: false,
-        error: null,
+        isStreaming: false,
         messages: [
           MessageModel(
             id: 'assistant-1',

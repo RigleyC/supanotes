@@ -95,9 +95,12 @@ class _AgentChatViewState extends State<AgentChatView> {
           }
           return const SizedBox.shrink();
         },
-        composerBuilder: (_) => ChatInput(
-          enabled: !widget.streaming,
-          onSend: widget.onSend,
+        composerBuilder: (_) => Align(
+          alignment: Alignment.bottomCenter,
+          child: ChatInput(
+            enabled: !widget.streaming,
+            onSend: widget.onSend,
+          ),
         ),
       ),
       onMessageSend: widget.streaming ? null : widget.onSend,

@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supanotes/features/agent/domain/session_manager.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 import 'package:supanotes/features/agent/presentation/widgets/agent_chat_view.dart';
 import 'package:supanotes/features/agent/presentation/widgets/new_session_button.dart';
@@ -15,13 +16,17 @@ class ChatScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen<ChatState>(chatControllerProvider, (prev, next) {
-      if (next.error != null && next.error != prev?.error) {
-        AppMessenger.showError(context, next.error!);
+    ref.listen<AsyncValue<ChatState>>(chatControllerProvider, (prev, next) {
+      if (!next.isLoading && next.hasError && next.error != prev?.error) {
+        AppMessenger.showError(context, next.error.toString());
       }
     });
 
-    final state = ref.watch(chatControllerProvider);
+    final asyncState = ref.watch(chatControllerProvider);
+    final state = asyncState.value;
+    final messages = state?.messages ?? const [];
+    final isStreaming = state?.isStreaming ?? false;
+    final isLoaded = !asyncState.isLoading || messages.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -31,11 +36,10 @@ class ChatScreen extends ConsumerWidget {
       body: SafeArea(
         top: false,
         child: AgentChatView(
-          messages: state.messages,
-          loaded: state.loaded,
-          streaming: state.streaming,
-          onSend: (text) =>
-              ref.read(chatControllerProvider.notifier).sendMessage(text),
+          messages: messages,
+          loaded: isLoaded,
+          streaming: isStreaming,
+          onSend: (text) => ref.read(chatControllerProvider.notifier).sendMessage(text),
         ),
       ),
     );

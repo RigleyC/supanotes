@@ -11,49 +11,44 @@ import 'package:supanotes/features/agent/domain/session_manager.dart';
 
 typedef ChatState = ({
   List<MessageModel> messages,
-  bool loaded,
-  bool streaming,
-  String? error,
+  bool isStreaming,
 });
 
-final chatControllerProvider =
-    NotifierProvider.autoDispose<ChatController, ChatState>(
+final chatControllerProvider = NotifierProvider<ChatController, AsyncValue<ChatState>>(
   ChatController.new,
 );
 
-class ChatController extends Notifier<ChatState> {
+class ChatController extends Notifier<AsyncValue<ChatState>> {
+  StreamSubscription<String>? _sseSub;
+
   @override
-  ChatState build() {
+  AsyncValue<ChatState> build() {
     final sessionId = ref.watch(sessionManagerProvider);
     ref.onDispose(() => _sseSub?.cancel());
+    
     Future.microtask(() => _loadHistory(sessionId));
-    return (messages: const [], loaded: false, streaming: false, error: null);
+    return const AsyncValue.loading();
   }
 
   Future<void> _loadHistory(String sessionId) async {
+    state = const AsyncValue.loading();
     try {
-      final messages =
-          await ref.read(chatRepositoryProvider).getHistory(sessionId);
-      if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = (messages: messages, loaded: true, streaming: false, error: null);
-    } on ApiException catch (e) {
-      if (ref.read(sessionManagerProvider) != sessionId) return;
-      state = (messages: state.messages, loaded: true, streaming: false, error: e.message);
+      final messages = await ref.read(chatRepositoryProvider).getHistory(sessionId);
+      state = AsyncValue.data((messages: messages, isStreaming: false));
+    } on ApiException catch (e, st) {
+      state = AsyncValue.error(e.message, st);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
     }
   }
-
-  Future<void> loadHistory() async {
-    final sessionId = ref.read(sessionManagerProvider);
-    await _loadHistory(sessionId);
-  }
-
-  StreamSubscription<String>? _sseSub;
 
   Future<void> sendMessage(String content) async {
     final trimmed = content.trim();
     if (trimmed.isEmpty) return;
 
     final sessionId = ref.read(sessionManagerProvider);
+    final currentMessages = state.value?.messages ?? [];
+
     final pending = MessageModel(
       id: 'pending-${DateTime.now().microsecondsSinceEpoch}',
       sessionId: sessionId,
@@ -71,54 +66,45 @@ class ChatController extends Notifier<ChatState> {
       createdAt: DateTime.now(),
     );
 
-    state = (
-      messages: [...state.messages, pending, initialAssistant],
-      loaded: true,
-      streaming: true,
-      error: null,
-    );
+    state = AsyncValue.data((
+      messages: [...currentMessages, pending, initialAssistant],
+      isStreaming: true,
+    ));
 
     _sseSub?.cancel();
     final sse = ChatSSE(apiClient: ref.read(apiClientProvider));
+
+    final messagesWithoutAssistant = [...currentMessages, pending];
+    final buffer = StringBuffer();
+
     _sseSub = sse.streamChat(
       sessionId: sessionId,
       message: trimmed,
     ).listen(
       (delta) {
-        if (ref.read(sessionManagerProvider) != sessionId) {
-          _sseSub?.cancel();
-          return;
-        }
-        final messages = state.messages;
-        final idx = messages.indexWhere((m) => m.id == assistantId);
-        if (idx == -1) return;
-        final updated = messages[idx].copyWith(
-          content: messages[idx].content + delta,
+        buffer.write(delta);
+        final updatedAssistant = initialAssistant.copyWith(
+          content: buffer.toString(),
         );
-        state = (
-          messages: [
-            ...messages.sublist(0, idx),
-            updated,
-            ...messages.sublist(idx + 1),
-          ],
-          loaded: true,
-          streaming: true,
-          error: null,
-        );
+        state = AsyncValue.data((
+          messages: [...messagesWithoutAssistant, updatedAssistant],
+          isStreaming: true,
+        ));
       },
-      onError: (Object e) {
-        if (ref.read(sessionManagerProvider) != sessionId) return;
-        state = (
-          messages:
-              state.messages.where((m) => m.id != assistantId).toList(growable: false),
-          loaded: true,
-          streaming: false,
-          error: e is ApiException ? e.message : e.toString(),
+      onError: (Object e, StackTrace st) {
+        state = AsyncValue.error(
+          e is ApiException ? e.message : e.toString(),
+          st,
         );
       },
       onDone: () {
-        if (ref.read(sessionManagerProvider) != sessionId) return;
-        state = (messages: state.messages, loaded: true, streaming: false, error: null);
+        final current = state.value;
+        if (current != null) {
+          state = AsyncValue.data((
+            messages: current.messages,
+            isStreaming: false,
+          ));
+        }
       },
     );
   }

@@ -26,4 +26,4 @@ class SessionManager extends Notifier<String> {
 }
 
 final sessionManagerProvider =
-    NotifierProvider.autoDispose<SessionManager, String>(SessionManager.new);
+    NotifierProvider<SessionManager, String>(SessionManager.new);

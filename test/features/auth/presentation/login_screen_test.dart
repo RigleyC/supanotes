@@ -20,6 +20,13 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.getAccessToken()).thenAnswer((_) async => null);
   when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
   when(() => storage.getUser()).thenAnswer((_) async => null);
+  when(() => storage.getSessionData()).thenAnswer((_) async => const {});
+  when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
+  when(() => storage.saveTokens(
+        accessToken: any(named: 'accessToken'),
+        refreshToken: any(named: 'refreshToken'),
+      )).thenAnswer((_) async {});
+  when(() => storage.saveUser(user: any(named: 'user'))).thenAnswer((_) async {});
   when(() => storage.clear()).thenAnswer((_) async {});
 }
 
@@ -50,6 +57,10 @@ Widget _wrap(Widget child, {required ProviderContainer container}) {
 }
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(const User(id: '', email: '', name: ''));
+  });
+
   testWidgets('renders the title and both fields', (tester) async {
     final storage = _MockAuthLocalStorage();
     final repository = _MockAuthRepository();

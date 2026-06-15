@@ -37,6 +37,7 @@ class ChatSSE {
         'session_id': sessionId,
         'content': message,
       },
+      options: Options(receiveTimeout: const Duration(minutes: 5)),
       cancelToken: _cancelToken,
     ).then((response) async {
       final body = response.data as ResponseBody;
