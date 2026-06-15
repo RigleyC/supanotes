@@ -18,24 +18,44 @@ import 'recurrence_picker.dart';
 /// Pops the (possibly-updated) [TaskModel] back through `Navigator.pop`
 /// when the user taps **Salvar**. **Excluir** is only shown for
 /// existing tasks and pops `null` to signal a delete.
+///
+/// When invoked from the note editor (long-press on a task), pass
+/// `allowTitleEdit: false` and `readOnlyTitle: true` so the title source
+/// of truth stays in the editor's `TaskNode.text`. `allowDelete: false`
+/// hides the destructive action since delete is owned by the editor.
 class TaskEditSheet extends ConsumerStatefulWidget {
   const TaskEditSheet({
     super.key,
     required this.noteId,
     this.task,
+    this.allowTitleEdit = true,
+    this.allowDelete = true,
+    this.readOnlyTitle = false,
   });
 
   final String noteId;
   final TaskModel? task;
+  final bool allowTitleEdit;
+  final bool allowDelete;
+  final bool readOnlyTitle;
 
   static Future<TaskEditResult?> show(
     BuildContext context, {
     required String noteId,
     TaskModel? task,
+    bool allowTitleEdit = true,
+    bool allowDelete = true,
+    bool readOnlyTitle = false,
   }) {
     return showAppBottomSheet<TaskEditResult>(
       context: context,
-      builder: (_) => TaskEditSheet(noteId: noteId, task: task),
+      builder: (_) => TaskEditSheet(
+        noteId: noteId,
+        task: task,
+        allowTitleEdit: allowTitleEdit,
+        allowDelete: allowDelete,
+        readOnlyTitle: readOnlyTitle,
+      ),
     );
   }
 
@@ -150,15 +170,25 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppSpacing.lg),
-          AppInput(
-            controller: _titleController,
-            autofocus: !_isEdit,
-            textInputAction: TextInputAction.done,
-            maxLines: 3,
-            labelText: 'Título',
-            hintText: 'O que precisa ser feito?',
-            onSubmitted: (_) => _onSave(),
-          ),
+          if (widget.allowTitleEdit)
+            AppInput(
+              controller: _titleController,
+              autofocus: !_isEdit,
+              textInputAction: TextInputAction.done,
+              maxLines: 3,
+              labelText: 'Título',
+              hintText: 'O que precisa ser feito?',
+              onSubmitted: (_) => _onSave(),
+            )
+          else if (widget.readOnlyTitle && _isEdit)
+            Text(
+              widget.task!.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           const SizedBox(height: AppSpacing.lg),
           Text('Data de vencimento', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: AppSpacing.sm),
@@ -176,7 +206,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
           const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
-              if (_isEdit)
+              if (_isEdit && widget.allowDelete)
                 IntrinsicWidth(
                   child: AppButton(
                     text: 'Excluir',

@@ -11,7 +11,7 @@ import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_she
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_actions_sheet.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_edit_sheet.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
@@ -50,7 +50,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     final task = freshMap[taskId];
     if (task == null || !mounted) return;
 
-    await TaskActionsSheet.show(context, task: task);
+    await TaskEditSheet.show(
+      context,
+      noteId: task.noteId,
+      task: task,
+      allowTitleEdit: false,
+      allowDelete: false,
+      readOnlyTitle: true,
+    );
   }
 
   Future<void> _onOrganizePressed() async {
