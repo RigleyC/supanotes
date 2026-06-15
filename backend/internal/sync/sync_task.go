@@ -1,12 +1,12 @@
 package sync
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/tasks"
 )
 
 // SyncTask is the wire shape of a task in the sync payload.
@@ -38,13 +38,11 @@ func toSyncTask(t sqlcgen.Task) SyncTask {
 		CreatedAt: t.CreatedAt.Time,
 		UpdatedAt: t.UpdatedAt.Time,
 	}
-	if t.Recurrence.Valid {
-		r := t.Recurrence.String
-		st.Recurrence = &r
+	if rec := tasks.FormatText(t.Recurrence); rec != nil {
+		st.Recurrence = rec
 	}
-	if t.DueDate.Valid {
-		d := t.DueDate.Time.Format("2006-01-02")
-		st.DueDate = &d
+	if due := tasks.FormatDate(t.DueDate); due != nil {
+		st.DueDate = due
 	}
 	if t.CompletedAt.Valid {
 		ct := t.CompletedAt.Time
@@ -72,9 +70,9 @@ func fromSyncTask(t SyncTask) (sqlcgen.Task, error) {
 		out.Recurrence = pgtype.Text{String: *t.Recurrence, Valid: true}
 	}
 	if t.DueDate != nil {
-		d, err := time.Parse("2006-01-02", *t.DueDate)
+		d, err := tasks.ParseDueDate(*t.DueDate)
 		if err != nil {
-			return sqlcgen.Task{}, fmt.Errorf("invalid due_date %q: expected YYYY-MM-DD", *t.DueDate)
+			return sqlcgen.Task{}, err
 		}
 		out.DueDate = pgtype.Date{Time: d, Valid: true}
 	}
