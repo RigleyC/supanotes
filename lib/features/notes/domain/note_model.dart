@@ -21,6 +21,7 @@ class NoteModel {
     required this.contextId,
     required this.createdAt,
     required this.updatedAt,
+    this.hideCompleted = false,
   });
 
   final String id;
@@ -34,6 +35,7 @@ class NoteModel {
   final String? contextId;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool hideCompleted;
 
   NoteModel copyWith({
     String? id,
@@ -47,6 +49,7 @@ class NoteModel {
     String? contextId,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? hideCompleted,
   }) =>
       NoteModel(
         id: id ?? this.id,
@@ -60,6 +63,7 @@ class NoteModel {
         contextId: contextId ?? this.contextId,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        hideCompleted: hideCompleted ?? this.hideCompleted,
       );
 
   /// Builds a presentation-layer [NoteModel] from a Drift row. Centralised
@@ -77,6 +81,7 @@ class NoteModel {
       contextId: d.contextId,
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
+      hideCompleted: d.hideCompleted,
     );
   }
 }

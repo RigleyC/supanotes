@@ -22,6 +22,7 @@ class SyncMapper {
         'is_inbox': n.isInbox,
         'favorite': n.favorite,
         'archived': n.archived,
+        'hide_completed': n.hideCompleted,
         'embedding_status': n.embeddingStatus,
         'created_at': n.createdAt.toUtc().toIso8601String(),
         'updated_at': n.updatedAt.toUtc().toIso8601String(),
@@ -99,6 +100,7 @@ class SyncMapper {
             : null,
         isDirty: false,
         hasRemoteCopy: true,
+        hideCompleted: (json['hide_completed'] as bool?) ?? false,
       );
 
   TaskData taskFromJson(Map<String, dynamic> json) => TaskData(

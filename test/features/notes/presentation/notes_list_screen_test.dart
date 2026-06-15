@@ -51,6 +51,7 @@ class _FakeNotesRepository implements INotesRepository {
     String? content,
     bool? favorite,
     bool? archived,
+    bool? hideCompleted,
     String? contextId,
   }) async {}
 
