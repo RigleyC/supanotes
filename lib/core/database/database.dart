@@ -36,9 +36,9 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to `5` — v5 adds timestamps to `note_links`.
+  /// Latest schema version. Bumped to `6` — v6 adds `hideCompleted` to notes.
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -58,6 +58,9 @@ class AppDatabase extends _$AppDatabase {
           } else if (from == 4) {
             await m.addColumn(noteLinks, noteLinks.createdAt);
             await m.addColumn(noteLinks, noteLinks.updatedAt);
+          }
+          if (from < 6) {
+            await m.addColumn(notes, notes.hideCompleted);
           }
         },
       );

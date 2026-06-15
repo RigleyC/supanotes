@@ -89,6 +89,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         excerpt: excluded.excerpt,
         updatedAt: excluded.updatedAt,
         isDirty: excluded.isDirty,
+        hideCompleted: excluded.hideCompleted,
       )),
     );
   }
