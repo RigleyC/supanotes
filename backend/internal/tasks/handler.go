@@ -280,7 +280,7 @@ func (h *Handler) Today(c echo.Context) error {
 func mapToTaskResponse(t sqlcgen.Task) TaskResponse {
 	var due *string
 	if t.DueDate.Valid {
-		d := t.DueDate.Time.Format(time.RFC3339)
+		d := t.DueDate.Time.Format("2006-01-02")
 		due = &d
 	}
 	var rec *string
