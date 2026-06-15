@@ -65,10 +65,13 @@ func (q *Queries) DeleteSessionMessages(ctx context.Context, arg DeleteSessionMe
 }
 
 const getMessages = `-- name: GetMessages :many
-SELECT id, user_id, session_id, role, content, tool_calls, tool_call_id, created_at FROM messages
-WHERE user_id = $1 AND session_id = $2
+SELECT id, user_id, session_id, role, content, tool_calls, tool_call_id, created_at FROM (
+  SELECT id, user_id, session_id, role, content, tool_calls, tool_call_id, created_at FROM messages
+  WHERE user_id = $1 AND session_id = $2
+  ORDER BY created_at DESC
+  LIMIT $3 OFFSET $4
+) sub
 ORDER BY created_at ASC
-LIMIT $3 OFFSET $4
 `
 
 type GetMessagesParams struct {
