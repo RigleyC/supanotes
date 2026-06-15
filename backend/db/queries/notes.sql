@@ -13,8 +13,8 @@ DELETE FROM contexts
 WHERE id = $1 AND user_id = $2;
 
 -- name: CreateNote :one
-INSERT INTO notes (user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO notes (user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status, hide_completed)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: GetNoteByID :one
@@ -29,6 +29,7 @@ SET title = COALESCE(sqlc.narg('title'), title),
     favorite = COALESCE(sqlc.narg('favorite'), favorite),
     archived = COALESCE(sqlc.narg('archived'), archived),
     embedding_status = COALESCE(sqlc.narg('embedding_status'), embedding_status),
+    hide_completed = COALESCE(sqlc.narg('hide_completed'), hide_completed),
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 RETURNING *;
