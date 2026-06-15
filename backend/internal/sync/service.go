@@ -208,9 +208,12 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	}
 
 	for _, st := range payload.Tasks {
-		t := fromSyncTask(st)
+		t, err := fromSyncTask(st)
+		if err != nil {
+			return err
+		}
 		status := sanitizeTaskStatus(t.Status)
-		_, err := r.UpsertTask(ctx, sqlcgen.UpsertTaskParams{
+		_, err = r.UpsertTask(ctx, sqlcgen.UpsertTaskParams{
 			ID:         t.ID,
 			UserID:     userID,
 			NoteID:     t.NoteID,

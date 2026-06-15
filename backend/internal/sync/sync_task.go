@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -56,7 +57,7 @@ func toSyncTask(t sqlcgen.Task) SyncTask {
 	return st
 }
 
-func fromSyncTask(t SyncTask) sqlcgen.Task {
+func fromSyncTask(t SyncTask) (sqlcgen.Task, error) {
 	out := sqlcgen.Task{
 		ID:        t.ID,
 		NoteID:    t.NoteID,
@@ -71,9 +72,11 @@ func fromSyncTask(t SyncTask) sqlcgen.Task {
 		out.Recurrence = pgtype.Text{String: *t.Recurrence, Valid: true}
 	}
 	if t.DueDate != nil {
-		if d, err := time.Parse("2006-01-02", *t.DueDate); err == nil {
-			out.DueDate = pgtype.Date{Time: d, Valid: true}
+		d, err := time.Parse("2006-01-02", *t.DueDate)
+		if err != nil {
+			return sqlcgen.Task{}, fmt.Errorf("invalid due_date %q: expected YYYY-MM-DD", *t.DueDate)
 		}
+		out.DueDate = pgtype.Date{Time: d, Valid: true}
 	}
 	if t.CompletedAt != nil {
 		out.CompletedAt = pgtype.Timestamptz{Time: *t.CompletedAt, Valid: true}
@@ -81,5 +84,5 @@ func fromSyncTask(t SyncTask) sqlcgen.Task {
 	if t.DeletedAt != nil {
 		out.DeletedAt = pgtype.Timestamptz{Time: *t.DeletedAt, Valid: true}
 	}
-	return out
+	return out, nil
 }
