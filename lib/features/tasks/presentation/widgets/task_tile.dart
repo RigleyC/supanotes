@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 import '../../domain/task_model.dart';
-import 'recurrence_picker.dart';
 import 'task_checkbox.dart';
+import 'task_metadata_badges.dart';
 
 /// Row widget that renders a single [TaskModel] with strikethrough-on-
 /// complete styling, a due-date badge coloured by urgency, a small
@@ -125,76 +124,9 @@ class _MetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final due = task.dueDate;
-    final isOverdue = task.isOverdue;
-    final isToday = task.isDueToday;
-    final recLabel = recurrenceLabel(task.recurrence);
-
-    final badgeColor = isOverdue
-        ? scheme.error
-        : isToday
-            ? AppColors.success
-            : scheme.onSurfaceVariant;
-    final badgeText = due == null
-        ? ''
-        : (isToday
-            ? 'Hoje'
-            : (isOverdue
-                ? 'Atrasada · ${DateFormat('d MMM').format(due)}'
-                : DateFormat('d MMM').format(due)));
-
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.xs,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        if (badgeText.isNotEmpty)
-          _DueBadge(text: badgeText, color: badgeColor),
-        if (task.isRepeating)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.refresh,
-                size: 14,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                recLabel,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-}
-
-class _DueBadge extends StatelessWidget {
-  const _DueBadge({required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-      ),
+    return TaskMetadataBadges(
+      dueDate: task.dueDate,
+      recurrence: task.recurrence,
     );
   }
 }
