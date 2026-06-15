@@ -32,7 +32,16 @@ type ToolRegistry struct {
 	tools map[string]ToolExecutor
 }
 
-func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks.Service, memoriesSvc *memories.Service, routinesSvc *routines.Service, soulSvc *soul.Service, embedCL *llm.EmbeddingClient) *ToolRegistry {
+func NewToolRegistry(
+	q sqlcgen.Querier,
+	notesSvc *notes.Service,
+	tasksSvc *tasks.Service,
+	memoriesSvc *memories.Service,
+	routinesSvc *routines.Service,
+	soulSvc *soul.Service,
+	embedCL *llm.EmbeddingClient,
+	llmFact llm.Factory,
+) *ToolRegistry {
 	registry := &ToolRegistry{
 		tools: make(map[string]ToolExecutor),
 	}
@@ -63,6 +72,8 @@ func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks
 		&GetTodayTasksTool{tasksSvc: tasksSvc},
 		&UpdateTaskTool{tasksSvc: tasksSvc},
 		&GetVaultContextTool{q: q},
+		&PlanInboxOrganizationTool{notesSvc: notesSvc, llmClient: llmFact.For(llm.TaskTypeInboxOrganize)},
+		&ApplyInboxOrganizationTool{notesSvc: notesSvc},
 	}
 
 	for _, e := range executors {
@@ -867,4 +878,70 @@ func (t *SetWeeklyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.
 		}
 	}
 	return "Weekly routine not found", nil
+}
+
+// --- PlanInboxOrganizationTool ---
+type PlanInboxOrganizationTool struct {
+	notesSvc  *notes.Service
+	llmClient llm.Client
+}
+
+func (t *PlanInboxOrganizationTool) Name() string { return "plan_inbox_organization" }
+func (t *PlanInboxOrganizationTool) Description() string {
+	return "Analyze the inbox content and propose how to organize snippets into notes, without editing anything"
+}
+func (t *PlanInboxOrganizationTool) SchemaJSON() string {
+	return `{"type":"object","properties":{}}`
+}
+func (t *PlanInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	note, err := t.notesSvc.GetInboxNote(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	systemPrompt := `Você é um organizador de notas. Analise o conteúdo do inbox abaixo e organize cada item.
+O inbox contém várias anotações separadas por linhas em branco. Para cada anotação, decida o destino:
+- "new_note": virar uma nova nota → forneça um título descritivo curto
+- "keep": permanecer no inbox
+Responda APENAS com um JSON array válido. Exemplo:
+[{"snippet": "primeira anotação", "destination": "new_note", "title": "Título Descritivo"},
+ {"snippet": "segunda anotação", "destination": "keep"}]`
+
+	resp, err := t.llmClient.Complete(ctx, llm.Request{
+		System: systemPrompt,
+		Messages: []llm.Message{
+			{Role: llm.RoleUser, Content: "Aqui está meu inbox:\n\n" + note.Content},
+		},
+		MaxTokens:   2000,
+		Temperature: 0.3,
+	})
+	if err != nil {
+		return "", err
+	}
+	return resp.Content, nil
+}
+
+// --- ApplyInboxOrganizationTool ---
+type ApplyInboxOrganizationTool struct {
+	notesSvc *notes.Service
+}
+
+func (t *ApplyInboxOrganizationTool) Name() string { return "apply_inbox_organization" }
+func (t *ApplyInboxOrganizationTool) Description() string {
+	return "Apply a confirmed inbox organization plan and remove organized items from the inbox"
+}
+func (t *ApplyInboxOrganizationTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"item_id":{"type":"string"},"destination_type":{"type":"string"},"destination_note_id":{"type":"string"},"destination_title":{"type":"string"},"accepted":{"type":"boolean"}},"required":["item_id","destination_type","accepted"]}}},"required":["items"]}`
+}
+func (t *ApplyInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	var args struct {
+		Items []notes.PlanOrganizationItem `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("parse args: %w", err)
+	}
+	if err := t.notesSvc.ApplyOrganization(ctx, userID, args.Items); err != nil {
+		return "", err
+	}
+	return "Inbox organization plan applied successfully", nil
 }

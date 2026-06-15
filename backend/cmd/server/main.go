@@ -252,7 +252,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// Agent Loop (built before the runner so the runner and the
 	// gateway can both depend on it).
 	agentRepo := agent.NewRepository(queries)
-	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient)
+	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient, llmFactory)
 	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools)
 	agentH := agent.NewHandler(agentLoop, agentRepo)
 	protected.POST("/agent/chat", agentH.Chat)

@@ -22,6 +22,9 @@ type stubQuerier struct {
 	getSoul           func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error)
 	getMessages       func(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error)
 	getRecentNotes    func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error)
+	getInboxNote      func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error)
+	createNote        func(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error)
+	setInboxContent   func(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
 }
 
 func (s *stubQuerier) GetSoul(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error) {
@@ -102,6 +105,9 @@ func (s *stubQuerier) CreateMessage(ctx context.Context, arg sqlcgen.CreateMessa
 	panic("unimplemented")
 }
 func (s *stubQuerier) CreateNote(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
+	if s.createNote != nil {
+		return s.createNote(ctx, arg)
+	}
 	panic("unimplemented")
 }
 func (s *stubQuerier) CreateRefreshToken(ctx context.Context, arg sqlcgen.CreateRefreshTokenParams) (sqlcgen.RefreshToken, error) {
@@ -156,6 +162,9 @@ func (s *stubQuerier) GetEnabledRoutines(ctx context.Context) ([]sqlcgen.GetEnab
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+	if s.getInboxNote != nil {
+		return s.getInboxNote(ctx, userID)
+	}
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
@@ -249,6 +258,9 @@ func (s *stubQuerier) SearchNotesSemantic(ctx context.Context, arg sqlcgen.Searc
 	panic("unimplemented")
 }
 func (s *stubQuerier) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
+	if s.setInboxContent != nil {
+		return s.setInboxContent(ctx, arg)
+	}
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
@@ -499,5 +511,42 @@ func TestGetNoteTool_InvalidUUID(t *testing.T) {
 	_, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"note_id":"not-a-uuid"}`)
 	if err == nil {
 		t.Fatal("expected error for invalid UUID")
+	}
+}
+
+func TestApplyInboxOrganizationTool_Execute(t *testing.T) {
+	inboxID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+	q := &stubQuerier{
+		getInboxNote: func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+			return sqlcgen.Note{
+				ID:      inboxID,
+				UserID:  userID,
+				IsInbox: true,
+				Content: "snippet 1\n\nsnippet 2",
+			}, nil
+		},
+		createNote: func(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
+			if arg.Content != "snippet 1" {
+				t.Fatalf("expected create note content to be 'snippet 1', got %q", arg.Content)
+			}
+			return sqlcgen.Note{}, nil
+		},
+		setInboxContent: func(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
+			if arg.Content != "snippet 2" {
+				t.Fatalf("expected set inbox content to be 'snippet 2', got %q", arg.Content)
+			}
+			return sqlcgen.Note{}, nil
+		},
+	}
+	notesSvc := newMockNotesService(q)
+	tool := &ApplyInboxOrganizationTool{notesSvc: notesSvc}
+
+	argsJSON := `{"items":[{"item_id":"00000000-0000-0000-0000-000000000001-0","original_snippet":"snippet 1","destination_type":"new_note","destination_title":"New Note Title","accepted":true}]}`
+	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{2}, Valid: true}, argsJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "Inbox organization plan applied successfully" {
+		t.Fatalf("expected success message, got %q", result)
 	}
 }
