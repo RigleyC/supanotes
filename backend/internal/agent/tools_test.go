@@ -465,3 +465,35 @@ func (m *mockNotesRepo) AppendToNoteContent(ctx context.Context, arg sqlcgen.App
 func (m *mockNotesRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
 }
+
+func TestGetNoteTool_Execute(t *testing.T) {
+	q := &stubQuerier{
+		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
+			return sqlcgen.Note{
+				ID:      arg.ID,
+				UserID:  arg.UserID,
+				Title:   pgtype.Text{String: "My Test Note", Valid: true},
+				Content: "Hello world this is note content",
+			}, nil
+		},
+	}
+	notesSvc := newMockNotesService(q)
+	tool := &GetNoteTool{notesSvc: notesSvc}
+
+	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{1}, Valid: true}, `{"note_id":"00000000-0000-0000-0000-000000000001"}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expected := "Note [00000000-0000-0000-0000-000000000001] My Test Note:\nHello world this is note content"
+	if result != expected {
+		t.Fatalf("expected:\n%q\ngot:\n%q", expected, result)
+	}
+}
+
+func TestGetNoteTool_InvalidUUID(t *testing.T) {
+	tool := &GetNoteTool{}
+	_, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"note_id":"not-a-uuid"}`)
+	if err == nil {
+		t.Fatal("expected error for invalid UUID")
+	}
+}

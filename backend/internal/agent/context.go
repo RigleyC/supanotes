@@ -165,7 +165,7 @@ RECENT MESSAGES HISTORY (Up to 10):
 	tier3 := &strings.Builder{}
 	tier3.WriteString("\nSEMANTIC SEARCH RESULTS:\n")
 	for _, r := range semanticResults {
-		tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f)\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity))
+		tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f):\n%s\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity, r.Content))
 	}
 	if len(semanticResults) == 0 {
 		tier3.WriteString("(none)\n")
@@ -190,7 +190,7 @@ RECENT MESSAGES HISTORY (Up to 10):
 	}
 	b.WriteString(truncate(tier5.String(), MaxTier5Tokens))
 
-	b.WriteString("\nYou have access to tools to modify the database. If the user asks you to create a note, use add_note. If the user asks about a specific file/note that is not in the context, search for it using search_notes.")
+	b.WriteString("\nYou have access to tools to modify the database. If the user asks you to create a note, use add_note. If the user asks about a specific file/note, search for its ID using search_notes, and then retrieve its full content using get_note.")
 
 	return b.String(), nil
 }

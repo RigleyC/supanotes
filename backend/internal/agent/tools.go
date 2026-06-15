@@ -54,6 +54,7 @@ func NewToolRegistry(q sqlcgen.Querier, notesSvc *notes.Service, tasksSvc *tasks
 		&SetDailyBriefScheduleTool{routinesSvc: routinesSvc},
 		&SetWeeklyBriefScheduleTool{routinesSvc: routinesSvc},
 		&GetNotesTool{notesSvc: notesSvc},
+		&GetNoteTool{notesSvc: notesSvc},
 		&UpdateNoteTool{notesSvc: notesSvc},
 		&AppendToNoteTool{notesSvc: notesSvc},
 		&LinkNotesTool{q: q, notesSvc: notesSvc},
@@ -488,6 +489,42 @@ func (t *SetDailyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.U
 		}
 	}
 	return "Daily routine not found", nil
+}
+
+// --- GetNoteTool ---
+type GetNoteTool struct {
+	notesSvc *notes.Service
+}
+
+func (t *GetNoteTool) Name() string { return "get_note" }
+func (t *GetNoteTool) Description() string {
+	return "Retrieve the full content of a specific note by its ID"
+}
+func (t *GetNoteTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"note_id":{"type":"string"}},"required":["note_id"]}`
+}
+func (t *GetNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	args, err := parseArgs[struct {
+		NoteID string `json:"note_id"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+	nid, err := uid.UUIDFromString(args.NoteID)
+	if err != nil {
+		return "", fmt.Errorf("invalid note ID format: %w", err)
+	}
+	note, err := t.notesSvc.GetNoteByID(ctx, nid, userID)
+	if err != nil {
+		return "", err
+	}
+	var title string
+	if note.Title.Valid {
+		title = note.Title.String
+	} else {
+		title = "<no title>"
+	}
+	return fmt.Sprintf("Note [%s] %s:\n%s", formatID(note.ID), title, note.Content), nil
 }
 
 // --- GetNotesTool ---
