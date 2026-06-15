@@ -67,6 +67,7 @@ void main() {
         contextId: null,
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
+        hideCompleted: false,
       ),
     );
     await tester.pumpAndSettle();
@@ -87,6 +88,7 @@ void main() {
         contextId: null,
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 12),
+        hideCompleted: false,
       ),
     );
     await tester.pump();
@@ -130,6 +132,7 @@ void main() {
         contextId: null,
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
+        hideCompleted: false,
       ),
     );
     await tester.pumpAndSettle();
