@@ -1,16 +1,34 @@
 class SSEChatEvent {
   final String type;
-  final String data;
-  final Map<String, dynamic>? raw;
+  final String? delta;
+  final String? data;
+  final bool? done;
 
-  SSEChatEvent({required this.type, required this.data, this.raw});
+  SSEChatEvent({
+    required this.type,
+    this.delta,
+    this.data,
+    this.done,
+  });
 
   factory SSEChatEvent.fromJson(Map<String, dynamic> json) {
-    return SSEChatEvent(
-      type: json['type'] as String? ?? '',
-      data: json['data'] as String? ?? '',
-      raw: json,
-    );
+    if (json.containsKey('delta')) {
+      return SSEChatEvent(
+        type: 'content_delta',
+        delta: json['delta'] as String?,
+      );
+    } else if (json['done'] == true) {
+      return SSEChatEvent(
+        type: 'done',
+        done: true,
+      );
+    } else if (json.containsKey('type')) {
+      return SSEChatEvent(
+        type: json['type'] as String? ?? 'unknown',
+        data: json['data'] as String?,
+      );
+    }
+    return SSEChatEvent(type: 'unknown');
   }
 
   bool get isContentDelta => type == 'content_delta';

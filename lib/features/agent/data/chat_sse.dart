@@ -6,6 +6,8 @@ import 'package:dio/dio.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
 
+import 'package:supanotes/features/agent/domain/sse_chat_event.dart';
+
 class ChatSSE {
   ChatSSE({required ApiClient apiClient}) : _api = apiClient;
 
@@ -18,18 +20,13 @@ class ChatSSE {
   }
 
   /// Opens an SSE stream to `POST /agent/chat/stream` and yields decoded
-  /// delta events until the server signals completion.
-  ///
-  /// Each chunk is a `data: {...}\n\n` SSE line. Two shapes:
-  ///   `{"delta":"text..."}`  → yield the text fragment
-  ///   `{"done":true}`        → close the stream
-  ///   `{"error":"..."}`      → yield then close
-  Stream<String> streamChat({
+  /// SSEChatEvents until the server signals completion.
+  Stream<SSEChatEvent> streamChat({
     required String sessionId,
     required String message,
   }) {
     _cancelToken = CancelToken();
-    final controller = StreamController<String>();
+    final controller = StreamController<SSEChatEvent>();
 
     _api.postStream(
       '/agent/chat/stream',
@@ -55,14 +52,18 @@ class ChatSSE {
 
         try {
           final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-          if (data.containsKey('delta')) {
-            controller.add(data['delta'] as String);
-          } else if (data['done'] == true) {
-            break;
-          } else if (data.containsKey('error')) {
+          final event = SSEChatEvent.fromJson(data);
+
+          if (event.type == 'error') {
             controller.addError(
-              ApiException(message: data['error'] as String),
+              ApiException(message: event.data ?? 'Ocorreu um erro no stream'),
             );
+            break;
+          }
+
+          controller.add(event);
+
+          if (event.type == 'done') {
             break;
           }
         } catch (_) {
