@@ -515,7 +515,7 @@ func TestGetNoteTool_InvalidUUID(t *testing.T) {
 }
 
 func TestApplyInboxOrganizationTool_Execute(t *testing.T) {
-	inboxID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+	inboxID := pgtype.UUID{Bytes: [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, Valid: true}
 	q := &stubQuerier{
 		getInboxNote: func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
 			return sqlcgen.Note{
