@@ -85,10 +85,11 @@ func (h *Handler) Create(c echo.Context) error {
 
 	var dueDate *time.Time
 	if req.DueDate != nil {
-		t, err := time.Parse(time.RFC3339, *req.DueDate)
-		if err == nil {
-			dueDate = &t
+		t, err := time.Parse("2006-01-02", *req.DueDate)
+		if err != nil {
+			return web.JSONError(c, http.StatusBadRequest, "invalid due_date format, expected YYYY-MM-DD")
 		}
+		dueDate = &t
 	}
 
 	task, err := h.svc.CreateTask(c.Request().Context(), userID, noteID, req.Title, dueDate, req.Recurrence, req.Position)
@@ -152,13 +153,14 @@ func (h *Handler) Update(c echo.Context) error {
 
 	var dueDate *time.Time
 	if req.DueDate != nil {
-		t, err := time.Parse(time.RFC3339, *req.DueDate)
-		if err == nil {
-			dueDate = &t
+		t, err := time.Parse("2006-01-02", *req.DueDate)
+		if err != nil {
+			return web.JSONError(c, http.StatusBadRequest, "invalid due_date format, expected YYYY-MM-DD")
 		}
+		dueDate = &t
 	}
 
-	task, err := h.svc.UpdateTask(c.Request().Context(), userID, id, req.Title, req.Status, dueDate, req.DueDate == nil && req.ClearDueDate, req.Recurrence, req.Recurrence == nil && req.ClearRecurrence, req.Position)
+	task, err := h.svc.UpdateTask(c.Request().Context(), userID, id, req.Title, req.Status, dueDate, req.ClearDueDate, req.Recurrence, req.ClearRecurrence, req.Position)
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "task not found")

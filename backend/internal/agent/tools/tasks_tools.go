@@ -138,14 +138,16 @@ func (t *UpdateTaskTool) Description() string {
 	return "Update a task's title, due_date, or recurrence"
 }
 func (t *UpdateTaskTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"task_id":{"type":"string"},"title":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date"},"recurrence":{"type":"string","enum":["daily","weekdays","weekly","monthly"]}},"required":["task_id"]}`
+	return `{"type":"object","properties":{"task_id":{"type":"string"},"title":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date, omit to leave unchanged"},"clear_due_date":{"type":"boolean","description":"Set to true to remove the due date"},"recurrence":{"type":"string","enum":["daily","weekdays","weekly","monthly"]},"clear_recurrence":{"type":"boolean","description":"Set to true to remove the recurrence"}},"required":["task_id"]}`
 }
 func (t *UpdateTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
-		TaskID     string  `json:"task_id"`
-		Title      *string `json:"title"`
-		DueDate    *string `json:"due_date"`
-		Recurrence *string `json:"recurrence"`
+		TaskID          string  `json:"task_id"`
+		Title           *string `json:"title"`
+		DueDate         *string `json:"due_date"`
+		ClearDueDate    bool    `json:"clear_due_date"`
+		Recurrence      *string `json:"recurrence"`
+		ClearRecurrence bool    `json:"clear_recurrence"`
 	}](argsJSON)
 	if err != nil {
 		return "", err
@@ -162,7 +164,7 @@ func (t *UpdateTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJS
 		}
 		dueDateTime = &t
 	}
-	updated, err := t.tasksSvc.UpdateTask(ctx, userID, tid, args.Title, nil, dueDateTime, args.DueDate == nil, args.Recurrence, args.Recurrence == nil, nil)
+	updated, err := t.tasksSvc.UpdateTask(ctx, userID, tid, args.Title, nil, dueDateTime, args.ClearDueDate, args.Recurrence, args.ClearRecurrence, nil)
 	if err != nil {
 		return "", err
 	}
