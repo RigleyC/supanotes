@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/database/database.dart';
 import '../../../core/utils/date_time_extensions.dart';
+import '../domain/task_date_filter.dart';
 import '../domain/task_model.dart';
 import '../domain/task_recurrence.dart';
 import 'local/tasks_local_repository.dart';
@@ -56,11 +57,10 @@ class TasksRepository implements ITasksRepository {
   @override
   Stream<List<TaskModel>> watchOverdueTasks() {
     return _local.watchOpenTasks().map((rows) {
-      return rows
-          .where((t) => t.dueDate != null && !t.dueDate!.isSameDayAs(DateTime.now()))
-          .map(TaskModel.fromData)
-          .toList()
-        ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
+      return TaskDateFilter.overdue(
+        rows.map(TaskModel.fromData).toList(),
+        today: DateTime.now().startOfDay,
+      );
     });
   }
 
@@ -68,11 +68,10 @@ class TasksRepository implements ITasksRepository {
   @override
   Stream<List<TaskModel>> watchTodayDueTasks() {
     return _local.watchOpenTasks().map((rows) {
-      return rows
-          .where((t) => t.dueDate != null && t.dueDate!.isSameDayAs(DateTime.now()))
-          .map(TaskModel.fromData)
-          .toList()
-        ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
+      return TaskDateFilter.today(
+        rows.map(TaskModel.fromData).toList(),
+        today: DateTime.now().startOfDay,
+      );
     });
   }
 
@@ -81,11 +80,7 @@ class TasksRepository implements ITasksRepository {
   @override
   Stream<List<TaskModel>> watchUndatedOpenTasks() {
     return _local.watchOpenTasks().map((rows) {
-      return rows
-          .where((t) => t.dueDate == null)
-          .map(TaskModel.fromData)
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return TaskDateFilter.undated(rows.map(TaskModel.fromData).toList());
     });
   }
 
