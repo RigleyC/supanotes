@@ -43,7 +43,6 @@ func NewContextBuilder(q sqlcgen.Querier, tasksSvc *tasks.Service, memoriesRepo 
 func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UUID, query string) (string, error) {
 	var (
 		soul        sqlcgen.Soul
-		recentMsgs  []sqlcgen.Message
 		todayTasks  []sqlcgen.Task
 		recentNotes []sqlcgen.Note
 	)
@@ -55,20 +54,6 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		soul, err = cb.q.GetSoul(gCtx, userID)
 		if err != nil {
 			return fmt.Errorf("get soul: %w", err)
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		var err error
-		recentMsgs, err = cb.q.GetMessages(gCtx, sqlcgen.GetMessagesParams{
-			UserID:    userID,
-			SessionID: sessionID,
-			Limit:     10,
-			Offset:    0,
-		})
-		if err != nil {
-			return fmt.Errorf("get recent msgs: %w", err)
 		}
 		return nil
 	})
@@ -147,13 +132,7 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 
 CURRENT DATE & TIME:
 %s
-
-RECENT MESSAGES HISTORY (Up to 10):
-`, soul.Personality, now), MaxTier0Tokens+MaxTier1Tokens))
-
-	for _, m := range recentMsgs {
-		b.WriteString(fmt.Sprintf("[%s]: %s\n", m.Role, m.Content))
-	}
+`, soul.Personality, now), MaxTier0Tokens))
 
 	tier2 := &strings.Builder{}
 	tier2.WriteString("\nTODAY/OVERDUE TASKS:\n")
