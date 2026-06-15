@@ -7,6 +7,7 @@
 .atom/
 .build/
 .buildlog/
+.worktrees/
 .history
 .svn/
 .swiftpm/
