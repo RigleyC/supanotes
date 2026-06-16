@@ -8,10 +8,16 @@ import '../../domain/task_recurrence.dart';
 import 'recurrence_picker.dart';
 
 class TaskMetadataBadges extends StatelessWidget {
-  const TaskMetadataBadges({super.key, this.dueDate, this.recurrence});
+  const TaskMetadataBadges({
+    super.key,
+    this.dueDate,
+    this.recurrence,
+    this.isCompleted = false,
+  });
 
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
+  final bool isCompleted;
 
   bool get _hasRecurrence => recurrence != null;
   bool get _hasDueDate => dueDate != null;
@@ -52,12 +58,19 @@ class TaskMetadataBadges extends StatelessWidget {
 
     if (date.isSameDayAs(today)) return 'Hoje';
     if (date.isBefore(today)) {
+      if (isCompleted) {
+        return DateFormat('d MMM').format(dueDate);
+      }
       return 'Atrasada \u00b7 ${DateFormat('d MMM').format(dueDate)}';
     }
     return DateFormat('d MMM').format(dueDate);
   }
 
   Color _dueDateColor(BuildContext context, DateTime dueDate) {
+    if (isCompleted) {
+      return Theme.of(context).colorScheme.onSurfaceVariant;
+    }
+
     final today = DateTime.now().startOfDay;
     final date = dueDate.startOfDay;
     

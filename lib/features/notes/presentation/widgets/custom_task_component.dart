@@ -209,6 +209,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                     TaskMetadataBadges(
                       dueDate: widget.taskMetadata?.dueDate,
                       recurrence: widget.taskMetadata?.recurrence,
+                      isCompleted: widget.viewModel.isComplete,
                     ),
                   ],
                 ],
