@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_exceptions.dart';
 import '../../../../core/di/providers.dart';
+import '../domain/share_model.dart';
 
 final sharesRepositoryProvider = Provider.autoDispose<SharesRepository>(
   (ref) => SharesRepository(ref.watch(apiClientProvider)),
@@ -28,6 +29,24 @@ class SharesRepository {
         'email': email,
         'permission': permission,
       });
+    } on DioException catch (e) {
+      throw fromDioError(e);
+    }
+  }
+
+  Future<List<ShareModel>> listShares({required String noteId}) async {
+    try {
+      final response = await _api.get('/notes/$noteId/shares');
+      final data = response.data as List;
+      return data.map((j) => ShareModel.fromJson(j as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw fromDioError(e);
+    }
+  }
+
+  Future<void> deleteShare({required String noteId, required String userId}) async {
+    try {
+      await _api.delete('/notes/$noteId/shares/$userId');
     } on DioException catch (e) {
       throw fromDioError(e);
     }

@@ -20,4 +20,11 @@ class NoteStrings {
   static const String addLabel = 'Adicionar';
   static const String shareSuccess = 'Nota compartilhada com sucesso';
   static const String shareErrorEmptyEmail = 'Informe um e-mail';
+
+  static const String sharesTitle = 'Compartilhamentos';
+  static const String noShares = 'Nenhum compartilhamento';
+  static const String revokeLabel = 'Remover';
+  static const String revokeConfirmTitle = 'Remover compartilhamento?';
+  static const String revokeConfirmMessage = 'Esta pessoa não verá mais esta nota.';
+  static const String revokeSuccess = 'Compartilhamento removido';
 }
