@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/task_entry.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
+import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 
@@ -34,6 +36,8 @@ class _FakeNotesRepository implements INotesRepository {
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
+
+class _MockTasksRepository extends Mock implements ITasksRepository {}
 
 void main() {
   testWidgets('initialized editor stays visible during stream refresh', skip: true, (
@@ -147,5 +151,139 @@ void main() {
 
     expect(androidScope.controller.controlsColor, primary);
     expect(iosScope.controller.handleColor, primary);
+  });
+
+  testWidgets('tapping a task checkbox calls completeTask on the repository', (
+    tester,
+  ) async {
+    final streamController = StreamController<NoteModel?>();
+    addTearDown(streamController.close);
+
+    final mockTasksRepo = _MockTasksRepository();
+    when(() => mockTasksRepo.watchByNote(any())).thenAnswer(
+      (_) => Stream.value([
+        TaskModel(
+          id: 'task-1',
+          userId: 'user-1',
+          noteId: 'note-1',
+          title: 'buy milk',
+          status: 'open',
+          position: 0,
+          dueDate: DateTime.now().add(const Duration(days: 1)),
+          completedAt: null,
+          recurrence: null,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ]),
+    );
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async {});
+    when(() => mockTasksRepo.reopenTask(any())).thenAnswer((_) async {});
+
+    const noteContent = '# Test note\n\n- [ ] buy milk <!-- task:task-1 -->\n';
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          notesRepositoryProvider.overrideWithValue(
+            _FakeNotesRepository(streamController),
+          ),
+          tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
+        ],
+        child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
+      ),
+    );
+
+    streamController.add(
+      NoteModel(
+        id: 'note-1',
+        userId: 'u-1',
+        title: 'Test note',
+        excerpt: null,
+        content: noteContent,
+        favorite: false,
+        archived: false,
+        isInbox: false,
+        contextId: null,
+        createdAt: DateTime(2026, 6, 11),
+        updatedAt: DateTime(2026, 6, 11),
+        hideCompleted: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final checkbox = find.byType(AnimatedTaskCheckbox);
+    expect(checkbox, findsOneWidget);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+
+    verify(() => mockTasksRepo.completeTask('task-1')).called(1);
+  });
+
+  testWidgets('un-tapping a completed task checkbox calls reopenTask on the repository', (
+    tester,
+  ) async {
+    final streamController = StreamController<NoteModel?>();
+    addTearDown(streamController.close);
+
+    final mockTasksRepo = _MockTasksRepository();
+    when(() => mockTasksRepo.watchByNote(any())).thenAnswer(
+      (_) => Stream.value([
+        TaskModel(
+          id: 'task-1',
+          userId: 'user-1',
+          noteId: 'note-1',
+          title: 'buy milk',
+          status: 'done',
+          position: 0,
+          dueDate: DateTime.now().add(const Duration(days: 1)),
+          completedAt: DateTime.now(),
+          recurrence: null,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ]),
+    );
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async {});
+    when(() => mockTasksRepo.reopenTask(any())).thenAnswer((_) async {});
+
+    const noteContent = '# Test note\n\n- [x] buy milk <!-- task:task-1 -->\n';
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          notesRepositoryProvider.overrideWithValue(
+            _FakeNotesRepository(streamController),
+          ),
+          tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
+        ],
+        child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
+      ),
+    );
+
+    streamController.add(
+      NoteModel(
+        id: 'note-1',
+        userId: 'u-1',
+        title: 'Test note',
+        excerpt: null,
+        content: noteContent,
+        favorite: false,
+        archived: false,
+        isInbox: false,
+        contextId: null,
+        createdAt: DateTime(2026, 6, 11),
+        updatedAt: DateTime(2026, 6, 11),
+        hideCompleted: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final checkbox = find.byType(AnimatedTaskCheckbox);
+    expect(checkbox, findsOneWidget);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+
+    verify(() => mockTasksRepo.reopenTask('task-1')).called(1);
   });
 }
