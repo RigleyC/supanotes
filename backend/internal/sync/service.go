@@ -23,13 +23,13 @@ import (
 //     client stamps user_id locally with the currently authenticated
 //     user because the table itself has no user_id column.
 type SyncPayload struct {
-	Notes           []sqlcgen.Note           `json:"notes"`
-	Tasks           []SyncTask               `json:"tasks"`
-	Contexts        []sqlcgen.Context        `json:"contexts"`
-	Tags            []sqlcgen.Tag            `json:"tags"`
-	TaskCompletions []sqlcgen.TaskCompletion `json:"task_completions"`
-	NoteTags        []sqlcgen.NoteTag        `json:"note_tags"`
-	NoteLinks       []sqlcgen.NoteLink       `json:"note_links"`
+	Notes           []sqlcgen.GetSyncNotesRow   `json:"notes"`
+	Tasks           []SyncTask                  `json:"tasks"`
+	Contexts        []sqlcgen.Context           `json:"contexts"`
+	Tags            []sqlcgen.Tag               `json:"tags"`
+	TaskCompletions []sqlcgen.TaskCompletion    `json:"task_completions"`
+	NoteTags        []sqlcgen.NoteTag           `json:"note_tags"`
+	NoteLinks       []sqlcgen.NoteLink          `json:"note_links"`
 }
 
 type Service interface {
@@ -57,7 +57,7 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		return nil, err
 	}
 	if notes == nil {
-		notes = make([]sqlcgen.Note, 0)
+		notes = make([]sqlcgen.GetSyncNotesRow, 0)
 	}
 
 	tasks, err := s.repo.GetSyncTasks(ctx, userID, lastSyncedAt, limit)
@@ -134,7 +134,7 @@ func sanitizeTaskStatus(status string) string {
 	}
 }
 
-func isEmptyIncomingRegularNote(n sqlcgen.Note) bool {
+func isEmptyIncomingRegularNote(n sqlcgen.GetSyncNotesRow) bool {
 	return !n.IsInbox &&
 		!n.DeletedAt.Valid &&
 		(!n.Title.Valid || strings.TrimSpace(n.Title.String) == "") &&
@@ -159,6 +159,17 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		if isEmptyIncomingRegularNote(n) {
 			return ErrEmptyNote
 		}
+
+		if n.UserID != userID {
+			share, err := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+				NoteID: n.ID,
+				UserID: userID,
+			})
+			if err != nil || share.Permission != "edit" {
+				return ErrSyncConflict
+			}
+		}
+
 		embStatus := n.EmbeddingStatus
 		if embStatus == "" {
 			embStatus = "pending"

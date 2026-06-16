@@ -110,6 +110,9 @@ func (s *stubQuerier) CreateNote(ctx context.Context, arg sqlcgen.CreateNotePara
 	}
 	panic("unimplemented")
 }
+func (s *stubQuerier) CreateNoteShare(_ context.Context, _ sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
 func (s *stubQuerier) CreateRefreshToken(ctx context.Context, arg sqlcgen.CreateRefreshTokenParams) (sqlcgen.RefreshToken, error) {
 	panic("unimplemented")
 }
@@ -142,6 +145,9 @@ func (s *stubQuerier) DeleteDeviceToken(ctx context.Context, arg sqlcgen.DeleteD
 }
 func (s *stubQuerier) DeleteMemory(ctx context.Context, arg sqlcgen.DeleteMemoryParams) error {
 	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error {
+	return nil
 }
 func (s *stubQuerier) DeleteNote(ctx context.Context, arg sqlcgen.DeleteNoteParams) error {
 	panic("unimplemented")
@@ -179,6 +185,12 @@ func (s *stubQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesPa
 func (s *stubQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
+func (s *stubQuerier) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
+	return nil, nil
+}
 func (s *stubQuerier) GetRefreshToken(ctx context.Context, tokenHash string) (sqlcgen.RefreshToken, error) {
 	panic("unimplemented")
 }
@@ -194,7 +206,7 @@ func (s *stubQuerier) GetRoutinesByUser(ctx context.Context, userID pgtype.UUID)
 func (s *stubQuerier) GetSyncContexts(ctx context.Context, arg sqlcgen.GetSyncContextsParams) ([]sqlcgen.Context, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetSyncNotes(ctx context.Context, arg sqlcgen.GetSyncNotesParams) ([]sqlcgen.Note, error) {
+func (s *stubQuerier) GetSyncNotes(ctx context.Context, arg sqlcgen.GetSyncNotesParams) ([]sqlcgen.GetSyncNotesRow, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetSyncTags(ctx context.Context, arg sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {

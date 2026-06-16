@@ -115,6 +115,9 @@ func (s *stubQuerier) CreateNote(context.Context, sqlcgen.CreateNoteParams) (sql
 func (s *stubQuerier) CreateNoteLink(context.Context, sqlcgen.CreateNoteLinkParams) error {
 	panic("unimplemented")
 }
+func (s *stubQuerier) CreateNoteShare(_ context.Context, _ sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
 func (s *stubQuerier) CreateRefreshToken(context.Context, sqlcgen.CreateRefreshTokenParams) (sqlcgen.RefreshToken, error) {
 	panic("unimplemented")
 }
@@ -145,6 +148,7 @@ func (s *stubQuerier) DeleteDeviceToken(context.Context, sqlcgen.DeleteDeviceTok
 }
 func (s *stubQuerier) DeleteMemory(context.Context, sqlcgen.DeleteMemoryParams) error      { panic("unimplemented") }
 func (s *stubQuerier) DeleteNote(context.Context, sqlcgen.DeleteNoteParams) error           { panic("unimplemented") }
+func (s *stubQuerier) DeleteNoteShare(context.Context, sqlcgen.DeleteNoteShareParams) error { panic("unimplemented") }
 func (s *stubQuerier) DeleteSessionMessages(context.Context, sqlcgen.DeleteSessionMessagesParams) error {
 	panic("unimplemented")
 }
@@ -167,6 +171,12 @@ func (s *stubQuerier) GetMemories(context.Context, sqlcgen.GetMemoriesParams) ([
 func (s *stubQuerier) GetNoteByID(context.Context, sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) GetNoteShareForUser(_ context.Context, _ sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
+func (s *stubQuerier) GetNoteShares(_ context.Context, _ pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
+	return nil, nil
+}
 func (s *stubQuerier) GetNotes(context.Context, sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
 	panic("unimplemented")
 }
@@ -185,7 +195,7 @@ func (s *stubQuerier) GetRoutinesByUser(context.Context, pgtype.UUID) ([]sqlcgen
 func (s *stubQuerier) GetSyncContexts(context.Context, sqlcgen.GetSyncContextsParams) ([]sqlcgen.Context, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetSyncNotes(context.Context, sqlcgen.GetSyncNotesParams) ([]sqlcgen.Note, error) {
+func (s *stubQuerier) GetSyncNotes(context.Context, sqlcgen.GetSyncNotesParams) ([]sqlcgen.GetSyncNotesRow, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetSyncTags(context.Context, sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {

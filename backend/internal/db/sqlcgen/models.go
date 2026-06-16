@@ -91,6 +91,15 @@ type NoteLink struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type NoteShare struct {
+	ID         pgtype.UUID        `json:"id"`
+	NoteID     pgtype.UUID        `json:"note_id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	Permission string             `json:"permission"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+}
+
 type NoteTag struct {
 	NoteID pgtype.UUID `json:"note_id"`
 	TagID  pgtype.UUID `json:"tag_id"`

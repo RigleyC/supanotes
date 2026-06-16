@@ -9,7 +9,7 @@ import (
 )
 
 type Repository interface {
-	GetSyncNotes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Note, error)
+	GetSyncNotes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.GetSyncNotesRow, error)
 	UpsertNote(ctx context.Context, arg sqlcgen.UpsertNoteParams) (sqlcgen.Note, error)
 	GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error)
 	GetSyncTasks(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Task, error)
@@ -24,6 +24,7 @@ type Repository interface {
 	UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error
 	GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error)
 	UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error
+	GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error)
 	WithQuerier(q sqlcgen.Querier) Repository
 }
 
@@ -39,7 +40,7 @@ func (r *repo) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.No
 	return r.q.GetInboxNote(ctx, userID)
 }
 
-func (r *repo) GetSyncNotes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Note, error) {
+func (r *repo) GetSyncNotes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.GetSyncNotesRow, error) {
 	return r.q.GetSyncNotes(ctx, sqlcgen.GetSyncNotesParams{
 		UserID:       userID,
 		LastSyncedAt: lastSyncedAt,
@@ -113,6 +114,10 @@ func (r *repo) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlc
 
 func (r *repo) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
 	return r.q.UpsertNoteLink(ctx, arg)
+}
+
+func (r *repo) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	return r.q.GetNoteShareForUser(ctx, arg)
 }
 
 func (r *repo) WithQuerier(q sqlcgen.Querier) Repository {

@@ -55,7 +55,8 @@ const getSyncNoteLinks = `-- name: GetSyncNoteLinks :many
 SELECT nl.source_id, nl.target_id, nl.relation, nl.id, nl.created_at, nl.updated_at
 FROM note_links nl
 JOIN notes n ON n.id = nl.source_id
-WHERE n.user_id = $1
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
+WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
 `
 
 func (q *Queries) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]NoteLink, error) {
@@ -89,7 +90,8 @@ const getSyncNoteTags = `-- name: GetSyncNoteTags :many
 SELECT nt.note_id, nt.tag_id
 FROM note_tags nt
 JOIN notes n ON n.id = nt.note_id
-WHERE n.user_id = $1
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
+WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
 `
 
 func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]NoteTag, error) {
@@ -113,9 +115,16 @@ func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]No
 }
 
 const getSyncNotes = `-- name: GetSyncNotes :many
-SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
-WHERE user_id = $1 AND updated_at > $2
-ORDER BY updated_at ASC
+SELECT n.id, n.user_id, n.context_id, n.title, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed,
+  COALESCE(ns.permission, '')::text AS shared_permission,
+  COALESCE(u.email, '')::text AS shared_by_email,
+  COALESCE(u.name, '')::text AS shared_by_name
+FROM notes n
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
+LEFT JOIN users u ON u.id = n.user_id
+WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
+  AND n.updated_at > $2
+ORDER BY n.updated_at ASC
 LIMIT $3
 `
 
@@ -125,15 +134,36 @@ type GetSyncNotesParams struct {
 	Limit        int32              `json:"limit"`
 }
 
-func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]Note, error) {
+type GetSyncNotesRow struct {
+	ID               pgtype.UUID        `json:"id"`
+	UserID           pgtype.UUID        `json:"user_id"`
+	ContextID        pgtype.UUID        `json:"context_id"`
+	Title            pgtype.Text        `json:"title"`
+	Content          string             `json:"content"`
+	Excerpt          pgtype.Text        `json:"excerpt"`
+	IsInbox          bool               `json:"is_inbox"`
+	Favorite         bool               `json:"favorite"`
+	Archived         bool               `json:"archived"`
+	SearchVector     pgtype.Text        `json:"search_vector"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	EmbeddingStatus  string             `json:"embedding_status"`
+	HideCompleted    bool               `json:"hide_completed"`
+	SharedPermission string             `json:"shared_permission"`
+	SharedByEmail    string             `json:"shared_by_email"`
+	SharedByName     string             `json:"shared_by_name"`
+}
+
+func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]GetSyncNotesRow, error) {
 	rows, err := q.db.Query(ctx, getSyncNotes, arg.UserID, arg.LastSyncedAt, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Note
+	var items []GetSyncNotesRow
 	for rows.Next() {
-		var i Note
+		var i GetSyncNotesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -150,6 +180,9 @@ func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]N
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
 			&i.HideCompleted,
+			&i.SharedPermission,
+			&i.SharedByEmail,
+			&i.SharedByName,
 		); err != nil {
 			return nil, err
 		}
@@ -204,7 +237,9 @@ const getSyncTaskCompletions = `-- name: GetSyncTaskCompletions :many
 SELECT tc.id, tc.task_id, tc.completed_at, tc.due_date
 FROM task_completions tc
 JOIN tasks t ON t.id = tc.task_id
-WHERE t.user_id = $1
+JOIN notes n ON n.id = t.note_id
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
+WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
   AND tc.completed_at > $2
 ORDER BY tc.completed_at ASC
 LIMIT $3
@@ -216,12 +251,6 @@ type GetSyncTaskCompletionsParams struct {
 	Limit        int32              `json:"limit"`
 }
 
-// Returns completion rows belonging to a user's tasks whose
-// `completed_at` is newer than the cursor. The table has no
-// `updated_at`, so we use `completed_at` as the pull cursor —
-// completions are append-only, so any new completion is guaranteed
-// to have a fresh timestamp. The join through `tasks` enforces the
-// per-user scope since `task_completions` itself has no `user_id`.
 func (q *Queries) GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error) {
 	rows, err := q.db.Query(ctx, getSyncTaskCompletions, arg.UserID, arg.LastSyncedAt, arg.Limit)
 	if err != nil {
@@ -248,9 +277,13 @@ func (q *Queries) GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCom
 }
 
 const getSyncTasks = `-- name: GetSyncTasks :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
-WHERE user_id = $1 AND updated_at > $2
-ORDER BY updated_at ASC
+SELECT t.id, t.note_id, t.user_id, t.title, t.status, t.due_date, t.recurrence, t.position, t.created_at, t.updated_at, t.deleted_at, t.completed_at
+FROM tasks t
+JOIN notes n ON n.id = t.note_id
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
+WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
+  AND t.updated_at > $2
+ORDER BY t.updated_at ASC
 LIMIT $3
 `
 
@@ -603,9 +636,6 @@ type UpsertTaskCompletionParams struct {
 	UserID      pgtype.UUID        `json:"user_id"`
 }
 
-// Inserts a completion row only if the parent task belongs to the user
-// (the SELECT returns 0 rows otherwise, making the INSERT a no-op).
-// Completions are append-only history; existing rows are never updated.
 func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error {
 	_, err := q.db.Exec(ctx, upsertTaskCompletion,
 		arg.ID,

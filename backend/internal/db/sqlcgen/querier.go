@@ -25,6 +25,7 @@ type Querier interface {
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error)
 	CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) error
+	CreateNoteShare(ctx context.Context, arg CreateNoteShareParams) (NoteShare, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRoutine(ctx context.Context, arg CreateRoutineParams) (Routine, error)
 	CreateRoutineLog(ctx context.Context, arg CreateRoutineLogParams) (RoutineLog, error)
@@ -37,6 +38,7 @@ type Querier interface {
 	DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error
 	DeleteMemory(ctx context.Context, arg DeleteMemoryParams) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
+	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
 	DeleteSessionMessages(ctx context.Context, arg DeleteSessionMessagesParams) error
 	DeleteTag(ctx context.Context, arg DeleteTagParams) error
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
@@ -48,6 +50,8 @@ type Querier interface {
 	GetMemories(ctx context.Context, arg GetMemoriesParams) ([]Memory, error)
 	GetMessages(ctx context.Context, arg GetMessagesParams) ([]Message, error)
 	GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (Note, error)
+	GetNoteShareForUser(ctx context.Context, arg GetNoteShareForUserParams) (NoteShare, error)
+	GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]GetNoteSharesRow, error)
 	GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Note, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
@@ -58,14 +62,8 @@ type Querier interface {
 	GetSyncContexts(ctx context.Context, arg GetSyncContextsParams) ([]Context, error)
 	GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]NoteLink, error)
 	GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]NoteTag, error)
-	GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]Note, error)
+	GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]GetSyncNotesRow, error)
 	GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error)
-	// Returns completion rows belonging to a user's tasks whose
-	// `completed_at` is newer than the cursor. The table has no
-	// `updated_at`, so we use `completed_at` as the pull cursor —
-	// completions are append-only, so any new completion is guaranteed
-	// to have a fresh timestamp. The join through `tasks` enforces the
-	// per-user scope since `task_completions` itself has no `user_id`.
 	GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error)
 	GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]Task, error)
 	GetTags(ctx context.Context, userID pgtype.UUID) ([]Tag, error)
@@ -104,9 +102,6 @@ type Querier interface {
 	UpsertSoul(ctx context.Context, arg UpsertSoulParams) (Soul, error)
 	UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, error)
 	UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, error)
-	// Inserts a completion row only if the parent task belongs to the user
-	// (the SELECT returns 0 rows otherwise, making the INSERT a no-op).
-	// Completions are append-only history; existing rows are never updated.
 	UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error
 }
 
