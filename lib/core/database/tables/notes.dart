@@ -21,6 +21,10 @@ class Notes extends Table {
       boolean().withDefault(const Constant(false))();
   BoolColumn get hideCompleted => boolean().withDefault(const Constant(false))();
 
+  TextColumn get permission => text().nullable()();
+  TextColumn get sharedByEmail => text().nullable()();
+  TextColumn get sharedByName => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
