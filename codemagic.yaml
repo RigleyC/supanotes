@@ -22,6 +22,9 @@ workflows:
       - name: Decode GoogleService-Info.plist
         script: |
           echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+      - name: Flutter pub get
+        script: |
+          flutter pub get
       - name: Install pods
         script: |
           cd ios && pod install && cd ..
@@ -63,6 +66,9 @@ workflows:
       - name: Decode GoogleService-Info.plist
         script: |
           echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+      - name: Flutter pub get
+        script: |
+          flutter pub get
       - name: Install pods
         script: |
           cd ios && pod install && cd ..
