@@ -28,7 +28,7 @@ class CustomDividerComponentBuilder implements ComponentBuilder {
     if (componentViewModel is! CustomDividerComponentViewModel) return null;
 
     return CustomDividerComponent(
-      key: componentContext.componentKey,
+      componentKey: componentContext.componentKey,
       dividerIndex: componentViewModel.dividerIndex,
       selection: componentViewModel.selection?.nodeSelection as UpstreamDownstreamNodeSelection?,
       selectionColor: componentViewModel.selectionColor,
@@ -80,6 +80,7 @@ class CustomDividerComponentViewModel extends SingleColumnLayoutComponentViewMod
 class CustomDividerComponent extends StatelessWidget {
   const CustomDividerComponent({
     super.key,
+    required this.componentKey,
     this.dividerIndex,
     this.selectionColor = Colors.blue,
     this.selection,
@@ -87,6 +88,7 @@ class CustomDividerComponent extends StatelessWidget {
     this.showCaret = false,
     this.opacity = 1.0,
   });
+  final GlobalKey componentKey;
   final int? dividerIndex;
   final Color selectionColor;
   final UpstreamDownstreamNodeSelection? selection;
@@ -103,19 +105,22 @@ class CustomDividerComponent extends StatelessWidget {
     final padIndex = safeIndex.toString().padLeft(2, '0');
     final assetPath = 'assets/dividers/divider_$padIndex.svg';
 
-    return SelectableBox(
-      selection: selection,
-      selectionColor: selectionColor,
-      child: Opacity(
-        opacity: opacity,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: SizedBox(
-            height: 24,
-            width: double.infinity,
-            child: SvgPicture.asset(
-              assetPath,
-              fit: BoxFit.fitWidth,
+    return IgnorePointer(
+      child: SelectableBox(
+        selection: selection,
+        selectionColor: selectionColor,
+        child: BoxComponent(
+          key: componentKey,
+          opacity: opacity,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: SizedBox(
+              height: 24,
+              width: double.infinity,
+              child: SvgPicture.asset(
+                assetPath,
+                fit: BoxFit.fitWidth,
+              ),
             ),
           ),
         ),

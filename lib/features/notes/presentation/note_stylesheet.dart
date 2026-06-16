@@ -41,7 +41,7 @@ Stylesheet noteStylesheet(BuildContext context) {
       StyleRule(
         const BlockSelector('header2'),
         (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 24),
+          Styles.padding: const CascadingPadding.only(top: 0),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: 24,
@@ -62,23 +62,33 @@ Stylesheet noteStylesheet(BuildContext context) {
       ),
       StyleRule(
         const BlockSelector('paragraph'),
-        (doc, docNode) => {Styles.padding: const CascadingPadding.only(top: 12)},
+        (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(top: 12),
+        },
       ),
       StyleRule(
         const BlockSelector('paragraph').after('header1'),
-        (doc, docNode) => {Styles.padding: const CascadingPadding.only(top: 16)},
+        (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(top: 16),
+        },
       ),
       StyleRule(
         const BlockSelector('paragraph').after('header2'),
-        (doc, docNode) => {Styles.padding: const CascadingPadding.only(top: 16)},
+        (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(top: 16),
+        },
       ),
       StyleRule(
         const BlockSelector('paragraph').after('header3'),
-        (doc, docNode) => {Styles.padding: const CascadingPadding.only(top: 16)},
+        (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(top: 16),
+        },
       ),
       StyleRule(
         const BlockSelector('listItem'),
-        (doc, docNode) => {Styles.padding: const CascadingPadding.only(top: 12)},
+        (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(top: 12),
+        },
       ),
       StyleRule(
         const BlockSelector('task'),
