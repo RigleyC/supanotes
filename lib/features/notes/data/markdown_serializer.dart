@@ -31,7 +31,41 @@ MutableDocument parseNoteToMarkdown(String markdown) {
     ));
   }
 
+  _enforceFirstNodeIsHeader1(nodes);
+
   return MutableDocument(nodes: nodes);
+}
+
+void _enforceFirstNodeIsHeader1(List<DocumentNode> nodes) {
+  if (nodes.isEmpty) {
+    nodes.add(ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(''),
+      metadata: const {'blockType': header1Attribution},
+    ));
+    return;
+  }
+
+  final firstNode = nodes.first;
+  if (firstNode is ParagraphNode) {
+    final blockType = firstNode.getMetadataValue('blockType');
+    if (blockType == header1Attribution) return;
+    nodes[0] = ParagraphNode(
+      id: firstNode.id,
+      text: firstNode.text,
+      metadata: const {'blockType': header1Attribution},
+    );
+    return;
+  }
+
+  nodes.insert(
+    0,
+    ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(''),
+      metadata: const {'blockType': header1Attribution},
+    ),
+  );
 }
 
 String serializeNoteToMarkdown(MutableDocument doc) {
