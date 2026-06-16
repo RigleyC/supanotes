@@ -43,6 +43,24 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
         _editor.execute([
           ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),
         ]);
+
+        if (isComplete) {
+          onTaskComplete?.call(node.id);
+        } else {
+          onTaskReopen?.call(node.id);
+        }
+
+        final taskMeta = taskMetadataById[node.id];
+        if (isComplete && taskMeta?.recurrence != null) {
+          Future.delayed(const Duration(milliseconds: 400), () {
+            final exists = document.getNodeById(node.id) != null;
+            if (exists) {
+              _editor.execute([
+                ChangeTaskCompletionRequest(nodeId: node.id, isComplete: false),
+              ]);
+            }
+          });
+        }
       },
       text: node.text,
       textDirection: getParagraphDirection(node.text.toPlainText()),
