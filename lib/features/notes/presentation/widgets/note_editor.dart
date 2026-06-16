@@ -67,17 +67,8 @@ class _NoteEditorState extends State<NoteEditor> {
           : widget.snapshotSave,
       emptyNoteExit: widget.isReadOnly ? null : widget.emptyNoteExit,
     );
-    String content = widget.content;
-    if (widget.title != null && widget.title!.isNotEmpty) {
-      final title = widget.title!.trim();
-      final startsWithH1Title = content.trimLeft().startsWith('# $title') ||
-          content.trimLeft().startsWith('#  $title');
-      if (!startsWithH1Title) {
-        content = '# $title\n\n$content';
-      }
-    }
     _controller!.bind(widget.noteId);
-    _controller!.init(content: content);
+    _controller!.init(content: widget.content);
     if (!widget.isReadOnly) {
       _controller!.document?.addListener(_onDocumentChanged);
     }
@@ -163,6 +154,11 @@ class _NoteEditorState extends State<NoteEditor> {
                       focusNode: widget.isReadOnly ? null : controller.focusNode,
                       documentLayoutKey: _docLayoutKey,
                       stylesheet: noteStylesheet(context),
+                      selectionStyle: SelectionStyles(
+                        selectionColor:
+                            Theme.of(context).textSelectionTheme.selectionColor ??
+                                Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                      ),
                       keyboardActions: buildRichKeyboardActions(
                         baseActions:
                             defaultTargetPlatform == TargetPlatform.iOS ||

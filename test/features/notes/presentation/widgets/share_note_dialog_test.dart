@@ -105,7 +105,7 @@ void main() {
       expect(fakeRepo.shareCalls[0].permission, 'view');
     });
 
-    testWidgets('shows loading indicator during submission', (tester) async {
+    testWidgets('shows loading indicator during submission and clears on success', (tester) async {
       final completer = Completer<void>();
       fakeRepo.shareNoteFunc = () => completer.future;
 
@@ -120,10 +120,14 @@ void main() {
       completer.complete();
       await tester.pumpAndSettle();
 
-      expect(find.byType(ShareNoteDialog), findsNothing);
+      expect(find.byType(ShareNoteDialog), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        isEmpty,
+      );
     });
 
-    testWidgets('closes dialog on success', (tester) async {
+    testWidgets('stays open on success and clears email', (tester) async {
       fakeRepo.shareNoteFunc = () async {};
 
       await openDialog(tester);
@@ -132,7 +136,11 @@ void main() {
       await tester.tap(find.text(NoteStrings.addLabel));
       await tester.pumpAndSettle();
 
-      expect(find.byType(ShareNoteDialog), findsNothing);
+      expect(find.byType(ShareNoteDialog), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        isEmpty,
+      );
     });
 
     testWidgets('shows error message on failure', (tester) async {
