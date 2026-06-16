@@ -237,10 +237,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			return err
 		}
 
-		if !editableNotes[t.NoteID] {
-			return ErrSyncConflict
-		}
-
 		status := sanitizeTaskStatus(t.Status)
 
 		upsertUserID := userID

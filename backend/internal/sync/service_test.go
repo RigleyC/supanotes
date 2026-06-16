@@ -171,6 +171,32 @@ func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
 	}
 }
 
+func TestSyncServicePushAllowsTaskSyncWithoutParentNoteInPayload(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo, nil)
+
+	userID := testUserID()
+	noteID := pgtype.UUID{Bytes: [16]byte{2}, Valid: true}
+
+	payload := &SyncPayload{
+		Notes: []sqlcgen.GetSyncNotesRow{},
+		Tasks: []SyncTask{
+			{
+				ID:     pgtype.UUID{Bytes: [16]byte{3}, Valid: true},
+				UserID: userID,
+				NoteID: noteID,
+				Title:  "Orphaned task",
+				Status: "open",
+			},
+		},
+	}
+
+	err := svc.Push(context.Background(), userID, payload)
+	if err != nil {
+		t.Fatalf("expected no error for task without parent note in payload, got %v", err)
+	}
+}
+
 func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
 	repo := &mockRepository{upsertNoteErr: pgx.ErrNoRows}
 	svc := NewService(repo, nil)
