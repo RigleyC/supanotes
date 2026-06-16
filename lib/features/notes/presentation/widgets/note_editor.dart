@@ -59,17 +59,8 @@ class _NoteEditorState extends State<NoteEditor> {
       snapshotSave: widget.snapshotSave,
       emptyNoteExit: widget.emptyNoteExit,
     );
-    String content = widget.content;
-    if (widget.title != null && widget.title!.isNotEmpty) {
-      final title = widget.title!.trim();
-      final startsWithH1Title = content.trimLeft().startsWith('# $title') ||
-          content.trimLeft().startsWith('#  $title');
-      if (!startsWithH1Title) {
-        content = '# $title\n\n$content';
-      }
-    }
     _controller!.bind(widget.noteId);
-    _controller!.init(content: content);
+    _controller!.init(content: widget.content);
     _controller!.document?.addListener(_onDocumentChanged);
     _notifyContentChanged();
   }
