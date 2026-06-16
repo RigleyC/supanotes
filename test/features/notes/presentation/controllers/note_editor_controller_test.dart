@@ -50,4 +50,38 @@ void main() {
       expect(deletedNoteId, 'empty-note');
     });
   });
+
+  group('H1 coercion', () {
+    test('first node is coerced to header1 on init with plain text', () {
+      final controller = NoteEditorController(
+        snapshotSave: (noteId, title, markdown, tasks) async {},
+      );
+
+      controller.init(content: 'hello');
+      controller.bind('test-note');
+
+      final firstNode = controller.document!.first;
+      expect(firstNode, isA<ParagraphNode>());
+      expect(
+        (firstNode as ParagraphNode).getMetadataValue('blockType'),
+        header1Attribution,
+      );
+    });
+
+    test('first node is coerced to header1 on init from markdown', () {
+      final controller = NoteEditorController(
+        snapshotSave: (noteId, title, markdown, tasks) async {},
+      );
+
+      controller.init(content: '## hello\n\nworld');
+      controller.bind('test-note');
+
+      final firstNode = controller.document!.first;
+      expect(firstNode, isA<ParagraphNode>());
+      expect(
+        (firstNode as ParagraphNode).getMetadataValue('blockType'),
+        header1Attribution,
+      );
+    });
+  });
 }

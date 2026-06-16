@@ -78,13 +78,17 @@ class NoteEditorController {
     );
     focusNode = FocusNode();
     document!.addListener(_onDocumentChanged);
+    _ensureFirstNodeIsHeader1();
   }
 
   void bind(String noteId) {
     _noteId = noteId;
   }
 
-  void _onDocumentChanged(DocumentChangeLog _) => _scheduleSnapshotSave();
+  void _onDocumentChanged(DocumentChangeLog _) {
+    _ensureFirstNodeIsHeader1();
+    _scheduleSnapshotSave();
+  }
 
   void _scheduleSnapshotSave() {
     final doc = document;
@@ -94,6 +98,46 @@ class NoteEditorController {
       generation: generation,
       operation: _runSnapshotSave,
     );
+  }
+
+  /// Coerces the first node of the document to be a ParagraphNode with
+  /// header1Attribution. Called on init and on every document change.
+  void _ensureFirstNodeIsHeader1() {
+    final doc = document;
+    if (doc == null || doc.isEmpty) return;
+
+    final firstNode = doc.first;
+    if (firstNode is! ParagraphNode) {
+      _replaceFirstNodeWithHeader1();
+      return;
+    }
+    final blockType = firstNode.getMetadataValue('blockType') as Attribution?;
+    if (blockType != header1Attribution) {
+      editor?.execute([
+        ChangeParagraphBlockTypeRequest(
+          nodeId: firstNode.id,
+          blockType: header1Attribution,
+        ),
+      ]);
+    }
+  }
+
+  void _replaceFirstNodeWithHeader1() {
+    final doc = document;
+    final firstNode = doc?.first;
+    if (doc == null || firstNode == null) return;
+
+    final replacement = ParagraphNode(
+      id: firstNode.id,
+      text: firstNode is TextNode ? firstNode.text : AttributedText(''),
+      metadata: {'blockType': header1Attribution},
+    );
+    editor?.execute([
+      ReplaceNodeRequest(
+        existingNodeId: firstNode.id,
+        newNode: replacement,
+      ),
+    ]);
   }
 
   String _extractTitle(MutableDocument doc) {
