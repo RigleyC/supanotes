@@ -130,6 +130,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           },
           onTaskLongPress: (taskId, flushSnapshot) =>
               _openTaskActions(taskId, flushSnapshot),
+          onTaskComplete: (taskId) =>
+              ref.read(tasksRepositoryProvider).completeTask(taskId),
+          onTaskReopen: (taskId) =>
+              ref.read(tasksRepositoryProvider).reopenTask(taskId),
         ),
       ),
       floatingActionButton: _hasContent ? _buildOrganizeFab : null,

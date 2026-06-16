@@ -128,6 +128,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
           onTaskLongPress: (taskId, flushSnapshot) =>
               _openTaskActions(taskId, flushSnapshot),
+          onTaskComplete: (taskId) =>
+              ref.read(tasksRepositoryProvider).completeTask(taskId),
+          onTaskReopen: (taskId) =>
+              ref.read(tasksRepositoryProvider).reopenTask(taskId),
         ),
       ),
     );

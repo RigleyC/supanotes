@@ -127,6 +127,7 @@ class _MetaRow extends StatelessWidget {
     return TaskMetadataBadges(
       dueDate: task.dueDate,
       recurrence: task.recurrence,
+      isCompleted: task.isCompleted,
     );
   }
 }

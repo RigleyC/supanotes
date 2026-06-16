@@ -35,4 +35,17 @@ void main() {
     expect(find.byIcon(Icons.refresh), findsOneWidget);
     expect(find.text('Semanalmente'), findsOneWidget);
   });
+
+  testWidgets('does not show Atrasada for past due dates when completed', (
+    tester,
+  ) async {
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+
+    await tester.pumpWidget(
+      wrap(TaskMetadataBadges(dueDate: yesterday, isCompleted: true)),
+    );
+
+    expect(find.byIcon(Icons.event_outlined), findsOneWidget);
+    expect(find.textContaining('Atrasada'), findsNothing);
+  });
 }

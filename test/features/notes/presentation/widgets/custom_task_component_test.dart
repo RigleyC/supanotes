@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
 
 void main() {
@@ -156,5 +158,178 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('fires onTaskComplete when completing a recurring task', (
+    tester,
+  ) async {
+    final document = MutableDocument(
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Tarefa recorrente'),
+          isComplete: false,
+        ),
+      ],
+    );
+    final composer = MutableDocumentComposer();
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: composer,
+    );
+
+    String? capturedCompleteId;
+    String? capturedReopenId;
+    final now = DateTime.now();
+
+    await tester.pumpWidget(
+      wrap(
+        SuperEditor(
+          editor: editor,
+          componentBuilders: [
+            ...defaultComponentBuilders,
+            CustomTaskComponentBuilder(
+              editor,
+              taskMetadataById: {
+                'task-1': TaskModel(
+                  id: 'task-1',
+                  userId: '',
+                  noteId: '',
+                  title: 'Tarefa recorrente',
+                  status: 'open',
+                  position: 0,
+                  dueDate: now,
+                  completedAt: null,
+                  recurrence: TaskRecurrence.daily,
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              },
+              onTaskComplete: (id) async => capturedCompleteId = id,
+              onTaskReopen: (id) async => capturedReopenId = id,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(AnimatedTaskCheckbox));
+    await tester.pump();
+
+    expect(capturedCompleteId, equals('task-1'));
+    expect(capturedReopenId, isNull);
+
+    // Drain the pending reset timer
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
+  testWidgets('fires onTaskReopen when un-completing a task', (tester) async {
+    final document = MutableDocument(
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Tarefa concluída'),
+          isComplete: true,
+        ),
+      ],
+    );
+    final composer = MutableDocumentComposer();
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: composer,
+    );
+
+    String? capturedCompleteId;
+    String? capturedReopenId;
+
+    await tester.pumpWidget(
+      wrap(
+        SuperEditor(
+          editor: editor,
+          componentBuilders: [
+            ...defaultComponentBuilders,
+            CustomTaskComponentBuilder(
+              editor,
+              onTaskComplete: (id) async => capturedCompleteId = id,
+              onTaskReopen: (id) async => capturedReopenId = id,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(AnimatedTaskCheckbox));
+    await tester.pump();
+
+    expect(capturedReopenId, equals('task-1'));
+    expect(capturedCompleteId, isNull);
+  });
+
+  testWidgets('un-checks recurring task after 400ms delay', (tester) async {
+    final document = MutableDocument(
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Tarefa recorrente'),
+          isComplete: false,
+        ),
+      ],
+    );
+    final composer = MutableDocumentComposer();
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: composer,
+    );
+
+    final now = DateTime.now();
+
+    await tester.pumpWidget(
+      wrap(
+        SuperEditor(
+          editor: editor,
+          componentBuilders: [
+            ...defaultComponentBuilders,
+            CustomTaskComponentBuilder(
+              editor,
+              taskMetadataById: {
+                'task-1': TaskModel(
+                  id: 'task-1',
+                  userId: '',
+                  noteId: '',
+                  title: 'Tarefa recorrente',
+                  status: 'open',
+                  position: 0,
+                  dueDate: now,
+                  completedAt: null,
+                  recurrence: TaskRecurrence.daily,
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+
+    TaskNode taskNode() => document.first as TaskNode;
+    expect(taskNode().isComplete, isFalse);
+
+    await tester.tap(find.byType(AnimatedTaskCheckbox));
+    // First pump: process the tap event, setComplete runs synchronously
+    // up to the await, _editor.execute updates the document.
+    await tester.pump();
+
+    expect(taskNode().isComplete, isTrue);
+
+    // Second pump: process the microtask that continues setComplete,
+    // which creates the Future.delayed(400ms) timer.
+    await tester.pump();
+
+    // Third pump: advance clock by 400ms so the timer fires and
+    // the document is reset.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(taskNode().isComplete, isFalse);
   });
 }
