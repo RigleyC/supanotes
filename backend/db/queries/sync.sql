@@ -1,8 +1,8 @@
 -- name: GetSyncNotes :many
 SELECT n.*,
   COALESCE(ns.permission, '')::text AS shared_permission,
-  COALESCE(u.email, '')::text AS shared_by_email,
-  COALESCE(u.name, '')::text AS shared_by_name
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
 FROM notes n
 LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
 LEFT JOIN users u ON u.id = n.user_id

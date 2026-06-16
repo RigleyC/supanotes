@@ -117,8 +117,8 @@ func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]No
 const getSyncNotes = `-- name: GetSyncNotes :many
 SELECT n.id, n.user_id, n.context_id, n.title, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed,
   COALESCE(ns.permission, '')::text AS shared_permission,
-  COALESCE(u.email, '')::text AS shared_by_email,
-  COALESCE(u.name, '')::text AS shared_by_name
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
 FROM notes n
 LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
 LEFT JOIN users u ON u.id = n.user_id
