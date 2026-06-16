@@ -121,7 +121,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         child: NoteEditor(
           noteId: noteId,
           content: inbox.content,
-          title: inbox.title,
           taskMetadata: tasksMap,
           snapshotSave: (noteId, title, markdown, tasks) =>
               defaultSnapshotSave(repo, noteId, title, markdown, tasks),
