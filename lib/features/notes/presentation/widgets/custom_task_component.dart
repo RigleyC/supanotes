@@ -22,6 +22,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final ValueChanged<String>? onTaskLongPress;
   final Future<void> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
+  final Set<String> _pendingResetNodeIds = {};
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -52,7 +53,9 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
         final taskMeta = taskMetadataById[node.id];
         if (isComplete && taskMeta?.recurrence != null) {
+          _pendingResetNodeIds.add(node.id);
           Future.delayed(const Duration(milliseconds: 400), () {
+            if (!_pendingResetNodeIds.remove(node.id)) return;
             final exists = document.getNodeById(node.id) != null;
             if (exists) {
               _editor.execute([
@@ -60,6 +63,9 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
               ]);
             }
           });
+        } else if (!isComplete) {
+          // User reopened the task — cancel any pending reset
+          _pendingResetNodeIds.remove(node.id);
         }
       },
       text: node.text,
