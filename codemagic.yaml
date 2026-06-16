@@ -22,37 +22,16 @@ workflows:
       - name: Decode GoogleService-Info.plist
         script: |
           echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
-      - name: Flutter pub get
+      - name: Install pods
         script: |
-          flutter pub get
-      - name: Flutter build config-only
+          cd ios && pod install && cd ..
+      - name: Build unsigned iOS
         script: |
-          set +e
-          flutter build ios --config-only --no-codesign --dart-define=API_BASE_URL="$API_BASE_URL"
-          exit 0
-      - name: Build iOS project with xcodebuild
-        script: |
-          cd ios
-          xcodebuild -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath ../DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            DEVELOPMENT_TEAM="" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
-            FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS="--dart-define=API_BASE_URL=$API_BASE_URL" \
-            clean build
+          flutter build ios --no-codesign --dart-define=API_BASE_URL="$API_BASE_URL"
       - name: Package Unsigned IPA
         script: |
-          APP_PATH=$(find DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -1)
-          if [ -z "$APP_PATH" ]; then
-            echo "Error: Could not find .app"
-            exit 1
-          fi
           mkdir -p build/Payload
-          cp -R "$APP_PATH" build/Payload/
+          cp -R build/ios/iphoneos/Runner.app build/Payload/
           cd build
           zip -rq supanotes-unsigned.ipa Payload
           rm -rf Payload
@@ -84,9 +63,9 @@ workflows:
       - name: Decode GoogleService-Info.plist
         script: |
           echo "$GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
-      - name: Flutter pub get
+      - name: Install pods
         script: |
-          flutter pub get
+          cd ios && pod install && cd ..
       - name: Set up keychain
         script: |
           keychain initialize
