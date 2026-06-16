@@ -49,11 +49,11 @@ class TaskModel {
       title: d.title,
       status: d.status,
       position: d.position,
-      dueDate: d.dueDate,
-      completedAt: d.completedAt,
+      dueDate: d.dueDate?.toLocal(),
+      completedAt: d.completedAt?.toLocal(),
       recurrence: d.recurrence,
-      createdAt: d.createdAt,
-      updatedAt: d.updatedAt,
+      createdAt: d.createdAt.toLocal(),
+      updatedAt: d.updatedAt.toLocal(),
     );
   }
 
