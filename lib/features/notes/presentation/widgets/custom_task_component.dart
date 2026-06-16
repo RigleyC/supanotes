@@ -85,17 +85,15 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ) {
     if (componentViewModel is! TaskComponentViewModel) return null;
 
-    final taskMeta = componentViewModel is CustomTaskComponentViewModel
-        ? taskMetadataById[componentViewModel.nodeId]
-        : null;
+    final nodeId = componentViewModel.nodeId;
 
     return CustomTaskComponent(
       key: componentContext.componentKey,
       viewModel: componentViewModel,
-      taskMetadata: taskMeta ?? taskMetadataById[componentViewModel.nodeId],
+      taskMetadata: taskMetadataById[nodeId],
       onLongPress: onTaskLongPress == null
           ? null
-          : () => onTaskLongPress!(componentViewModel.nodeId),
+          : () => onTaskLongPress!(nodeId),
     );
   }
 }
