@@ -20,6 +20,7 @@ class NoteEditor extends StatefulWidget {
   final String? title;
   final Map<String, TaskModel> taskMetadata;
   final bool hideCompleted;
+  final bool isReadOnly;
   final SnapshotSave snapshotSave;
   final EmptyNoteExit? emptyNoteExit;
   final ValueChanged<bool>? onHasContentChanged;
@@ -35,6 +36,7 @@ class NoteEditor extends StatefulWidget {
     this.title,
     required this.taskMetadata,
     this.hideCompleted = false,
+    this.isReadOnly = false,
     required this.snapshotSave,
     this.emptyNoteExit,
     this.onHasContentChanged,
@@ -179,10 +181,11 @@ class _NoteEditorState extends State<NoteEditor> {
               ],
             ),
           ),
-          NoteToolbar(
-            editor: controller.editor!,
-            composer: controller.composer!,
-          ),
+          if (!widget.isReadOnly)
+            NoteToolbar(
+              editor: controller.editor!,
+              composer: controller.composer!,
+            ),
         ],
       ),
     );
