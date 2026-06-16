@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
@@ -26,7 +27,9 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     if (node is! TaskNode) return null;
     if (hideCompleted && node.isComplete) return null;
 
-    return TaskComponentViewModel(
+    final metadata = taskMetadataById[node.id];
+
+    return CustomTaskComponentViewModel(
       nodeId: node.id,
       createdAt: node.metadata[NodeMetadata.createdAt],
       padding: EdgeInsets.zero,
@@ -42,6 +45,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       textAlignment: TextAlign.left,
       textStyleBuilder: noStyleBuilder,
       selectionColor: const Color(0x00000000),
+      dueDate: metadata?.dueDate,
+      recurrence: metadata?.recurrence,
     );
   }
 
@@ -52,15 +57,51 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ) {
     if (componentViewModel is! TaskComponentViewModel) return null;
 
+    final taskMeta = componentViewModel is CustomTaskComponentViewModel
+        ? taskMetadataById[componentViewModel.nodeId]
+        : null;
+
     return CustomTaskComponent(
       key: componentContext.componentKey,
       viewModel: componentViewModel,
-      taskMetadata: taskMetadataById[componentViewModel.nodeId],
+      taskMetadata: taskMeta ?? taskMetadataById[componentViewModel.nodeId],
       onLongPress: onTaskLongPress == null
           ? null
           : () => onTaskLongPress!(componentViewModel.nodeId),
     );
   }
+}
+
+class CustomTaskComponentViewModel extends TaskComponentViewModel {
+  CustomTaskComponentViewModel({
+    required super.nodeId,
+    required super.createdAt,
+    required super.padding,
+    required super.indent,
+    required super.isComplete,
+    required super.setComplete,
+    required super.text,
+    required super.textDirection,
+    required super.textAlignment,
+    required super.textStyleBuilder,
+    required super.selectionColor,
+    this.dueDate,
+    this.recurrence,
+  });
+
+  final DateTime? dueDate;
+  final TaskRecurrence? recurrence;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! CustomTaskComponentViewModel) return false;
+    if (super == other) return false;
+    return dueDate == other.dueDate && recurrence == other.recurrence;
+  }
+
+  @override
+  int get hashCode => Object.hash(super.hashCode, dueDate, recurrence);
 }
 
 class CustomTaskComponent extends StatefulWidget {
