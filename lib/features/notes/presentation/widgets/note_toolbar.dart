@@ -38,6 +38,7 @@ class NoteToolbar extends StatelessWidget {
             ? editor.context.document.getNodeById(activeNodeId)
             : null;
         final isTask = activeNode is TaskNode;
+        final isOnFirstLine = _isOnFirstLine(selection);
 
         return Container(
           margin: const EdgeInsets.fromLTRB(8, 0, 8, 24),
@@ -71,7 +72,7 @@ class NoteToolbar extends StatelessWidget {
                     selection,
                     boldAttribution,
                   ),
-                  onPressed: () => _toggleInline(boldAttribution),
+                  onPressed: isOnFirstLine ? null : () => _toggleInline(boldAttribution),
                 ),
                 _ToolbarButton(
                   icon: Icons.format_italic,
@@ -80,7 +81,7 @@ class NoteToolbar extends StatelessWidget {
                     selection,
                     italicsAttribution,
                   ),
-                  onPressed: () => _toggleInline(italicsAttribution),
+                  onPressed: isOnFirstLine ? null : () => _toggleInline(italicsAttribution),
                 ),
                 _ToolbarButton(
                   icon: Icons.format_strikethrough,
@@ -89,36 +90,36 @@ class NoteToolbar extends StatelessWidget {
                     selection,
                     strikethroughAttribution,
                   ),
-                  onPressed: () => _toggleInline(strikethroughAttribution),
+                  onPressed: isOnFirstLine ? null : () => _toggleInline(strikethroughAttribution),
                 ),
                 const _ToolbarDivider(),
                 _LabeledToolbarButton(
                   label: 'H1',
                   isActive: blockType == header1Attribution,
-                  onPressed: () => _setBlockType(header1Attribution),
+                  onPressed: isOnFirstLine ? null : () => _setBlockType(header1Attribution),
                 ),
                 _LabeledToolbarButton(
                   label: 'H2',
                   isActive: blockType == header2Attribution,
-                  onPressed: () => _setBlockType(header2Attribution),
+                  onPressed: isOnFirstLine ? null : () => _setBlockType(header2Attribution),
                 ),
                 _LabeledToolbarButton(
                   label: 'H3',
                   isActive: blockType == header3Attribution,
-                  onPressed: () => _setBlockType(header3Attribution),
+                  onPressed: isOnFirstLine ? null : () => _setBlockType(header3Attribution),
                 ),
                 const _ToolbarDivider(),
                 _ToolbarButton(
                   icon: Icons.format_list_bulleted,
                   tooltip: 'Lista',
                   isActive: selectedListType == ListItemType.unordered,
-                  onPressed: () => _convertToListItem(ListItemType.unordered),
+                  onPressed: isOnFirstLine ? null : () => _convertToListItem(ListItemType.unordered),
                 ),
                 _ToolbarButton(
                   icon: Icons.format_list_numbered,
                   tooltip: 'Lista numerada',
                   isActive: selectedListType == ListItemType.ordered,
-                  onPressed: () => _convertToListItem(ListItemType.ordered),
+                  onPressed: isOnFirstLine ? null : () => _convertToListItem(ListItemType.ordered),
                 ),
                 // Indent/unindent: enabled whenever the current node is a list
                 // item. The actual indent cap is enforced by super_editor's
@@ -127,32 +128,32 @@ class NoteToolbar extends StatelessWidget {
                   icon: Icons.format_indent_increase,
                   tooltip: 'Aumentar indentação',
                   isActive: false,
-                  onPressed: isListItem ? _indentListItem : null,
+                  onPressed: isOnFirstLine ? null : (isListItem ? _indentListItem : null),
                 ),
                 _ToolbarButton(
                   icon: Icons.format_indent_decrease,
                   tooltip: 'Diminuir indentação',
                   isActive: false,
-                  onPressed: isListItem ? _unindentListItem : null,
+                  onPressed: isOnFirstLine ? null : (isListItem ? _unindentListItem : null),
                 ),
                 _ToolbarButton(
                   icon: Icons.check_box_outlined,
                   tooltip: 'Tarefa',
                   isActive: isTask,
-                  onPressed: _convertToTask,
+                  onPressed: isOnFirstLine ? null : _convertToTask,
                 ),
                 _ToolbarButton(
                   icon: Icons.format_quote,
                   tooltip: 'Citação',
                   isActive: blockType == blockquoteAttribution,
-                  onPressed: () => _setBlockType(blockquoteAttribution),
+                  onPressed: isOnFirstLine ? null : () => _setBlockType(blockquoteAttribution),
                 ),
                 const _ToolbarDivider(),
                 _ToolbarButton(
                   icon: Icons.horizontal_rule,
                   tooltip: 'Divisor',
                   isActive: false,
-                  onPressed: _insertDivider,
+                  onPressed: isOnFirstLine ? null : _insertDivider,
                 ),
               ],
             ),
@@ -160,6 +161,15 @@ class NoteToolbar extends StatelessWidget {
         );
       },
     );
+  }
+
+  bool _isOnFirstLine(DocumentSelection? selection) {
+    if (selection == null) return false;
+    final doc = editor.context.document;
+    if (doc.isEmpty) return false;
+    final firstNodeId = doc.first.id;
+    final activeId = _activeNodeId(selection);
+    return activeId == firstNodeId;
   }
 
   String? _activeNodeId(DocumentSelection? selection) {
@@ -278,7 +288,7 @@ class _LabeledToolbarButton extends StatelessWidget {
 
   final String label;
   final bool isActive;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
