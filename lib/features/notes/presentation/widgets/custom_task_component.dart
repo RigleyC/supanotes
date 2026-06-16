@@ -12,12 +12,16 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.taskMetadataById = const {},
     this.hideCompleted = false,
     this.onTaskLongPress,
+    this.onTaskComplete,
+    this.onTaskReopen,
   });
 
   final Editor _editor;
   final Map<String, TaskModel> taskMetadataById;
   final bool hideCompleted;
   final ValueChanged<String>? onTaskLongPress;
+  final void Function(String taskId)? onTaskComplete;
+  final void Function(String taskId)? onTaskReopen;
 
   @override
   TaskComponentViewModel? createViewModel(

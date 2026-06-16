@@ -27,6 +27,8 @@ class NoteEditor extends StatefulWidget {
     String taskId,
     Future<void> Function() flushSnapshot,
   )? onTaskLongPress;
+  final void Function(String taskId)? onTaskComplete;
+  final void Function(String taskId)? onTaskReopen;
 
   const NoteEditor({
     super.key,
@@ -39,6 +41,8 @@ class NoteEditor extends StatefulWidget {
     this.emptyNoteExit,
     this.onHasContentChanged,
     this.onTaskLongPress,
+    this.onTaskComplete,
+    this.onTaskReopen,
   });
 
   @override
@@ -171,6 +175,8 @@ class _NoteEditorState extends State<NoteEditor> {
                                 taskId,
                                 () => controller.persistSnapshotNow(),
                               ),
+                          onTaskComplete: widget.onTaskComplete,
+                          onTaskReopen: widget.onTaskReopen,
                         ),
                       ],
                     ),
