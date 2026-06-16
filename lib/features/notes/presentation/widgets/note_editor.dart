@@ -27,8 +27,8 @@ class NoteEditor extends StatefulWidget {
     String taskId,
     Future<void> Function() flushSnapshot,
   )? onTaskLongPress;
-  final void Function(String taskId)? onTaskComplete;
-  final void Function(String taskId)? onTaskReopen;
+  final Future<void> Function(String taskId)? onTaskComplete;
+  final Future<void> Function(String taskId)? onTaskReopen;
 
   const NoteEditor({
     super.key,

@@ -20,8 +20,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final Map<String, TaskModel> taskMetadataById;
   final bool hideCompleted;
   final ValueChanged<String>? onTaskLongPress;
-  final void Function(String taskId)? onTaskComplete;
-  final void Function(String taskId)? onTaskReopen;
+  final Future<void> Function(String taskId)? onTaskComplete;
+  final Future<void> Function(String taskId)? onTaskReopen;
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -39,15 +39,15 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       padding: EdgeInsets.zero,
       indent: node.indent,
       isComplete: node.isComplete,
-      setComplete: (bool isComplete) {
+      setComplete: (bool isComplete) async {
         _editor.execute([
           ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),
         ]);
 
         if (isComplete) {
-          onTaskComplete?.call(node.id);
+          await onTaskComplete?.call(node.id);
         } else {
-          onTaskReopen?.call(node.id);
+          await onTaskReopen?.call(node.id);
         }
 
         final taskMeta = taskMetadataById[node.id];
