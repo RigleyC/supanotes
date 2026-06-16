@@ -435,6 +435,157 @@ func (h *Handler) ApplyOrganization(c echo.Context) error {
 
 func ptr(s string) *string { return &s }
 
+type ShareNoteRequest struct {
+	Email      string `json:"email" validate:"required,email"`
+	Permission string `json:"permission" validate:"required,oneof=view edit"`
+}
+
+type ShareResponse struct {
+	ID         string `json:"id"`
+	NoteID     string `json:"note_id"`
+	UserID     string `json:"user_id"`
+	Email      string `json:"email"`
+	Name       string `json:"name"`
+	Permission string `json:"permission"`
+}
+
+func (h *Handler) ShareNote(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	noteID, err := uid.UUIDFromString(c.Param("id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid note id")
+	}
+
+	note, err := h.svc.GetNoteByID(c.Request().Context(), noteID, userID)
+	if err != nil {
+		if errors.Is(err, ErrNoteNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "note not found")
+		}
+		return err
+	}
+
+	if note.UserID != userID {
+		return web.JSONError(c, http.StatusForbidden, "only the note owner can share")
+	}
+
+	var req ShareNoteRequest
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+
+	targetUser, err := h.svc.GetUserByEmail(c.Request().Context(), req.Email)
+	if err != nil {
+		return web.JSONError(c, http.StatusNotFound, "user not found")
+	}
+
+	if targetUser.ID == userID {
+		return web.JSONError(c, http.StatusBadRequest, "cannot share with yourself")
+	}
+
+	share, err := h.svc.CreateNoteShare(c.Request().Context(), sqlcgen.CreateNoteShareParams{
+		NoteID:     noteID,
+		UserID:     targetUser.ID,
+		Permission: req.Permission,
+	})
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusCreated, ShareResponse{
+		ID:         uid.UUIDToString(share.ID),
+		NoteID:     uid.UUIDToString(share.NoteID),
+		UserID:     uid.UUIDToString(share.UserID),
+		Email:      targetUser.Email,
+		Name:       targetUser.Name,
+		Permission: share.Permission,
+	})
+}
+
+func (h *Handler) ListNoteShares(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	noteID, err := uid.UUIDFromString(c.Param("id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid note id")
+	}
+
+	note, err := h.svc.GetNoteByID(c.Request().Context(), noteID, userID)
+	if err != nil {
+		if errors.Is(err, ErrNoteNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "note not found")
+		}
+		return err
+	}
+
+	if note.UserID != userID {
+		return web.JSONError(c, http.StatusForbidden, "only the note owner can list shares")
+	}
+
+	shares, err := h.svc.GetNoteShares(c.Request().Context(), noteID)
+	if err != nil {
+		return err
+	}
+
+	resp := make([]ShareResponse, len(shares))
+	for i, s := range shares {
+		resp[i] = ShareResponse{
+			ID:         uid.UUIDToString(s.ID),
+			NoteID:     uid.UUIDToString(s.NoteID),
+			UserID:     uid.UUIDToString(s.UserID),
+			Email:      s.Email,
+			Name:       s.Name,
+			Permission: s.Permission,
+		}
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) DeleteNoteShare(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	noteID, err := uid.UUIDFromString(c.Param("id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid note id")
+	}
+
+	note, err := h.svc.GetNoteByID(c.Request().Context(), noteID, userID)
+	if err != nil {
+		if errors.Is(err, ErrNoteNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "note not found")
+		}
+		return err
+	}
+
+	if note.UserID != userID {
+		return web.JSONError(c, http.StatusForbidden, "only the note owner can remove shares")
+	}
+
+	targetUserID, err := uid.UUIDFromString(c.Param("user_id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid user id")
+	}
+
+	if err := h.svc.DeleteNoteShare(c.Request().Context(), sqlcgen.DeleteNoteShareParams{
+		NoteID: noteID,
+		UserID: targetUserID,
+	}); err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
 func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
 	var ctxID *string
 	if n.ContextID.Valid {

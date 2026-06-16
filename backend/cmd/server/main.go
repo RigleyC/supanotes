@@ -240,6 +240,10 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/notes/inbox/organize/plan", notesH.PlanOrganization)
 	protected.POST("/notes/inbox/organize/apply", notesH.ApplyOrganization)
 
+	protected.POST("/notes/:id/shares", notesH.ShareNote)
+	protected.GET("/notes/:id/shares", notesH.ListNoteShares)
+	protected.DELETE("/notes/:id/shares/:user_id", notesH.DeleteNoteShare)
+
 	// Agent Context Builder
 	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc, memoriesRepo, embeddingClient)
 

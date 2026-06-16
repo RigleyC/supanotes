@@ -494,6 +494,22 @@ func (m *mockNotesRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int
 	panic("unimplemented")
 }
 
+func (m *mockNotesRepo) GetUserByEmail(ctx context.Context, email string) (sqlcgen.User, error) {
+	panic("unimplemented")
+}
+
+func (m *mockNotesRepo) CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+	panic("unimplemented")
+}
+
+func (m *mockNotesRepo) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
+	panic("unimplemented")
+}
+
+func (m *mockNotesRepo) DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error {
+	panic("unimplemented")
+}
+
 func TestGetNoteTool_Execute(t *testing.T) {
 	q := &stubQuerier{
 		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {

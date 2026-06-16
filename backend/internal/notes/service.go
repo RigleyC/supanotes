@@ -357,3 +357,19 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 	}
 	return nil
 }
+
+func (s *Service) GetUserByEmail(ctx context.Context, email string) (sqlcgen.User, error) {
+	return s.repo.GetUserByEmail(ctx, email)
+}
+
+func (s *Service) CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+	return s.repo.CreateNoteShare(ctx, arg)
+}
+
+func (s *Service) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
+	return s.repo.GetNoteShares(ctx, noteID)
+}
+
+func (s *Service) DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error {
+	return s.repo.DeleteNoteShare(ctx, arg)
+}
