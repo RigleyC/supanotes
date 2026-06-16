@@ -47,6 +47,32 @@ class FakeConnectivityMonitor implements ConnectivityMonitor {
 }
 
 void main() {
+  group('SyncMapper.noteToJson', () {
+    test('serializes note and includes user_id', () {
+      final now = DateTime.utc(2026, 6, 15, 12, 0);
+      final note = NoteData(
+        id: 'note-1',
+        userId: 'user-1',
+        title: 'Test Note',
+        content: 'Hello World',
+        isInbox: false,
+        favorite: false,
+        archived: false,
+        createdAt: now,
+        updatedAt: now,
+        isDirty: true,
+        hasRemoteCopy: false,
+        hideCompleted: false,
+      );
+
+      final json = SyncMapper().noteToJson(note);
+
+      expect(json['user_id'], 'user-1');
+      expect(json['title'], 'Test Note');
+      expect(json['content'], 'Hello World');
+    });
+  });
+
   group('SyncMapper.taskToJson', () {
     test('serializes recurrence enum as a string', () {
       final now = DateTime.utc(2026, 6, 15, 12, 0);
@@ -68,6 +94,7 @@ void main() {
 
       final json = SyncMapper().taskToJson(task);
 
+      expect(json['user_id'], 'user-1');
       expect(json['recurrence'], 'weekly');
       expect(json['due_date'], '2026-06-15');
     });
@@ -92,6 +119,7 @@ void main() {
 
       final json = SyncMapper().taskToJson(task);
 
+      expect(json['user_id'], 'user-1');
       expect(json['recurrence'], isNull);
       expect(json['due_date'], isNull);
     });

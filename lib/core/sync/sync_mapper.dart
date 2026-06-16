@@ -34,6 +34,7 @@ class SyncMapper {
 
   Map<String, dynamic> noteToJson(NoteData n) => {
         'id': n.id,
+        'user_id': n.userId,
         'context_id': n.contextId,
         'title': n.title,
         'content': n.content,
@@ -53,6 +54,7 @@ class SyncMapper {
 
   Map<String, dynamic> taskToJson(TaskData t) => {
         'id': t.id,
+        'user_id': t.userId,
         'note_id': t.noteId,
         'title': t.title,
         'status': t.status,

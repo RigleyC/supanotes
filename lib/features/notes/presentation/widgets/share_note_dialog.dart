@@ -11,11 +11,14 @@ import '../../domain/share_model.dart';
 import '../controllers/share_note_controller.dart';
 import '../controllers/share_list_controller.dart';
 
+
+//Transformar isso aqui num modal
 class ShareNoteDialog extends ConsumerStatefulWidget {
   final String noteId;
 
   const ShareNoteDialog({super.key, required this.noteId});
 
+  //Isso aqui não existe, o certo é criar o widget e usar o showDialogGlobal passando ele.
   static Future<void> show(BuildContext context, String noteId) {
     return showDialog(
       context: context,
