@@ -476,7 +476,12 @@ SELECT $1::uuid,
        $5::timestamptz,
        NOW()
 WHERE EXISTS (
-  SELECT 1 FROM notes WHERE id = $2::uuid AND user_id = $6::uuid
+  SELECT 1 FROM notes WHERE id = $2::uuid
+    AND (user_id = $6::uuid
+         OR EXISTS (SELECT 1 FROM note_shares
+                    WHERE note_id = $2::uuid
+                      AND user_id = $6::uuid
+                      AND permission = 'edit'))
 )
 ON CONFLICT (id) DO UPDATE
 SET relation = EXCLUDED.relation,
@@ -508,7 +513,12 @@ const upsertNoteTag = `-- name: UpsertNoteTag :exec
 INSERT INTO note_tags (note_id, tag_id)
 SELECT $1::uuid, $2::uuid
 WHERE EXISTS (
-  SELECT 1 FROM notes WHERE id = $1::uuid AND user_id = $3::uuid
+  SELECT 1 FROM notes WHERE id = $1::uuid
+    AND (user_id = $3::uuid
+         OR EXISTS (SELECT 1 FROM note_shares
+                    WHERE note_id = $1::uuid
+                      AND user_id = $3::uuid
+                      AND permission = 'edit'))
 )
 ON CONFLICT (note_id, tag_id) DO NOTHING
 `
@@ -625,7 +635,11 @@ SELECT $1::uuid,
        'completed'
 FROM tasks
 WHERE tasks.id = $2::uuid
-  AND tasks.user_id = $4::uuid
+  AND (tasks.user_id = $4::uuid
+       OR EXISTS (SELECT 1 FROM note_shares ns
+                  WHERE ns.note_id = tasks.note_id
+                    AND ns.user_id = $4::uuid
+                    AND ns.permission = 'edit'))
 ON CONFLICT (id) DO NOTHING
 `
 

@@ -58,8 +58,10 @@ class _NoteEditorState extends State<NoteEditor> {
   void initState() {
     super.initState();
     _controller = NoteEditorController(
-      snapshotSave: widget.snapshotSave,
-      emptyNoteExit: widget.emptyNoteExit,
+      snapshotSave: widget.isReadOnly
+          ? (noteId, title, markdown, tasks) async {}
+          : widget.snapshotSave,
+      emptyNoteExit: widget.isReadOnly ? null : widget.emptyNoteExit,
     );
     String content = widget.content;
     if (widget.title != null && widget.title!.isNotEmpty) {
@@ -72,13 +74,17 @@ class _NoteEditorState extends State<NoteEditor> {
     }
     _controller!.bind(widget.noteId);
     _controller!.init(content: content);
-    _controller!.document?.addListener(_onDocumentChanged);
+    if (!widget.isReadOnly) {
+      _controller!.document?.addListener(_onDocumentChanged);
+    }
     _notifyContentChanged();
   }
 
   @override
   void dispose() {
-    _controller?.document?.removeListener(_onDocumentChanged);
+    if (!widget.isReadOnly) {
+      _controller?.document?.removeListener(_onDocumentChanged);
+    }
     _iosController?.dispose();
     _androidController?.dispose();
     _controller?.dispose();
@@ -150,7 +156,7 @@ class _NoteEditorState extends State<NoteEditor> {
                     controller: _iosController!,
                     child: SuperEditor(
                       editor: controller.editor!,
-                      focusNode: controller.focusNode,
+                      focusNode: widget.isReadOnly ? null : controller.focusNode,
                       documentLayoutKey: _docLayoutKey,
                       stylesheet: noteStylesheet(context),
                       keyboardActions: buildRichKeyboardActions(
@@ -168,11 +174,12 @@ class _NoteEditorState extends State<NoteEditor> {
                           controller.editor!,
                           taskMetadataById: widget.taskMetadata,
                           hideCompleted: widget.hideCompleted,
-                          onTaskLongPress: (taskId) =>
-                              widget.onTaskLongPress?.call(
-                                taskId,
-                                () => controller.persistSnapshotNow(),
-                              ),
+                          onTaskLongPress: widget.isReadOnly
+                              ? null
+                              : (taskId) => widget.onTaskLongPress?.call(
+                                    taskId,
+                                    () => controller.persistSnapshotNow(),
+                                  ),
                         ),
                       ],
                     ),

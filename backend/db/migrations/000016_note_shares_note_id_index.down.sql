@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_note_shares_note_id;

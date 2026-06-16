@@ -50,6 +50,7 @@ type Querier interface {
 	GetMemories(ctx context.Context, arg GetMemoriesParams) ([]Memory, error)
 	GetMessages(ctx context.Context, arg GetMessagesParams) ([]Message, error)
 	GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (Note, error)
+	GetNoteOwner(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 	GetNoteShareForUser(ctx context.Context, arg GetNoteShareForUserParams) (NoteShare, error)
 	GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]GetNoteSharesRow, error)
 	GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, error)

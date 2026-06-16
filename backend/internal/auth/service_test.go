@@ -615,15 +615,6 @@ func (m *mockQuerier) ListDeviceTokensByUser(ctx context.Context, userID pgtype.
 func (m *mockQuerier) HardDeleteExpiredNotes(ctx context.Context) error {
 	return nil
 }
-func (m *mockQuerier) DeleteNoteShare(_ context.Context, _ sqlcgen.DeleteNoteShareParams) error {
-	return nil
-}
-func (m *mockQuerier) GetNoteShareForUser(_ context.Context, _ sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
-	return sqlcgen.NoteShare{}, nil
-}
-func (m *mockQuerier) GetNoteShares(_ context.Context, _ pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
-	return nil, nil
-}
 
 func (m *mockQuerier) HardDeleteExpiredTasks(ctx context.Context) error {
 	return nil
@@ -656,6 +647,18 @@ func (m *mockQuerier) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) 
 func (m *mockQuerier) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
 	return nil
 }
-func (m *mockQuerier) CreateNoteShare(_ context.Context, _ sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+func (m *mockQuerier) CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
 	return sqlcgen.NoteShare{}, nil
+}
+func (m *mockQuerier) DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error {
+	return nil
+}
+func (m *mockQuerier) GetNoteOwner(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
+func (m *mockQuerier) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
+func (m *mockQuerier) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
+	return nil, nil
 }

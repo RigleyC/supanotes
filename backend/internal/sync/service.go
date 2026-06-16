@@ -155,17 +155,22 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		r = s.repo.WithQuerier(sqlcgen.New(tx))
 	}
 
+	// Track note IDs the authenticated user can edit (owned or shared with edit).
+	editableNotes := make(map[pgtype.UUID]bool)
+
 	for i, n := range payload.Notes {
 		if isEmptyIncomingRegularNote(n) {
 			return ErrEmptyNote
 		}
 
-		if n.UserID != userID {
+		canEdit := n.UserID == userID
+		if !canEdit {
 			share, err := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
 				NoteID: n.ID,
 				UserID: userID,
 			})
-			if err != nil || share.Permission != "edit" {
+			canEdit = err == nil && share.Permission == "edit"
+			if !canEdit {
 				return ErrSyncConflict
 			}
 		}
@@ -196,10 +201,18 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				}
 			}
 		}
+		editableNotes[noteID] = canEdit
+
+		// Preserve the original owner ID for UpsertNote so the
+		// WHERE notes.user_id = EXCLUDED.user_id check passes.
+		upsertUserID := userID
+		if n.UserID != userID {
+			upsertUserID = n.UserID
+		}
 
 		_, err := r.UpsertNote(ctx, sqlcgen.UpsertNoteParams{
 			ID:              noteID,
-			UserID:          userID,
+			UserID:          upsertUserID,
 			ContextID:       n.ContextID,
 			Title:           n.Title,
 			Content:         n.Content,
@@ -223,10 +236,20 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		if err != nil {
 			return err
 		}
+
+		if !editableNotes[t.NoteID] {
+			return ErrSyncConflict
+		}
+
 		status := sanitizeTaskStatus(t.Status)
+
+		upsertUserID := userID
+		if t.UserID != userID {
+			upsertUserID = t.UserID
+		}
 		_, err = r.UpsertTask(ctx, sqlcgen.UpsertTaskParams{
 			ID:         t.ID,
-			UserID:     userID,
+			UserID:     upsertUserID,
 			NoteID:     t.NoteID,
 			Title:      t.Title,
 			Status:     status,

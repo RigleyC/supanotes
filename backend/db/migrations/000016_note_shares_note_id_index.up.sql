@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_note_shares_note_id ON note_shares(note_id);

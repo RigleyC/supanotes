@@ -64,9 +64,6 @@ func (m *mockQuerier) CreateNoteLink(_ context.Context, _ sqlcgen.CreateNoteLink
 func (m *mockQuerier) CreateNote(_ context.Context, _ sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
-func (m *mockQuerier) CreateNoteShare(_ context.Context, _ sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
-	return sqlcgen.NoteShare{}, nil
-}
 func (m *mockQuerier) CreateRefreshToken(_ context.Context, _ sqlcgen.CreateRefreshTokenParams) (sqlcgen.RefreshToken, error) {
 	return sqlcgen.RefreshToken{}, nil
 }
@@ -93,7 +90,6 @@ func (m *mockQuerier) CreateUserSettings(_ context.Context, _ sqlcgen.CreateUser
 }
 func (m *mockQuerier) DeleteDeviceToken(_ context.Context, _ sqlcgen.DeleteDeviceTokenParams) error { return nil }
 func (m *mockQuerier) DeleteMemory(_ context.Context, _ sqlcgen.DeleteMemoryParams) error           { return nil }
-func (m *mockQuerier) DeleteNoteShare(_ context.Context, _ sqlcgen.DeleteNoteShareParams) error     { return nil }
 func (m *mockQuerier) DeleteNote(_ context.Context, _ sqlcgen.DeleteNoteParams) error               { return nil }
 func (m *mockQuerier) DeleteSessionMessages(_ context.Context, _ sqlcgen.DeleteSessionMessagesParams) error {
 	return nil
@@ -120,12 +116,6 @@ func (m *mockQuerier) GetMessages(_ context.Context, _ sqlcgen.GetMessagesParams
 }
 func (m *mockQuerier) GetNoteByID(_ context.Context, _ sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
-}
-func (m *mockQuerier) GetNoteShareForUser(_ context.Context, _ sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
-	return sqlcgen.NoteShare{}, nil
-}
-func (m *mockQuerier) GetNoteShares(_ context.Context, _ pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
-	return nil, nil
 }
 func (m *mockQuerier) GetNotes(_ context.Context, _ sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
 	return nil, nil
@@ -254,6 +244,17 @@ func (m *mockQuerier) GetSyncTaskCompletions(_ context.Context, _ sqlcgen.GetSyn
 	return nil, nil
 }
 func (m *mockQuerier) GetSyncNoteTags(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteTag, error) {
+	return nil, nil
+}
+func (m *mockQuerier) CreateNoteShare(_ context.Context, _ sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
+func (m *mockQuerier) DeleteNoteShare(_ context.Context, _ sqlcgen.DeleteNoteShareParams) error { return nil }
+func (m *mockQuerier) GetNoteOwner(_ context.Context, _ pgtype.UUID) (pgtype.UUID, error) { return pgtype.UUID{}, nil }
+func (m *mockQuerier) GetNoteShareForUser(_ context.Context, _ sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
+func (m *mockQuerier) GetNoteShares(_ context.Context, _ pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
 	return nil, nil
 }
 

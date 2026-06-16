@@ -19,10 +19,6 @@ type Repository interface {
 	SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
 	AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
-	GetUserByEmail(ctx context.Context, email string) (sqlcgen.User, error)
-	CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error)
-	GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error)
-	DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error
 	WithQuerier(q sqlcgen.Querier) Repository
 }
 
@@ -76,20 +72,4 @@ func (r *repository) AppendToNoteContent(ctx context.Context, arg sqlcgen.Append
 
 func (r *repository) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return r.q.CountNotes(ctx, userID)
-}
-
-func (r *repository) GetUserByEmail(ctx context.Context, email string) (sqlcgen.User, error) {
-	return r.q.GetUserByEmail(ctx, email)
-}
-
-func (r *repository) CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
-	return r.q.CreateNoteShare(ctx, arg)
-}
-
-func (r *repository) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
-	return r.q.GetNoteShares(ctx, noteID)
-}
-
-func (r *repository) DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error {
-	return r.q.DeleteNoteShare(ctx, arg)
 }

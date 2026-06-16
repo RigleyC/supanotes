@@ -107,7 +107,11 @@ SELECT sqlc.arg('id')::uuid,
        'completed'
 FROM tasks
 WHERE tasks.id = sqlc.arg('task_id')::uuid
-  AND tasks.user_id = sqlc.arg('user_id')::uuid
+  AND (tasks.user_id = sqlc.arg('user_id')::uuid
+       OR EXISTS (SELECT 1 FROM note_shares ns
+                  WHERE ns.note_id = tasks.note_id
+                    AND ns.user_id = sqlc.arg('user_id')::uuid
+                    AND ns.permission = 'edit'))
 ON CONFLICT (id) DO NOTHING;
 
 -- name: GetSyncTaskCompletions :many
@@ -132,7 +136,12 @@ WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')
 INSERT INTO note_tags (note_id, tag_id)
 SELECT sqlc.arg('note_id')::uuid, sqlc.arg('tag_id')::uuid
 WHERE EXISTS (
-  SELECT 1 FROM notes WHERE id = sqlc.arg('note_id')::uuid AND user_id = sqlc.arg('user_id')::uuid
+  SELECT 1 FROM notes WHERE id = sqlc.arg('note_id')::uuid
+    AND (user_id = sqlc.arg('user_id')::uuid
+         OR EXISTS (SELECT 1 FROM note_shares
+                    WHERE note_id = sqlc.arg('note_id')::uuid
+                      AND user_id = sqlc.arg('user_id')::uuid
+                      AND permission = 'edit'))
 )
 ON CONFLICT (note_id, tag_id) DO NOTHING;
 
@@ -152,7 +161,12 @@ SELECT sqlc.arg('id')::uuid,
        sqlc.arg('created_at')::timestamptz,
        NOW()
 WHERE EXISTS (
-  SELECT 1 FROM notes WHERE id = sqlc.arg('source_id')::uuid AND user_id = sqlc.arg('user_id')::uuid
+  SELECT 1 FROM notes WHERE id = sqlc.arg('source_id')::uuid
+    AND (user_id = sqlc.arg('user_id')::uuid
+         OR EXISTS (SELECT 1 FROM note_shares
+                    WHERE note_id = sqlc.arg('source_id')::uuid
+                      AND user_id = sqlc.arg('user_id')::uuid
+                      AND permission = 'edit'))
 )
 ON CONFLICT (id) DO UPDATE
 SET relation = EXCLUDED.relation,

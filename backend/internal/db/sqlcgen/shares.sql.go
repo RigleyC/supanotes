@@ -54,6 +54,18 @@ func (q *Queries) DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams
 	return err
 }
 
+const getNoteOwner = `-- name: GetNoteOwner :one
+SELECT user_id FROM notes
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) GetNoteOwner(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getNoteOwner, id)
+	var user_id pgtype.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const getNoteShareForUser = `-- name: GetNoteShareForUser :one
 SELECT id, note_id, user_id, permission, created_at, updated_at FROM note_shares
 WHERE note_id = $1 AND user_id = $2

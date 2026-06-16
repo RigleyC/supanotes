@@ -45,6 +45,7 @@ class NoteModel {
 
   bool get isOwner => permission == null;
   bool get isReadOnly => permission == 'view';
+  bool get isShared => sharedByEmail != null;
 
   NoteModel copyWith({
     String? id,
@@ -97,9 +98,9 @@ class NoteModel {
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
       hideCompleted: d.hideCompleted,
-      permission: d.permission,
-      sharedByEmail: d.sharedByEmail,
-      sharedByName: d.sharedByName,
+      permission: d.permission?.isNotEmpty == true ? d.permission : null,
+      sharedByEmail: d.sharedByEmail?.isNotEmpty == true ? d.sharedByEmail : null,
+      sharedByName: d.sharedByName?.isNotEmpty == true ? d.sharedByName : null,
     );
   }
 }

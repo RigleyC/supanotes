@@ -115,9 +115,6 @@ func (s *stubQuerier) CreateNote(context.Context, sqlcgen.CreateNoteParams) (sql
 func (s *stubQuerier) CreateNoteLink(context.Context, sqlcgen.CreateNoteLinkParams) error {
 	panic("unimplemented")
 }
-func (s *stubQuerier) CreateNoteShare(_ context.Context, _ sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
-	return sqlcgen.NoteShare{}, nil
-}
 func (s *stubQuerier) CreateRefreshToken(context.Context, sqlcgen.CreateRefreshTokenParams) (sqlcgen.RefreshToken, error) {
 	panic("unimplemented")
 }
@@ -148,7 +145,6 @@ func (s *stubQuerier) DeleteDeviceToken(context.Context, sqlcgen.DeleteDeviceTok
 }
 func (s *stubQuerier) DeleteMemory(context.Context, sqlcgen.DeleteMemoryParams) error      { panic("unimplemented") }
 func (s *stubQuerier) DeleteNote(context.Context, sqlcgen.DeleteNoteParams) error           { panic("unimplemented") }
-func (s *stubQuerier) DeleteNoteShare(context.Context, sqlcgen.DeleteNoteShareParams) error { panic("unimplemented") }
 func (s *stubQuerier) DeleteSessionMessages(context.Context, sqlcgen.DeleteSessionMessagesParams) error {
 	panic("unimplemented")
 }
@@ -170,12 +166,6 @@ func (s *stubQuerier) GetMemories(context.Context, sqlcgen.GetMemoriesParams) ([
 }
 func (s *stubQuerier) GetNoteByID(context.Context, sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
-}
-func (s *stubQuerier) GetNoteShareForUser(_ context.Context, _ sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
-	return sqlcgen.NoteShare{}, nil
-}
-func (s *stubQuerier) GetNoteShares(_ context.Context, _ pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
-	return nil, nil
 }
 func (s *stubQuerier) GetNotes(context.Context, sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
 	panic("unimplemented")
@@ -297,6 +287,17 @@ func (s *stubQuerier) GetSyncNoteLinks(context.Context, pgtype.UUID) ([]sqlcgen.
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertNoteLink(context.Context, sqlcgen.UpsertNoteLinkParams) error   { panic("unimplemented") }
+func (s *stubQuerier) CreateNoteShare(context.Context, sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteNoteShare(context.Context, sqlcgen.DeleteNoteShareParams) error { panic("unimplemented") }
+func (s *stubQuerier) GetNoteOwner(context.Context, pgtype.UUID) (pgtype.UUID, error)      { panic("unimplemented") }
+func (s *stubQuerier) GetNoteShareForUser(context.Context, sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetNoteShares(context.Context, pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
+	panic("unimplemented")
+}
 
 type stubMemRepo struct{}
 

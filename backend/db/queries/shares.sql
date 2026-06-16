@@ -18,3 +18,7 @@ WHERE note_id = $1 AND user_id = $2;
 -- name: GetNoteShareForUser :one
 SELECT * FROM note_shares
 WHERE note_id = $1 AND user_id = $2;
+
+-- name: GetNoteOwner :one
+SELECT user_id FROM notes
+WHERE id = $1 AND deleted_at IS NULL;

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_dialog.dart';
@@ -77,7 +78,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
     final note = asyncValue.asData?.value;
     if (note == null) {
-      return const Scaffold(body: Center(child: Text('Nota nao encontrada')));
+      return Scaffold(body: Center(child: Text(NoteStrings.errorNotFound)));
     }
 
     final isOwner = note.isOwner;
@@ -86,7 +87,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: isReadOnly ? Text('Compartilhada por ${note.sharedByEmail}') : null,
+        title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : null,
         actions: [
           if (isOwner)
             IconButton(
@@ -109,8 +110,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               items: [
                 AdaptivePopupMenuItem<String>(
                   label: note.hideCompleted
-                      ? 'Mostrar concluídas'
-                      : 'Ocultar concluídas',
+                      ? NoteStrings.showCompleted
+                      : NoteStrings.hideCompleted,
                   icon: PlatformInfo.isIOS26OrHigher()
                       ? (note.hideCompleted ? 'eye' : 'eye.slash')
                       : (note.hideCompleted
@@ -139,8 +140,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           snapshotSave: (noteId, title, markdown, tasks) =>
               defaultSnapshotSave(repo, noteId, title, markdown, tasks),
           emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
-          onTaskLongPress: (taskId, flushSnapshot) =>
-              _openTaskActions(taskId, flushSnapshot),
+          onTaskLongPress: isReadOnly
+              ? null
+              : (taskId, flushSnapshot) =>
+                  _openTaskActions(taskId, flushSnapshot),
         ),
       ),
     );
