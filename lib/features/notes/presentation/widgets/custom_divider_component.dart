@@ -103,21 +103,19 @@ class CustomDividerComponent extends StatelessWidget {
     final padIndex = safeIndex.toString().padLeft(2, '0');
     final assetPath = 'assets/dividers/divider_$padIndex.svg';
 
-    return IgnorePointer(
-      child: SelectableBox(
-        selection: selection,
-        selectionColor: selectionColor,
-        child: Opacity(
-          opacity: opacity,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: SizedBox(
-              height: 24,
-              width: double.infinity,
-              child: SvgPicture.asset(
-                assetPath,
-                fit: BoxFit.fitWidth,
-              ),
+    return SelectableBox(
+      selection: selection,
+      selectionColor: selectionColor,
+      child: Opacity(
+        opacity: opacity,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: SizedBox(
+            height: 24,
+            width: double.infinity,
+            child: SvgPicture.asset(
+              assetPath,
+              fit: BoxFit.fitWidth,
             ),
           ),
         ),

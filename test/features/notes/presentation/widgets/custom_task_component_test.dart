@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
 
 void main() {
   Widget wrap(Widget child) {
@@ -32,7 +33,25 @@ void main() {
     expect(find.byType(CustomTaskComponent), findsOneWidget);
   });
 
-  testWidgets('opens task actions from text area long press', (tester) async {
+  testWidgets('opens task actions from checkbox long press', (tester) async {
+    var openedActions = false;
+
+    await tester.pumpWidget(
+      wrap(
+        CustomTaskComponent(
+          viewModel: viewModel(),
+          onLongPress: () => openedActions = true,
+        ),
+      ),
+    );
+
+    await tester.longPress(find.byType(AnimatedTaskCheckbox));
+    await tester.pump();
+
+    expect(openedActions, isTrue);
+  });
+
+  testWidgets('text area long press does not open task actions', (tester) async {
     var openedActions = false;
 
     await tester.pumpWidget(
@@ -45,14 +64,12 @@ void main() {
     );
 
     await tester.longPress(
-      find.ancestor(
-        of: find.byType(TextComponent),
-        matching: find.byType(GestureDetector),
-      ),
+      find.byType(TextComponent),
+      warnIfMissed: false,
     );
     await tester.pump();
 
-    expect(openedActions, isTrue);
+    expect(openedActions, isFalse);
   });
 
   testWidgets('toggles completion from checkbox tap', (tester) async {

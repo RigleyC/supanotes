@@ -118,18 +118,42 @@ class _TaskElementConverter implements ElementToNodeConverter {
       return null;
     }
 
+    // markdown v7.3+ may parse `<!-- task:... -->` as an inline HTML element
+    // (via InlineHtmlSyntax) rather than plain text, so the marker may not
+    // appear in `element.textContent`. We must scan the children too, and
+    // strip any inline element whose text content carries the marker.
     final textContent = element.textContent;
-    final idMatch = _taskIdMarkerRegExp.firstMatch(textContent);
-    final taskId = idMatch?.group(1) ?? Editor.createNodeId();
-    final cleanText = textContent.replaceFirst(_taskIdMarkerRegExp, '').trim();
+    var idMatch = _taskIdMarkerRegExp.firstMatch(textContent);
+    String? taskId = idMatch?.group(1);
 
+    final filteredChildren = <md.Node>[];
     bool checked = false;
-    if (element.children != null && element.children!.isNotEmpty && element.children!.first is md.Element) {
-      final firstChild = element.children!.first as md.Element;
-      if (firstChild.tag == 'input') {
-        checked = firstChild.attributes['checked'] == 'true';
+    if (element.children != null) {
+      for (final child in element.children!) {
+        if (child is md.Element && child.tag == 'input') {
+          checked = child.attributes['checked'] == 'true';
+          continue;
+        }
+        if (idMatch == null && child is md.Element) {
+          final childText = child.textContent;
+          final childMatch = _taskIdMarkerRegExp.firstMatch(childText);
+          if (childMatch != null) {
+            idMatch = childMatch;
+            taskId = childMatch.group(1);
+            continue;
+          }
+        }
+        filteredChildren.add(child);
       }
     }
+
+    taskId ??= Editor.createNodeId();
+
+    final filteredText =
+        filteredChildren.map((c) => c.textContent).join();
+    final cleanText = filteredText
+        .replaceFirst(_taskIdMarkerRegExp, '')
+        .trim();
 
     return TaskNode(
       id: taskId,

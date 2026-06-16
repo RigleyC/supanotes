@@ -9,6 +9,7 @@ class AnimatedTaskCheckbox extends StatefulWidget {
     required this.inactiveColor,
     required this.checkmarkColor,
     required this.onChanged,
+    this.onLongPress,
   });
 
   final double size;
@@ -17,6 +18,7 @@ class AnimatedTaskCheckbox extends StatefulWidget {
   final Color inactiveColor;
   final Color checkmarkColor;
   final void Function(bool)? onChanged;
+  final VoidCallback? onLongPress;
 
   @override
   State<AnimatedTaskCheckbox> createState() => _AnimatedTaskCheckboxState();
@@ -79,6 +81,7 @@ class _AnimatedTaskCheckboxState extends State<AnimatedTaskCheckbox>
       onTap: widget.onChanged != null
           ? () => widget.onChanged!(!widget.value)
           : null,
+      onLongPress: widget.onLongPress,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.all(9),

@@ -122,5 +122,17 @@ void main() {
         expect(identical(fromCache, fromFactory), isFalse);
       });
     });
+
+    test('text selection theme follows the primary color in both modes',
+        () async {
+      await runGuarded(() {
+        for (final theme in [AppTheme.lightTheme, AppTheme.darkTheme]) {
+          final sel = theme.textSelectionTheme;
+          expect(sel.cursorColor, theme.colorScheme.primary);
+          expect(sel.selectionHandleColor, theme.colorScheme.primary);
+          expect(sel.selectionColor, isNotNull);
+        }
+      });
+    });
   });
 }

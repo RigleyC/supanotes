@@ -24,6 +24,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     DocumentNode node,
   ) {
     if (node is! TaskNode) return null;
+    if (hideCompleted && node.isComplete) return null;
 
     return TaskComponentViewModel(
       nodeId: node.id,
@@ -55,7 +56,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       key: componentContext.componentKey,
       viewModel: componentViewModel,
       taskMetadata: taskMetadataById[componentViewModel.nodeId],
-      hideCompleted: hideCompleted,
       onLongPress: onTaskLongPress == null
           ? null
           : () => onTaskLongPress!(componentViewModel.nodeId),
@@ -68,13 +68,11 @@ class CustomTaskComponent extends StatefulWidget {
     super.key,
     required this.viewModel,
     this.taskMetadata,
-    this.hideCompleted = false,
     this.onLongPress,
   });
 
   final TaskComponentViewModel viewModel;
   final TaskModel? taskMetadata;
-  final bool hideCompleted;
   final VoidCallback? onLongPress;
 
   @override
@@ -99,15 +97,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final taskColor = semantics?.task ?? AppColors.taskAccent;
     const checkboxSize = 22.0;
 
-    final shouldHide =
-        widget.viewModel.isComplete && widget.hideCompleted;
-
-    return Visibility(
-      visible: !shouldHide,
-      maintainState: true,
-      child: Directionality(
-        textDirection: widget.viewModel.textDirection,
-        child: Row(
+    return Directionality(
+      textDirection: widget.viewModel.textDirection,
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
@@ -123,50 +115,46 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
             inactiveColor: colorScheme.outline,
             checkmarkColor: Colors.white,
             onChanged: widget.viewModel.setComplete,
+            onLongPress: widget.onLongPress,
           ),
           Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onLongPress: widget.onLongPress,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 2, right: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextComponent(
-                      key: _textKey,
-                      text: widget.viewModel.text,
-                      textDirection: widget.viewModel.textDirection,
-                      textAlign: widget.viewModel.textAlignment,
-                      maxLines: widget.viewModel.maxLines,
-                      overflow: widget.viewModel.overflow,
-                      textStyleBuilder: (attributions) =>
-                          _computeStyles(attributions, context),
-                      inlineWidgetBuilders:
-                          widget.viewModel.inlineWidgetBuilders,
-                      textSelection: widget.viewModel.selection,
-                      selectionColor: widget.viewModel.selectionColor,
-                      highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                      underlines: widget.viewModel.createUnderlines(),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2, right: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextComponent(
+                    key: _textKey,
+                    text: widget.viewModel.text,
+                    textDirection: widget.viewModel.textDirection,
+                    textAlign: widget.viewModel.textAlignment,
+                    maxLines: widget.viewModel.maxLines,
+                    overflow: widget.viewModel.overflow,
+                    textStyleBuilder: (attributions) =>
+                        _computeStyles(attributions, context),
+                    inlineWidgetBuilders:
+                        widget.viewModel.inlineWidgetBuilders,
+                    textSelection: widget.viewModel.selection,
+                    selectionColor: widget.viewModel.selectionColor,
+                    highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                    underlines: widget.viewModel.createUnderlines(),
+                  ),
+                  if (widget.taskMetadata?.dueDate != null ||
+                      widget.taskMetadata?.recurrence != null) ...[
+                    const SizedBox(height: 4),
+                    TaskMetadataBadges(
+                      dueDate: widget.taskMetadata?.dueDate,
+                      recurrence: widget.taskMetadata?.recurrence,
                     ),
-                    if (widget.taskMetadata?.dueDate != null ||
-                        widget.taskMetadata?.recurrence != null) ...[
-                      const SizedBox(height: 4),
-                      TaskMetadataBadges(
-                        dueDate: widget.taskMetadata?.dueDate,
-                        recurrence: widget.taskMetadata?.recurrence,
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
             ),
           ),
         ],
       ),
-    ),
-  );
+    );
   }
 
   TextStyle _computeStyles(Set<Attribution> attributions, BuildContext context) {

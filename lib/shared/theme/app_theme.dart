@@ -122,6 +122,11 @@ class AppTheme {
         space: 1,
         thickness: 1,
       ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: colorScheme.primary,
+        selectionHandleColor: colorScheme.primary,
+        selectionColor: colorScheme.primary.withValues(alpha: 0.4),
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: colorScheme.inverseSurface,
