@@ -83,5 +83,28 @@ void main() {
         header1Attribution,
       );
     });
+
+    test('user changes first node block type — it is coerced back to H1', () {
+      final controller = NoteEditorController(
+        snapshotSave: (_, _, _, _) async {},
+      );
+      controller.init(content: 'hello');
+      controller.bind('test');
+
+      // Simulate user attempting to convert the first paragraph to a list item.
+      controller.editor!.execute([
+        ConvertParagraphToListItemRequest(
+          nodeId: controller.document!.first.id,
+          type: ListItemType.unordered,
+        ),
+      ]);
+
+      final firstNode = controller.document!.first;
+      expect(firstNode, isA<ParagraphNode>());
+      expect(
+        (firstNode as ParagraphNode).getMetadataValue('blockType'),
+        header1Attribution,
+      );
+    });
   });
 }
