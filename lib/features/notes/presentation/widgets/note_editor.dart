@@ -17,7 +17,6 @@ import 'package:supanotes/features/tasks/domain/task_model.dart';
 class NoteEditor extends StatefulWidget {
   final String noteId;
   final String content;
-  final String? title;
   final Map<String, TaskModel> taskMetadata;
   final bool hideCompleted;
   final SnapshotSave snapshotSave;
@@ -32,7 +31,6 @@ class NoteEditor extends StatefulWidget {
     super.key,
     required this.noteId,
     required this.content,
-    this.title,
     required this.taskMetadata,
     this.hideCompleted = false,
     required this.snapshotSave,
@@ -59,17 +57,8 @@ class _NoteEditorState extends State<NoteEditor> {
       snapshotSave: widget.snapshotSave,
       emptyNoteExit: widget.emptyNoteExit,
     );
-    String content = widget.content;
-    if (widget.title != null && widget.title!.isNotEmpty) {
-      final title = widget.title!.trim();
-      final startsWithH1Title = content.trimLeft().startsWith('# $title') ||
-          content.trimLeft().startsWith('#  $title');
-      if (!startsWithH1Title) {
-        content = '# $title\n\n$content';
-      }
-    }
     _controller!.bind(widget.noteId);
-    _controller!.init(content: content);
+    _controller!.init(content: widget.content);
     _controller!.document?.addListener(_onDocumentChanged);
     _notifyContentChanged();
   }

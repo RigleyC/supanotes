@@ -120,7 +120,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         child: NoteEditor(
           noteId: widget.noteId,
           content: note.content,
-          title: note.title,
           taskMetadata: tasksMap,
           hideCompleted: note.hideCompleted,
           snapshotSave: (noteId, title, markdown, tasks) =>

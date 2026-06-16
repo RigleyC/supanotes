@@ -50,4 +50,61 @@ void main() {
       expect(deletedNoteId, 'empty-note');
     });
   });
+
+  group('H1 coercion', () {
+    test('first node is coerced to header1 on init with plain text', () {
+      final controller = NoteEditorController(
+        snapshotSave: (noteId, title, markdown, tasks) async {},
+      );
+
+      controller.init(content: 'hello');
+      controller.bind('test-note');
+
+      final firstNode = controller.document!.first;
+      expect(firstNode, isA<ParagraphNode>());
+      expect(
+        (firstNode as ParagraphNode).getMetadataValue('blockType'),
+        header1Attribution,
+      );
+    });
+
+    test('first node is coerced to header1 on init from markdown', () {
+      final controller = NoteEditorController(
+        snapshotSave: (noteId, title, markdown, tasks) async {},
+      );
+
+      controller.init(content: '## hello\n\nworld');
+      controller.bind('test-note');
+
+      final firstNode = controller.document!.first;
+      expect(firstNode, isA<ParagraphNode>());
+      expect(
+        (firstNode as ParagraphNode).getMetadataValue('blockType'),
+        header1Attribution,
+      );
+    });
+
+    test('user changes first node block type — it is coerced back to H1', () {
+      final controller = NoteEditorController(
+        snapshotSave: (_, _, _, _) async {},
+      );
+      controller.init(content: 'hello');
+      controller.bind('test');
+
+      // Simulate user attempting to convert the first paragraph to a list item.
+      controller.editor!.execute([
+        ConvertParagraphToListItemRequest(
+          nodeId: controller.document!.first.id,
+          type: ListItemType.unordered,
+        ),
+      ]);
+
+      final firstNode = controller.document!.first;
+      expect(firstNode, isA<ParagraphNode>());
+      expect(
+        (firstNode as ParagraphNode).getMetadataValue('blockType'),
+        header1Attribution,
+      );
+    });
+  });
 }

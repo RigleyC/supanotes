@@ -84,7 +84,10 @@ class NoteEditorController {
     _noteId = noteId;
   }
 
-  void _onDocumentChanged(DocumentChangeLog _) => _scheduleSnapshotSave();
+  void _onDocumentChanged(DocumentChangeLog _) {
+    _ensureFirstNodeIsHeader1();
+    _scheduleSnapshotSave();
+  }
 
   void _scheduleSnapshotSave() {
     final doc = document;
@@ -94,6 +97,41 @@ class NoteEditorController {
       generation: generation,
       operation: _runSnapshotSave,
     );
+  }
+
+  /// Restores the first node to a ParagraphNode with header1Attribution
+  /// after a user edit. The parse path already enforces this invariant;
+  /// this only fires when the user changes the first node's block type
+  /// (e.g. converts the title paragraph into a list item or task).
+  void _ensureFirstNodeIsHeader1() {
+    final doc = document;
+    if (doc == null || doc.isEmpty) return;
+
+    final firstNode = doc.first;
+    if (firstNode is ParagraphNode) {
+      final blockType = firstNode.getMetadataValue('blockType') as Attribution?;
+      if (blockType != header1Attribution) {
+        editor?.execute([
+          ChangeParagraphBlockTypeRequest(
+            nodeId: firstNode.id,
+            blockType: header1Attribution,
+          ),
+        ]);
+      }
+      return;
+    }
+
+    final newHeader = ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(''),
+      metadata: const {'blockType': header1Attribution},
+    );
+    editor?.execute([
+      InsertNodeBeforeNodeRequest(
+        existingNodeId: firstNode.id,
+        newNode: newHeader,
+      ),
+    ]);
   }
 
   String _extractTitle(MutableDocument doc) {
