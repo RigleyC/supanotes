@@ -337,6 +337,31 @@ void main() {
         expect(refreshedLocalMarkdown, savedMarkdown);
       },
     );
+
+    test('preserves intentionally indented bullet lists after tasks', () {
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'task-1',
+            text: AttributedText('Treinar'),
+            isComplete: false,
+          ),
+          ListItemNode.unordered(
+            id: 'bullet-1',
+            text: AttributedText('Carga 1'),
+            indent: 1,
+          ),
+        ],
+      );
+
+      final savedMarkdown = serializeNoteToMarkdown(document);
+      final reloaded = parseNoteToMarkdown(savedMarkdown);
+
+      final bullet = reloaded.whereType<ListItemNode>().singleWhere(
+        (node) => node.text.toPlainText() == 'Carga 1',
+      );
+      expect(bullet.indent, 1);
+    });
   });
 }
 

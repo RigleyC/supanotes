@@ -9,8 +9,9 @@ const String _kTaskIdMarkerSuffix = ' -->';
 final RegExp _taskIdMarkerRegExp = RegExp(r'<!--\s*task:(.*?)\s*-->');
 
 MutableDocument parseNoteToMarkdown(String markdown) {
+  final normalizedMarkdown = _normalizeTaskListMarkdown(markdown);
   final doc = deserializeMarkdownToDocument(
-    markdown,
+    normalizedMarkdown,
     customBlockSyntax: [_DividerWithMetadataSyntax()],
     customElementToNodeConverters: [
       const _TaskElementConverter(),
@@ -18,7 +19,7 @@ MutableDocument parseNoteToMarkdown(String markdown) {
     ],
   );
 
-  final nodes = _normalizeListsAfterTasks(doc.toList(growable: true));
+  final nodes = doc.toList(growable: true);
 
   if (nodes.last is! ParagraphNode) {
     nodes.add(
@@ -29,21 +30,39 @@ MutableDocument parseNoteToMarkdown(String markdown) {
   return MutableDocument(nodes: nodes);
 }
 
-List<DocumentNode> _normalizeListsAfterTasks(List<DocumentNode> nodes) {
-  final normalized = <DocumentNode>[];
+String _normalizeTaskListMarkdown(String markdown) {
+  final lines = markdown.split('\n');
   var followsTask = false;
 
-  for (final node in nodes) {
-    if (node is ListItemNode && followsTask && node.indent > 0) {
-      normalized.add(node.copyListItemWith(indent: node.indent - 1));
-    } else {
-      normalized.add(node);
+  for (var i = 0; i < lines.length; i++) {
+    final line = lines[i];
+    if (_isTaskListLine(line)) {
+      followsTask = true;
+      continue;
     }
 
-    followsTask = node is TaskNode || (followsTask && node is ListItemNode);
+    if (followsTask && _isIndentedListLine(line)) {
+      lines[i] = line.substring(2);
+      continue;
+    }
+
+    if (line.trim().isEmpty) {
+      continue;
+    }
+
+    followsTask = false;
   }
 
-  return normalized;
+  return lines.join('\n');
+}
+
+bool _isTaskListLine(String line) {
+  return RegExp(r'^\s*[-*]\s+\[[ xX]\]\s+').hasMatch(line);
+}
+
+bool _isIndentedListLine(String line) {
+  return RegExp(r'^\s{2,}[-*]\s+').hasMatch(line) ||
+      RegExp(r'^\s{2,}\d+\.\s+').hasMatch(line);
 }
 
 String serializeNoteToMarkdown(MutableDocument doc) {
