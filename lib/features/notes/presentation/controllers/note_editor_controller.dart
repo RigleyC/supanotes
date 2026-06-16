@@ -78,7 +78,6 @@ class NoteEditorController {
     );
     focusNode = FocusNode();
     document!.addListener(_onDocumentChanged);
-    _ensureFirstNodeIsHeader1();
   }
 
   void bind(String noteId) {
@@ -100,42 +99,37 @@ class NoteEditorController {
     );
   }
 
-  /// Coerces the first node of the document to be a ParagraphNode with
-  /// header1Attribution. Called on init and on every document change.
+  /// Restores the first node to a ParagraphNode with header1Attribution
+  /// after a user edit. The parse path already enforces this invariant;
+  /// this only fires when the user changes the first node's block type
+  /// (e.g. converts the title paragraph into a list item or task).
   void _ensureFirstNodeIsHeader1() {
     final doc = document;
     if (doc == null || doc.isEmpty) return;
 
     final firstNode = doc.first;
-    if (firstNode is! ParagraphNode) {
-      _replaceFirstNodeWithHeader1();
+    if (firstNode is ParagraphNode) {
+      final blockType = firstNode.getMetadataValue('blockType') as Attribution?;
+      if (blockType != header1Attribution) {
+        editor?.execute([
+          ChangeParagraphBlockTypeRequest(
+            nodeId: firstNode.id,
+            blockType: header1Attribution,
+          ),
+        ]);
+      }
       return;
     }
-    final blockType = firstNode.getMetadataValue('blockType') as Attribution?;
-    if (blockType != header1Attribution) {
-      editor?.execute([
-        ChangeParagraphBlockTypeRequest(
-          nodeId: firstNode.id,
-          blockType: header1Attribution,
-        ),
-      ]);
-    }
-  }
 
-  void _replaceFirstNodeWithHeader1() {
-    final doc = document;
-    final firstNode = doc?.first;
-    if (doc == null || firstNode == null) return;
-
-    final replacement = ParagraphNode(
-      id: firstNode.id,
-      text: firstNode is TextNode ? firstNode.text : AttributedText(''),
-      metadata: {'blockType': header1Attribution},
+    final newHeader = ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(''),
+      metadata: const {'blockType': header1Attribution},
     );
     editor?.execute([
-      ReplaceNodeRequest(
+      InsertNodeBeforeNodeRequest(
         existingNodeId: firstNode.id,
-        newNode: replacement,
+        newNode: newHeader,
       ),
     ]);
   }
