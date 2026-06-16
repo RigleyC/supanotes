@@ -11,11 +11,34 @@ import (
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
-type mockRepository struct {
-	upsertNoteErr error
+func testNote(overrides ...func(*sqlcgen.GetSyncNotesRow)) sqlcgen.GetSyncNotesRow {
+	n := sqlcgen.GetSyncNotesRow{
+		ID:        pgtype.UUID{Valid: true},
+		UserID:    pgtype.UUID{Valid: true},
+		Content:   "",
+		IsInbox:   false,
+		DeletedAt: pgtype.Timestamptz{Valid: false},
+	}
+	for _, o := range overrides {
+		o(&n)
+	}
+	return n
 }
 
-func (m *mockRepository) GetSyncNotes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Note, error) {
+func testUserID() pgtype.UUID {
+	return pgtype.UUID{Valid: true}
+}
+
+func testOtherUserID() pgtype.UUID {
+	return pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+}
+
+type mockRepository struct {
+	upsertNoteErr       error
+	getNoteShareForUser func(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error)
+}
+
+func (m *mockRepository) GetSyncNotes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.GetSyncNotesRow, error) {
 	return nil, nil
 }
 
@@ -75,6 +98,13 @@ func (m *mockRepository) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertN
 	return nil
 }
 
+func (m *mockRepository) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	if m.getNoteShareForUser != nil {
+		return m.getNoteShareForUser(ctx, arg)
+	}
+	return sqlcgen.NoteShare{}, pgx.ErrNoRows
+}
+
 func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }
@@ -83,14 +113,13 @@ func TestSyncPushRejectsEmptyNewRegularNote(t *testing.T) {
 	repo := &mockRepository{}
 	svc := NewService(repo, nil)
 
-	err := svc.Push(context.Background(), pgtype.UUID{Valid: true}, &SyncPayload{
-		Notes: []sqlcgen.Note{{
-			ID:        pgtype.UUID{Valid: true},
-			Title:     pgtype.Text{Valid: false},
-			Content:   "   ",
-			IsInbox:   false,
-			DeletedAt: pgtype.Timestamptz{Valid: false},
-		}},
+	err := svc.Push(context.Background(), testUserID(), &SyncPayload{
+		Notes: []sqlcgen.GetSyncNotesRow{
+			testNote(func(n *sqlcgen.GetSyncNotesRow) {
+				n.Title = pgtype.Text{Valid: false}
+				n.Content = "   "
+			}),
+		},
 	})
 
 	if !errors.Is(err, ErrEmptyNote) {
@@ -98,25 +127,90 @@ func TestSyncPushRejectsEmptyNewRegularNote(t *testing.T) {
 	}
 }
 
+func TestSyncServicePushRejectsSharedNoteWithoutEditPermission(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo, nil)
+
+	payload := &SyncPayload{
+		Notes: []sqlcgen.GetSyncNotesRow{
+			testNote(func(n *sqlcgen.GetSyncNotesRow) {
+				n.UserID = testOtherUserID()
+				n.Title = pgtype.Text{String: "Shared Note", Valid: true}
+				n.Content = "Hello"
+			}),
+		},
+	}
+
+	err := svc.Push(context.Background(), testUserID(), payload)
+	if !errors.Is(err, ErrSyncConflict) {
+		t.Fatalf("expected ErrSyncConflict for shared note without edit permission, got %v", err)
+	}
+}
+
+func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
+	repo := &mockRepository{
+		getNoteShareForUser: func(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+			return sqlcgen.NoteShare{Permission: "edit"}, nil
+		},
+	}
+	svc := NewService(repo, nil)
+
+	payload := &SyncPayload{
+		Notes: []sqlcgen.GetSyncNotesRow{
+			testNote(func(n *sqlcgen.GetSyncNotesRow) {
+				n.UserID = testOtherUserID()
+				n.Title = pgtype.Text{String: "Shared Note", Valid: true}
+				n.Content = "Hello"
+			}),
+		},
+	}
+
+	err := svc.Push(context.Background(), testUserID(), payload)
+	if err != nil {
+		t.Fatalf("expected no error for shared note with edit permission, got %v", err)
+	}
+}
+
+func TestSyncServicePushAllowsTaskSyncWithoutParentNoteInPayload(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo, nil)
+
+	userID := testUserID()
+	noteID := pgtype.UUID{Bytes: [16]byte{2}, Valid: true}
+
+	payload := &SyncPayload{
+		Notes: []sqlcgen.GetSyncNotesRow{},
+		Tasks: []SyncTask{
+			{
+				ID:     pgtype.UUID{Bytes: [16]byte{3}, Valid: true},
+				UserID: userID,
+				NoteID: noteID,
+				Title:  "Orphaned task",
+				Status: "open",
+			},
+		},
+	}
+
+	err := svc.Push(context.Background(), userID, payload)
+	if err != nil {
+		t.Fatalf("expected no error for task without parent note in payload, got %v", err)
+	}
+}
+
 func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
 	repo := &mockRepository{upsertNoteErr: pgx.ErrNoRows}
 	svc := NewService(repo, nil)
 
-	userID := pgtype.UUID{Valid: true}
+	userID := testUserID()
 
 	payload := &SyncPayload{
-		Notes: []sqlcgen.Note{{
-			ID:              pgtype.UUID{Valid: true},
-			ContextID:       pgtype.UUID{Valid: false},
-			Title:           pgtype.Text{String: "Test", Valid: true},
-			Content:         "Hello",
-			IsInbox:         false,
-			Favorite:        false,
-			Archived:        false,
-			EmbeddingStatus: "",
-			CreatedAt:       pgtype.Timestamptz{Time: pgtype.Timestamptz{}.Time, Valid: true},
-			DeletedAt:       pgtype.Timestamptz{Valid: false},
-		}},
+		Notes: []sqlcgen.GetSyncNotesRow{
+			testNote(func(n *sqlcgen.GetSyncNotesRow) {
+				n.Title = pgtype.Text{String: "Test", Valid: true}
+				n.Content = "Hello"
+				n.CreatedAt = pgtype.Timestamptz{Time: pgtype.Timestamptz{}.Time, Valid: true}
+			}),
+		},
 	}
 
 	err := svc.Push(context.Background(), userID, payload)

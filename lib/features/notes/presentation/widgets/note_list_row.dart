@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../domain/note_model.dart';
+import '../../domain/note_strings.dart';
 
 class NoteListRow extends StatelessWidget {
   const NoteListRow({
@@ -17,14 +18,12 @@ class NoteListRow extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onToggleFavorite;
 
-  static const _fallbackTitle = 'Sem título';
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final title = note.title?.trim().isNotEmpty == true
         ? note.title!.trim()
-        : _fallbackTitle;
+        : NoteStrings.fallbackTitle;
 
     return Dismissible(
       key: ValueKey('note-${note.id}'),
@@ -51,9 +50,9 @@ class NoteListRow extends StatelessWidget {
         }
         final confirmed = await showConfirmDialog(
           context: context,
-          title: 'Apagar nota?',
-          message: 'Esta ação não pode ser desfeita.',
-          confirmLabel: 'Apagar',
+          title: NoteStrings.deleteConfirmTitle,
+          message: NoteStrings.deleteConfirmMessage,
+          confirmLabel: NoteStrings.deleteConfirmLabel,
           destructive: true,
         );
         if (confirmed) onDelete();
@@ -68,11 +67,38 @@ class NoteListRow extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    if (note.sharedByEmail != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            Icon(Icons.person_outline,
+                                size: 14, color: scheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${NoteStrings.sharedFromPrefix} ${note.sharedByEmail}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: scheme.onSurfaceVariant),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
               if (note.favorite)
                 Icon(Icons.star_rate_rounded, size: 18, color: scheme.tertiary),

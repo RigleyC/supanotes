@@ -22,6 +22,9 @@ class NoteModel {
     required this.createdAt,
     required this.updatedAt,
     this.hideCompleted = false,
+    this.permission,
+    this.sharedByEmail,
+    this.sharedByName,
   });
 
   final String id;
@@ -36,6 +39,13 @@ class NoteModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool hideCompleted;
+  final String? permission;
+  final String? sharedByEmail;
+  final String? sharedByName;
+
+  bool get isOwner => permission == null;
+  bool get isReadOnly => permission == 'view';
+  bool get isShared => sharedByEmail != null;
 
   NoteModel copyWith({
     String? id,
@@ -50,6 +60,9 @@ class NoteModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? hideCompleted,
+    String? permission,
+    String? sharedByEmail,
+    String? sharedByName,
   }) =>
       NoteModel(
         id: id ?? this.id,
@@ -64,6 +77,9 @@ class NoteModel {
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         hideCompleted: hideCompleted ?? this.hideCompleted,
+        permission: permission ?? this.permission,
+        sharedByEmail: sharedByEmail ?? this.sharedByEmail,
+        sharedByName: sharedByName ?? this.sharedByName,
       );
 
   /// Builds a presentation-layer [NoteModel] from a Drift row. Centralised
@@ -82,6 +98,9 @@ class NoteModel {
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
       hideCompleted: d.hideCompleted,
+      permission: d.permission?.isNotEmpty == true ? d.permission : null,
+      sharedByEmail: d.sharedByEmail?.isNotEmpty == true ? d.sharedByEmail : null,
+      sharedByName: d.sharedByName?.isNotEmpty == true ? d.sharedByName : null,
     );
   }
 }

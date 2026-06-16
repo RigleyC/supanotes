@@ -202,6 +202,39 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _permissionMeta = const VerificationMeta(
+    'permission',
+  );
+  @override
+  late final GeneratedColumn<String> permission = GeneratedColumn<String>(
+    'permission',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sharedByEmailMeta = const VerificationMeta(
+    'sharedByEmail',
+  );
+  @override
+  late final GeneratedColumn<String> sharedByEmail = GeneratedColumn<String>(
+    'shared_by_email',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sharedByNameMeta = const VerificationMeta(
+    'sharedByName',
+  );
+  @override
+  late final GeneratedColumn<String> sharedByName = GeneratedColumn<String>(
+    'shared_by_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -220,6 +253,9 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     isDirty,
     hasRemoteCopy,
     hideCompleted,
+    permission,
+    sharedByEmail,
+    sharedByName,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -345,6 +381,30 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         ),
       );
     }
+    if (data.containsKey('permission')) {
+      context.handle(
+        _permissionMeta,
+        permission.isAcceptableOrUnknown(data['permission']!, _permissionMeta),
+      );
+    }
+    if (data.containsKey('shared_by_email')) {
+      context.handle(
+        _sharedByEmailMeta,
+        sharedByEmail.isAcceptableOrUnknown(
+          data['shared_by_email']!,
+          _sharedByEmailMeta,
+        ),
+      );
+    }
+    if (data.containsKey('shared_by_name')) {
+      context.handle(
+        _sharedByNameMeta,
+        sharedByName.isAcceptableOrUnknown(
+          data['shared_by_name']!,
+          _sharedByNameMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -418,6 +478,18 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         DriftSqlType.bool,
         data['${effectivePrefix}hide_completed'],
       )!,
+      permission: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}permission'],
+      ),
+      sharedByEmail: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shared_by_email'],
+      ),
+      sharedByName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shared_by_name'],
+      ),
     );
   }
 
@@ -444,6 +516,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
   final bool isDirty;
   final bool hasRemoteCopy;
   final bool hideCompleted;
+  final String? permission;
+  final String? sharedByEmail;
+  final String? sharedByName;
   const NoteData({
     required this.id,
     required this.userId,
@@ -461,6 +536,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     required this.isDirty,
     required this.hasRemoteCopy,
     required this.hideCompleted,
+    this.permission,
+    this.sharedByEmail,
+    this.sharedByName,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -491,6 +569,15 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     map['is_dirty'] = Variable<bool>(isDirty);
     map['has_remote_copy'] = Variable<bool>(hasRemoteCopy);
     map['hide_completed'] = Variable<bool>(hideCompleted);
+    if (!nullToAbsent || permission != null) {
+      map['permission'] = Variable<String>(permission);
+    }
+    if (!nullToAbsent || sharedByEmail != null) {
+      map['shared_by_email'] = Variable<String>(sharedByEmail);
+    }
+    if (!nullToAbsent || sharedByName != null) {
+      map['shared_by_name'] = Variable<String>(sharedByName);
+    }
     return map;
   }
 
@@ -522,6 +609,15 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       isDirty: Value(isDirty),
       hasRemoteCopy: Value(hasRemoteCopy),
       hideCompleted: Value(hideCompleted),
+      permission: permission == null && nullToAbsent
+          ? const Value.absent()
+          : Value(permission),
+      sharedByEmail: sharedByEmail == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sharedByEmail),
+      sharedByName: sharedByName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sharedByName),
     );
   }
 
@@ -547,6 +643,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       isDirty: serializer.fromJson<bool>(json['isDirty']),
       hasRemoteCopy: serializer.fromJson<bool>(json['hasRemoteCopy']),
       hideCompleted: serializer.fromJson<bool>(json['hideCompleted']),
+      permission: serializer.fromJson<String?>(json['permission']),
+      sharedByEmail: serializer.fromJson<String?>(json['sharedByEmail']),
+      sharedByName: serializer.fromJson<String?>(json['sharedByName']),
     );
   }
   @override
@@ -569,6 +668,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       'isDirty': serializer.toJson<bool>(isDirty),
       'hasRemoteCopy': serializer.toJson<bool>(hasRemoteCopy),
       'hideCompleted': serializer.toJson<bool>(hideCompleted),
+      'permission': serializer.toJson<String?>(permission),
+      'sharedByEmail': serializer.toJson<String?>(sharedByEmail),
+      'sharedByName': serializer.toJson<String?>(sharedByName),
     };
   }
 
@@ -589,6 +691,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     bool? isDirty,
     bool? hasRemoteCopy,
     bool? hideCompleted,
+    Value<String?> permission = const Value.absent(),
+    Value<String?> sharedByEmail = const Value.absent(),
+    Value<String?> sharedByName = const Value.absent(),
   }) => NoteData(
     id: id ?? this.id,
     userId: userId ?? this.userId,
@@ -608,6 +713,11 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     isDirty: isDirty ?? this.isDirty,
     hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
     hideCompleted: hideCompleted ?? this.hideCompleted,
+    permission: permission.present ? permission.value : this.permission,
+    sharedByEmail: sharedByEmail.present
+        ? sharedByEmail.value
+        : this.sharedByEmail,
+    sharedByName: sharedByName.present ? sharedByName.value : this.sharedByName,
   );
   NoteData copyWithCompanion(NotesCompanion data) {
     return NoteData(
@@ -633,6 +743,15 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       hideCompleted: data.hideCompleted.present
           ? data.hideCompleted.value
           : this.hideCompleted,
+      permission: data.permission.present
+          ? data.permission.value
+          : this.permission,
+      sharedByEmail: data.sharedByEmail.present
+          ? data.sharedByEmail.value
+          : this.sharedByEmail,
+      sharedByName: data.sharedByName.present
+          ? data.sharedByName.value
+          : this.sharedByName,
     );
   }
 
@@ -654,7 +773,10 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ..write('deletedAt: $deletedAt, ')
           ..write('isDirty: $isDirty, ')
           ..write('hasRemoteCopy: $hasRemoteCopy, ')
-          ..write('hideCompleted: $hideCompleted')
+          ..write('hideCompleted: $hideCompleted, ')
+          ..write('permission: $permission, ')
+          ..write('sharedByEmail: $sharedByEmail, ')
+          ..write('sharedByName: $sharedByName')
           ..write(')'))
         .toString();
   }
@@ -677,6 +799,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     isDirty,
     hasRemoteCopy,
     hideCompleted,
+    permission,
+    sharedByEmail,
+    sharedByName,
   );
   @override
   bool operator ==(Object other) =>
@@ -697,7 +822,10 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           other.deletedAt == this.deletedAt &&
           other.isDirty == this.isDirty &&
           other.hasRemoteCopy == this.hasRemoteCopy &&
-          other.hideCompleted == this.hideCompleted);
+          other.hideCompleted == this.hideCompleted &&
+          other.permission == this.permission &&
+          other.sharedByEmail == this.sharedByEmail &&
+          other.sharedByName == this.sharedByName);
 }
 
 class NotesCompanion extends UpdateCompanion<NoteData> {
@@ -717,6 +845,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   final Value<bool> isDirty;
   final Value<bool> hasRemoteCopy;
   final Value<bool> hideCompleted;
+  final Value<String?> permission;
+  final Value<String?> sharedByEmail;
+  final Value<String?> sharedByName;
   final Value<int> rowid;
   const NotesCompanion({
     this.id = const Value.absent(),
@@ -735,6 +866,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.isDirty = const Value.absent(),
     this.hasRemoteCopy = const Value.absent(),
     this.hideCompleted = const Value.absent(),
+    this.permission = const Value.absent(),
+    this.sharedByEmail = const Value.absent(),
+    this.sharedByName = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NotesCompanion.insert({
@@ -754,6 +888,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.isDirty = const Value.absent(),
     this.hasRemoteCopy = const Value.absent(),
     this.hideCompleted = const Value.absent(),
+    this.permission = const Value.absent(),
+    this.sharedByEmail = const Value.absent(),
+    this.sharedByName = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        userId = Value(userId),
@@ -777,6 +914,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Expression<bool>? isDirty,
     Expression<bool>? hasRemoteCopy,
     Expression<bool>? hideCompleted,
+    Expression<String>? permission,
+    Expression<String>? sharedByEmail,
+    Expression<String>? sharedByName,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -796,6 +936,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       if (isDirty != null) 'is_dirty': isDirty,
       if (hasRemoteCopy != null) 'has_remote_copy': hasRemoteCopy,
       if (hideCompleted != null) 'hide_completed': hideCompleted,
+      if (permission != null) 'permission': permission,
+      if (sharedByEmail != null) 'shared_by_email': sharedByEmail,
+      if (sharedByName != null) 'shared_by_name': sharedByName,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -817,6 +960,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Value<bool>? isDirty,
     Value<bool>? hasRemoteCopy,
     Value<bool>? hideCompleted,
+    Value<String?>? permission,
+    Value<String?>? sharedByEmail,
+    Value<String?>? sharedByName,
     Value<int>? rowid,
   }) {
     return NotesCompanion(
@@ -836,6 +982,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       isDirty: isDirty ?? this.isDirty,
       hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
       hideCompleted: hideCompleted ?? this.hideCompleted,
+      permission: permission ?? this.permission,
+      sharedByEmail: sharedByEmail ?? this.sharedByEmail,
+      sharedByName: sharedByName ?? this.sharedByName,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -891,6 +1040,15 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     if (hideCompleted.present) {
       map['hide_completed'] = Variable<bool>(hideCompleted.value);
     }
+    if (permission.present) {
+      map['permission'] = Variable<String>(permission.value);
+    }
+    if (sharedByEmail.present) {
+      map['shared_by_email'] = Variable<String>(sharedByEmail.value);
+    }
+    if (sharedByName.present) {
+      map['shared_by_name'] = Variable<String>(sharedByName.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -916,6 +1074,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
           ..write('isDirty: $isDirty, ')
           ..write('hasRemoteCopy: $hasRemoteCopy, ')
           ..write('hideCompleted: $hideCompleted, ')
+          ..write('permission: $permission, ')
+          ..write('sharedByEmail: $sharedByEmail, ')
+          ..write('sharedByName: $sharedByName, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3699,6 +3860,9 @@ typedef $$NotesTableCreateCompanionBuilder =
       Value<bool> isDirty,
       Value<bool> hasRemoteCopy,
       Value<bool> hideCompleted,
+      Value<String?> permission,
+      Value<String?> sharedByEmail,
+      Value<String?> sharedByName,
       Value<int> rowid,
     });
 typedef $$NotesTableUpdateCompanionBuilder =
@@ -3719,6 +3883,9 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<bool> isDirty,
       Value<bool> hasRemoteCopy,
       Value<bool> hideCompleted,
+      Value<String?> permission,
+      Value<String?> sharedByEmail,
+      Value<String?> sharedByName,
       Value<int> rowid,
     });
 
@@ -3830,6 +3997,21 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<bool> get hideCompleted => $composableBuilder(
     column: $table.hideCompleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get permission => $composableBuilder(
+    column: $table.permission,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sharedByEmail => $composableBuilder(
+    column: $table.sharedByEmail,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sharedByName => $composableBuilder(
+    column: $table.sharedByName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3947,6 +4129,21 @@ class $$NotesTableOrderingComposer
     column: $table.hideCompleted,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get permission => $composableBuilder(
+    column: $table.permission,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sharedByEmail => $composableBuilder(
+    column: $table.sharedByEmail,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sharedByName => $composableBuilder(
+    column: $table.sharedByName,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$NotesTableAnnotationComposer
@@ -4009,6 +4206,21 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<bool> get hideCompleted => $composableBuilder(
     column: $table.hideCompleted,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get permission => $composableBuilder(
+    column: $table.permission,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sharedByEmail => $composableBuilder(
+    column: $table.sharedByEmail,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sharedByName => $composableBuilder(
+    column: $table.sharedByName,
     builder: (column) => column,
   );
 
@@ -4082,6 +4294,9 @@ class $$NotesTableTableManager
                 Value<bool> isDirty = const Value.absent(),
                 Value<bool> hasRemoteCopy = const Value.absent(),
                 Value<bool> hideCompleted = const Value.absent(),
+                Value<String?> permission = const Value.absent(),
+                Value<String?> sharedByEmail = const Value.absent(),
+                Value<String?> sharedByName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotesCompanion(
                 id: id,
@@ -4100,6 +4315,9 @@ class $$NotesTableTableManager
                 isDirty: isDirty,
                 hasRemoteCopy: hasRemoteCopy,
                 hideCompleted: hideCompleted,
+                permission: permission,
+                sharedByEmail: sharedByEmail,
+                sharedByName: sharedByName,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4120,6 +4338,9 @@ class $$NotesTableTableManager
                 Value<bool> isDirty = const Value.absent(),
                 Value<bool> hasRemoteCopy = const Value.absent(),
                 Value<bool> hideCompleted = const Value.absent(),
+                Value<String?> permission = const Value.absent(),
+                Value<String?> sharedByEmail = const Value.absent(),
+                Value<String?> sharedByName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotesCompanion.insert(
                 id: id,
@@ -4138,6 +4359,9 @@ class $$NotesTableTableManager
                 isDirty: isDirty,
                 hasRemoteCopy: hasRemoteCopy,
                 hideCompleted: hideCompleted,
+                permission: permission,
+                sharedByEmail: sharedByEmail,
+                sharedByName: sharedByName,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

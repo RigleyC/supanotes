@@ -23,13 +23,13 @@ import (
 //     client stamps user_id locally with the currently authenticated
 //     user because the table itself has no user_id column.
 type SyncPayload struct {
-	Notes           []sqlcgen.Note           `json:"notes"`
-	Tasks           []SyncTask               `json:"tasks"`
-	Contexts        []sqlcgen.Context        `json:"contexts"`
-	Tags            []sqlcgen.Tag            `json:"tags"`
-	TaskCompletions []sqlcgen.TaskCompletion `json:"task_completions"`
-	NoteTags        []sqlcgen.NoteTag        `json:"note_tags"`
-	NoteLinks       []sqlcgen.NoteLink       `json:"note_links"`
+	Notes           []sqlcgen.GetSyncNotesRow   `json:"notes"`
+	Tasks           []SyncTask                  `json:"tasks"`
+	Contexts        []sqlcgen.Context           `json:"contexts"`
+	Tags            []sqlcgen.Tag               `json:"tags"`
+	TaskCompletions []sqlcgen.TaskCompletion    `json:"task_completions"`
+	NoteTags        []sqlcgen.NoteTag           `json:"note_tags"`
+	NoteLinks       []sqlcgen.NoteLink          `json:"note_links"`
 }
 
 type Service interface {
@@ -57,7 +57,7 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		return nil, err
 	}
 	if notes == nil {
-		notes = make([]sqlcgen.Note, 0)
+		notes = make([]sqlcgen.GetSyncNotesRow, 0)
 	}
 
 	tasks, err := s.repo.GetSyncTasks(ctx, userID, lastSyncedAt, limit)
@@ -134,7 +134,7 @@ func sanitizeTaskStatus(status string) string {
 	}
 }
 
-func isEmptyIncomingRegularNote(n sqlcgen.Note) bool {
+func isEmptyIncomingRegularNote(n sqlcgen.GetSyncNotesRow) bool {
 	return !n.IsInbox &&
 		!n.DeletedAt.Valid &&
 		(!n.Title.Valid || strings.TrimSpace(n.Title.String) == "") &&
@@ -155,10 +155,26 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		r = s.repo.WithQuerier(sqlcgen.New(tx))
 	}
 
+	// Track note IDs the authenticated user can edit (owned or shared with edit).
+	editableNotes := make(map[pgtype.UUID]bool)
+
 	for i, n := range payload.Notes {
 		if isEmptyIncomingRegularNote(n) {
 			return ErrEmptyNote
 		}
+
+		canEdit := n.UserID == userID
+		if !canEdit {
+			share, err := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+				NoteID: n.ID,
+				UserID: userID,
+			})
+			canEdit = err == nil && share.Permission == "edit"
+			if !canEdit {
+				return ErrSyncConflict
+			}
+		}
+
 		embStatus := n.EmbeddingStatus
 		if embStatus == "" {
 			embStatus = "pending"
@@ -185,10 +201,18 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				}
 			}
 		}
+		editableNotes[noteID] = canEdit
+
+		// Preserve the original owner ID for UpsertNote so the
+		// WHERE notes.user_id = EXCLUDED.user_id check passes.
+		upsertUserID := userID
+		if n.UserID != userID {
+			upsertUserID = n.UserID
+		}
 
 		_, err := r.UpsertNote(ctx, sqlcgen.UpsertNoteParams{
 			ID:              noteID,
-			UserID:          userID,
+			UserID:          upsertUserID,
 			ContextID:       n.ContextID,
 			Title:           n.Title,
 			Content:         n.Content,
@@ -212,10 +236,16 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		if err != nil {
 			return err
 		}
+
 		status := sanitizeTaskStatus(t.Status)
+
+		upsertUserID := userID
+		if t.UserID != userID {
+			upsertUserID = t.UserID
+		}
 		_, err = r.UpsertTask(ctx, sqlcgen.UpsertTaskParams{
 			ID:         t.ID,
-			UserID:     userID,
+			UserID:     upsertUserID,
 			NoteID:     t.NoteID,
 			Title:      t.Title,
 			Status:     status,

@@ -1,7 +1,14 @@
 -- name: GetSyncNotes :many
-SELECT * FROM notes
-WHERE user_id = $1 AND updated_at > sqlc.arg('last_synced_at')
-ORDER BY updated_at ASC
+SELECT n.*,
+  COALESCE(ns.permission, '')::text AS shared_permission,
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
+FROM notes n
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
+LEFT JOIN users u ON u.id = n.user_id
+WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
+  AND n.updated_at > sqlc.arg('last_synced_at')
+ORDER BY n.updated_at ASC
 LIMIT sqlc.arg('limit');
 
 -- name: HardDeleteExpiredNotes :exec
@@ -37,9 +44,13 @@ WHERE notes.user_id = EXCLUDED.user_id
 RETURNING *;
 
 -- name: GetSyncTasks :many
-SELECT * FROM tasks
-WHERE user_id = $1 AND updated_at > sqlc.arg('last_synced_at')
-ORDER BY updated_at ASC
+SELECT t.*
+FROM tasks t
+JOIN notes n ON n.id = t.note_id
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
+WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
+  AND t.updated_at > sqlc.arg('last_synced_at')
+ORDER BY t.updated_at ASC
 LIMIT sqlc.arg('limit');
 
 -- name: UpsertTask :one
@@ -89,9 +100,6 @@ WHERE tags.user_id = EXCLUDED.user_id
 RETURNING *;
 
 -- name: UpsertTaskCompletion :exec
--- Inserts a completion row only if the parent task belongs to the user
--- (the SELECT returns 0 rows otherwise, making the INSERT a no-op).
--- Completions are append-only history; existing rows are never updated.
 INSERT INTO task_completions (id, task_id, completed_at, status)
 SELECT sqlc.arg('id')::uuid,
        sqlc.arg('task_id')::uuid,
@@ -99,20 +107,20 @@ SELECT sqlc.arg('id')::uuid,
        'completed'
 FROM tasks
 WHERE tasks.id = sqlc.arg('task_id')::uuid
-  AND tasks.user_id = sqlc.arg('user_id')::uuid
+  AND (tasks.user_id = sqlc.arg('user_id')::uuid
+       OR EXISTS (SELECT 1 FROM note_shares ns
+                  WHERE ns.note_id = tasks.note_id
+                    AND ns.user_id = sqlc.arg('user_id')::uuid
+                    AND ns.permission = 'edit'))
 ON CONFLICT (id) DO NOTHING;
 
 -- name: GetSyncTaskCompletions :many
--- Returns completion rows belonging to a user's tasks whose
--- `completed_at` is newer than the cursor. The table has no
--- `updated_at`, so we use `completed_at` as the pull cursor —
--- completions are append-only, so any new completion is guaranteed
--- to have a fresh timestamp. The join through `tasks` enforces the
--- per-user scope since `task_completions` itself has no `user_id`.
 SELECT tc.id, tc.task_id, tc.completed_at, tc.due_date
 FROM task_completions tc
 JOIN tasks t ON t.id = tc.task_id
-WHERE t.user_id = $1
+JOIN notes n ON n.id = t.note_id
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
+WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
   AND tc.completed_at > sqlc.arg('last_synced_at')
 ORDER BY tc.completed_at ASC
 LIMIT sqlc.arg('limit');
@@ -121,13 +129,19 @@ LIMIT sqlc.arg('limit');
 SELECT nt.note_id, nt.tag_id
 FROM note_tags nt
 JOIN notes n ON n.id = nt.note_id
-WHERE n.user_id = $1;
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
+WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid);
 
 -- name: UpsertNoteTag :exec
 INSERT INTO note_tags (note_id, tag_id)
 SELECT sqlc.arg('note_id')::uuid, sqlc.arg('tag_id')::uuid
 WHERE EXISTS (
-  SELECT 1 FROM notes WHERE id = sqlc.arg('note_id')::uuid AND user_id = sqlc.arg('user_id')::uuid
+  SELECT 1 FROM notes WHERE id = sqlc.arg('note_id')::uuid
+    AND (user_id = sqlc.arg('user_id')::uuid
+         OR EXISTS (SELECT 1 FROM note_shares
+                    WHERE note_id = sqlc.arg('note_id')::uuid
+                      AND user_id = sqlc.arg('user_id')::uuid
+                      AND permission = 'edit'))
 )
 ON CONFLICT (note_id, tag_id) DO NOTHING;
 
@@ -135,7 +149,8 @@ ON CONFLICT (note_id, tag_id) DO NOTHING;
 SELECT nl.*
 FROM note_links nl
 JOIN notes n ON n.id = nl.source_id
-WHERE n.user_id = $1;
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
+WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid);
 
 -- name: UpsertNoteLink :exec
 INSERT INTO note_links (id, source_id, target_id, relation, created_at, updated_at)
@@ -146,7 +161,12 @@ SELECT sqlc.arg('id')::uuid,
        sqlc.arg('created_at')::timestamptz,
        NOW()
 WHERE EXISTS (
-  SELECT 1 FROM notes WHERE id = sqlc.arg('source_id')::uuid AND user_id = sqlc.arg('user_id')::uuid
+  SELECT 1 FROM notes WHERE id = sqlc.arg('source_id')::uuid
+    AND (user_id = sqlc.arg('user_id')::uuid
+         OR EXISTS (SELECT 1 FROM note_shares
+                    WHERE note_id = sqlc.arg('source_id')::uuid
+                      AND user_id = sqlc.arg('user_id')::uuid
+                      AND permission = 'edit'))
 )
 ON CONFLICT (id) DO UPDATE
 SET relation = EXCLUDED.relation,

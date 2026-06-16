@@ -8,8 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
+import 'package:supanotes/features/notes/presentation/widgets/share_note_dialog.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_edit_sheet.dart';
@@ -76,43 +78,54 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
     final note = asyncValue.asData?.value;
     if (note == null) {
-      return const Scaffold(body: Center(child: Text('Nota nao encontrada')));
+      return Scaffold(body: Center(child: Text(NoteStrings.errorNotFound)));
     }
+
+    final isOwner = note.isOwner;
+    final isReadOnly = note.isReadOnly;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
+        title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : null,
         actions: [
-          AdaptivePopupMenuButton.icon<String>(
-            icon: PlatformInfo.isIOS26OrHigher()
-                ? 'ellipsis'
-                : Icons.more_vert,
-            onSelected: (index, entry) async {
-              if (entry.value == 'hide_completed') {
-                await repo.updateNote(
-                  widget.noteId,
-                  hideCompleted: !note.hideCompleted,
-                );
-              }
-            },
-            items: [
-              AdaptivePopupMenuItem<String>(
-                label: note.hideCompleted
-                    ? 'Mostrar concluídas'
-                    : 'Ocultar concluídas',
-                icon: PlatformInfo.isIOS26OrHigher()
-                    ? (note.hideCompleted ? 'eye' : 'eye.slash')
-                    : (note.hideCompleted
-                        ? Icons.visibility
-                        : Icons.visibility_off),
-                value: 'hide_completed',
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
-          ),
+          if (isOwner)
+            IconButton(
+              icon: const Icon(Icons.share_outlined),
+              onPressed: () => ShareNoteDialog.show(context, widget.noteId),
+            ),
+          if (isOwner)
+            AdaptivePopupMenuButton.icon<String>(
+              icon: PlatformInfo.isIOS26OrHigher()
+                  ? 'ellipsis'
+                  : Icons.more_vert,
+              onSelected: (index, entry) async {
+                if (entry.value == 'hide_completed') {
+                  await repo.updateNote(
+                    widget.noteId,
+                    hideCompleted: !note.hideCompleted,
+                  );
+                }
+              },
+              items: [
+                AdaptivePopupMenuItem<String>(
+                  label: note.hideCompleted
+                      ? NoteStrings.showCompleted
+                      : NoteStrings.hideCompleted,
+                  icon: PlatformInfo.isIOS26OrHigher()
+                      ? (note.hideCompleted ? 'eye' : 'eye.slash')
+                      : (note.hideCompleted
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                  value: 'hide_completed',
+                ),
+              ],
+            ),
+          if (!isReadOnly)
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+            ),
         ],
       ),
       body: SafeArea(
@@ -123,11 +136,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           title: note.title,
           taskMetadata: tasksMap,
           hideCompleted: note.hideCompleted,
+          isReadOnly: isReadOnly,
           snapshotSave: (noteId, title, markdown, tasks) =>
               defaultSnapshotSave(repo, noteId, title, markdown, tasks),
           emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
-          onTaskLongPress: (taskId, flushSnapshot) =>
-              _openTaskActions(taskId, flushSnapshot),
+          onTaskLongPress: isReadOnly
+              ? null
+              : (taskId, flushSnapshot) =>
+                  _openTaskActions(taskId, flushSnapshot),
           onTaskComplete: (taskId) =>
               ref.read(tasksRepositoryProvider).completeTask(taskId),
           onTaskReopen: (taskId) =>

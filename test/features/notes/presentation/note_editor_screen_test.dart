@@ -113,6 +113,7 @@ void main() {
           notesRepositoryProvider.overrideWithValue(
             _FakeNotesRepository(streamController),
           ),
+          tasksByNoteStreamProvider.overrideWith((ref, arg) => Stream.value(<TaskModel>[])),
         ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,

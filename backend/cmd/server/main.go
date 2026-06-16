@@ -30,6 +30,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/routines"
 	"github.com/RigleyC/supanotes/internal/search"
 	"github.com/RigleyC/supanotes/internal/settings"
+	"github.com/RigleyC/supanotes/internal/shares"
 	"github.com/RigleyC/supanotes/internal/soul"
 	syncpkg "github.com/RigleyC/supanotes/internal/sync"
 	"github.com/RigleyC/supanotes/internal/tags"
@@ -239,6 +240,14 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/notes/inbox/append", notesH.AppendToInbox)
 	protected.POST("/notes/inbox/organize/plan", notesH.PlanOrganization)
 	protected.POST("/notes/inbox/organize/apply", notesH.ApplyOrganization)
+
+	// Shares
+	sharesRepo := shares.NewRepository(queries)
+	sharesSvc := shares.NewService(sharesRepo)
+	sharesH := shares.NewHandler(sharesSvc)
+	protected.POST("/notes/:id/shares", sharesH.ShareNote)
+	protected.GET("/notes/:id/shares", sharesH.ListNoteShares)
+	protected.DELETE("/notes/:id/shares/:user_id", sharesH.DeleteNoteShare)
 
 	// Agent Context Builder
 	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc, memoriesRepo, embeddingClient)

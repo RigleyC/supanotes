@@ -10,6 +10,8 @@ import 'package:intl/intl.dart';
 import '../../features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/core/database/database.dart';
 
+String? _nullIfEmpty(String? s) => (s != null && s.isEmpty) ? null : s;
+
 DateTime? _parseDueDate(String? s) {
   if (s == null) return null;
   // Server contract: always YYYY-MM-DD. We construct a local DateTime
@@ -41,6 +43,9 @@ class SyncMapper {
         'archived': n.archived,
         'hide_completed': n.hideCompleted,
         'embedding_status': n.embeddingStatus,
+        'shared_permission': n.permission,
+        'shared_by_email': n.sharedByEmail,
+        'shared_by_name': n.sharedByName,
         'created_at': n.createdAt.toUtc().toIso8601String(),
         'updated_at': n.updatedAt.toUtc().toIso8601String(),
         'deleted_at': n.deletedAt?.toUtc().toIso8601String(),
@@ -110,6 +115,9 @@ class SyncMapper {
         favorite: (json['favorite'] as bool?) ?? false,
         archived: (json['archived'] as bool?) ?? false,
         embeddingStatus: json['embedding_status'] as String?,
+        permission: _nullIfEmpty(json['shared_permission'] as String?),
+        sharedByEmail: _nullIfEmpty(json['shared_by_email'] as String?),
+        sharedByName: _nullIfEmpty(json['shared_by_name'] as String?),
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
         updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
         deletedAt: json['deleted_at'] != null

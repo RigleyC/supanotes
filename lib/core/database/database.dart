@@ -36,9 +36,10 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to `6` — v6 adds `hideCompleted` to notes.
+  /// Latest schema version. Bumped to `7` — v7 adds `permission`,
+  /// `sharedByEmail`, `sharedByName` to notes.
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -61,6 +62,11 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 6) {
             await m.addColumn(notes, notes.hideCompleted);
+          }
+          if (from < 7) {
+            await m.addColumn(notes, notes.permission);
+            await m.addColumn(notes, notes.sharedByEmail);
+            await m.addColumn(notes, notes.sharedByName);
           }
         },
       );

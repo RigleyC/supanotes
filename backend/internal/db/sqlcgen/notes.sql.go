@@ -67,7 +67,8 @@ func (q *Queries) AppendToInbox(ctx context.Context, arg AppendToInboxParams) (N
 const appendToNoteContent = `-- name: AppendToNoteContent :one
 UPDATE notes
 SET content = content || E'\n\n' || $3, updated_at = NOW()
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND is_inbox = false
+WHERE notes.id = $1 AND notes.deleted_at IS NULL AND notes.is_inbox = false
+  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
 RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 
@@ -388,7 +389,8 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 
 const getNoteByID = `-- name: GetNoteByID :one
 SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+WHERE notes.id = $1 AND notes.deleted_at IS NULL
+  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2))
 `
 
 type GetNoteByIDParams struct {
@@ -421,13 +423,13 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (Note,
 
 const getNotes = `-- name: GetNotes :many
 SELECT id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
-WHERE user_id = $1
-  AND is_inbox = false
+WHERE is_inbox = false
   AND deleted_at IS NULL
+  AND (notes.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = notes.id AND note_shares.user_id = $1))
   AND ($2::uuid IS NULL OR context_id = $2)
   AND ($3::boolean IS NULL OR favorite = $3)
-  AND ($4::timestamptz IS NULL OR updated_at < $4 OR (updated_at = $4 AND id < $5))
-ORDER BY updated_at DESC, id DESC
+  AND ($4::timestamptz IS NULL OR notes.updated_at < $4 OR (notes.updated_at = $4 AND notes.id < $5))
+ORDER BY notes.updated_at DESC, notes.id DESC
 LIMIT $6
 `
 
@@ -652,7 +654,8 @@ SET title = COALESCE($3, title),
     embedding_status = COALESCE($8, embedding_status),
     hide_completed = COALESCE($9, hide_completed),
     updated_at = NOW()
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+WHERE notes.id = $1 AND notes.deleted_at IS NULL
+  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
 RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 

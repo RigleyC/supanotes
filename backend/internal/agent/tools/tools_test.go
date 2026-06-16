@@ -194,7 +194,7 @@ func (s *stubQuerier) GetRoutinesByUser(ctx context.Context, userID pgtype.UUID)
 func (s *stubQuerier) GetSyncContexts(ctx context.Context, arg sqlcgen.GetSyncContextsParams) ([]sqlcgen.Context, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetSyncNotes(ctx context.Context, arg sqlcgen.GetSyncNotesParams) ([]sqlcgen.Note, error) {
+func (s *stubQuerier) GetSyncNotes(ctx context.Context, arg sqlcgen.GetSyncNotesParams) ([]sqlcgen.GetSyncNotesRow, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetSyncTags(ctx context.Context, arg sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {
@@ -317,6 +317,21 @@ func (s *stubQuerier) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) 
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetNoteOwner(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
 	panic("unimplemented")
 }
 

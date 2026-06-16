@@ -19,7 +19,8 @@ RETURNING *;
 
 -- name: GetNoteByID :one
 SELECT * FROM notes
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
+WHERE notes.id = $1 AND notes.deleted_at IS NULL
+  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2));
 
 -- name: UpdateNote :one
 UPDATE notes
@@ -31,7 +32,8 @@ SET title = COALESCE(sqlc.narg('title'), title),
     embedding_status = COALESCE(sqlc.narg('embedding_status'), embedding_status),
     hide_completed = COALESCE(sqlc.narg('hide_completed'), hide_completed),
     updated_at = NOW()
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+WHERE notes.id = $1 AND notes.deleted_at IS NULL
+  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
 RETURNING *;
 
 -- name: DeleteNote :exec
@@ -41,13 +43,13 @@ WHERE id = $1 AND user_id = $2;
 
 -- name: GetNotes :many
 SELECT * FROM notes
-WHERE user_id = $1
-  AND is_inbox = false
+WHERE is_inbox = false
   AND deleted_at IS NULL
+  AND (notes.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = notes.id AND note_shares.user_id = $1))
   AND (sqlc.narg('context_id')::uuid IS NULL OR context_id = sqlc.narg('context_id'))
   AND (sqlc.narg('favorite')::boolean IS NULL OR favorite = sqlc.narg('favorite'))
-  AND (sqlc.narg('cursor_updated_at')::timestamptz IS NULL OR updated_at < sqlc.narg('cursor_updated_at') OR (updated_at = sqlc.narg('cursor_updated_at') AND id < sqlc.narg('cursor_id')))
-ORDER BY updated_at DESC, id DESC
+  AND (sqlc.narg('cursor_updated_at')::timestamptz IS NULL OR notes.updated_at < sqlc.narg('cursor_updated_at') OR (notes.updated_at = sqlc.narg('cursor_updated_at') AND notes.id < sqlc.narg('cursor_id')))
+ORDER BY notes.updated_at DESC, notes.id DESC
 LIMIT sqlc.arg('limit');
 
 -- name: GetInboxNote :one
@@ -117,7 +119,8 @@ RETURNING *;
 -- name: AppendToNoteContent :one
 UPDATE notes
 SET content = content || E'\n\n' || $3, updated_at = NOW()
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND is_inbox = false
+WHERE notes.id = $1 AND notes.deleted_at IS NULL AND notes.is_inbox = false
+  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
 RETURNING *;
 
 -- name: CreateNoteLink :exec

@@ -357,3 +357,5 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 	}
 	return nil
 }
+
+
