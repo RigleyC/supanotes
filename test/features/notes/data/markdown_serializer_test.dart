@@ -74,7 +74,9 @@ void main() {
     });
 
     test('task id marker is preserved across the parse step', () {
-      final doc = parseNoteToMarkdown('- [ ] call doctor <!-- task:abc-123 -->');
+      final doc = parseNoteToMarkdown(
+        '- [ ] call doctor <!-- task:abc-123 -->',
+      );
 
       expect((doc.first as TaskNode).id, 'abc-123');
       expect((doc.first as TaskNode).text.toPlainText(), 'call doctor');
@@ -84,7 +86,10 @@ void main() {
       final doc = parseNoteToMarkdown('--- <!-- divider:hr-123|index:5 -->');
       expect(doc.first, isA<HorizontalRuleNode>());
       expect((doc.first as HorizontalRuleNode).id, 'hr-123');
-      expect((doc.first as HorizontalRuleNode).getMetadataValue('dividerIndex'), 5);
+      expect(
+        (doc.first as HorizontalRuleNode).getMetadataValue('dividerIndex'),
+        5,
+      );
     });
 
     test('plain horizontal rule creates a HorizontalRuleNode', () {
@@ -175,9 +180,9 @@ void main() {
           ],
         ),
       );
-      final doc = MutableDocument(nodes: [
-        ParagraphNode(id: Editor.createNodeId(), text: text),
-      ]);
+      final doc = MutableDocument(
+        nodes: [ParagraphNode(id: Editor.createNodeId(), text: text)],
+      );
 
       final out = serializeNoteToMarkdown(doc);
       expect(out, '~hello~ world');
@@ -259,10 +264,22 @@ void main() {
         attributionFilter: (a) => a == strikethroughAttribution,
         range: SpanRange(0, text.toPlainText().length),
       );
-      expect(boldSpans, isNotEmpty, reason: 'bold attribution must survive parse');
-      expect(strikeSpans, isNotEmpty, reason: 'strikethrough attribution must survive parse');
+      expect(
+        boldSpans,
+        isNotEmpty,
+        reason: 'bold attribution must survive parse',
+      );
+      expect(
+        strikeSpans,
+        isNotEmpty,
+        reason: 'strikethrough attribution must survive parse',
+      );
       expect(out, contains('**'), reason: 'bold marker must appear in output');
-      expect(out, contains('~'), reason: 'strikethrough marker must appear in output');
+      expect(
+        out,
+        contains('~'),
+        reason: 'strikethrough marker must appear in output',
+      );
     });
 
     test('horizontal rule round-trips and keeps the id marker and index', () {
@@ -276,6 +293,50 @@ void main() {
       final doc = parseNoteToMarkdown(original);
       expect(serializeNoteToMarkdown(doc), original);
     });
+
+    test(
+      'preserves headings, tasks, and following bullet lists after save and local refresh',
+      () {
+        const original = '''# Projeto
+## Plano
+- [ ] Escrever relatório <!-- task:task-1 -->
+- Revisar escopo
+- Levantar riscos
+- Definir próximos passos
+- [ ] Atualizar documentação <!-- task:task-2 -->
+- Confirmar revisão
+- Publicar changelog
+- Avisar usuários''';
+
+        const expectedSavedMarkdown = '''# Projeto
+
+## Plano
+
+- [ ] Escrever relatório <!-- task:task-1 -->
+  * Revisar escopo
+  * Levantar riscos
+  * Definir próximos passos
+
+- [ ] Atualizar documentação <!-- task:task-2 -->
+  * Confirmar revisão
+  * Publicar changelog
+  * Avisar usuários''';
+
+        final savedMarkdown = serializeNoteToMarkdown(
+          parseNoteToMarkdown(original),
+        );
+        final reloadedFromServerMarkdown = serializeNoteToMarkdown(
+          parseNoteToMarkdown(savedMarkdown),
+        );
+        final refreshedLocalMarkdown = serializeNoteToMarkdown(
+          parseNoteToMarkdown(reloadedFromServerMarkdown),
+        );
+
+        expect(savedMarkdown, expectedSavedMarkdown);
+        expect(reloadedFromServerMarkdown, savedMarkdown);
+        expect(refreshedLocalMarkdown, savedMarkdown);
+      },
+    );
   });
 }
 
