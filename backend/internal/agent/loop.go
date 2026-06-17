@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/RigleyC/supanotes/internal/agent/tools"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/pkg/llm"
 )
@@ -41,6 +42,18 @@ func sendEvent(events chan<- SSEEvent, typ, data string) {
 	}
 }
 
+func sendStreamEvent(events chan<- SSEEvent, event StreamEvent) {
+	if events == nil {
+		return
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		slog.Error("marshal stream event", "error", err)
+		return
+	}
+	events <- SSEEvent{Type: string(event.Type), Data: string(payload)}
+}
+
 func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string) (<-chan string, error) {
 	ch := make(chan string, 10)
 
@@ -53,8 +66,35 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 		go func() {
 			defer wg.Done()
 			for evt := range events {
-				if evt.Type == "content_delta" || evt.Type == "done" {
-					ch <- evt.Data
+				switch EventType(evt.Type) {
+				case EventContentDelta:
+					var event StreamEvent
+					if err := json.Unmarshal([]byte(evt.Data), &event); err != nil {
+						continue
+					}
+					payloadBytes, err := json.Marshal(event.Payload)
+					if err != nil {
+						continue
+					}
+					var payload ContentDeltaPayload
+					if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+						continue
+					}
+					ch <- payload.Delta
+				case EventMessageFinished:
+					var event StreamEvent
+					if err := json.Unmarshal([]byte(evt.Data), &event); err != nil {
+						continue
+					}
+					payloadBytes, err := json.Marshal(event.Payload)
+					if err != nil {
+						continue
+					}
+					var payload MessageFinishedPayload
+					if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+						continue
+					}
+					ch <- payload.Content
 				}
 			}
 		}()
@@ -83,6 +123,13 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 	sessionUUID := pgtype.UUID{Bytes: sessionID, Valid: true}
 
+	assistantMessageID := uuid.NewString()
+	writer := NewStreamEventWriter(sessionIDStr, assistantMessageID)
+	sendStreamEvent(events, writer.Event(
+		EventMessageStarted,
+		map[string]string{"role": string(llm.RoleAssistant)},
+	))
+
 	// 1. Save User Message
 	_, err = l.repo.CreateMessage(ctx, userID, sessionUUID, string(llm.RoleUser), userMessage, nil, nil)
 	if err != nil {
@@ -97,7 +144,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 	// 3. Get LLM Client
 	client := l.llmFact.For(llm.TaskTypeAgentic)
-	tools := l.tools.GetTools()
+	toolDefs := l.tools.GetTools()
 
 	messages, err := l.loadHistory(ctx, userID, sessionUUID)
 	if err != nil {
@@ -111,7 +158,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 		req := llm.Request{
 			System:      sysPrompt,
 			Messages:    messages,
-			Tools:       tools,
+			Tools:       toolDefs,
 			MaxTokens:   4000,
 			Temperature: 0.7,
 		}
@@ -133,30 +180,60 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 		}
 
 		if res.Content != "" {
-			sendEvent(events, "content_delta", res.Content)
+			sendStreamEvent(events, writer.Event(
+				EventContentDelta,
+				ContentDeltaPayload{Delta: res.Content},
+			))
 		}
 
 		if len(res.ToolCalls) > 0 {
 			for _, tc := range res.ToolCalls {
-				tcJSON, marshalErr := json.Marshal(tc)
-				if marshalErr != nil {
-					slog.Error("marshal tool call", "error", marshalErr)
-					continue
-				}
-				sendEvent(events, "tool_use", string(tcJSON))
+				sendStreamEvent(events, writer.Event(
+					EventToolStarted,
+					ToolActivityPayload{Name: tc.Name, Label: labelForTool(tc.Name)},
+				))
 			}
 		}
 
 		if len(res.ToolCalls) == 0 {
 			finalContent = res.Content
-			sendEvent(events, "done", finalContent)
+			sendStreamEvent(events, writer.Event(
+				EventMessageFinished,
+				MessageFinishedPayload{Content: finalContent},
+			))
 			break
 		}
 
 		for _, tc := range res.ToolCalls {
+			if l.tools.Risk(tc.Name) == tools.ToolRiskSensitiveWrite {
+				sendStreamEvent(events, writer.Event(
+					EventConfirmationRequired,
+					ConfirmationRequiredPayload{
+						ToolName: tc.Name,
+						Label:    l.tools.Label(tc.Name),
+						ArgsJSON: tc.ArgsJSON,
+					},
+				))
+				finalContent = "Preciso da sua confirmação antes de aplicar essa alteração."
+				sendStreamEvent(events, writer.Event(
+					EventMessageFinished,
+					MessageFinishedPayload{Content: finalContent},
+				))
+				return finalContent, nil
+			}
+
 			resultStr, err := l.tools.Execute(ctx, userID, tc.Name, tc.ArgsJSON)
 			if err != nil {
 				resultStr = fmt.Sprintf("Error executing tool: %v", err)
+				sendStreamEvent(events, writer.Event(
+					EventToolFailed,
+					ToolFailedPayload{Name: tc.Name, Label: labelForTool(tc.Name), Message: err.Error()},
+				))
+			} else {
+				sendStreamEvent(events, writer.Event(
+					EventToolFinished,
+					ToolActivityPayload{Name: tc.Name, Label: labelForTool(tc.Name)},
+				))
 			}
 
 			toolMsg := llm.Message{
@@ -169,17 +246,35 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 			if _, err := l.persistTurn(ctx, userID, sessionUUID, toolMsg); err != nil {
 				return "", fmt.Errorf("save tool msg: %w", err)
 			}
-
-			sendEvent(events, "tool_result", resultStr)
 		}
 	}
 
 	if finalContent == "" {
 		finalContent = "Agent reached maximum iterations without final answer."
-		sendEvent(events, "done", finalContent)
+		sendStreamEvent(events, writer.Event(
+			EventMessageFinished,
+			MessageFinishedPayload{Content: finalContent},
+		))
 	}
 
 	return finalContent, nil
+}
+
+func labelForTool(toolName string) string {
+	switch toolName {
+	case "search_notes":
+		return "Buscando notas"
+	case "get_note", "get_notes":
+		return "Lendo notas"
+	case "get_open_tasks", "get_today_tasks":
+		return "Consultando tarefas"
+	case "add_note", "append_to_note", "append_to_inbox":
+		return "Atualizando notas"
+	case "add_task", "update_task", "complete_task":
+		return "Atualizando tarefas"
+	default:
+		return "Executando acao"
+	}
 }
 
 func (l *Loop) loadHistory(ctx context.Context, userID, sessionID pgtype.UUID) ([]llm.Message, error) {

@@ -34,13 +34,16 @@ void main() {
           loaded: true,
           streaming: false,
           onSend: (_) {},
+          activeToolLabel: null,
+          errorMessage: null,
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Comece uma conversa'), findsOneWidget);
-    expect(find.text('Pergunte algo ao agent e a resposta aparecer\u00e1 aqui.'), findsOneWidget);
+    expect(find.text('Pergunte algo ao agente e a resposta aparecer\u00e1 aqui.'), findsOneWidget);
   });
 
   testWidgets('renders user and assistant text messages', (tester) async {
@@ -54,6 +57,8 @@ void main() {
           loaded: true,
           streaming: false,
           onSend: (_) {},
+          activeToolLabel: null,
+          errorMessage: null,
         ),
       ),
     );
@@ -74,6 +79,8 @@ void main() {
           loaded: true,
           streaming: true,
           onSend: (_) {},
+          activeToolLabel: null,
+          errorMessage: null,
         ),
       ),
     );
@@ -92,6 +99,8 @@ void main() {
           loaded: true,
           streaming: false,
           onSend: sent.add,
+          activeToolLabel: null,
+          errorMessage: null,
         ),
       ),
     );
@@ -104,5 +113,65 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(sent, ['Criar resumo']);
+  });
+
+  testWidgets('shows tool activity while streaming', (tester) async {
+    await tester.pumpWidget(wrap(AgentChatView(
+      messages: const [],
+      loaded: true,
+      streaming: true,
+      activeToolLabel: 'Buscando notas',
+      errorMessage: null,
+      onRetry: null,
+      onCancel: () {},
+      onSend: (_) {},
+    )));
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Buscando notas'), findsOneWidget);
+    expect(find.byTooltip('Cancelar resposta'), findsOneWidget);
+  });
+
+  testWidgets('prompt suggestion chips send the correct prompt', (tester) async {
+    final sent = <String>[];
+    await tester.pumpWidget(wrap(AgentChatView(
+      messages: const [],
+      loaded: true,
+      streaming: false,
+      activeToolLabel: null,
+      errorMessage: null,
+      onSend: sent.add,
+    )));
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.text('Resuma minhas notas recentes'));
+    await tester.pump();
+    expect(sent, ['Resuma minhas notas recentes']);
+  });
+
+  testWidgets('shows inline error with retry action', (tester) async {
+    var retried = false;
+    await tester.pumpWidget(wrap(AgentChatView(
+      messages: const [],
+      loaded: true,
+      streaming: false,
+      activeToolLabel: null,
+      errorMessage: 'Falha no stream',
+      onRetry: () => retried = true,
+      onCancel: null,
+      onSend: (_) {},
+    )));
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Falha no stream'), findsOneWidget);
+    await tester.tap(find.text('Tentar novamente'));
+    await tester.pump();
+    expect(retried, isTrue);
   });
 }

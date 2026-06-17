@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -85,18 +86,24 @@ func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([
 }
 
 // remaining Querier methods (unused by context tests)
-func (s *stubQuerier) AddTagToNote(context.Context, sqlcgen.AddTagToNoteParams) error      { panic("unimplemented") }
+func (s *stubQuerier) AddTagToNote(context.Context, sqlcgen.AddTagToNoteParams) error {
+	panic("unimplemented")
+}
 func (s *stubQuerier) AppendToInbox(context.Context, sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) AppendToNoteContent(context.Context, sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) CleanupOldMessages(context.Context) error          { panic("unimplemented") }
-func (s *stubQuerier) CountNotes(context.Context, pgtype.UUID) (int64, error)         { panic("unimplemented") }
-func (s *stubQuerier) CountTasks(context.Context, pgtype.UUID) (int64, error)         { panic("unimplemented") }
-func (s *stubQuerier) CountOpenTasks(context.Context, pgtype.UUID) (int64, error)     { panic("unimplemented") }
-func (s *stubQuerier) CountCompletedTasks(context.Context, pgtype.UUID) (int64, error) { panic("unimplemented") }
+func (s *stubQuerier) CleanupOldMessages(context.Context) error               { panic("unimplemented") }
+func (s *stubQuerier) CountNotes(context.Context, pgtype.UUID) (int64, error) { panic("unimplemented") }
+func (s *stubQuerier) CountTasks(context.Context, pgtype.UUID) (int64, error) { panic("unimplemented") }
+func (s *stubQuerier) CountOpenTasks(context.Context, pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) CountCompletedTasks(context.Context, pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) CreateContext(context.Context, sqlcgen.CreateContextParams) (sqlcgen.Context, error) {
 	panic("unimplemented")
 }
@@ -139,22 +146,36 @@ func (s *stubQuerier) CreateUser(context.Context, sqlcgen.CreateUserParams) (sql
 func (s *stubQuerier) CreateUserSettings(context.Context, sqlcgen.CreateUserSettingsParams) (sqlcgen.UserSetting, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) DeleteContext(context.Context, sqlcgen.DeleteContextParams) error     { panic("unimplemented") }
+func (s *stubQuerier) DeleteContext(context.Context, sqlcgen.DeleteContextParams) error {
+	panic("unimplemented")
+}
 func (s *stubQuerier) DeleteDeviceToken(context.Context, sqlcgen.DeleteDeviceTokenParams) error {
 	panic("unimplemented")
 }
-func (s *stubQuerier) DeleteMemory(context.Context, sqlcgen.DeleteMemoryParams) error      { panic("unimplemented") }
-func (s *stubQuerier) DeleteNote(context.Context, sqlcgen.DeleteNoteParams) error           { panic("unimplemented") }
+func (s *stubQuerier) DeleteMemory(context.Context, sqlcgen.DeleteMemoryParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteNote(context.Context, sqlcgen.DeleteNoteParams) error {
+	panic("unimplemented")
+}
 func (s *stubQuerier) DeleteSessionMessages(context.Context, sqlcgen.DeleteSessionMessagesParams) error {
 	panic("unimplemented")
 }
-func (s *stubQuerier) DeleteTag(context.Context, sqlcgen.DeleteTagParams) error    { panic("unimplemented") }
-func (s *stubQuerier) DeleteTask(context.Context, sqlcgen.DeleteTaskParams) error   { panic("unimplemented") }
-func (s *stubQuerier) GetContexts(context.Context, pgtype.UUID) ([]sqlcgen.Context, error) { panic("unimplemented") }
+func (s *stubQuerier) DeleteTag(context.Context, sqlcgen.DeleteTagParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteTask(context.Context, sqlcgen.DeleteTaskParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetContexts(context.Context, pgtype.UUID) ([]sqlcgen.Context, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetEnabledRoutines(context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetInboxNote(context.Context, pgtype.UUID) (sqlcgen.Note, error) { panic("unimplemented") }
+func (s *stubQuerier) GetInboxNote(context.Context, pgtype.UUID) (sqlcgen.Note, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetLatestBriefByType(context.Context, sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
 	panic("unimplemented")
 }
@@ -194,8 +215,12 @@ func (s *stubQuerier) GetSyncTags(context.Context, sqlcgen.GetSyncTagsParams) ([
 func (s *stubQuerier) GetSyncTasks(context.Context, sqlcgen.GetSyncTasksParams) ([]sqlcgen.Task, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetTags(context.Context, pgtype.UUID) ([]sqlcgen.Tag, error)          { panic("unimplemented") }
-func (s *stubQuerier) GetTagsForNote(context.Context, pgtype.UUID) ([]sqlcgen.Tag, error)   { panic("unimplemented") }
+func (s *stubQuerier) GetTags(context.Context, pgtype.UUID) ([]sqlcgen.Tag, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetTagsForNote(context.Context, pgtype.UUID) ([]sqlcgen.Tag, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetTaskByID(context.Context, sqlcgen.GetTaskByIDParams) (sqlcgen.Task, error) {
 	panic("unimplemented")
 }
@@ -208,8 +233,12 @@ func (s *stubQuerier) GetTasksByNoteID(context.Context, sqlcgen.GetTasksByNoteID
 func (s *stubQuerier) GetTodayTasks(context.Context, sqlcgen.GetTodayTasksParams) ([]sqlcgen.Task, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetUserByEmail(context.Context, string) (sqlcgen.User, error)          { panic("unimplemented") }
-func (s *stubQuerier) GetUserByID(context.Context, pgtype.UUID) (sqlcgen.User, error)        { panic("unimplemented") }
+func (s *stubQuerier) GetUserByEmail(context.Context, string) (sqlcgen.User, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetUserByID(context.Context, pgtype.UUID) (sqlcgen.User, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetUserSettings(context.Context, pgtype.UUID) (sqlcgen.UserSetting, error) {
 	panic("unimplemented")
 }
@@ -222,8 +251,10 @@ func (s *stubQuerier) ListDeviceTokensByUser(context.Context, pgtype.UUID) ([]sq
 func (s *stubQuerier) RemoveTagFromNote(context.Context, sqlcgen.RemoveTagFromNoteParams) error {
 	panic("unimplemented")
 }
-func (s *stubQuerier) RevokeAllUserRefreshTokens(context.Context, pgtype.UUID) error { panic("unimplemented") }
-func (s *stubQuerier) RevokeRefreshToken(context.Context, pgtype.UUID) error          { panic("unimplemented") }
+func (s *stubQuerier) RevokeAllUserRefreshTokens(context.Context, pgtype.UUID) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) RevokeRefreshToken(context.Context, pgtype.UUID) error { panic("unimplemented") }
 func (s *stubQuerier) SearchMemoriesByEmbedding(context.Context, sqlcgen.SearchMemoriesByEmbeddingParams) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
 	panic("unimplemented")
 }
@@ -272,7 +303,9 @@ func (s *stubQuerier) UpsertTag(context.Context, sqlcgen.UpsertTagParams) (sqlcg
 func (s *stubQuerier) UpsertTask(context.Context, sqlcgen.UpsertTaskParams) (sqlcgen.Task, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) UpdateRoutineLastRunAt(context.Context, pgtype.UUID) error            { panic("unimplemented") }
+func (s *stubQuerier) UpdateRoutineLastRunAt(context.Context, pgtype.UUID) error {
+	panic("unimplemented")
+}
 func (s *stubQuerier) UpsertTaskCompletion(context.Context, sqlcgen.UpsertTaskCompletionParams) error {
 	panic("unimplemented")
 }
@@ -282,16 +315,24 @@ func (s *stubQuerier) GetSyncTaskCompletions(context.Context, sqlcgen.GetSyncTas
 func (s *stubQuerier) GetSyncNoteTags(context.Context, pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) UpsertNoteTag(context.Context, sqlcgen.UpsertNoteTagParams) error     { panic("unimplemented") }
+func (s *stubQuerier) UpsertNoteTag(context.Context, sqlcgen.UpsertNoteTagParams) error {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetSyncNoteLinks(context.Context, pgtype.UUID) ([]sqlcgen.NoteLink, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) UpsertNoteLink(context.Context, sqlcgen.UpsertNoteLinkParams) error   { panic("unimplemented") }
+func (s *stubQuerier) UpsertNoteLink(context.Context, sqlcgen.UpsertNoteLinkParams) error {
+	panic("unimplemented")
+}
 func (s *stubQuerier) CreateNoteShare(context.Context, sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) DeleteNoteShare(context.Context, sqlcgen.DeleteNoteShareParams) error { panic("unimplemented") }
-func (s *stubQuerier) GetNoteOwner(context.Context, pgtype.UUID) (pgtype.UUID, error)      { panic("unimplemented") }
+func (s *stubQuerier) DeleteNoteShare(context.Context, sqlcgen.DeleteNoteShareParams) error {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetNoteOwner(context.Context, pgtype.UUID) (pgtype.UUID, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetNoteShareForUser(context.Context, sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
 	panic("unimplemented")
 }
@@ -350,5 +391,22 @@ func TestContextBuilder_Build(t *testing.T) {
 	}
 	if result == "" {
 		t.Fatal("expected non-empty context")
+	}
+
+	requiredSections := []string{
+		"SYSTEM RULES:",
+		"TOOL RULES:",
+		"SOUL:",
+		"CURRENT DATE & TIME:",
+		"TODAY/OVERDUE TASKS:",
+		"RECENT NOTES",
+		"SEMANTIC SEARCH RESULTS:",
+		"RELATED NOTES:",
+		"RELEVANT MEMORIES:",
+	}
+	for _, section := range requiredSections {
+		if !strings.Contains(result, section) {
+			t.Fatalf("expected context to contain %q, got:\n%s", section, result)
+		}
 	}
 }
