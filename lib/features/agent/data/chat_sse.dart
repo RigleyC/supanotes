@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as dev;
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,59 +30,68 @@ class ChatSSE {
   }) {
     _cancelToken = CancelToken();
     final controller = StreamController<SSEChatEvent>();
+    dev.log('stream start session=$sessionId', name: 'ChatSSE');
 
-    _api.postStream(
-      '/agent/chat/stream',
-      data: <String, dynamic>{
-        'session_id': sessionId,
-        'content': message,
-      },
-      options: Options(receiveTimeout: const Duration(minutes: 5)),
-      cancelToken: _cancelToken,
-    ).then((response) async {
-      final body = response.data as ResponseBody;
-      final lines = body.stream
-          .cast<List<int>>()
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
+    _api
+        .postStream(
+          '/agent/chat/stream',
+          data: <String, dynamic>{'session_id': sessionId, 'content': message},
+          options: Options(receiveTimeout: const Duration(minutes: 5)),
+          cancelToken: _cancelToken,
+        )
+        .then((response) async {
+          final body = response.data as ResponseBody;
+          final lines = body.stream
+              .cast<List<int>>()
+              .transform(utf8.decoder)
+              .transform(const LineSplitter());
 
-      await for (final line in lines) {
-        if (_cancelToken?.isCancelled ?? false) break;
-        if (!line.startsWith('data: ')) continue;
+          await for (final line in lines) {
+            if (_cancelToken?.isCancelled ?? false) break;
+            if (!line.startsWith('data: ')) continue;
 
-        final jsonStr = line.substring(6);
-        if (jsonStr.isEmpty) continue;
+            final jsonStr = line.substring(6);
+            if (jsonStr.isEmpty) continue;
 
-        try {
-          final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-          final event = SSEChatEvent.fromJson(data);
+            try {
+              final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+              final event = SSEChatEvent.fromJson(data);
+              dev.log('stream event type=${event.type}', name: 'ChatSSE');
 
-          if (event.isError) {
-            controller.addError(
-              ApiException(message: event.errorMessage ?? event.data ?? 'Ocorreu um erro no stream'),
-            );
-            break;
+              if (event.isError) {
+                controller.addError(
+                  ApiException(
+                    message:
+                        event.errorMessage ??
+                        event.data ??
+                        'Ocorreu um erro no stream',
+                  ),
+                );
+                break;
+              }
+
+              controller.add(event);
+
+              if (event.isDone) {
+                break;
+              }
+            } catch (_) {
+              // skip malformed lines
+            }
           }
-
-          controller.add(event);
-
-          if (event.isDone) {
-            break;
+          dev.log('stream close session=$sessionId', name: 'ChatSSE');
+          await controller.close();
+        })
+        .catchError((Object e) {
+          dev.log('stream error session=$sessionId error=$e', name: 'ChatSSE');
+          if (e is DioException) {
+            if (CancelToken.isCancel(e)) return;
+            controller.addError(fromDioError(e));
+          } else {
+            controller.addError(ApiException(message: e.toString()));
           }
-        } catch (_) {
-          // skip malformed lines
-        }
-      }
-      await controller.close();
-    }).catchError((Object e) {
-      if (e is DioException) {
-        if (CancelToken.isCancel(e)) return;
-        controller.addError(fromDioError(e));
-      } else {
-        controller.addError(ApiException(message: e.toString()));
-      }
-      controller.close();
-    });
+          controller.close();
+        });
 
     return controller.stream;
   }

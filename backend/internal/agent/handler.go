@@ -74,6 +74,8 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 		return err
 	}
 
+	slog.Info("agent chat stream started", "session_id", req.SessionID)
+
 	c.Response().Header().Set(echo.HeaderContentType, "text/event-stream")
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-cache")
 	c.Response().Header().Set(echo.HeaderConnection, "keep-alive")
@@ -87,6 +89,7 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 			close(events)
 		}()
 		if err := h.loop.ChatStream(c.Request().Context(), userID, req.SessionID, req.Content, events); err != nil {
+			slog.Error("agent chat stream failed", "session_id", req.SessionID, "error", err)
 			writer := NewStreamEventWriter(req.SessionID, "")
 			sendStreamEvent(events, writer.Event(EventError, ErrorPayload{Message: err.Error()}))
 		}
@@ -100,10 +103,12 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 	for event := range events {
 		_, err := fmt.Fprintf(c.Response().Writer, "data: %s\n\n", event.Data)
 		if err != nil {
+			slog.Error("agent chat stream write failed", "session_id", req.SessionID, "error", err)
 			break
 		}
 		flusher.Flush()
 	}
+	slog.Info("agent chat stream closed", "session_id", req.SessionID)
 	return nil
 }
 
