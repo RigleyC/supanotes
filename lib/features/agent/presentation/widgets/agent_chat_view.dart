@@ -16,12 +16,20 @@ class AgentChatView extends StatefulWidget {
     required this.loaded,
     required this.streaming,
     required this.onSend,
+    required this.activeToolLabel,
+    required this.errorMessage,
+    this.onRetry,
+    this.onCancel,
   });
 
   final List<MessageModel> messages;
   final bool loaded;
   final bool streaming;
   final ValueChanged<String> onSend;
+  final String? activeToolLabel;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
+  final VoidCallback? onCancel;
 
   @override
   State<AgentChatView> createState() => _AgentChatViewState();
@@ -71,16 +79,41 @@ class _AgentChatViewState extends State<AgentChatView> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return flyer_ui.Chat(
+    final chat = flyer_ui.Chat(
       currentUserId: agentChatCurrentUserId,
       resolveUser: resolveAgentChatUser,
       chatController: _chatController,
       theme: flyer.ChatTheme.fromThemeData(Theme.of(context)),
       builders: flyer.Builders(
-        emptyChatListBuilder: (_) => const EmptyState(
-          icon: Icons.chat_bubble_outline,
-          title: 'Comece uma conversa',
-          subtitle: 'Pergunte algo ao agent e a resposta aparecer\u00e1 aqui.',
+        emptyChatListBuilder: (_) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const EmptyState(
+              icon: Icons.chat_bubble_outline,
+              title: 'Comece uma conversa',
+              subtitle: 'Pergunte algo ao agente e a resposta aparecer\u00e1 aqui.',
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              alignment: WrapAlignment.center,
+              children: [
+                ActionChip(
+                  label: const Text('Resuma minhas notas recentes'),
+                  onPressed: () => widget.onSend('Resuma minhas notas recentes'),
+                ),
+                ActionChip(
+                  label: const Text('Quais tarefas vencem hoje?'),
+                  onPressed: () => widget.onSend('Quais tarefas vencem hoje?'),
+                ),
+                ActionChip(
+                  label: const Text('Organize meu inbox'),
+                  onPressed: () => widget.onSend('Organize meu inbox'),
+                ),
+              ],
+            ),
+          ],
         ),
         customMessageBuilder: (context, message, index, {groupStatus, required isSentByMe}) {
           if (message.metadata?['kind'] == agentChatTypingKind) {
@@ -105,13 +138,98 @@ class _AgentChatViewState extends State<AgentChatView> {
       ),
       onMessageSend: widget.streaming ? null : widget.onSend,
     );
-  }
 
+    final statusBar = _AgentChatStatusBar(
+      activeToolLabel: widget.activeToolLabel,
+      errorMessage: widget.errorMessage,
+      onRetry: widget.onRetry,
+      onCancel: widget.onCancel,
+    );
+
+    if (statusBar.isHidden) return chat;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: chat),
+        statusBar,
+      ],
+    );
+  }
   String _signatureFor(List<MessageModel> messages, bool streaming) {
     return [
       streaming ? 'streaming' : 'idle',
       for (final message in messages)
         '${message.id}:${message.role.name}:${message.content}',
     ].join('|');
+  }
+}
+
+class _AgentChatStatusBar extends StatelessWidget {
+  const _AgentChatStatusBar({
+    this.activeToolLabel,
+    this.errorMessage,
+    this.onRetry,
+    this.onCancel,
+  });
+
+  final String? activeToolLabel;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
+  final VoidCallback? onCancel;
+
+  bool get isHidden =>
+      activeToolLabel == null && errorMessage == null && onRetry == null && onCancel == null;
+
+  @override
+  Widget build(BuildContext context) {
+
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Row(
+        children: [
+          if (activeToolLabel != null) ...[
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                activeToolLabel!,
+                style: theme.textTheme.bodySmall,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          if (errorMessage != null) ...[
+            Icon(Icons.error_outline, size: 16, color: theme.colorScheme.error),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                errorMessage!,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Tentar novamente'),
+            ),
+          const Spacer(),
+          if (onCancel != null)
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              tooltip: 'Cancelar resposta',
+              onPressed: onCancel,
+            ),
+        ],
+      ),
+    );
   }
 }

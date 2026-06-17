@@ -1,11 +1,8 @@
-// ignore_for_file: invalid_use_of_internal_member
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/agent/data/chat_repository.dart';
 import 'package:supanotes/features/agent/data/chat_sse.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
@@ -15,7 +12,26 @@ import 'package:supanotes/features/agent/domain/sse_chat_event.dart';
 typedef ChatState = ({
   List<MessageModel> messages,
   bool isStreaming,
+  String? activeToolLabel,
+  String? errorMessage,
+  String? retryMessage,
 });
+
+ChatState chatState({
+  List<MessageModel> messages = const [],
+  bool isStreaming = false,
+  String? activeToolLabel,
+  String? errorMessage,
+  String? retryMessage,
+}) {
+  return (
+    messages: messages,
+    isStreaming: isStreaming,
+    activeToolLabel: activeToolLabel,
+    errorMessage: errorMessage,
+    retryMessage: retryMessage,
+  );
+}
 
 final chatControllerProvider = NotifierProvider<ChatController, AsyncValue<ChatState>>(
   ChatController.new,
@@ -37,7 +53,7 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
     state = const AsyncValue.loading();
     try {
       final messages = await ref.read(chatRepositoryProvider).getHistory(sessionId);
-      state = AsyncValue.data((messages: messages, isStreaming: false));
+      state = AsyncValue.data(chatState(messages: messages));
     } on ApiException catch (e, st) {
       state = AsyncValue.error(e.message, st);
     } catch (e, st) {
@@ -69,92 +85,100 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
       createdAt: DateTime.now(),
     );
 
-    state = AsyncValue.data((
+    state = AsyncValue.data(chatState(
       messages: [...currentMessages, pending, initialAssistant],
       isStreaming: true,
+      retryMessage: trimmed,
     ));
 
     _sseSub?.cancel();
-    final sse = ChatSSE(apiClient: ref.read(apiClientProvider));
+    final sse = ref.read(chatSSEProvider);
 
     final messagesWithoutAssistant = [...currentMessages, pending];
     final buffer = StringBuffer();
-    String currentToolStatus = '';
 
     _sseSub = sse.streamChat(
       sessionId: sessionId,
       message: trimmed,
     ).listen(
       (event) {
-        if (event.type == 'content_delta' && event.delta != null) {
+        if (event.isContentDelta && event.delta != null) {
           buffer.write(event.delta);
-          currentToolStatus = ''; // Clear tool status when text response starts
-          final updatedAssistant = initialAssistant.copyWith(
-            content: buffer.toString(),
-          );
-          state = AsyncValue.data((
-            messages: [...messagesWithoutAssistant, updatedAssistant],
+          state = AsyncValue.data(chatState(
+            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: buffer.toString())],
             isStreaming: true,
+            retryMessage: trimmed,
           ));
-        } else if (event.type == 'tool_use' && event.data != null) {
-          try {
-            final toolCall = jsonDecode(event.data!) as Map<String, dynamic>;
-            final toolName = toolCall['name'] as String? ?? 'processamento';
-            
-            currentToolStatus = '\n\n*(Pensando... executando ação: $toolName)*';
-            final updatedAssistant = initialAssistant.copyWith(
-              content: buffer.toString() + currentToolStatus,
-            );
-            state = AsyncValue.data((
-              messages: [...messagesWithoutAssistant, updatedAssistant],
-              isStreaming: true,
-            ));
-          } catch (_) {}
-        } else if (event.type == 'tool_result') {
-          currentToolStatus = '\n\n*(Pensando... processando resultado)*';
-          final updatedAssistant = initialAssistant.copyWith(
-            content: buffer.toString() + currentToolStatus,
-          );
-          state = AsyncValue.data((
-            messages: [...messagesWithoutAssistant, updatedAssistant],
+        } else if (event.isToolStarted) {
+          state = AsyncValue.data(chatState(
+            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: buffer.toString())],
             isStreaming: true,
+            activeToolLabel: event.toolLabel ?? 'Executando acao',
+            retryMessage: trimmed,
           ));
-        } else if (event.type == 'done') {
-          final current = state.value;
-          if (current != null) {
-            final finalAssistant = initialAssistant.copyWith(
-              content: buffer.toString(),
-            );
-            state = AsyncValue.data((
-              messages: [...messagesWithoutAssistant, finalAssistant],
-              isStreaming: false,
-            ));
-          }
+        } else if (event.isToolFinished || event.isToolFailed || event.isToolResult) {
+          state = AsyncValue.data(chatState(
+            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: buffer.toString())],
+            isStreaming: true,
+            retryMessage: trimmed,
+          ));
+        } else if (event.isDone) {
+          final content = event.finalContent ?? buffer.toString();
+          state = AsyncValue.data(chatState(
+            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: content)],
+            isStreaming: false,
+            retryMessage: trimmed,
+          ));
         }
       },
       onError: (Object e, StackTrace st) {
-        final messages = state.value?.messages ?? currentMessages;
-        final errorState = AsyncValue<ChatState>.data((
-          messages: messages,
-          isStreaming: false,
-        ));
-        state = AsyncError<ChatState>(
+        _setRecoverableError(
           e is ApiException ? e.message : e.toString(),
-          st,
-        ).copyWithPrevious(errorState);
+          trimmed,
+        );
       },
       onDone: () {
         final current = state.value;
-        if (current != null) {
-          final finalAssistant = initialAssistant.copyWith(
-            content: buffer.toString(),
-          );
-          state = AsyncValue.data((
-            messages: [...messagesWithoutAssistant, finalAssistant],
+        if (current != null && current.isStreaming) {
+          state = AsyncValue.data(chatState(
+            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: buffer.toString())],
             isStreaming: false,
+            retryMessage: trimmed,
           ));
         }
       },
     );
+  }
+
+  void _setRecoverableError(String message, String retryMessage) {
+    final current = state.value;
+    if (current == null) {
+      state = AsyncValue.error(message, StackTrace.current);
+      return;
+    }
+    state = AsyncValue.data(chatState(
+      messages: current.messages,
+      isStreaming: false,
+      errorMessage: message,
+      retryMessage: retryMessage,
+    ));
+  }
+
+  Future<void> retryLastMessage() async {
+    final retry = state.value?.retryMessage;
+    if (retry == null || retry.trim().isEmpty) return;
+    await sendMessage(retry);
+  }
+
+  Future<void> cancelStreaming() async {
+    await _sseSub?.cancel();
+    _sseSub = null;
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncValue.data(chatState(
+      messages: current.messages,
+      isStreaming: false,
+      retryMessage: current.retryMessage,
+    ));
   }
 }

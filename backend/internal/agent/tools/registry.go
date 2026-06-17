@@ -77,6 +77,44 @@ func NewToolRegistry(
 	return registry
 }
 
+type ToolRisk string
+
+const (
+	ToolRiskRead           ToolRisk = "read"
+	ToolRiskLowWrite       ToolRisk = "low_write"
+	ToolRiskSensitiveWrite ToolRisk = "sensitive_write"
+)
+
+func (tr *ToolRegistry) Risk(toolName string) ToolRisk {
+	switch toolName {
+	case "search_notes", "get_note", "get_notes", "get_open_tasks", "get_today_tasks", "list_memories", "get_soul", "list_routines", "get_vault_context":
+		return ToolRiskRead
+	case "add_note", "add_task", "save_memory", "append_to_inbox":
+		return ToolRiskLowWrite
+	case "update_note", "append_to_note", "delete_memory", "update_soul", "apply_inbox_organization", "set_daily_brief_schedule", "set_weekly_brief_schedule", "update_task", "complete_task":
+		return ToolRiskSensitiveWrite
+	default:
+		return ToolRiskSensitiveWrite
+	}
+}
+
+func (tr *ToolRegistry) Label(toolName string) string {
+	switch toolName {
+	case "search_notes":
+		return "Buscando notas"
+	case "get_note", "get_notes":
+		return "Lendo notas"
+	case "get_open_tasks", "get_today_tasks":
+		return "Consultando tarefas"
+	case "add_note", "append_to_note", "append_to_inbox":
+		return "Atualizando notas"
+	case "add_task", "update_task", "complete_task":
+		return "Atualizando tarefas"
+	default:
+		return "Executando acao"
+	}
+}
+
 func (tr *ToolRegistry) GetTools() []llm.Tool {
 	var result []llm.Tool
 	for _, e := range tr.tools {

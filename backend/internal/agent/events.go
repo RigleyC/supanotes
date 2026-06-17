@@ -3,13 +3,14 @@ package agent
 type EventType string
 
 const (
-	EventMessageStarted  EventType = "message_started"
-	EventContentDelta    EventType = "content_delta"
-	EventToolStarted     EventType = "tool_started"
-	EventToolFinished    EventType = "tool_finished"
-	EventToolFailed      EventType = "tool_failed"
-	EventMessageFinished EventType = "message_finished"
-	EventError           EventType = "error"
+	EventMessageStarted       EventType = "message_started"
+	EventContentDelta         EventType = "content_delta"
+	EventToolStarted          EventType = "tool_started"
+	EventToolFinished         EventType = "tool_finished"
+	EventToolFailed           EventType = "tool_failed"
+	EventMessageFinished      EventType = "message_finished"
+	EventError                EventType = "error"
+	EventConfirmationRequired EventType = "confirmation_required"
 )
 
 type StreamEvent struct {
@@ -41,6 +42,12 @@ type MessageFinishedPayload struct {
 
 type ErrorPayload struct {
 	Message string `json:"message"`
+}
+
+type ConfirmationRequiredPayload struct {
+	ToolName string `json:"tool_name"`
+	Label    string `json:"label"`
+	ArgsJSON string `json:"args_json"`
 }
 
 type StreamEventWriter struct {

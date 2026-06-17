@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/di/providers.dart';
 
 import 'package:supanotes/features/agent/domain/sse_chat_event.dart';
 
@@ -84,3 +86,7 @@ class ChatSSE {
     return controller.stream;
   }
 }
+
+final chatSSEProvider = Provider.autoDispose<ChatSSE>((ref) {
+  return ChatSSE(apiClient: ref.watch(apiClientProvider));
+});

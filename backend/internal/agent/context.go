@@ -127,6 +127,18 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 	}
 
 	var b strings.Builder
+	b.WriteString(`SYSTEM RULES:
+- Answer in the user's language.
+- Be concise and explicit about what changed.
+- Admit when available context is insufficient.
+
+TOOL RULES:
+- Use read tools when the current context is insufficient.
+- Do not expose raw tool JSON or internal tool names to the user.
+- Summarize successful writes in the final answer.
+- Ask for confirmation before sensitive writes.
+
+`)
 	b.WriteString(truncate(fmt.Sprintf(`SOUL:
 %s
 
@@ -169,7 +181,7 @@ CURRENT DATE & TIME:
 	}
 	b.WriteString(truncate(tier5.String(), MaxTier5Tokens))
 
-	b.WriteString("\nYou have access to tools to modify the database. If the user asks you to create a note, use add_note. If the user asks about a specific file/note, search for its ID using search_notes, and then retrieve its full content using get_note.")
+	b.WriteString("\nUse tools only when they directly help answer or complete the user's request.")
 
 	return b.String(), nil
 }

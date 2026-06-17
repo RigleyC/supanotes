@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/RigleyC/supanotes/internal/agent/tools"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/pkg/llm"
 )
@@ -143,7 +144,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 	// 3. Get LLM Client
 	client := l.llmFact.For(llm.TaskTypeAgentic)
-	tools := l.tools.GetTools()
+	toolDefs := l.tools.GetTools()
 
 	messages, err := l.loadHistory(ctx, userID, sessionUUID)
 	if err != nil {
@@ -157,7 +158,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 		req := llm.Request{
 			System:      sysPrompt,
 			Messages:    messages,
-			Tools:       tools,
+			Tools:       toolDefs,
 			MaxTokens:   4000,
 			Temperature: 0.7,
 		}
@@ -204,6 +205,23 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 		}
 
 		for _, tc := range res.ToolCalls {
+			if l.tools.Risk(tc.Name) == tools.ToolRiskSensitiveWrite {
+				sendStreamEvent(events, writer.Event(
+					EventConfirmationRequired,
+					ConfirmationRequiredPayload{
+						ToolName: tc.Name,
+						Label:    l.tools.Label(tc.Name),
+						ArgsJSON: tc.ArgsJSON,
+					},
+				))
+				finalContent = "Preciso da sua confirmação antes de aplicar essa alteração."
+				sendStreamEvent(events, writer.Event(
+					EventMessageFinished,
+					MessageFinishedPayload{Content: finalContent},
+				))
+				return finalContent, nil
+			}
+
 			resultStr, err := l.tools.Execute(ctx, userID, tc.Name, tc.ArgsJSON)
 			if err != nil {
 				resultStr = fmt.Sprintf("Error executing tool: %v", err)

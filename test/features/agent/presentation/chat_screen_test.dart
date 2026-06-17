@@ -24,7 +24,7 @@ class _TestChatController extends ChatController {
 void main() {
   testWidgets('chat screen renders package chat view and sends through controller', (tester) async {
     final controller = _TestChatController(
-      (
+      chatState(
         isStreaming: false,
         messages: [
           MessageModel(
