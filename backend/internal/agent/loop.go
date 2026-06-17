@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -152,6 +153,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 	}
 
 	finalContent := ""
+	var lastToolResults []string
 
 	// 4. Tool Calling Loop (max 5 iterations)
 	for i := 0; i < 5; i++ {
@@ -176,8 +178,14 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 				return "", fmt.Errorf("llm fallback call: %w", err)
 			}
 			if res.Content == "" && len(res.ToolCalls) == 0 {
-				slog.Error("llm returned empty agent response", "iteration", i)
-				return "", fmt.Errorf("llm returned empty response")
+				if len(lastToolResults) > 0 {
+					res.Content = strings.Join(lastToolResults, "\n")
+					res.ToolCalls = nil
+					slog.Warn("llm returned empty agent response; finishing with tool result", "iteration", i)
+				} else {
+					slog.Error("llm returned empty agent response", "iteration", i)
+					return "", fmt.Errorf("llm returned empty response")
+				}
 			}
 		}
 
@@ -255,6 +263,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 				ToolCallID: tc.ID,
 			}
 			messages = append(messages, toolMsg)
+			lastToolResults = append(lastToolResults, resultStr)
 
 			if _, err := l.persistTurn(ctx, userID, sessionUUID, toolMsg); err != nil {
 				return "", fmt.Errorf("save tool msg: %w", err)

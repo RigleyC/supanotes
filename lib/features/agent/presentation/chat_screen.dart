@@ -40,13 +40,17 @@ class ChatScreen extends ConsumerWidget {
           streaming: isStreaming,
           activeToolLabel: state?.activeToolLabel,
           errorMessage: state?.errorMessage,
-          onRetry: state?.retryMessage == null
+          onRetry: state?.errorMessage == null || state?.retryMessage == null
               ? null
-              : () => ref.read(chatControllerProvider.notifier).retryLastMessage(),
+              : () => ref
+                    .read(chatControllerProvider.notifier)
+                    .retryLastMessage(),
           onCancel: isStreaming
-              ? () => ref.read(chatControllerProvider.notifier).cancelStreaming()
+              ? () =>
+                    ref.read(chatControllerProvider.notifier).cancelStreaming()
               : null,
-          onSend: (text) => ref.read(chatControllerProvider.notifier).sendMessage(text),
+          onSend: (text) =>
+              ref.read(chatControllerProvider.notifier).sendMessage(text),
         ),
       ),
     );

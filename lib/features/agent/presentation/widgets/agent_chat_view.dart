@@ -91,7 +91,8 @@ class _AgentChatViewState extends State<AgentChatView> {
             const EmptyState(
               icon: Icons.chat_bubble_outline,
               title: 'Comece uma conversa',
-              subtitle: 'Pergunte algo ao agente e a resposta aparecer\u00e1 aqui.',
+              subtitle:
+                  'Pergunte algo ao agente e a resposta aparecer\u00e1 aqui.',
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -101,7 +102,8 @@ class _AgentChatViewState extends State<AgentChatView> {
               children: [
                 ActionChip(
                   label: const Text('Resuma minhas notas recentes'),
-                  onPressed: () => widget.onSend('Resuma minhas notas recentes'),
+                  onPressed: () =>
+                      widget.onSend('Resuma minhas notas recentes'),
                 ),
                 ActionChip(
                   label: const Text('Quais tarefas vencem hoje?'),
@@ -115,47 +117,43 @@ class _AgentChatViewState extends State<AgentChatView> {
             ),
           ],
         ),
-        customMessageBuilder: (context, message, index, {groupStatus, required isSentByMe}) {
-          if (message.metadata?['kind'] == agentChatTypingKind) {
-            return const Padding(
-              key: ValueKey('agent-chat-typing-indicator'),
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: flyer_ui.IsTypingIndicator(),
-              ),
-            );
-          }
-          return const SizedBox.shrink();
-        },
-        composerBuilder: (_) => Align(
-          alignment: Alignment.bottomCenter,
-          child: ChatInput(
-            enabled: !widget.streaming,
-            onSend: widget.onSend,
-          ),
-        ),
+        customMessageBuilder:
+            (context, message, index, {groupStatus, required isSentByMe}) {
+              if (message.metadata?['kind'] == agentChatTypingKind) {
+                return const Padding(
+                  key: ValueKey('agent-chat-typing-indicator'),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: flyer_ui.IsTypingIndicator(),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+        composerBuilder: (_) => const SizedBox.shrink(),
       ),
-      onMessageSend: widget.streaming ? null : widget.onSend,
+      onMessageSend: null,
     );
 
     final statusBar = _AgentChatStatusBar(
+      streaming: widget.streaming,
       activeToolLabel: widget.activeToolLabel,
       errorMessage: widget.errorMessage,
       onRetry: widget.onRetry,
       onCancel: widget.onCancel,
     );
 
-    if (statusBar.isHidden) return chat;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(child: chat),
-        statusBar,
+        if (!statusBar.isHidden) statusBar,
+        ChatInput(enabled: !widget.streaming, onSend: widget.onSend),
       ],
     );
   }
+
   String _signatureFor(List<MessageModel> messages, bool streaming) {
     return [
       streaming ? 'streaming' : 'idle',
@@ -167,30 +165,37 @@ class _AgentChatViewState extends State<AgentChatView> {
 
 class _AgentChatStatusBar extends StatelessWidget {
   const _AgentChatStatusBar({
+    required this.streaming,
     this.activeToolLabel,
     this.errorMessage,
     this.onRetry,
     this.onCancel,
   });
 
+  final bool streaming;
   final String? activeToolLabel;
   final String? errorMessage;
   final VoidCallback? onRetry;
   final VoidCallback? onCancel;
 
   bool get isHidden =>
-      activeToolLabel == null && errorMessage == null && onRetry == null && onCancel == null;
+      !streaming &&
+      activeToolLabel == null &&
+      errorMessage == null &&
+      onRetry == null &&
+      onCancel == null;
 
   @override
   Widget build(BuildContext context) {
-
     final theme = Theme.of(context);
+    final statusText =
+        errorMessage ?? activeToolLabel ?? (streaming ? 'Pensando...' : null);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: theme.colorScheme.surfaceContainerHighest,
       child: Row(
         children: [
-          if (activeToolLabel != null) ...[
+          if (statusText != null && errorMessage == null) ...[
             SizedBox(
               width: 12,
               height: 12,
@@ -199,7 +204,7 @@ class _AgentChatStatusBar extends StatelessWidget {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                activeToolLabel!,
+                statusText,
                 style: theme.textTheme.bodySmall,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -211,7 +216,9 @@ class _AgentChatStatusBar extends StatelessWidget {
             Flexible(
               child: Text(
                 errorMessage!,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),

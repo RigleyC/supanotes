@@ -89,9 +89,9 @@ func (tr *ToolRegistry) Risk(toolName string) ToolRisk {
 	switch toolName {
 	case "search_notes", "get_note", "get_notes", "get_open_tasks", "get_today_tasks", "list_memories", "get_soul", "list_routines", "get_vault_context":
 		return ToolRiskRead
-	case "add_note", "add_task", "save_memory", "append_to_inbox":
+	case "add_note", "add_task", "save_memory", "append_to_inbox", "update_soul":
 		return ToolRiskLowWrite
-	case "update_note", "append_to_note", "delete_memory", "update_soul", "apply_inbox_organization", "set_daily_brief_schedule", "set_weekly_brief_schedule", "update_task", "complete_task":
+	case "update_note", "append_to_note", "delete_memory", "apply_inbox_organization", "set_daily_brief_schedule", "set_weekly_brief_schedule", "update_task", "complete_task":
 		return ToolRiskSensitiveWrite
 	default:
 		return ToolRiskSensitiveWrite

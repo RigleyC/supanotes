@@ -10,9 +10,9 @@ func TestToolRegistryRiskDefaults(t *testing.T) {
 		"get_note":                 ToolRiskRead,
 		"add_note":                 ToolRiskLowWrite,
 		"append_to_inbox":          ToolRiskLowWrite,
+		"update_soul":              ToolRiskLowWrite,
 		"update_note":              ToolRiskSensitiveWrite,
 		"delete_memory":            ToolRiskSensitiveWrite,
-		"update_soul":              ToolRiskSensitiveWrite,
 		"apply_inbox_organization": ToolRiskSensitiveWrite,
 	}
 

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -532,6 +533,78 @@ func TestLoopFallsBackWithoutToolsWhenLLMReturnsEmptyResponse(t *testing.T) {
 	}
 	if !foundFinal {
 		t.Fatal("expected fallback response to finish the message")
+	}
+}
+
+func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	q := &stubLoopQuerier{}
+	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+	memRepo := &stubLoopMemRepo{}
+	tasksSvc := tasks.NewService(&stubLoopTasksRepo{})
+	ctxBldr := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+	llmFact := &stubLoopLLMFactory{
+		client: &stubLoopLLMClient{
+			responses: []*llm.Response{
+				{
+					ToolCalls: []llm.ToolCall{
+						{ID: "call-1", Name: "get_today_tasks", ArgsJSON: `{}`},
+					},
+				},
+				{},
+				{},
+			},
+		},
+	}
+
+	memSvc := memories.NewService(memRepo, embedCL)
+	toolReg := tools.NewToolRegistry(
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
+	)
+
+	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+
+	events := make(chan SSEEvent, 10)
+	err := loop.ChatStream(
+		context.Background(),
+		pgtype.UUID{},
+		"00000000-0000-0000-0000-000000000001",
+		"what is due today?",
+		events,
+	)
+	close(events)
+
+	if err != nil {
+		t.Fatalf("ChatStream: %v", err)
+	}
+
+	var final string
+	for evt := range events {
+		if evt.Type != string(EventMessageFinished) {
+			continue
+		}
+		var streamEvent StreamEvent
+		if err := json.Unmarshal([]byte(evt.Data), &streamEvent); err != nil {
+			t.Fatalf("unmarshal stream event: %v", err)
+		}
+		payloadBytes, err := json.Marshal(streamEvent.Payload)
+		if err != nil {
+			t.Fatalf("marshal payload: %v", err)
+		}
+		var payload MessageFinishedPayload
+		if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+			t.Fatalf("unmarshal payload: %v", err)
+		}
+		final = payload.Content
+	}
+
+	if final != "No tasks for today" {
+		t.Fatalf("final content: want %q, got %q", "No tasks for today", final)
 	}
 }
 
