@@ -167,7 +167,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     return Directionality(
       textDirection: widget.viewModel.textDirection,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: defaultTaskIndentCalculator(

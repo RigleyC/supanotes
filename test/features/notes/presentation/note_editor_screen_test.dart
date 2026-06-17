@@ -156,12 +156,12 @@ void main() {
     expect(iosScope.controller.handleColor, primary);
   });
 
-  test('NoteEditor does not wire the custom note stylesheet', () {
+  test('NoteEditor wires the custom note stylesheet', () {
     final source = File(
       'lib/features/notes/presentation/widgets/note_editor.dart',
     ).readAsStringSync();
 
-    expect(source, isNot(contains('noteStylesheet')));
+    expect(source, contains('noteStylesheet'));
   });
 
   testWidgets('owner actions put share inside the more menu', (tester) async {
