@@ -24,10 +24,8 @@ class NoteEditor extends StatefulWidget {
   final SnapshotSave snapshotSave;
   final EmptyNoteExit? emptyNoteExit;
   final ValueChanged<bool>? onHasContentChanged;
-  final void Function(
-    String taskId,
-    Future<void> Function() flushSnapshot,
-  )? onTaskLongPress;
+  final void Function(String taskId, Future<void> Function() flushSnapshot)?
+  onTaskLongPress;
   final Future<void> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
 
@@ -137,9 +135,7 @@ class _NoteEditorState extends State<NoteEditor> {
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Column(
         children: [
           Expanded(
@@ -151,25 +147,35 @@ class _NoteEditorState extends State<NoteEditor> {
                     controller: _iosController!,
                     child: SuperEditor(
                       editor: controller.editor!,
-                      focusNode: widget.isReadOnly ? null : controller.focusNode,
+                      focusNode: widget.isReadOnly
+                          ? null
+                          : controller.focusNode,
                       documentLayoutKey: _docLayoutKey,
-                      stylesheet: noteStylesheet(context),
+                      stylesheet: noteStylesheet(
+                        context,
+                        hideCompleted: widget.hideCompleted,
+                      ),
                       selectionStyle: SelectionStyles(
                         selectionColor:
-                            Theme.of(context).textSelectionTheme.selectionColor ??
-                                Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                            Theme.of(
+                              context,
+                            ).textSelectionTheme.selectionColor ??
+                            Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.4),
                       ),
                       keyboardActions: buildRichKeyboardActions(
                         baseActions:
                             defaultTargetPlatform == TargetPlatform.iOS ||
-                                    defaultTargetPlatform ==
-                                        TargetPlatform.android
-                                ? defaultImeKeyboardActions
-                                : defaultKeyboardActions,
+                                defaultTargetPlatform == TargetPlatform.android
+                            ? defaultImeKeyboardActions
+                            : defaultKeyboardActions,
                       ),
                       componentBuilders: [
                         const CustomDividerComponentBuilder(),
-                        ...defaultComponentBuilders,
+                        HiddenTaskComponentBuilder(
+                          hideCompleted: widget.hideCompleted,
+                        ),
                         CustomTaskComponentBuilder(
                           controller.editor!,
                           taskMetadataById: widget.taskMetadata,
@@ -177,12 +183,13 @@ class _NoteEditorState extends State<NoteEditor> {
                           onTaskLongPress: widget.isReadOnly
                               ? null
                               : (taskId) => widget.onTaskLongPress?.call(
-                                    taskId,
-                                    () => controller.persistSnapshotNow(),
-                                  ),
+                                  taskId,
+                                  () => controller.persistSnapshotNow(),
+                                ),
                           onTaskComplete: widget.onTaskComplete,
                           onTaskReopen: widget.onTaskReopen,
                         ),
+                        ...defaultComponentBuilders,
                       ],
                     ),
                   ),

@@ -6,6 +6,46 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badg
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
 
+/// Renders completed tasks as an empty zero-height box when [hideCompleted]
+/// is true, preventing the [UnknownComponentBuilder] Placeholder fallback.
+class HiddenTaskComponentBuilder implements ComponentBuilder {
+  const HiddenTaskComponentBuilder({this.hideCompleted = false});
+
+  final bool hideCompleted;
+
+  @override
+  SingleColumnLayoutComponentViewModel? createViewModel(
+    Document document,
+    DocumentNode node,
+  ) {
+    if (node is! TaskNode) return null;
+    if (!hideCompleted || !node.isComplete) return null;
+
+    return HiddenTaskComponentViewModel(nodeId: node.id);
+  }
+
+  @override
+  Widget? createComponent(
+    SingleColumnDocumentComponentContext componentContext,
+    SingleColumnLayoutComponentViewModel componentViewModel,
+  ) {
+    if (componentViewModel is! HiddenTaskComponentViewModel) return null;
+
+    return SizedBox(key: componentContext.componentKey, height: 0);
+  }
+}
+
+class HiddenTaskComponentViewModel
+    extends SingleColumnLayoutComponentViewModel {
+  HiddenTaskComponentViewModel({required super.nodeId})
+    : super(createdAt: null, padding: EdgeInsets.zero);
+
+  @override
+  HiddenTaskComponentViewModel copy() {
+    return HiddenTaskComponentViewModel(nodeId: nodeId);
+  }
+}
+
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
     this._editor, {
@@ -200,8 +240,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                     overflow: widget.viewModel.overflow,
                     textStyleBuilder: (attributions) =>
                         _computeStyles(attributions, context),
-                    inlineWidgetBuilders:
-                        widget.viewModel.inlineWidgetBuilders,
+                    inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
                     textSelection: widget.viewModel.selection,
                     selectionColor: widget.viewModel.selectionColor,
                     highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
@@ -225,11 +264,15 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     );
   }
 
-  TextStyle _computeStyles(Set<Attribution> attributions, BuildContext context) {
+  TextStyle _computeStyles(
+    Set<Attribution> attributions,
+    BuildContext context,
+  ) {
     final style = widget.viewModel.textStyleBuilder(attributions);
     final baseColor = style.color ?? Theme.of(context).colorScheme.onSurface;
-    final muted =
-        baseColor.withValues(alpha: widget.viewModel.isComplete ? 0.5 : 1.0);
+    final muted = baseColor.withValues(
+      alpha: widget.viewModel.isComplete ? 0.5 : 1.0,
+    );
     return widget.viewModel.isComplete
         ? style.copyWith(decoration: TextDecoration.lineThrough, color: muted)
         : style.copyWith(color: baseColor);
