@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -88,7 +87,8 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 			close(events)
 		}()
 		if err := h.loop.ChatStream(c.Request().Context(), userID, req.SessionID, req.Content, events); err != nil {
-			events <- SSEEvent{Type: "error", Data: err.Error()}
+			writer := NewStreamEventWriter(req.SessionID, "")
+			sendStreamEvent(events, writer.Event(EventError, ErrorPayload{Message: err.Error()}))
 		}
 	}()
 
@@ -98,16 +98,7 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 	}
 
 	for event := range events {
-		var payload []byte
-		switch event.Type {
-		case "content_delta":
-			payload, _ = json.Marshal(map[string]string{"delta": event.Data})
-		case "done":
-			payload, _ = json.Marshal(map[string]bool{"done": true})
-		default:
-			payload, _ = json.Marshal(map[string]string{"type": event.Type, "data": event.Data})
-		}
-		_, err := fmt.Fprintf(c.Response().Writer, "data: %s\n\n", payload)
+		_, err := fmt.Fprintf(c.Response().Writer, "data: %s\n\n", event.Data)
 		if err != nil {
 			break
 		}

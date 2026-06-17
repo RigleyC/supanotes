@@ -54,16 +54,16 @@ class ChatSSE {
           final data = jsonDecode(jsonStr) as Map<String, dynamic>;
           final event = SSEChatEvent.fromJson(data);
 
-          if (event.type == 'error') {
+          if (event.isError) {
             controller.addError(
-              ApiException(message: event.data ?? 'Ocorreu um erro no stream'),
+              ApiException(message: event.errorMessage ?? event.data ?? 'Ocorreu um erro no stream'),
             );
             break;
           }
 
           controller.add(event);
 
-          if (event.type == 'done') {
+          if (event.isDone) {
             break;
           }
         } catch (_) {
@@ -72,8 +72,12 @@ class ChatSSE {
       }
       await controller.close();
     }).catchError((Object e) {
-      if (e is DioException && CancelToken.isCancel(e)) return;
-      controller.addError(fromDioError(e as DioException));
+      if (e is DioException) {
+        if (CancelToken.isCancel(e)) return;
+        controller.addError(fromDioError(e));
+      } else {
+        controller.addError(ApiException(message: e.toString()));
+      }
       controller.close();
     });
 
