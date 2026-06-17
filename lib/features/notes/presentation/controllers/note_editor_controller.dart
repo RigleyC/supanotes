@@ -27,7 +27,10 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/utils/save_throttle.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
+import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
 import 'package:supanotes/features/notes/domain/task_entry.dart';
+
+const int _dividerCount = 35;
 
 /// Signature for the snapshot save and empty-note exit operations.
 ///
@@ -84,7 +87,21 @@ class NoteEditorController {
     _noteId = noteId;
   }
 
-  void _onDocumentChanged(DocumentChangeLog _) => _scheduleSnapshotSave();
+  void _onDocumentChanged(DocumentChangeLog _) {
+    final currentEditor = editor;
+    final currentComposer = composer;
+    if (currentEditor != null &&
+        currentComposer != null &&
+        NoteEditorCommands.convertDividerShortcut(
+          currentEditor,
+          currentComposer,
+          dividerCount: _dividerCount,
+        )) {
+      return;
+    }
+
+    _scheduleSnapshotSave();
+  }
 
   void _scheduleSnapshotSave() {
     final doc = document;

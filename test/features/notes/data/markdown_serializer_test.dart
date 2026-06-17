@@ -217,6 +217,17 @@ void main() {
       expect(out, original);
     });
 
+    test('preserves trailing spaces and blank paragraphs', () {
+      final doc = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'node-1', text: AttributedText('line  ')),
+          ParagraphNode(id: 'node-2', text: AttributedText('')),
+        ],
+      );
+
+      expect(serializeNoteToMarkdown(doc), 'line  \n\n');
+    });
+
     test('multiple paragraphs separated by blank lines are preserved', () {
       const original = 'first paragraph\n\nsecond paragraph\n\nthird';
       final doc = parseNoteToMarkdown(original);

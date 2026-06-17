@@ -119,4 +119,50 @@ class NoteEditorCommands {
       ),
     ]);
   }
+
+  /// Converts a paragraph that contains only "---" into a horizontal rule.
+  static bool convertDividerShortcut(
+    Editor editor,
+    DocumentComposer composer, {
+    required int dividerCount,
+  }) {
+    final selection = composer.selection;
+    if (selection == null || !selection.isCollapsed) return false;
+
+    final document = editor.context.document;
+    final node = document.getNodeById(selection.extent.nodeId);
+    if (node is! ParagraphNode) return false;
+    if (node.text.toPlainText() != '---') return false;
+
+    final index = math.Random().nextInt(dividerCount) + 1;
+    final paragraphAfter = ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(''),
+    );
+
+    editor.execute([
+      ReplaceNodeRequest(
+        existingNodeId: node.id,
+        newNode: HorizontalRuleNode(
+          id: node.id,
+          metadata: {'dividerIndex': index},
+        ),
+      ),
+      InsertNodeAtIndexRequest(
+        nodeIndex: document.getNodeIndexById(node.id) + 1,
+        newNode: paragraphAfter,
+      ),
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: paragraphAfter.id,
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+        ),
+        SelectionChangeType.placeCaret,
+        SelectionReason.contentChange,
+      ),
+    ]);
+    return true;
+  }
 }

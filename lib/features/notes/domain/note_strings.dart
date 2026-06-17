@@ -12,6 +12,7 @@ class NoteStrings {
   static const String deleteConfirmLabel = 'Apagar';
 
   static const String shareDialogTitle = 'Compartilhar Nota';
+  static const String shareLabel = 'Compartilhar';
   static const String emailLabel = 'E-mail';
   static const String permissionLabel = 'Permissão';
   static const String permissionView = 'Visualizar';

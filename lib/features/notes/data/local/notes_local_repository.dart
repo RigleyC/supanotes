@@ -36,7 +36,7 @@ class NotesLocalRepository {
     return _dao.watchFavorites();
   }
 
-  Stream<NoteData?> watchInbox() => _dao.watchInboxNote();
+  Stream<NoteData?> watchInbox() => _dao.watchInboxNote(_userId);
 
   Stream<NoteData?> watchNoteById(String id) => _dao.watchNoteById(id);
 
@@ -123,7 +123,7 @@ class NotesLocalRepository {
   }
 
   Future<NoteData> getOrCreateInboxNote() async {
-    final existing = await _dao.getInboxNote();
+    final existing = await _dao.getInboxNote(_userId);
     if (existing != null) return existing;
 
     final now = DateTime.now().toUtc();

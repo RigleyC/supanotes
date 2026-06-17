@@ -90,24 +90,29 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : null,
         actions: [
           if (isOwner)
-            IconButton(
-              icon: const Icon(Icons.share_outlined),
-              onPressed: () => ShareNoteDialog.show(context, widget.noteId),
-            ),
-          if (isOwner)
             AdaptivePopupMenuButton.icon<String>(
               icon: PlatformInfo.isIOS26OrHigher()
                   ? 'ellipsis'
                   : Icons.more_vert,
               onSelected: (index, entry) async {
-                if (entry.value == 'hide_completed') {
-                  await repo.updateNote(
-                    widget.noteId,
-                    hideCompleted: !note.hideCompleted,
-                  );
+                switch (entry.value) {
+                  case 'share':
+                    await ShareNoteDialog.show(context, widget.noteId);
+                  case 'hide_completed':
+                    await repo.updateNote(
+                      widget.noteId,
+                      hideCompleted: !note.hideCompleted,
+                    );
                 }
               },
               items: [
+                AdaptivePopupMenuItem<String>(
+                  label: NoteStrings.shareLabel,
+                  icon: PlatformInfo.isIOS26OrHigher()
+                      ? 'square.and.arrow.up'
+                      : Icons.share_outlined,
+                  value: 'share',
+                ),
                 AdaptivePopupMenuItem<String>(
                   label: note.hideCompleted
                       ? NoteStrings.showCompleted

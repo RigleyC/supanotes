@@ -100,11 +100,10 @@ WHERE tags.user_id = EXCLUDED.user_id
 RETURNING *;
 
 -- name: UpsertTaskCompletion :exec
-INSERT INTO task_completions (id, task_id, completed_at, status)
+INSERT INTO task_completions (id, task_id, completed_at)
 SELECT sqlc.arg('id')::uuid,
        sqlc.arg('task_id')::uuid,
-       sqlc.arg('completed_at')::timestamptz,
-       'completed'
+       sqlc.arg('completed_at')::timestamptz
 FROM tasks
 WHERE tasks.id = sqlc.arg('task_id')::uuid
   AND (tasks.user_id = sqlc.arg('user_id')::uuid

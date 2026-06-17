@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/domain/task_entry.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
@@ -152,6 +154,57 @@ void main() {
 
     expect(androidScope.controller.controlsColor, primary);
     expect(iosScope.controller.handleColor, primary);
+  });
+
+  test('NoteEditor does not wire the custom note stylesheet', () {
+    final source = File(
+      'lib/features/notes/presentation/widgets/note_editor.dart',
+    ).readAsStringSync();
+
+    expect(source, isNot(contains('noteStylesheet')));
+  });
+
+  testWidgets('owner actions put share inside the more menu', (tester) async {
+    final streamController = StreamController<NoteModel?>();
+    addTearDown(streamController.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          notesRepositoryProvider.overrideWithValue(
+            _FakeNotesRepository(streamController),
+          ),
+          tasksByNoteStreamProvider.overrideWith((ref, arg) => Stream.value(<TaskModel>[])),
+        ],
+        child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
+      ),
+    );
+
+    streamController.add(
+      NoteModel(
+        id: 'note-1',
+        userId: 'u-1',
+        title: 'Owner note',
+        excerpt: null,
+        content: 'Plain content',
+        favorite: false,
+        archived: false,
+        isInbox: false,
+        contextId: null,
+        createdAt: DateTime(2026, 6, 17),
+        updatedAt: DateTime(2026, 6, 17),
+        hideCompleted: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.share_outlined), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+
+    expect(find.text(NoteStrings.shareLabel), findsOneWidget);
+    expect(find.text(NoteStrings.hideCompleted), findsOneWidget);
   });
 
   testWidgets('tapping a task checkbox calls completeTask on the repository', (

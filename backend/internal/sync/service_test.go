@@ -3,6 +3,8 @@ package sync
 import (
 	"context"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -23,6 +25,17 @@ func testNote(overrides ...func(*sqlcgen.GetSyncNotesRow)) sqlcgen.GetSyncNotesR
 		o(&n)
 	}
 	return n
+}
+
+func TestSyncTaskCompletionQueryMatchesCurrentSchema(t *testing.T) {
+	query, err := os.ReadFile("../../db/queries/sync.sql")
+	if err != nil {
+		t.Fatalf("read sync query: %v", err)
+	}
+
+	if strings.Contains(string(query), "INSERT INTO task_completions (id, task_id, completed_at, status)") {
+		t.Fatal("UpsertTaskCompletion must not insert task_completions.status; migration 000011 removed that column")
+	}
 }
 
 func testUserID() pgtype.UUID {

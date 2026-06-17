@@ -5,6 +5,7 @@ import 'package:super_editor/super_editor.dart';
 
 const String _kTaskIdMarkerPrefix = '<!-- task:';
 const String _kTaskIdMarkerSuffix = ' -->';
+const String _kSyntheticTrailingParagraph = 'syntheticTrailingParagraph';
 
 final RegExp _taskIdMarkerRegExp = RegExp(r'<!--\s*task:(.*?)\s*-->');
 
@@ -23,7 +24,11 @@ MutableDocument parseNoteToMarkdown(String markdown) {
 
   if (nodes.last is! ParagraphNode) {
     nodes.add(
-      ParagraphNode(id: Editor.createNodeId(), text: AttributedText('')),
+      ParagraphNode(
+        id: Editor.createNodeId(),
+        text: AttributedText(''),
+        metadata: {_kSyntheticTrailingParagraph: true},
+      ),
     );
   }
 
@@ -66,14 +71,30 @@ bool _isIndentedListLine(String line) {
 }
 
 String serializeNoteToMarkdown(MutableDocument doc) {
+  final nodes = doc.toList(growable: false);
+  final serializableDoc = _withoutSyntheticTrailingParagraph(nodes);
+
   return serializeDocumentToMarkdown(
-    doc,
+    serializableDoc,
     syntax: MarkdownSyntax.superEditor,
     customNodeSerializers: [
       const _TaskNodeSerializer(),
       _DividerNodeSerializer(),
     ],
-  ).trimRight();
+  );
+}
+
+Document _withoutSyntheticTrailingParagraph(List<DocumentNode> nodes) {
+  if (nodes.isEmpty) return MutableDocument(nodes: nodes);
+
+  final lastNode = nodes.last;
+  if (lastNode is! ParagraphNode ||
+      lastNode.text.toPlainText().isNotEmpty ||
+      lastNode.getMetadataValue(_kSyntheticTrailingParagraph) != true) {
+    return MutableDocument(nodes: nodes);
+  }
+
+  return MutableDocument(nodes: nodes.sublist(0, nodes.length - 1));
 }
 
 class _TaskNodeSerializer

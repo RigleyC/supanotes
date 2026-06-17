@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
-import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
@@ -153,7 +152,6 @@ class _NoteEditorState extends State<NoteEditor> {
                       editor: controller.editor!,
                       focusNode: widget.isReadOnly ? null : controller.focusNode,
                       documentLayoutKey: _docLayoutKey,
-                      stylesheet: noteStylesheet(context),
                       selectionStyle: SelectionStyles(
                         selectionColor:
                             Theme.of(context).textSelectionTheme.selectionColor ??

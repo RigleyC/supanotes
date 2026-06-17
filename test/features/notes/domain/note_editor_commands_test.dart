@@ -352,4 +352,39 @@ void main() {
       expect(item.indent, 1);
     });
   });
+
+  group('convertDividerShortcut', () {
+    test('converts a paragraph that only contains dashes into a divider', () {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'node-1', text: AttributedText('---')),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 3),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      final didConvert = NoteEditorCommands.convertDividerShortcut(
+        editor,
+        composer,
+        dividerCount: 1,
+      );
+
+      expect(didConvert, isTrue);
+      expect(document.nodeCount, 2);
+      expect(document.first, isA<HorizontalRuleNode>());
+      expect(document.last, isA<ParagraphNode>());
+      expect((document.last as ParagraphNode).text.toPlainText(), '');
+      expect(composer.selection!.extent.nodeId, document.last.id);
+    });
+  });
 }

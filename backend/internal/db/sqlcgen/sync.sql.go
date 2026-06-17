@@ -628,11 +628,10 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, e
 }
 
 const upsertTaskCompletion = `-- name: UpsertTaskCompletion :exec
-INSERT INTO task_completions (id, task_id, completed_at, status)
+INSERT INTO task_completions (id, task_id, completed_at)
 SELECT $1::uuid,
        $2::uuid,
-       $3::timestamptz,
-       'completed'
+       $3::timestamptz
 FROM tasks
 WHERE tasks.id = $2::uuid
   AND (tasks.user_id = $4::uuid
