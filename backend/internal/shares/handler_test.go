@@ -86,6 +86,16 @@ func TestShareNote_Success(t *testing.T) {
 	if result.Permission != "view" {
 		t.Errorf("permission: want view, got %q", result.Permission)
 	}
+	var raw map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("decode raw: %v (body=%s)", err, rec.Body.String())
+	}
+	if _, ok := raw["note_id"]; !ok {
+		t.Fatalf("response missing note_id key: %s", rec.Body.String())
+	}
+	if _, ok := raw["user_id"]; !ok {
+		t.Fatalf("response missing user_id key: %s", rec.Body.String())
+	}
 }
 
 func TestShareNote_InvalidNoteID(t *testing.T) {

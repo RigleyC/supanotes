@@ -12,19 +12,19 @@ import (
 )
 
 var (
-	ErrNoteNotFound      = errors.New("note not found")
-	ErrNotOwner          = errors.New("only the note owner can manage shares")
-	ErrUserNotFound      = errors.New("user not found")
+	ErrNoteNotFound        = errors.New("note not found")
+	ErrNotOwner            = errors.New("only the note owner can manage shares")
+	ErrUserNotFound        = errors.New("user not found")
 	ErrCannotShareWithSelf = errors.New("cannot share with yourself")
 )
 
 type ShareResult struct {
-	ID         string
-	NoteID     string
-	UserID     string
-	Email      string
-	Name       string
-	Permission string
+	ID         string `json:"id"`
+	NoteID     string `json:"note_id"`
+	UserID     string `json:"user_id"`
+	Email      string `json:"email"`
+	Name       string `json:"name"`
+	Permission string `json:"permission"`
 }
 
 type Service struct {
