@@ -225,38 +225,36 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
             onLongPress: widget.onLongPress,
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2, right: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextComponent(
-                    key: _textKey,
-                    text: widget.viewModel.text,
-                    textDirection: widget.viewModel.textDirection,
-                    textAlign: widget.viewModel.textAlignment,
-                    maxLines: widget.viewModel.maxLines,
-                    overflow: widget.viewModel.overflow,
-                    textStyleBuilder: (attributions) =>
-                        _computeStyles(attributions, context),
-                    inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
-                    textSelection: widget.viewModel.selection,
-                    selectionColor: widget.viewModel.selectionColor,
-                    highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                    underlines: widget.viewModel.createUnderlines(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextComponent(
+                  key: _textKey,
+                  text: widget.viewModel.text,
+                  textDirection: widget.viewModel.textDirection,
+                  textAlign: widget.viewModel.textAlignment,
+                  maxLines: widget.viewModel.maxLines,
+                  overflow: widget.viewModel.overflow,
+                  textStyleBuilder: (attributions) =>
+                      _computeStyles(attributions, context),
+                  inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
+                  textSelection: widget.viewModel.selection,
+                  selectionColor: widget.viewModel.selectionColor,
+                  highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                  underlines: widget.viewModel.createUnderlines(),
+                ),
+                if (widget.taskMetadata?.dueDate != null ||
+                    widget.taskMetadata?.recurrence != null) ...[
+                  const SizedBox(height: 4),
+                  TaskMetadataBadges(
+                    dueDate: widget.taskMetadata?.dueDate,
+                    recurrence: widget.taskMetadata?.recurrence,
+                    isCompleted: widget.viewModel.isComplete,
                   ),
-                  if (widget.taskMetadata?.dueDate != null ||
-                      widget.taskMetadata?.recurrence != null) ...[
-                    const SizedBox(height: 4),
-                    TaskMetadataBadges(
-                      dueDate: widget.taskMetadata?.dueDate,
-                      recurrence: widget.taskMetadata?.recurrence,
-                      isCompleted: widget.viewModel.isComplete,
-                    ),
-                  ],
+                  const SizedBox(height: 4),
                 ],
-              ),
+              ],
             ),
           ),
         ],

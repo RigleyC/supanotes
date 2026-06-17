@@ -195,12 +195,21 @@ class SyncService {
     final data = await _repo.pull(
       lastSyncedAt: lastSyncedAt.toUtc().toIso8601String(),
     );
+    final dirtyNoteIds = {
+      for (final note in await (_db.select(_db.notes)
+            ..where((t) => t.isDirty.equals(true)))
+          .get())
+        note.id,
+    };
 
     await _db.batch((batch) {
       for (final raw in (data['notes'] as List? ?? [])) {
         final note = _mapper
             .noteFromJson(raw as Map<String, dynamic>)
             .copyWith(isDirty: false, hasRemoteCopy: true);
+        if (dirtyNoteIds.contains(note.id)) {
+          continue;
+        }
         batch.insert(_db.notes, note, onConflict: DoUpdate((_) => note));
       }
       for (final raw in (data['tasks'] as List? ?? [])) {

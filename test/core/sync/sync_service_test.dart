@@ -173,51 +173,121 @@ void main() {
   });
 
   group('SyncService.push', () {
-    test('marks pushed notes as having a remote copy and clears dirty flag',
-        () async {
-      SharedPreferences.setMockInitialValues({});
+    test(
+      'marks pushed notes as having a remote copy and clears dirty flag',
+      () async {
+        SharedPreferences.setMockInitialValues({});
 
-      final db = AppDatabase.test();
-      final dao = db.notesDao;
+        final db = AppDatabase.test();
+        final dao = db.notesDao;
 
-      final now = DateTime.now().toUtc();
-      await dao.createNote(NotesCompanion.insert(
-        id: 'test-note-1',
-        userId: 'test-user',
-        content: 'Hello',
-        createdAt: now,
-        updatedAt: now,
-        isDirty: const Value(true),
-        hasRemoteCopy: const Value(false),
-      ));
+        final now = DateTime.now().toUtc();
+        await dao.createNote(
+          NotesCompanion.insert(
+            id: 'test-note-1',
+            userId: 'test-user',
+            content: 'Hello',
+            createdAt: now,
+            updatedAt: now,
+            isDirty: const Value(true),
+            hasRemoteCopy: const Value(false),
+          ),
+        );
 
-      final fakeRepo = FakeSyncRepository();
-      final connectivity = FakeConnectivityMonitor();
-      final mapper = SyncMapper();
-      final notifier = SyncStateNotifier();
+        final fakeRepo = FakeSyncRepository();
+        final connectivity = FakeConnectivityMonitor();
+        final mapper = SyncMapper();
+        final notifier = SyncStateNotifier();
 
-      final service = SyncService(
-        db: db,
-        repo: fakeRepo,
-        mapper: mapper,
-        connectivity: connectivity,
-        notifier: notifier,
-        userId: 'test-user',
-      );
+        final service = SyncService(
+          db: db,
+          repo: fakeRepo,
+          mapper: mapper,
+          connectivity: connectivity,
+          notifier: notifier,
+          userId: 'test-user',
+        );
 
-      await service.push();
+        await service.push();
 
-      final note = await dao.getNoteById('test-note-1');
-      expect(note, isNotNull);
-      expect(note!.hasRemoteCopy, isTrue);
-      expect(note.isDirty, isFalse);
-      expect(fakeRepo.pushCalled, isTrue);
+        final note = await dao.getNoteById('test-note-1');
+        expect(note, isNotNull);
+        expect(note!.hasRemoteCopy, isTrue);
+        expect(note.isDirty, isFalse);
+        expect(fakeRepo.pushCalled, isTrue);
 
-      await db.close();
-    });
+        await db.close();
+      },
+    );
   });
 
   group('SyncService.pull', () {
+    test(
+      'does not overwrite dirty local note fields with stale remote data',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+
+        final db = AppDatabase.test();
+        final now = DateTime.utc(2026, 6, 17, 12);
+        await db.notesDao.createNote(
+          NotesCompanion.insert(
+            id: 'note-1',
+            userId: 'test-user',
+            content: 'local content',
+            createdAt: now,
+            updatedAt: now,
+            isDirty: const Value(true),
+            hasRemoteCopy: const Value(true),
+            hideCompleted: const Value(true),
+          ),
+        );
+
+        final fakeRepo = FakeSyncRepository()
+          ..pullResponse = {
+            'notes': [
+              {
+                'id': 'note-1',
+                'user_id': 'test-user',
+                'context_id': null,
+                'title': null,
+                'content': 'remote content',
+                'excerpt': null,
+                'is_inbox': false,
+                'favorite': false,
+                'archived': false,
+                'hide_completed': false,
+                'embedding_status': null,
+                'shared_permission': null,
+                'shared_by_email': null,
+                'shared_by_name': null,
+                'created_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
+                'deleted_at': null,
+              },
+            ],
+          };
+
+        final service = SyncService(
+          db: db,
+          repo: fakeRepo,
+          mapper: SyncMapper(),
+          connectivity: FakeConnectivityMonitor(),
+          notifier: SyncStateNotifier(),
+          userId: 'test-user',
+        );
+
+        await service.pull();
+
+        final note = await db.notesDao.getNoteById('note-1');
+        expect(note, isNotNull);
+        expect(note!.hideCompleted, isTrue);
+        expect(note.content, 'local content');
+        expect(note.isDirty, isTrue);
+
+        await db.close();
+      },
+    );
+
     test('persists task completions from the remote payload', () async {
       SharedPreferences.setMockInitialValues({});
 
@@ -252,8 +322,7 @@ void main() {
 
       await service.pull();
 
-      final rows =
-          await db.select(db.localTaskCompletions).get();
+      final rows = await db.select(db.localTaskCompletions).get();
       expect(rows, hasLength(1));
       final row = rows.single;
       expect(row.id, 'cmp-remote-1');
