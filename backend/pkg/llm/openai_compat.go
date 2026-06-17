@@ -8,7 +8,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 )
+
+const llmHTTPTimeout = 60 * time.Second
 
 type openAICompatClient struct {
 	apiKey  string
@@ -22,7 +25,7 @@ func NewOpenAICompatClient(apiKey, baseURL, model string) Client {
 		apiKey:  apiKey,
 		baseURL: baseURL,
 		model:   model,
-		client:  &http.Client{},
+		client:  &http.Client{Timeout: llmHTTPTimeout},
 	}
 }
 
