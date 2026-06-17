@@ -41,10 +41,18 @@ func (s *stubLoopRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UU
 }
 
 type stubLoopLLMClient struct {
-	response *llm.Response
+	response  *llm.Response
+	responses []*llm.Response
+	requests  []llm.Request
 }
 
 func (s *stubLoopLLMClient) Complete(ctx context.Context, req llm.Request) (*llm.Response, error) {
+	s.requests = append(s.requests, req)
+	if len(s.responses) > 0 {
+		res := s.responses[0]
+		s.responses = s.responses[1:]
+		return res, nil
+	}
 	return s.response, nil
 }
 
@@ -423,6 +431,107 @@ func TestLoopConfirmationRequired(t *testing.T) {
 
 	if !foundConfirmation {
 		t.Fatal("expected confirmation_required event but got none")
+	}
+}
+
+func TestLoopRejectsEmptyLLMResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	q := &stubLoopQuerier{}
+	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+	memRepo := &stubLoopMemRepo{}
+	tasksSvc := tasks.NewService(&stubLoopTasksRepo{})
+	ctxBldr := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+	llmFact := &stubLoopLLMFactory{
+		client: &stubLoopLLMClient{
+			response: &llm.Response{},
+		},
+	}
+
+	memSvc := memories.NewService(memRepo, embedCL)
+	toolReg := tools.NewToolRegistry(
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
+	)
+
+	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+
+	events := make(chan SSEEvent, 10)
+	err := loop.ChatStream(
+		context.Background(),
+		pgtype.UUID{},
+		"00000000-0000-0000-0000-000000000001",
+		"hello",
+		events,
+	)
+	close(events)
+
+	if err == nil {
+		t.Fatal("expected empty llm response to return an error")
+	}
+}
+
+func TestLoopFallsBackWithoutToolsWhenLLMReturnsEmptyResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	q := &stubLoopQuerier{}
+	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+	memRepo := &stubLoopMemRepo{}
+	tasksSvc := tasks.NewService(&stubLoopTasksRepo{})
+	ctxBldr := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+	llmClient := &stubLoopLLMClient{
+		responses: []*llm.Response{
+			{},
+			{Content: "hello back"},
+		},
+	}
+	llmFact := &stubLoopLLMFactory{client: llmClient}
+
+	memSvc := memories.NewService(memRepo, embedCL)
+	toolReg := tools.NewToolRegistry(
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
+	)
+
+	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+
+	events := make(chan SSEEvent, 10)
+	err := loop.ChatStream(
+		context.Background(),
+		pgtype.UUID{},
+		"00000000-0000-0000-0000-000000000001",
+		"hello",
+		events,
+	)
+	close(events)
+
+	if err != nil {
+		t.Fatalf("ChatStream: %v", err)
+	}
+	if len(llmClient.requests) != 2 {
+		t.Fatalf("expected two llm requests, got %d", len(llmClient.requests))
+	}
+	if len(llmClient.requests[0].Tools) == 0 {
+		t.Fatal("expected first request to include tools")
+	}
+	if len(llmClient.requests[1].Tools) != 0 {
+		t.Fatal("expected fallback request to omit tools")
+	}
+
+	var foundFinal bool
+	for evt := range events {
+		if evt.Type == string(EventMessageFinished) {
+			foundFinal = true
+		}
+	}
+	if !foundFinal {
+		t.Fatal("expected fallback response to finish the message")
 	}
 }
 

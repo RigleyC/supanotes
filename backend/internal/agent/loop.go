@@ -167,6 +167,19 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 		if err != nil {
 			return "", fmt.Errorf("llm call: %w", err)
 		}
+		if res.Content == "" && len(res.ToolCalls) == 0 {
+			slog.Warn("llm returned empty agent response; retrying without tools", "iteration", i)
+			fallbackReq := req
+			fallbackReq.Tools = nil
+			res, err = client.Complete(ctx, fallbackReq)
+			if err != nil {
+				return "", fmt.Errorf("llm fallback call: %w", err)
+			}
+			if res.Content == "" && len(res.ToolCalls) == 0 {
+				slog.Error("llm returned empty agent response", "iteration", i)
+				return "", fmt.Errorf("llm returned empty response")
+			}
+		}
 
 		assistMsg := llm.Message{
 			Role:      llm.RoleAssistant,
