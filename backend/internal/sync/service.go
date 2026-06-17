@@ -23,13 +23,13 @@ import (
 //     client stamps user_id locally with the currently authenticated
 //     user because the table itself has no user_id column.
 type SyncPayload struct {
-	Notes           []sqlcgen.GetSyncNotesRow   `json:"notes"`
-	Tasks           []SyncTask                  `json:"tasks"`
-	Contexts        []sqlcgen.Context           `json:"contexts"`
-	Tags            []sqlcgen.Tag               `json:"tags"`
-	TaskCompletions []sqlcgen.TaskCompletion    `json:"task_completions"`
-	NoteTags        []sqlcgen.NoteTag           `json:"note_tags"`
-	NoteLinks       []sqlcgen.NoteLink          `json:"note_links"`
+	Notes           []sqlcgen.GetSyncNotesRow `json:"notes"`
+	Tasks           []SyncTask                `json:"tasks"`
+	Contexts        []sqlcgen.Context         `json:"contexts"`
+	Tags            []sqlcgen.Tag             `json:"tags"`
+	TaskCompletions []sqlcgen.TaskCompletion  `json:"task_completions"`
+	NoteTags        []sqlcgen.NoteTag         `json:"note_tags"`
+	NoteLinks       []sqlcgen.NoteLink        `json:"note_links"`
 }
 
 type Service interface {
@@ -220,6 +220,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			Favorite:        n.Favorite,
 			Archived:        n.Archived,
 			EmbeddingStatus: embStatus,
+			HideCompleted:   n.HideCompleted,
 			CreatedAt:       n.CreatedAt,
 			DeletedAt:       n.DeletedAt,
 		})

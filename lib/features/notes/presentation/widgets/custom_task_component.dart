@@ -6,6 +6,10 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badg
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
 
+const double _taskCheckboxSize = 22;
+const double _taskCheckboxPadding = 9;
+const double _taskCheckboxGap = 9;
+
 /// Renders completed tasks as an empty zero-height box when [hideCompleted]
 /// is true, preventing the [UnknownComponentBuilder] Placeholder fallback.
 class HiddenTaskComponentBuilder implements ComponentBuilder {
@@ -202,7 +206,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final colorScheme = Theme.of(context).colorScheme;
     final semantics = Theme.of(context).extension<AppSemanticColors>();
     final taskColor = semantics?.task ?? AppColors.taskAccent;
-    const checkboxSize = 22.0;
 
     return Directionality(
       textDirection: widget.viewModel.textDirection,
@@ -215,14 +218,14 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
               widget.viewModel.indent,
             ),
           ),
-          AnimatedTaskCheckbox(
-            size: checkboxSize,
+          _TaskCheckboxHitTarget(
             value: widget.viewModel.isComplete,
             activeColor: taskColor,
             inactiveColor: colorScheme.outline,
             checkmarkColor: Colors.white,
             onChanged: widget.viewModel.setComplete,
             onLongPress: widget.onLongPress,
+            firstLineHeight: _firstLineHeight(context),
           ),
           Expanded(
             child: Column(
@@ -274,5 +277,65 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     return widget.viewModel.isComplete
         ? style.copyWith(decoration: TextDecoration.lineThrough, color: muted)
         : style.copyWith(color: baseColor);
+  }
+
+  double _firstLineHeight(BuildContext context) {
+    final painter = TextPainter(
+      text: TextSpan(text: ' ', style: _computeStyles({}, context)),
+      textDirection: widget.viewModel.textDirection,
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    return painter.preferredLineHeight;
+  }
+}
+
+class _TaskCheckboxHitTarget extends StatelessWidget {
+  const _TaskCheckboxHitTarget({
+    required this.value,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.checkmarkColor,
+    required this.onChanged,
+    required this.onLongPress,
+    required this.firstLineHeight,
+  });
+
+  final bool value;
+  final Color activeColor;
+  final Color inactiveColor;
+  final Color checkmarkColor;
+  final ValueChanged<bool>? onChanged;
+  final VoidCallback? onLongPress;
+  final double firstLineHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onChanged == null ? null : () => onChanged!(!value),
+      onLongPress: onLongPress,
+      child: SizedBox(
+        width: _taskCheckboxPadding + _taskCheckboxSize + _taskCheckboxGap,
+        height: (_taskCheckboxPadding * 2) + _taskCheckboxSize,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: _taskCheckboxPadding,
+              top: (firstLineHeight - _taskCheckboxSize) / 2,
+              child: AnimatedTaskCheckbox(
+                size: _taskCheckboxSize,
+                value: value,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+                checkmarkColor: checkmarkColor,
+                onChanged: onChanged,
+                onLongPress: onLongPress,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

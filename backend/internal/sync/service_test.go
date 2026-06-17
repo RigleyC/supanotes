@@ -48,6 +48,7 @@ func testOtherUserID() pgtype.UUID {
 
 type mockRepository struct {
 	upsertNoteErr       error
+	lastUpsertNoteArg   sqlcgen.UpsertNoteParams
 	getNoteShareForUser func(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error)
 }
 
@@ -56,6 +57,7 @@ func (m *mockRepository) GetSyncNotes(ctx context.Context, userID pgtype.UUID, l
 }
 
 func (m *mockRepository) UpsertNote(ctx context.Context, arg sqlcgen.UpsertNoteParams) (sqlcgen.Note, error) {
+	m.lastUpsertNoteArg = arg
 	return sqlcgen.Note{}, m.upsertNoteErr
 }
 
@@ -137,6 +139,28 @@ func TestSyncPushRejectsEmptyNewRegularNote(t *testing.T) {
 
 	if !errors.Is(err, ErrEmptyNote) {
 		t.Fatalf("expected ErrEmptyNote, got %v", err)
+	}
+}
+
+func TestSyncServicePushPreservesHideCompleted(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo, nil)
+
+	err := svc.Push(context.Background(), testUserID(), &SyncPayload{
+		Notes: []sqlcgen.GetSyncNotesRow{
+			testNote(func(n *sqlcgen.GetSyncNotesRow) {
+				n.Title = pgtype.Text{String: "Task note", Valid: true}
+				n.Content = "- [x] Done"
+				n.HideCompleted = true
+			}),
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !repo.lastUpsertNoteArg.HideCompleted {
+		t.Fatal("expected hide_completed=true to be forwarded to UpsertNote")
 	}
 }
 

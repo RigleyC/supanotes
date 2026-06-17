@@ -26,6 +26,21 @@ void main() {
     );
   }
 
+  TaskComponentViewModel multilineViewModel() {
+    return TaskComponentViewModel(
+      nodeId: 'task-1',
+      padding: EdgeInsets.zero,
+      indent: 0,
+      isComplete: false,
+      setComplete: (_) {},
+      text: AttributedText('Enviar relatorio\ncom observacoes'),
+      textDirection: TextDirection.ltr,
+      textAlignment: TextAlign.left,
+      textStyleBuilder: (_) => const TextStyle(fontSize: 16),
+      selectionColor: Colors.transparent,
+    );
+  }
+
   testWidgets('keeps editable task text registered in the component', (
     tester,
   ) async {
@@ -53,7 +68,9 @@ void main() {
     expect(openedActions, isTrue);
   });
 
-  testWidgets('text area long press does not open task actions', (tester) async {
+  testWidgets('text area long press does not open task actions', (
+    tester,
+  ) async {
     var openedActions = false;
 
     await tester.pumpWidget(
@@ -65,10 +82,7 @@ void main() {
       ),
     );
 
-    await tester.longPress(
-      find.byType(TextComponent),
-      warnIfMissed: false,
-    );
+    await tester.longPress(find.byType(TextComponent), warnIfMissed: false);
     await tester.pump();
 
     expect(openedActions, isFalse);
@@ -95,6 +109,52 @@ void main() {
     await tester.pump();
 
     expect(completed, isTrue);
+  });
+
+  testWidgets('keeps text spaced from the checkbox icon', (tester) async {
+    await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: viewModel())));
+
+    expect(
+      tester.getSize(find.byType(AnimatedTaskCheckbox)),
+      const Size(22, 22),
+    );
+
+    final checkboxLeft = tester
+        .getTopLeft(find.byType(AnimatedTaskCheckbox))
+        .dx;
+    final textLeft = tester.getTopLeft(find.byType(TextComponent)).dx;
+
+    expect(textLeft, checkboxLeft + 31);
+  });
+
+  testWidgets('centers the first text line against the checkbox icon', (
+    tester,
+  ) async {
+    await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: viewModel())));
+
+    final checkboxTop = tester.getTopLeft(find.byType(AnimatedTaskCheckbox)).dy;
+    final iconCenterY = checkboxTop + 11;
+    final textTop = tester.getTopLeft(find.byType(TextComponent)).dy;
+    final textHeight = tester.getSize(find.byType(TextComponent)).height;
+    final firstLineCenterY = textTop + (textHeight / 2);
+
+    expect(iconCenterY, closeTo(firstLineCenterY, 1));
+  });
+
+  testWidgets('keeps checkbox aligned to the first line for multiline text', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      wrap(CustomTaskComponent(viewModel: multilineViewModel())),
+    );
+
+    final checkboxTop = tester.getTopLeft(find.byType(AnimatedTaskCheckbox)).dy;
+    final iconCenterY = checkboxTop + 11;
+    final textTop = tester.getTopLeft(find.byType(TextComponent)).dy;
+    final textHeight = tester.getSize(find.byType(TextComponent)).height;
+    final firstLineCenterY = textTop + (textHeight / 4);
+
+    expect(iconCenterY, closeTo(firstLineCenterY, 1));
   });
 
   testWidgets('keeps typed paragraph text visible after leaving empty task', (
