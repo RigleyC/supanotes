@@ -50,7 +50,7 @@ class NoteCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: scheme.surface,
+          color: scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
@@ -75,10 +75,8 @@ class NoteCard extends StatelessWidget {
                       color: Theme.of(context).colorScheme.tertiary,
                     ),
                   ),
-                AdaptivePopupMenuButton.icon<String>(
-                  icon: PlatformInfo.isIOS26OrHigher()
-                      ? 'ellipsis.vertical'
-                      : Icons.more_vert_rounded,
+                AdaptivePopupMenuButton.widget<String>(
+                  tint: scheme.onSurfaceVariant,
                   onSelected: (index, entry) {
                     switch (entry.value) {
                       case 'favorite':
@@ -87,17 +85,12 @@ class NoteCard extends StatelessWidget {
                         _confirmDelete(context);
                     }
                   },
-                  size: 38,
                   items: [
                     AdaptivePopupMenuItem<String>(
-                      label: note.favorite
-                          ? 'Remover favorito'
-                          : 'Favoritar',
+                      label: note.favorite ? 'Remover favorito' : 'Favoritar',
                       icon: PlatformInfo.isIOS26OrHigher()
                           ? 'star'
-                          : (note.favorite
-                              ? Icons.star
-                              : Icons.star_border),
+                          : (note.favorite ? Icons.star : Icons.star_border),
                       value: 'favorite',
                     ),
                     const AdaptivePopupMenuDivider(),
@@ -109,6 +102,15 @@ class NoteCard extends StatelessWidget {
                       value: 'delete',
                     ),
                   ],
+                  child: SizedBox.square(
+                    dimension: 38,
+                    child: Center(
+                      child: Icon(
+                        Icons.more_vert_rounded,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

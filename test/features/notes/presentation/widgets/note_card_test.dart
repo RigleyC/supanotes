@@ -52,8 +52,10 @@ void main() {
 
       expect(decoration.color, isNot(scheme.surface));
 
-      final iconContext = tester.element(find.byIcon(Icons.more_vert_rounded));
-      expect(IconTheme.of(iconContext).color, scheme.onSurfaceVariant);
+      final menuIcon = tester.widget<Icon>(
+        find.byIcon(Icons.more_vert_rounded),
+      );
+      expect(menuIcon.color, scheme.onSurfaceVariant);
     });
   });
 }
