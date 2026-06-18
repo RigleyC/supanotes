@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/features/auth/data/session_cache.dart';
 import 'package:supanotes/features/settings/data/settings_models.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/controllers/soul_editor_controller.dart';
@@ -70,7 +71,10 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     }
     setState(() => _isSaving = true);
     try {
-      await ref.read(settingsRepositoryProvider).updateSoul(text);
+      final soul = await ref.read(settingsRepositoryProvider).updateSoul(text);
+      await ref.read(sessionCacheProvider.notifier).updateSoul({
+        'personality': soul.personality,
+      });
       ref.invalidate(soulProvider);
       if (!mounted) return;
       AppMessenger.showSuccess(context, _SoulStrings.savedSnackbar);
@@ -118,16 +122,11 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: _buildBody(context, soulAsync),
-      ),
+      body: SafeArea(child: _buildBody(context, soulAsync)),
     );
   }
 
-  Widget _buildBody(
-    BuildContext context,
-    AsyncValue<Soul> soulAsync,
-  ) {
+  Widget _buildBody(BuildContext context, AsyncValue<Soul> soulAsync) {
     return soulAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => AppErrorView(
@@ -141,9 +140,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
           children: [
             _modeBanner(context),
             const SizedBox(height: AppSpacing.sm),
-            Expanded(
-              child: _isEditing ? _editor(context) : _preview(context),
-            ),
+            Expanded(child: _isEditing ? _editor(context) : _preview(context)),
             const SizedBox(height: AppSpacing.md),
             _footerActions(context),
           ],
@@ -207,9 +204,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       return Center(
         child: Text(
           _SoulStrings.previewEmpty,
-          style: textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
+          style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         ),
       );
     }

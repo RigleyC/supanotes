@@ -33,9 +33,8 @@ ChatState chatState({
   );
 }
 
-final chatControllerProvider = NotifierProvider<ChatController, AsyncValue<ChatState>>(
-  ChatController.new,
-);
+final chatControllerProvider =
+    NotifierProvider<ChatController, AsyncValue<ChatState>>(ChatController.new);
 
 class ChatController extends Notifier<AsyncValue<ChatState>> {
   StreamSubscription<SSEChatEvent>? _sseSub;
@@ -44,7 +43,7 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
   AsyncValue<ChatState> build() {
     final sessionId = ref.watch(sessionManagerProvider);
     ref.onDispose(() => _sseSub?.cancel());
-    
+
     Future.microtask(() => _loadHistory(sessionId));
     return const AsyncValue.loading();
   }
@@ -52,7 +51,9 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
   Future<void> _loadHistory(String sessionId) async {
     state = const AsyncValue.loading();
     try {
-      final messages = await ref.read(chatRepositoryProvider).getHistory(sessionId);
+      final messages = await ref
+          .read(chatRepositoryProvider)
+          .getHistory(sessionId);
       state = AsyncValue.data(chatState(messages: messages));
     } on ApiException catch (e, st) {
       state = AsyncValue.error(e.message, st);
@@ -85,69 +86,118 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
       createdAt: DateTime.now(),
     );
 
-    state = AsyncValue.data(chatState(
-      messages: [...currentMessages, pending, initialAssistant],
-      isStreaming: true,
-      retryMessage: trimmed,
-    ));
+    state = AsyncValue.data(
+      chatState(
+        messages: [...currentMessages, pending, initialAssistant],
+        isStreaming: true,
+        retryMessage: trimmed,
+      ),
+    );
 
-    _sseSub?.cancel();
     final sse = ref.read(chatSSEProvider);
+    if (_sseSub != null) {
+      sse.cancel();
+      _sseSub?.cancel();
+    }
 
     final messagesWithoutAssistant = [...currentMessages, pending];
     final buffer = StringBuffer();
 
-    _sseSub = sse.streamChat(
-      sessionId: sessionId,
-      message: trimmed,
-    ).listen(
-      (event) {
-        if (event.isContentDelta && event.delta != null) {
-          buffer.write(event.delta);
-          state = AsyncValue.data(chatState(
-            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: buffer.toString())],
-            isStreaming: true,
-            retryMessage: trimmed,
-          ));
-        } else if (event.isToolStarted) {
-          state = AsyncValue.data(chatState(
-            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: buffer.toString())],
-            isStreaming: true,
-            activeToolLabel: event.toolLabel ?? 'Executando acao',
-            retryMessage: trimmed,
-          ));
-        } else if (event.isToolFinished || event.isToolFailed || event.isToolResult) {
-          state = AsyncValue.data(chatState(
-            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: buffer.toString())],
-            isStreaming: true,
-            retryMessage: trimmed,
-          ));
-        } else if (event.isDone) {
-          final content = event.finalContent ?? buffer.toString();
-          state = AsyncValue.data(chatState(
-            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: content)],
-            isStreaming: false,
-            retryMessage: trimmed,
-          ));
-        }
-      },
-      onError: (Object e, StackTrace st) {
-        _setRecoverableError(
-          e is ApiException ? e.message : e.toString(),
-          trimmed,
+    _sseSub = sse
+        .streamChat(sessionId: sessionId, message: trimmed)
+        .listen(
+          (event) {
+            if (event.isContentDelta && event.delta != null) {
+              buffer.write(event.delta);
+              state = AsyncValue.data(
+                chatState(
+                  messages: [
+                    ...messagesWithoutAssistant,
+                    initialAssistant.copyWith(content: buffer.toString()),
+                  ],
+                  isStreaming: true,
+                  retryMessage: trimmed,
+                ),
+              );
+            } else if (event.isToolStarted) {
+              state = AsyncValue.data(
+                chatState(
+                  messages: [
+                    ...messagesWithoutAssistant,
+                    initialAssistant.copyWith(content: buffer.toString()),
+                  ],
+                  isStreaming: true,
+                  activeToolLabel: event.toolLabel ?? 'Executando acao',
+                  retryMessage: trimmed,
+                ),
+              );
+            } else if (event.isToolFinished ||
+                event.isToolFailed ||
+                event.isToolResult) {
+              state = AsyncValue.data(
+                chatState(
+                  messages: [
+                    ...messagesWithoutAssistant,
+                    initialAssistant.copyWith(content: buffer.toString()),
+                  ],
+                  isStreaming: true,
+                  retryMessage: trimmed,
+                ),
+              );
+            } else if (event.isConfirmationRequired) {
+              final label =
+                  event.confirmationLabel ??
+                  event.confirmationToolName ??
+                  'esta ação';
+              state = AsyncValue.data(
+                chatState(
+                  messages: [
+                    ...messagesWithoutAssistant,
+                    initialAssistant.copyWith(content: buffer.toString()),
+                  ],
+                  isStreaming: true,
+                  errorMessage: 'Preciso da sua confirmação: $label',
+                  retryMessage: trimmed,
+                ),
+              );
+            } else if (event.isDone) {
+              final content = event.finalContent ?? buffer.toString();
+              final current = state.value;
+              state = AsyncValue.data(
+                chatState(
+                  messages: [
+                    ...messagesWithoutAssistant,
+                    initialAssistant.copyWith(content: content),
+                  ],
+                  isStreaming: false,
+                  errorMessage: current?.errorMessage,
+                  retryMessage: trimmed,
+                ),
+              );
+            }
+          },
+          onError: (Object e, StackTrace st) {
+            _setRecoverableError(
+              e is ApiException ? e.message : e.toString(),
+              trimmed,
+            );
+          },
+          onDone: () {
+            final current = state.value;
+            if (current != null && current.isStreaming) {
+              state = AsyncValue.data(
+                chatState(
+                  messages: [
+                    ...messagesWithoutAssistant,
+                    initialAssistant.copyWith(content: buffer.toString()),
+                  ],
+                  isStreaming: false,
+                  retryMessage: trimmed,
+                ),
+              );
+            }
+          },
         );
-      },
-      onDone: () {
-        final current = state.value;
-        if (current != null && current.isStreaming) {
-          state = AsyncValue.data(chatState(
-            messages: [...messagesWithoutAssistant, initialAssistant.copyWith(content: buffer.toString())],
-            isStreaming: false,
-            retryMessage: trimmed,
-          ));
-        }
-      },
-    );
   }
 
   void _setRecoverableError(String message, String retryMessage) {
@@ -156,12 +206,14 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
       state = AsyncValue.error(message, StackTrace.current);
       return;
     }
-    state = AsyncValue.data(chatState(
-      messages: current.messages,
-      isStreaming: false,
-      errorMessage: message,
-      retryMessage: retryMessage,
-    ));
+    state = AsyncValue.data(
+      chatState(
+        messages: current.messages,
+        isStreaming: false,
+        errorMessage: message,
+        retryMessage: retryMessage,
+      ),
+    );
   }
 
   Future<void> retryLastMessage() async {
@@ -171,14 +223,17 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
   }
 
   Future<void> cancelStreaming() async {
+    ref.read(chatSSEProvider).cancel();
     await _sseSub?.cancel();
     _sseSub = null;
     final current = state.value;
     if (current == null) return;
-    state = AsyncValue.data(chatState(
-      messages: current.messages,
-      isStreaming: false,
-      retryMessage: current.retryMessage,
-    ));
+    state = AsyncValue.data(
+      chatState(
+        messages: current.messages,
+        isStreaming: false,
+        retryMessage: current.retryMessage,
+      ),
+    );
   }
 }

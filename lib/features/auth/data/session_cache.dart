@@ -39,11 +39,11 @@ class SessionCache {
   }
 
   Map<String, dynamic> toJson() => {
-        'settings': settings,
-        'soul': soul,
-        'contexts': contexts,
-        'routines': routines,
-      };
+    'settings': settings,
+    'soul': soul,
+    'contexts': contexts,
+    'routines': routines,
+  };
 }
 
 class SessionCacheNotifier extends Notifier<SessionCache> {
@@ -69,6 +69,17 @@ class SessionCacheNotifier extends Notifier<SessionCache> {
     await _storage.saveSessionData(data);
   }
 
+  Future<void> updateSoul(Map<String, dynamic> soul) async {
+    final data = {
+      'settings': state.settings,
+      'soul': soul,
+      'contexts': state.contexts,
+      'routines': state.routines,
+    };
+    state = SessionCache.fromJson(data);
+    await _storage.saveSessionData(data);
+  }
+
   void clear() {
     state = const SessionCache();
   }
@@ -76,5 +87,5 @@ class SessionCacheNotifier extends Notifier<SessionCache> {
 
 final sessionCacheProvider =
     NotifierProvider<SessionCacheNotifier, SessionCache>(
-  SessionCacheNotifier.new,
-);
+      SessionCacheNotifier.new,
+    );

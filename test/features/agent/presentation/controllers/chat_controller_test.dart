@@ -17,16 +17,16 @@ void main() {
   late _FakeChatSSE fakeSSE;
   late _FakeChatRepository fakeRepo;
 
-  ProviderContainer createContainer({
-    String sessionId = 'session-1',
-  }) {
-    streamController = StreamController<SSEChatEvent>();
+  ProviderContainer createContainer({String sessionId = 'session-1'}) {
+    streamController = StreamController<SSEChatEvent>.broadcast();
     fakeSSE = _FakeChatSSE(streamController);
     fakeRepo = _FakeChatRepository();
 
     return ProviderContainer(
       overrides: [
-        sessionManagerProvider.overrideWith(() => _FakeSessionManager(sessionId)),
+        sessionManagerProvider.overrideWith(
+          () => _FakeSessionManager(sessionId),
+        ),
         chatRepositoryProvider.overrideWith((ref) => fakeRepo),
         chatSSEProvider.overrideWith((ref) => fakeSSE),
       ],
@@ -74,10 +74,12 @@ void main() {
     controller.sendMessage('do something');
     await Future(() {});
 
-    streamController.add(SSEChatEvent(
-      type: 'tool_started',
-      payload: {'name': 'search_notes', 'label': 'Buscando notas'},
-    ));
+    streamController.add(
+      SSEChatEvent(
+        type: 'tool_started',
+        payload: {'name': 'search_notes', 'label': 'Buscando notas'},
+      ),
+    );
 
     await Future(() {});
 
@@ -94,17 +96,15 @@ void main() {
     controller.sendMessage('write something');
     await Future(() {});
 
-    streamController.add(SSEChatEvent(
-      type: 'content_delta',
-      payload: {'delta': 'Here is '},
-    ));
+    streamController.add(
+      SSEChatEvent(type: 'content_delta', payload: {'delta': 'Here is '}),
+    );
 
     await Future(() {});
 
-    streamController.add(SSEChatEvent(
-      type: 'content_delta',
-      payload: {'delta': 'the result'},
-    ));
+    streamController.add(
+      SSEChatEvent(type: 'content_delta', payload: {'delta': 'the result'}),
+    );
 
     await Future(() {});
 
@@ -122,17 +122,18 @@ void main() {
     controller.sendMessage('finish');
     await Future(() {});
 
-    streamController.add(SSEChatEvent(
-      type: 'content_delta',
-      payload: {'delta': 'Final answer'},
-    ));
+    streamController.add(
+      SSEChatEvent(type: 'content_delta', payload: {'delta': 'Final answer'}),
+    );
 
     await Future(() {});
 
-    streamController.add(SSEChatEvent(
-      type: 'message_finished',
-      payload: {'content': 'Final answer'},
-    ));
+    streamController.add(
+      SSEChatEvent(
+        type: 'message_finished',
+        payload: {'content': 'Final answer'},
+      ),
+    );
 
     await Future(() {});
 
@@ -149,10 +150,9 @@ void main() {
     controller.sendMessage('will error');
     await Future(() {});
 
-    streamController.add(SSEChatEvent(
-      type: 'content_delta',
-      payload: {'delta': 'Partial '},
-    ));
+    streamController.add(
+      SSEChatEvent(type: 'content_delta', payload: {'delta': 'Partial '}),
+    );
 
     await Future(() {});
 
@@ -166,6 +166,46 @@ void main() {
     expect(data, isNotNull);
     expect(data!.errorMessage, 'Stream failed');
     expect(data.isStreaming, isFalse);
+  });
+
+  test('confirmation_required stays visible after message finishes', () async {
+    final container = createContainer();
+    final controller = container.read(chatControllerProvider.notifier);
+
+    controller.sendMessage('delete a memory');
+    await Future(() {});
+
+    streamController.add(
+      SSEChatEvent(
+        type: 'confirmation_required',
+        payload: {
+          'tool_name': 'delete_memory',
+          'label': 'Apagando memória',
+          'args_json': '{"memory_id":"m-1"}',
+        },
+      ),
+    );
+
+    await Future(() {});
+
+    streamController.add(
+      SSEChatEvent(
+        type: 'message_finished',
+        payload: {'content': 'Preciso da sua confirmação antes de aplicar.'},
+      ),
+    );
+
+    await Future(() {});
+
+    final state = container.read(chatControllerProvider);
+    final data = state.value!;
+    expect(data.isStreaming, isFalse);
+    expect(data.errorMessage, 'Preciso da sua confirmação: Apagando memória');
+    expect(data.retryMessage, 'delete a memory');
+    expect(
+      data.messages.last.content,
+      'Preciso da sua confirmação antes de aplicar.',
+    );
   });
 
   test('cancelStreaming clears isStreaming', () async {
@@ -182,7 +222,24 @@ void main() {
     final state = container.read(chatControllerProvider);
     final data = state.value!;
     expect(data.isStreaming, isFalse);
+    expect(fakeSSE.cancelCalls, 1);
   });
+
+  test(
+    'sendMessage cancels an existing stream before opening another',
+    () async {
+      final container = createContainer();
+      final controller = container.read(chatControllerProvider.notifier);
+
+      controller.sendMessage('first');
+      await Future(() {});
+
+      controller.sendMessage('second');
+      await Future(() {});
+
+      expect(fakeSSE.cancelCalls, 1);
+    },
+  );
 }
 
 class _FakeSessionManager extends SessionManager {
@@ -196,19 +253,23 @@ class _FakeSessionManager extends SessionManager {
 
 class _FakeChatSSE extends ChatSSE {
   _FakeChatSSE(this._controller)
-    : super(apiClient: ApiClient(
-        authInterceptor: AuthInterceptor(
-          getAccessToken: () async => null,
-          getRefreshToken: () async => null,
-          saveTokens: ({required accessToken, required refreshToken}) async {},
-          onAuthFailure: () async {},
-          onRefresh: (_) async => null,
-          replay: (_) async => throw UnimplementedError(),
+    : super(
+        apiClient: ApiClient(
+          authInterceptor: AuthInterceptor(
+            getAccessToken: () async => null,
+            getRefreshToken: () async => null,
+            saveTokens:
+                ({required accessToken, required refreshToken}) async {},
+            onAuthFailure: () async {},
+            onRefresh: (_) async => null,
+            replay: (_) async => throw UnimplementedError(),
+          ),
+          dio: Dio(),
         ),
-        dio: Dio(),
-      ));
+      );
 
   final StreamController<SSEChatEvent> _controller;
+  var cancelCalls = 0;
 
   @override
   Stream<SSEChatEvent> streamChat({
@@ -220,7 +281,7 @@ class _FakeChatSSE extends ChatSSE {
 
   @override
   void cancel() {
-    // no-op
+    cancelCalls++;
   }
 }
 
@@ -228,7 +289,10 @@ class _FakeChatRepository implements IChatRepository {
   List<MessageModel> history = [];
 
   @override
-  Future<String> sendMessage({required String sessionId, required String message}) async {
+  Future<String> sendMessage({
+    required String sessionId,
+    required String message,
+  }) async {
     return '';
   }
 

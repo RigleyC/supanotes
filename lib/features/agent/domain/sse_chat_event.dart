@@ -47,6 +47,8 @@ class SSEChatEvent {
   String? get data => payload['data'] as String?;
   String? get toolName => payload['name'] as String?;
   String? get toolLabel => payload['label'] as String?;
+  String? get confirmationToolName => payload['tool_name'] as String?;
+  String? get confirmationLabel => payload['label'] as String?;
   String? get errorMessage => payload['message'] as String?;
   String? get finalContent => payload['content'] as String?;
 
@@ -56,6 +58,7 @@ class SSEChatEvent {
   bool get isToolStarted => type == 'tool_started';
   bool get isToolFinished => type == 'tool_finished';
   bool get isToolFailed => type == 'tool_failed';
+  bool get isConfirmationRequired => type == 'confirmation_required';
   bool get isDone => type == 'done' || type == 'message_finished';
   bool get isError => type == 'error';
 }
