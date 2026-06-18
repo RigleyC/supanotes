@@ -17,7 +17,7 @@ type AddTaskTool struct {
 }
 
 func (t *AddTaskTool) Name() string        { return "add_task" }
-func (t *AddTaskTool) Description() string { return "Create a new actionable task" }
+func (t *AddTaskTool) Description() string { return "Create a new task. Optionally link to a note via note_id. Set recurrence for repeating tasks (daily/weekdays/weekly/monthly). Set due_date (YYYY-MM-DD) for deadline tracking." }
 func (t *AddTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"title":{"type":"string"},"note_id":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date"},"recurrence":{"type":"string","enum":["none","daily","weekdays","weekly","monthly"]}},"required":["title"]}`
 }
@@ -59,7 +59,7 @@ type CompleteTaskTool struct {
 }
 
 func (t *CompleteTaskTool) Name() string        { return "complete_task" }
-func (t *CompleteTaskTool) Description() string { return "Mark a task as complete" }
+func (t *CompleteTaskTool) Description() string { return "Mark a task as done. Use this when the user says they completed something (e.g., 'comprei o arroz', 'fiz o treino', 'terminei o relatório'). Pass the task_id from get_open_tasks or get_today_tasks." }
 func (t *CompleteTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]}`
 }
@@ -86,7 +86,7 @@ type GetOpenTasksTool struct {
 }
 
 func (t *GetOpenTasksTool) Name() string        { return "get_open_tasks" }
-func (t *GetOpenTasksTool) Description() string { return "List all open tasks" }
+func (t *GetOpenTasksTool) Description() string { return "List all open (pending) tasks across all notes. Returns task ID, title, and note title. Use this when the user asks what they have pending or need to do." }
 func (t *GetOpenTasksTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -97,10 +97,8 @@ func (t *GetOpenTasksTool) Execute(ctx context.Context, userID pgtype.UUID, args
 		return "", err
 	}
 	result := "Open Tasks:\n"
-	for _, t := range tasksList {
-		if t.Status == "open" {
-			result += fmt.Sprintf("- [%s] %s\n", formatID(t.ID), t.Title)
-		}
+	for _, task := range tasksList {
+		result += fmt.Sprintf("- [%s] %s\n", formatID(task.ID), task.Title)
 	}
 	return result, nil
 }
@@ -110,7 +108,7 @@ type GetTodayTasksTool struct {
 }
 
 func (t *GetTodayTasksTool) Name() string        { return "get_today_tasks" }
-func (t *GetTodayTasksTool) Description() string { return "List today's tasks" }
+func (t *GetTodayTasksTool) Description() string { return "List tasks due today or overdue. Returns task ID, title, status, due date, and recurrence. Use this when the user asks what they have for today." }
 func (t *GetTodayTasksTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -121,10 +119,10 @@ func (t *GetTodayTasksTool) Execute(ctx context.Context, userID pgtype.UUID, arg
 	}
 	var b strings.Builder
 	for _, task := range ts {
-		b.WriteString(fmt.Sprintf("- [%s] %s (Due: %v)\n", task.Status, task.Title, task.DueDate.Time))
+		b.WriteString(fmt.Sprintf("- [%s] %s (Due: %v, Recurrence: %s)\n", task.Status, task.Title, task.DueDate.Time, task.Recurrence.String))
 	}
 	if b.Len() == 0 {
-		return "No tasks for today", nil
+		return "No tasks for today or overdue", nil
 	}
 	return b.String(), nil
 }

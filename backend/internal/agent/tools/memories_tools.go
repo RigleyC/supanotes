@@ -16,7 +16,7 @@ type SaveMemoryTool struct {
 
 func (t *SaveMemoryTool) Name() string { return "save_memory" }
 func (t *SaveMemoryTool) Description() string {
-	return "Save an important fact or preference about the user"
+	return "Save a persistent fact or preference about the user (e.g., 'O usuário treina Seg/Ter/Qui/Sex', 'O usuário é vegetariano', 'Reunião de trabalho toda segunda às 14h'). Use this when the user tells you something about themselves that you should remember for future conversations."
 }
 func (t *SaveMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`

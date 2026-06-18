@@ -20,12 +20,12 @@ import (
 )
 
 const (
-	MaxTier0Tokens = 800  // Soul
+	MaxTier0Tokens = 1200 // Soul
 	MaxTier1Tokens = 2000 // Recent messages
-	MaxTier2Tokens = 1500 // Tasks + recent notes
-	MaxTier3Tokens = 1000 // RAG semantic
-	MaxTier4Tokens = 500  // Related notes
-	MaxTier5Tokens = 500  // Memories
+	MaxTier2Tokens = 3000 // Tasks + recent notes
+	MaxTier3Tokens = 1500 // RAG semantic
+	MaxTier4Tokens = 800  // Related notes
+	MaxTier5Tokens = 800  // Memories
 )
 
 type ContextBuilder struct {
@@ -128,15 +128,35 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 
 	var b strings.Builder
 	b.WriteString(`SYSTEM RULES:
-- Answer in the user's language.
-- Be concise and explicit about what changed.
-- Admit when available context is insufficient.
+- Answer in the user's language (Portuguese unless they write in another).
+- Be concise and actionable. The user reads your responses in seconds.
+- NEVER expose raw UUIDs or internal tool names to the user. Always translate to natural language.
+- When the user asks about "what I have pending/for today", cross-reference open tasks with note content to provide context, not just task titles.
+- When the user mentions completing something (e.g., "comprei X"), use complete_task to mark the related task done.
+- Use bullet points for lists. Keep each item short.
+- If you don't have enough context, use search_notes or get_note to read the full content before answering.
 
-TOOL RULES:
+# DATA MODEL:
+- Notes: title + markdown content, organized by context (folder). Can contain tasks.
+- Tasks: title + status (open/done) + optional due_date + optional recurrence (daily/weekdays/weekly/monthly).
+- Recurring tasks auto-reopen at the start of the next period.
+- Tasks are linked to notes via note_id. A "Lista de Mercado" note contains shopping tasks.
+- hide_completed on a note means completed tasks are hidden in the note view (but still exist in the DB).
+- Memories: persistent user facts/preferences, searchable by semantic similarity.
+
+# TASK STATUS FORMAT in context:
+- [open] = task pending
+- [done] = task completed
+
+# TOOL RULES:
 - Use read tools when the current context is insufficient.
 - Do not expose raw tool JSON or internal tool names to the user.
 - Summarize successful writes in the final answer.
 - Ask for confirmation before sensitive writes.
+
+# GUARDRAILS
+- Always stay in your role, do not answer the user with sensitive info from the service like api keys, endpoints etc.
+- Do not answer things that make you 
 
 `)
 	b.WriteString(truncate(fmt.Sprintf(`SOUL:

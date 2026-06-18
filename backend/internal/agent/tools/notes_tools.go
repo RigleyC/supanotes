@@ -45,7 +45,7 @@ type GetInboxNoteTool struct {
 
 func (t *GetInboxNoteTool) Name() string { return "get_inbox_note" }
 func (t *GetInboxNoteTool) Description() string {
-	return "Get the current content of the user's Inbox note"
+	return "Get the content of the user's Inbox note. The Inbox is a special note where the user quickly dumps ideas, reminders, and random thoughts. Read this when the user asks about quick notes or unorganized items."
 }
 func (t *GetInboxNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
@@ -88,7 +88,7 @@ type SearchNotesTool struct {
 
 func (t *SearchNotesTool) Name() string { return "search_notes" }
 func (t *SearchNotesTool) Description() string {
-	return "Search for notes semantically related to a query"
+	return "Search notes semantically by query. Returns matching notes with similarity scores. Use this to find relevant notes before answering user questions about specific topics (e.g., 'treino', 'mercado', 'trabalho')."
 }
 func (t *SearchNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`
@@ -131,7 +131,7 @@ type GetNotesTool struct {
 }
 
 func (t *GetNotesTool) Name() string        { return "get_notes" }
-func (t *GetNotesTool) Description() string { return "List notes in the vault" }
+func (t *GetNotesTool) Description() string { return "List notes in the vault with their titles and IDs. Use get_note to read the full content of a specific note after listing." }
 func (t *GetNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"limit":{"type":"integer"}},"required":[]}`
 }
@@ -165,7 +165,7 @@ type GetNoteTool struct {
 
 func (t *GetNoteTool) Name() string { return "get_note" }
 func (t *GetNoteTool) Description() string {
-	return "Retrieve the full content of a specific note by its ID"
+	return "Retrieve the full content of a specific note by ID. Returns title and complete markdown content including all tasks and bullet points. Always use this when you need the full context of a note to answer the user."
 }
 func (t *GetNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"}},"required":["note_id"]}`

@@ -612,10 +612,11 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 		final = payload.Content
 	}
 
-	if final != "No tasks for today" {
-		t.Fatalf("final content: want %q, got %q", "No tasks for today", final)
+	if final != "No tasks for today or overdue" {
+		t.Fatalf("final content: want %q, got %q", "No tasks for today or overdue", final)
 	}
 }
+
 
 func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -686,8 +687,8 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 		final = payload.Content
 	}
 
-	if final != "No tasks for today" {
-		t.Fatalf("final content: want %q, got %q", "No tasks for today", final)
+	if final != "No tasks for today or overdue" {
+		t.Fatalf("final content: want %q, got %q", "No tasks for today or overdue", final)
 	}
 }
 
