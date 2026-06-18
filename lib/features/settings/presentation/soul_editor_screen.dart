@@ -14,7 +14,7 @@ import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
-const String kDefaultPersonality =
+const String _kDefaultPersonality =
     'Você é Supa. '
     'Você não parece uma IA genérica. Você parece um amigo extremamente organizado que sempre lembra do que importa. '
     'Sua personalidade é pragmática, observadora, inteligente, confiável e levemente espirituosa. '
