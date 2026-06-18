@@ -39,6 +39,78 @@ supanotes/
 - No hardcoded strings; use constants.
 - File naming: `snake_case.dart`.
 
+### Flutter UI Screen Conventions
+
+Cada tela deve seguir o padrão abaixo. **Toda tela nova deve seguir estas regras; telas existentes devem ser refatoradas gradualmente.**
+
+#### Estrutura básica da tela
+
+```
+Scaffold(
+  body: CustomScrollView(
+    slivers: [
+      SliverAppBar.medium(title: const Text('Title')),
+      SliverPadding(
+        sliver: SliverList(
+          delegate: SliverChildListDelegate([ ...conteúdo ]),
+        ),
+      ),
+    ],
+  ),
+)
+```
+
+- Use `CustomScrollView` + `SliverAppBar.medium` + `SliverList` como estrutura padrão.
+- Use `SliverPadding` para padding ao redor do `SliverList`.
+- Use `SliverFillRemaining` para telas que precisam ocupar todo o espaço (loading, estados especiais).
+- Use `bottomNavigationBar` (quando houver botões de ação fixos no rodapé) em vez de widgets soltos no body.
+
+#### Estado e requisições
+
+- Use `AsyncValue.when(data:loading:error:)` em vez de checar `.isLoading` / `.hasError` manualmente. **PROIBIDO**:
+  ```dart
+  // PROIBIDO
+  if (asyncValue.isLoading) return ...;
+  if (asyncValue.hasError) return ...;
+  final data = asyncValue.asData?.value;
+  if (data == null) return ...;
+
+  // OBRIGATÓRIO
+  return asyncValue.when(
+    data: (data) => ...,
+    loading: () => ...,
+    error: (err, _) => ...,
+  );
+  ```
+- **PROIBIDO**: booleanos como `_isLoading`, `_isSaving`, `_isEditing`, `_initialized`, `_waitingForLink` para estado de requisição. Use o estado do provider + `AsyncValue`.
+- Exceção: estado de UI local (query string, visibilidade de sheet, countdown) pode usar `setState` ou `ValueNotifier` conforme as regras de Riverpod acima.
+- **PROIBIDO**: modo visualização/edição. Telas devem usar apenas modo edição.
+
+#### Botões e componentes
+
+- Use **sempre** os componentes compartilhados do app: `AppButton`, `AppInput`, `AppCard`, `AppErrorView`, `AppBottomSheet`, `confirm_dialog.dart`, etc.
+- **PROIBIDO**: `FloatingActionButton`, `ElevatedButton`, `TextButton`, `OutlinedButton`, `FilledButton` — use `AppButton` com a variante apropriada.
+- Se um componente necessário não existir, crie no `shared/widgets/`.
+- Use `FloatingActionButton` ou `QuickActionFabs` apenas para ações principais que justifiquem FAB.
+
+#### Métodos privados e widgets separados
+
+- **PROIBIDO** criar métodos privados como `_buildBody`, `_buildHeader`, `_modeBanner`, `_editor`, `_preview`, `_footerActions` para trechos que podem ficar inline no `build()`.
+- Para lógica complexa que justifique extração, prefira criar widgets privados reutilizáveis (classes `_FooWidget extends StatelessWidget`).
+- Ações de callback (onPressed handlers) que precisam de contexto podem usar métodos nomeados privados (`_onSave`, `_onDelete`).
+
+#### Strings
+
+- Strings simples (títulos, labels de botão, placeholders) **inline**: `const Text('Configurações')` — sem classe de strings para isso.
+- Strings complexas (mensagens longas, textos com interpolação, usados em múltiplos lugares) vão em um arquivo de constantes do feature (`domain/<feature>_strings.dart`).
+- **PROIBIDO** criar classes `_FooStrings` dentro do arquivo de screen.
+
+#### Dialogs e Modals
+
+- Dialogs de confirmação: use `showConfirmDialog(...)` de `confirm_dialog.dart` — **PROIBIDO** `showDialog` + `AlertDialog` inline.
+- Modals/bottom sheets: crie um widget dedicado (ex. `NewContextSheet`) e use `showAppBottomSheet(context, builder: (_) => SheetWidget())`.
+- Dialogs personalizados: crie um widget simples (ex. `class SomeDialog extends StatelessWidget`) que receba callbacks e use com o método global.
+
 ### Go (Backend)
 - Module name: `github.com/RigleyC/supanotes`
 - Package layout follows [Standard Go Project Layout](https://github.com/golang-standards/project-layout).

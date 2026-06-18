@@ -1,4 +1,7 @@
-server.exe
+*.exe
+supanotes-server
+__debug_bin*
+bin/
 *.log
 .env
 .git
