@@ -10,7 +10,7 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
   final onSurfaceVariant = colorScheme.onSurfaceVariant;
 
   return defaultStylesheet.copyWith(
-    documentPadding: EdgeInsets.all(24),
+    documentPadding: EdgeInsets.symmetric(horizontal: 24),
     rules: [
       // Override base rule: swap hardcoded Colors.black for theme colour.
       StyleRule(
