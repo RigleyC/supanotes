@@ -246,7 +246,7 @@ func (r *repository) CreatePendingToolConfirmation(ctx context.Context, userID, 
 		UserID:    userID,
 		SessionID: sessionID,
 		ToolName:  toolName,
-		ArgsJson:  []byte(argsJSON),
+		ArgsJSON: []byte(argsJSON),
 	})
 }
 
@@ -266,7 +266,7 @@ func (r *repository) ResolvePendingToolConfirmation(ctx context.Context, id, use
 }
 ```
 
-If sqlc names `args_json` as `ArgsJSON` instead of `ArgsJson`, use the generated field name.
+After `sqlc generate`, use the generated field name for `args_json`. With the current sqlc config this is expected to be `ArgsJSON`, but verify in `backend/internal/db/sqlcgen/agent.sql.go` before editing repository code.
 
 - [ ] **Step 5: Run event tests**
 
@@ -344,7 +344,7 @@ func (f *fakeRepository) CreatePendingToolConfirmation(ctx context.Context, user
 		UserID: userID,
 		SessionID: sessionID,
 		ToolName: toolName,
-		ArgsJson: []byte(argsJSON),
+		ArgsJSON: []byte(argsJSON),
 		Status: "pending",
 	}, nil
 }
@@ -534,19 +534,18 @@ func (h *Handler) resolveToolConfirmation(ctx context.Context, userID pgtype.UUI
 		}, http.StatusOK, nil
 	}
 
-	result, err := h.loop.tools.Execute(ctx, userID, pending.ToolName, string(pending.ArgsJson))
-	if err != nil {
-		_, _ = h.repo.ResolvePendingToolConfirmation(ctx, confirmationID, userID, "cancelled")
-		return ResolveToolConfirmationResponse{}, http.StatusInternalServerError, fmt.Errorf(err.Error())
-	}
-
-	if _, err := h.repo.CreateMessage(ctx, userID, pending.SessionID, string(llm.RoleTool), result, nil, nil); err != nil {
-		return ResolveToolConfirmationResponse{}, http.StatusInternalServerError, fmt.Errorf("save tool result: %w", err)
-	}
-
 	resolved, err := h.repo.ResolvePendingToolConfirmation(ctx, confirmationID, userID, "approved")
 	if err != nil {
 		return ResolveToolConfirmationResponse{}, http.StatusConflict, fmt.Errorf("confirmation already resolved")
+	}
+
+	result, err := h.loop.ExecuteTool(ctx, userID, resolved.ToolName, string(resolved.ArgsJSON))
+	if err != nil {
+		return ResolveToolConfirmationResponse{}, http.StatusInternalServerError, fmt.Errorf("execute confirmed tool: %w", err)
+	}
+
+	if _, err := h.repo.CreateMessage(ctx, userID, resolved.SessionID, string(llm.RoleTool), result, nil, nil); err != nil {
+		return ResolveToolConfirmationResponse{}, http.StatusInternalServerError, fmt.Errorf("save tool result: %w", err)
 	}
 
 	return ResolveToolConfirmationResponse{
@@ -557,7 +556,7 @@ func (h *Handler) resolveToolConfirmation(ctx context.Context, userID pgtype.UUI
 }
 ```
 
-Required imports include `context`, `github.com/jackc/pgx/v5/pgtype`, and `github.com/RigleyC/supanotes/pkg/llm` if not already present. If `h.loop.tools` is too private for handler use, add a method on `Loop`:
+Required imports include `context`, `github.com/jackc/pgx/v5/pgtype`, and `github.com/RigleyC/supanotes/pkg/llm` if not already present. Add a method on `Loop` instead of reaching into `h.loop.tools` from the handler:
 
 ```go
 func (l *Loop) ExecuteTool(ctx context.Context, userID pgtype.UUID, toolName, argsJSON string) (string, error) {
@@ -566,6 +565,8 @@ func (l *Loop) ExecuteTool(ctx context.Context, userID pgtype.UUID, toolName, ar
 ```
 
 Then call `h.loop.ExecuteTool(...)`.
+
+This order intentionally claims the pending confirmation before executing the tool. Do not change it to "execute then resolve"; that creates a race where two concurrent confirm requests can execute the same sensitive tool twice.
 
 - [ ] **Step 5: Add HTTP method**
 
@@ -1104,7 +1105,23 @@ flutter pub get
 
 Expected: `pubspec.lock` updates and contains `flutter_gen_ai_chat_ui`.
 
-- [ ] **Step 3: Write failing adapter tests**
+- [ ] **Step 3: Inspect the installed package API**
+
+Run:
+
+```bash
+dart pub cache list | rg flutter_gen_ai_chat_ui
+```
+
+Then inspect the installed package source in the pub cache for these symbols:
+
+```bash
+rg "class ChatUser|class ChatMessage|class ChatMessagesController|class AiChatWidget|typedef.*Bubble|customBubbleBuilder|setMessages|updateMessage" "$env:LOCALAPPDATA\\Pub\\Cache\\hosted" -g "*.dart"
+```
+
+Expected: confirm the exact constructor names for `ChatUser`, `ChatMessage`, `ChatMessagesController`, and the exact `AiChatWidget` customization callbacks before copying snippets below. If the API differs, update the tests first to match the installed package and then implement against those tests.
+
+- [ ] **Step 4: Write failing adapter tests**
 
 Replace `test/features/agent/presentation/chat_message_adapter_test.dart` expectations with package types:
 
@@ -1145,7 +1162,7 @@ test('maps tool actions to rich action messages with stable ids', () {
 });
 ```
 
-- [ ] **Step 4: Run adapter tests and verify failure**
+- [ ] **Step 5: Run adapter tests and verify failure**
 
 Run:
 
@@ -1155,7 +1172,7 @@ flutter test test/features/agent/presentation/chat_message_adapter_test.dart
 
 Expected: FAIL because new adapter functions do not exist.
 
-- [ ] **Step 5: Replace adapter implementation**
+- [ ] **Step 6: Replace adapter implementation**
 
 In `lib/features/agent/presentation/chat_message_adapter.dart`:
 
@@ -1228,7 +1245,7 @@ ChatMessage _actionToChatMessage(ChatToolAction action) {
 
 If the package constructor uses `name` instead of `firstName`, adjust after compiler feedback and update tests to match the actual API.
 
-- [ ] **Step 6: Run adapter tests**
+- [ ] **Step 7: Run adapter tests**
 
 Run:
 
@@ -1238,7 +1255,7 @@ flutter test test/features/agent/presentation/chat_message_adapter_test.dart
 
 Expected: PASS.
 
-- [ ] **Step 7: Run analyzer on adapter**
+- [ ] **Step 8: Run analyzer on adapter**
 
 Run:
 
@@ -1248,7 +1265,7 @@ dart analyze lib/features/agent/presentation/chat_message_adapter.dart test/feat
 
 Expected: No issues.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add pubspec.yaml pubspec.lock lib/features/agent/presentation/chat_message_adapter.dart test/features/agent/presentation/chat_message_adapter_test.dart
@@ -1548,7 +1565,17 @@ testWidgets('chat screen resolves confirmation through controller', (tester) asy
     ),
   );
 
-  await tester.pumpWidget(/* existing ProviderScope setup */);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        chatControllerProvider.overrideWith(() => controller),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: const ChatScreen(),
+      ),
+    ),
+  );
   await tester.pumpAndSettle();
 
   await tester.tap(find.text('Confirmar'));
