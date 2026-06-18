@@ -238,6 +238,8 @@ func (h *Handler) Webhook(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	}
 
+	_ = h.bot.SendChatAction(deliveryChatID, "typing")
+
 	placeholderID, err := h.bot.SendMessage(deliveryChatID, "...")
 	if err != nil {
 		c.Logger().Error(err)
@@ -248,6 +250,8 @@ func (h *Handler) Webhook(c echo.Context) error {
 	lastSent := ""
 	ticker := time.NewTicker(600 * time.Millisecond)
 	defer ticker.Stop()
+	typingTicker := time.NewTicker(5 * time.Second)
+	defer typingTicker.Stop()
 
 loop:
 	for {
@@ -256,7 +260,9 @@ loop:
 			if !ok {
 				break loop
 			}
-			buf = chunk
+			buf += chunk
+		case <-typingTicker.C:
+			_ = h.bot.SendChatAction(deliveryChatID, "typing")
 		case <-ticker.C:
 		}
 		if buf != "" && buf != lastSent {
@@ -307,6 +313,7 @@ func (h *Handler) respond(_ context.Context, chatID int64, text string) {
 	if h.bot == nil || !h.bot.IsEnabled() {
 		return
 	}
+	_ = h.bot.SendChatAction(chatID, "typing")
 	placeholder, err := h.bot.SendMessage(chatID, "Pensando...")
 	if err != nil {
 		log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram placeholder failed")

@@ -114,6 +114,33 @@ func (t *TelegramClient) EditMessageText(chatID int64, messageID int64, text str
 	return nil
 }
 
+func (t *TelegramClient) SendChatAction(chatID int64, action string) error {
+	if !t.IsEnabled() {
+		return nil
+	}
+	payload, err := json.Marshal(map[string]any{
+		"chat_id": chatID,
+		"action":  action,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, t.baseURL+"/sendChatAction", bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := t.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telegram chat action returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (t *TelegramClient) NotifyUser(ctx context.Context, userID pgtype.UUID, text string) error {
 	if !t.IsEnabled() || t.repo == nil {
 		return nil
