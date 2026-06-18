@@ -1,5 +1,6 @@
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/router/app_routes.dart';
@@ -10,6 +11,7 @@ String? authGuardRedirect({
   required AsyncValue<User?> authState,
   String? persistedLocation,
 }) {
+  debugPrint('[LastRoute] authGuardRedirect currentLocation=$currentLocation persistedLocation=$persistedLocation authState=${authState.runtimeType}');
   final isAuthPage = currentLocation == AppRoutes.login ||
       currentLocation == AppRoutes.register;
 

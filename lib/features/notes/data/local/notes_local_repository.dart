@@ -8,7 +8,10 @@ import '../../../../core/database/daos/notes_dao.dart';
 
 final notesLocalRepositoryProvider = Provider.autoDispose<NotesLocalRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  final userId = ref.watch(currentUserIdProvider)!;
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) {
+    throw StateError('Cannot create NotesLocalRepository: user not authenticated');
+  }
   return NotesLocalRepository(db.notesDao, userId);
 });
 

@@ -13,11 +13,13 @@ class TaskMetadataBadges extends StatelessWidget {
     this.dueDate,
     this.recurrence,
     this.isCompleted = false,
+    this.now,
   });
 
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
   final bool isCompleted;
+  final DateTime? now;
 
   bool get _hasRecurrence => recurrence != null;
   bool get _hasDueDate => dueDate != null;
@@ -53,7 +55,7 @@ class TaskMetadataBadges extends StatelessWidget {
   }
 
   String _dueDateLabel(DateTime dueDate) {
-    final today = DateTime.now().startOfDay;
+    final today = (now ?? DateTime.now()).startOfDay;
     final date = dueDate.startOfDay;
 
     if (date.isSameDayAs(today)) return 'Hoje';
@@ -71,7 +73,7 @@ class TaskMetadataBadges extends StatelessWidget {
       return Theme.of(context).colorScheme.onSurfaceVariant;
     }
 
-    final today = DateTime.now().startOfDay;
+    final today = (now ?? DateTime.now()).startOfDay;
     final date = dueDate.startOfDay;
     
     if (date.isBefore(today)) return Theme.of(context).colorScheme.error;
@@ -98,11 +100,14 @@ class _MetadataPill extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.labelMedium?.copyWith(color: color),
+        Flexible(
+          child: Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: color),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

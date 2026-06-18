@@ -20,7 +20,7 @@ class AppErrorView extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,

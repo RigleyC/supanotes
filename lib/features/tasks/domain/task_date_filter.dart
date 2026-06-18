@@ -4,7 +4,7 @@ import 'task_model.dart';
 class TaskDateFilter {
   static List<TaskModel> overdue(List<TaskModel> tasks, {required DateTime today}) {
     return tasks
-        .where((t) => t.dueDate != null && !t.dueDate!.isSameDayAs(today) && t.dueDate!.isBefore(today))
+        .where((t) => !t.isCompleted && t.dueDate != null && !t.dueDate!.isSameDayAs(today) && t.dueDate!.isBefore(today))
         .toList()
       ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
   }

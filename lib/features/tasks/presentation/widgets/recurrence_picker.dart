@@ -21,7 +21,7 @@ class RecurrencePicker extends StatelessWidget {
 
   static const _options = <_RecurrenceOption>[
     _RecurrenceOption(value: null, label: 'Nenhuma', icon: Icons.do_not_disturb_on_outlined),
-    _RecurrenceOption(value: TaskRecurrence.daily, label: 'Diária', icon: Icons.today_outlined),
+    _RecurrenceOption(value: TaskRecurrence.daily, label: 'Diária', icon: Icons.today_rounded),
     _RecurrenceOption(value: TaskRecurrence.weekdays, label: 'Dias úteis', icon: Icons.work_outline),
     _RecurrenceOption(value: TaskRecurrence.weekly, label: 'Semanal', icon: Icons.calendar_view_week_outlined),
     _RecurrenceOption(value: TaskRecurrence.monthly, label: 'Mensal', icon: Icons.calendar_month_outlined),
@@ -66,7 +66,7 @@ String recurrenceLabel(TaskRecurrence? recurrence) {
       return 'Semanalmente';
     case TaskRecurrence.monthly:
       return 'Mensalmente';
-    default:
+    case null:
       return '';
   }
 }

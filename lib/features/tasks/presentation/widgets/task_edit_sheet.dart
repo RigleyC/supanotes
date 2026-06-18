@@ -11,6 +11,7 @@ import '../../domain/task_model.dart';
 import '../../domain/task_recurrence.dart';
 import 'due_date_picker.dart';
 import 'recurrence_picker.dart';
+import 'package:supanotes/core/utils/date_time_extensions.dart';
 
 /// Bottom-sheet form for creating or editing a task.
 ///
@@ -145,9 +146,34 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
   Future<void> _onDelete() async {
     final task = widget.task;
     if (task == null) return;
+
+    final navigator = Navigator.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir tarefa'),
+        content: Text(
+          task.recurrence != null
+              ? 'Tem certeza que deseja excluir esta tarefa recorrente? Ela não será mais reagendada.'
+              : 'Tem certeza que deseja excluir esta tarefa?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     setState(() => _saving = true);
     final repo = ref.read(tasksRepositoryProvider);
-    final navigator = Navigator.of(context);
     try {
       await repo.deleteTask(task.id);
       navigator.pop(TaskEditResult(task: task, deleted: true));
@@ -201,7 +227,12 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
           const SizedBox(height: AppSpacing.sm),
           RecurrencePicker(
             initialRecurrence: _recurrence,
-            onChanged: (r) => setState(() => _recurrence = r),
+            onChanged: (r) => setState(() {
+              _recurrence = r;
+              if (r != null && _dueDate == null) {
+                _dueDate = DateTime.now().startOfDay;
+              }
+            }),
           ),
           const SizedBox(height: AppSpacing.lg),
           Row(

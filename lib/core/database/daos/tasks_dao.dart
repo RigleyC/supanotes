@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../features/tasks/domain/task_recurrence.dart';
+import '../../utils/date_time_extensions.dart';
 
 import '../database.dart';
 import '../tables/tasks.dart';
@@ -21,8 +22,8 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     final today = DateTime(now.year, now.month, now.day);
 
     return (select(tasks)
-          ..where((t) => t.dueDate.isSmallerOrEqualValue(
-              DateTime(today.year, today.month, today.day, 23, 59, 59)))
+          ..where((t) => t.dueDate.isSmallerThanValue(today.add(const Duration(days: 1))))
+          ..where((t) => t.deletedAt.isNull())
           ..orderBy([
             (t) => OrderingTerm(
                   expression: t.status.equals('done'),
@@ -237,9 +238,12 @@ DateTime? _nextDueDate({
   required DateTime from,
   required TaskRecurrence recurrence,
 }) {
+  final today = DateTime.now().startOfDay;
+
+  DateTime? raw;
   switch (recurrence) {
     case TaskRecurrence.daily:
-      return from.add(const Duration(days: 1));
+      raw = from.add(const Duration(days: 1));
     case TaskRecurrence.weekdays:
       var day = from.add(const Duration(days: 1));
       // Skip Saturday (6) and Sunday (7) — Dart's DateTime.weekday is
@@ -248,9 +252,9 @@ DateTime? _nextDueDate({
           day.weekday == DateTime.sunday) {
         day = day.add(const Duration(days: 1));
       }
-      return day;
+      raw = day;
     case TaskRecurrence.weekly:
-      return from.add(const Duration(days: 7));
+      raw = from.add(const Duration(days: 7));
     case TaskRecurrence.monthly:
       final desiredMonth = from.month + 1;
       final overflow = desiredMonth > 12;
@@ -261,6 +265,12 @@ DateTime? _nextDueDate({
       // into March.
       final lastDayOfTarget = DateTime(year, month + 1, 0).day;
       final day = from.day <= lastDayOfTarget ? from.day : lastDayOfTarget;
-      return DateTime(year, month, day);
+      raw = DateTime(year, month, day);
   }
+
+  if (raw.isBefore(today)) {
+    raw = today;
+  }
+
+  return raw;
 }

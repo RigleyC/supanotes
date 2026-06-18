@@ -6,7 +6,9 @@ void main() {
   test('completing a recurring task updates the same row with the next due date', () async {
     final db = AppDatabase.test();
     db.tasksDao.completionsDao = db.taskCompletionsDao;
-    final due = DateTime(2026, 6, 15);
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final due = todayStart.subtract(const Duration(days: 1));
     await db.tasksDao.insertTask(TaskData(
       id: 'task-1',
       userId: 'user-1',
@@ -17,8 +19,8 @@ void main() {
       recurrence: TaskRecurrence.daily,
       dueDate: due,
       completedAt: null,
-      createdAt: DateTime(2026, 6, 15),
-      updatedAt: DateTime(2026, 6, 15),
+      createdAt: todayStart,
+      updatedAt: todayStart,
       deletedAt: null,
       isDirty: true,
     ));
@@ -31,7 +33,7 @@ void main() {
     expect(task.id, 'task-1');
     expect(task.status, 'open');
     expect(task.completedAt, isNull);
-    expect(task.dueDate, DateTime(2026, 6, 16));
+    expect(task.dueDate, todayStart);
     expect(task.recurrence, TaskRecurrence.daily);
 
     final completions = await db.select(db.localTaskCompletions).get();
@@ -114,7 +116,8 @@ void main() {
   test('completing a monthly recurring task clamps to last valid day', () async {
     final db = AppDatabase.test();
     db.tasksDao.completionsDao = db.taskCompletionsDao;
-    final due = DateTime(2026, 1, 31);  // last day of January
+    // Use August 31 → September (30 days) to test clamp, both in future.
+    final due = DateTime(2026, 8, 31);
     await db.tasksDao.insertTask(TaskData(
       id: 'task-4',
       userId: 'user-1',
@@ -137,8 +140,8 @@ void main() {
     final task = tasks.single;
     expect(task.status, 'open');
     expect(task.dueDate!.year, 2026);
-    expect(task.dueDate!.month, 2);
-    expect(task.dueDate!.day, 28);  // Feb has 28 days in 2026
+    expect(task.dueDate!.month, 9);
+    expect(task.dueDate!.day, 30);  // Sep has 30 days, clamped from 31
 
     await db.close();
   });

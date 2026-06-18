@@ -28,16 +28,19 @@ class NoteEditorCommands {
     ]);
   }
 
-  /// Changes block type of all selected nodes.
+  /// Changes block type of all selected nodes. Toggles off (back to paragraph)
+  /// when the node already has the given [blockType].
   static void setBlockType(Editor editor, DocumentComposer composer, Attribution? blockType) {
     final requests = <EditRequest>[];
     for (final node in selectedNodes(editor.context.document, composer.selection)) {
       if (node is ParagraphNode) {
-        requests.add(ChangeParagraphBlockTypeRequest(nodeId: node.id, blockType: blockType));
+        final current = node.getMetadataValue('blockType') as Attribution?;
+        final newType = current == blockType ? null : blockType;
+        requests.add(ChangeParagraphBlockTypeRequest(nodeId: node.id, blockType: newType));
       } else if (node is ListItemNode) {
         requests.add(ConvertListItemToParagraphRequest(
           nodeId: node.id,
-          paragraphMetadata: {'blockType': blockType},
+          paragraphMetadata: blockType != null ? {'blockType': blockType} : <String, dynamic>{},
         ));
       } else if (node is TaskNode) {
         requests.add(ReplaceNodeRequest(
@@ -53,12 +56,16 @@ class NoteEditorCommands {
     if (requests.isNotEmpty) editor.execute(requests);
   }
 
-  /// Converts selected nodes to the given list type.
+  /// Converts selected nodes to the given list type. Toggles off (back to
+  /// paragraph) when the node is already a list item of the same [type].
   static void convertToListItem(Editor editor, DocumentComposer composer, ListItemType type) {
     final requests = <EditRequest>[];
     for (final node in selectedNodes(editor.context.document, composer.selection)) {
       if (node is ListItemNode) {
-        if (node.type != type) {
+        if (node.type == type) {
+          // Already this list type — toggle back to paragraph.
+          requests.add(ConvertListItemToParagraphRequest(nodeId: node.id));
+        } else {
           requests.add(ChangeListItemTypeRequest(nodeId: node.id, newType: type));
         }
       } else if (node is TaskNode) {
@@ -164,5 +171,77 @@ class NoteEditorCommands {
       ),
     ]);
     return true;
+  }
+}
+
+/// Like super_editor's default [HorizontalRuleConversionReaction] but assigns
+/// a random [dividerIndex] metadata so the divider renders a random SVG.
+class RandomDividerConversionReaction extends EditReaction {
+  static final _hrPattern = RegExp(r'^(---|—-)\s');
+
+  const RandomDividerConversionReaction({this.dividerCount = 35});
+
+  final int dividerCount;
+
+  @override
+  void react(
+    EditContext editorContext,
+    RequestDispatcher requestDispatcher,
+    List<EditEvent> changeList,
+  ) {
+    if (changeList.length < 2) return;
+
+    final document = editorContext.document;
+
+    final didTypeSpace = EditInspector.didTypeSpace(document, changeList);
+    if (!didTypeSpace) return;
+
+    final edit = changeList.reversed.firstWhere(
+      (edit) => edit is DocumentEdit,
+    ) as DocumentEdit;
+    if (edit.change is! TextInsertionEvent) return;
+
+    final textInsertionEvent = edit.change as TextInsertionEvent;
+    final paragraph = document.getNodeById(
+      textInsertionEvent.nodeId,
+    ) as TextNode;
+    final match = _hrPattern.firstMatch(
+      paragraph.text.toPlainText(),
+    )?.group(0);
+    if (match == null) return;
+
+    final index = math.Random().nextInt(dividerCount) + 1;
+
+    requestDispatcher.execute([
+      DeleteContentRequest(
+        documentRange: DocumentRange(
+          start: DocumentPosition(
+            nodeId: paragraph.id,
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+          end: DocumentPosition(
+            nodeId: paragraph.id,
+            nodePosition: TextNodePosition(offset: match.length),
+          ),
+        ),
+      ),
+      InsertNodeAtIndexRequest(
+        nodeIndex: document.getNodeIndexById(paragraph.id),
+        newNode: HorizontalRuleNode(
+          id: Editor.createNodeId(),
+          metadata: {'dividerIndex': index},
+        ),
+      ),
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: paragraph.id,
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+        ),
+        SelectionChangeType.placeCaret,
+        SelectionReason.contentChange,
+      ),
+    ]);
   }
 }

@@ -219,16 +219,15 @@ class _AgentChatStatusBar extends StatelessWidget {
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.error,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
           if (onRetry != null)
-            TextButton(
+            /*   TextButton(
               onPressed: onRetry,
               child: const Text('Tentar novamente'),
-            ),
-          const Spacer(),
+            ), */
+            const Spacer(),
           if (onCancel != null)
             IconButton(
               icon: const Icon(Icons.close, size: 18),

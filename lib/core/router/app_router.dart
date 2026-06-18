@@ -101,11 +101,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const MemoriesScreen(),
       ),
     ],
-    redirect: (context, state) => authGuardRedirect(
-      currentLocation: state.matchedLocation,
-      authState: notifier.value,
-      persistedLocation: lastRouteStore.initialLocation(),
-    ),
+    redirect: (context, state) {
+      final result = authGuardRedirect(
+        currentLocation: state.matchedLocation,
+        authState: notifier.value,
+        persistedLocation: lastRouteStore.initialLocation(),
+      );
+      debugPrint('[LastRoute] redirect result=$result for location=${state.matchedLocation}');
+      return result;
+    },
   );
 
   void onRouteChanged() {
@@ -113,6 +117,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     if (authState is! AsyncData<User?>) return;
     if (authState.value == null) return;
     final location = router.routerDelegate.currentConfiguration.uri.toString();
+    debugPrint('[LastRoute] onRouteChanged saving: $location');
     unawaited(lastRouteStore.save(location));
   }
 

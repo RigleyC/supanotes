@@ -23,11 +23,11 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
           ),
         },
       ),
-      // Override headers: theme colour + top spacing.
+      // Override headers: theme colour + top/bottom spacing.
       StyleRule(
         const BlockSelector('header1'),
         (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 32),
+          Styles.padding: const CascadingPadding.only(top: 24, bottom: 12),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: 38,
@@ -38,7 +38,7 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
       StyleRule(
         const BlockSelector('header2'),
         (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 24),
+          Styles.padding: const CascadingPadding.only(top: 20, bottom: 12),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: 26,
@@ -49,7 +49,7 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
       StyleRule(
         const BlockSelector('header3'),
         (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 20),
+          Styles.padding: const CascadingPadding.only(top: 16, bottom: 8),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: 22,
@@ -60,7 +60,7 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
       // List spacing.
       StyleRule(
         const BlockSelector('listItem'),
-        (doc, docNode) => {Styles.padding: const CascadingPadding.only(top: 4)},
+        (doc, docNode) => {Styles.padding: const CascadingPadding.only(top: 8)},
       ),
       StyleRule(
         const BlockSelector('listItem').last(),
@@ -72,12 +72,20 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
       StyleRule(
         const BlockSelector('blockquote'),
         (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(top: 8, bottom: 8),
           Styles.textStyle: TextStyle(
             color: onSurfaceVariant,
             fontSize: 20,
             fontWeight: FontWeight.bold,
             height: 1.4,
           ),
+        },
+      ),
+      // Divider spacing.
+      StyleRule(
+        const BlockSelector('horizontalRule'),
+        (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(top: 12, bottom: 12),
         },
       ),
       // Task block (not in default stylesheet).
@@ -87,7 +95,7 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
           Styles.padding:
               hideCompleted && docNode is TaskNode && docNode.isComplete
               ? const CascadingPadding.all(0)
-              : const CascadingPadding.only(top: 4),
+              : const CascadingPadding.only(top: 8),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: 18,

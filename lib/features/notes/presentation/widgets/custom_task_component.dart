@@ -102,9 +102,13 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
             if (!_pendingResetNodeIds.remove(node.id)) return;
             final exists = document.getNodeById(node.id) != null;
             if (exists) {
-              _editor.execute([
-                ChangeTaskCompletionRequest(nodeId: node.id, isComplete: false),
-              ]);
+              try {
+                _editor.execute([
+                  ChangeTaskCompletionRequest(nodeId: node.id, isComplete: false),
+                ]);
+              } catch (_) {
+                // Editor was disposed while the timer was pending — safe to ignore.
+              }
             }
           });
         } else if (!isComplete) {

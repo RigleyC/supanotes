@@ -79,6 +79,15 @@ class NoteEditorController {
       document: document!,
       composer: composer!,
     );
+    // Replace the default HorizontalRuleConversionReaction (which creates
+    // dividers without dividerIndex, always showing SVG #1) with one that
+    // assigns a random dividerIndex so "--- " gives a random divider.
+    editor!.reactionPipeline.removeWhere(
+      (r) => r is HorizontalRuleConversionReaction,
+    );
+    editor!.reactionPipeline.add(
+      const RandomDividerConversionReaction(dividerCount: _dividerCount),
+    );
     focusNode = FocusNode();
     document!.addListener(_onDocumentChanged);
   }
@@ -87,21 +96,7 @@ class NoteEditorController {
     _noteId = noteId;
   }
 
-  void _onDocumentChanged(DocumentChangeLog _) {
-    final currentEditor = editor;
-    final currentComposer = composer;
-    if (currentEditor != null &&
-        currentComposer != null &&
-        NoteEditorCommands.convertDividerShortcut(
-          currentEditor,
-          currentComposer,
-          dividerCount: _dividerCount,
-        )) {
-      return;
-    }
-
-    _scheduleSnapshotSave();
-  }
+  void _onDocumentChanged(DocumentChangeLog _) => _scheduleSnapshotSave();
 
   void _scheduleSnapshotSave() {
     final doc = document;

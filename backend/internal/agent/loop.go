@@ -167,6 +167,15 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 		res, err := client.Complete(ctx, req)
 		if err != nil {
+			if len(lastToolResults) > 0 {
+				slog.Warn("llm call failed after tool execution; finishing with tool result", "error", err, "iteration", i)
+				finalContent = strings.Join(lastToolResults, "\n")
+				sendStreamEvent(events, writer.Event(
+					EventMessageFinished,
+					MessageFinishedPayload{Content: finalContent},
+				))
+				return finalContent, nil
+			}
 			return "", fmt.Errorf("llm call: %w", err)
 		}
 		if res.Content == "" && len(res.ToolCalls) == 0 {
