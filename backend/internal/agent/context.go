@@ -283,7 +283,7 @@ CURRENT DATE & TIME:
 	}
 	b.WriteString(truncate(tier5.String(), MaxTier5Tokens))
 
-	b.WriteString("\nUse tools only when they directly help answer or complete the user's request.")
+	b.WriteString("\nTOOL RULES:\nUse tools only when they directly help answer or complete the user's request.")
 
 	return b.String(), nil
 }

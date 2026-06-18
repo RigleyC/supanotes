@@ -18,7 +18,11 @@ import (
 	"github.com/RigleyC/supanotes/pkg/llm"
 )
 
-type stubLoopRepo struct{}
+type stubLoopRepo struct {
+	deletedUserID    pgtype.UUID
+	deletedSessionID pgtype.UUID
+	deleteErr        error
+}
 
 func (s *stubLoopRepo) GetMessages(ctx context.Context, userID, sessionID pgtype.UUID, limit, offset int32) ([]sqlcgen.Message, error) {
 	return nil, nil
@@ -27,7 +31,9 @@ func (s *stubLoopRepo) CreateMessage(ctx context.Context, userID, sessionID pgty
 	return sqlcgen.Message{}, nil
 }
 func (s *stubLoopRepo) DeleteSessionMessages(ctx context.Context, userID, sessionID pgtype.UUID) error {
-	return nil
+	s.deletedUserID = userID
+	s.deletedSessionID = sessionID
+	return s.deleteErr
 }
 func (s *stubLoopRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
@@ -40,6 +46,25 @@ func (s *stubLoopRepo) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (
 }
 func (s *stubLoopRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
+}
+
+func TestLoopResetSessionDeletesSessionMessages(t *testing.T) {
+	repo := &stubLoopRepo{}
+	loop := NewLoop(repo, nil, nil, nil)
+	userID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+	sessionID := "00000000-0000-0000-0000-000000000001"
+
+	if err := loop.ResetSession(context.Background(), userID, sessionID); err != nil {
+		t.Fatalf("ResetSession: %v", err)
+	}
+
+	if repo.deletedUserID != userID {
+		t.Fatalf("deleted user id: want %v, got %v", userID, repo.deletedUserID)
+	}
+	wantSessionID := pgtype.UUID{Bytes: [16]byte{15: 1}, Valid: true}
+	if repo.deletedSessionID != wantSessionID {
+		t.Fatalf("deleted session id: want %v, got %v", wantSessionID, repo.deletedSessionID)
+	}
 }
 
 type stubLoopLLMClient struct {
@@ -616,7 +641,6 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 		t.Fatalf("final content: want %q, got %q", "No tasks for today or overdue", final)
 	}
 }
-
 
 func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

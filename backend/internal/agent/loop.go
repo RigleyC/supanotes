@@ -111,6 +111,15 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 	return ch, nil
 }
 
+func (l *Loop) ResetSession(ctx context.Context, userID pgtype.UUID, sessionIDStr string) error {
+	sessionID, err := uuid.Parse(sessionIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid session id: %w", err)
+	}
+	sessionUUID := pgtype.UUID{Bytes: sessionID, Valid: true}
+	return l.repo.DeleteSessionMessages(ctx, userID, sessionUUID)
+}
+
 func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) error {
 	_, err := l.doChat(ctx, userID, sessionIDStr, userMessage, events)
 	return err

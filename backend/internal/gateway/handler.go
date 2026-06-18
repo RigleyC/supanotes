@@ -22,6 +22,7 @@ import (
 // import on the agent package.
 type AgentBridge interface {
 	Chat(ctx context.Context, userID pgtype.UUID, sessionID, message string) (<-chan string, error)
+	ResetSession(ctx context.Context, userID pgtype.UUID, sessionID string) error
 }
 
 type LinkCodeResponse struct {
@@ -188,6 +189,12 @@ func (h *Handler) Webhook(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	}
 
+	// /reset — clear conversation history
+	if strings.HasPrefix(text, "/reset") {
+		h.handleReset(ctx, msg)
+		return c.NoContent(http.StatusOK)
+	}
+
 	// Free-form text — route to agent.
 	// Identify the Telegram user via message.from.id (stable), not chat.id (delivery target).
 	if msg.From == nil {
@@ -298,6 +305,39 @@ func (h *Handler) handleStart(ctx context.Context, msg *TgMsg, code string) erro
 	h.respond(ctx, msg.Chat.ID,
 		"Linked! You can now send messages here and they'll show up in SupaNotes.")
 	return nil
+}
+
+func (h *Handler) handleReset(ctx context.Context, msg *TgMsg) {
+	if msg.From == nil {
+		return
+	}
+	telegramUserID := msg.From.ID
+
+	userID, _, err := h.repo.GetLinkByTelegramUserID(ctx, telegramUserID)
+	if err != nil {
+		if errors.Is(err, ErrLinkNotFound) {
+			h.respond(ctx, msg.Chat.ID,
+				"Your Telegram isn't linked to SupaNotes yet. Nothing to reset.")
+			return
+		}
+		log.Error().Err(err).Int64("chat_id", msg.Chat.ID).Msg("telegram reset lookup failed")
+		return
+	}
+
+	if h.agent == nil {
+		h.respond(ctx, msg.Chat.ID, "Agent is not configured on this server.")
+		return
+	}
+
+	sessionIDStr := uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprintf("tg:%d", telegramUserID))).String()
+
+	if err := h.agent.ResetSession(ctx, userID, sessionIDStr); err != nil {
+		log.Error().Err(err).Int64("chat_id", msg.Chat.ID).Msg("telegram reset failed")
+		h.respond(ctx, msg.Chat.ID, "Failed to clear history. Try again.")
+		return
+	}
+
+	h.respond(ctx, msg.Chat.ID, "Histórico limpo! Agora estou seguindo as instruções mais recentes.")
 }
 
 func (h *Handler) sessionIDForUser(_ context.Context, telegramUserID int64) (string, error) {
