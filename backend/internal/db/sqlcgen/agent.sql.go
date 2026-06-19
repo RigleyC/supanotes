@@ -49,6 +49,40 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 	return i, err
 }
 
+const createPendingToolConfirmation = `-- name: CreatePendingToolConfirmation :one
+INSERT INTO pending_tool_confirmations (user_id, session_id, tool_name, args_json, status)
+VALUES ($1, $2, $3, $4, 'pending')
+RETURNING id, user_id, session_id, tool_name, args_json, status, created_at, resolved_at
+`
+
+type CreatePendingToolConfirmationParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	SessionID pgtype.UUID `json:"session_id"`
+	ToolName  string      `json:"tool_name"`
+	ArgsJson  []byte      `json:"args_json"`
+}
+
+func (q *Queries) CreatePendingToolConfirmation(ctx context.Context, arg CreatePendingToolConfirmationParams) (PendingToolConfirmation, error) {
+	row := q.db.QueryRow(ctx, createPendingToolConfirmation,
+		arg.UserID,
+		arg.SessionID,
+		arg.ToolName,
+		arg.ArgsJson,
+	)
+	var i PendingToolConfirmation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SessionID,
+		&i.ToolName,
+		&i.ArgsJson,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
+}
+
 const deleteSessionMessages = `-- name: DeleteSessionMessages :exec
 DELETE FROM messages
 WHERE user_id = $1 AND session_id = $2
@@ -113,4 +147,60 @@ func (q *Queries) GetMessages(ctx context.Context, arg GetMessagesParams) ([]Mes
 		return nil, err
 	}
 	return items, nil
+}
+
+const getPendingToolConfirmation = `-- name: GetPendingToolConfirmation :one
+SELECT id, user_id, session_id, tool_name, args_json, status, created_at, resolved_at
+FROM pending_tool_confirmations
+WHERE id = $1 AND user_id = $2
+`
+
+type GetPendingToolConfirmationParams struct {
+	ID     pgtype.UUID `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetPendingToolConfirmation(ctx context.Context, arg GetPendingToolConfirmationParams) (PendingToolConfirmation, error) {
+	row := q.db.QueryRow(ctx, getPendingToolConfirmation, arg.ID, arg.UserID)
+	var i PendingToolConfirmation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SessionID,
+		&i.ToolName,
+		&i.ArgsJson,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
+}
+
+const resolvePendingToolConfirmation = `-- name: ResolvePendingToolConfirmation :one
+UPDATE pending_tool_confirmations
+SET status = $3, resolved_at = NOW()
+WHERE id = $1 AND user_id = $2 AND status = 'pending'
+RETURNING id, user_id, session_id, tool_name, args_json, status, created_at, resolved_at
+`
+
+type ResolvePendingToolConfirmationParams struct {
+	ID     pgtype.UUID `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+	Status string      `json:"status"`
+}
+
+func (q *Queries) ResolvePendingToolConfirmation(ctx context.Context, arg ResolvePendingToolConfirmationParams) (PendingToolConfirmation, error) {
+	row := q.db.QueryRow(ctx, resolvePendingToolConfirmation, arg.ID, arg.UserID, arg.Status)
+	var i PendingToolConfirmation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SessionID,
+		&i.ToolName,
+		&i.ArgsJson,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
 }
