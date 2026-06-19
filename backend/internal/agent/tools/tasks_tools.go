@@ -88,6 +88,7 @@ func (t *CompleteTaskTool) Execute(ctx context.Context, userID pgtype.UUID, args
 
 type QueryTasksTool struct {
 	tasksSvc *tasks.Service
+	q        sqlcgen.Querier
 }
 
 func (t *QueryTasksTool) Name() string { return "query_tasks" }
@@ -115,6 +116,14 @@ func (t *QueryTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJS
 		statusFilter = args.Status
 	}
 
+	var tzLoc *time.Location = time.UTC
+	userSettings, err := t.q.GetUserSettings(ctx, userID)
+	if err == nil && userSettings.Timezone != "" {
+		if loc, locErr := time.LoadLocation(userSettings.Timezone); locErr == nil {
+			tzLoc = loc
+		}
+	}
+
 	limit := int32(50)
 	var tasksList []sqlcgen.Task
 
@@ -124,12 +133,12 @@ func (t *QueryTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJS
 			return "", err
 		}
 	} else if args.Timeframe != nil && (*args.Timeframe == "today" || *args.Timeframe == "overdue") {
-		tasksList, err = t.tasksSvc.GetTodayTasks(ctx, userID)
+		tasksList, err = t.tasksSvc.GetTodayTasksInTimezone(ctx, userID, tzLoc)
 		if err != nil {
 			return "", err
 		}
 		if *args.Timeframe == "overdue" {
-			now := time.Now()
+			now := time.Now().In(tzLoc)
 			// Today date boundary
 			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 			var overdue []sqlcgen.Task

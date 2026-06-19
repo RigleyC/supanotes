@@ -117,7 +117,7 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
                       ),
                     ),
                   )
-                : const SizedBox(width: double.infinity, height: 0),
+                : const SizedBox.shrink(),
           ),
         ],
       ),

@@ -140,48 +140,49 @@ class _AgentChatViewState extends State<AgentChatView> {
         final thinkingRegex = RegExp(r'<thinking>([\s\S]*?)(?:</thinking>|$)');
         final match = thinkingRegex.firstMatch(text);
 
+        Widget? thinkingWidget;
+        String markdownText = text;
+
         if (match != null) {
           final thinkingText = match.group(1)?.trim() ?? '';
-          final cleanText = text.replaceFirst(match.group(0)!, '').trim();
+          markdownText = text.replaceFirst(match.group(0)!, '').trim();
           final isFinished = text.contains('</thinking>');
 
+          thinkingWidget = CollapsibleThinkingCard(
+            thinkingText: thinkingText,
+            isFinished: isFinished,
+          );
+        }
+
+        Future<void> handleTapLink(String? href) async {
+          if (href != null) {
+            final uri = Uri.tryParse(href);
+            if (uri != null && await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          }
+        }
+
+        final markdownBody = markdownText.isNotEmpty
+            ? MarkdownBody(
+                data: markdownText,
+                styleSheet: stylesheet,
+                onTapLink: (text, href, title) => handleTapLink(href),
+              )
+            : const SizedBox.shrink();
+
+        if (thinkingWidget != null) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              CollapsibleThinkingCard(
-                thinkingText: thinkingText,
-                isFinished: isFinished,
-              ),
-              if (cleanText.isNotEmpty)
-                MarkdownBody(
-                  data: cleanText,
-                  styleSheet: stylesheet,
-                  onTapLink: (text, href, title) async {
-                    if (href != null) {
-                      final uri = Uri.tryParse(href);
-                      if (uri != null && await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      }
-                    }
-                  },
-                ),
+              thinkingWidget,
+              markdownBody,
             ],
           );
         }
 
-        return MarkdownBody(
-          data: text,
-          styleSheet: stylesheet,
-          onTapLink: (text, href, title) async {
-            if (href != null) {
-              final uri = Uri.tryParse(href);
-              if (uri != null && await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            }
-          },
-        );
+        return markdownBody;
       },
     );
 

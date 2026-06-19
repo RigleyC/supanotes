@@ -18,7 +18,6 @@ type Querier interface {
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
-	CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
 	CreateDeviceToken(ctx context.Context, arg CreateDeviceTokenParams) (DeviceToken, error)

@@ -45,7 +45,7 @@ func NewToolRegistry(
 		&AddTaskTool{tasksSvc: tasksSvc},
 		&SaveMemoryTool{memoriesSvc: memoriesSvc},
 		&CompleteTaskTool{tasksSvc: tasksSvc},
-		&QueryTasksTool{tasksSvc: tasksSvc},
+		&QueryTasksTool{tasksSvc: tasksSvc, q: q},
 		&ListMemoriesTool{memoriesSvc: memoriesSvc},
 		&GetInboxNoteTool{notesSvc: notesSvc},
 		&AppendToInboxTool{notesSvc: notesSvc},

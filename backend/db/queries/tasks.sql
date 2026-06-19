@@ -60,9 +60,6 @@ SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL;
 -- name: CountOpenTasks :one
 SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open';
 
--- name: CountOverdueTasks :one
-SELECT COUNT(*) FROM tasks 
-WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open' AND due_date < NOW();
 
 -- name: CountCompletedTasks :one
 SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'done';

@@ -19,7 +19,6 @@ type Repository interface {
 	CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, dueDate pgtype.Date) (sqlcgen.TaskCompletion, error)
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
-	CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error)
 	GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error)
@@ -71,10 +70,6 @@ func (r *repository) CountTasks(ctx context.Context, userID pgtype.UUID) (int64,
 
 func (r *repository) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return r.q.CountOpenTasks(ctx, userID)
-}
-
-func (r *repository) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	return r.q.CountOverdueTasks(ctx, userID)
 }
 
 func (r *repository) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {

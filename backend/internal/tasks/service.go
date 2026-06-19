@@ -258,10 +258,6 @@ func (s *Service) GetRecentlyCompletedTasks(ctx context.Context, userID pgtype.U
 	})
 }
 
-func (s *Service) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	return s.repo.CountOverdueTasks(ctx, userID)
-}
-
 func calculateNextDueDate(current time.Time, recurrence string) (time.Time, bool) {
 	switch recurrence {
 	case "daily":

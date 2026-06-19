@@ -33,18 +33,6 @@ func (q *Queries) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64
 	return count, err
 }
 
-const countOverdueTasks = `-- name: CountOverdueTasks :one
-SELECT COUNT(*) FROM tasks 
-WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open' AND due_date < NOW()
-`
-
-func (q *Queries) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countOverdueTasks, userID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countTasks = `-- name: CountTasks :one
 SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL
 `

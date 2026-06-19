@@ -79,23 +79,13 @@ func NewContextBuilder(q sqlcgen.Querier, tasksSvc *tasks.Service, memoriesRepo 
 
 // Build compiles the tiered context RAG string by fetching data concurrently.
 func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UUID, query string) (string, error) {
-	// 1. Fetch user settings timezone preference
 	var tzLoc *time.Location = time.UTC
-	userSettings, err := cb.q.GetUserSettings(ctx, userID)
-	if err == nil && userSettings.Timezone != "" {
-		if loc, locErr := time.LoadLocation(userSettings.Timezone); locErr == nil {
-			tzLoc = loc
-		} else {
-			log.Warn().Err(locErr).Str("timezone", userSettings.Timezone).Msg("failed to load user timezone; falling back to UTC")
-		}
-	}
 
 	var (
 		soul           sqlcgen.Soul
 		todayTasks     []sqlcgen.Task
 		recentNotes    []sqlcgen.Note
 		completedTasks []sqlcgen.Task
-		overdueCount   int64
 	)
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -110,10 +100,20 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 	})
 
 	g.Go(func() error {
-		var err error
-		todayTasks, err = cb.tasksSvc.GetTodayTasksInTimezone(gCtx, userID, tzLoc)
-		if err != nil {
-			return fmt.Errorf("get today tasks: %w", err)
+		// Fetch timezone preference and today's tasks sequentially in the same goroutine
+		userSettings, err := cb.q.GetUserSettings(gCtx, userID)
+		if err == nil && userSettings.Timezone != "" {
+			if loc, locErr := time.LoadLocation(userSettings.Timezone); locErr == nil {
+				tzLoc = loc
+			} else {
+				log.Warn().Err(locErr).Str("timezone", userSettings.Timezone).Msg("failed to load user timezone; falling back to UTC")
+			}
+		}
+
+		var errToday error
+		todayTasks, errToday = cb.tasksSvc.GetTodayTasksInTimezone(gCtx, userID, tzLoc)
+		if errToday != nil {
+			return fmt.Errorf("get today tasks: %w", errToday)
 		}
 		return nil
 	})
@@ -133,14 +133,18 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		return err
 	})
 
-	g.Go(func() error {
-		var err error
-		overdueCount, err = cb.tasksSvc.CountOverdueTasks(gCtx, userID)
-		return err
-	})
-
 	if err := g.Wait(); err != nil {
 		return "", err
+	}
+
+	// Calculate overdue count in-memory in the user's local timezone
+	var overdueCount int64
+	nowLocal := time.Now().In(tzLoc)
+	todayBoundary := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, tzLoc)
+	for _, task := range todayTasks {
+		if task.DueDate.Valid && task.DueDate.Time.Before(todayBoundary) {
+			overdueCount++
+		}
 	}
 
 	var (
@@ -254,6 +258,8 @@ func truncate(s string, maxBytes int) string {
 
 // BuildForRoutine builds the context RAG string concurrently, omitting the conversation history.
 func (cb *ContextBuilder) BuildForRoutine(ctx context.Context, userID pgtype.UUID, routineType string) (string, error) {
+	var tzLoc *time.Location = time.UTC
+
 	var (
 		soul        sqlcgen.Soul
 		todayTasks  []sqlcgen.Task
@@ -269,9 +275,17 @@ func (cb *ContextBuilder) BuildForRoutine(ctx context.Context, userID pgtype.UUI
 	})
 
 	g.Go(func() error {
-		var err error
-		todayTasks, err = cb.tasksSvc.GetTodayTasks(gCtx, userID)
-		return err
+		// Fetch timezone preference and today's tasks sequentially in the same goroutine
+		userSettings, err := cb.q.GetUserSettings(gCtx, userID)
+		if err == nil && userSettings.Timezone != "" {
+			if loc, locErr := time.LoadLocation(userSettings.Timezone); locErr == nil {
+				tzLoc = loc
+			}
+		}
+
+		var errToday error
+		todayTasks, errToday = cb.tasksSvc.GetTodayTasksInTimezone(gCtx, userID, tzLoc)
+		return errToday
 	})
 
 	g.Go(func() error {
@@ -284,7 +298,7 @@ func (cb *ContextBuilder) BuildForRoutine(ctx context.Context, userID pgtype.UUI
 		return "", err
 	}
 
-	now := time.Now()
+	now := time.Now().In(tzLoc)
 
 	var (
 		semanticResults []sqlcgen.SearchNotesByEmbeddingRow

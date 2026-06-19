@@ -40,10 +40,9 @@ class _ShimmerTextState extends State<ShimmerText>
     }
 
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
-    final baseColor = isDark ? Colors.white70 : Colors.black87;
-    final highlightColor = isDark ? Colors.white : theme.colorScheme.primary;
+    final baseColor = theme.colorScheme.onSurface.withValues(alpha: 0.6);
+    final highlightColor = theme.colorScheme.primary;
 
     return AnimatedBuilder(
       animation: _controller,
