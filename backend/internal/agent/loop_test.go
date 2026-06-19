@@ -6,8 +6,10 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
 
@@ -431,6 +433,24 @@ func (s *stubLoopQuerier) ResolvePendingToolConfirmation(context.Context, sqlcge
 	panic("unimplemented")
 }
 
+type trackingStubLoopRepo struct {
+	stubLoopRepo
+	pendingConfirmations []string
+}
+
+func (s *trackingStubLoopRepo) CreatePendingToolConfirmation(ctx context.Context, userID, sessionID pgtype.UUID, toolName, argsJSON string) (sqlcgen.PendingToolConfirmation, error) {
+	id := uuid.New()
+	s.pendingConfirmations = append(s.pendingConfirmations, id.String())
+	return sqlcgen.PendingToolConfirmation{
+		ID:        pgtype.UUID{Bytes: id, Valid: true},
+		UserID:    userID,
+		SessionID: sessionID,
+		ToolName:  toolName,
+		ArgsJson:  []byte(argsJSON),
+		Status:    "pending",
+	}, nil
+}
+
 func TestLoopConfirmationRequired(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -459,7 +479,8 @@ func TestLoopConfirmationRequired(t *testing.T) {
 		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
 	)
 
-	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+	repo := &trackingStubLoopRepo{}
+	loop := NewLoop(repo, llmFact, ctxBldr, toolReg)
 
 	events := make(chan SSEEvent, 10)
 	go func() {
@@ -476,14 +497,52 @@ func TestLoopConfirmationRequired(t *testing.T) {
 	}()
 
 	var foundConfirmation bool
+	var confirmationPayload struct {
+		ConfirmationID string `json:"confirmation_id"`
+		ToolName       string `json:"tool_name"`
+		Label          string `json:"label"`
+	}
+	var confirmationPayloadJSON string
 	for evt := range events {
-		if evt.Type == string(EventConfirmationRequired) {
-			foundConfirmation = true
+		if evt.Type != string(EventConfirmationRequired) {
+			continue
+		}
+		foundConfirmation = true
+		var streamEvent StreamEvent
+		if err := json.Unmarshal([]byte(evt.Data), &streamEvent); err != nil {
+			t.Fatalf("unmarshal stream event: %v", err)
+		}
+		payloadBytes, err := json.Marshal(streamEvent.Payload)
+		if err != nil {
+			t.Fatalf("marshal payload: %v", err)
+		}
+		confirmationPayloadJSON = string(payloadBytes)
+		if err := json.Unmarshal(payloadBytes, &confirmationPayload); err != nil {
+			t.Fatalf("unmarshal payload: %v", err)
 		}
 	}
 
 	if !foundConfirmation {
 		t.Fatal("expected confirmation_required event but got none")
+	}
+	if confirmationPayload.ConfirmationID == "" {
+		t.Fatal("expected non-empty confirmation_id in payload")
+	}
+	if confirmationPayload.ToolName != "update_note" {
+		t.Fatalf("tool_name: want update_note, got %s", confirmationPayload.ToolName)
+	}
+	if confirmationPayload.Label == "" {
+		t.Fatal("expected non-empty label in payload")
+	}
+	if len(repo.pendingConfirmations) != 1 {
+		t.Fatalf("expected 1 pending confirmation, got %d", len(repo.pendingConfirmations))
+	}
+	if repo.pendingConfirmations[0] != confirmationPayload.ConfirmationID {
+		t.Fatalf("confirmation_id mismatch: repo has %s, payload has %s",
+			repo.pendingConfirmations[0], confirmationPayload.ConfirmationID)
+	}
+	if strings.Contains(confirmationPayloadJSON, "args_json") {
+		t.Fatal("payload must not contain args_json")
 	}
 }
 
