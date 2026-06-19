@@ -309,8 +309,7 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
       state = AsyncValue<ChatState>.error(message, StackTrace.current);
       return;
     }
-    // Set isStreaming to false in the state first, so copyWithPrevious preserves the non-streaming state
-    state = AsyncValue.data(
+    final nonStreamingState = AsyncValue.data(
       chatState(
         messages: current.messages,
         actions: current.actions,
@@ -318,7 +317,7 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
       ),
     );
     // ignore: invalid_use_of_internal_member
-    state = AsyncValue<ChatState>.error(message, StackTrace.current).copyWithPrevious(state);
+    state = AsyncValue<ChatState>.error(message, StackTrace.current).copyWithPrevious(nonStreamingState);
   }
 
   Future<void> retryLastMessage() async {
