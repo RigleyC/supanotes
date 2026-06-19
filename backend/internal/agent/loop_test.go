@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/llm"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type stubLoopRepo struct {
@@ -790,6 +792,107 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 
 	if final != "No tasks for today or overdue" {
 		t.Fatalf("final content: want %q, got %q", "No tasks for today or overdue", final)
+	}
+}
+
+type resolveTestRepo struct {
+	pending sqlcgen.PendingToolConfirmation
+	created sqlcgen.Message
+}
+
+func (r *resolveTestRepo) GetMessages(ctx context.Context, userID, sessionID pgtype.UUID, limit, offset int32) ([]sqlcgen.Message, error) {
+	return nil, nil
+}
+func (r *resolveTestRepo) CreateMessage(ctx context.Context, userID, sessionID pgtype.UUID, role, content string, toolCalls []byte, toolCallID *string) (sqlcgen.Message, error) {
+	r.created = sqlcgen.Message{Content: content}
+	return r.created, nil
+}
+func (r *resolveTestRepo) DeleteSessionMessages(ctx context.Context, userID, sessionID pgtype.UUID) error {
+	return nil
+}
+func (r *resolveTestRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (r *resolveTestRepo) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (r *resolveTestRepo) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (r *resolveTestRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (r *resolveTestRepo) CreatePendingToolConfirmation(ctx context.Context, userID, sessionID pgtype.UUID, toolName, argsJSON string) (sqlcgen.PendingToolConfirmation, error) {
+	id := uuid.New()
+	r.pending = sqlcgen.PendingToolConfirmation{
+		ID:        pgtype.UUID{Bytes: id, Valid: true},
+		UserID:    userID,
+		SessionID: sessionID,
+		ToolName:  toolName,
+		ArgsJson:  []byte(argsJSON),
+		Status:    "pending",
+	}
+	return r.pending, nil
+}
+func (r *resolveTestRepo) GetPendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID) (sqlcgen.PendingToolConfirmation, error) {
+	if r.pending.Status == "" {
+		return sqlcgen.PendingToolConfirmation{}, fmt.Errorf("not found")
+	}
+	return r.pending, nil
+}
+func (r *resolveTestRepo) ResolvePendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID, status string) (sqlcgen.PendingToolConfirmation, error) {
+	if r.pending.Status != "pending" {
+		return sqlcgen.PendingToolConfirmation{}, fmt.Errorf("already resolved")
+	}
+	r.pending.Status = status
+	return r.pending, nil
+}
+
+func TestResolveToolConfirmationCancelDoesNotExecuteTool(t *testing.T) {
+	repo := &resolveTestRepo{
+		pending: sqlcgen.PendingToolConfirmation{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			UserID:    pgtype.UUID{},
+			SessionID: pgtype.UUID{},
+			ToolName:  "update_note",
+			ArgsJson:  []byte(`{}`),
+			Status:    "pending",
+		},
+	}
+	h := &Handler{repo: repo, loop: NewLoop(&stubLoopRepo{}, nil, nil, nil)}
+
+	resp, status, err := h.resolveToolConfirmation(context.Background(), pgtype.UUID{}, uid.UUIDToString(repo.pending.ID), false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status != 200 {
+		t.Fatalf("status: want 200, got %d", status)
+	}
+	if resp.Status != "cancelled" {
+		t.Fatalf("status field: want cancelled, got %s", resp.Status)
+	}
+}
+
+func TestResolveToolConfirmationRejectsAlreadyResolved(t *testing.T) {
+	id := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	userID := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	h := &Handler{
+		repo: &resolveTestRepo{
+			pending: sqlcgen.PendingToolConfirmation{
+				ID:     id,
+				UserID: userID,
+				Status: "approved",
+			},
+		},
+		loop: NewLoop(&stubLoopRepo{}, nil, nil, nil),
+	}
+
+	_, status, err := h.resolveToolConfirmation(context.Background(), userID, uid.UUIDToString(id), true)
+	if err == nil {
+		t.Fatal("expected error for already resolved confirmation")
+	}
+	if status != 409 {
+		t.Fatalf("status: want 409, got %d", status)
 	}
 }
 

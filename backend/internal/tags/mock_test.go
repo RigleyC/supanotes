@@ -257,11 +257,24 @@ func (m *mockQuerier) UpsertNoteLink(_ context.Context, _ sqlcgen.UpsertNoteLink
 func (m *mockQuerier) CreateNoteShare(_ context.Context, _ sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
 	return sqlcgen.NoteShare{}, nil
 }
-func (m *mockQuerier) DeleteNoteShare(_ context.Context, _ sqlcgen.DeleteNoteShareParams) error { return nil }
-func (m *mockQuerier) GetNoteOwner(_ context.Context, _ pgtype.UUID) (pgtype.UUID, error) { return pgtype.UUID{}, nil }
+func (m *mockQuerier) DeleteNoteShare(_ context.Context, _ sqlcgen.DeleteNoteShareParams) error {
+	return nil
+}
+func (m *mockQuerier) GetNoteOwner(_ context.Context, _ pgtype.UUID) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
 func (m *mockQuerier) GetNoteShareForUser(_ context.Context, _ sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
 	return sqlcgen.NoteShare{}, nil
 }
 func (m *mockQuerier) GetNoteShares(_ context.Context, _ pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
 	return nil, nil
+}
+func (m *mockQuerier) CreatePendingToolConfirmation(_ context.Context, _ sqlcgen.CreatePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (m *mockQuerier) GetPendingToolConfirmation(_ context.Context, _ sqlcgen.GetPendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (m *mockQuerier) ResolvePendingToolConfirmation(_ context.Context, _ sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
 }

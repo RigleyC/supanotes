@@ -120,6 +120,10 @@ func (l *Loop) ResetSession(ctx context.Context, userID pgtype.UUID, sessionIDSt
 	return l.repo.DeleteSessionMessages(ctx, userID, sessionUUID)
 }
 
+func (l *Loop) ExecuteTool(ctx context.Context, userID pgtype.UUID, toolName, argsJSON string) (string, error) {
+	return l.tools.Execute(ctx, userID, toolName, argsJSON)
+}
+
 func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) error {
 	_, err := l.doChat(ctx, userID, sessionIDStr, userMessage, events)
 	return err

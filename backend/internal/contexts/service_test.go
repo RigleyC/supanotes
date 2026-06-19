@@ -44,7 +44,7 @@ func (m *mockQuerier) AppendToInbox(_ context.Context, _ sqlcgen.AppendToInboxPa
 func (m *mockQuerier) AppendToNoteContent(_ context.Context, _ sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
-func (m *mockQuerier) CleanupOldMessages(_ context.Context) error { return nil }
+func (m *mockQuerier) CleanupOldMessages(_ context.Context) error                     { return nil }
 func (m *mockQuerier) CountNotes(_ context.Context, _ pgtype.UUID) (int64, error)     { return 0, nil }
 func (m *mockQuerier) CountTasks(_ context.Context, _ pgtype.UUID) (int64, error)     { return 0, nil }
 func (m *mockQuerier) CountOpenTasks(_ context.Context, _ pgtype.UUID) (int64, error) { return 0, nil }
@@ -60,7 +60,9 @@ func (m *mockQuerier) CreateMemory(_ context.Context, _ sqlcgen.CreateMemoryPara
 func (m *mockQuerier) CreateMessage(_ context.Context, _ sqlcgen.CreateMessageParams) (sqlcgen.Message, error) {
 	return sqlcgen.Message{}, nil
 }
-func (m *mockQuerier) CreateNoteLink(_ context.Context, _ sqlcgen.CreateNoteLinkParams) error { return nil }
+func (m *mockQuerier) CreateNoteLink(_ context.Context, _ sqlcgen.CreateNoteLinkParams) error {
+	return nil
+}
 func (m *mockQuerier) CreateNote(_ context.Context, _ sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
@@ -88,9 +90,11 @@ func (m *mockQuerier) CreateUser(_ context.Context, _ sqlcgen.CreateUserParams) 
 func (m *mockQuerier) CreateUserSettings(_ context.Context, _ sqlcgen.CreateUserSettingsParams) (sqlcgen.UserSetting, error) {
 	return sqlcgen.UserSetting{}, nil
 }
-func (m *mockQuerier) DeleteDeviceToken(_ context.Context, _ sqlcgen.DeleteDeviceTokenParams) error { return nil }
-func (m *mockQuerier) DeleteMemory(_ context.Context, _ sqlcgen.DeleteMemoryParams) error           { return nil }
-func (m *mockQuerier) DeleteNote(_ context.Context, _ sqlcgen.DeleteNoteParams) error               { return nil }
+func (m *mockQuerier) DeleteDeviceToken(_ context.Context, _ sqlcgen.DeleteDeviceTokenParams) error {
+	return nil
+}
+func (m *mockQuerier) DeleteMemory(_ context.Context, _ sqlcgen.DeleteMemoryParams) error { return nil }
+func (m *mockQuerier) DeleteNote(_ context.Context, _ sqlcgen.DeleteNoteParams) error     { return nil }
 func (m *mockQuerier) DeleteSessionMessages(_ context.Context, _ sqlcgen.DeleteSessionMessagesParams) error {
 	return nil
 }
@@ -153,8 +157,12 @@ func (m *mockQuerier) GetSyncTags(_ context.Context, _ sqlcgen.GetSyncTagsParams
 func (m *mockQuerier) GetSyncTasks(_ context.Context, _ sqlcgen.GetSyncTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetTags(_ context.Context, _ pgtype.UUID) ([]sqlcgen.Tag, error)     { return nil, nil }
-func (m *mockQuerier) GetTagsForNote(_ context.Context, _ pgtype.UUID) ([]sqlcgen.Tag, error) { return nil, nil }
+func (m *mockQuerier) GetTags(_ context.Context, _ pgtype.UUID) ([]sqlcgen.Tag, error) {
+	return nil, nil
+}
+func (m *mockQuerier) GetTagsForNote(_ context.Context, _ pgtype.UUID) ([]sqlcgen.Tag, error) {
+	return nil, nil
+}
 func (m *mockQuerier) GetTaskByID(_ context.Context, _ sqlcgen.GetTaskByIDParams) (sqlcgen.Task, error) {
 	return sqlcgen.Task{}, nil
 }
@@ -167,7 +175,9 @@ func (m *mockQuerier) GetTasksByNoteID(_ context.Context, _ sqlcgen.GetTasksByNo
 func (m *mockQuerier) GetTodayTasks(_ context.Context, _ sqlcgen.GetTodayTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetUserByEmail(_ context.Context, _ string) (sqlcgen.User, error) { return sqlcgen.User{}, nil }
+func (m *mockQuerier) GetUserByEmail(_ context.Context, _ string) (sqlcgen.User, error) {
+	return sqlcgen.User{}, nil
+}
 func (m *mockQuerier) GetUserByID(_ context.Context, _ pgtype.UUID) (sqlcgen.User, error) {
 	return sqlcgen.User{}, nil
 }
@@ -180,7 +190,9 @@ func (m *mockQuerier) HardDeleteExpiredTasks(_ context.Context) error    { retur
 func (m *mockQuerier) ListDeviceTokensByUser(_ context.Context, _ pgtype.UUID) ([]sqlcgen.DeviceToken, error) {
 	return nil, nil
 }
-func (m *mockQuerier) RemoveTagFromNote(_ context.Context, _ sqlcgen.RemoveTagFromNoteParams) error { return nil }
+func (m *mockQuerier) RemoveTagFromNote(_ context.Context, _ sqlcgen.RemoveTagFromNoteParams) error {
+	return nil
+}
 func (m *mockQuerier) RevokeAllUserRefreshTokens(_ context.Context, _ pgtype.UUID) error { return nil }
 func (m *mockQuerier) RevokeRefreshToken(_ context.Context, _ pgtype.UUID) error         { return nil }
 func (m *mockQuerier) SearchMemoriesByEmbedding(_ context.Context, _ sqlcgen.SearchMemoriesByEmbeddingParams) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
@@ -226,8 +238,12 @@ func (m *mockQuerier) UpsertNote(_ context.Context, _ sqlcgen.UpsertNoteParams) 
 func (m *mockQuerier) UpsertNoteEmbedding(_ context.Context, _ sqlcgen.UpsertNoteEmbeddingParams) error {
 	return nil
 }
-func (m *mockQuerier) UpsertNoteLink(_ context.Context, _ sqlcgen.UpsertNoteLinkParams) error { return nil }
-func (m *mockQuerier) UpsertNoteTag(_ context.Context, _ sqlcgen.UpsertNoteTagParams) error    { return nil }
+func (m *mockQuerier) UpsertNoteLink(_ context.Context, _ sqlcgen.UpsertNoteLinkParams) error {
+	return nil
+}
+func (m *mockQuerier) UpsertNoteTag(_ context.Context, _ sqlcgen.UpsertNoteTagParams) error {
+	return nil
+}
 func (m *mockQuerier) UpsertSoul(_ context.Context, _ sqlcgen.UpsertSoulParams) (sqlcgen.Soul, error) {
 	return sqlcgen.Soul{}, nil
 }
@@ -249,13 +265,26 @@ func (m *mockQuerier) GetSyncNoteTags(_ context.Context, _ pgtype.UUID) ([]sqlcg
 func (m *mockQuerier) CreateNoteShare(_ context.Context, _ sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
 	return sqlcgen.NoteShare{}, nil
 }
-func (m *mockQuerier) DeleteNoteShare(_ context.Context, _ sqlcgen.DeleteNoteShareParams) error { return nil }
-func (m *mockQuerier) GetNoteOwner(_ context.Context, _ pgtype.UUID) (pgtype.UUID, error) { return pgtype.UUID{}, nil }
+func (m *mockQuerier) DeleteNoteShare(_ context.Context, _ sqlcgen.DeleteNoteShareParams) error {
+	return nil
+}
+func (m *mockQuerier) GetNoteOwner(_ context.Context, _ pgtype.UUID) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
 func (m *mockQuerier) GetNoteShareForUser(_ context.Context, _ sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
 	return sqlcgen.NoteShare{}, nil
 }
 func (m *mockQuerier) GetNoteShares(_ context.Context, _ pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
 	return nil, nil
+}
+func (m *mockQuerier) CreatePendingToolConfirmation(_ context.Context, _ sqlcgen.CreatePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (m *mockQuerier) GetPendingToolConfirmation(_ context.Context, _ sqlcgen.GetPendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (m *mockQuerier) ResolvePendingToolConfirmation(_ context.Context, _ sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
 }
 
 func TestServiceList_Success(t *testing.T) {
