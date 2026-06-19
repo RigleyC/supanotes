@@ -214,8 +214,38 @@ class CustomTaskComponent extends StatefulWidget {
 }
 
 class _CustomTaskComponentState extends State<CustomTaskComponent>
-    with ProxyDocumentComponent<CustomTaskComponent>, ProxyTextComposable {
+    with ProxyDocumentComponent<CustomTaskComponent>, ProxyTextComposable, TickerProviderStateMixin {
   final _textKey = GlobalKey();
+
+  late AnimationController _exitController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _sizeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _exitController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _exitController, curve: Curves.easeOut),
+    );
+    _sizeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _exitController, curve: Curves.easeInOutCubic),
+    );
+    _exitController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onAnimationComplete?.call();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _exitController.dispose();
+    super.dispose();
+  }
 
   @override
   GlobalKey<State<StatefulWidget>> get childDocumentComponentKey => _textKey;
@@ -225,12 +255,24 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       childDocumentComponentKey.currentState as TextComposable;
 
   @override
+  void didUpdateWidget(CustomTaskComponent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.hideCompleted && widget.viewModel.isComplete && !oldWidget.viewModel.isComplete) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _exitController.forward();
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final semantics = Theme.of(context).extension<AppSemanticColors>();
     final taskColor = semantics?.task ?? AppColors.taskAccent;
 
-    return Directionality(
+    final content = Directionality(
       textDirection: widget.viewModel.textDirection,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,6 +326,15 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
             ),
           ),
         ],
+      ),
+    );
+
+    return SizeTransition(
+      sizeFactor: _sizeAnimation,
+      axisAlignment: -1.0,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: content,
       ),
     );
   }
