@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 import 'package:supanotes/features/agent/presentation/widgets/agent_chat_view.dart';
+import 'package:supanotes/features/agent/presentation/widgets/collapsible_thinking_card.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 
 void main() {
@@ -68,6 +69,31 @@ void main() {
 
     expect(find.text('Oi'), findsOneWidget);
     expect(find.text('Olá'), findsOneWidget);
+  });
+
+  testWidgets('renders CollapsibleThinkingCard when thinking tags are present', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        AgentChatView(
+          messages: [
+            message(
+              id: 'assistant-1',
+              role: MessageRole.assistant,
+              content: '<thinking>\nEstou pensando...\n</thinking>\nOlá, como posso ajudar?',
+            ),
+          ],
+          actions: const [],
+          loaded: true,
+          streaming: false,
+          onSend: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CollapsibleThinkingCard), findsOneWidget);
+    expect(find.text('Raciocínio concluído'), findsOneWidget);
+    expect(find.text('Olá, como posso ajudar?'), findsOneWidget);
   });
 
   testWidgets('shows loading indicator while not loaded', (tester) async {
