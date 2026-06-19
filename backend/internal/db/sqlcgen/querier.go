@@ -26,6 +26,7 @@ type Querier interface {
 	CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error)
 	CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) error
 	CreateNoteShare(ctx context.Context, arg CreateNoteShareParams) (NoteShare, error)
+	CreatePendingToolConfirmation(ctx context.Context, arg CreatePendingToolConfirmationParams) (PendingToolConfirmation, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRoutine(ctx context.Context, arg CreateRoutineParams) (Routine, error)
 	CreateRoutineLog(ctx context.Context, arg CreateRoutineLogParams) (RoutineLog, error)
@@ -54,6 +55,7 @@ type Querier interface {
 	GetNoteShareForUser(ctx context.Context, arg GetNoteShareForUserParams) (NoteShare, error)
 	GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]GetNoteSharesRow, error)
 	GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, error)
+	GetPendingToolConfirmation(ctx context.Context, arg GetPendingToolConfirmationParams) (PendingToolConfirmation, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Note, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRetryableEmbeddings(ctx context.Context, limit int32) ([]GetRetryableEmbeddingsRow, error)
@@ -81,6 +83,7 @@ type Querier interface {
 	HardDeleteExpiredTasks(ctx context.Context) error
 	ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]DeviceToken, error)
 	RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error
+	ResolvePendingToolConfirmation(ctx context.Context, arg ResolvePendingToolConfirmationParams) (PendingToolConfirmation, error)
 	RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error
 	SearchMemoriesByEmbedding(ctx context.Context, arg SearchMemoriesByEmbeddingParams) ([]SearchMemoriesByEmbeddingRow, error)

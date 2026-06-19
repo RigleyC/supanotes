@@ -1,76 +1,84 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_chat_core/flutter_chat_core.dart' as flyer;
-import 'package:flutter_chat_ui/flutter_chat_ui.dart' as flyer_ui;
+import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/presentation/chat_message_adapter.dart';
-import 'package:supanotes/features/agent/presentation/widgets/chat_input.dart';
-import 'package:supanotes/shared/widgets/empty_state.dart';
+import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
+
 
 class AgentChatView extends StatefulWidget {
   const AgentChatView({
     super.key,
     required this.messages,
+    required this.actions,
     required this.loaded,
     required this.streaming,
     required this.onSend,
-    required this.activeToolLabel,
     required this.errorMessage,
     this.onRetry,
     this.onCancel,
+    this.onResolveConfirmation,
   });
 
   final List<MessageModel> messages;
+  final List<ChatToolAction> actions;
   final bool loaded;
   final bool streaming;
   final ValueChanged<String> onSend;
-  final String? activeToolLabel;
   final String? errorMessage;
   final VoidCallback? onRetry;
   final VoidCallback? onCancel;
+  final void Function(String confirmationId, {required bool approved})?
+      onResolveConfirmation;
 
   @override
   State<AgentChatView> createState() => _AgentChatViewState();
 }
 
 class _AgentChatViewState extends State<AgentChatView> {
-  late final flyer.InMemoryChatController _chatController;
-  String _messageSignature = '';
+  late final ChatMessagesController _controller;
+  String _lastSignature = '';
 
   @override
   void initState() {
     super.initState();
-    _chatController = flyer.InMemoryChatController();
-    _scheduleMessageSync();
+    _controller = ChatMessagesController();
+    _syncMessages();
   }
 
   @override
   void didUpdateWidget(covariant AgentChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _scheduleMessageSync();
+    _syncMessages();
   }
 
   @override
   void dispose() {
-    _chatController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _scheduleMessageSync() {
-    final nextSignature = _signatureFor(widget.messages, widget.streaming);
-    if (nextSignature == _messageSignature) return;
-    _messageSignature = nextSignature;
+  void _syncMessages() {
+    final nextSignature = _buildSignature();
+    if (nextSignature == _lastSignature) return;
+    _lastSignature = nextSignature;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final messages = toFlyerMessages(
+      final genAiMessages = toGenAiChatMessages(
         widget.messages,
-        streaming: widget.streaming,
+        actions: widget.actions,
       );
-      unawaited(_chatController.setMessages(messages));
+      _controller.setMessages(genAiMessages);
     });
+  }
+
+  String _buildSignature() {
+    final lastContent = widget.messages.isNotEmpty
+        ? widget.messages.last.content
+        : '';
+    return '${widget.messages.length}:${widget.actions.length}:${widget.streaming}:${lastContent.length}';
   }
 
   @override
@@ -79,160 +87,155 @@ class _AgentChatViewState extends State<AgentChatView> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final chat = flyer_ui.Chat(
-      currentUserId: agentChatCurrentUserId,
-      resolveUser: resolveAgentChatUser,
-      chatController: _chatController,
-      theme: flyer.ChatTheme.fromThemeData(Theme.of(context)),
-      builders: flyer.Builders(
-        emptyChatListBuilder: (_) => Column(
+    final options = MessageOptions(
+      showTime: false,
+      showCopyButton: false,
+    );
+
+    final inputOpts = InputOptions(
+      decoration: const InputDecoration(
+        hintText: 'Mensagem...',
+        border: InputBorder.none,
+      ),
+    );
+
+    return Column(
+      children: [
+        Expanded(
+          child: AiChatWidget(
+            currentUser: agentChatCurrentUser,
+            aiUser: agentChatAssistantUser,
+            controller: _controller,
+            onSendMessage: (message) => widget.onSend(message.text),
+            onCancelGenerating: widget.onCancel,
+            messageOptions: options,
+            inputOptions: inputOpts,
+            enableMarkdownStreaming: true,
+            loadingConfig: LoadingConfig(isLoading: widget.streaming),
+            resultRenderers: {
+              'confirmation': _buildConfirmationCard,
+            },
+          ),
+        ),
+        if (widget.errorMessage != null)
+          _ErrorBanner(
+            message: widget.errorMessage!,
+            onRetry: widget.onRetry,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildConfirmationCard(BuildContext context, Map<String, dynamic> data) {
+    final confirmationId = data['confirmationId'] as String? ?? '';
+    final label = data['label'] as String? ?? '';
+
+    return _ConfirmationCard(
+      key: ValueKey('confirm-$confirmationId'),
+      label: label,
+      onApprove: () =>
+          widget.onResolveConfirmation?.call(confirmationId, approved: true),
+      onCancel: () =>
+          widget.onResolveConfirmation?.call(confirmationId, approved: false),
+    );
+  }
+}
+
+class _ConfirmationCard extends StatelessWidget {
+  const _ConfirmationCard({
+    super.key,
+    required this.label,
+    required this.onApprove,
+    required this.onCancel,
+  });
+
+  final String label;
+  final VoidCallback onApprove;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const EmptyState(
-              icon: Icons.chat_bubble_outline,
-              title: 'Comece uma conversa',
-              subtitle:
-                  'Pergunte algo ao agente e a resposta aparecer\u00e1 aqui.',
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Confirmação necessária',
+                  style: theme.textTheme.titleSmall,
+                ),
+              ],
             ),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              alignment: WrapAlignment.center,
+            Text(label, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                ActionChip(
-                  label: const Text('Resuma minhas notas recentes'),
-                  onPressed: () =>
-                      widget.onSend('Resuma minhas notas recentes'),
+                AppButton(
+                  text: 'Cancelar',
+                  onPressed: onCancel,
+                  variant: AppButtonVariant.secondary,
+                  width: 100,
                 ),
-                ActionChip(
-                  label: const Text('Quais tarefas vencem hoje?'),
-                  onPressed: () => widget.onSend('Quais tarefas vencem hoje?'),
-                ),
-                ActionChip(
-                  label: const Text('Organize meu inbox'),
-                  onPressed: () => widget.onSend('Organize meu inbox'),
+                const SizedBox(width: 8),
+                AppButton(
+                  text: 'Confirmar',
+                  onPressed: onApprove,
+                  variant: AppButtonVariant.primary,
+                  width: 100,
                 ),
               ],
             ),
           ],
         ),
-        customMessageBuilder:
-            (context, message, index, {groupStatus, required isSentByMe}) {
-              if (message.metadata?['kind'] == agentChatTypingKind) {
-                return const Padding(
-                  key: ValueKey('agent-chat-typing-indicator'),
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: flyer_ui.IsTypingIndicator(),
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-        composerBuilder: (_) => const SizedBox.shrink(),
       ),
-      onMessageSend: null,
     );
-
-    final statusBar = _AgentChatStatusBar(
-      streaming: widget.streaming,
-      activeToolLabel: widget.activeToolLabel,
-      errorMessage: widget.errorMessage,
-      onRetry: widget.onRetry,
-      onCancel: widget.onCancel,
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(child: chat),
-        if (!statusBar.isHidden) statusBar,
-        ChatInput(enabled: !widget.streaming, onSend: widget.onSend),
-      ],
-    );
-  }
-
-  String _signatureFor(List<MessageModel> messages, bool streaming) {
-    return [
-      streaming ? 'streaming' : 'idle',
-      for (final message in messages)
-        '${message.id}:${message.role.name}:${message.content}',
-    ].join('|');
   }
 }
 
-class _AgentChatStatusBar extends StatelessWidget {
-  const _AgentChatStatusBar({
-    required this.streaming,
-    this.activeToolLabel,
-    this.errorMessage,
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({
+    required this.message,
     this.onRetry,
-    this.onCancel,
   });
 
-  final bool streaming;
-  final String? activeToolLabel;
-  final String? errorMessage;
+  final String message;
   final VoidCallback? onRetry;
-  final VoidCallback? onCancel;
-
-  bool get isHidden =>
-      !streaming &&
-      activeToolLabel == null &&
-      errorMessage == null &&
-      onRetry == null &&
-      onCancel == null;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusText =
-        errorMessage ?? activeToolLabel ?? (streaming ? 'Pensando...' : null);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: theme.colorScheme.surfaceContainerHighest,
+      color: theme.colorScheme.errorContainer,
       child: Row(
         children: [
-          if (statusText != null && errorMessage == null) ...[
-            SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(strokeWidth: 1.5),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                statusText,
-                style: theme.textTheme.bodySmall,
-                overflow: TextOverflow.ellipsis,
+          Icon(Icons.error_outline, size: 16, color: theme.colorScheme.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
               ),
             ),
-          ],
-          if (errorMessage != null) ...[
-            Icon(Icons.error_outline, size: 16, color: theme.colorScheme.error),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                errorMessage!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              ),
-            ),
-          ],
+          ),
           if (onRetry != null)
-            /*   TextButton(
+            AppButton(
+              text: 'Tentar novamente',
               onPressed: onRetry,
-              child: const Text('Tentar novamente'),
-            ), */
-            const Spacer(),
-          if (onCancel != null)
-            IconButton(
-              icon: const Icon(Icons.close, size: 18),
-              tooltip: 'Cancelar resposta',
-              onPressed: onCancel,
+              variant: AppButtonVariant.tonal,
+              width: 140,
             ),
         ],
       ),

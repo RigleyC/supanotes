@@ -120,6 +120,10 @@ func (l *Loop) ResetSession(ctx context.Context, userID pgtype.UUID, sessionIDSt
 	return l.repo.DeleteSessionMessages(ctx, userID, sessionUUID)
 }
 
+func (l *Loop) ExecuteTool(ctx context.Context, userID pgtype.UUID, toolName, argsJSON string) (string, error) {
+	return l.tools.Execute(ctx, userID, toolName, argsJSON)
+}
+
 func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) error {
 	_, err := l.doChat(ctx, userID, sessionIDStr, userMessage, events)
 	return err
@@ -245,12 +249,17 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 		for _, tc := range res.ToolCalls {
 			if l.tools.Risk(tc.Name) == tools.ToolRiskSensitiveWrite {
+				pending, err := l.repo.CreatePendingToolConfirmation(ctx, userID, sessionUUID, tc.Name, tc.ArgsJSON)
+				if err != nil {
+					return "", fmt.Errorf("create pending tool confirmation: %w", err)
+				}
+
 				sendStreamEvent(events, writer.Event(
 					EventConfirmationRequired,
 					ConfirmationRequiredPayload{
-						ToolName: tc.Name,
-						Label:    l.tools.Label(tc.Name),
-						ArgsJSON: tc.ArgsJSON,
+						ConfirmationID: uuid.UUID(pending.ID.Bytes).String(),
+						ToolName:       tc.Name,
+						Label:          l.tools.Label(tc.Name),
 					},
 				))
 				finalContent = "Preciso da sua confirmação antes de aplicar essa alteração."

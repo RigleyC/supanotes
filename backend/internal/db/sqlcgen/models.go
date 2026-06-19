@@ -105,6 +105,17 @@ type NoteTag struct {
 	TagID  pgtype.UUID `json:"tag_id"`
 }
 
+type PendingToolConfirmation struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	SessionID  pgtype.UUID        `json:"session_id"`
+	ToolName   string             `json:"tool_name"`
+	ArgsJson   []byte             `json:"args_json"`
+	Status     string             `json:"status"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ResolvedAt pgtype.Timestamptz `json:"resolved_at"`
+}
+
 type RefreshToken struct {
 	ID        pgtype.UUID        `json:"id"`
 	UserID    pgtype.UUID        `json:"user_id"`

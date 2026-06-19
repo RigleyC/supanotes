@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/llm"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type stubLoopRepo struct {
@@ -46,6 +50,15 @@ func (s *stubLoopRepo) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (
 }
 func (s *stubLoopRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
+}
+func (s *stubLoopRepo) CreatePendingToolConfirmation(ctx context.Context, userID, sessionID pgtype.UUID, toolName, argsJSON string) (sqlcgen.PendingToolConfirmation, error) {
+	return sqlcgen.PendingToolConfirmation{}, nil
+}
+func (s *stubLoopRepo) GetPendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID) (sqlcgen.PendingToolConfirmation, error) {
+	return sqlcgen.PendingToolConfirmation{}, nil
+}
+func (s *stubLoopRepo) ResolvePendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID, status string) (sqlcgen.PendingToolConfirmation, error) {
+	return sqlcgen.PendingToolConfirmation{}, nil
 }
 
 func TestLoopResetSessionDeletesSessionMessages(t *testing.T) {
@@ -412,6 +425,33 @@ func (s *stubLoopQuerier) GetNoteShareForUser(ctx context.Context, arg sqlcgen.G
 func (s *stubLoopQuerier) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
 	panic("unimplemented")
 }
+func (s *stubLoopQuerier) CreatePendingToolConfirmation(context.Context, sqlcgen.CreatePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) GetPendingToolConfirmation(context.Context, sqlcgen.GetPendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+
+type trackingStubLoopRepo struct {
+	stubLoopRepo
+	pendingConfirmations []string
+}
+
+func (s *trackingStubLoopRepo) CreatePendingToolConfirmation(ctx context.Context, userID, sessionID pgtype.UUID, toolName, argsJSON string) (sqlcgen.PendingToolConfirmation, error) {
+	id := uuid.New()
+	s.pendingConfirmations = append(s.pendingConfirmations, id.String())
+	return sqlcgen.PendingToolConfirmation{
+		ID:        pgtype.UUID{Bytes: id, Valid: true},
+		UserID:    userID,
+		SessionID: sessionID,
+		ToolName:  toolName,
+		ArgsJson:  []byte(argsJSON),
+		Status:    "pending",
+	}, nil
+}
 
 func TestLoopConfirmationRequired(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -441,7 +481,8 @@ func TestLoopConfirmationRequired(t *testing.T) {
 		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
 	)
 
-	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+	repo := &trackingStubLoopRepo{}
+	loop := NewLoop(repo, llmFact, ctxBldr, toolReg)
 
 	events := make(chan SSEEvent, 10)
 	go func() {
@@ -458,14 +499,52 @@ func TestLoopConfirmationRequired(t *testing.T) {
 	}()
 
 	var foundConfirmation bool
+	var confirmationPayload struct {
+		ConfirmationID string `json:"confirmation_id"`
+		ToolName       string `json:"tool_name"`
+		Label          string `json:"label"`
+	}
+	var confirmationPayloadJSON string
 	for evt := range events {
-		if evt.Type == string(EventConfirmationRequired) {
-			foundConfirmation = true
+		if evt.Type != string(EventConfirmationRequired) {
+			continue
+		}
+		foundConfirmation = true
+		var streamEvent StreamEvent
+		if err := json.Unmarshal([]byte(evt.Data), &streamEvent); err != nil {
+			t.Fatalf("unmarshal stream event: %v", err)
+		}
+		payloadBytes, err := json.Marshal(streamEvent.Payload)
+		if err != nil {
+			t.Fatalf("marshal payload: %v", err)
+		}
+		confirmationPayloadJSON = string(payloadBytes)
+		if err := json.Unmarshal(payloadBytes, &confirmationPayload); err != nil {
+			t.Fatalf("unmarshal payload: %v", err)
 		}
 	}
 
 	if !foundConfirmation {
 		t.Fatal("expected confirmation_required event but got none")
+	}
+	if confirmationPayload.ConfirmationID == "" {
+		t.Fatal("expected non-empty confirmation_id in payload")
+	}
+	if confirmationPayload.ToolName != "update_note" {
+		t.Fatalf("tool_name: want update_note, got %s", confirmationPayload.ToolName)
+	}
+	if confirmationPayload.Label == "" {
+		t.Fatal("expected non-empty label in payload")
+	}
+	if len(repo.pendingConfirmations) != 1 {
+		t.Fatalf("expected 1 pending confirmation, got %d", len(repo.pendingConfirmations))
+	}
+	if repo.pendingConfirmations[0] != confirmationPayload.ConfirmationID {
+		t.Fatalf("confirmation_id mismatch: repo has %s, payload has %s",
+			repo.pendingConfirmations[0], confirmationPayload.ConfirmationID)
+	}
+	if strings.Contains(confirmationPayloadJSON, "args_json") {
+		t.Fatal("payload must not contain args_json")
 	}
 }
 
@@ -713,6 +792,125 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 
 	if final != "No tasks for today or overdue" {
 		t.Fatalf("final content: want %q, got %q", "No tasks for today or overdue", final)
+	}
+}
+
+type resolveTestRepo struct {
+	pending sqlcgen.PendingToolConfirmation
+	created sqlcgen.Message
+}
+
+func (r *resolveTestRepo) GetMessages(ctx context.Context, userID, sessionID pgtype.UUID, limit, offset int32) ([]sqlcgen.Message, error) {
+	return nil, nil
+}
+func (r *resolveTestRepo) CreateMessage(ctx context.Context, userID, sessionID pgtype.UUID, role, content string, toolCalls []byte, toolCallID *string) (sqlcgen.Message, error) {
+	r.created = sqlcgen.Message{Content: content}
+	return r.created, nil
+}
+func (r *resolveTestRepo) DeleteSessionMessages(ctx context.Context, userID, sessionID pgtype.UUID) error {
+	return nil
+}
+func (r *resolveTestRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (r *resolveTestRepo) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (r *resolveTestRepo) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (r *resolveTestRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (r *resolveTestRepo) CreatePendingToolConfirmation(ctx context.Context, userID, sessionID pgtype.UUID, toolName, argsJSON string) (sqlcgen.PendingToolConfirmation, error) {
+	id := uuid.New()
+	r.pending = sqlcgen.PendingToolConfirmation{
+		ID:        pgtype.UUID{Bytes: id, Valid: true},
+		UserID:    userID,
+		SessionID: sessionID,
+		ToolName:  toolName,
+		ArgsJson:  []byte(argsJSON),
+		Status:    "pending",
+	}
+	return r.pending, nil
+}
+func (r *resolveTestRepo) GetPendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID) (sqlcgen.PendingToolConfirmation, error) {
+	if r.pending.Status == "" {
+		return sqlcgen.PendingToolConfirmation{}, fmt.Errorf("not found")
+	}
+	return r.pending, nil
+}
+func (r *resolveTestRepo) ResolvePendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID, status string) (sqlcgen.PendingToolConfirmation, error) {
+	if r.pending.Status != "pending" {
+		return sqlcgen.PendingToolConfirmation{}, fmt.Errorf("already resolved")
+	}
+	r.pending.Status = status
+	return r.pending, nil
+}
+
+func TestResolveToolConfirmationCancelDoesNotExecuteTool(t *testing.T) {
+	repo := &resolveTestRepo{
+		pending: sqlcgen.PendingToolConfirmation{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			UserID:    pgtype.UUID{},
+			SessionID: pgtype.UUID{},
+			ToolName:  "update_note",
+			ArgsJson:  []byte(`{}`),
+			Status:    "pending",
+		},
+	}
+	h := &Handler{repo: repo, loop: NewLoop(&stubLoopRepo{}, nil, nil, nil)}
+
+	resp, status, err := h.resolveToolConfirmation(context.Background(), pgtype.UUID{}, uid.UUIDToString(repo.pending.ID), false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status != 200 {
+		t.Fatalf("status: want 200, got %d", status)
+	}
+	if resp.Status != "cancelled" {
+		t.Fatalf("status field: want cancelled, got %s", resp.Status)
+	}
+}
+
+func TestResolveToolConfirmationRejectsAlreadyResolved(t *testing.T) {
+	id := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	userID := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	h := &Handler{
+		repo: &resolveTestRepo{
+			pending: sqlcgen.PendingToolConfirmation{
+				ID:     id,
+				UserID: userID,
+				Status: "approved",
+			},
+		},
+		loop: NewLoop(&stubLoopRepo{}, nil, nil, nil),
+	}
+
+	_, status, err := h.resolveToolConfirmation(context.Background(), userID, uid.UUIDToString(id), true)
+	if err == nil {
+		t.Fatal("expected error for already resolved confirmation")
+	}
+	if status != 409 {
+		t.Fatalf("status: want 409, got %d", status)
+	}
+}
+
+func TestResolveToolConfirmationNotFound(t *testing.T) {
+	repo := &resolveTestRepo{}
+	h := NewHandler(NewLoop(&stubLoopRepo{}, nil, nil, nil), repo)
+
+	_, status, err := h.resolveToolConfirmation(
+		context.Background(),
+		pgtype.UUID{},
+		uuid.New().String(),
+		true,
+	)
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+	if status != 404 {
+		t.Fatalf("status: want 404, got %d", status)
 	}
 }
 

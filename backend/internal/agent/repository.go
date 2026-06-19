@@ -16,6 +16,9 @@ type Repository interface {
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CreatePendingToolConfirmation(ctx context.Context, userID, sessionID pgtype.UUID, toolName, argsJSON string) (sqlcgen.PendingToolConfirmation, error)
+	GetPendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID) (sqlcgen.PendingToolConfirmation, error)
+	ResolvePendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID, status string) (sqlcgen.PendingToolConfirmation, error)
 }
 
 type repository struct {
@@ -72,4 +75,28 @@ func (r *repository) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (in
 
 func (r *repository) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return r.q.CountCompletedTasks(ctx, userID)
+}
+
+func (r *repository) CreatePendingToolConfirmation(ctx context.Context, userID, sessionID pgtype.UUID, toolName, argsJSON string) (sqlcgen.PendingToolConfirmation, error) {
+	return r.q.CreatePendingToolConfirmation(ctx, sqlcgen.CreatePendingToolConfirmationParams{
+		UserID:    userID,
+		SessionID: sessionID,
+		ToolName:  toolName,
+		ArgsJson:  []byte(argsJSON),
+	})
+}
+
+func (r *repository) GetPendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID) (sqlcgen.PendingToolConfirmation, error) {
+	return r.q.GetPendingToolConfirmation(ctx, sqlcgen.GetPendingToolConfirmationParams{
+		ID:     id,
+		UserID: userID,
+	})
+}
+
+func (r *repository) ResolvePendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID, status string) (sqlcgen.PendingToolConfirmation, error) {
+	return r.q.ResolvePendingToolConfirmation(ctx, sqlcgen.ResolvePendingToolConfirmationParams{
+		ID:     id,
+		UserID: userID,
+		Status: status,
+	})
 }

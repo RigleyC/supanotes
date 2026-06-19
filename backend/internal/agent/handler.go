@@ -1,16 +1,29 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/web"
+	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
+
+type ResolveToolConfirmationRequest struct {
+	Approved bool `json:"approved"`
+}
+
+type ResolveToolConfirmationResponse struct {
+	ConfirmationID string `json:"confirmation_id"`
+	Status         string `json:"status"`
+	Message        string `json:"message"`
+}
 
 func parseInt32(s string) (int32, error) {
 	n, err := strconv.ParseInt(s, 10, 32)
@@ -142,6 +155,71 @@ func (h *Handler) ListMessages(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, messages)
+}
+
+func (h *Handler) resolveToolConfirmation(ctx context.Context, userID pgtype.UUID, confirmationIDStr string, approved bool) (ResolveToolConfirmationResponse, int, error) {
+	confirmationID, err := uid.UUIDFromString(confirmationIDStr)
+	if err != nil {
+		return ResolveToolConfirmationResponse{}, http.StatusBadRequest, fmt.Errorf("invalid confirmation_id")
+	}
+
+	pending, err := h.repo.GetPendingToolConfirmation(ctx, confirmationID, userID)
+	if err != nil {
+		return ResolveToolConfirmationResponse{}, http.StatusNotFound, fmt.Errorf("confirmation not found")
+	}
+	if pending.Status != "pending" {
+		return ResolveToolConfirmationResponse{}, http.StatusConflict, fmt.Errorf("confirmation already resolved")
+	}
+
+	if !approved {
+		resolved, err := h.repo.ResolvePendingToolConfirmation(ctx, confirmationID, userID, "cancelled")
+		if err != nil {
+			return ResolveToolConfirmationResponse{}, http.StatusConflict, fmt.Errorf("confirmation already resolved")
+		}
+		return ResolveToolConfirmationResponse{
+			ConfirmationID: uid.UUIDToString(resolved.ID),
+			Status:         "cancelled",
+			Message:        "Ação cancelada.",
+		}, http.StatusOK, nil
+	}
+
+	resolved, err := h.repo.ResolvePendingToolConfirmation(ctx, confirmationID, userID, "approved")
+	if err != nil {
+		return ResolveToolConfirmationResponse{}, http.StatusConflict, fmt.Errorf("confirmation already resolved")
+	}
+
+	result, err := h.loop.ExecuteTool(ctx, userID, resolved.ToolName, string(resolved.ArgsJson))
+	if err != nil {
+		return ResolveToolConfirmationResponse{}, http.StatusInternalServerError, fmt.Errorf("execute confirmed tool: %w", err)
+	}
+
+	if _, err := h.repo.CreateMessage(ctx, userID, resolved.SessionID, string(llm.RoleTool), result, nil, nil); err != nil {
+		return ResolveToolConfirmationResponse{}, http.StatusInternalServerError, fmt.Errorf("save tool result: %w", err)
+	}
+
+	return ResolveToolConfirmationResponse{
+		ConfirmationID: uid.UUIDToString(resolved.ID),
+		Status:         "approved",
+		Message:        result,
+	}, http.StatusOK, nil
+}
+
+func (h *Handler) ResolveToolConfirmation(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	var req ResolveToolConfirmationRequest
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+
+	resp, status, err := h.resolveToolConfirmation(c.Request().Context(), userID, c.Param("id"), req.Approved)
+	if err != nil {
+		return web.JSONError(c, status, err.Error())
+	}
+	return c.JSON(status, resp)
 }
 
 func (h *Handler) DeleteMessages(c echo.Context) error {

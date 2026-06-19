@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/presentation/chat_message_adapter.dart';
+import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 
 void main() {
   MessageModel message({
@@ -17,60 +18,76 @@ void main() {
     );
   }
 
-  test('maps user and assistant messages to stable author ids', () {
-    final messages = toFlyerMessages(
+  test('maps user and assistant messages to gen ai chat users', () {
+    final messages = toGenAiChatMessages(
       [
         message(id: 'user-1', role: MessageRole.user, content: 'Oi'),
-        message(
-          id: 'assistant-1',
-          role: MessageRole.assistant,
-          content: 'Como posso ajudar?',
+        message(id: 'assistant-1', role: MessageRole.assistant, content: 'Olá'),
+      ],
+    );
+
+    expect(messages, hasLength(2));
+    expect(messages[0].text, 'Oi');
+    expect(messages[0].user.id, agentChatCurrentUser.id);
+    expect(messages[0].customProperties?['id'], 'user-1');
+    expect(messages[1].user.id, agentChatAssistantUser.id);
+  });
+
+  test('maps tool actions to rich action messages with result kind', () {
+    final messages = toGenAiChatMessages(
+      const [],
+      actions: [
+        (
+          id: 'action-1',
+          name: 'update_note',
+          label: 'Atualizando notas',
+          status: ChatToolActionStatus.confirmationRequired,
+          message: null,
+          confirmationId: 'confirmation-1',
         ),
       ],
-      streaming: false,
     );
 
-    expect(messages, hasLength(2));
-    expect(messages[0].id, 'user-1');
-    expect(messages[0].authorId, agentChatCurrentUserId);
-    expect(messages[1].id, 'assistant-1');
-    expect(messages[1].authorId, agentChatAssistantUserId);
+    final data = messages.single.customProperties!;
+    expect(data['resultKind'], 'confirmation');
+    expect((data['resultData'] as Map)['actionId'], 'action-1');
+    expect(
+      (data['resultData'] as Map)['confirmationId'],
+      'confirmation-1',
+    );
+    expect((data['resultData'] as Map)['label'], 'Atualizando notas');
   });
 
-  test('adds a typing placeholder when assistant is streaming empty content', () {
-    final messages = toFlyerMessages(
-      [
-        message(id: 'user-1', role: MessageRole.user, content: 'Resumo?'),
-        message(id: 'assistant-1', role: MessageRole.assistant, content: ''),
+  test('skip non-interactive actions', () {
+    final messages = toGenAiChatMessages(
+      const [],
+      actions: [
+        (
+          id: 'action-1',
+          name: 'search_notes',
+          label: 'Buscando notas',
+          status: ChatToolActionStatus.running,
+          message: null,
+          confirmationId: null,
+        ),
+        (
+          id: 'action-2',
+          name: 'search_notes',
+          label: 'Buscando notas',
+          status: ChatToolActionStatus.completed,
+          message: null,
+          confirmationId: null,
+        ),
       ],
-      streaming: true,
     );
 
-    expect(messages, hasLength(2));
-    expect(messages.last.id, 'agent-typing-assistant-1');
-    expect(messages.last.authorId, agentChatAssistantUserId);
+    expect(messages, isEmpty);
   });
 
-  test('does not add a typing placeholder when assistant already has text', () {
-    final messages = toFlyerMessages(
-      [
-        message(id: 'user-1', role: MessageRole.user, content: 'Resumo?'),
-        message(id: 'assistant-1', role: MessageRole.assistant, content: 'Claro'),
-      ],
-      streaming: true,
-    );
-
-    expect(messages, hasLength(2));
-    expect(messages.last.id, 'assistant-1');
-  });
-
-  test('resolves known chat users', () async {
-    final me = await resolveAgentChatUser(agentChatCurrentUserId);
-    final assistant = await resolveAgentChatUser(agentChatAssistantUserId);
-    final unknown = await resolveAgentChatUser('missing');
-
-    expect(me?.name, 'Voc\u00ea');
-    expect(assistant?.name, 'Agent');
-    expect(unknown, isNull);
+  test('resolves known chat users', () {
+    expect(agentChatCurrentUser.id, 'agent-chat-current-user');
+    expect(agentChatCurrentUser.name, 'Você');
+    expect(agentChatAssistantUser.id, 'agent-chat-assistant');
+    expect(agentChatAssistantUser.name, 'Agente');
   });
 }

@@ -268,6 +268,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/agent/chat/stream", agentH.ChatSSE)
 	protected.GET("/agent/messages", agentH.ListMessages)
 	protected.DELETE("/agent/messages", agentH.DeleteMessages)
+	protected.POST("/agent/tool-confirmations/:id/resolve", agentH.ResolveToolConfirmation)
 
 	// FCM push + Telegram sender — feed both into the routines runner
 	// so a fired brief triggers real notifications.

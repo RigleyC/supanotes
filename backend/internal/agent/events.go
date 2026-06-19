@@ -45,9 +45,9 @@ type ErrorPayload struct {
 }
 
 type ConfirmationRequiredPayload struct {
-	ToolName string `json:"tool_name"`
-	Label    string `json:"label"`
-	ArgsJSON string `json:"args_json"`
+	ConfirmationID string `json:"confirmation_id"`
+	ToolName       string `json:"tool_name"`
+	Label          string `json:"label"`
 }
 
 type StreamEventWriter struct {
