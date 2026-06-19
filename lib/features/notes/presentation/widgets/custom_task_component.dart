@@ -10,6 +10,10 @@ const double _taskCheckboxSize = 22;
 const double _taskCheckboxPadding = 9;
 const double _taskCheckboxGap = 9;
 
+const Duration _exitAnimationDelay = Duration(milliseconds: 300);
+const Duration _exitAnimationDuration = Duration(milliseconds: 350);
+const Duration _recurrenceResetDelay = Duration(milliseconds: 400);
+
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
     this._editor, {
@@ -63,7 +67,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
         final taskMeta = taskMetadataById[node.id];
         if (isComplete && taskMeta?.recurrence != null) {
           _pendingResetNodeIds.add(node.id);
-          Future.delayed(const Duration(milliseconds: 400), () {
+          Future.delayed(_recurrenceResetDelay, () {
             if (!_pendingResetNodeIds.remove(node.id)) return;
             final exists = document.getNodeById(node.id) != null;
             if (exists) {
@@ -185,7 +189,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     super.initState();
     _exitController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: _exitAnimationDuration,
     );
     _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(parent: _exitController, curve: Curves.easeOut),
@@ -217,7 +221,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   void didUpdateWidget(CustomTaskComponent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.hideCompleted && widget.viewModel.isComplete && !oldWidget.viewModel.isComplete) {
-      Future.delayed(const Duration(milliseconds: 300), () {
+      Future.delayed(_exitAnimationDelay, () {
         if (mounted) {
           _exitController.forward();
         }
