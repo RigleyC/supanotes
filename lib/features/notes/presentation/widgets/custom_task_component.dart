@@ -77,7 +77,11 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     DocumentNode node,
   ) {
     if (node is! TaskNode) return null;
-    if (hideCompleted && node.isComplete) return null;
+    if (hideCompleted && node.isComplete) {
+      if (!_animatingNodeIds.contains(node.id)) {
+        return null;
+      }
+    }
 
     final metadata = taskMetadataById[node.id];
 
@@ -88,6 +92,9 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       indent: node.indent,
       isComplete: node.isComplete,
       setComplete: (bool isComplete) async {
+        if (isComplete && hideCompleted) {
+          _animatingNodeIds.add(node.id);
+        }
         _editor.execute([
           ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),
         ]);
