@@ -207,9 +207,6 @@ class _NoteEditorState extends State<NoteEditor> {
                       ),
                       componentBuilders: [
                         const CustomDividerComponentBuilder(),
-                        HiddenTaskComponentBuilder(
-                          hideCompleted: widget.hideCompleted,
-                        ),
                         _taskComponentBuilder,
                         ...defaultComponentBuilders,
                       ],

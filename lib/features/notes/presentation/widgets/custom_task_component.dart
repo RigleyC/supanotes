@@ -10,46 +10,6 @@ const double _taskCheckboxSize = 22;
 const double _taskCheckboxPadding = 9;
 const double _taskCheckboxGap = 9;
 
-/// Renders completed tasks as an empty zero-height box when [hideCompleted]
-/// is true, preventing the [UnknownComponentBuilder] Placeholder fallback.
-class HiddenTaskComponentBuilder implements ComponentBuilder {
-  const HiddenTaskComponentBuilder({this.hideCompleted = false});
-
-  final bool hideCompleted;
-
-  @override
-  SingleColumnLayoutComponentViewModel? createViewModel(
-    Document document,
-    DocumentNode node,
-  ) {
-    if (node is! TaskNode) return null;
-    if (!hideCompleted || !node.isComplete) return null;
-
-    return HiddenTaskComponentViewModel(nodeId: node.id);
-  }
-
-  @override
-  Widget? createComponent(
-    SingleColumnDocumentComponentContext componentContext,
-    SingleColumnLayoutComponentViewModel componentViewModel,
-  ) {
-    if (componentViewModel is! HiddenTaskComponentViewModel) return null;
-
-    return SizedBox(key: componentContext.componentKey, height: 0);
-  }
-}
-
-class HiddenTaskComponentViewModel
-    extends SingleColumnLayoutComponentViewModel {
-  HiddenTaskComponentViewModel({required super.nodeId})
-    : super(createdAt: null, padding: EdgeInsets.zero);
-
-  @override
-  HiddenTaskComponentViewModel copy() {
-    return HiddenTaskComponentViewModel(nodeId: nodeId);
-  }
-}
-
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
     this._editor, {
@@ -77,11 +37,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     DocumentNode node,
   ) {
     if (node is! TaskNode) return null;
-    if (hideCompleted && node.isComplete) {
-      if (!_animatingNodeIds.contains(node.id)) {
-        return null;
-      }
-    }
 
     final metadata = taskMetadataById[node.id];
 
@@ -144,6 +99,10 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     if (componentViewModel is! TaskComponentViewModel) return null;
 
     final nodeId = componentViewModel.nodeId;
+
+    if (hideCompleted && componentViewModel.isComplete && !_animatingNodeIds.contains(nodeId)) {
+      return SizedBox(key: componentContext.componentKey, height: 0);
+    }
 
     return CustomTaskComponent(
       key: componentContext.componentKey,
@@ -331,7 +290,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
     return SizeTransition(
       sizeFactor: _sizeAnimation,
-      axisAlignment: -1.0,
+      alignment: Alignment.topCenter,
       child: FadeTransition(
         opacity: _fadeAnimation,
         child: content,
