@@ -32,23 +32,17 @@ typedef ChatState = ({
   List<MessageModel> messages,
   List<ChatToolAction> actions,
   bool isStreaming,
-  String? errorMessage,
-  String? retryMessage,
 });
 
 ChatState chatState({
   List<MessageModel> messages = const [],
   List<ChatToolAction> actions = const [],
   bool isStreaming = false,
-  String? errorMessage,
-  String? retryMessage,
 }) {
   return (
     messages: messages,
     actions: actions,
     isStreaming: isStreaming,
-    errorMessage: errorMessage,
-    retryMessage: retryMessage,
   );
 }
 
@@ -114,7 +108,6 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
         messages: [...currentMessages, pending, initialAssistant],
         actions: currentActions,
         isStreaming: true,
-        retryMessage: trimmed,
       ),
     );
 
@@ -143,7 +136,6 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
           ],
           actions: actions ?? current?.actions ?? const [],
           isStreaming: isStreaming ?? true,
-          retryMessage: trimmed,
         ),
       );
     }
@@ -284,16 +276,10 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
         messages: nextMessages,
         actions: nextActions,
         isStreaming: current.isStreaming,
-        retryMessage: current.retryMessage,
       ));
-    } on ApiException catch (e) {
-      state = AsyncValue.data(chatState(
-        messages: current.messages,
-        actions: current.actions,
-        isStreaming: current.isStreaming,
-        errorMessage: e.message,
-        retryMessage: current.retryMessage,
-      ));
+    } on ApiException catch (e, st) {
+      // ignore: invalid_use_of_internal_member
+      state = AsyncValue<ChatState>.error(e.message, st).copyWithPrevious(state);
     }
   }
 
@@ -320,24 +306,27 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
   void _setRecoverableError(String message, String retryMessage) {
     final current = state.value;
     if (current == null) {
-      state = AsyncValue.error(message, StackTrace.current);
+      state = AsyncValue<ChatState>.error(message, StackTrace.current);
       return;
     }
-    state = AsyncValue.data(
-      chatState(
-        messages: current.messages,
-        actions: current.actions,
-        isStreaming: false,
-        errorMessage: message,
-        retryMessage: retryMessage,
-      ),
-    );
+    // ignore: invalid_use_of_internal_member
+    state = AsyncValue<ChatState>.error(message, StackTrace.current).copyWithPrevious(state);
   }
 
   Future<void> retryLastMessage() async {
-    final retry = state.value?.retryMessage;
-    if (retry == null || retry.trim().isEmpty) return;
-    await sendMessage(retry);
+    final messages = state.value?.messages;
+    if (messages == null || messages.isEmpty) return;
+    
+    MessageModel? lastUserMsg;
+    for (int i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role == MessageRole.user) {
+        lastUserMsg = messages[i];
+        break;
+      }
+    }
+    
+    if (lastUserMsg == null || lastUserMsg.content.trim().isEmpty) return;
+    await sendMessage(lastUserMsg.content);
   }
 
   Future<void> cancelStreaming() async {
@@ -351,7 +340,6 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
         messages: current.messages,
         actions: current.actions,
         isStreaming: false,
-        retryMessage: current.retryMessage,
       ),
     );
   }

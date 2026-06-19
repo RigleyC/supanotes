@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart' show MarkdownStyleSheet;
 
+import 'package:supanotes/features/agent/domain/agent_strings.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/presentation/chat_message_adapter.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
-import 'package:supanotes/shared/widgets/app_button.dart';
+import 'package:supanotes/features/agent/presentation/widgets/agent_action_card.dart';
+import 'package:supanotes/features/agent/presentation/widgets/confirmation_card.dart';
 
 
 class AgentChatView extends StatefulWidget {
@@ -16,8 +18,6 @@ class AgentChatView extends StatefulWidget {
     required this.loaded,
     required this.streaming,
     required this.onSend,
-    required this.errorMessage,
-    this.onRetry,
     this.onCancel,
     this.onResolveConfirmation,
   });
@@ -27,8 +27,6 @@ class AgentChatView extends StatefulWidget {
   final bool loaded;
   final bool streaming;
   final ValueChanged<String> onSend;
-  final String? errorMessage;
-  final VoidCallback? onRetry;
   final VoidCallback? onCancel;
   final void Function(String confirmationId, {required bool approved})?
       onResolveConfirmation;
@@ -114,7 +112,7 @@ class _AgentChatViewState extends State<AgentChatView> {
 
     final inputOpts = InputOptions(
       decoration: InputDecoration(
-        hintText: 'Mensagem...',
+        hintText: AgentStrings.inputHint,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide(color: theme.colorScheme.outline),
@@ -156,14 +154,12 @@ class _AgentChatViewState extends State<AgentChatView> {
               'action': _buildActionCard,
             },
             welcomeMessageConfig: WelcomeMessageConfig(
-              title: 'Como posso ajudar?',
+              title: AgentStrings.welcomeTitle,
               centerVertically: true,
             ),
-            exampleQuestions: const [
-              ExampleQuestion(question: 'Resumir minhas notas'),
-              ExampleQuestion(question: 'O que tenho para fazer hoje?'),
-              ExampleQuestion(question: 'Criar uma tarefa'),
-            ],
+            exampleQuestions: AgentStrings.exampleQuestions
+                .map((q) => ExampleQuestion(question: q))
+                .toList(),
             markdownStyleSheet: MarkdownStyleSheet(
               codeblockDecoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
@@ -172,11 +168,6 @@ class _AgentChatViewState extends State<AgentChatView> {
             ),
           ),
         ),
-        if (widget.errorMessage != null)
-          _ErrorBanner(
-            message: widget.errorMessage!,
-            onRetry: widget.onRetry,
-          ),
       ],
     );
   }
@@ -185,7 +176,7 @@ class _AgentChatViewState extends State<AgentChatView> {
     final confirmationId = data['confirmationId'] as String? ?? '';
     final label = data['label'] as String? ?? '';
 
-    return _ConfirmationCard(
+    return ConfirmationCard(
       key: ValueKey('confirm-$confirmationId'),
       label: label,
       onApprove: () =>
@@ -197,7 +188,7 @@ class _AgentChatViewState extends State<AgentChatView> {
 
   Widget _buildActionCard(BuildContext context, Map<String, dynamic> data) {
     final statusName = data['status'] as String? ?? 'running';
-    final label = data['label'] as String? ?? 'Executando...';
+    final label = data['label'] as String? ?? AgentStrings.actionDefaultLabel;
     final message = data['message'] as String?;
     
     final status = ChatToolActionStatus.values.firstWhere(
@@ -205,196 +196,11 @@ class _AgentChatViewState extends State<AgentChatView> {
       orElse: () => ChatToolActionStatus.running,
     );
 
-    return _AgentActionCard(
+    return AgentActionCard(
       key: ValueKey('action-${data['actionId']}'),
       status: status,
       label: label,
       message: message,
-    );
-  }
-}
-
-class _ConfirmationCard extends StatelessWidget {
-  const _ConfirmationCard({
-    super.key,
-    required this.label,
-    required this.onApprove,
-    required this.onCancel,
-  });
-
-  final String label;
-  final VoidCallback onApprove;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.warning_amber_rounded,
-                    size: 20, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Confirmação necessária',
-                  style: theme.textTheme.titleSmall,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(label, style: theme.textTheme.bodyMedium),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                AppButton(
-                  text: 'Cancelar',
-                  onPressed: onCancel,
-                  variant: AppButtonVariant.secondary,
-                  width: 100,
-                ),
-                const SizedBox(width: 8),
-                AppButton(
-                  text: 'Confirmar',
-                  onPressed: onApprove,
-                  variant: AppButtonVariant.primary,
-                  width: 100,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({
-    required this.message,
-    this.onRetry,
-  });
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: theme.colorScheme.errorContainer,
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, size: 16, color: theme.colorScheme.error),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
-              ),
-            ),
-          ),
-          if (onRetry != null)
-            AppButton(
-              text: 'Tentar novamente',
-              onPressed: onRetry,
-              variant: AppButtonVariant.tonal,
-              width: 140,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AgentActionCard extends StatelessWidget {
-  const _AgentActionCard({
-    super.key,
-    required this.status,
-    required this.label,
-    this.message,
-  });
-
-  final ChatToolActionStatus status;
-  final String label;
-  final String? message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    Widget icon;
-    Color? textColor;
-    
-    switch (status) {
-      case ChatToolActionStatus.running:
-        icon = const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        );
-        break;
-      case ChatToolActionStatus.completed:
-      case ChatToolActionStatus.confirmed:
-        icon = Icon(Icons.check_circle, size: 16, color: theme.colorScheme.primary);
-        break;
-      case ChatToolActionStatus.failed:
-      case ChatToolActionStatus.cancelled:
-        icon = Icon(Icons.error, size: 16, color: theme.colorScheme.error);
-        textColor = theme.colorScheme.error;
-        break;
-      case ChatToolActionStatus.confirmationRequired:
-        icon = Icon(Icons.warning, size: 16, color: theme.colorScheme.primary);
-        break;
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              icon,
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: textColor ?? theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (message != null && message!.isNotEmpty && status == ChatToolActionStatus.failed) ...[
-            const SizedBox(height: 4),
-            Text(
-              message!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-          ]
-        ],
-      ),
     );
   }
 }

@@ -45,7 +45,7 @@ func NewToolRegistry(
 		&AddTaskTool{tasksSvc: tasksSvc},
 		&SaveMemoryTool{memoriesSvc: memoriesSvc},
 		&CompleteTaskTool{tasksSvc: tasksSvc},
-		&GetOpenTasksTool{tasksSvc: tasksSvc},
+		&QueryTasksTool{tasksSvc: tasksSvc},
 		&ListMemoriesTool{memoriesSvc: memoriesSvc},
 		&GetInboxNoteTool{notesSvc: notesSvc},
 		&AppendToInboxTool{notesSvc: notesSvc},
@@ -63,12 +63,10 @@ func NewToolRegistry(
 		&LinkNotesTool{q: q, notesSvc: notesSvc},
 		&DeleteMemoryTool{memoriesSvc: memoriesSvc},
 		&UpdateSoulTool{soulSvc: soulSvc},
-		&GetTodayTasksTool{tasksSvc: tasksSvc},
 		&UpdateTaskTool{tasksSvc: tasksSvc},
 		&GetVaultContextTool{q: q},
 		&PlanInboxOrganizationTool{notesSvc: notesSvc, llmClient: llmFact.For(llm.TaskTypeInboxOrganize)},
 		&ApplyInboxOrganizationTool{notesSvc: notesSvc},
-		&SearchTasksTool{tasksSvc: tasksSvc},
 	}
 
 	for _, e := range executors {
@@ -88,7 +86,7 @@ const (
 
 func (tr *ToolRegistry) Risk(toolName string) ToolRisk {
 	switch toolName {
-	case "search_notes", "get_note", "get_notes", "get_open_tasks", "get_today_tasks", "list_memories", "get_soul", "list_routines", "get_vault_context", "get_inbox_note", "plan_inbox_organization", "test_daily_brief", "test_weekly_brief", "search_tasks":
+	case "search_notes", "get_note", "get_notes", "query_tasks", "list_memories", "get_soul", "list_routines", "get_vault_context", "get_inbox_note", "plan_inbox_organization", "test_daily_brief", "test_weekly_brief":
 		return ToolRiskRead
 	case "add_note", "add_task", "save_memory", "append_to_inbox", "update_soul", "link_notes":
 		return ToolRiskLowWrite
@@ -105,7 +103,7 @@ func (tr *ToolRegistry) Label(toolName string) string {
 		return "Buscando notas"
 	case "get_note", "get_notes":
 		return "Lendo notas"
-	case "get_open_tasks", "get_today_tasks", "search_tasks":
+	case "query_tasks":
 		return "Consultando tarefas"
 	case "add_note", "append_to_note", "append_to_inbox":
 		return "Atualizando notas"

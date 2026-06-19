@@ -36,17 +36,12 @@ class ChatScreen extends ConsumerWidget {
           ),
           SliverFillRemaining(
             child: ref.watch(chatControllerProvider).when(
+                  skipError: true,
                   data: (state) => AgentChatView(
                     messages: state.messages,
                     actions: state.actions,
                     loaded: true,
                     streaming: state.isStreaming,
-                    errorMessage: state.errorMessage,
-                    onRetry: state.retryMessage != null
-                        ? () => ref
-                            .read(chatControllerProvider.notifier)
-                            .retryLastMessage()
-                        : null,
                     onCancel: state.isStreaming
                         ? () => ref
                             .read(chatControllerProvider.notifier)
@@ -66,7 +61,6 @@ class ChatScreen extends ConsumerWidget {
                     actions: const [],
                     loaded: false,
                     streaming: false,
-                    errorMessage: null,
                     onSend: onSend,
                   ),
                   error: (err, _) => AgentChatView(
@@ -74,7 +68,6 @@ class ChatScreen extends ConsumerWidget {
                     actions: const [],
                     loaded: true,
                     streaming: false,
-                    errorMessage: err.toString(),
                     onSend: onSend,
                   ),
                 ),

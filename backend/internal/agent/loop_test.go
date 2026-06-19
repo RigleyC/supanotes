@@ -144,6 +144,9 @@ func (s *stubLoopTasksRepo) CountTasks(ctx context.Context, userID pgtype.UUID) 
 func (s *stubLoopTasksRepo) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
 }
+func (s *stubLoopTasksRepo) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
 func (s *stubLoopTasksRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
 }
@@ -188,6 +191,9 @@ func (s *stubLoopQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTas
 }
 func (s *stubLoopQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
+}
+func (s *stubLoopQuerier) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
 }
 func (s *stubLoopQuerier) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
@@ -678,7 +684,7 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 			responses: []*llm.Response{
 				{
 					ToolCalls: []llm.ToolCall{
-						{ID: "call-1", Name: "get_today_tasks", ArgsJSON: `{}`},
+						{ID: "call-1", Name: "query_tasks", ArgsJSON: `{}`},
 					},
 				},
 				{},
@@ -728,8 +734,8 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 		final = payload.Content
 	}
 
-	if final != "No tasks for today or overdue" {
-		t.Fatalf("final content: want %q, got %q", "No tasks for today or overdue", final)
+	if final != "No matching tasks found" {
+		t.Fatalf("final content: want %q, got %q", "No matching tasks found", final)
 	}
 }
 
@@ -750,7 +756,7 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 			responses: []*llm.Response{
 				{
 					ToolCalls: []llm.ToolCall{
-						{ID: "call-1", Name: "get_today_tasks", ArgsJSON: `{}`},
+						{ID: "call-1", Name: "query_tasks", ArgsJSON: `{}`},
 					},
 				},
 			},
@@ -802,8 +808,8 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 		final = payload.Content
 	}
 
-	if final != "No tasks for today or overdue" {
-		t.Fatalf("final content: want %q, got %q", "No tasks for today or overdue", final)
+	if final != "No matching tasks found" {
+		t.Fatalf("final content: want %q, got %q", "No matching tasks found", final)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
@@ -85,89 +86,74 @@ func (t *CompleteTaskTool) Execute(ctx context.Context, userID pgtype.UUID, args
 	return "Task marked as completed", nil
 }
 
-type GetOpenTasksTool struct {
+type QueryTasksTool struct {
 	tasksSvc *tasks.Service
 }
 
-func (t *GetOpenTasksTool) Name() string { return "get_open_tasks" }
-func (t *GetOpenTasksTool) Description() string {
-	return "List all open (pending) tasks across all notes. Returns task ID, title, and note title. Use this when the user asks what they have pending or need to do."
+func (t *QueryTasksTool) Name() string { return "query_tasks" }
+func (t *QueryTasksTool) Description() string {
+	return "Search and filter tasks. Use this when the user asks for their open tasks, today's tasks, or searches for a specific task. You can filter by status (open/done/all), timeframe (today/overdue/all), and keyword query."
 }
-func (t *GetOpenTasksTool) SchemaJSON() string {
-	return `{"type":"object","properties":{}}`
+func (t *QueryTasksTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"status":{"type":"string","enum":["open","done","all"],"description":"Filter by status. Default: open"},"timeframe":{"type":"string","enum":["today","overdue","all"],"description":"Filter by timeframe. 'today' means due today or earlier. 'overdue' means due before today. Default: all"},"query":{"type":"string","description":"Optional keyword to search in task titles"}},"required":[]}`
 }
-func (t *GetOpenTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	openStatus := "open"
-	tasksList, err := t.tasksSvc.GetTasks(ctx, userID, nil, &openStatus, nil, nil, 100, 0)
-	if err != nil {
-		return "", err
-	}
-	result := "Open Tasks:\n"
-	for _, task := range tasksList {
-		result += fmt.Sprintf("- [%s] %s\n", formatID(task.ID), task.Title)
-	}
-	return result, nil
-}
-
-type GetTodayTasksTool struct {
-	tasksSvc *tasks.Service
-}
-
-func (t *GetTodayTasksTool) Name() string { return "get_today_tasks" }
-func (t *GetTodayTasksTool) Description() string {
-	return "List tasks due today or overdue. Returns task ID, title, status, due date, and recurrence. Use this when the user asks what they have for today."
-}
-func (t *GetTodayTasksTool) SchemaJSON() string {
-	return `{"type":"object","properties":{}}`
-}
-func (t *GetTodayTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	ts, err := t.tasksSvc.GetTodayTasks(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-	var b strings.Builder
-	for _, task := range ts {
-		b.WriteString(fmt.Sprintf("- [%s] %s (Due: %v, Recurrence: %s)\n", task.Status, task.Title, task.DueDate.Time, task.Recurrence.String))
-	}
-	if b.Len() == 0 {
-		return "No tasks for today or overdue", nil
-	}
-	return b.String(), nil
-}
-
-type SearchTasksTool struct {
-	tasksSvc *tasks.Service
-}
-
-func (t *SearchTasksTool) Name() string { return "search_tasks" }
-func (t *SearchTasksTool) Description() string {
-	return "Search tasks by keyword. Use when the user mentions completing or finding a specific task but you don't have the exact ID. Optionally filter by status (open/done/all, default: all)."
-}
-func (t *SearchTasksTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"query":{"type":"string","description":"Keyword to search in task titles"},"status":{"type":"string","enum":["open","done","all"],"description":"Filter by status. Default: all"}},"required":["query"]}`
-}
-func (t *SearchTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *QueryTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
-		Query  string  `json:"query"`
-		Status *string `json:"status"`
+		Status    *string `json:"status"`
+		Timeframe *string `json:"timeframe"`
+		Query     *string `json:"query"`
 	}](argsJSON)
 	if err != nil {
 		return "", err
 	}
 
 	var statusFilter *string
-	if args.Status != nil && *args.Status != "all" {
+	if args.Status == nil {
+		open := "open"
+		statusFilter = &open
+	} else if *args.Status != "all" {
 		statusFilter = args.Status
 	}
 
-	tasksList, err := t.tasksSvc.SearchTasks(ctx, userID, args.Query, statusFilter, 20, 0)
-	if err != nil {
-		return "", err
+	limit := int32(50)
+	var tasksList []sqlcgen.Task
+
+	if args.Query != nil && *args.Query != "" {
+		tasksList, err = t.tasksSvc.SearchTasks(ctx, userID, *args.Query, statusFilter, limit, 0)
+		if err != nil {
+			return "", err
+		}
+	} else if args.Timeframe != nil && (*args.Timeframe == "today" || *args.Timeframe == "overdue") {
+		tasksList, err = t.tasksSvc.GetTodayTasks(ctx, userID)
+		if err != nil {
+			return "", err
+		}
+		if *args.Timeframe == "overdue" {
+			now := time.Now()
+			// Today date boundary
+			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+			var overdue []sqlcgen.Task
+			for _, task := range tasksList {
+				if task.DueDate.Valid && task.DueDate.Time.Before(today) {
+					overdue = append(overdue, task)
+				}
+			}
+			tasksList = overdue
+		}
+	} else {
+		tasksList, err = t.tasksSvc.GetTasks(ctx, userID, nil, statusFilter, nil, nil, limit, 0)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	var b strings.Builder
 	for _, task := range tasksList {
-		b.WriteString(fmt.Sprintf("- [%s] [%s] %s\n", task.Status, formatID(task.ID), task.Title))
+		due := ""
+		if task.DueDate.Valid {
+			due = fmt.Sprintf(" (Due: %s)", task.DueDate.Time.Format("2006-01-02"))
+		}
+		b.WriteString(fmt.Sprintf("- [%s] [%s] %s%s\n", task.Status, formatID(task.ID), task.Title, due))
 	}
 	if b.Len() == 0 {
 		return "No matching tasks found", nil

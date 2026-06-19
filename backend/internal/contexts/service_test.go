@@ -46,7 +46,13 @@ func (m *mockQuerier) AppendToNoteContent(_ context.Context, _ sqlcgen.AppendToN
 }
 func (m *mockQuerier) CleanupOldMessages(_ context.Context) error                     { return nil }
 func (m *mockQuerier) CountNotes(_ context.Context, _ pgtype.UUID) (int64, error)     { return 0, nil }
-func (m *mockQuerier) CountTasks(_ context.Context, _ pgtype.UUID) (int64, error)     { return 0, nil }
+func (m *mockQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockQuerier) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
 func (m *mockQuerier) CountOpenTasks(_ context.Context, _ pgtype.UUID) (int64, error) { return 0, nil }
 func (m *mockQuerier) CountCompletedTasks(_ context.Context, _ pgtype.UUID) (int64, error) {
 	return 0, nil
