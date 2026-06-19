@@ -261,7 +261,7 @@ func (s *stubQuerier) GetUserByID(context.Context, pgtype.UUID) (sqlcgen.User, e
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetUserSettings(context.Context, pgtype.UUID) (sqlcgen.UserSetting, error) {
-	panic("unimplemented")
+	return sqlcgen.UserSetting{}, nil
 }
 func (s *stubQuerier) HardDeleteExpiredContexts(context.Context) error { panic("unimplemented") }
 func (s *stubQuerier) HardDeleteExpiredNotes(context.Context) error    { panic("unimplemented") }

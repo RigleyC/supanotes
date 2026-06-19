@@ -79,6 +79,17 @@ func NewContextBuilder(q sqlcgen.Querier, tasksSvc *tasks.Service, memoriesRepo 
 
 // Build compiles the tiered context RAG string by fetching data concurrently.
 func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UUID, query string) (string, error) {
+	// 1. Fetch user settings timezone preference
+	var tzLoc *time.Location = time.UTC
+	userSettings, err := cb.q.GetUserSettings(ctx, userID)
+	if err == nil && userSettings.Timezone != "" {
+		if loc, locErr := time.LoadLocation(userSettings.Timezone); locErr == nil {
+			tzLoc = loc
+		} else {
+			log.Warn().Err(locErr).Str("timezone", userSettings.Timezone).Msg("failed to load user timezone; falling back to UTC")
+		}
+	}
+
 	var (
 		soul           sqlcgen.Soul
 		todayTasks     []sqlcgen.Task
@@ -100,7 +111,7 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 
 	g.Go(func() error {
 		var err error
-		todayTasks, err = cb.tasksSvc.GetTodayTasks(gCtx, userID)
+		todayTasks, err = cb.tasksSvc.GetTodayTasksInTimezone(gCtx, userID, tzLoc)
 		if err != nil {
 			return fmt.Errorf("get today tasks: %w", err)
 		}
@@ -180,10 +191,10 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 
 	b.WriteString(truncate(fmt.Sprintf("IDENTITY:\n%s\n\n", soul.Personality), MaxTier0Tokens))
 
-	nowStr := time.Now().Format("2006-01-02 15:04:05 MST")
-	weekday := time.Now().Weekday().String()
+	nowStr := time.Now().In(tzLoc).Format("2006-01-02 15:04:05 MST")
+	weekday := time.Now().In(tzLoc).Weekday().String()
 
-	b.WriteString(fmt.Sprintf("CURRENT CONTEXT:\nDate/Time: %s\nDay: %s\n\n", nowStr, weekday))
+	b.WriteString(fmt.Sprintf("CURRENT CONTEXT:\nDate/Time: %s\nDay: %s\nTimezone: %s\n\n", nowStr, weekday, tzLoc.String()))
 
 	briefing := buildIntelligenceBriefing(todayTasks, completedTasks, recentNotes, overdueCount)
 	b.WriteString(truncate(briefing, MaxTierIBTokens))

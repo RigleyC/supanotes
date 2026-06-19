@@ -36,7 +36,6 @@ void main() {
           loaded: true,
           streaming: false,
           onSend: (_) {},
-          errorMessage: null,
         ),
       ),
     );
@@ -55,21 +54,20 @@ void main() {
             message(
               id: 'assistant-1',
               role: MessageRole.assistant,
-              content: 'Ol\u00e1',
+              content: 'Olá',
             ),
           ],
           actions: const [],
           loaded: true,
           streaming: false,
           onSend: (_) {},
-          errorMessage: null,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Oi'), findsOneWidget);
-    expect(find.text('Ol\u00e1'), findsOneWidget);
+    expect(find.text('Olá'), findsOneWidget);
   });
 
   testWidgets('shows loading indicator while not loaded', (tester) async {
@@ -81,39 +79,12 @@ void main() {
           loaded: false,
           streaming: false,
           onSend: (_) {},
-          errorMessage: null,
         ),
       ),
     );
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-  });
-
-  testWidgets('shows inline error with retry action', (tester) async {
-    var retried = false;
-    await tester.pumpWidget(
-      wrap(
-        AgentChatView(
-          messages: const [],
-          actions: const [],
-          loaded: true,
-          streaming: false,
-          errorMessage: 'Falha no stream',
-          onRetry: () => retried = true,
-          onCancel: null,
-          onSend: (_) {},
-        ),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.text('Falha no stream'), findsOneWidget);
-    await tester.tap(find.text('Tentar novamente'));
-    await tester.pump();
-    expect(retried, isTrue);
   });
 
   testWidgets('confirmation action card calls approve and cancel callbacks', (
@@ -139,7 +110,6 @@ void main() {
           onSend: (_) {},
           onResolveConfirmation: (_, {required approved}) =>
               resolved.add(approved),
-          errorMessage: null,
         ),
       ),
     );

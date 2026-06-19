@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
+import 'package:supanotes/features/agent/presentation/widgets/shimmer_text.dart';
 
 class AgentActionCard extends StatelessWidget {
   const AgentActionCard({
@@ -42,6 +43,27 @@ class AgentActionCard extends StatelessWidget {
         break;
     }
 
+    Widget header = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        icon,
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: textColor ?? theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (status == ChatToolActionStatus.running) {
+      header = ShimmerText(child: header);
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -53,22 +75,7 @@ class AgentActionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              icon,
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: textColor ?? theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          header,
           if (message != null && message!.isNotEmpty && status == ChatToolActionStatus.failed) ...[
             const SizedBox(height: 4),
             Text(

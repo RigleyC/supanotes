@@ -340,7 +340,7 @@ func (s *stubLoopQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) GetUserSettings(ctx context.Context, userID pgtype.UUID) (sqlcgen.UserSetting, error) {
-	panic("unimplemented")
+	return sqlcgen.UserSetting{}, nil
 }
 func (s *stubLoopQuerier) HardDeleteExpiredContexts(ctx context.Context) error {
 	panic("unimplemented")

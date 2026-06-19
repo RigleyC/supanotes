@@ -165,10 +165,11 @@ void main() {
     await Future(() {});
 
     final state = container.read(chatControllerProvider);
+    expect(state.hasError, isTrue);
+    expect(state.error, 'Stream failed');
     final data = state.value;
     expect(data, isNotNull);
-    expect(data!.errorMessage, 'Stream failed');
-    expect(data.isStreaming, isFalse);
+    expect(data!.isStreaming, isFalse);
   });
 
   test('confirmation_required stores confirmation id', () async {
