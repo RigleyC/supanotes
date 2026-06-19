@@ -58,15 +58,18 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
+    this.requestRebuild,
   });
 
   final Editor _editor;
-  final Map<String, TaskModel> taskMetadataById;
-  final bool hideCompleted;
-  final ValueChanged<String>? onTaskLongPress;
+  Map<String, TaskModel> taskMetadataById;
+  bool hideCompleted;
+  ValueChanged<String>? onTaskLongPress;
   final Future<void> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
+  final VoidCallback? requestRebuild;
   final Set<String> _pendingResetNodeIds = {};
+  final Set<String> _animatingNodeIds = {};
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -139,9 +142,14 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       key: componentContext.componentKey,
       viewModel: componentViewModel,
       taskMetadata: taskMetadataById[nodeId],
+      hideCompleted: hideCompleted,
       onLongPress: onTaskLongPress == null
           ? null
           : () => onTaskLongPress!(nodeId),
+      onAnimationComplete: () {
+        _animatingNodeIds.remove(componentViewModel.nodeId);
+        requestRebuild?.call();
+      },
     );
   }
 }
@@ -183,12 +191,16 @@ class CustomTaskComponent extends StatefulWidget {
     super.key,
     required this.viewModel,
     this.taskMetadata,
+    this.hideCompleted = false,
     this.onLongPress,
+    this.onAnimationComplete,
   });
 
   final TaskComponentViewModel viewModel;
   final TaskModel? taskMetadata;
+  final bool hideCompleted;
   final VoidCallback? onLongPress;
+  final VoidCallback? onAnimationComplete;
 
   @override
   State<CustomTaskComponent> createState() => _CustomTaskComponentState();
