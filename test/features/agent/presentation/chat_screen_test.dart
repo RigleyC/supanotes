@@ -61,8 +61,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Chat'), findsOneWidget);
     expect(find.text('Como posso ajudar?'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
   });
 
   testWidgets('chat screen resolves confirmation through controller', (tester) async {
