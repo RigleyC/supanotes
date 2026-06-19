@@ -56,6 +56,8 @@ class _NoteEditorState extends State<NoteEditor> {
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
 
+  late CustomTaskComponentBuilder _taskComponentBuilder;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +73,36 @@ class _NoteEditorState extends State<NoteEditor> {
       _controller!.document?.addListener(_onDocumentChanged);
     }
     _notifyContentChanged();
+
+    _taskComponentBuilder = CustomTaskComponentBuilder(
+      _controller!.editor!,
+      taskMetadataById: widget.taskMetadata,
+      hideCompleted: widget.hideCompleted,
+      onTaskLongPress: widget.isReadOnly
+          ? null
+          : (taskId) => widget.onTaskLongPress?.call(
+              taskId,
+              () => _controller!.persistSnapshotNow(),
+            ),
+      onTaskComplete: widget.onTaskComplete,
+      onTaskReopen: widget.onTaskReopen,
+      requestRebuild: () {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  @override
+  void didUpdateWidget(NoteEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _taskComponentBuilder.taskMetadataById = widget.taskMetadata;
+    _taskComponentBuilder.hideCompleted = widget.hideCompleted;
+    _taskComponentBuilder.onTaskLongPress = widget.isReadOnly
+        ? null
+        : (taskId) => widget.onTaskLongPress?.call(
+            taskId,
+            () => _controller?.persistSnapshotNow() ?? Future.value(),
+          );
   }
 
   @override
@@ -178,19 +210,7 @@ class _NoteEditorState extends State<NoteEditor> {
                         HiddenTaskComponentBuilder(
                           hideCompleted: widget.hideCompleted,
                         ),
-                        CustomTaskComponentBuilder(
-                          controller.editor!,
-                          taskMetadataById: widget.taskMetadata,
-                          hideCompleted: widget.hideCompleted,
-                          onTaskLongPress: widget.isReadOnly
-                              ? null
-                              : (taskId) => widget.onTaskLongPress?.call(
-                                  taskId,
-                                  () => controller.persistSnapshotNow(),
-                                ),
-                          onTaskComplete: widget.onTaskComplete,
-                          onTaskReopen: widget.onTaskReopen,
-                        ),
+                        _taskComponentBuilder,
                         ...defaultComponentBuilders,
                       ],
                     ),
