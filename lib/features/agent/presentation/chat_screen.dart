@@ -1,5 +1,5 @@
 /// Agent chat screen backed by the app-owned agent controller and rendered
-/// through `flutter_chat_ui`.
+/// through `flutter_gen_ai_chat_ui`.
 library;
 
 import 'package:flutter/material.dart';
@@ -21,11 +21,8 @@ class ChatScreen extends ConsumerWidget {
       }
     });
 
-    final asyncState = ref.watch(chatControllerProvider);
-    final state = asyncState.value;
-    final messages = state?.messages ?? const [];
-    final isStreaming = state?.isStreaming ?? false;
-    final isLoaded = !asyncState.isLoading || messages.isNotEmpty;
+    void onSend(String text) =>
+        ref.read(chatControllerProvider.notifier).sendMessage(text);
 
     return Scaffold(
       appBar: AppBar(
@@ -34,23 +31,48 @@ class ChatScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         top: false,
-        child: AgentChatView(
-          messages: messages,
-          loaded: isLoaded,
-          streaming: isStreaming,
-          activeToolLabel: state?.activeToolLabel,
-          errorMessage: state?.errorMessage,
-          onRetry: state?.errorMessage == null || state?.retryMessage == null
-              ? null
-              : () => ref
+        child: ref.watch(chatControllerProvider).when(
+          data: (state) => AgentChatView(
+            messages: state.messages,
+            actions: state.actions,
+            loaded: true,
+            streaming: state.isStreaming,
+            errorMessage: state.errorMessage,
+            onRetry: state.retryMessage != null
+                ? () => ref
                     .read(chatControllerProvider.notifier)
-                    .retryLastMessage(),
-          onCancel: isStreaming
-              ? () =>
-                    ref.read(chatControllerProvider.notifier).cancelStreaming()
-              : null,
-          onSend: (text) =>
-              ref.read(chatControllerProvider.notifier).sendMessage(text),
+                    .retryLastMessage()
+                : null,
+            onCancel: state.isStreaming
+                ? () => ref
+                    .read(chatControllerProvider.notifier)
+                    .cancelStreaming()
+                : null,
+            onSend: onSend,
+            onResolveConfirmation: (confirmationId, {required approved}) =>
+                ref
+                    .read(chatControllerProvider.notifier)
+                    .resolveToolConfirmation(
+                      confirmationId,
+                      approved: approved,
+                    ),
+          ),
+          loading: () => AgentChatView(
+            messages: const [],
+            actions: const [],
+            loaded: false,
+            streaming: false,
+            errorMessage: null,
+            onSend: onSend,
+          ),
+          error: (err, _) => AgentChatView(
+            messages: const [],
+            actions: const [],
+            loaded: true,
+            streaming: false,
+            errorMessage: err.toString(),
+            onSend: onSend,
+          ),
         ),
       ),
     );

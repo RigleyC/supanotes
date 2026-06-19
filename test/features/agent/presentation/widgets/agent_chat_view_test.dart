@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
+import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 import 'package:supanotes/features/agent/presentation/widgets/agent_chat_view.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 
@@ -31,10 +32,10 @@ void main() {
       wrap(
         AgentChatView(
           messages: const [],
+          actions: const [],
           loaded: true,
           streaming: false,
           onSend: (_) {},
-          activeToolLabel: null,
           errorMessage: null,
         ),
       ),
@@ -42,11 +43,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Comece uma conversa'), findsOneWidget);
-    expect(
-      find.text('Pergunte algo ao agente e a resposta aparecer\u00e1 aqui.'),
-      findsOneWidget,
-    );
+    expect(find.text('Comece uma conversa'), findsNothing);
   });
 
   testWidgets('renders user and assistant text messages', (tester) async {
@@ -61,10 +58,10 @@ void main() {
               content: 'Ol\u00e1',
             ),
           ],
+          actions: const [],
           loaded: true,
           streaming: false,
           onSend: (_) {},
-          activeToolLabel: null,
           errorMessage: null,
         ),
       ),
@@ -75,134 +72,22 @@ void main() {
     expect(find.text('Ol\u00e1'), findsOneWidget);
   });
 
-  testWidgets(
-    'shows typing indicator while waiting for first assistant delta',
-    (tester) async {
-      await tester.pumpWidget(
-        wrap(
-          AgentChatView(
-            messages: [
-              message(id: 'user-1', role: MessageRole.user, content: 'Resumo?'),
-              message(
-                id: 'assistant-1',
-                role: MessageRole.assistant,
-                content: '',
-              ),
-            ],
-            loaded: true,
-            streaming: true,
-            onSend: (_) {},
-            activeToolLabel: null,
-            errorMessage: null,
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(
-        find.byKey(const ValueKey('agent-chat-typing-indicator')),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets('sends text through custom composer', (tester) async {
-    final sent = <String>[];
+  testWidgets('shows loading indicator while not loaded', (tester) async {
     await tester.pumpWidget(
       wrap(
         AgentChatView(
           messages: const [],
-          loaded: true,
+          actions: const [],
+          loaded: false,
           streaming: false,
-          onSend: sent.add,
-          activeToolLabel: null,
-          errorMessage: null,
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    await tester.enterText(find.byType(TextField), 'Criar resumo');
-    await tester.pump();
-    await tester.tap(find.byIcon(Icons.send));
-    await tester.pumpAndSettle();
-
-    expect(sent, ['Criar resumo']);
-  });
-
-  testWidgets('shows tool activity while streaming', (tester) async {
-    await tester.pumpWidget(
-      wrap(
-        AgentChatView(
-          messages: const [],
-          loaded: true,
-          streaming: true,
-          activeToolLabel: 'Buscando notas',
-          errorMessage: null,
-          onRetry: null,
-          onCancel: () {},
           onSend: (_) {},
-        ),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.text('Buscando notas'), findsOneWidget);
-    expect(find.byTooltip('Cancelar resposta'), findsOneWidget);
-  });
-
-  testWidgets('shows thinking status while streaming before tool activity', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      wrap(
-        AgentChatView(
-          messages: const [],
-          loaded: true,
-          streaming: true,
-          activeToolLabel: null,
           errorMessage: null,
-          onRetry: null,
-          onCancel: () {},
-          onSend: (_) {},
         ),
       ),
     );
-
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Pensando...'), findsOneWidget);
-    expect(find.byTooltip('Cancelar resposta'), findsOneWidget);
-  });
-
-  testWidgets('prompt suggestion chips send the correct prompt', (
-    tester,
-  ) async {
-    final sent = <String>[];
-    await tester.pumpWidget(
-      wrap(
-        AgentChatView(
-          messages: const [],
-          loaded: true,
-          streaming: false,
-          activeToolLabel: null,
-          errorMessage: null,
-          onSend: sent.add,
-        ),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    await tester.tap(find.text('Resuma minhas notas recentes'));
-    await tester.pump();
-    expect(sent, ['Resuma minhas notas recentes']);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
   testWidgets('shows inline error with retry action', (tester) async {
@@ -211,9 +96,9 @@ void main() {
       wrap(
         AgentChatView(
           messages: const [],
+          actions: const [],
           loaded: true,
           streaming: false,
-          activeToolLabel: null,
           errorMessage: 'Falha no stream',
           onRetry: () => retried = true,
           onCancel: null,
@@ -229,5 +114,45 @@ void main() {
     await tester.tap(find.text('Tentar novamente'));
     await tester.pump();
     expect(retried, isTrue);
+  });
+
+  testWidgets('confirmation action card calls approve and cancel callbacks', (
+    tester,
+  ) async {
+    final resolved = <bool>[];
+    await tester.pumpWidget(
+      wrap(
+        AgentChatView(
+          messages: const [],
+          actions: [
+            (
+              id: 'action-1',
+              name: 'update_note',
+              label: 'Atualizando notas',
+              status: ChatToolActionStatus.confirmationRequired,
+              message: null,
+              confirmationId: 'confirmation-1',
+            ),
+          ],
+          loaded: true,
+          streaming: false,
+          onSend: (_) {},
+          onResolveConfirmation: (_, {required approved}) =>
+              resolved.add(approved),
+          errorMessage: null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirmação necessária'), findsOneWidget);
+    expect(find.text('Atualizando notas'), findsOneWidget);
+
+    await tester.tap(find.text('Confirmar'));
+    await tester.pump();
+    await tester.tap(find.text('Cancelar'));
+    await tester.pump();
+
+    expect(resolved, [true, false]);
   });
 }

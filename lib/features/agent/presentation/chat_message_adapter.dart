@@ -1,90 +1,80 @@
-import 'package:flutter_chat_core/flutter_chat_core.dart' as flyer;
+import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 
 import 'package:supanotes/features/agent/domain/message_model.dart';
+import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 
-const String agentChatCurrentUserId = 'agent-chat-current-user';
-const String agentChatAssistantUserId = 'agent-chat-assistant';
-const String agentChatSystemUserId = 'agent-chat-system';
-const String agentChatToolUserId = 'agent-chat-tool';
-const String agentChatTypingKind = 'typing';
+final ChatUser agentChatCurrentUser = ChatUser(
+  id: 'agent-chat-current-user',
+  name: 'Você',
+  role: 'user',
+);
 
-List<flyer.Message> toFlyerMessages(
+final ChatUser agentChatAssistantUser = ChatUser(
+  id: 'agent-chat-assistant',
+  name: 'Agente',
+  role: 'bot',
+);
+
+final ChatUser agentChatSystemUser = ChatUser(
+  id: 'agent-chat-system',
+  name: 'Sistema',
+  role: 'system',
+);
+
+List<ChatMessage> toGenAiChatMessages(
   List<MessageModel> messages, {
-  required bool streaming,
+  List<ChatToolAction> actions = const [],
 }) {
-  final converted = <flyer.Message>[];
-  for (final message in messages) {
-    final flyerMessage = _toFlyerMessage(message);
-    if (flyerMessage != null) {
-      converted.add(flyerMessage);
+  final result = <ChatMessage>[
+    for (final message in messages)
+      if (message.content.trim().isNotEmpty)
+        _toChatMessage(message),
+  ];
+
+  for (final action in actions) {
+    final chatMessage = _actionToChatMessage(action);
+    if (chatMessage != null) {
+      result.add(chatMessage);
     }
   }
 
-  if (streaming && messages.isNotEmpty) {
-    final last = messages.last;
-    if (last.role == MessageRole.assistant && last.content.trim().isEmpty) {
-      converted.removeWhere((message) => message.id == last.id);
-      converted.add(
-        flyer.Message.custom(
-          id: 'agent-typing-${last.id}',
-          authorId: agentChatAssistantUserId,
-          createdAt: last.createdAt,
-          metadata: const {'kind': agentChatTypingKind},
-        ),
-      );
-    }
-  }
-
-  return converted;
+  return result;
 }
 
-flyer.Message? _toFlyerMessage(MessageModel message) {
-  final content = message.content.trimRight();
-  if (content.isEmpty) {
-    return null;
-  }
-
-  if (message.role == MessageRole.system) {
-    return flyer.Message.system(
-      id: message.id,
-      authorId: agentChatSystemUserId,
-      createdAt: message.createdAt,
-      text: content,
-    );
-  }
-
-  return flyer.Message.text(
-    id: message.id,
-    authorId: _authorIdForRole(message.role),
+ChatMessage _toChatMessage(MessageModel message) {
+  return ChatMessage(
+    text: message.content,
+    user: _userForRole(message.role),
     createdAt: message.createdAt,
-    text: content,
+    isMarkdown: message.role == MessageRole.assistant,
+    customProperties: {'id': message.id},
   );
 }
 
-String _authorIdForRole(MessageRole role) {
+ChatUser _userForRole(MessageRole role) {
   switch (role) {
     case MessageRole.user:
-      return agentChatCurrentUserId;
+      return agentChatCurrentUser;
     case MessageRole.assistant:
-      return agentChatAssistantUserId;
+      return agentChatAssistantUser;
     case MessageRole.system:
-      return agentChatSystemUserId;
     case MessageRole.tool:
-      return agentChatToolUserId;
+      return agentChatSystemUser;
   }
 }
 
-Future<flyer.User?> resolveAgentChatUser(String id) async {
-  switch (id) {
-    case agentChatCurrentUserId:
-      return const flyer.User(id: agentChatCurrentUserId, name: 'Voc\u00ea');
-    case agentChatAssistantUserId:
-      return const flyer.User(id: agentChatAssistantUserId, name: 'Agent');
-    case agentChatSystemUserId:
-      return const flyer.User(id: agentChatSystemUserId, name: 'Sistema');
-    case agentChatToolUserId:
-      return const flyer.User(id: agentChatToolUserId, name: 'Tool');
-    default:
-      return null;
-  }
+ChatMessage? _actionToChatMessage(ChatToolAction action) {
+  if (action.status != ChatToolActionStatus.confirmationRequired) return null;
+
+  return ChatMessage.rich(
+    user: agentChatSystemUser,
+    resultKind: 'confirmation',
+    data: {
+      'actionId': action.id,
+      'name': action.name,
+      'label': action.label,
+      if (action.confirmationId != null)
+        'confirmationId': action.confirmationId,
+    },
+  );
 }

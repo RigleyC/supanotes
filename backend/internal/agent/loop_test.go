@@ -896,6 +896,24 @@ func TestResolveToolConfirmationRejectsAlreadyResolved(t *testing.T) {
 	}
 }
 
+func TestResolveToolConfirmationNotFound(t *testing.T) {
+	repo := &resolveTestRepo{}
+	h := NewHandler(NewLoop(&stubLoopRepo{}, nil, nil, nil), repo)
+
+	_, status, err := h.resolveToolConfirmation(
+		context.Background(),
+		pgtype.UUID{},
+		uuid.New().String(),
+		true,
+	)
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+	if status != 404 {
+		t.Fatalf("status: want 404, got %d", status)
+	}
+}
+
 type stubLoopMemRepo struct{}
 
 func (m *stubLoopMemRepo) GetMemories(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.Memory, error) {

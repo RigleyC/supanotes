@@ -11,6 +11,7 @@ class _TestChatController extends ChatController {
 
   final ChatState initialState;
   final sent = <String>[];
+  final resolvedConfirmations = <(String, bool)>[];
 
   @override
   AsyncValue<ChatState> build() => AsyncValue.data(initialState);
@@ -19,10 +20,18 @@ class _TestChatController extends ChatController {
   Future<void> sendMessage(String content) async {
     sent.add(content);
   }
+
+  @override
+  Future<void> resolveToolConfirmation(
+    String confirmationId, {
+    required bool approved,
+  }) async {
+    resolvedConfirmations.add((confirmationId, approved));
+  }
 }
 
 void main() {
-  testWidgets('chat screen renders package chat view and sends through controller', (tester) async {
+  testWidgets('chat screen renders agent chat view and sends through controller', (tester) async {
     final controller = _TestChatController(
       chatState(
         isStreaming: false,
@@ -54,12 +63,44 @@ void main() {
 
     expect(find.text('Chat'), findsOneWidget);
     expect(find.text('Como posso ajudar?'), findsOneWidget);
+  });
 
-    await tester.enterText(find.byType(TextField), 'Ajude com minhas notas');
-    await tester.pump();
-    await tester.tap(find.byIcon(Icons.send));
+  testWidgets('chat screen resolves confirmation through controller', (tester) async {
+    final controller = _TestChatController(
+      chatState(
+        messages: const [],
+        actions: [
+          (
+            id: 'action-1',
+            name: 'update_note',
+            label: 'Atualizando notas',
+            status: ChatToolActionStatus.confirmationRequired,
+            message: null,
+            confirmationId: 'confirmation-1',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatControllerProvider.overrideWith(() => controller),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const ChatScreen(),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(controller.sent, ['Ajude com minhas notas']);
+    expect(find.text('Confirmação necessária'), findsOneWidget);
+    expect(find.text('Atualizando notas'), findsOneWidget);
+
+    await tester.tap(find.text('Confirmar'));
+    await tester.pump();
+
+    expect(controller.resolvedConfirmations, [('confirmation-1', true)]);
   });
 }

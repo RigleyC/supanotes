@@ -10,6 +10,7 @@ import 'package:supanotes/features/agent/data/chat_sse.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/domain/session_manager.dart';
 import 'package:supanotes/features/agent/domain/sse_chat_event.dart';
+import 'package:supanotes/features/agent/domain/tool_confirmation.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 
 void main() {
@@ -67,7 +68,7 @@ void main() {
     expect(data.isStreaming, isFalse);
   });
 
-  test('tool_started sets activeToolLabel', () async {
+  test('tool_started appends a running action', () async {
     final container = createContainer();
     final controller = container.read(chatControllerProvider.notifier);
 
@@ -85,7 +86,9 @@ void main() {
 
     final state = container.read(chatControllerProvider);
     final data = state.value!;
-    expect(data.activeToolLabel, 'Buscando notas');
+    expect(data.actions.single.name, 'search_notes');
+    expect(data.actions.single.label, 'Buscando notas');
+    expect(data.actions.single.status, ChatToolActionStatus.running);
     expect(data.isStreaming, isTrue);
   });
 
@@ -168,44 +171,97 @@ void main() {
     expect(data.isStreaming, isFalse);
   });
 
-  test('confirmation_required stays visible after message finishes', () async {
+  test('confirmation_required stores confirmation id', () async {
     final container = createContainer();
     final controller = container.read(chatControllerProvider.notifier);
 
-    controller.sendMessage('delete a memory');
+    controller.sendMessage('update note');
     await Future(() {});
 
     streamController.add(
       SSEChatEvent(
         type: 'confirmation_required',
         payload: {
-          'tool_name': 'delete_memory',
-          'label': 'Apagando memória',
-          'args_json': '{"memory_id":"m-1"}',
+          'confirmation_id': 'confirmation-1',
+          'tool_name': 'update_note',
+          'label': 'Atualizando notas',
         },
       ),
     );
 
     await Future(() {});
 
-    streamController.add(
-      SSEChatEvent(
-        type: 'message_finished',
-        payload: {'content': 'Preciso da sua confirmação antes de aplicar.'},
-      ),
-    );
+    final state = container.read(chatControllerProvider);
+    final action = state.value!.actions.single;
+    expect(action.status, ChatToolActionStatus.confirmationRequired);
+    expect(action.confirmationId, 'confirmation-1');
+    expect(action.name, 'update_note');
+    expect(action.label, 'Atualizando notas');
+  });
 
+  test('resolveToolConfirmation marks approved action and appends result message', () async {
+    final container = createContainer();
+    fakeRepo.confirmationResponse = ToolConfirmationResolution(
+      confirmationId: 'confirmation-1',
+      status: ConfirmationStatus.approved,
+      message: 'Nota atualizada',
+    );
+    final controller = container.read(chatControllerProvider.notifier);
+
+    controller.sendMessage('update note');
     await Future(() {});
 
-    final state = container.read(chatControllerProvider);
-    final data = state.value!;
-    expect(data.isStreaming, isFalse);
-    expect(data.errorMessage, 'Preciso da sua confirmação: Apagando memória');
-    expect(data.retryMessage, 'delete a memory');
-    expect(
-      data.messages.last.content,
-      'Preciso da sua confirmação antes de aplicar.',
+    streamController.add(
+      SSEChatEvent(
+        type: 'confirmation_required',
+        payload: {
+          'confirmation_id': 'confirmation-1',
+          'tool_name': 'update_note',
+          'label': 'Atualizando notas',
+        },
+      ),
     );
+    await Future(() {});
+
+    await controller.resolveToolConfirmation('confirmation-1', approved: true);
+    await Future(() {});
+
+    final data = container.read(chatControllerProvider).value!;
+    expect(data.actions.single.status, ChatToolActionStatus.confirmed);
+    expect(data.messages.last.role, MessageRole.tool);
+    expect(data.messages.last.content, 'Nota atualizada');
+  });
+
+  test('resolveToolConfirmation with cancelled marks action and appends message', () async {
+    final container = createContainer();
+    fakeRepo.confirmationResponse = ToolConfirmationResolution(
+      confirmationId: 'confirmation-1',
+      status: ConfirmationStatus.cancelled,
+      message: 'Ação cancelada.',
+    );
+    final controller = container.read(chatControllerProvider.notifier);
+
+    controller.sendMessage('update note');
+    await Future(() {});
+
+    streamController.add(
+      SSEChatEvent(
+        type: 'confirmation_required',
+        payload: {
+          'confirmation_id': 'confirmation-1',
+          'tool_name': 'update_note',
+          'label': 'Atualizando notas',
+        },
+      ),
+    );
+    await Future(() {});
+
+    await controller.resolveToolConfirmation('confirmation-1', approved: false);
+    await Future(() {});
+
+    final data = container.read(chatControllerProvider).value!;
+    expect(data.actions.single.status, ChatToolActionStatus.cancelled);
+    expect(data.messages.last.content, 'Ação cancelada.');
   });
 
   test('cancelStreaming clears isStreaming', () async {
@@ -315,7 +371,9 @@ class _FakeChatRepository implements IChatRepository {
     return confirmationResponse ??
         ToolConfirmationResolution(
           confirmationId: confirmationId,
-          status: approved ? 'approved' : 'cancelled',
+          status: approved
+              ? ConfirmationStatus.approved
+              : ConfirmationStatus.cancelled,
           message: approved ? 'Executado' : 'Ação cancelada.',
         );
   }

@@ -18,26 +18,7 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 
 import '../domain/message_model.dart';
-
-class ToolConfirmationResolution {
-  const ToolConfirmationResolution({
-    required this.confirmationId,
-    required this.status,
-    required this.message,
-  });
-
-  final String confirmationId;
-  final String status;
-  final String message;
-
-  factory ToolConfirmationResolution.fromJson(Map<String, dynamic> json) {
-    return ToolConfirmationResolution(
-      confirmationId: (json['confirmation_id'] ?? '') as String,
-      status: (json['status'] ?? '') as String,
-      message: (json['message'] ?? '') as String,
-    );
-  }
-}
+import '../domain/tool_confirmation.dart';
 
 abstract class IChatRepository {
   Future<String> sendMessage({required String sessionId, required String message});
