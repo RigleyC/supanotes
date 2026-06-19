@@ -19,10 +19,34 @@ import 'package:supanotes/core/di/providers.dart';
 
 import '../domain/message_model.dart';
 
+class ToolConfirmationResolution {
+  const ToolConfirmationResolution({
+    required this.confirmationId,
+    required this.status,
+    required this.message,
+  });
+
+  final String confirmationId;
+  final String status;
+  final String message;
+
+  factory ToolConfirmationResolution.fromJson(Map<String, dynamic> json) {
+    return ToolConfirmationResolution(
+      confirmationId: (json['confirmation_id'] ?? '') as String,
+      status: (json['status'] ?? '') as String,
+      message: (json['message'] ?? '') as String,
+    );
+  }
+}
+
 abstract class IChatRepository {
   Future<String> sendMessage({required String sessionId, required String message});
   Future<List<MessageModel>> getHistory(String sessionId);
   Future<void> clearHistory(String sessionId);
+  Future<ToolConfirmationResolution> resolveToolConfirmation({
+    required String confirmationId,
+    required bool approved,
+  });
 }
 
 class ChatRepository implements IChatRepository {
@@ -71,6 +95,30 @@ class ChatRepository implements IChatRepository {
           .whereType<Map<String, dynamic>>()
           .map(MessageModel.fromJson)
           .toList(growable: false);
+    } on DioException catch (e) {
+      throw fromDioError(e);
+    }
+  }
+
+  /// `POST /agent/tool-confirmations/:id/resolve` → approve/cancel a pending tool.
+  @override
+  Future<ToolConfirmationResolution> resolveToolConfirmation({
+    required String confirmationId,
+    required bool approved,
+  }) async {
+    try {
+      final response = await _api.post<Map<String, dynamic>>(
+        '/agent/tool-confirmations/$confirmationId/resolve',
+        data: <String, dynamic>{'approved': approved},
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const ServerException(
+          message: 'Resposta vazia do servidor',
+          statusCode: 500,
+        );
+      }
+      return ToolConfirmationResolution.fromJson(data);
     } on DioException catch (e) {
       throw fromDioError(e);
     }

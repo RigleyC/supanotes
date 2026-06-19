@@ -34,7 +34,23 @@ void main() {
     expect(event.isToolStarted, isTrue);
   });
 
-  test('parses normalized message finished event', () {
+  test('parses confirmation_required with confirmation_id', () {
+  final event = SSEChatEvent.fromJson({
+    'type': 'confirmation_required',
+    'payload': {
+      'confirmation_id': 'confirmation-1',
+      'tool_name': 'update_note',
+      'label': 'Atualizando notas',
+    },
+  });
+
+  expect(event.isConfirmationRequired, isTrue);
+  expect(event.confirmationId, 'confirmation-1');
+  expect(event.confirmationToolName, 'update_note');
+  expect(event.confirmationLabel, 'Atualizando notas');
+});
+
+test('parses normalized message finished event', () {
     final event = SSEChatEvent.fromJson(const {
       'session_id': 'session-1',
       'message_id': 'message-1',

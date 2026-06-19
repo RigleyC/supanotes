@@ -43,6 +43,7 @@ class SSEChatEvent {
     return const SSEChatEvent(type: 'unknown');
   }
 
+  String? get confirmationId => payload['confirmation_id'] as String?;
   String? get delta => payload['delta'] as String?;
   String? get data => payload['data'] as String?;
   String? get toolName => payload['name'] as String?;

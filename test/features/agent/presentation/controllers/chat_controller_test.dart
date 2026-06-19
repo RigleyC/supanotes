@@ -287,6 +287,7 @@ class _FakeChatSSE extends ChatSSE {
 
 class _FakeChatRepository implements IChatRepository {
   List<MessageModel> history = [];
+  ToolConfirmationResolution? confirmationResponse;
 
   @override
   Future<String> sendMessage({
@@ -304,5 +305,18 @@ class _FakeChatRepository implements IChatRepository {
   @override
   Future<void> clearHistory(String sessionId) async {
     // no-op
+  }
+
+  @override
+  Future<ToolConfirmationResolution> resolveToolConfirmation({
+    required String confirmationId,
+    required bool approved,
+  }) async {
+    return confirmationResponse ??
+        ToolConfirmationResolution(
+          confirmationId: confirmationId,
+          status: approved ? 'approved' : 'cancelled',
+          message: approved ? 'Executado' : 'Ação cancelada.',
+        );
   }
 }
