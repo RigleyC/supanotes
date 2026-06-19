@@ -278,3 +278,11 @@ func (m *mockQuerier) GetPendingToolConfirmation(_ context.Context, _ sqlcgen.Ge
 func (m *mockQuerier) ResolvePendingToolConfirmation(_ context.Context, _ sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
 	panic("unimplemented")
 }
+
+func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}

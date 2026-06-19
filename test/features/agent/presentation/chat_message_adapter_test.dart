@@ -58,7 +58,7 @@ void main() {
     expect((data['resultData'] as Map)['label'], 'Atualizando notas');
   });
 
-  test('skip non-interactive actions', () {
+  test('maps running and completed actions to rich action messages', () {
     final messages = toGenAiChatMessages(
       const [],
       actions: [
@@ -81,7 +81,11 @@ void main() {
       ],
     );
 
-    expect(messages, isEmpty);
+    expect(messages, hasLength(2));
+    expect(messages[0].customProperties?['resultKind'], 'action');
+    expect((messages[0].customProperties?['resultData'] as Map)['status'], 'running');
+    expect(messages[1].customProperties?['resultKind'], 'action');
+    expect((messages[1].customProperties?['resultData'] as Map)['status'], 'completed');
   });
 
   test('resolves known chat users', () {

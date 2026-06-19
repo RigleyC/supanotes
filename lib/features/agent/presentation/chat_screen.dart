@@ -25,60 +25,61 @@ class ChatScreen extends ConsumerWidget {
         ref.read(chatControllerProvider.notifier).sendMessage(text);
 
     return Scaffold(
-      body: SafeArea(
-        top: false,
-        child: Stack(
-          children: [
-            ref.watch(chatControllerProvider).when(
-          data: (state) => AgentChatView(
-            messages: state.messages,
-            actions: state.actions,
-            loaded: true,
-            streaming: state.isStreaming,
-            errorMessage: state.errorMessage,
-            onRetry: state.retryMessage != null
-                ? () => ref
-                    .read(chatControllerProvider.notifier)
-                    .retryLastMessage()
-                : null,
-            onCancel: state.isStreaming
-                ? () => ref
-                    .read(chatControllerProvider.notifier)
-                    .cancelStreaming()
-                : null,
-            onSend: onSend,
-            onResolveConfirmation: (confirmationId, {required approved}) =>
-                ref
-                    .read(chatControllerProvider.notifier)
-                    .resolveToolConfirmation(
-                      confirmationId,
-                      approved: approved,
-                    ),
+      body: CustomScrollView(
+        slivers: [
+          const SliverAppBar.medium(
+            title: Text('Assistente'),
+            actions: [
+              NewSessionButton(),
+              SizedBox(width: 8),
+            ],
           ),
-          loading: () => AgentChatView(
-            messages: const [],
-            actions: const [],
-            loaded: false,
-            streaming: false,
-            errorMessage: null,
-            onSend: onSend,
+          SliverFillRemaining(
+            child: ref.watch(chatControllerProvider).when(
+                  data: (state) => AgentChatView(
+                    messages: state.messages,
+                    actions: state.actions,
+                    loaded: true,
+                    streaming: state.isStreaming,
+                    errorMessage: state.errorMessage,
+                    onRetry: state.retryMessage != null
+                        ? () => ref
+                            .read(chatControllerProvider.notifier)
+                            .retryLastMessage()
+                        : null,
+                    onCancel: state.isStreaming
+                        ? () => ref
+                            .read(chatControllerProvider.notifier)
+                            .cancelStreaming()
+                        : null,
+                    onSend: onSend,
+                    onResolveConfirmation: (confirmationId, {required approved}) =>
+                        ref
+                            .read(chatControllerProvider.notifier)
+                            .resolveToolConfirmation(
+                              confirmationId,
+                              approved: approved,
+                            ),
+                  ),
+                  loading: () => AgentChatView(
+                    messages: const [],
+                    actions: const [],
+                    loaded: false,
+                    streaming: false,
+                    errorMessage: null,
+                    onSend: onSend,
+                  ),
+                  error: (err, _) => AgentChatView(
+                    messages: const [],
+                    actions: const [],
+                    loaded: true,
+                    streaming: false,
+                    errorMessage: err.toString(),
+                    onSend: onSend,
+                  ),
+                ),
           ),
-          error: (err, _) => AgentChatView(
-            messages: const [],
-            actions: const [],
-            loaded: true,
-            streaming: false,
-            errorMessage: err.toString(),
-            onSend: onSend,
-          ),
-        ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: NewSessionButton(),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

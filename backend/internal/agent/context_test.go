@@ -25,7 +25,7 @@ func (s *stubTasksRepo) GetTaskByID(ctx context.Context, id pgtype.UUID, userID 
 	panic("unimplemented")
 }
 func (s *stubTasksRepo) GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) ([]sqlcgen.Task, error) {
-	panic("unimplemented")
+	return nil, nil
 }
 func (s *stubTasksRepo) UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
 	panic("unimplemented")
@@ -47,6 +47,14 @@ func (s *stubTasksRepo) CountTasks(ctx context.Context, userID pgtype.UUID) (int
 }
 func (s *stubTasksRepo) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
+}
+
+func (s *stubTasksRepo) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
+func (s *stubTasksRepo) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
 }
 func (s *stubTasksRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
@@ -83,6 +91,12 @@ func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([
 		return s.getRecentNotes(ctx, userID)
 	}
 	panic("unimplemented")
+}
+func (s *stubQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+func (s *stubQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
 }
 
 // remaining Querier methods (unused by context tests)
@@ -403,10 +417,10 @@ func TestContextBuilder_Build(t *testing.T) {
 	}
 
 	requiredSections := []string{
-		"SYSTEM RULES:",
+		"BEHAVIORAL GUIDELINES:",
 		"TOOL RULES:",
-		"SOUL:",
-		"CURRENT DATE & TIME:",
+		"IDENTITY:",
+		"CURRENT CONTEXT:",
 		"TODAY/OVERDUE TASKS:",
 		"RECENT NOTES",
 		"SEMANTIC SEARCH RESULTS:",

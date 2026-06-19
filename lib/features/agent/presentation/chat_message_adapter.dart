@@ -64,17 +64,19 @@ ChatUser _userForRole(MessageRole role) {
 }
 
 ChatMessage? _actionToChatMessage(ChatToolAction action) {
-  if (action.status != ChatToolActionStatus.confirmationRequired) return null;
+  final bool isConfirmation =
+      action.status == ChatToolActionStatus.confirmationRequired;
 
   return ChatMessage.rich(
     user: agentChatSystemUser,
-    resultKind: 'confirmation',
+    resultKind: isConfirmation ? 'confirmation' : 'action',
     data: {
       'actionId': action.id,
       'name': action.name,
       'label': action.label,
-      if (action.confirmationId != null)
-        'confirmationId': action.confirmationId,
+      'status': action.status.name,
+      if (action.message != null) 'message': action.message,
+      if (action.confirmationId != null) 'confirmationId': action.confirmationId,
     },
   );
 }

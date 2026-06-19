@@ -321,6 +321,14 @@ func (m *mockQuerier) CountCompletedTasks(ctx context.Context, userID pgtype.UUI
 	return 0, nil
 }
 
+func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
 func testConfig() *config.Config {
 
 	return &config.Config{

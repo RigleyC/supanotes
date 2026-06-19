@@ -16,8 +16,10 @@ type AddTaskTool struct {
 	tasksSvc *tasks.Service
 }
 
-func (t *AddTaskTool) Name() string        { return "add_task" }
-func (t *AddTaskTool) Description() string { return "Create a new task. Optionally link to a note via note_id. Set recurrence for repeating tasks (daily/weekdays/weekly/monthly). Set due_date (YYYY-MM-DD) for deadline tracking." }
+func (t *AddTaskTool) Name() string { return "add_task" }
+func (t *AddTaskTool) Description() string {
+	return "Create a new task. Optionally link to a note via note_id. Set recurrence for repeating tasks (daily/weekdays/weekly/monthly). Set due_date (YYYY-MM-DD) for deadline tracking."
+}
 func (t *AddTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"title":{"type":"string"},"note_id":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date"},"recurrence":{"type":"string","enum":["none","daily","weekdays","weekly","monthly"]}},"required":["title"]}`
 }
@@ -58,8 +60,10 @@ type CompleteTaskTool struct {
 	tasksSvc *tasks.Service
 }
 
-func (t *CompleteTaskTool) Name() string        { return "complete_task" }
-func (t *CompleteTaskTool) Description() string { return "Mark a task as done. Use this when the user says they completed something (e.g., 'comprei o arroz', 'fiz o treino', 'terminei o relatório'). Pass the task_id from get_open_tasks or get_today_tasks." }
+func (t *CompleteTaskTool) Name() string { return "complete_task" }
+func (t *CompleteTaskTool) Description() string {
+	return "Mark a task as done. Use this when the user says they completed something (e.g., 'comprei o arroz', 'fiz o treino', 'terminei o relatório'). Pass the task_id from get_open_tasks or get_today_tasks."
+}
 func (t *CompleteTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]}`
 }
@@ -85,8 +89,10 @@ type GetOpenTasksTool struct {
 	tasksSvc *tasks.Service
 }
 
-func (t *GetOpenTasksTool) Name() string        { return "get_open_tasks" }
-func (t *GetOpenTasksTool) Description() string { return "List all open (pending) tasks across all notes. Returns task ID, title, and note title. Use this when the user asks what they have pending or need to do." }
+func (t *GetOpenTasksTool) Name() string { return "get_open_tasks" }
+func (t *GetOpenTasksTool) Description() string {
+	return "List all open (pending) tasks across all notes. Returns task ID, title, and note title. Use this when the user asks what they have pending or need to do."
+}
 func (t *GetOpenTasksTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -107,8 +113,10 @@ type GetTodayTasksTool struct {
 	tasksSvc *tasks.Service
 }
 
-func (t *GetTodayTasksTool) Name() string        { return "get_today_tasks" }
-func (t *GetTodayTasksTool) Description() string { return "List tasks due today or overdue. Returns task ID, title, status, due date, and recurrence. Use this when the user asks what they have for today." }
+func (t *GetTodayTasksTool) Name() string { return "get_today_tasks" }
+func (t *GetTodayTasksTool) Description() string {
+	return "List tasks due today or overdue. Returns task ID, title, status, due date, and recurrence. Use this when the user asks what they have for today."
+}
 func (t *GetTodayTasksTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -123,6 +131,46 @@ func (t *GetTodayTasksTool) Execute(ctx context.Context, userID pgtype.UUID, arg
 	}
 	if b.Len() == 0 {
 		return "No tasks for today or overdue", nil
+	}
+	return b.String(), nil
+}
+
+type SearchTasksTool struct {
+	tasksSvc *tasks.Service
+}
+
+func (t *SearchTasksTool) Name() string { return "search_tasks" }
+func (t *SearchTasksTool) Description() string {
+	return "Search tasks by keyword. Use when the user mentions completing or finding a specific task but you don't have the exact ID. Optionally filter by status (open/done/all, default: all)."
+}
+func (t *SearchTasksTool) SchemaJSON() string {
+	return `{"type":"object","properties":{"query":{"type":"string","description":"Keyword to search in task titles"},"status":{"type":"string","enum":["open","done","all"],"description":"Filter by status. Default: all"}},"required":["query"]}`
+}
+func (t *SearchTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+	args, err := parseArgs[struct {
+		Query  string  `json:"query"`
+		Status *string `json:"status"`
+	}](argsJSON)
+	if err != nil {
+		return "", err
+	}
+
+	var statusFilter *string
+	if args.Status != nil && *args.Status != "all" {
+		statusFilter = args.Status
+	}
+
+	tasksList, err := t.tasksSvc.SearchTasks(ctx, userID, args.Query, statusFilter, 20, 0)
+	if err != nil {
+		return "", err
+	}
+
+	var b strings.Builder
+	for _, task := range tasksList {
+		b.WriteString(fmt.Sprintf("- [%s] [%s] %s\n", task.Status, formatID(task.ID), task.Title))
+	}
+	if b.Len() == 0 {
+		return "No matching tasks found", nil
 	}
 	return b.String(), nil
 }

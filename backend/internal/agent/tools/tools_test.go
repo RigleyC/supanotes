@@ -48,6 +48,14 @@ func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([
 	panic("unimplemented")
 }
 
+func (s *stubQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
+func (s *stubQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
 func (s *stubQuerier) CreateNoteLink(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
 	if s.createNoteLink != nil {
 		return s.createNoteLink(ctx, arg)

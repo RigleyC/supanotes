@@ -60,5 +60,26 @@ SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL;
 -- name: CountOpenTasks :one
 SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open';
 
+-- name: CountOverdueTasks :one
+SELECT COUNT(*) FROM tasks 
+WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open' AND due_date < NOW();
+
 -- name: CountCompletedTasks :one
 SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL AND status = 'done';
+
+-- name: SearchTasks :many
+SELECT * FROM tasks
+WHERE user_id = $1
+  AND deleted_at IS NULL
+  AND title ILIKE '%' || sqlc.arg('query')::text || '%'
+  AND (sqlc.narg('status')::varchar IS NULL OR status = sqlc.narg('status'))
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3;
+
+-- name: GetRecentlyCompletedTasks :many
+SELECT * FROM tasks
+WHERE user_id = $1
+  AND deleted_at IS NULL
+  AND status = 'done'
+  AND completed_at >= NOW() - (sqlc.arg('days')::int || ' days')::interval
+ORDER BY completed_at DESC;

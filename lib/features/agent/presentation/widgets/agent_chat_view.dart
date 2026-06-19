@@ -153,6 +153,7 @@ class _AgentChatViewState extends State<AgentChatView> {
             maxWidth: 768,
             resultRenderers: {
               'confirmation': _buildConfirmationCard,
+              'action': _buildActionCard,
             },
             welcomeMessageConfig: WelcomeMessageConfig(
               title: 'Como posso ajudar?',
@@ -191,6 +192,24 @@ class _AgentChatViewState extends State<AgentChatView> {
           widget.onResolveConfirmation?.call(confirmationId, approved: true),
       onCancel: () =>
           widget.onResolveConfirmation?.call(confirmationId, approved: false),
+    );
+  }
+
+  Widget _buildActionCard(BuildContext context, Map<String, dynamic> data) {
+    final statusName = data['status'] as String? ?? 'running';
+    final label = data['label'] as String? ?? 'Executando...';
+    final message = data['message'] as String?;
+    
+    final status = ChatToolActionStatus.values.firstWhere(
+      (e) => e.name == statusName,
+      orElse: () => ChatToolActionStatus.running,
+    );
+
+    return _AgentActionCard(
+      key: ValueKey('action-${data['actionId']}'),
+      status: status,
+      label: label,
+      message: message,
     );
   }
 }
@@ -291,6 +310,89 @@ class _ErrorBanner extends StatelessWidget {
               variant: AppButtonVariant.tonal,
               width: 140,
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AgentActionCard extends StatelessWidget {
+  const _AgentActionCard({
+    super.key,
+    required this.status,
+    required this.label,
+    this.message,
+  });
+
+  final ChatToolActionStatus status;
+  final String label;
+  final String? message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    Widget icon;
+    Color? textColor;
+    
+    switch (status) {
+      case ChatToolActionStatus.running:
+        icon = const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        );
+        break;
+      case ChatToolActionStatus.completed:
+      case ChatToolActionStatus.confirmed:
+        icon = Icon(Icons.check_circle, size: 16, color: theme.colorScheme.primary);
+        break;
+      case ChatToolActionStatus.failed:
+      case ChatToolActionStatus.cancelled:
+        icon = Icon(Icons.error, size: 16, color: theme.colorScheme.error);
+        textColor = theme.colorScheme.error;
+        break;
+      case ChatToolActionStatus.confirmationRequired:
+        icon = Icon(Icons.warning, size: 16, color: theme.colorScheme.primary);
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              icon,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: textColor ?? theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (message != null && message!.isNotEmpty && status == ChatToolActionStatus.failed) ...[
+            const SizedBox(height: 4),
+            Text(
+              message!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ]
         ],
       ),
     );

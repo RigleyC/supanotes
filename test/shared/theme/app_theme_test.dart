@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
@@ -11,6 +12,7 @@ void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     FlutterError.onError = (_) {};
+    GoogleFonts.config.allowRuntimeFetching = false;
   });
 
   // AppTheme's static caches evaluate `AppTypography.textTheme` which calls
@@ -100,11 +102,11 @@ void main() {
       });
     });
 
-    test('AppBar theme uses surface color with no shadow', () async {
+    test('AppBar theme uses transparent background with no shadow', () async {
       await runGuarded(() {
         final appBar = AppTheme.lightTheme.appBarTheme;
         expect(appBar.elevation, 0);
-        expect(appBar.backgroundColor, AppTheme.lightTheme.colorScheme.surface);
+        expect(appBar.backgroundColor, Colors.transparent);
       });
     });
 

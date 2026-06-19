@@ -121,7 +121,7 @@ func (s *stubLoopTasksRepo) GetTaskByID(ctx context.Context, id pgtype.UUID, use
 	panic("unimplemented")
 }
 func (s *stubLoopTasksRepo) GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) ([]sqlcgen.Task, error) {
-	panic("unimplemented")
+	return nil, nil
 }
 func (s *stubLoopTasksRepo) UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
 	panic("unimplemented")
@@ -146,6 +146,12 @@ func (s *stubLoopTasksRepo) CountOpenTasks(ctx context.Context, userID pgtype.UU
 }
 func (s *stubLoopTasksRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
+}
+func (s *stubLoopTasksRepo) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+func (s *stubLoopTasksRepo) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
 }
 
 type stubLoopQuerier struct{}
@@ -176,6 +182,12 @@ func (s *stubLoopQuerier) CountNotes(ctx context.Context, userID pgtype.UUID) (i
 }
 func (s *stubLoopQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
+}
+func (s *stubLoopQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+func (s *stubLoopQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
 }
 func (s *stubLoopQuerier) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil

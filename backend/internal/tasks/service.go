@@ -229,10 +229,37 @@ func (s *Service) GetTasks(ctx context.Context, userID pgtype.UUID, noteID *pgty
 }
 
 func (s *Service) GetTodayTasks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Task, error) {
-	// Em produção real, este `now` deve estar no timezone do usuário.
-	now := time.Now()
+	return s.GetTodayTasksInTimezone(ctx, userID, time.Now().Location())
+}
+
+func (s *Service) GetTodayTasksInTimezone(ctx context.Context, userID pgtype.UUID, loc *time.Location) ([]sqlcgen.Task, error) {
+	now := time.Now().In(loc)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	return s.repo.GetTodayTasks(ctx, userID, pgtype.Date{Time: today, Valid: true})
+}
+
+func (s *Service) SearchTasks(ctx context.Context, userID pgtype.UUID, query string, status *string, limit, offset int32) ([]sqlcgen.Task, error) {
+	arg := sqlcgen.SearchTasksParams{
+		UserID: userID,
+		Query:  query,
+		Limit:  limit,
+		Offset: offset,
+	}
+	if status != nil {
+		arg.Status = pgtype.Text{String: *status, Valid: true}
+	}
+	return s.repo.SearchTasks(ctx, arg)
+}
+
+func (s *Service) GetRecentlyCompletedTasks(ctx context.Context, userID pgtype.UUID, days int32) ([]sqlcgen.Task, error) {
+	return s.repo.GetRecentlyCompletedTasks(ctx, sqlcgen.GetRecentlyCompletedTasksParams{
+		UserID: userID,
+		Days:   days,
+	})
+}
+
+func (s *Service) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return s.repo.CountOverdueTasks(ctx, userID)
 }
 
 func calculateNextDueDate(current time.Time, recurrence string) (time.Time, bool) {

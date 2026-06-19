@@ -33,6 +33,18 @@ func (q *Queries) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64
 	return count, err
 }
 
+const countOverdueTasks = `-- name: CountOverdueTasks :one
+SELECT COUNT(*) FROM tasks 
+WHERE user_id = $1 AND deleted_at IS NULL AND status = 'open' AND due_date < NOW()
+`
+
+func (q *Queries) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOverdueTasks, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countTasks = `-- name: CountTasks :one
 SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND deleted_at IS NULL
 `
@@ -123,6 +135,53 @@ type DeleteTaskParams struct {
 func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
 	_, err := q.db.Exec(ctx, deleteTask, arg.ID, arg.UserID)
 	return err
+}
+
+const getRecentlyCompletedTasks = `-- name: GetRecentlyCompletedTasks :many
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+WHERE user_id = $1
+  AND deleted_at IS NULL
+  AND status = 'done'
+  AND completed_at >= NOW() - ($2::int || ' days')::interval
+ORDER BY completed_at DESC
+`
+
+type GetRecentlyCompletedTasksParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Days   int32       `json:"days"`
+}
+
+func (q *Queries) GetRecentlyCompletedTasks(ctx context.Context, arg GetRecentlyCompletedTasksParams) ([]Task, error) {
+	rows, err := q.db.Query(ctx, getRecentlyCompletedTasks, arg.UserID, arg.Days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Task
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.NoteID,
+			&i.UserID,
+			&i.Title,
+			&i.Status,
+			&i.DueDate,
+			&i.Recurrence,
+			&i.Position,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getTaskByID = `-- name: GetTaskByID :one
@@ -279,6 +338,63 @@ type GetTodayTasksParams struct {
 
 func (q *Queries) GetTodayTasks(ctx context.Context, arg GetTodayTasksParams) ([]Task, error) {
 	rows, err := q.db.Query(ctx, getTodayTasks, arg.UserID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Task
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.NoteID,
+			&i.UserID,
+			&i.Title,
+			&i.Status,
+			&i.DueDate,
+			&i.Recurrence,
+			&i.Position,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchTasks = `-- name: SearchTasks :many
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+WHERE user_id = $1
+  AND deleted_at IS NULL
+  AND title ILIKE '%' || $4::text || '%'
+  AND ($5::varchar IS NULL OR status = $5)
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type SearchTasksParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Limit  int32       `json:"limit"`
+	Offset int32       `json:"offset"`
+	Query  string      `json:"query"`
+	Status pgtype.Text `json:"status"`
+}
+
+func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Task, error) {
+	rows, err := q.db.Query(ctx, searchTasks,
+		arg.UserID,
+		arg.Limit,
+		arg.Offset,
+		arg.Query,
+		arg.Status,
+	)
 	if err != nil {
 		return nil, err
 	}

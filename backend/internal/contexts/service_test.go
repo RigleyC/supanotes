@@ -287,6 +287,14 @@ func (m *mockQuerier) ResolvePendingToolConfirmation(_ context.Context, _ sqlcge
 	panic("unimplemented")
 }
 
+func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
 func TestServiceList_Success(t *testing.T) {
 	mq := &mockQuerier{
 		getContextsFn: func(_ context.Context, _ pgtype.UUID) ([]sqlcgen.Context, error) {

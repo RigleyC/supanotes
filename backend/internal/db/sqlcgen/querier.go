@@ -18,6 +18,7 @@ type Querier interface {
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
 	CreateDeviceToken(ctx context.Context, arg CreateDeviceTokenParams) (DeviceToken, error)
@@ -57,6 +58,7 @@ type Querier interface {
 	GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, error)
 	GetPendingToolConfirmation(ctx context.Context, arg GetPendingToolConfirmationParams) (PendingToolConfirmation, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Note, error)
+	GetRecentlyCompletedTasks(ctx context.Context, arg GetRecentlyCompletedTasksParams) ([]Task, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRetryableEmbeddings(ctx context.Context, limit int32) ([]GetRetryableEmbeddingsRow, error)
 	GetRoutineLogsByUser(ctx context.Context, arg GetRoutineLogsByUserParams) ([]RoutineLog, error)
@@ -91,6 +93,7 @@ type Querier interface {
 	SearchNotesFTS(ctx context.Context, arg SearchNotesFTSParams) ([]SearchNotesFTSRow, error)
 	SearchNotesHybrid(ctx context.Context, arg SearchNotesHybridParams) ([]SearchNotesHybridRow, error)
 	SearchNotesSemantic(ctx context.Context, arg SearchNotesSemanticParams) ([]SearchNotesSemanticRow, error)
+	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Task, error)
 	SetInboxContent(ctx context.Context, arg SetInboxContentParams) (Note, error)
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteEmbeddingStatus(ctx context.Context, arg UpdateNoteEmbeddingStatusParams) error

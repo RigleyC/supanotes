@@ -11,6 +11,7 @@ void main() {
     await tester.pumpWidget(
       wrap(
         CustomDividerComponent(
+          componentKey: GlobalKey(),
           dividerIndex: 7,
           caretColor: Colors.black,
         ),
@@ -24,6 +25,7 @@ void main() {
     await tester.pumpWidget(
       wrap(
         CustomDividerComponent(
+          componentKey: GlobalKey(),
           dividerIndex: null,
           caretColor: Colors.black,
         ),

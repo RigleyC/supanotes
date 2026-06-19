@@ -71,4 +71,3 @@ super_editor_fork/
 # Generated at build time by Codemagic from GOOGLE_SERVICE_INFO_B64 env var
 ios/Runner/GoogleService-Info.plist
 
-nul
