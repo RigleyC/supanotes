@@ -25,13 +25,11 @@ class ChatScreen extends ConsumerWidget {
         ref.read(chatControllerProvider.notifier).sendMessage(text);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chat'),
-        actions: const <Widget>[NewSessionButton()],
-      ),
       body: SafeArea(
         top: false,
-        child: ref.watch(chatControllerProvider).when(
+        child: Stack(
+          children: [
+            ref.watch(chatControllerProvider).when(
           data: (state) => AgentChatView(
             messages: state.messages,
             actions: state.actions,
@@ -73,6 +71,13 @@ class ChatScreen extends ConsumerWidget {
             errorMessage: err.toString(),
             onSend: onSend,
           ),
+        ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: NewSessionButton(),
+            ),
+          ],
         ),
       ),
     );

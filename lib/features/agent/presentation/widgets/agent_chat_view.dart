@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart' show MarkdownStyleSheet;
 
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/presentation/chat_message_adapter.dart';
@@ -87,15 +88,49 @@ class _AgentChatViewState extends State<AgentChatView> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final theme = Theme.of(context);
+
+    final bubbleStyle = BubbleStyle(
+      enableShadow: false,
+      userBubbleColor: Colors.transparent,
+      aiBubbleColor: Colors.transparent,
+      userBubbleMaxWidth: double.infinity,
+      aiBubbleMaxWidth: double.infinity,
+      userBubbleTopLeftRadius: 0,
+      userBubbleTopRightRadius: 0,
+      aiBubbleTopLeftRadius: 0,
+      aiBubbleTopRightRadius: 0,
+      bottomLeftRadius: 0,
+      bottomRightRadius: 0,
+    );
+
     final options = MessageOptions(
       showTime: false,
-      showCopyButton: false,
+      showCopyButton: true,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      containerColor: theme.colorScheme.surfaceContainerLow,
+      bubbleStyle: bubbleStyle,
     );
 
     final inputOpts = InputOptions(
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         hintText: 'Mensagem...',
-        border: InputBorder.none,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide(color: theme.colorScheme.outline),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+      ),
+      sendButtonBuilder: (onSend) => IconButton(
+        icon: const Icon(Icons.arrow_upward),
+        style: IconButton.styleFrom(
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: theme.colorScheme.onPrimary,
+        ),
+        onPressed: onSend,
       ),
     );
 
@@ -111,10 +146,29 @@ class _AgentChatViewState extends State<AgentChatView> {
             messageOptions: options,
             inputOptions: inputOpts,
             enableMarkdownStreaming: true,
+            streamingWordByWord: true,
+            streamingFadeInEnabled: true,
+            streamingFadeInDuration: const Duration(milliseconds: 150),
             loadingConfig: LoadingConfig(isLoading: widget.streaming),
+            maxWidth: 768,
             resultRenderers: {
               'confirmation': _buildConfirmationCard,
             },
+            welcomeMessageConfig: WelcomeMessageConfig(
+              title: 'Como posso ajudar?',
+              centerVertically: true,
+            ),
+            exampleQuestions: const [
+              ExampleQuestion(question: 'Resumir minhas notas'),
+              ExampleQuestion(question: 'O que tenho para fazer hoje?'),
+              ExampleQuestion(question: 'Criar uma tarefa'),
+            ],
+            markdownStyleSheet: MarkdownStyleSheet(
+              codeblockDecoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
         ),
         if (widget.errorMessage != null)
