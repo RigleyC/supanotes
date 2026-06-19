@@ -3,6 +3,9 @@ package agent
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStreamEventEnvelopeMarshal(t *testing.T) {
@@ -39,6 +42,33 @@ func TestStreamEventEnvelopeMarshal(t *testing.T) {
 	if decoded["payload"] == nil {
 		t.Fatal("payload missing")
 	}
+}
+
+func TestConfirmationRequiredPayloadIncludesConfirmationID(t *testing.T) {
+	writer := NewStreamEventWriter("session-1", "message-1")
+
+	event := writer.Event(EventConfirmationRequired, ConfirmationRequiredPayload{
+		ConfirmationID: "confirmation-1",
+		ToolName:       "update_note",
+		Label:          "Atualizando notas",
+	})
+
+	payload, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	var decoded StreamEvent
+	require.NoError(t, json.Unmarshal(payload, &decoded))
+
+	body, err := json.Marshal(decoded.Payload)
+	require.NoError(t, err)
+
+	var confirmation ConfirmationRequiredPayload
+	require.NoError(t, json.Unmarshal(body, &confirmation))
+
+	assert.Equal(t, "confirmation-1", confirmation.ConfirmationID)
+	assert.Equal(t, "update_note", confirmation.ToolName)
+	assert.Equal(t, "Atualizando notas", confirmation.Label)
+	assert.NotContains(t, string(body), "args_json")
 }
 
 func TestStreamEventWriterIncrementsSequence(t *testing.T) {

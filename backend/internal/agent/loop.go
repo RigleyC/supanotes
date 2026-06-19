@@ -245,12 +245,17 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 		for _, tc := range res.ToolCalls {
 			if l.tools.Risk(tc.Name) == tools.ToolRiskSensitiveWrite {
+				pending, err := l.repo.CreatePendingToolConfirmation(ctx, userID, sessionUUID, tc.Name, tc.ArgsJSON)
+				if err != nil {
+					return "", fmt.Errorf("create pending tool confirmation: %w", err)
+				}
+
 				sendStreamEvent(events, writer.Event(
 					EventConfirmationRequired,
 					ConfirmationRequiredPayload{
-						ToolName: tc.Name,
-						Label:    l.tools.Label(tc.Name),
-						ArgsJSON: tc.ArgsJSON,
+						ConfirmationID: uuid.UUID(pending.ID.Bytes).String(),
+						ToolName:       tc.Name,
+						Label:          l.tools.Label(tc.Name),
 					},
 				))
 				finalContent = "Preciso da sua confirmação antes de aplicar essa alteração."

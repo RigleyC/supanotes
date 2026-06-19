@@ -47,6 +47,15 @@ func (s *stubLoopRepo) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (
 func (s *stubLoopRepo) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
 }
+func (s *stubLoopRepo) CreatePendingToolConfirmation(ctx context.Context, userID, sessionID pgtype.UUID, toolName, argsJSON string) (sqlcgen.PendingToolConfirmation, error) {
+	return sqlcgen.PendingToolConfirmation{}, nil
+}
+func (s *stubLoopRepo) GetPendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID) (sqlcgen.PendingToolConfirmation, error) {
+	return sqlcgen.PendingToolConfirmation{}, nil
+}
+func (s *stubLoopRepo) ResolvePendingToolConfirmation(ctx context.Context, id, userID pgtype.UUID, status string) (sqlcgen.PendingToolConfirmation, error) {
+	return sqlcgen.PendingToolConfirmation{}, nil
+}
 
 func TestLoopResetSessionDeletesSessionMessages(t *testing.T) {
 	repo := &stubLoopRepo{}
@@ -410,6 +419,15 @@ func (s *stubLoopQuerier) GetNoteShareForUser(ctx context.Context, arg sqlcgen.G
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) CreatePendingToolConfirmation(context.Context, sqlcgen.CreatePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) GetPendingToolConfirmation(context.Context, sqlcgen.GetPendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
 	panic("unimplemented")
 }
 

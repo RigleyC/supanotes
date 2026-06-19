@@ -339,6 +339,15 @@ func (s *stubQuerier) GetNoteShareForUser(context.Context, sqlcgen.GetNoteShareF
 func (s *stubQuerier) GetNoteShares(context.Context, pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) CreatePendingToolConfirmation(context.Context, sqlcgen.CreatePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetPendingToolConfirmation(context.Context, sqlcgen.GetPendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
+	panic("unimplemented")
+}
 
 type stubMemRepo struct{}
 
