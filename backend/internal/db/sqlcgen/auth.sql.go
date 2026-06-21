@@ -128,6 +128,21 @@ func (q *Queries) DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenPa
 	return err
 }
 
+const deleteDeviceTokenByToken = `-- name: DeleteDeviceTokenByToken :exec
+DELETE FROM device_tokens
+WHERE token = $1 AND user_id = $2
+`
+
+type DeleteDeviceTokenByTokenParams struct {
+	Token  string      `json:"token"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteDeviceTokenByToken(ctx context.Context, arg DeleteDeviceTokenByTokenParams) error {
+	_, err := q.db.Exec(ctx, deleteDeviceTokenByToken, arg.Token, arg.UserID)
+	return err
+}
+
 const getRefreshToken = `-- name: GetRefreshToken :one
 SELECT id, user_id, token_hash, expires_at, created_at, revoked_at FROM refresh_tokens
 WHERE token_hash = $1

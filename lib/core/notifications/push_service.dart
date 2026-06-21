@@ -1,11 +1,17 @@
-library;
-
+import 'dart:io' show Platform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/di/providers.dart';
+
+String _getPlatformName() {
+  if (kIsWeb) return 'web';
+  if (Platform.isAndroid) return 'android';
+  if (Platform.isIOS) return 'ios';
+  return 'desktop';
+}
 
 class PushService extends Notifier<bool> {
   late final ApiClient _api;
@@ -20,7 +26,10 @@ class PushService extends Notifier<bool> {
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
-        await _api.post('/device-tokens', data: {'token': token});
+        await _api.post('/device-tokens', data: {
+          'token': token,
+          'platform': _getPlatformName(),
+        });
         state = true;
       }
     } catch (e) {

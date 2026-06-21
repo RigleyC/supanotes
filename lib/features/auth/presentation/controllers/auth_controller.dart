@@ -106,7 +106,11 @@ class AuthController extends Notifier<AsyncValue<User?>> {
   Future<void> _clearSession() async {
     await _storage.clear();
     _sessionCache.clear();
-    await ref.read(lastRouteStoreProvider).clear();
+    // Note: lastRouteStore is intentionally NOT cleared here.
+    // The route is UX metadata, not security-sensitive data — authGuard already
+    // blocks unauthenticated access to protected routes. Preserving the route
+    // across involuntary session expiry lets the user land back where they were
+    // after re-login. See: logout() for the explicit-logout path.
     state = const AsyncValue.data(null);
   }
 
@@ -117,6 +121,8 @@ class AuthController extends Notifier<AsyncValue<User?>> {
     } catch (e) {
       debugPrint('logout error: $e');
     }
+    // On explicit logout, clear the saved route so the user starts fresh.
+    await ref.read(lastRouteStoreProvider).clear();
     await _clearSession();
   }
 

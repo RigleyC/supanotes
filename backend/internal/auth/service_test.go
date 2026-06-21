@@ -162,6 +162,9 @@ func (m *mockQuerier) CreateDeviceToken(ctx context.Context, arg sqlcgen.CreateD
 func (m *mockQuerier) DeleteDeviceToken(ctx context.Context, arg sqlcgen.DeleteDeviceTokenParams) error {
 	return errors.New("DeleteDeviceToken: not implemented in mock")
 }
+func (m *mockQuerier) DeleteDeviceTokenByToken(ctx context.Context, arg sqlcgen.DeleteDeviceTokenByTokenParams) error {
+	return errors.New("DeleteDeviceTokenByToken: not implemented in mock")
+}
 func (m *mockQuerier) AddTagToNote(ctx context.Context, arg sqlcgen.AddTagToNoteParams) error {
 	return nil
 }

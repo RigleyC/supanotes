@@ -30,9 +30,9 @@ func (s *Service) RegisterToken(ctx context.Context, userID pgtype.UUID, token, 
 	return mapper.DeviceTokenFromSQLC(deviceToken), nil
 }
 
-func (s *Service) DeleteToken(ctx context.Context, userID, id pgtype.UUID) error {
-	return s.q.DeleteDeviceToken(ctx, sqlcgen.DeleteDeviceTokenParams{
-		ID:     id,
+func (s *Service) DeleteTokenByToken(ctx context.Context, userID pgtype.UUID, token string) error {
+	return s.q.DeleteDeviceTokenByToken(ctx, sqlcgen.DeleteDeviceTokenByTokenParams{
+		Token:  token,
 		UserID: userID,
 	})
 }

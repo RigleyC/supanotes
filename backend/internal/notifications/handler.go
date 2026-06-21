@@ -6,7 +6,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/web"
-	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 type RegisterDeviceTokenRequest struct {
@@ -42,18 +41,22 @@ func (h *Handler) RegisterToken(c echo.Context) error {
 	return c.JSON(http.StatusCreated, token)
 }
 
+type DeleteDeviceTokenRequest struct {
+	Token string `json:"token" validate:"required"`
+}
+
 func (h *Handler) DeleteToken(c echo.Context) error {
 	userID, err := web.UserID(c)
 	if err != nil {
 		return err
 	}
 
-	id, err := uid.UUIDFromString(c.Param("id"))
-	if err != nil {
-		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
+	var req DeleteDeviceTokenRequest
+	if err := web.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
-	if err := h.svc.DeleteToken(c.Request().Context(), userID, id); err != nil {
+	if err := h.svc.DeleteTokenByToken(c.Request().Context(), userID, req.Token); err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to delete device token")
 	}

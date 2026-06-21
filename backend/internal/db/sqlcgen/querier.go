@@ -37,6 +37,7 @@ type Querier interface {
 	CreateUserSettings(ctx context.Context, arg CreateUserSettingsParams) (UserSetting, error)
 	DeleteContext(ctx context.Context, arg DeleteContextParams) error
 	DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error
+	DeleteDeviceTokenByToken(ctx context.Context, arg DeleteDeviceTokenByTokenParams) error
 	DeleteMemory(ctx context.Context, arg DeleteMemoryParams) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error

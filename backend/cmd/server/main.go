@@ -295,7 +295,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	notificationsSvc := notifications.NewService(queries)
 	notificationsH := notifications.NewHandler(notificationsSvc)
 	protected.POST("/device-tokens", notificationsH.RegisterToken)
-	protected.DELETE("/device-tokens/:id", notificationsH.DeleteToken)
+	protected.DELETE("/device-tokens", notificationsH.DeleteToken)
 
 	// Telegram gateway (uses the agent loop as a bridge for free-form
 	// messages; the public webhook is mounted on the unauthenticated

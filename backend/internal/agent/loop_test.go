@@ -262,6 +262,9 @@ func (s *stubLoopQuerier) DeleteContext(ctx context.Context, arg sqlcgen.DeleteC
 func (s *stubLoopQuerier) DeleteDeviceToken(ctx context.Context, arg sqlcgen.DeleteDeviceTokenParams) error {
 	panic("unimplemented")
 }
+func (s *stubLoopQuerier) DeleteDeviceTokenByToken(ctx context.Context, arg sqlcgen.DeleteDeviceTokenByTokenParams) error {
+	panic("unimplemented")
+}
 func (s *stubLoopQuerier) DeleteMemory(ctx context.Context, arg sqlcgen.DeleteMemoryParams) error {
 	panic("unimplemented")
 }

@@ -99,6 +99,9 @@ func (m *mockQuerier) CreateUserSettings(_ context.Context, _ sqlcgen.CreateUser
 func (m *mockQuerier) DeleteDeviceToken(_ context.Context, _ sqlcgen.DeleteDeviceTokenParams) error {
 	return nil
 }
+func (m *mockQuerier) DeleteDeviceTokenByToken(_ context.Context, _ sqlcgen.DeleteDeviceTokenByTokenParams) error {
+	return nil
+}
 func (m *mockQuerier) DeleteMemory(_ context.Context, _ sqlcgen.DeleteMemoryParams) error { return nil }
 func (m *mockQuerier) DeleteNote(_ context.Context, _ sqlcgen.DeleteNoteParams) error     { return nil }
 func (m *mockQuerier) DeleteSessionMessages(_ context.Context, _ sqlcgen.DeleteSessionMessagesParams) error {

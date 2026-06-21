@@ -9,9 +9,9 @@
 /// The repository does **not** know about Riverpod or widget state — the
 /// [AuthController] is responsible for translating these results into
 /// application state.
-library;
-
+import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
@@ -153,9 +153,19 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> registerDeviceToken(String token) async {
     try {
-      await _api.post('/device-tokens', data: {'token': token});
+      await _api.post('/device-tokens', data: {
+        'token': token,
+        'platform': _getPlatformName(),
+      });
     } on DioException {
       // Non-fatal — push will simply not work until the next registration.
     }
   }
+}
+
+String _getPlatformName() {
+  if (kIsWeb) return 'web';
+  if (Platform.isAndroid) return 'android';
+  if (Platform.isIOS) return 'ios';
+  return 'desktop';
 }
