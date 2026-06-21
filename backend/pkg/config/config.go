@@ -107,13 +107,20 @@ func Load() (*Config, error) {
 		OpenAICompatModel:      os.Getenv("OPENAI_COMPAT_MODEL"),
 		OpenAIEmbeddingsAPIKey: os.Getenv("OPENAI_EMBEDDINGS_API_KEY"),
 		OpenAIEmbeddingsModel:  os.Getenv("OPENAI_EMBEDDINGS_MODEL"),
-		S3Endpoint:             os.Getenv("S3_ENDPOINT"),
-		S3Region:               os.Getenv("S3_REGION"),
-		S3Bucket:               os.Getenv("S3_BUCKET"),
-		S3AccessKeyID:          os.Getenv("S3_ACCESS_KEY_ID"),
-		S3SecretAccessKey:      os.Getenv("S3_SECRET_ACCESS_KEY"),
-		S3PublicBaseURL:        os.Getenv("S3_PUBLIC_BASE_URL"),
+		S3Endpoint:             firstNonEmpty(os.Getenv("S3_ENDPOINT"), os.Getenv("AWS_ENDPOINT_URL_S3")),
+		S3Region:               firstNonEmpty(os.Getenv("S3_REGION"), os.Getenv("AWS_REGION")),
+		S3Bucket:               firstNonEmpty(os.Getenv("S3_BUCKET"), os.Getenv("BUCKET_NAME")),
+		S3AccessKeyID:          firstNonEmpty(os.Getenv("S3_ACCESS_KEY_ID"), os.Getenv("AWS_ACCESS_KEY_ID")),
+		S3SecretAccessKey:      firstNonEmpty(os.Getenv("S3_SECRET_ACCESS_KEY"), os.Getenv("AWS_SECRET_ACCESS_KEY")),
+		S3PublicBaseURL:        firstNonEmpty(os.Getenv("S3_PUBLIC_BASE_URL"), buildTigrisPublicBaseURL(firstNonEmpty(os.Getenv("S3_BUCKET"), os.Getenv("BUCKET_NAME")), firstNonEmpty(os.Getenv("S3_ENDPOINT"), os.Getenv("AWS_ENDPOINT_URL_S3")))),
 	}, nil
+}
+
+func buildTigrisPublicBaseURL(bucket, endpoint string) string {
+	if bucket != "" && strings.Contains(endpoint, "tigris.dev") {
+		return fmt.Sprintf("https://%s.fly.storage.tigris.dev", bucket)
+	}
+	return ""
 }
 
 func (c *Config) IsDev() bool {

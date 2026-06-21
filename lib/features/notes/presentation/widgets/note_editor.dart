@@ -137,11 +137,13 @@ class _NoteEditorState extends State<NoteEditor> {
     widget.onHasContentChanged?.call(doc != null && doc.isNotEmpty);
   }
 
-  Future<void> _onAttach() async {
+  Future<void> _onAttach({bool imageOnly = false}) async {
     if (widget.onUploadFile == null) return;
     if (_controller?.editor == null) return;
 
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.platform.pickFiles(
+      type: imageOnly ? FileType.image : FileType.any,
+    );
     if (result == null || result.files.isEmpty) return;
     final picked = result.files.single;
     final path = picked.path;
@@ -271,7 +273,8 @@ class _NoteEditorState extends State<NoteEditor> {
             NoteToolbar(
               editor: controller.editor!,
               composer: controller.composer!,
-              onAttach: _onAttach,
+              onAttachFile: () => _onAttach(imageOnly: false),
+              onAttachImage: () => _onAttach(imageOnly: true),
             ),
         ],
       ),

@@ -23,12 +23,14 @@ class NoteToolbar extends StatelessWidget {
     super.key,
     required this.editor,
     required this.composer,
-    this.onAttach,
+    this.onAttachFile,
+    this.onAttachImage,
   });
 
   final Editor editor;
   final MutableDocumentComposer composer;
-  final VoidCallback? onAttach;
+  final VoidCallback? onAttachFile;
+  final VoidCallback? onAttachImage;
 
   @override
   Widget build(BuildContext context) {
@@ -162,10 +164,16 @@ class NoteToolbar extends StatelessWidget {
                 ),
                 const _ToolbarDivider(),
                 _ToolbarButton(
+                  icon: Icons.image,
+                  tooltip: 'Anexar imagem',
+                  isActive: false,
+                  onPressed: onAttachImage,
+                ),
+                _ToolbarButton(
                   icon: Icons.attach_file,
                   tooltip: 'Anexar arquivo',
                   isActive: false,
-                  onPressed: onAttach,
+                  onPressed: onAttachFile,
                 ),
               ],
             ),
