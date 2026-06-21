@@ -71,6 +71,7 @@ type Note struct {
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 	EmbeddingStatus string             `json:"embedding_status"`
 	HideCompleted   bool               `json:"hide_completed"`
+	CollapseImages  bool               `json:"collapse_images"`
 }
 
 type NoteEmbedding struct {

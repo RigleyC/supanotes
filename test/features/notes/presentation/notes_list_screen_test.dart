@@ -50,6 +50,7 @@ class _FakeNotesRepository implements INotesRepository {
     bool? favorite,
     bool? archived,
     bool? hideCompleted,
+    bool? collapseImages,
     String? contextId,
   }) async {}
 

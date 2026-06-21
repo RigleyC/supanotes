@@ -39,9 +39,9 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to `9` — v9 adds attachments table.
+  /// Latest schema version. Bumped to `10` — v10 adds collapseImages.
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -83,6 +83,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 9) {
             await m.createTable(attachments);
+          }
+          if (from < 10) {
+            await m.addColumn(notes, notes.collapseImages);
           }
         },
       );

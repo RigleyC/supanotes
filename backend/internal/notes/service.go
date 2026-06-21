@@ -35,7 +35,7 @@ func isEmptyRegularNote(content string) bool {
 	return strings.TrimSpace(content) == ""
 }
 
-func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string, contextID *pgtype.UUID, favorite, archived, hideCompleted bool) (sqlcgen.Note, error) {
+func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string, contextID *pgtype.UUID, favorite, archived, hideCompleted, collapseImages bool) (sqlcgen.Note, error) {
 	if isEmptyRegularNote(content) {
 		return sqlcgen.Note{}, ErrEmptyNote
 	}
@@ -47,6 +47,7 @@ func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content st
 		Archived:        archived,
 		EmbeddingStatus: "pending",
 		HideCompleted:   hideCompleted,
+		CollapseImages:  collapseImages,
 	}
 	if contextID != nil {
 		arg.ContextID = *contextID
@@ -65,7 +66,7 @@ func (s *Service) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype
 	return note, nil
 }
 
-func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, contextID *pgtype.UUID, favorite *bool, archived *bool, hideCompleted *bool) (sqlcgen.Note, error) {
+func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, contextID *pgtype.UUID, favorite *bool, archived *bool, hideCompleted *bool, collapseImages *bool) (sqlcgen.Note, error) {
 	note, err := s.GetNoteByID(ctx, id, userID)
 	if err != nil {
 		return sqlcgen.Note{}, err
@@ -96,6 +97,9 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	}
 	if hideCompleted != nil {
 		arg.HideCompleted = pgtype.Bool{Bool: *hideCompleted, Valid: true}
+	}
+	if collapseImages != nil {
+		arg.CollapseImages = pgtype.Bool{Bool: *collapseImages, Valid: true}
 	}
 
 	return s.repo.UpdateNote(ctx, arg)

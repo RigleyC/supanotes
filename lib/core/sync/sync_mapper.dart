@@ -42,6 +42,7 @@ class SyncMapper {
         'favorite': n.favorite,
         'archived': n.archived,
         'hide_completed': n.hideCompleted,
+        'collapse_images': n.collapseImages,
         'embedding_status': n.embeddingStatus,
         'shared_permission': n.permission,
         'shared_by_email': n.sharedByEmail,
@@ -126,6 +127,7 @@ class SyncMapper {
         isDirty: false,
         hasRemoteCopy: true,
         hideCompleted: (json['hide_completed'] as bool?) ?? false,
+        collapseImages: (json['collapse_images'] as bool?) ?? false,
       );
 
   TaskData taskFromJson(Map<String, dynamic> json) => TaskData(

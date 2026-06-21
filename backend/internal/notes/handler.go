@@ -30,7 +30,8 @@ type CreateNoteRequest struct {
 	ContextID     *string `json:"context_id"`
 	Favorite      bool    `json:"favorite"`
 	Archived      bool    `json:"archived"`
-	HideCompleted bool    `json:"hide_completed"`
+	HideCompleted  bool    `json:"hide_completed"`
+	CollapseImages bool    `json:"collapse_images"`
 }
 
 type UpdateNoteRequest struct {
@@ -38,7 +39,8 @@ type UpdateNoteRequest struct {
 	ContextID     *string `json:"context_id"`
 	Favorite      *bool   `json:"favorite"`
 	Archived      *bool   `json:"archived"`
-	HideCompleted *bool   `json:"hide_completed"`
+	HideCompleted  *bool   `json:"hide_completed"`
+	CollapseImages *bool   `json:"collapse_images"`
 }
 
 type AppendToInboxRequest struct {
@@ -46,16 +48,17 @@ type AppendToInboxRequest struct {
 }
 
 type NoteResponse struct {
-	ID            string  `json:"id"`
-	ContextID     *string `json:"context_id,omitempty"`
-	Content       string  `json:"content"`
-	Excerpt       *string `json:"excerpt,omitempty"`
-	IsInbox       bool    `json:"is_inbox"`
-	Favorite      bool    `json:"favorite"`
-	Archived      bool    `json:"archived"`
-	HideCompleted bool    `json:"hide_completed"`
-	CreatedAt     string  `json:"created_at"`
-	UpdatedAt     string  `json:"updated_at"`
+	ID             string  `json:"id"`
+	ContextID      *string `json:"context_id,omitempty"`
+	Content        string  `json:"content"`
+	Excerpt        *string `json:"excerpt,omitempty"`
+	IsInbox        bool    `json:"is_inbox"`
+	Favorite       bool    `json:"favorite"`
+	Archived       bool    `json:"archived"`
+	HideCompleted  bool    `json:"hide_completed"`
+	CollapseImages bool    `json:"collapse_images"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 type Handler struct {
@@ -86,7 +89,7 @@ func (h *Handler) Create(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted)
+	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted, req.CollapseImages)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create note")
@@ -186,7 +189,7 @@ func (h *Handler) Update(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted, req.CollapseImages)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
@@ -444,15 +447,16 @@ func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
 		excerpt = &e
 	}
 	return NoteResponse{
-		ID:            uid.UUIDToString(n.ID),
-		ContextID:     ctxID,
-		Content:       n.Content,
-		Excerpt:       excerpt,
-		IsInbox:       n.IsInbox,
-		Favorite:      n.Favorite,
-		Archived:      n.Archived,
-		HideCompleted: n.HideCompleted,
-		CreatedAt:     n.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:     n.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		ID:             uid.UUIDToString(n.ID),
+		ContextID:      ctxID,
+		Content:        n.Content,
+		Excerpt:        excerpt,
+		IsInbox:        n.IsInbox,
+		Favorite:       n.Favorite,
+		Archived:       n.Archived,
+		HideCompleted:  n.HideCompleted,
+		CollapseImages: n.CollapseImages,
+		CreatedAt:      n.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:      n.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }

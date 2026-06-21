@@ -62,6 +62,7 @@ void main() {
         isDirty: true,
         hasRemoteCopy: false,
         hideCompleted: false,
+        collapseImages: false,
       );
 
       final json = SyncMapper().noteToJson(note);

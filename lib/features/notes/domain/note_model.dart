@@ -13,6 +13,7 @@ class NoteModel {
     required this.createdAt,
     required this.updatedAt,
     this.hideCompleted = false,
+    this.collapseImages = false,
     this.permission,
     this.sharedByEmail,
     this.sharedByName,
@@ -28,6 +29,7 @@ class NoteModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool hideCompleted;
+  final bool collapseImages;
   final String? permission;
   final String? sharedByEmail;
   final String? sharedByName;
@@ -50,6 +52,7 @@ class NoteModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? hideCompleted,
+    bool? collapseImages,
     String? permission,
     String? sharedByEmail,
     String? sharedByName,
@@ -65,6 +68,7 @@ class NoteModel {
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         hideCompleted: hideCompleted ?? this.hideCompleted,
+        collapseImages: collapseImages ?? this.collapseImages,
         permission: permission ?? this.permission,
         sharedByEmail: sharedByEmail ?? this.sharedByEmail,
         sharedByName: sharedByName ?? this.sharedByName,
@@ -82,6 +86,7 @@ class NoteModel {
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
       hideCompleted: d.hideCompleted,
+      collapseImages: d.collapseImages,
       permission: d.permission?.isNotEmpty == true ? d.permission : null,
       sharedByEmail: d.sharedByEmail?.isNotEmpty == true ? d.sharedByEmail : null,
       sharedByName: d.sharedByName?.isNotEmpty == true ? d.sharedByName : null,

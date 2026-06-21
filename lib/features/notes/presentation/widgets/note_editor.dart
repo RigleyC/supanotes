@@ -24,6 +24,7 @@ class NoteEditor extends StatefulWidget {
   final String content;
   final Map<String, TaskModel> taskMetadata;
   final bool hideCompleted;
+  final bool collapseImages;
   final bool isReadOnly;
   final SnapshotSave snapshotSave;
   final EmptyNoteExit? emptyNoteExit;
@@ -44,6 +45,7 @@ class NoteEditor extends StatefulWidget {
     required this.content,
     required this.taskMetadata,
     this.hideCompleted = false,
+    this.collapseImages = false,
     this.isReadOnly = false,
     required this.snapshotSave,
     this.emptyNoteExit,
@@ -189,13 +191,21 @@ class _NoteEditorState extends State<NoteEditor> {
               fileSize: attachment.fileSize,
             );
 
+      final existingNode = _controller!.editor!.document.getNodeById(tempId);
+      if (existingNode == null) {
+        return;
+      }
+
       _controller!.editor!.execute([
         ReplaceNodeRequest(existingNodeId: tempId, newNode: finalNode),
       ]);
     } catch (_) {
-      _controller!.editor!.execute([
-        DeleteNodeRequest(nodeId: tempId),
-      ]);
+      final existingNode = _controller!.editor!.document.getNodeById(tempId);
+      if (existingNode != null) {
+        _controller!.editor!.execute([
+          DeleteNodeRequest(nodeId: tempId),
+        ]);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -288,7 +298,10 @@ class _NoteEditorState extends State<NoteEditor> {
                       componentBuilders: [
                         const CustomDividerComponentBuilder(),
                         _taskComponentBuilder,
-                        AttachmentComponentBuilder(editor: controller.editor!),
+                        AttachmentComponentBuilder(
+                          editor: controller.editor!,
+                          collapseImages: widget.collapseImages,
+                        ),
                         ...defaultComponentBuilders,
                       ],
                     ),

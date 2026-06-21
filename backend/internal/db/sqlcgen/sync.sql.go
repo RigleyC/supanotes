@@ -115,7 +115,7 @@ func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]No
 }
 
 const getSyncNotes = `-- name: GetSyncNotes :many
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed,
+SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed, n.collapse_images,
   COALESCE(ns.permission, '')::text AS shared_permission,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
@@ -149,6 +149,7 @@ type GetSyncNotesRow struct {
 	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
 	EmbeddingStatus  string             `json:"embedding_status"`
 	HideCompleted    bool               `json:"hide_completed"`
+	CollapseImages   bool               `json:"collapse_images"`
 	SharedPermission string             `json:"shared_permission"`
 	SharedByEmail    string             `json:"shared_by_email"`
 	SharedByName     string             `json:"shared_by_name"`
@@ -178,6 +179,7 @@ func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]G
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
 			&i.HideCompleted,
+			&i.CollapseImages,
 			&i.SharedPermission,
 			&i.SharedByEmail,
 			&i.SharedByName,
@@ -397,8 +399,8 @@ func (q *Queries) UpsertContext(ctx context.Context, arg UpsertContextParams) (C
 }
 
 const upsertNote = `-- name: UpsertNote :one
-INSERT INTO notes (id, user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
+INSERT INTO notes (id, user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed, collapse_images, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)
 ON CONFLICT (id) DO UPDATE
 SET context_id = EXCLUDED.context_id,
     content = EXCLUDED.content,
@@ -407,10 +409,11 @@ SET context_id = EXCLUDED.context_id,
     archived = EXCLUDED.archived,
     embedding_status = EXCLUDED.embedding_status,
     hide_completed = EXCLUDED.hide_completed,
+    collapse_images = EXCLUDED.collapse_images,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 WHERE notes.user_id = EXCLUDED.user_id
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
+RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images
 `
 
 type UpsertNoteParams struct {
@@ -423,6 +426,7 @@ type UpsertNoteParams struct {
 	Archived        bool               `json:"archived"`
 	EmbeddingStatus string             `json:"embedding_status"`
 	HideCompleted   bool               `json:"hide_completed"`
+	CollapseImages  bool               `json:"collapse_images"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 }
@@ -438,6 +442,7 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 		arg.Archived,
 		arg.EmbeddingStatus,
 		arg.HideCompleted,
+		arg.CollapseImages,
 		arg.CreatedAt,
 		arg.DeletedAt,
 	)
@@ -457,6 +462,7 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
 		&i.HideCompleted,
+		&i.CollapseImages,
 	)
 	return i, err
 }

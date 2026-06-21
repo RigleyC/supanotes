@@ -1,0 +1,1 @@
+ALTER TABLE notes ADD COLUMN collapse_images BOOLEAN NOT NULL DEFAULT false;

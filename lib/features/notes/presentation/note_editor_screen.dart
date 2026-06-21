@@ -105,6 +105,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       widget.noteId,
                       hideCompleted: !note.hideCompleted,
                     );
+                  case 'collapse_images':
+                    await repo.updateNote(
+                      widget.noteId,
+                      collapseImages: !note.collapseImages,
+                    );
                 }
               },
               items: [
@@ -126,6 +131,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           : Icons.visibility_off),
                   value: 'hide_completed',
                 ),
+                AdaptivePopupMenuItem<String>(
+                  label: note.collapseImages
+                      ? 'Expandir imagens'
+                      : 'Colapsar imagens',
+                  icon: PlatformInfo.isIOS26OrHigher()
+                      ? (note.collapseImages ? 'photo.fill' : 'photo')
+                      : (note.collapseImages
+                          ? Icons.image
+                          : Icons.image_outlined),
+                  value: 'collapse_images',
+                ),
               ],
             ),
           if (!isReadOnly)
@@ -142,6 +158,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           content: note.content,
           taskMetadata: tasksMap,
           hideCompleted: note.hideCompleted,
+          collapseImages: note.collapseImages,
           isReadOnly: isReadOnly,
           snapshotSave: (noteId, markdown, tasks) =>
               defaultSnapshotSave(repo, noteId, markdown, tasks),

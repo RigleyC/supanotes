@@ -123,7 +123,9 @@ class _AttachmentElementConverter implements ElementToNodeConverter {
 
       switch (type) {
         case 'img':
-          return ImageAttachmentNode(id: id, url: url, fileName: filename);
+          return ImageAttachmentNode(
+            id: id, url: url, fileName: filename,
+          );
         case 'file':
           final mime = data['mime'] as String? ?? 'application/octet-stream';
           final size = data['size'] as int?;

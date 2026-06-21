@@ -31,7 +31,7 @@ func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON 
 	if err != nil {
 		return "", err
 	}
-	note, err := t.notesSvc.CreateNote(ctx, userID, args.Content, nil, false, false, false)
+	note, err := t.notesSvc.CreateNote(ctx, userID, args.Content, nil, false, false, false, false)
 	if err != nil {
 		return "", err
 	}
@@ -210,7 +210,7 @@ func (t *UpdateNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJS
 	if err != nil {
 		return "", err
 	}
-	note, err := t.notesSvc.UpdateNote(ctx, userID, nid, args.Content, nil, nil, nil, nil)
+	note, err := t.notesSvc.UpdateNote(ctx, userID, nid, args.Content, nil, nil, nil, nil, nil)
 	if err != nil {
 		return "", err
 	}
@@ -243,7 +243,7 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, args
 		return "", err
 	}
 	newContent := note.Content + "\n" + args.Content
-	updated, err := t.notesSvc.UpdateNote(ctx, userID, nid, &newContent, nil, nil, nil, nil)
+	updated, err := t.notesSvc.UpdateNote(ctx, userID, nid, &newContent, nil, nil, nil, nil, nil)
 	if err != nil {
 		return "", err
 	}

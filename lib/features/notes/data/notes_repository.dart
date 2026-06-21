@@ -33,6 +33,7 @@ abstract class INotesRepository {
     bool? favorite,
     bool? archived,
     bool? hideCompleted,
+    bool? collapseImages,
     String? contextId,
   });
   Future<void> toggleFavorite(String id);
@@ -136,6 +137,7 @@ class NotesRepository implements INotesRepository {
     bool? favorite,
     bool? archived,
     bool? hideCompleted,
+    bool? collapseImages,
     String? contextId,
   }) async {
     final current = await _local.getNoteById(id);
@@ -152,6 +154,8 @@ class NotesRepository implements INotesRepository {
       archived: archived == null ? const Value.absent() : Value(archived),
       hideCompleted:
           hideCompleted == null ? const Value.absent() : Value(hideCompleted),
+      collapseImages:
+          collapseImages == null ? const Value.absent() : Value(collapseImages),
       contextId: contextId == null ? const Value.absent() : Value(contextId),
       updatedAt: Value(DateTime.now().toUtc()),
       isDirty: const Value(true),

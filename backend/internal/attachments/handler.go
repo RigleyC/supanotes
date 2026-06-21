@@ -1,6 +1,7 @@
 package attachments
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -52,6 +53,9 @@ func (h *Handler) Upload(c echo.Context) error {
 
 	attachment, err := h.svc.Upload(c.Request().Context(), noteID, file.Filename, src, file.Size)
 	if err != nil {
+		if errors.Is(err, ErrFileTooLarge) {
+			return web.JSONError(c, http.StatusRequestEntityTooLarge, "O arquivo excede o limite de 200 MB")
+		}
 		c.Logger().Errorf("attachment upload failed: %v", err)
 		return web.JSONError(c, http.StatusInternalServerError, "upload failed")
 	}

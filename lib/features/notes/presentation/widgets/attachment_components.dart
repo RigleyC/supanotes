@@ -7,9 +7,11 @@ import '../../domain/attachment_nodes.dart';
 class AttachmentComponentBuilder implements ComponentBuilder {
   const AttachmentComponentBuilder({
     required this.editor,
+    required this.collapseImages,
   });
 
   final Editor editor;
+  final bool collapseImages;
 
   @override
   SingleColumnLayoutComponentViewModel? createViewModel(
@@ -19,6 +21,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
       nodeId: node.id,
       node: node,
       createdAt: node.metadata[NodeMetadata.createdAt],
+      collapseImages: collapseImages,
       onDelete: () {
         editor.execute([
           DeleteNodeRequest(nodeId: node.id),
@@ -38,6 +41,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
           selection: viewModel.selection?.nodeSelection as UpstreamDownstreamNodeSelection?,
           selectionColor: viewModel.selectionColor,
           onDelete: viewModel.onDelete,
+          collapseImages: viewModel.collapseImages,
         ),
       FileAttachmentNode n => _FileAttachmentWidget(
           componentKey: context.componentKey,
@@ -62,6 +66,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel with Sel
     required super.nodeId,
     required this.node,
     required this.onDelete,
+    required this.collapseImages,
     super.createdAt,
     super.padding = EdgeInsets.zero,
     DocumentNodeSelection? selection,
@@ -73,6 +78,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel with Sel
 
   final AttachmentNode node;
   final VoidCallback onDelete;
+  final bool collapseImages;
 
   @override
   _AttachmentViewModel copy() =>
@@ -80,6 +86,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel with Sel
         nodeId: nodeId,
         node: node,
         onDelete: onDelete,
+        collapseImages: collapseImages,
         selection: selection,
         selectionColor: selectionColor,
       );
@@ -97,6 +104,7 @@ class _ImageAttachmentWidget extends StatelessWidget {
     required this.componentKey,
     required this.node,
     required this.onDelete,
+    required this.collapseImages,
     this.selection,
     required this.selectionColor,
   });
@@ -104,17 +112,17 @@ class _ImageAttachmentWidget extends StatelessWidget {
   final GlobalKey componentKey;
   final ImageAttachmentNode node;
   final VoidCallback onDelete;
+  final bool collapseImages;
   final UpstreamDownstreamNodeSelection? selection;
   final Color selectionColor;
 
   @override
   Widget build(BuildContext context) {
     final isUploading = node.metadata['isUploading'] == true;
-    final isFailed = node.metadata['isFailed'] == true;
     final cs = Theme.of(context).colorScheme;
 
     late final Widget child;
-    if (isUploading || isFailed) {
+    if (isUploading) {
       child = Container(
         height: 160,
         decoration: BoxDecoration(
@@ -125,33 +133,21 @@ class _ImageAttachmentWidget extends StatelessWidget {
         child: Stack(
           children: [
             Center(
-              child: isUploading
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Enviando foto...',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, color: cs.error, size: 28),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Falha ao enviar foto',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
-                        ),
-                      ],
-                    ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Enviando foto...',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
             ),
             Positioned(
               top: 8,
@@ -159,21 +155,72 @@ class _ImageAttachmentWidget extends StatelessWidget {
               child: IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: onDelete,
-                color: isFailed ? cs.error : cs.outline,
-                tooltip: 'Remover foto',
+                color: cs.outline,
+                tooltip: 'Cancelar envio',
               ),
             ),
           ],
         ),
       );
-    } else {
-      child = ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          node.url,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
+    } else if (collapseImages) {
+      child = InkWell(
+        onTap: () => launchUrl(Uri.parse(node.url)),
+        borderRadius: BorderRadius.circular(32),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainer.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(Icons.image_outlined, color: cs.onSurfaceVariant, size: 22),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      node.fileName,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Imagem',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.outline, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
+      );
+    } else {
+      child = Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              node.url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
+            ),
+          ),
+        ],
       );
     }
 
@@ -216,7 +263,6 @@ class _FileAttachmentWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUploading = node.metadata['isUploading'] == true;
-    final isFailed = node.metadata['isFailed'] == true;
     final cs = Theme.of(context).colorScheme;
 
     return SelectableBox(
@@ -227,7 +273,7 @@ class _FileAttachmentWidget extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: InkWell(
-            onTap: (isUploading || isFailed) ? null : () => launchUrl(Uri.parse(node.url)),
+            onTap: isUploading ? null : () => launchUrl(Uri.parse(node.url)),
             borderRadius: BorderRadius.circular(32),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -258,12 +304,10 @@ class _FileAttachmentWidget extends StatelessWidget {
                               ),
                             )
                           : Icon(
-                              isFailed
-                                  ? Icons.error_outline
-                                  : (node.isVideo
-                                      ? Icons.play_circle_outline
-                                      : Icons.insert_drive_file),
-                              color: isFailed ? cs.error : cs.onSurfaceVariant,
+                              node.isVideo
+                                  ? Icons.play_circle_outline
+                                  : Icons.insert_drive_file,
+                              color: cs.onSurfaceVariant,
                               size: 22,
                             ),
                     ),
@@ -283,24 +327,22 @@ class _FileAttachmentWidget extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          isUploading
-                              ? 'Enviando...'
-                              : (isFailed ? 'Falha no envio' : _formatBytes(node.fileSize)),
+                          isUploading ? 'Enviando...' : _formatBytes(node.fileSize),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isFailed ? cs.error : cs.outline,
+                                color: cs.outline,
                                 fontSize: 12,
                               ),
                         ),
                       ],
                     ),
                   ),
-                  if (isFailed || isUploading) ...[
+                  if (isUploading) ...[
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: onDelete,
-                      color: isFailed ? cs.error : cs.outline,
-                      tooltip: 'Remover anexo',
+                      color: cs.outline,
+                      tooltip: 'Cancelar envio',
                     ),
                   ],
                 ],

@@ -119,6 +119,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       isDirty: false,
       hasRemoteCopy: false,
       hideCompleted: false,
+      collapseImages: false,
     );
     _store[id] = data;
     return data;

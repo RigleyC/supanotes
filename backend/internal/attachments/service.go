@@ -2,6 +2,7 @@ package attachments
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -14,7 +15,9 @@ import (
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
-const maxUploadBytes = 50 * 1024 * 1024 // 50 MB
+const maxUploadBytes = 200 * 1024 * 1024 // 200 MB
+
+var ErrFileTooLarge = errors.New("file exceeds 200 MB limit")
 
 type Service interface {
 	Upload(ctx context.Context, noteID pgtype.UUID, filename string, r io.Reader, size int64) (sqlcgen.Attachment, error)
@@ -32,7 +35,7 @@ func NewService(repo Repository, storage StorageService) Service {
 
 func (s *service) Upload(ctx context.Context, noteID pgtype.UUID, filename string, r io.Reader, size int64) (sqlcgen.Attachment, error) {
 	if size > maxUploadBytes {
-		return sqlcgen.Attachment{}, fmt.Errorf("file too large: %d bytes (max 50 MB)", size)
+		return sqlcgen.Attachment{}, ErrFileTooLarge
 	}
 	ext := filepath.Ext(filename)
 	mimeType := mime.TypeByExtension(ext)

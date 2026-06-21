@@ -32,7 +32,7 @@ UPDATE notes
 SET content = content || E'\n\n' || $3,
     updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
+RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images
 `
 
 type AppendToInboxParams struct {
@@ -59,6 +59,7 @@ func (q *Queries) AppendToInbox(ctx context.Context, arg AppendToInboxParams) (N
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
 		&i.HideCompleted,
+		&i.CollapseImages,
 	)
 	return i, err
 }
@@ -68,7 +69,7 @@ UPDATE notes
 SET content = content || E'\n\n' || $3, updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL AND notes.is_inbox = false
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
+RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images
 `
 
 type AppendToNoteContentParams struct {
@@ -95,6 +96,7 @@ func (q *Queries) AppendToNoteContent(ctx context.Context, arg AppendToNoteConte
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
 		&i.HideCompleted,
+		&i.CollapseImages,
 	)
 	return i, err
 }
@@ -137,9 +139,9 @@ func (q *Queries) CreateContext(ctx context.Context, arg CreateContextParams) (C
 }
 
 const createNote = `-- name: CreateNote :one
-INSERT INTO notes (user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
+INSERT INTO notes (user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed, collapse_images)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images
 `
 
 type CreateNoteParams struct {
@@ -151,6 +153,7 @@ type CreateNoteParams struct {
 	Archived        bool        `json:"archived"`
 	EmbeddingStatus string      `json:"embedding_status"`
 	HideCompleted   bool        `json:"hide_completed"`
+	CollapseImages  bool        `json:"collapse_images"`
 }
 
 func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error) {
@@ -163,6 +166,7 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		arg.Archived,
 		arg.EmbeddingStatus,
 		arg.HideCompleted,
+		arg.CollapseImages,
 	)
 	var i Note
 	err := row.Scan(
@@ -180,6 +184,7 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
 		&i.HideCompleted,
+		&i.CollapseImages,
 	)
 	return i, err
 }
@@ -303,7 +308,7 @@ func (q *Queries) GetContexts(ctx context.Context, userID pgtype.UUID) ([]Contex
 }
 
 const getInboxNote = `-- name: GetInboxNote :one
-SELECT id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
+SELECT id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images FROM notes
 WHERE user_id = $1 AND is_inbox = true AND deleted_at IS NULL
 `
 
@@ -325,12 +330,13 @@ func (q *Queries) GetInboxNote(ctx context.Context, userID pgtype.UUID) (Note, e
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
 		&i.HideCompleted,
+		&i.CollapseImages,
 	)
 	return i, err
 }
 
 const getLinkedNotes = `-- name: GetLinkedNotes :many
-SELECT DISTINCT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed FROM notes n
+SELECT DISTINCT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed, n.collapse_images FROM notes n
 JOIN note_links nl ON (n.id = nl.source_id OR n.id = nl.target_id)
 WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.id != ALL($1::uuid[])
@@ -369,6 +375,7 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
 			&i.HideCompleted,
+			&i.CollapseImages,
 		); err != nil {
 			return nil, err
 		}
@@ -381,7 +388,7 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 }
 
 const getNoteByID = `-- name: GetNoteByID :one
-SELECT id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
+SELECT id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images FROM notes
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2))
 `
@@ -409,12 +416,13 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (Note,
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
 		&i.HideCompleted,
+		&i.CollapseImages,
 	)
 	return i, err
 }
 
 const getNotes = `-- name: GetNotes :many
-SELECT id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
+SELECT id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images FROM notes
 WHERE is_inbox = false
   AND deleted_at IS NULL
   AND (notes.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = notes.id AND note_shares.user_id = $1))
@@ -465,6 +473,7 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, err
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
 			&i.HideCompleted,
+			&i.CollapseImages,
 		); err != nil {
 			return nil, err
 		}
@@ -477,7 +486,7 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]Note, err
 }
 
 const getRecentNotes = `-- name: GetRecentNotes :many
-SELECT id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed FROM notes
+SELECT id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images FROM notes
 WHERE user_id = $1
   AND is_inbox = false
   AND deleted_at IS NULL
@@ -510,6 +519,7 @@ func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Not
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
 			&i.HideCompleted,
+			&i.CollapseImages,
 		); err != nil {
 			return nil, err
 		}
@@ -602,7 +612,7 @@ const setInboxContent = `-- name: SetInboxContent :one
 UPDATE notes
 SET content = $3, updated_at = NOW()
 WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
+RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images
 `
 
 type SetInboxContentParams struct {
@@ -629,6 +639,7 @@ func (q *Queries) SetInboxContent(ctx context.Context, arg SetInboxContentParams
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
 		&i.HideCompleted,
+		&i.CollapseImages,
 	)
 	return i, err
 }
@@ -641,10 +652,11 @@ SET content = COALESCE($3, content),
     archived = COALESCE($6, archived),
     embedding_status = COALESCE($7, embedding_status),
     hide_completed = COALESCE($8, hide_completed),
+    collapse_images = COALESCE($9, collapse_images),
     updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
+RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed, collapse_images
 `
 
 type UpdateNoteParams struct {
@@ -656,6 +668,7 @@ type UpdateNoteParams struct {
 	Archived        pgtype.Bool `json:"archived"`
 	EmbeddingStatus pgtype.Text `json:"embedding_status"`
 	HideCompleted   pgtype.Bool `json:"hide_completed"`
+	CollapseImages  pgtype.Bool `json:"collapse_images"`
 }
 
 func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error) {
@@ -668,6 +681,7 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		arg.Archived,
 		arg.EmbeddingStatus,
 		arg.HideCompleted,
+		arg.CollapseImages,
 	)
 	var i Note
 	err := row.Scan(
@@ -685,6 +699,7 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		&i.DeletedAt,
 		&i.EmbeddingStatus,
 		&i.HideCompleted,
+		&i.CollapseImages,
 	)
 	return i, err
 }

@@ -7,7 +7,7 @@ import (
 	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -46,16 +46,14 @@ func NewS3Storage(endpoint, region, bucket, accessKey, secretKey, publicBase str
 }
 
 func (s *s3Storage) Upload(ctx context.Context, key string, r io.Reader, mimeType string, size int64) (string, error) {
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+	uploader := manager.NewUploader(s.client)
+	_, err := uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(s.bucket),
 		Key:           aws.String(key),
 		Body:          r,
 		ContentType:   aws.String(mimeType),
-		ContentLength: size,
-	}, s3.WithAPIOptions(
-		v4.AddUnsignedPayloadMiddleware,
-		v4.RemoveComputePayloadSHA256Middleware,
-	))
+		ContentLength: aws.Int64(size),
+	})
 	if err != nil {
 		return "", fmt.Errorf("s3 upload: %w", err)
 	}
