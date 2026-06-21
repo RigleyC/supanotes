@@ -19,6 +19,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	"github.com/RigleyC/supanotes/internal/agent"
+	"github.com/RigleyC/supanotes/internal/attachments"
 	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/contexts"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
@@ -249,6 +250,19 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/notes/:id/shares", sharesH.ShareNote)
 	protected.GET("/notes/:id/shares", sharesH.ListNoteShares)
 	protected.DELETE("/notes/:id/shares/:user_id", sharesH.DeleteNoteShare)
+
+	// Attachments
+	storageBackend, err := attachments.NewS3Storage(
+		cfg.S3Endpoint, cfg.S3Region, cfg.S3Bucket,
+		cfg.S3AccessKeyID, cfg.S3SecretAccessKey, cfg.S3PublicBaseURL,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to init storage backend")
+	}
+	attachmentsRepo := attachments.NewRepository(queries)
+	attachmentsSvc := attachments.NewService(attachmentsRepo, storageBackend)
+	attachmentsH := attachments.NewHandler(attachmentsSvc)
+	protected.POST("/attachments/upload", attachmentsH.Upload)
 
 	// Agent Context Builder
 	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc, memoriesRepo, embeddingClient)

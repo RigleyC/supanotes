@@ -293,3 +293,10 @@ func (m *mockQuerier) CountOverdueTasks(ctx context.Context, userID pgtype.UUID)
 func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
+func (m *mockQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (m *mockQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
+	return sqlcgen.Attachment{}, nil
+}
+func (m *mockQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
+	return nil, nil
+}

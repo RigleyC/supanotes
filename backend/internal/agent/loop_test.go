@@ -468,6 +468,13 @@ func (s *stubLoopQuerier) GetPendingToolConfirmation(context.Context, sqlcgen.Ge
 func (s *stubLoopQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
 	panic("unimplemented")
 }
+func (s *stubLoopQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (s *stubLoopQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
+	return nil, nil
+}
 
 type trackingStubLoopRepo struct {
 	stubLoopRepo

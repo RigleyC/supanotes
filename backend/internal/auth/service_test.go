@@ -686,3 +686,10 @@ func (m *mockQuerier) GetPendingToolConfirmation(context.Context, sqlcgen.GetPen
 func (m *mockQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
 	panic("unimplemented")
 }
+func (m *mockQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (m *mockQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
+	return sqlcgen.Attachment{}, nil
+}
+func (m *mockQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
+	return nil, nil
+}

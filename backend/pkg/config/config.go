@@ -47,6 +47,14 @@ type Config struct {
 	OpenAICompatModel      string
 	OpenAIEmbeddingsAPIKey string
 	OpenAIEmbeddingsModel  string
+
+	// Storage (S3-compatible: AWS, MinIO, Supabase, GCS)
+	S3Endpoint        string // S3_ENDPOINT — e.g. https://s3.amazonaws.com or http://minio:9000
+	S3Region          string // S3_REGION
+	S3Bucket          string // S3_BUCKET
+	S3AccessKeyID     string // S3_ACCESS_KEY_ID
+	S3SecretAccessKey string // S3_SECRET_ACCESS_KEY
+	S3PublicBaseURL   string // S3_PUBLIC_BASE_URL — public URL prefix for serving files
 }
 
 func Load() (*Config, error) {
@@ -99,6 +107,12 @@ func Load() (*Config, error) {
 		OpenAICompatModel:      os.Getenv("OPENAI_COMPAT_MODEL"),
 		OpenAIEmbeddingsAPIKey: os.Getenv("OPENAI_EMBEDDINGS_API_KEY"),
 		OpenAIEmbeddingsModel:  os.Getenv("OPENAI_EMBEDDINGS_MODEL"),
+		S3Endpoint:             os.Getenv("S3_ENDPOINT"),
+		S3Region:               os.Getenv("S3_REGION"),
+		S3Bucket:               os.Getenv("S3_BUCKET"),
+		S3AccessKeyID:          os.Getenv("S3_ACCESS_KEY_ID"),
+		S3SecretAccessKey:      os.Getenv("S3_SECRET_ACCESS_KEY"),
+		S3PublicBaseURL:        os.Getenv("S3_PUBLIC_BASE_URL"),
 	}, nil
 }
 

@@ -357,6 +357,13 @@ func (s *stubQuerier) GetPendingToolConfirmation(context.Context, sqlcgen.GetPen
 func (s *stubQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (s *stubQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
+	return nil, nil
+}
 
 var _ sqlcgen.Querier = (*stubQuerier)(nil)
 

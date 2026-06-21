@@ -44,8 +44,8 @@ func (m *mockQuerier) AppendToInbox(_ context.Context, _ sqlcgen.AppendToInboxPa
 func (m *mockQuerier) AppendToNoteContent(_ context.Context, _ sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
-func (m *mockQuerier) CleanupOldMessages(_ context.Context) error                     { return nil }
-func (m *mockQuerier) CountNotes(_ context.Context, _ pgtype.UUID) (int64, error)     { return 0, nil }
+func (m *mockQuerier) CleanupOldMessages(_ context.Context) error                 { return nil }
+func (m *mockQuerier) CountNotes(_ context.Context, _ pgtype.UUID) (int64, error) { return 0, nil }
 func (m *mockQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
 }
@@ -301,6 +301,14 @@ func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen
 }
 
 func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (m *mockQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
+	return sqlcgen.Attachment{}, nil
+}
+func (m *mockQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return nil, nil
 }
 
