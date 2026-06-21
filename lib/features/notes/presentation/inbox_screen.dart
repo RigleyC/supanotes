@@ -109,6 +109,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
+        title: Text(inbox.title),
         actions: [
           IconButton(
             icon: const Icon(Icons.check),

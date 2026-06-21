@@ -1,11 +1,17 @@
 library;
 
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/features/notes/domain/attachment_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
+import 'package:supanotes/features/notes/presentation/widgets/attachment_components.dart';
+import 'package:supanotes/features/notes/presentation/widgets/attachment_nodes.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
@@ -27,6 +33,8 @@ class NoteEditor extends StatefulWidget {
   onTaskLongPress;
   final Future<void> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
+  final Future<AttachmentModel> Function(String noteId, File file, String mimeType)?
+  onUploadFile;
 
   const NoteEditor({
     super.key,
@@ -41,6 +49,7 @@ class NoteEditor extends StatefulWidget {
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
+    this.onUploadFile,
   });
 
   @override
@@ -69,6 +78,11 @@ class _NoteEditorState extends State<NoteEditor> {
     _controller!.init(content: widget.content);
     if (!widget.isReadOnly) {
       _controller!.document?.addListener(_onDocumentChanged);
+      if (widget.content.isEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _controller?.focusNode?.requestFocus();
+        });
+      }
     }
     _notifyContentChanged();
 
@@ -119,6 +133,73 @@ class _NoteEditorState extends State<NoteEditor> {
   void _notifyContentChanged() {
     final doc = _controller?.document;
     widget.onHasContentChanged?.call(doc != null && doc.isNotEmpty);
+  }
+
+  Future<void> _onAttach() async {
+    if (widget.onUploadFile == null) return;
+    if (_controller?.editor == null) return;
+
+    final result = await FilePicker.platform.pickFiles();
+    if (result == null || result.files.isEmpty) return;
+    final picked = result.files.single;
+    final path = picked.path;
+    if (path == null) return;
+    final file = File(path);
+    final ext = picked.extension?.toLowerCase() ?? '';
+    final mimeType = _mimeFromExtension(ext);
+
+    late final AttachmentModel attachment;
+    try {
+      attachment = await widget.onUploadFile!(widget.noteId, file, mimeType);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Falha ao enviar anexo')),
+        );
+      }
+      return;
+    }
+
+    final url = attachment.displayUrl ?? '';
+    final DocumentNode node = attachment.type == AttachmentType.image
+        ? ImageAttachmentNode(
+            id: attachment.id, url: url, fileName: attachment.fileName,
+          )
+        : FileAttachmentNode(
+            id: attachment.id, url: url,
+            fileName: attachment.fileName, mimeType: attachment.mimeType,
+          );
+
+    _controller!.editor!.execute([
+      InsertNodeAtCaretRequest(node: node),
+    ]);
+  }
+
+  String _mimeFromExtension(String ext) {
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mov':
+        return 'video/quicktime';
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+      case 'docx':
+        return 'application/msword';
+      case 'zip':
+        return 'application/zip';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   @override
@@ -176,8 +257,6 @@ class _NoteEditorState extends State<NoteEditor> {
                   child: SuperEditorIosControlsScope(
                     controller: _iosController!,
                     child: SuperEditor(
-                      autofocus: true,
-
                       editor: controller.editor!,
                       focusNode: widget.isReadOnly
                           ? null
@@ -206,6 +285,9 @@ class _NoteEditorState extends State<NoteEditor> {
                       componentBuilders: [
                         const CustomDividerComponentBuilder(),
                         _taskComponentBuilder,
+                        const ImageAttachmentComponentBuilder(),
+                        const FileAttachmentComponentBuilder(),
+                        const RichLinkComponentBuilder(),
                         ...defaultComponentBuilders,
                       ],
                     ),
@@ -218,6 +300,7 @@ class _NoteEditorState extends State<NoteEditor> {
             NoteToolbar(
               editor: controller.editor!,
               composer: controller.composer!,
+              onAttach: _onAttach,
             ),
         ],
       ),

@@ -3,7 +3,6 @@ library;
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/utils/save_throttle.dart';
@@ -11,7 +10,7 @@ import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
-    show NoteEditorCommands, RandomDividerConversionReaction;
+    show RandomDividerConversionReaction;
 import 'package:supanotes/features/notes/domain/task_entry.dart';
 
 const int _dividerCount = 35;

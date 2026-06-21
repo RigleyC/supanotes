@@ -6,6 +6,7 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supanotes/features/notes/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
@@ -152,6 +153,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               ref.read(tasksRepositoryProvider).completeTask(taskId),
           onTaskReopen: (taskId) =>
               ref.read(tasksRepositoryProvider).reopenTask(taskId),
+          onUploadFile: isReadOnly
+              ? null
+              : (noteId, file, mimeType) =>
+                  ref.read(attachmentsRepositoryProvider).upload(
+                    noteId: noteId, file: file, mimeType: mimeType,
+                  ),
         ),
       ),
     );

@@ -53,6 +53,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       setComplete: (bool isComplete) async {
         if (isComplete && hideCompleted) {
           _animatingNodeIds.add(node.id);
+          FocusManager.instance.primaryFocus?.unfocus();
         }
         _editor.execute([
           ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),

@@ -35,6 +35,7 @@ type Querier interface {
 	CreateTaskCompletion(ctx context.Context, arg CreateTaskCompletionParams) (TaskCompletion, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserSettings(ctx context.Context, arg CreateUserSettingsParams) (UserSetting, error)
+	DeleteAttachment(ctx context.Context, id pgtype.UUID) error
 	DeleteContext(ctx context.Context, arg DeleteContextParams) error
 	DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error
 	DeleteDeviceTokenByToken(ctx context.Context, arg DeleteDeviceTokenByTokenParams) error
@@ -83,6 +84,8 @@ type Querier interface {
 	HardDeleteExpiredContexts(ctx context.Context) error
 	HardDeleteExpiredNotes(ctx context.Context) error
 	HardDeleteExpiredTasks(ctx context.Context) error
+	InsertAttachment(ctx context.Context, arg InsertAttachmentParams) (Attachment, error)
+	ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]Attachment, error)
 	ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]DeviceToken, error)
 	RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error
 	ResolvePendingToolConfirmation(ctx context.Context, arg ResolvePendingToolConfirmationParams) (PendingToolConfirmation, error)

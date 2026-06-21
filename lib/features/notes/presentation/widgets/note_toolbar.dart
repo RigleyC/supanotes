@@ -19,10 +19,16 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
 
 class NoteToolbar extends StatelessWidget {
-  const NoteToolbar({super.key, required this.editor, required this.composer});
+  const NoteToolbar({
+    super.key,
+    required this.editor,
+    required this.composer,
+    this.onAttach,
+  });
 
   final Editor editor;
   final MutableDocumentComposer composer;
+  final VoidCallback? onAttach;
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +159,13 @@ class NoteToolbar extends StatelessWidget {
                   tooltip: 'Divisor',
                   isActive: false,
                   onPressed: _insertDivider,
+                ),
+                const _ToolbarDivider(),
+                _ToolbarButton(
+                  icon: Icons.attach_file,
+                  tooltip: 'Anexar arquivo',
+                  isActive: false,
+                  onPressed: onAttach,
                 ),
               ],
             ),
