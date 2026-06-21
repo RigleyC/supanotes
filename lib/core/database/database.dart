@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
+import 'daos/attachments_dao.dart';
 import 'daos/contexts_dao.dart';
 import 'daos/note_links_dao.dart';
 import 'daos/note_tags_dao.dart';
@@ -15,6 +16,7 @@ import 'daos/notes_dao.dart';
 import 'daos/tags_dao.dart';
 import 'daos/task_completions_dao.dart';
 import 'daos/tasks_dao.dart';
+import 'tables/attachments.dart';
 import 'tables/contexts.dart';
 import 'tables/note_links.dart';
 import 'tables/note_tags.dart';
@@ -28,8 +30,8 @@ import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNam
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions, NoteLinks],
-  daos: [NotesDao, ContextsDao, TasksDao, TagsDao, TaskCompletionsDao, NoteLinksDao, NoteTagsDao],
+  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions, NoteLinks, Attachments],
+  daos: [NotesDao, ContextsDao, TasksDao, TagsDao, TaskCompletionsDao, NoteLinksDao, NoteTagsDao, AttachmentsDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -37,9 +39,9 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to `8` — v8 drops `title` from notes.
+  /// Latest schema version. Bumped to `9` — v9 adds attachments table.
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -78,6 +80,9 @@ class AppDatabase extends _$AppDatabase {
             } catch (e) {
               dev.log('Failed to drop note title column during migration: $e', name: 'DatabaseMigration');
             }
+          }
+          if (from < 9) {
+            await m.createTable(attachments);
           }
         },
       );
