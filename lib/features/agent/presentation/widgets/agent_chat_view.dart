@@ -8,10 +8,9 @@ import 'package:supanotes/features/agent/domain/agent_strings.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
 import 'package:supanotes/features/agent/presentation/chat_message_adapter.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
-import 'package:supanotes/features/agent/presentation/widgets/agent_action_card.dart';
-import 'package:supanotes/features/agent/presentation/widgets/confirmation_card.dart';
+import 'package:supanotes/features/agent/presentation/widgets/agent_action_timeline_card.dart';
 import 'package:supanotes/features/agent/presentation/widgets/collapsible_thinking_card.dart';
-import 'package:supanotes/features/agent/presentation/widgets/skeleton_status_card.dart';
+import 'package:supanotes/features/agent/presentation/widgets/shimmer_text.dart';
 
 
 class AgentChatView extends StatefulWidget {
@@ -22,6 +21,7 @@ class AgentChatView extends StatefulWidget {
     required this.loaded,
     required this.streaming,
     required this.onSend,
+    this.loadingLabel,
     this.onCancel,
     this.onResolveConfirmation,
   });
@@ -30,6 +30,7 @@ class AgentChatView extends StatefulWidget {
   final List<ChatToolAction> actions;
   final bool loaded;
   final bool streaming;
+  final String? loadingLabel;
   final ValueChanged<String> onSend;
   final VoidCallback? onCancel;
   final void Function(String confirmationId, {required bool approved})?
@@ -336,7 +337,7 @@ class _AgentChatViewState extends State<AgentChatView> {
                     const SizedBox(width: 8),
                     ShimmerText(
                       child: Text(
-                        'Pensando...',
+                        widget.loadingLabel ?? 'Pensando...',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                           fontStyle: FontStyle.italic,
@@ -349,8 +350,7 @@ class _AgentChatViewState extends State<AgentChatView> {
             ),
             maxWidth: 768,
             resultRenderers: {
-              'confirmation': _buildConfirmationCard,
-              'action': _buildActionCard,
+              'action_timeline': _buildActionTimelineCard,
             },
             welcomeMessageConfig: WelcomeMessageConfig(
               containerDecoration: const BoxDecoration(color: Colors.transparent),
@@ -365,35 +365,11 @@ class _AgentChatViewState extends State<AgentChatView> {
     );
   }
 
-  Widget _buildConfirmationCard(BuildContext context, Map<String, dynamic> data) {
-    final confirmationId = data['confirmationId'] as String? ?? '';
-    final label = data['label'] as String? ?? '';
-
-    return ConfirmationCard(
-      key: ValueKey('confirm-$confirmationId'),
-      label: label,
-      onApprove: () =>
-          widget.onResolveConfirmation?.call(confirmationId, approved: true),
-      onCancel: () =>
-          widget.onResolveConfirmation?.call(confirmationId, approved: false),
-    );
-  }
-
-  Widget _buildActionCard(BuildContext context, Map<String, dynamic> data) {
-    final statusName = data['status'] as String? ?? 'running';
-    final label = data['label'] as String? ?? AgentStrings.actionDefaultLabel;
-    final message = data['message'] as String?;
-    
-    final status = ChatToolActionStatus.values.firstWhere(
-      (e) => e.name == statusName,
-      orElse: () => ChatToolActionStatus.running,
-    );
-
-    return AgentActionCard(
-      key: ValueKey('action-${data['actionId']}'),
-      status: status,
-      label: label,
-      message: message,
+  Widget _buildActionTimelineCard(BuildContext context, Map<String, dynamic> data) {
+    final actions = data['actions'] as List<ChatToolAction>;
+    return AgentActionTimelineCard(
+      actions: actions,
+      onResolveConfirmation: widget.onResolveConfirmation,
     );
   }
 

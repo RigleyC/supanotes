@@ -31,11 +31,16 @@ List<ChatMessage> toGenAiChatMessages(
         _toChatMessage(message),
   ];
 
-  for (final action in actions) {
-    final chatMessage = _actionToChatMessage(action);
-    if (chatMessage != null) {
-      result.add(chatMessage);
-    }
+  if (actions.isNotEmpty) {
+    result.add(
+      ChatMessage.rich(
+        user: agentChatSystemUser,
+        resultKind: 'action_timeline',
+        data: {
+          'actions': actions,
+        },
+      ),
+    );
   }
 
   return result;
@@ -61,22 +66,4 @@ ChatUser _userForRole(MessageRole role) {
     case MessageRole.tool:
       return agentChatSystemUser;
   }
-}
-
-ChatMessage? _actionToChatMessage(ChatToolAction action) {
-  final bool isConfirmation =
-      action.status == ChatToolActionStatus.confirmationRequired;
-
-  return ChatMessage.rich(
-    user: agentChatSystemUser,
-    resultKind: isConfirmation ? 'confirmation' : 'action',
-    data: {
-      'actionId': action.id,
-      'name': action.name,
-      'label': action.label,
-      'status': action.status.name,
-      if (action.message != null) 'message': action.message,
-      if (action.confirmationId != null) 'confirmationId': action.confirmationId,
-    },
-  );
 }

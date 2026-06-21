@@ -32,17 +32,20 @@ typedef ChatState = ({
   List<MessageModel> messages,
   List<ChatToolAction> actions,
   bool isStreaming,
+  String? loadingLabel,
 });
 
 ChatState chatState({
   List<MessageModel> messages = const [],
   List<ChatToolAction> actions = const [],
   bool isStreaming = false,
+  String? loadingLabel,
 }) {
   return (
     messages: messages,
     actions: actions,
     isStreaming: isStreaming,
+    loadingLabel: loadingLabel,
   );
 }
 
@@ -101,13 +104,12 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
       createdAt: DateTime.now(),
     );
 
-    final currentActions = state.value?.actions ?? const [];
-
     state = AsyncValue.data(
       chatState(
         messages: [...currentMessages, pending, initialAssistant],
-        actions: currentActions,
+        actions: const [],
         isStreaming: true,
+        loadingLabel: 'Pensando...',
       ),
     );
 
@@ -124,6 +126,7 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
       List<ChatToolAction>? actions,
       String? content,
       bool? isStreaming,
+      String? loadingLabel,
     }) {
       final current = state.value;
       state = AsyncValue.data(
@@ -136,6 +139,7 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
           ],
           actions: actions ?? current?.actions ?? const [],
           isStreaming: isStreaming ?? true,
+          loadingLabel: loadingLabel ?? current?.loadingLabel,
         ),
       );
     }
@@ -144,7 +148,12 @@ class ChatController extends Notifier<AsyncValue<ChatState>> {
         .streamChat(sessionId: sessionId, message: trimmed)
         .listen(
           (event) {
-            if (event.isContentDelta && event.delta != null) {
+            if (event.type == 'message_started') {
+              final label = event.payload['label'] as String?;
+              if (label != null && label.isNotEmpty) {
+                progress(loadingLabel: label);
+              }
+            } else if (event.isContentDelta && event.delta != null) {
               buffer.write(event.delta);
               progress();
             } else if (event.isToolStarted) {

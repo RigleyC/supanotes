@@ -141,7 +141,10 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 	writer := NewStreamEventWriter(sessionIDStr, assistantMessageID)
 	sendStreamEvent(events, writer.Event(
 		EventMessageStarted,
-		map[string]string{"role": string(llm.RoleAssistant)},
+		MessageStartedPayload{
+			Role:  string(llm.RoleAssistant),
+			Label: initialLabelForPrompt(userMessage),
+		},
 	))
 
 	// 1. Save User Message
@@ -308,6 +311,17 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 	}
 
 	return finalContent, nil
+}
+
+func initialLabelForPrompt(prompt string) string {
+	p := strings.ToLower(prompt)
+	if strings.Contains(p, "nota") || strings.Contains(p, "anota") {
+		return "Analisando suas notas..."
+	}
+	if strings.Contains(p, "tarefa") || strings.Contains(p, "hoje") || strings.Contains(p, "agenda") {
+		return "Consultando sua agenda..."
+	}
+	return "Pensando..."
 }
 
 func labelForTool(toolName string) string {

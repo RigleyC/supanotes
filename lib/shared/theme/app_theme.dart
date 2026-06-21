@@ -56,10 +56,8 @@ class AppTheme {
 
     return base.copyWith(
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        /* backgroundColor: colorScheme.surface,
-        surfaceTintColor: colorScheme.surfaceTint, */
+        backgroundColor: colorScheme.surface,
+        surfaceTintColor: colorScheme.surfaceTint,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
@@ -83,18 +81,18 @@ class AppTheme {
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm + AppSpacing.xs,
         ),
-        border: _buildInputBorder(InputBorderType.outline).copyWith(
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: _buildInputBorder(InputBorderType.outline).copyWith(
-          borderSide: BorderSide.none,
-        ),
+        border: _buildInputBorder(
+          InputBorderType.outline,
+        ).copyWith(borderSide: BorderSide.none),
+        enabledBorder: _buildInputBorder(
+          InputBorderType.outline,
+        ).copyWith(borderSide: BorderSide.none),
         focusedBorder: _buildInputBorder(InputBorderType.outline).copyWith(
           borderSide: BorderSide(color: colorScheme.primary, width: 2),
         ),
-        errorBorder: _buildInputBorder(InputBorderType.outline).copyWith(
-          borderSide: BorderSide(color: colorScheme.error),
-        ),
+        errorBorder: _buildInputBorder(
+          InputBorderType.outline,
+        ).copyWith(borderSide: BorderSide(color: colorScheme.error)),
         labelStyle: AppTypography.textTheme.bodyMedium?.copyWith(
           color: colorScheme.onSurfaceVariant,
         ),

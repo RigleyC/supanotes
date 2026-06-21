@@ -21,6 +21,11 @@ type StreamEvent struct {
 	Payload   interface{} `json:"payload"`
 }
 
+type MessageStartedPayload struct {
+	Role  string `json:"role"`
+	Label string `json:"label,omitempty"`
+}
+
 type ContentDeltaPayload struct {
 	Delta string `json:"delta"`
 }

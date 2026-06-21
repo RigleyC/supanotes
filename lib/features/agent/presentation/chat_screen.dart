@@ -42,6 +42,7 @@ class ChatScreen extends ConsumerWidget {
                     actions: state.actions,
                     loaded: true,
                     streaming: state.isStreaming,
+                    loadingLabel: state.loadingLabel,
                     onCancel: state.isStreaming
                         ? () => ref
                             .read(chatControllerProvider.notifier)

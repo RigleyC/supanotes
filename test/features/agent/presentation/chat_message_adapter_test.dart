@@ -33,7 +33,7 @@ void main() {
     expect(messages[1].user.id, agentChatAssistantUser.id);
   });
 
-  test('maps tool actions to rich action messages with result kind', () {
+  test('maps tool actions to single action_timeline message', () {
     final messages = toGenAiChatMessages(
       const [],
       actions: [
@@ -48,17 +48,18 @@ void main() {
       ],
     );
 
+    expect(messages, hasLength(1));
     final data = messages.single.customProperties!;
-    expect(data['resultKind'], 'confirmation');
-    expect((data['resultData'] as Map)['actionId'], 'action-1');
-    expect(
-      (data['resultData'] as Map)['confirmationId'],
-      'confirmation-1',
-    );
-    expect((data['resultData'] as Map)['label'], 'Atualizando notas');
+    expect(data['resultKind'], 'action_timeline');
+    
+    final actionsList = (data['resultData'] as Map)['actions'] as List<ChatToolAction>;
+    expect(actionsList, hasLength(1));
+    expect(actionsList[0].id, 'action-1');
+    expect(actionsList[0].confirmationId, 'confirmation-1');
+    expect(actionsList[0].label, 'Atualizando notas');
   });
 
-  test('maps running and completed actions to rich action messages', () {
+  test('maps multiple running and completed actions to single action_timeline message', () {
     final messages = toGenAiChatMessages(
       const [],
       actions: [
@@ -81,11 +82,14 @@ void main() {
       ],
     );
 
-    expect(messages, hasLength(2));
-    expect(messages[0].customProperties?['resultKind'], 'action');
-    expect((messages[0].customProperties?['resultData'] as Map)['status'], 'running');
-    expect(messages[1].customProperties?['resultKind'], 'action');
-    expect((messages[1].customProperties?['resultData'] as Map)['status'], 'completed');
+    expect(messages, hasLength(1));
+    final data = messages.single.customProperties!;
+    expect(data['resultKind'], 'action_timeline');
+    
+    final actionsList = (data['resultData'] as Map)['actions'] as List<ChatToolAction>;
+    expect(actionsList, hasLength(2));
+    expect(actionsList[0].status, ChatToolActionStatus.running);
+    expect(actionsList[1].status, ChatToolActionStatus.completed);
   });
 
   test('resolves known chat users', () {

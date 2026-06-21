@@ -351,9 +351,9 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 }
 
 var (
-	headerRegex  = regexp.MustCompile(`^#+\s+`)
-	listRegex    = regexp.MustCompile(`^[-*]\s+(\[[ xX]\]\s+)?`)
-	numListRegex = regexp.MustCompile(`^\d+\.\s+`)
+	headerRegex  = regexp.MustCompile(`^#+\s*`)
+	listRegex    = regexp.MustCompile(`^[-*]\s*(\[[ xX]\]\s*)?`)
+	numListRegex = regexp.MustCompile(`^\d+\.\s*`)
 )
 
 func DeriveTitle(content string) string {

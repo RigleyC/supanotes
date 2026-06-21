@@ -14,6 +14,7 @@ class KeepFirstLineAsTitleReaction extends EditReaction {
 
     final firstNode = document.first;
     if (firstNode is ParagraphNode) {
+      if (firstNode.text.toPlainText().trim().isEmpty) return;
       final blockType = firstNode.getMetadataValue('blockType');
       if (blockType != header1Attribution) {
         requestDispatcher.execute([

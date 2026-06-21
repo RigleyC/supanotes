@@ -176,14 +176,14 @@ class _NoteEditorState extends State<NoteEditor> {
                   child: SuperEditorIosControlsScope(
                     controller: _iosController!,
                     child: SuperEditor(
-                    
+                      autofocus: true,
+
                       editor: controller.editor!,
                       focusNode: widget.isReadOnly
                           ? null
                           : controller.focusNode,
                       documentLayoutKey: _docLayoutKey,
                       stylesheet: noteStylesheet(
-                        
                         context,
                         hideCompleted: widget.hideCompleted,
                       ),
@@ -193,7 +193,7 @@ class _NoteEditorState extends State<NoteEditor> {
                               context,
                             ).textSelectionTheme.selectionColor ??
                             Theme.of(
-                              context
+                              context,
                             ).colorScheme.primary.withValues(alpha: 0.4),
                       ),
                       keyboardActions: buildRichKeyboardActions(
