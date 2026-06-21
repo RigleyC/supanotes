@@ -5,7 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../domain/attachment_nodes.dart';
 
 class AttachmentComponentBuilder implements ComponentBuilder {
-  const AttachmentComponentBuilder();
+  const AttachmentComponentBuilder({
+    required this.editor,
+  });
+
+  final Editor editor;
 
   @override
   SingleColumnLayoutComponentViewModel? createViewModel(
@@ -15,6 +19,11 @@ class AttachmentComponentBuilder implements ComponentBuilder {
       nodeId: node.id,
       node: node,
       createdAt: node.metadata[NodeMetadata.createdAt],
+      onDelete: () {
+        editor.execute([
+          DeleteNodeRequest(nodeId: node.id),
+        ]);
+      },
     );
   }
 
@@ -23,9 +32,20 @@ class AttachmentComponentBuilder implements ComponentBuilder {
       SingleColumnLayoutComponentViewModel viewModel) {
     if (viewModel is! _AttachmentViewModel) return null;
     return switch (viewModel.node) {
-      ImageAttachmentNode n => _ImageAttachmentWidget(node: n),
-      FileAttachmentNode n => _FileAttachmentWidget(node: n),
-      RichLinkNode n => _RichLinkAttachmentWidget(node: n),
+      ImageAttachmentNode n => _ImageAttachmentWidget(
+          key: context.componentKey,
+          node: n,
+          onDelete: viewModel.onDelete,
+        ),
+      FileAttachmentNode n => _FileAttachmentWidget(
+          key: context.componentKey,
+          node: n,
+          onDelete: viewModel.onDelete,
+        ),
+      RichLinkNode n => _RichLinkAttachmentWidget(
+          key: context.componentKey,
+          node: n,
+        ),
       _ => null,
     };
   }
@@ -35,15 +55,17 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel {
   _AttachmentViewModel({
     required super.nodeId,
     required this.node,
+    required this.onDelete,
     super.createdAt,
     super.padding = EdgeInsets.zero,
   });
 
   final AttachmentNode node;
+  final VoidCallback onDelete;
 
   @override
   _AttachmentViewModel copy() =>
-      _AttachmentViewModel(nodeId: nodeId, node: node);
+      _AttachmentViewModel(nodeId: nodeId, node: node, onDelete: onDelete);
 
   @override
   bool operator ==(Object other) =>
@@ -54,8 +76,9 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel {
 }
 
 class _ImageAttachmentWidget extends StatelessWidget {
-  const _ImageAttachmentWidget({required this.node});
+  const _ImageAttachmentWidget({super.key, required this.node, required this.onDelete});
   final ImageAttachmentNode node;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -73,34 +96,48 @@ class _ImageAttachmentWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
           ),
-          child: Center(
-            child: isUploading
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
+          child: Stack(
+            children: [
+              Center(
+                child: isUploading
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Enviando foto...',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, color: cs.error, size: 28),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Falha ao enviar foto',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Enviando foto...',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, color: cs.error, size: 28),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Falha ao enviar foto',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
-                      ),
-                    ],
-                  ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: onDelete,
+                  color: isFailed ? cs.error : cs.outline,
+                  tooltip: 'Remover foto',
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -121,8 +158,9 @@ class _ImageAttachmentWidget extends StatelessWidget {
 }
 
 class _FileAttachmentWidget extends StatelessWidget {
-  const _FileAttachmentWidget({required this.node});
+  const _FileAttachmentWidget({super.key, required this.node, required this.onDelete});
   final FileAttachmentNode node;
+  final VoidCallback onDelete;
 
   String _formatBytes(int? bytes) {
     if (bytes == null) return '';
@@ -207,6 +245,15 @@ class _FileAttachmentWidget extends StatelessWidget {
                   ],
                 ),
               ),
+              if (isFailed || isUploading) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: onDelete,
+                  color: isFailed ? cs.error : cs.outline,
+                  tooltip: 'Remover anexo',
+                ),
+              ],
             ],
           ),
         ),
@@ -216,7 +263,7 @@ class _FileAttachmentWidget extends StatelessWidget {
 }
 
 class _RichLinkAttachmentWidget extends StatelessWidget {
-  const _RichLinkAttachmentWidget({required this.node});
+  const _RichLinkAttachmentWidget({super.key, required this.node});
   final RichLinkNode node;
 
   @override

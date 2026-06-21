@@ -193,24 +193,8 @@ class _NoteEditorState extends State<NoteEditor> {
         ReplaceNodeRequest(existingNodeId: tempId, newNode: finalNode),
       ]);
     } catch (_) {
-      final DocumentNode errorNode = isImage
-          ? ImageAttachmentNode(
-              id: tempId,
-              url: '',
-              fileName: picked.name,
-              metadata: {'isFailed': true},
-            )
-          : FileAttachmentNode(
-              id: tempId,
-              url: '',
-              fileName: picked.name,
-              mimeType: mimeType,
-              fileSize: picked.size,
-              metadata: {'isFailed': true},
-            );
-
       _controller!.editor!.execute([
-        ReplaceNodeRequest(existingNodeId: tempId, newNode: errorNode),
+        DeleteNodeRequest(nodeId: tempId),
       ]);
 
       if (mounted) {
@@ -304,7 +288,7 @@ class _NoteEditorState extends State<NoteEditor> {
                       componentBuilders: [
                         const CustomDividerComponentBuilder(),
                         _taskComponentBuilder,
-                        const AttachmentComponentBuilder(),
+                        AttachmentComponentBuilder(editor: controller.editor!),
                         ...defaultComponentBuilders,
                       ],
                     ),

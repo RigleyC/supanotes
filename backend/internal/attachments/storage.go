@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -51,7 +52,10 @@ func (s *s3Storage) Upload(ctx context.Context, key string, r io.Reader, mimeTyp
 		Body:          r,
 		ContentType:   aws.String(mimeType),
 		ContentLength: size,
-	})
+	}, s3.WithAPIOptions(
+		v4.AddUnsignedPayloadMiddleware,
+		v4.RemoveComputePayloadSHA256Middleware,
+	))
 	if err != nil {
 		return "", fmt.Errorf("s3 upload: %w", err)
 	}
