@@ -58,54 +58,157 @@ class _ImageAttachmentWidget extends StatelessWidget {
   final ImageAttachmentNode node;
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) {
+    final isUploading = node.metadata['isUploading'] == true;
+    final isFailed = node.metadata['isFailed'] == true;
+    final cs = Theme.of(context).colorScheme;
+
+    if (isUploading || isFailed) {
+      return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            node.url,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
+        child: Container(
+          height: 160,
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+          ),
+          child: Center(
+            child: isUploading
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Enviando foto...',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, color: cs.error, size: 28),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Falha ao enviar foto',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+                      ),
+                    ],
+                  ),
           ),
         ),
       );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          node.url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
+        ),
+      ),
+    );
+  }
 }
 
 class _FileAttachmentWidget extends StatelessWidget {
   const _FileAttachmentWidget({required this.node});
   final FileAttachmentNode node;
 
+  String _formatBytes(int? bytes) {
+    if (bytes == null) return '';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isUploading = node.metadata['isUploading'] == true;
+    final isFailed = node.metadata['isFailed'] == true;
     final cs = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: InkWell(
-        onTap: () => launchUrl(Uri.parse(node.url)),
-        borderRadius: BorderRadius.circular(12),
+        onTap: (isUploading || isFailed) ? null : () => launchUrl(Uri.parse(node.url)),
+        borderRadius: BorderRadius.circular(32),
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(32),
             border: Border.all(
-                color: cs.outlineVariant.withValues(alpha: 0.4)),
+              color: cs.outlineVariant.withValues(alpha: 0.3),
+            ),
           ),
-          child: Row(children: [
-            Icon(
-              node.isVideo
-                  ? Icons.play_circle_outline
-                  : Icons.insert_drive_file,
-              color: cs.primary,
-              size: 32,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(node.fileName,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium),
-            ),
-          ]),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainer.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: isUploading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: cs.primary,
+                          ),
+                        )
+                      : Icon(
+                          isFailed
+                              ? Icons.error_outline
+                              : (node.isVideo
+                                  ? Icons.play_circle_outline
+                                  : Icons.insert_drive_file),
+                          color: isFailed ? cs.error : cs.onSurfaceVariant,
+                          size: 22,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      node.fileName,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isUploading
+                          ? 'Enviando...'
+                          : (isFailed ? 'Falha no envio' : _formatBytes(node.fileSize)),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isFailed ? cs.error : cs.outline,
+                            fontSize: 12,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -53,6 +53,7 @@ class _FileAttachmentSerializer
       'url': node.url,
       'filename': node.fileName,
       'mime': node.mimeType,
+      if (node.fileSize != null) 'size': node.fileSize,
     };
     return '--- <!-- attachment:file ${jsonEncode(data)} -->';
   }
@@ -125,8 +126,10 @@ class _AttachmentElementConverter implements ElementToNodeConverter {
           return ImageAttachmentNode(id: id, url: url, fileName: filename);
         case 'file':
           final mime = data['mime'] as String? ?? 'application/octet-stream';
+          final size = data['size'] as int?;
           return FileAttachmentNode(
             id: id, url: url, fileName: filename, mimeType: mime,
+            fileSize: size,
           );
         case 'link':
           return RichLinkNode(

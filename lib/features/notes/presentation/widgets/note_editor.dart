@@ -149,32 +149,76 @@ class _NoteEditorState extends State<NoteEditor> {
     final path = picked.path;
     if (path == null) return;
     final mimeType = lookupMimeType(path) ?? 'application/octet-stream';
+    final tempId = Editor.createNodeId();
 
-    late final AttachmentModel attachment;
+    final isImage = mimeType.startsWith('image/');
+    final placeholderNode = isImage
+        ? ImageAttachmentNode(
+            id: tempId,
+            url: '',
+            fileName: picked.name,
+            metadata: {'isUploading': true},
+          )
+        : FileAttachmentNode(
+            id: tempId,
+            url: '',
+            fileName: picked.name,
+            mimeType: mimeType,
+            fileSize: picked.size,
+            metadata: {'isUploading': true},
+          );
+
+    _controller!.editor!.execute([
+      InsertNodeAtCaretRequest(node: placeholderNode),
+    ]);
+
     try {
-      attachment = await widget.onUploadFile!(widget.noteId, path, mimeType);
+      final attachment = await widget.onUploadFile!(widget.noteId, path, mimeType);
+      final url = attachment.displayUrl ?? '';
+      final DocumentNode finalNode = attachment.type == AttachmentType.image
+          ? ImageAttachmentNode(
+              id: attachment.id,
+              url: url,
+              fileName: attachment.fileName,
+            )
+          : FileAttachmentNode(
+              id: attachment.id,
+              url: url,
+              fileName: attachment.fileName,
+              mimeType: attachment.mimeType,
+              fileSize: attachment.fileSize,
+            );
+
+      _controller!.editor!.execute([
+        ReplaceNodeRequest(existingNodeId: tempId, newNode: finalNode),
+      ]);
     } catch (_) {
+      final DocumentNode errorNode = isImage
+          ? ImageAttachmentNode(
+              id: tempId,
+              url: '',
+              fileName: picked.name,
+              metadata: {'isFailed': true},
+            )
+          : FileAttachmentNode(
+              id: tempId,
+              url: '',
+              fileName: picked.name,
+              mimeType: mimeType,
+              fileSize: picked.size,
+              metadata: {'isFailed': true},
+            );
+
+      _controller!.editor!.execute([
+        ReplaceNodeRequest(existingNodeId: tempId, newNode: errorNode),
+      ]);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Falha ao enviar anexo')),
         );
       }
-      return;
     }
-
-    final url = attachment.displayUrl ?? '';
-    final DocumentNode node = attachment.type == AttachmentType.image
-        ? ImageAttachmentNode(
-            id: attachment.id, url: url, fileName: attachment.fileName,
-          )
-        : FileAttachmentNode(
-            id: attachment.id, url: url,
-            fileName: attachment.fileName, mimeType: attachment.mimeType,
-          );
-
-    _controller!.editor!.execute([
-      InsertNodeAtCaretRequest(node: node),
-    ]);
   }
 
   @override

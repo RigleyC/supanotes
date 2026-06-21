@@ -58,6 +58,7 @@ class FileAttachmentNode extends AttachmentNode {
     required this.url,
     required this.fileName,
     required this.mimeType,
+    this.fileSize,
     super.metadata,
   });
 
@@ -67,6 +68,7 @@ class FileAttachmentNode extends AttachmentNode {
   final String url;
   final String fileName;
   final String mimeType;
+  final int? fileSize;
 
   bool get isVideo => mimeType.startsWith('video/');
 
@@ -74,6 +76,7 @@ class FileAttachmentNode extends AttachmentNode {
   DocumentNode copyWithAddedMetadata(Map<String, dynamic> newProperties) =>
       FileAttachmentNode(
         id: id, url: url, fileName: fileName, mimeType: mimeType,
+        fileSize: fileSize,
         metadata: {...metadata, ...newProperties},
       );
 
@@ -81,11 +84,13 @@ class FileAttachmentNode extends AttachmentNode {
   DocumentNode copyAndReplaceMetadata(Map<String, dynamic> newMetadata) =>
       FileAttachmentNode(
         id: id, url: url, fileName: fileName, mimeType: mimeType,
+        fileSize: fileSize,
         metadata: newMetadata,
       );
 
   FileAttachmentNode copy() => FileAttachmentNode(
         id: id, url: url, fileName: fileName, mimeType: mimeType,
+        fileSize: fileSize,
         metadata: Map.from(metadata),
       );
 }
