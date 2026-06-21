@@ -37,7 +37,7 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 	}, nil)
 
 	newContent := "updated content"
-	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, nil, &newContent, nil, nil, nil, nil)
+	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -47,29 +47,6 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 	}
 	if capturedArg.EmbeddingStatus.String != "pending" {
 		t.Fatalf("expected 'pending', got %q", capturedArg.EmbeddingStatus.String)
-	}
-}
-
-func TestService_UpdateNote_DoesNotSetEmbeddingPendingOnTitleOnly(t *testing.T) {
-	var capturedArg sqlcgen.UpdateNoteParams
-	svc := NewService(&mockRepo{
-		getNoteByIDFn: func(_ context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Note, error) {
-			return sqlcgen.Note{ID: id, UserID: userID}, nil
-		},
-		updateNoteFn: func(_ context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
-			capturedArg = arg
-			return sqlcgen.Note{ID: arg.ID}, nil
-		},
-	}, nil)
-
-	newTitle := "new title"
-	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newTitle, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	_ = note
-	if capturedArg.EmbeddingStatus.Valid {
-		t.Fatal("expected embedding_status to NOT be set when only title changes")
 	}
 }
 
@@ -86,7 +63,7 @@ func TestService_UpdateNote_DoesNotSetEmbeddingPendingOnFavoriteOnly(t *testing.
 		},
 	}, nil)
 
-	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, nil, nil, nil, &fav, nil, nil)
+	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, nil, nil, &fav, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -100,7 +77,7 @@ func TestCreateNoteRejectsEmptyRegularNote(t *testing.T) {
 	svc := NewService(&mockRepo{}, nil)
 	userID := pgtype.UUID{Valid: true}
 
-	_, err := svc.CreateNote(context.Background(), userID, nil, "   ", nil, false, false, false)
+	_, err := svc.CreateNote(context.Background(), userID, "   ", nil, false, false, false)
 
 	if !errors.Is(err, ErrEmptyNote) {
 		t.Fatalf("expected ErrEmptyNote, got %v", err)

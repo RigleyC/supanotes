@@ -60,7 +60,6 @@ type Note struct {
 	ID              pgtype.UUID        `json:"id"`
 	UserID          pgtype.UUID        `json:"user_id"`
 	ContextID       pgtype.UUID        `json:"context_id"`
-	Title           pgtype.Text        `json:"title"`
 	Content         string             `json:"content"`
 	Excerpt         pgtype.Text        `json:"excerpt"`
 	IsInbox         bool               `json:"is_inbox"`

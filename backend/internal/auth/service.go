@@ -285,11 +285,9 @@ func seedUserDefaults(ctx context.Context, q sqlcgen.Querier, userID pgtype.UUID
 		return fmt.Errorf("auth: seed user settings: %w", err)
 	}
 
-	title := "Rascunho"
-	content := "Bem-vindo ao SupaNotes! Esta é sua nota de inbox, o lugar perfeito para despejar ideias rapidamente."
+	content := "# Rascunho\n\nBem-vindo ao SupaNotes! Esta é sua nota de inbox, o lugar perfeito para despejar ideias rapidamente."
 	if _, err := q.CreateNote(ctx, sqlcgen.CreateNoteParams{
 		UserID:          userID,
-		Title:           pgtype.Text{String: title, Valid: true},
 		Content:         content,
 		IsInbox:         true,
 		Favorite:        false,

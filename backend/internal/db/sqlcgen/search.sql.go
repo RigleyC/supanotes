@@ -13,7 +13,7 @@ import (
 )
 
 const searchNotesFTS = `-- name: SearchNotesFTS :many
-SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
        ts_rank(n.search_vector, plainto_tsquery('simple', $1::text)) AS score
 FROM notes n
 WHERE n.user_id = $2
@@ -33,7 +33,7 @@ type SearchNotesFTSParams struct {
 
 type SearchNotesFTSRow struct {
 	ID        pgtype.UUID        `json:"id"`
-	Title     pgtype.Text        `json:"title"`
+	Title     string             `json:"title"`
 	Content   string             `json:"content"`
 	Excerpt   pgtype.Text        `json:"excerpt"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
@@ -75,7 +75,7 @@ func (q *Queries) SearchNotesFTS(ctx context.Context, arg SearchNotesFTSParams) 
 
 const searchNotesHybrid = `-- name: SearchNotesHybrid :many
 WITH fts AS (
-  SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
          row_number() OVER (ORDER BY ts_rank(n.search_vector, to_tsquery('simple', $2::text)) DESC) as rank
   FROM notes n
   WHERE n.user_id = $3
@@ -86,7 +86,7 @@ WITH fts AS (
   LIMIT $4::int
 ),
 semantic AS (
-  SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
          row_number() OVER (ORDER BY ne.embedding <=> $5::vector) as rank
   FROM notes n
   JOIN note_embeddings ne ON n.id = ne.note_id
@@ -123,7 +123,7 @@ type SearchNotesHybridParams struct {
 
 type SearchNotesHybridRow struct {
 	ID        pgtype.UUID        `json:"id"`
-	Title     pgtype.Text        `json:"title"`
+	Title     string             `json:"title"`
 	Content   string             `json:"content"`
 	Excerpt   pgtype.Text        `json:"excerpt"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
@@ -171,7 +171,7 @@ func (q *Queries) SearchNotesHybrid(ctx context.Context, arg SearchNotesHybridPa
 }
 
 const searchNotesSemantic = `-- name: SearchNotesSemantic :many
-SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
        (1.0 - (ne.embedding <=> $1::vector))::float8 AS score
 FROM notes n
 JOIN note_embeddings ne ON n.id = ne.note_id
@@ -191,7 +191,7 @@ type SearchNotesSemanticParams struct {
 
 type SearchNotesSemanticRow struct {
 	ID        pgtype.UUID        `json:"id"`
-	Title     pgtype.Text        `json:"title"`
+	Title     string             `json:"title"`
 	Content   string             `json:"content"`
 	Excerpt   pgtype.Text        `json:"excerpt"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`

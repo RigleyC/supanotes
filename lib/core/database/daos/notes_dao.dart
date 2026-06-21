@@ -89,7 +89,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return into(notes).insert(
       note,
       onConflict: DoUpdate.withExcluded((old, excluded) => NotesCompanion.custom(
-        title: excluded.title,
         content: excluded.content,
         contextId: excluded.contextId,
         excerpt: excluded.excerpt,
@@ -117,12 +116,12 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
   }
 
-  /// Shared filter: a note is non-empty when its trimmed title or content
-  /// is not blank. Used to hide empty local-only notes from lists and to
+  /// Shared filter: a note is non-empty when its trimmed content is not
+  /// blank. Used to hide empty local-only notes from lists and to
   /// determine sync eligibility.
   Expression<bool> Function($NotesTable) get _nonEmptyNote =>
       (t) => CustomExpression<bool>(
-            "trim(title) <> '' OR trim(content) <> ''",
+            "trim(content) <> ''",
           );
 
   /// Returns every note that has unsynced local changes and is eligible for

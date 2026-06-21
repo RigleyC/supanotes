@@ -21,6 +21,19 @@ func (m *mockFailingClient) Complete(ctx context.Context, req Request) (*Respons
 	return &Response{Content: "success!"}, nil
 }
 
+func (m *mockFailingClient) CompleteStream(ctx context.Context, req Request, onToken func(string) error) (*Response, error) {
+	res, err := m.Complete(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if res.Content != "" {
+		if err := onToken(res.Content); err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 type mockNonRetryableClient struct {
 	attempts int
 }
@@ -28,6 +41,10 @@ type mockNonRetryableClient struct {
 func (m *mockNonRetryableClient) Complete(ctx context.Context, req Request) (*Response, error) {
 	m.attempts++
 	return nil, errors.New("anthropic API error 400: Bad Request")
+}
+
+func (m *mockNonRetryableClient) CompleteStream(ctx context.Context, req Request, onToken func(string) error) (*Response, error) {
+	return m.Complete(ctx, req)
 }
 
 func TestWithRetry_SuccessAfterFails(t *testing.T) {

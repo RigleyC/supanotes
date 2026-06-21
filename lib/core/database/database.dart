@@ -1,3 +1,4 @@
+import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -36,10 +37,9 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to `7` — v7 adds `permission`,
-  /// `sharedByEmail`, `sharedByName` to notes.
+  /// Latest schema version. Bumped to `8` — v8 drops `title` from notes.
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -71,6 +71,13 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(notes, notes.permission);
             await m.addColumn(notes, notes.sharedByEmail);
             await m.addColumn(notes, notes.sharedByName);
+          }
+          if (from < 8) {
+            try {
+              await customStatement('ALTER TABLE notes DROP COLUMN title');
+            } catch (e) {
+              dev.log('Failed to drop note title column during migration: $e', name: 'DatabaseMigration');
+            }
           }
         },
       );

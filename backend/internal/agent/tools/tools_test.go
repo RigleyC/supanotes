@@ -372,7 +372,7 @@ func TestSearchNotesTool_Execute(t *testing.T) {
 			return []sqlcgen.SearchNotesByEmbeddingRow{
 				{
 					ID:         pgtype.UUID{Bytes: [16]byte{1}, Valid: true},
-					Title:      pgtype.Text{String: "Test Note", Valid: true},
+					Title:      "Test Note",
 					Content:    "content here",
 					Similarity: 85,
 				},
@@ -523,8 +523,7 @@ func TestGetNoteTool_Execute(t *testing.T) {
 			return sqlcgen.Note{
 				ID:      arg.ID,
 				UserID:  arg.UserID,
-				Title:   pgtype.Text{String: "My Test Note", Valid: true},
-				Content: "Hello world this is note content",
+				Content: "My Test Note\n\nHello world this is note content",
 			}, nil
 		},
 	}
@@ -535,7 +534,7 @@ func TestGetNoteTool_Execute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expected := "Note [00000000-0000-0000-0000-000000000001] My Test Note:\nHello world this is note content"
+	expected := "Note [00000000-0000-0000-0000-000000000001] My Test Note:\nMy Test Note\n\nHello world this is note content"
 	if result != expected {
 		t.Fatalf("expected:\n%q\ngot:\n%q", expected, result)
 	}
@@ -562,8 +561,8 @@ func TestApplyInboxOrganizationTool_Execute(t *testing.T) {
 			}, nil
 		},
 		createNote: func(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
-			if arg.Content != "snippet 1" {
-				t.Fatalf("expected create note content to be 'snippet 1', got %q", arg.Content)
+			if arg.Content != "# New Note Title\n\nsnippet 1" {
+				t.Fatalf("expected create note content to include title, got %q", arg.Content)
 			}
 			return sqlcgen.Note{}, nil
 		},

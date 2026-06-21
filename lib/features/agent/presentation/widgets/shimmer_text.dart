@@ -41,8 +41,8 @@ class _ShimmerTextState extends State<ShimmerText>
 
     final theme = Theme.of(context);
 
-    final baseColor = theme.colorScheme.onSurface.withValues(alpha: 0.6);
-    final highlightColor = theme.colorScheme.primary;
+    final baseColor = theme.colorScheme.onSurface.withValues(alpha: 0.3);
+    final highlightColor = theme.colorScheme.onSurface;
 
     return AnimatedBuilder(
       animation: _controller,
@@ -51,15 +51,13 @@ class _ShimmerTextState extends State<ShimmerText>
           blendMode: BlendMode.srcIn,
           shaderCallback: (bounds) {
             return LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              stops: const [0.1, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
               colors: [
                 baseColor,
                 baseColor,
-                highlightColor.withValues(alpha: 0.8),
                 highlightColor,
-                highlightColor.withValues(alpha: 0.8),
                 baseColor,
                 baseColor,
               ],

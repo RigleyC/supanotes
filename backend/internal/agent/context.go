@@ -15,6 +15,7 @@ import (
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/memories"
+	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
@@ -218,7 +219,7 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 	tier3 := &strings.Builder{}
 	tier3.WriteString("\nSEMANTIC SEARCH RESULTS:\n")
 	for _, r := range semanticResults {
-		tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f):\n%s\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity, r.Content))
+		tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f):\n%s\n", uid.UUIDToString(r.ID), notes.DeriveTitle(r.Content), r.Similarity, r.Content))
 	}
 	if len(semanticResults) == 0 {
 		tier3.WriteString("(none)\n")
@@ -339,7 +340,7 @@ TODAY / OVERDUE TASKS:
 	if len(semanticResults) > 0 {
 		b.WriteString("\nRELEVANT NOTES (via semantic search):\n")
 		for _, r := range semanticResults {
-			b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f)\n", uid.UUIDToString(r.ID), r.Title.String, r.Similarity))
+			b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f)\n", uid.UUIDToString(r.ID), notes.DeriveTitle(r.Content), r.Similarity))
 		}
 	}
 
@@ -361,9 +362,11 @@ func writeTasksWithDueDate(b *strings.Builder, tasks []sqlcgen.Task) {
 	}
 }
 
-func writeNotesWithID(b *strings.Builder, notes []sqlcgen.Note) {
-	for _, n := range notes {
-		b.WriteString(fmt.Sprintf("- ID: %s | Title: %s\n", uid.UUIDToString(n.ID), n.Title.String))
+
+
+func writeNotesWithID(b *strings.Builder, notesList []sqlcgen.Note) {
+	for _, n := range notesList {
+		b.WriteString(fmt.Sprintf("- ID: %s | Title: %s\n", uid.UUIDToString(n.ID), notes.DeriveTitle(n.Content)))
 	}
 }
 
@@ -375,12 +378,12 @@ func float64ToFloat32(src []float64) []float32 {
 	return dst
 }
 
-func writeNotesWithContent(b *strings.Builder, notes []sqlcgen.Note, maxContentLen int) {
-	for _, n := range notes {
+func writeNotesWithContent(b *strings.Builder, notesList []sqlcgen.Note, maxContentLen int) {
+	for _, n := range notesList {
 		content := n.Content
 		if maxContentLen > 0 && len(content) > maxContentLen {
 			content = content[:maxContentLen] + "... [TRUNCATED]"
 		}
-		b.WriteString(fmt.Sprintf("- Title: %s | Content: %s\n", n.Title.String, content))
+		b.WriteString(fmt.Sprintf("- Title: %s | Content: %s\n", notes.DeriveTitle(n.Content), content))
 	}
 }

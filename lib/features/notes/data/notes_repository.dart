@@ -24,13 +24,11 @@ abstract class INotesRepository {
   Future<NoteModel?> getNoteById(String id);
   Future<NoteModel> upsertNote({
     required String id,
-    String? title,
     String content = '',
     String? contextId,
   });
   Future<void> updateNote(
     String id, {
-    String? title,
     String? content,
     bool? favorite,
     bool? archived,
@@ -45,7 +43,6 @@ abstract class INotesRepository {
   Future<NoteModel> createLocalNote({required String id});
   Future<void> saveNoteSnapshot({
     required String id,
-    required String title,
     required String content,
     required List<TaskEntry> tasks,
   });
@@ -110,7 +107,6 @@ class NotesRepository implements INotesRepository {
   @override
   Future<NoteModel> upsertNote({
     required String id,
-    String? title,
     String content = '',
     String? contextId,
   }) async {
@@ -118,7 +114,6 @@ class NotesRepository implements INotesRepository {
     final companion = NotesCompanion(
       id: Value(id),
       userId: Value(_local.userId),
-      title: Value(title),
       content: Value(content),
       contextId: Value(contextId),
       excerpt: Value(_excerptFrom(content)),
@@ -137,7 +132,6 @@ class NotesRepository implements INotesRepository {
   @override
   Future<void> updateNote(
     String id, {
-    String? title,
     String? content,
     bool? favorite,
     bool? archived,
@@ -150,7 +144,6 @@ class NotesRepository implements INotesRepository {
     final nextContent = content ?? current.content;
     final companion = NotesCompanion(
       id: Value(id),
-      title: title == null ? const Value.absent() : Value(title),
       content: content == null ? const Value.absent() : Value(nextContent),
       excerpt: content == null
           ? const Value.absent()
@@ -211,7 +204,6 @@ class NotesRepository implements INotesRepository {
   @override
   Future<void> saveNoteSnapshot({
     required String id,
-    required String title,
     required String content,
     required List<TaskEntry> tasks,
   }) async {
@@ -219,10 +211,8 @@ class NotesRepository implements INotesRepository {
     if (current == null) return;
 
     await syncTasksFromDocument(id, tasks);
-    final normalizedTitle = title.trim().isEmpty ? null : title;
     await updateNote(
       id,
-      title: normalizedTitle,
       content: content,
     );
   }
@@ -302,8 +292,7 @@ class NotesRepository implements INotesRepository {
   }
 
   bool _isTextEmpty(NoteData note) {
-    return (note.title == null || note.title!.trim().isEmpty) &&
-        note.content.trim().isEmpty;
+    return note.content.trim().isEmpty;
   }
 }
 

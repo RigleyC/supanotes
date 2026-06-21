@@ -22,17 +22,16 @@ type AddNoteTool struct {
 func (t *AddNoteTool) Name() string        { return "add_note" }
 func (t *AddNoteTool) Description() string { return "Create a new note in the vault" }
 func (t *AddNoteTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"title":{"type":"string"},"content":{"type":"string"}},"required":["title","content"]}`
+	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
 func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
-		Title   string `json:"title"`
 		Content string `json:"content"`
 	}](argsJSON)
 	if err != nil {
 		return "", err
 	}
-	note, err := t.notesSvc.CreateNote(ctx, userID, &args.Title, args.Content, nil, false, false, false)
+	note, err := t.notesSvc.CreateNote(ctx, userID, args.Content, nil, false, false, false)
 	if err != nil {
 		return "", err
 	}
@@ -118,7 +117,7 @@ func (t *SearchNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJ
 	}
 	var b strings.Builder
 	for _, r := range results {
-		b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f)\n", formatID(r.ID), r.Title.String, r.Similarity))
+		b.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f)\n", formatID(r.ID), r.Title, r.Similarity))
 	}
 	if b.Len() == 0 {
 		return "No matching notes found", nil
@@ -130,8 +129,10 @@ type GetNotesTool struct {
 	notesSvc *notes.Service
 }
 
-func (t *GetNotesTool) Name() string        { return "get_notes" }
-func (t *GetNotesTool) Description() string { return "List notes in the vault with their titles and IDs. Use get_note to read the full content of a specific note after listing." }
+func (t *GetNotesTool) Name() string { return "get_notes" }
+func (t *GetNotesTool) Description() string {
+	return "List notes in the vault with their titles and IDs. Use get_note to read the full content of a specific note after listing."
+}
 func (t *GetNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"limit":{"type":"integer"}},"required":[]}`
 }
@@ -151,7 +152,7 @@ func (t *GetNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON
 	}
 	var b strings.Builder
 	for _, n := range notesList {
-		b.WriteString(fmt.Sprintf("- [%s] %s\n", formatID(n.ID), n.Title.String))
+		b.WriteString(fmt.Sprintf("- [%s] %s\n", formatID(n.ID), notes.DeriveTitle(n.Content)))
 	}
 	if b.Len() == 0 {
 		return "No notes found", nil
@@ -185,13 +186,7 @@ func (t *GetNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON 
 	if err != nil {
 		return "", err
 	}
-	var title string
-	if note.Title.Valid {
-		title = note.Title.String
-	} else {
-		title = "<no title>"
-	}
-	return fmt.Sprintf("Note [%s] %s:\n%s", formatID(note.ID), title, note.Content), nil
+	return fmt.Sprintf("Note [%s] %s:\n%s", formatID(note.ID), notes.DeriveTitle(note.Content), note.Content), nil
 }
 
 type UpdateNoteTool struct {
@@ -199,14 +194,13 @@ type UpdateNoteTool struct {
 }
 
 func (t *UpdateNoteTool) Name() string        { return "update_note" }
-func (t *UpdateNoteTool) Description() string { return "Update title or content of a note" }
+func (t *UpdateNoteTool) Description() string { return "Update content of a note" }
 func (t *UpdateNoteTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"note_id":{"type":"string"},"title":{"type":"string"},"content":{"type":"string"}},"required":["note_id"]}`
+	return `{"type":"object","properties":{"note_id":{"type":"string"},"content":{"type":"string"}},"required":["note_id"]}`
 }
 func (t *UpdateNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		NoteID  string  `json:"note_id"`
-		Title   *string `json:"title"`
 		Content *string `json:"content"`
 	}](argsJSON)
 	if err != nil {
@@ -216,11 +210,11 @@ func (t *UpdateNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJS
 	if err != nil {
 		return "", err
 	}
-	note, err := t.notesSvc.UpdateNote(ctx, userID, nid, args.Title, args.Content, nil, nil, nil, nil)
+	note, err := t.notesSvc.UpdateNote(ctx, userID, nid, args.Content, nil, nil, nil, nil)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Note updated: [%s] %s", formatID(note.ID), note.Title.String), nil
+	return fmt.Sprintf("Note updated: [%s] %s", formatID(note.ID), notes.DeriveTitle(note.Content)), nil
 }
 
 type AppendToNoteTool struct {
@@ -249,11 +243,11 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, args
 		return "", err
 	}
 	newContent := note.Content + "\n" + args.Content
-	updated, err := t.notesSvc.UpdateNote(ctx, userID, nid, nil, &newContent, nil, nil, nil, nil)
+	updated, err := t.notesSvc.UpdateNote(ctx, userID, nid, &newContent, nil, nil, nil, nil)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Content appended to note [%s] %s", formatID(updated.ID), updated.Title.String), nil
+	return fmt.Sprintf("Content appended to note [%s] %s", formatID(updated.ID), notes.DeriveTitle(updated.Content)), nil
 }
 
 type LinkNotesTool struct {
@@ -404,3 +398,5 @@ func (t *ApplyInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.
 	}
 	return "Inbox organization plan applied successfully", nil
 }
+
+

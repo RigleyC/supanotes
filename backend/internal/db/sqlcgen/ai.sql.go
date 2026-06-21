@@ -194,7 +194,7 @@ func (q *Queries) SearchMemoriesByEmbedding(ctx context.Context, arg SearchMemor
 }
 
 const searchNotesByEmbedding = `-- name: SearchNotesByEmbedding :many
-SELECT n.id, n.title, n.content, n.updated_at, (1 - (ne.embedding <=> $2::vector))::real AS similarity
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.updated_at, (1 - (ne.embedding <=> $2::vector))::real AS similarity
 FROM notes n
 JOIN note_embeddings ne ON n.id = ne.note_id
 WHERE n.user_id = $1 AND n.deleted_at IS NULL AND NOT n.is_inbox
@@ -210,7 +210,7 @@ type SearchNotesByEmbeddingParams struct {
 
 type SearchNotesByEmbeddingRow struct {
 	ID         pgtype.UUID        `json:"id"`
-	Title      pgtype.Text        `json:"title"`
+	Title      string             `json:"title"`
 	Content    string             `json:"content"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 	Similarity float32            `json:"similarity"`

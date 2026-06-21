@@ -29,7 +29,6 @@ class _FakeNotesRepository implements INotesRepository {
   @override
   Future<void> saveNoteSnapshot({
     required String id,
-    required String title,
     required String content,
     required List<TaskEntry> tasks,
   }) async {}
@@ -69,8 +68,6 @@ void main() {
         NoteModel(
           id: 'note-1',
           userId: 'u-1',
-          title: 'Persisted note',
-          excerpt: null,
           content: '# Persisted note',
           favorite: false,
           archived: false,
@@ -90,8 +87,6 @@ void main() {
         NoteModel(
           id: 'note-1',
           userId: 'u-1',
-          title: 'Persisted note',
-          excerpt: null,
           content: '# Persisted note',
           favorite: false,
           archived: false,
@@ -138,8 +133,6 @@ void main() {
       NoteModel(
         id: 'note-1',
         userId: 'u-1',
-        title: 'Dark note',
-        excerpt: null,
         content: 'Dark content',
         favorite: false,
         archived: false,
@@ -184,7 +177,7 @@ void main() {
                 '- [x] tarefa concluida <!-- task:task-1 -->\n\ntexto visivel',
             taskMetadata: const {},
             hideCompleted: true,
-            snapshotSave: (noteId, title, markdown, tasks) async {},
+            snapshotSave: (noteId, markdown, tasks) async {},
           ),
         ),
       ),
@@ -225,7 +218,7 @@ void main() {
                           '- [x] tarefa concluida <!-- task:task-1 -->\n\ntexto visivel',
                       taskMetadata: const {},
                       hideCompleted: hideCompleted,
-                      snapshotSave: (noteId, title, markdown, tasks) async {},
+            snapshotSave: (noteId, markdown, tasks) async {},
                     ),
                   ),
                 ],
@@ -311,8 +304,6 @@ void main() {
       NoteModel(
         id: 'note-1',
         userId: 'u-1',
-        title: 'Owner note',
-        excerpt: null,
         content: 'Plain content',
         favorite: false,
         archived: false,
@@ -379,8 +370,6 @@ void main() {
       NoteModel(
         id: 'note-1',
         userId: 'u-1',
-        title: 'Test note',
-        excerpt: null,
         content: noteContent,
         favorite: false,
         archived: false,
@@ -447,8 +436,6 @@ void main() {
         NoteModel(
           id: 'note-1',
           userId: 'u-1',
-          title: 'Test note',
-          excerpt: null,
           content: noteContent,
           favorite: false,
           archived: false,

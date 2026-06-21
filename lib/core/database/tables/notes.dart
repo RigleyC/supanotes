@@ -5,7 +5,6 @@ class Notes extends Table {
   TextColumn get id => text()();
   TextColumn get userId => text()();
   TextColumn get contextId => text().nullable()();
-  TextColumn get title => text().nullable()();
   TextColumn get content => text()();
   TextColumn get excerpt => text().nullable()();
   BoolColumn get isInbox => boolean().withDefault(const Constant(false))();

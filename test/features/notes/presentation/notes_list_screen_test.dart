@@ -35,11 +35,10 @@ class _FakeNotesRepository implements INotesRepository {
   @override
   Future<NoteModel> upsertNote({
     required String id,
-    String? title,
     String content = '',
     String? contextId,
   }) async {
-    final note = _note(id: id, title: title, content: content);
+    final note = _note(id: id, content: content);
     createdNotes.add(note);
     return note;
   }
@@ -47,13 +46,21 @@ class _FakeNotesRepository implements INotesRepository {
   @override
   Future<void> updateNote(
     String id, {
-    String? title,
     String? content,
     bool? favorite,
     bool? archived,
     bool? hideCompleted,
     String? contextId,
   }) async {}
+
+  @override
+  Future<void> saveNoteSnapshot({
+    required String id,
+    required String content,
+    required List<TaskEntry> tasks,
+  }) async {
+    await updateNote(id, content: content);
+  }
 
   @override
   Future<void> toggleFavorite(String id) async {}
@@ -81,14 +88,6 @@ class _FakeNotesRepository implements INotesRepository {
   }
 
   @override
-  Future<void> saveNoteSnapshot({
-    required String id,
-    required String title,
-    required String content,
-    required List<TaskEntry> tasks,
-  }) async {}
-
-  @override
   Future<void> deleteIfEmptyOrTombstone(String id) async {}
 
   @override
@@ -96,7 +95,6 @@ class _FakeNotesRepository implements INotesRepository {
 
   NoteModel _note({
     required String id,
-    String? title,
     String content = '',
     bool isInbox = false,
   }) {
@@ -104,8 +102,6 @@ class _FakeNotesRepository implements INotesRepository {
     return NoteModel(
       id: id,
       userId: 'user-1',
-      title: title,
-      excerpt: null,
       content: content,
       isInbox: isInbox,
       favorite: false,

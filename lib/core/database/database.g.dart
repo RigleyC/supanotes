@@ -37,15 +37,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _titleMeta = const VerificationMeta('title');
-  @override
-  late final GeneratedColumn<String> title = GeneratedColumn<String>(
-    'title',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
   static const VerificationMeta _contentMeta = const VerificationMeta(
     'content',
   );
@@ -240,7 +231,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     id,
     userId,
     contextId,
-    title,
     content,
     excerpt,
     isInbox,
@@ -286,12 +276,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
       context.handle(
         _contextIdMeta,
         contextId.isAcceptableOrUnknown(data['context_id']!, _contextIdMeta),
-      );
-    }
-    if (data.containsKey('title')) {
-      context.handle(
-        _titleMeta,
-        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
       );
     }
     if (data.containsKey('content')) {
@@ -426,10 +410,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         DriftSqlType.string,
         data['${effectivePrefix}context_id'],
       ),
-      title: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}title'],
-      ),
       content: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}content'],
@@ -503,7 +483,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
   final String id;
   final String userId;
   final String? contextId;
-  final String? title;
   final String content;
   final String? excerpt;
   final bool isInbox;
@@ -523,7 +502,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     required this.id,
     required this.userId,
     this.contextId,
-    this.title,
     required this.content,
     this.excerpt,
     required this.isInbox,
@@ -547,9 +525,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     map['user_id'] = Variable<String>(userId);
     if (!nullToAbsent || contextId != null) {
       map['context_id'] = Variable<String>(contextId);
-    }
-    if (!nullToAbsent || title != null) {
-      map['title'] = Variable<String>(title);
     }
     map['content'] = Variable<String>(content);
     if (!nullToAbsent || excerpt != null) {
@@ -588,9 +563,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       contextId: contextId == null && nullToAbsent
           ? const Value.absent()
           : Value(contextId),
-      title: title == null && nullToAbsent
-          ? const Value.absent()
-          : Value(title),
       content: Value(content),
       excerpt: excerpt == null && nullToAbsent
           ? const Value.absent()
@@ -630,7 +602,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       id: serializer.fromJson<String>(json['id']),
       userId: serializer.fromJson<String>(json['userId']),
       contextId: serializer.fromJson<String?>(json['contextId']),
-      title: serializer.fromJson<String?>(json['title']),
       content: serializer.fromJson<String>(json['content']),
       excerpt: serializer.fromJson<String?>(json['excerpt']),
       isInbox: serializer.fromJson<bool>(json['isInbox']),
@@ -655,7 +626,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       'id': serializer.toJson<String>(id),
       'userId': serializer.toJson<String>(userId),
       'contextId': serializer.toJson<String?>(contextId),
-      'title': serializer.toJson<String?>(title),
       'content': serializer.toJson<String>(content),
       'excerpt': serializer.toJson<String?>(excerpt),
       'isInbox': serializer.toJson<bool>(isInbox),
@@ -678,7 +648,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     String? id,
     String? userId,
     Value<String?> contextId = const Value.absent(),
-    Value<String?> title = const Value.absent(),
     String? content,
     Value<String?> excerpt = const Value.absent(),
     bool? isInbox,
@@ -698,7 +667,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     id: id ?? this.id,
     userId: userId ?? this.userId,
     contextId: contextId.present ? contextId.value : this.contextId,
-    title: title.present ? title.value : this.title,
     content: content ?? this.content,
     excerpt: excerpt.present ? excerpt.value : this.excerpt,
     isInbox: isInbox ?? this.isInbox,
@@ -724,7 +692,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       id: data.id.present ? data.id.value : this.id,
       userId: data.userId.present ? data.userId.value : this.userId,
       contextId: data.contextId.present ? data.contextId.value : this.contextId,
-      title: data.title.present ? data.title.value : this.title,
       content: data.content.present ? data.content.value : this.content,
       excerpt: data.excerpt.present ? data.excerpt.value : this.excerpt,
       isInbox: data.isInbox.present ? data.isInbox.value : this.isInbox,
@@ -761,7 +728,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ..write('id: $id, ')
           ..write('userId: $userId, ')
           ..write('contextId: $contextId, ')
-          ..write('title: $title, ')
           ..write('content: $content, ')
           ..write('excerpt: $excerpt, ')
           ..write('isInbox: $isInbox, ')
@@ -786,7 +752,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     id,
     userId,
     contextId,
-    title,
     content,
     excerpt,
     isInbox,
@@ -810,7 +775,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           other.id == this.id &&
           other.userId == this.userId &&
           other.contextId == this.contextId &&
-          other.title == this.title &&
           other.content == this.content &&
           other.excerpt == this.excerpt &&
           other.isInbox == this.isInbox &&
@@ -832,7 +796,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   final Value<String> id;
   final Value<String> userId;
   final Value<String?> contextId;
-  final Value<String?> title;
   final Value<String> content;
   final Value<String?> excerpt;
   final Value<bool> isInbox;
@@ -853,7 +816,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.id = const Value.absent(),
     this.userId = const Value.absent(),
     this.contextId = const Value.absent(),
-    this.title = const Value.absent(),
     this.content = const Value.absent(),
     this.excerpt = const Value.absent(),
     this.isInbox = const Value.absent(),
@@ -875,7 +837,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     required String id,
     required String userId,
     this.contextId = const Value.absent(),
-    this.title = const Value.absent(),
     required String content,
     this.excerpt = const Value.absent(),
     this.isInbox = const Value.absent(),
@@ -901,7 +862,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Expression<String>? id,
     Expression<String>? userId,
     Expression<String>? contextId,
-    Expression<String>? title,
     Expression<String>? content,
     Expression<String>? excerpt,
     Expression<bool>? isInbox,
@@ -923,7 +883,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       if (id != null) 'id': id,
       if (userId != null) 'user_id': userId,
       if (contextId != null) 'context_id': contextId,
-      if (title != null) 'title': title,
       if (content != null) 'content': content,
       if (excerpt != null) 'excerpt': excerpt,
       if (isInbox != null) 'is_inbox': isInbox,
@@ -947,7 +906,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Value<String>? id,
     Value<String>? userId,
     Value<String?>? contextId,
-    Value<String?>? title,
     Value<String>? content,
     Value<String?>? excerpt,
     Value<bool>? isInbox,
@@ -969,7 +927,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       id: id ?? this.id,
       userId: userId ?? this.userId,
       contextId: contextId ?? this.contextId,
-      title: title ?? this.title,
       content: content ?? this.content,
       excerpt: excerpt ?? this.excerpt,
       isInbox: isInbox ?? this.isInbox,
@@ -1000,9 +957,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     }
     if (contextId.present) {
       map['context_id'] = Variable<String>(contextId.value);
-    }
-    if (title.present) {
-      map['title'] = Variable<String>(title.value);
     }
     if (content.present) {
       map['content'] = Variable<String>(content.value);
@@ -1061,7 +1015,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
           ..write('id: $id, ')
           ..write('userId: $userId, ')
           ..write('contextId: $contextId, ')
-          ..write('title: $title, ')
           ..write('content: $content, ')
           ..write('excerpt: $excerpt, ')
           ..write('isInbox: $isInbox, ')
@@ -3847,7 +3800,6 @@ typedef $$NotesTableCreateCompanionBuilder =
       required String id,
       required String userId,
       Value<String?> contextId,
-      Value<String?> title,
       required String content,
       Value<String?> excerpt,
       Value<bool> isInbox,
@@ -3870,7 +3822,6 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> userId,
       Value<String?> contextId,
-      Value<String?> title,
       Value<String> content,
       Value<String?> excerpt,
       Value<bool> isInbox,
@@ -3932,11 +3883,6 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<String> get contextId => $composableBuilder(
     column: $table.contextId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get title => $composableBuilder(
-    column: $table.title,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4065,11 +4011,6 @@ class $$NotesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get title => $composableBuilder(
-    column: $table.title,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get content => $composableBuilder(
     column: $table.content,
     builder: (column) => ColumnOrderings(column),
@@ -4163,9 +4104,6 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<String> get contextId =>
       $composableBuilder(column: $table.contextId, builder: (column) => column);
-
-  GeneratedColumn<String> get title =>
-      $composableBuilder(column: $table.title, builder: (column) => column);
 
   GeneratedColumn<String> get content =>
       $composableBuilder(column: $table.content, builder: (column) => column);
@@ -4281,7 +4219,6 @@ class $$NotesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> userId = const Value.absent(),
                 Value<String?> contextId = const Value.absent(),
-                Value<String?> title = const Value.absent(),
                 Value<String> content = const Value.absent(),
                 Value<String?> excerpt = const Value.absent(),
                 Value<bool> isInbox = const Value.absent(),
@@ -4302,7 +4239,6 @@ class $$NotesTableTableManager
                 id: id,
                 userId: userId,
                 contextId: contextId,
-                title: title,
                 content: content,
                 excerpt: excerpt,
                 isInbox: isInbox,
@@ -4325,7 +4261,6 @@ class $$NotesTableTableManager
                 required String id,
                 required String userId,
                 Value<String?> contextId = const Value.absent(),
-                Value<String?> title = const Value.absent(),
                 required String content,
                 Value<String?> excerpt = const Value.absent(),
                 Value<bool> isInbox = const Value.absent(),
@@ -4346,7 +4281,6 @@ class $$NotesTableTableManager
                 id: id,
                 userId: userId,
                 contextId: contextId,
-                title: title,
                 content: content,
                 excerpt: excerpt,
                 isInbox: isInbox,

@@ -5,11 +5,11 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_co
 
 void main() {
   group('NoteEditorController snapshot save', () {
-    test('document changes schedule one snapshot save with extracted title', () async {
-      final savedCalls = <(String, String, String, List<TaskEntry>)>[];
+    test('document changes schedule one snapshot save', () async {
+      final savedCalls = <(String, String, List<TaskEntry>)>[];
       final controller = NoteEditorController(
-        snapshotSave: (noteId, title, markdown, tasks) async {
-          savedCalls.add((noteId, title, markdown, tasks));
+        snapshotSave: (noteId, markdown, tasks) async {
+          savedCalls.add((noteId, markdown, tasks));
         },
       );
 
@@ -31,13 +31,13 @@ void main() {
 
       await Future.delayed(const Duration(milliseconds: 600));
       expect(savedCalls.length, 1);
-      expect(savedCalls.first.$2, 'new titlehello');
+      expect(savedCalls.first.$2, '# new titlehello');
     });
 
     test('flushBeforePop deletes empty regular note through lifecycle callback', () async {
       String? deletedNoteId;
       final controller = NoteEditorController(
-        snapshotSave: (noteId, title, markdown, tasks) async {},
+        snapshotSave: (noteId, markdown, tasks) async {},
         emptyNoteExit: (noteId) async {
           deletedNoteId = noteId;
         },

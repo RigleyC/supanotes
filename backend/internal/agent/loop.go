@@ -168,6 +168,14 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 	finalContent := ""
 	var lastToolResults []string
 
+	streamCallback := func(token string) error {
+		sendStreamEvent(events, writer.Event(
+			EventContentDelta,
+			ContentDeltaPayload{Delta: token},
+		))
+		return nil
+	}
+
 	// 4. Tool Calling Loop (max 5 iterations)
 	for i := 0; i < 5; i++ {
 		req := llm.Request{
@@ -178,7 +186,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 			Temperature: 0.7,
 		}
 
-		res, err := client.Complete(ctx, req)
+		res, err := client.CompleteStream(ctx, req, streamCallback)
 		if err != nil {
 			if len(lastToolResults) > 0 {
 				slog.Warn("llm call failed after tool execution; finishing with tool result", "error", err, "iteration", i)
@@ -195,7 +203,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 			slog.Warn("llm returned empty agent response; retrying without tools", "iteration", i)
 			fallbackReq := req
 			fallbackReq.Tools = nil
-			res, err = client.Complete(ctx, fallbackReq)
+			res, err = client.CompleteStream(ctx, fallbackReq, streamCallback)
 			if err != nil {
 				return "", fmt.Errorf("llm fallback call: %w", err)
 			}
@@ -220,13 +228,6 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 		if _, err := l.persistTurn(ctx, userID, sessionUUID, assistMsg); err != nil {
 			return "", fmt.Errorf("save assistant msg: %w", err)
-		}
-
-		if res.Content != "" {
-			sendStreamEvent(events, writer.Event(
-				EventContentDelta,
-				ContentDeltaPayload{Delta: res.Content},
-			))
 		}
 
 		if len(res.ToolCalls) > 0 {

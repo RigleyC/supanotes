@@ -12,9 +12,7 @@ void main() {
       final note = NoteModel(
         id: 'note-1',
         userId: 'user-1',
-        title: 'Dark note',
-        excerpt: 'Readable excerpt',
-        content: '',
+        content: 'Dark note\nReadable excerpt',
         isInbox: false,
         favorite: false,
         archived: false,

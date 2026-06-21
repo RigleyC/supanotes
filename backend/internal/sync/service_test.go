@@ -131,7 +131,6 @@ func TestSyncPushRejectsEmptyNewRegularNote(t *testing.T) {
 	err := svc.Push(context.Background(), testUserID(), &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
 			testNote(func(n *sqlcgen.GetSyncNotesRow) {
-				n.Title = pgtype.Text{Valid: false}
 				n.Content = "   "
 			}),
 		},
@@ -149,7 +148,6 @@ func TestSyncServicePushPreservesHideCompleted(t *testing.T) {
 	err := svc.Push(context.Background(), testUserID(), &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
 			testNote(func(n *sqlcgen.GetSyncNotesRow) {
-				n.Title = pgtype.Text{String: "Task note", Valid: true}
 				n.Content = "- [x] Done"
 				n.HideCompleted = true
 			}),
@@ -172,7 +170,6 @@ func TestSyncServicePushRejectsSharedNoteWithoutEditPermission(t *testing.T) {
 		Notes: []sqlcgen.GetSyncNotesRow{
 			testNote(func(n *sqlcgen.GetSyncNotesRow) {
 				n.UserID = testOtherUserID()
-				n.Title = pgtype.Text{String: "Shared Note", Valid: true}
 				n.Content = "Hello"
 			}),
 		},
@@ -196,7 +193,6 @@ func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
 		Notes: []sqlcgen.GetSyncNotesRow{
 			testNote(func(n *sqlcgen.GetSyncNotesRow) {
 				n.UserID = testOtherUserID()
-				n.Title = pgtype.Text{String: "Shared Note", Valid: true}
 				n.Content = "Hello"
 			}),
 		},
@@ -243,7 +239,6 @@ func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
 	payload := &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
 			testNote(func(n *sqlcgen.GetSyncNotesRow) {
-				n.Title = pgtype.Text{String: "Test", Valid: true}
 				n.Content = "Hello"
 				n.CreatedAt = pgtype.Timestamptz{Time: pgtype.Timestamptz{}.Time, Valid: true}
 			}),

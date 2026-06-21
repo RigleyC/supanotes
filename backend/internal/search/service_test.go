@@ -39,7 +39,7 @@ func TestService_Search(t *testing.T) {
 				t.Errorf("expected limit 10, got %d", arg.Limit)
 			}
 			return []sqlcgen.SearchNotesHybridRow{
-				{ID: makeUUID(30), Title: pgtype.Text{String: "Hybrid Note", Valid: true}, Content: "hybrid", Score: 0.9},
+				{ID: makeUUID(30), Title: "Hybrid Note", Content: "hybrid", Score: 0.9},
 			}, nil
 		},
 	}, llm.NewEmbeddingClient("", "", ""))

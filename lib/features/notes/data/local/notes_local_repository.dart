@@ -85,7 +85,7 @@ class NotesLocalRepository {
   /// Soft-delete the row with [id]. Marks `deletedAt` and flips
   /// `isDirty` so the tombstone reaches the backend on the next sync.
   Future<NoteData> createNoteWithId(String id,
-      {String? title, String content = ''}) async {
+      {String content = ''}) async {
     final now = DateTime.now().toUtc();
     final companion = NotesCompanion.insert(
       id: id,

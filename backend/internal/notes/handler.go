@@ -26,7 +26,6 @@ const (
 )
 
 type CreateNoteRequest struct {
-	Title         *string `json:"title"`
 	Content       string  `json:"content" validate:"required"`
 	ContextID     *string `json:"context_id"`
 	Favorite      bool    `json:"favorite"`
@@ -35,7 +34,6 @@ type CreateNoteRequest struct {
 }
 
 type UpdateNoteRequest struct {
-	Title         *string `json:"title"`
 	Content       *string `json:"content"`
 	ContextID     *string `json:"context_id"`
 	Favorite      *bool   `json:"favorite"`
@@ -50,7 +48,6 @@ type AppendToInboxRequest struct {
 type NoteResponse struct {
 	ID            string  `json:"id"`
 	ContextID     *string `json:"context_id,omitempty"`
-	Title         *string `json:"title,omitempty"`
 	Content       string  `json:"content"`
 	Excerpt       *string `json:"excerpt,omitempty"`
 	IsInbox       bool    `json:"is_inbox"`
@@ -89,7 +86,7 @@ func (h *Handler) Create(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Title, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted)
+	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create note")
@@ -189,7 +186,7 @@ func (h *Handler) Update(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Title, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
@@ -441,11 +438,6 @@ func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
 		id := uid.UUIDToString(n.ContextID)
 		ctxID = &id
 	}
-	var title *string
-	if n.Title.Valid {
-		t := n.Title.String
-		title = &t
-	}
 	var excerpt *string
 	if n.Excerpt.Valid {
 		e := n.Excerpt.String
@@ -454,7 +446,6 @@ func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
 	return NoteResponse{
 		ID:            uid.UUIDToString(n.ID),
 		ContextID:     ctxID,
-		Title:         title,
 		Content:       n.Content,
 		Excerpt:       excerpt,
 		IsInbox:       n.IsInbox,

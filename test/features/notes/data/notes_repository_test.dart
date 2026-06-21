@@ -15,7 +15,7 @@ void main() {
 
       final note = await repo.createLocalNote(id: 'note-1');
       expect(note.id, 'note-1');
-      expect(note.title, isNull);
+      expect(note.title, equals('Sem título'));
       expect(note.content, isEmpty);
     });
 
@@ -44,7 +44,7 @@ void main() {
 
     test('deleteIfEmpty does nothing for non-empty notes', () async {
       final local = FakeNotesLocalRepository();
-      await local.createNoteWithId('note-1', title: 'Hi', content: 'Hello');
+      await local.createNoteWithId('note-1', content: 'Hello');
       final tasksLocal = FakeTasksLocalRepository();
       final repo = NotesRepository(local, tasksLocal);
 
@@ -53,7 +53,7 @@ void main() {
       expect(local.softDeletedIds, isEmpty);
     });
 
-    test('saveSnapshot writes title content and tasks together', () async {
+    test('saveSnapshot writes content and tasks together', () async {
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
       final tasksLocal = FakeTasksLocalRepository();
@@ -61,15 +61,13 @@ void main() {
 
       await repo.saveNoteSnapshot(
         id: 'note-1',
-        title: 'A',
         content: 'B',
         tasks: const [],
       );
 
       final saved = await local.getNoteById('note-1');
       expect(saved, isNotNull);
-      expect(saved!.title, 'A');
-      expect(saved.content, 'B');
+      expect(saved!.content, 'B');
     });
   });
 }
@@ -107,12 +105,11 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
 
   @override
   Future<NoteData> createNoteWithId(String id,
-      {String? title, String content = ''}) async {
+      {String content = ''}) async {
     final now = DateTime.now().toUtc();
     final data = NoteData(
       id: id,
       userId: userId,
-      title: title,
       content: content,
       isInbox: false,
       favorite: false,

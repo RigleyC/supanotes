@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,12 +31,12 @@ func NewService(repo Repository, pool *pgxpool.Pool) *Service {
 	return &Service{repo: repo, pool: pool}
 }
 
-func isEmptyRegularNote(title *string, content string) bool {
-	return (title == nil || strings.TrimSpace(*title) == "") && strings.TrimSpace(content) == ""
+func isEmptyRegularNote(content string) bool {
+	return strings.TrimSpace(content) == ""
 }
 
-func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, title *string, content string, contextID *pgtype.UUID, favorite, archived, hideCompleted bool) (sqlcgen.Note, error) {
-	if isEmptyRegularNote(title, content) {
+func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string, contextID *pgtype.UUID, favorite, archived, hideCompleted bool) (sqlcgen.Note, error) {
+	if isEmptyRegularNote(content) {
 		return sqlcgen.Note{}, ErrEmptyNote
 	}
 	arg := sqlcgen.CreateNoteParams{
@@ -46,9 +47,6 @@ func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, title *str
 		Archived:        archived,
 		EmbeddingStatus: "pending",
 		HideCompleted:   hideCompleted,
-	}
-	if title != nil {
-		arg.Title = pgtype.Text{String: *title, Valid: true}
 	}
 	if contextID != nil {
 		arg.ContextID = *contextID
@@ -67,7 +65,7 @@ func (s *Service) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype
 	return note, nil
 }
 
-func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, title *string, content *string, contextID *pgtype.UUID, favorite *bool, archived *bool, hideCompleted *bool) (sqlcgen.Note, error) {
+func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, contextID *pgtype.UUID, favorite *bool, archived *bool, hideCompleted *bool) (sqlcgen.Note, error) {
 	note, err := s.GetNoteByID(ctx, id, userID)
 	if err != nil {
 		return sqlcgen.Note{}, err
@@ -82,9 +80,6 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	arg := sqlcgen.UpdateNoteParams{
 		ID:     id,
 		UserID: userID,
-	}
-	if title != nil {
-		arg.Title = pgtype.Text{String: *title, Valid: true}
 	}
 	if content != nil {
 		arg.Content = pgtype.Text{String: *content, Valid: true}
@@ -185,8 +180,8 @@ func (s *Service) AppendToInbox(ctx context.Context, userID pgtype.UUID, content
 }
 
 const (
-	batchCreateNoteSQL = `INSERT INTO notes (user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status, hide_completed)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	batchCreateNoteSQL = `INSERT INTO notes (user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id`
 
 	batchAppendToNoteContentSQL = `UPDATE notes
@@ -224,7 +219,6 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 	}
 
 	type createOp struct {
-		title   pgtype.Text
 		content string
 	}
 	type appendOp struct {
@@ -254,11 +248,11 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 
 		switch reqItem.DestinationType {
 		case DestNewNote:
-			titleText := pgtype.Text{}
-			if reqItem.DestinationTitle != nil {
-				titleText = pgtype.Text{String: *reqItem.DestinationTitle, Valid: true}
+			content := trimmed
+			if reqItem.DestinationTitle != nil && strings.TrimSpace(*reqItem.DestinationTitle) != "" {
+				content = fmt.Sprintf("# %s\n\n%s", *reqItem.DestinationTitle, trimmed)
 			}
-			creates = append(creates, createOp{title: titleText, content: trimmed})
+			creates = append(creates, createOp{content: content})
 		case DestExistingNote:
 			if reqItem.DestinationNoteID != nil {
 				noteID, err := uid.UUIDFromString(*reqItem.DestinationNoteID)
@@ -285,7 +279,6 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 				batch.Queue(batchCreateNoteSQL,
 					userID,
 					pgtype.UUID{},
-					op.title,
 					op.content,
 					false,
 					false,
@@ -321,7 +314,6 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 			for _, op := range creates {
 				if _, err := r.CreateNote(ctx, sqlcgen.CreateNoteParams{
 					UserID:          userID,
-					Title:           op.title,
 					Content:         op.content,
 					IsInbox:         false,
 					Favorite:        false,
@@ -358,4 +350,25 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 	return nil
 }
 
+var (
+	headerRegex  = regexp.MustCompile(`^#+\s+`)
+	listRegex    = regexp.MustCompile(`^[-*]\s+(\[[ xX]\]\s+)?`)
+	numListRegex = regexp.MustCompile(`^\d+\.\s+`)
+)
 
+func DeriveTitle(content string) string {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			clean := headerRegex.ReplaceAllString(trimmed, "")
+			clean = listRegex.ReplaceAllString(clean, "")
+			clean = numListRegex.ReplaceAllString(clean, "")
+			clean = strings.TrimSpace(clean)
+			if clean != "" {
+				return clean
+			}
+		}
+	}
+	return "Sem título"
+}

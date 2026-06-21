@@ -53,7 +53,6 @@ void main() {
       final note = NoteData(
         id: 'note-1',
         userId: 'user-1',
-        title: 'Test Note',
         content: 'Hello World',
         isInbox: false,
         favorite: false,
@@ -68,7 +67,6 @@ void main() {
       final json = SyncMapper().noteToJson(note);
 
       expect(json['user_id'], 'user-1');
-      expect(json['title'], 'Test Note');
       expect(json['content'], 'Hello World');
     });
   });

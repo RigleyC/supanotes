@@ -11,9 +11,7 @@ void main() {
       final note = NoteModel(
         id: '1',
         userId: 'user1',
-        title: 'My Note',
-        excerpt: null,
-        content: '',
+        content: 'My Note',
         isInbox: false,
         favorite: false,
         archived: false,
@@ -44,9 +42,7 @@ void main() {
       final note = NoteModel(
         id: '2',
         userId: 'user2',
-        title: 'Shared Note',
-        excerpt: null,
-        content: '',
+        content: 'Shared Note',
         isInbox: false,
         favorite: false,
         archived: false,
@@ -80,9 +76,7 @@ void main() {
       final note = NoteModel(
         id: '3',
         userId: 'user1',
-        title: 'Favorite Note',
-        excerpt: null,
-        content: '',
+        content: 'Favorite Note',
         isInbox: false,
         favorite: true,
         archived: false,
@@ -115,9 +109,7 @@ void main() {
       final note = NoteModel(
         id: '4',
         userId: 'user1',
-        title: 'Non-favorite Note',
-        excerpt: null,
-        content: '',
+        content: 'Non-favorite Note',
         isInbox: false,
         favorite: false,
         archived: false,

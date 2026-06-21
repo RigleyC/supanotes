@@ -138,12 +138,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         child: NoteEditor(
           noteId: widget.noteId,
           content: note.content,
-          title: note.title,
           taskMetadata: tasksMap,
           hideCompleted: note.hideCompleted,
           isReadOnly: isReadOnly,
-          snapshotSave: (noteId, title, markdown, tasks) =>
-              defaultSnapshotSave(repo, noteId, title, markdown, tasks),
+          snapshotSave: (noteId, markdown, tasks) =>
+              defaultSnapshotSave(repo, noteId, markdown, tasks),
           emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
           onTaskLongPress: isReadOnly
               ? null

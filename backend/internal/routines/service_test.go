@@ -76,6 +76,19 @@ func (m *mockLLMClient) Complete(_ context.Context, _ llm.Request) (*llm.Respons
 	return m.resp, m.err
 }
 
+func (m *mockLLMClient) CompleteStream(ctx context.Context, req llm.Request, onToken func(string) error) (*llm.Response, error) {
+	res, err := m.Complete(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if res.Content != "" {
+		if err := onToken(res.Content); err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 type mockLLMFactory struct {
 	client llm.Client
 }

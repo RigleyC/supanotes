@@ -48,4 +48,5 @@ type Response struct {
 
 type Client interface {
 	Complete(ctx context.Context, req Request) (*Response, error)
+	CompleteStream(ctx context.Context, req Request, onToken func(string) error) (*Response, error)
 }

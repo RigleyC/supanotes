@@ -137,7 +137,6 @@ func sanitizeTaskStatus(status string) string {
 func isEmptyIncomingRegularNote(n sqlcgen.GetSyncNotesRow) bool {
 	return !n.IsInbox &&
 		!n.DeletedAt.Valid &&
-		(!n.Title.Valid || strings.TrimSpace(n.Title.String) == "") &&
 		strings.TrimSpace(n.Content) == ""
 }
 
@@ -214,7 +213,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			ID:              noteID,
 			UserID:          upsertUserID,
 			ContextID:       n.ContextID,
-			Title:           n.Title,
 			Content:         n.Content,
 			IsInbox:         n.IsInbox,
 			Favorite:        n.Favorite,

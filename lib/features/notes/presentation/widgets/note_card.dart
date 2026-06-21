@@ -19,31 +19,16 @@ class NoteCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onToggleFavorite;
 
-  static const _fallbackTitle = 'Sem titulo';
   static const _deleteTitle = 'Apagar nota?';
   static const _deleteMessage = 'Esta acao nao pode ser desfeita.';
   static const _deleteConfirmLabel = 'Apagar';
 
   static String titleHeroTag(String noteId) => 'note-title-$noteId';
 
-  String? _resolveExcerpt() {
-    if (note.excerpt != null && note.excerpt!.trim().isNotEmpty) {
-      return note.excerpt!.trim();
-    }
-    if (note.content.isEmpty) return null;
-    final flat = note.content.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (flat.length <= AppConstants.noteExcerptMaxLength) return flat;
-    return '${flat.substring(0, AppConstants.noteExcerptMaxLength)}…';
-  }
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final title = note.title?.trim().isNotEmpty == true
-        ? note.title!.trim()
-        : _fallbackTitle;
-    final excerpt = _resolveExcerpt();
 
     return GestureDetector(
       onTap: onTap,
@@ -120,17 +105,17 @@ class NoteCard extends StatelessWidget {
               child: Material(
                 type: MaterialType.transparency,
                 child: Text(
-                  title,
+                  note.title,
                   style: textTheme.titleMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
-            if (excerpt != null && excerpt.isNotEmpty) ...[
+            if (note.excerpt != null) ...[
               const SizedBox(height: 4),
               Text(
-                excerpt,
+                note.excerpt!,
                 style: textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
-import 'package:supanotes/features/agent/presentation/widgets/shimmer_text.dart';
+import 'package:supanotes/features/agent/presentation/widgets/skeleton_status_card.dart';
 
 class AgentActionCard extends StatelessWidget {
   const AgentActionCard({
@@ -18,70 +18,38 @@ class AgentActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    Widget icon;
-    Color? textColor;
+    IconData? icon;
+    Color? iconColor;
     
     switch (status) {
       case ChatToolActionStatus.running:
-        icon = const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        );
+        icon = Icons.sync;
         break;
       case ChatToolActionStatus.completed:
       case ChatToolActionStatus.confirmed:
-        icon = Icon(Icons.check_circle, size: 16, color: theme.colorScheme.primary);
+        icon = Icons.check_circle;
+        iconColor = theme.colorScheme.primary;
         break;
       case ChatToolActionStatus.failed:
       case ChatToolActionStatus.cancelled:
-        icon = Icon(Icons.error, size: 16, color: theme.colorScheme.error);
-        textColor = theme.colorScheme.error;
+        icon = Icons.error;
+        iconColor = theme.colorScheme.error;
         break;
       case ChatToolActionStatus.confirmationRequired:
-        icon = Icon(Icons.warning, size: 16, color: theme.colorScheme.primary);
+        icon = Icons.warning;
+        iconColor = theme.colorScheme.primary;
         break;
     }
 
-    Widget header = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        icon,
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: textColor ?? theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
-    );
+    final isRunning = status == ChatToolActionStatus.running;
 
-    if (status == ChatToolActionStatus.running) {
-      header = ShimmerText(child: header);
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          header,
-          if (message != null && message!.isNotEmpty && status == ChatToolActionStatus.failed) ...[
-            const SizedBox(height: 4),
-            Text(
-              message!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-          ]
-        ],
-      ),
+    return SkeletonStatusCard(
+      label: label,
+      icon: icon,
+      iconColor: iconColor,
+      isShimmering: isRunning,
+      showSkeletonLines: isRunning,
+      padding: const EdgeInsets.all(12),
     );
   }
 }

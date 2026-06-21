@@ -62,7 +62,7 @@ func (s *Service) Search(ctx context.Context, userID pgtype.UUID, query string, 
 	for i, r := range rows {
 		res[i] = SearchResult{
 			ID:        r.ID,
-			Title:     r.Title.String,
+			Title:     r.Title,
 			Content:   r.Content,
 			Excerpt:   r.Excerpt.String,
 			UpdatedAt: r.UpdatedAt,

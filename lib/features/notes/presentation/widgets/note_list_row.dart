@@ -21,9 +21,7 @@ class NoteListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final title = note.title?.trim().isNotEmpty == true
-        ? note.title!.trim()
-        : NoteStrings.fallbackTitle;
+    final title = note.title;
 
     return Dismissible(
       key: ValueKey('note-${note.id}'),

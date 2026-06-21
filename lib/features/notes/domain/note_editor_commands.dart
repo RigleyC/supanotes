@@ -173,9 +173,6 @@ class NoteEditorCommands {
     return true;
   }
 }
-
-/// Like super_editor's default [HorizontalRuleConversionReaction] but assigns
-/// a random [dividerIndex] metadata so the divider renders a random SVG.
 class RandomDividerConversionReaction extends EditReaction {
   static final _hrPattern = RegExp(r'^(---|—-)\s');
 

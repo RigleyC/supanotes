@@ -50,6 +50,12 @@ func (r *retryClient) Complete(ctx context.Context, req Request) (*Response, err
 	return nil, fmt.Errorf("llm retry failed after %d attempts: %w", r.maxRetries, lastErr)
 }
 
+func (r *retryClient) CompleteStream(ctx context.Context, req Request, onToken func(string) error) (*Response, error) {
+	// Retrying streaming requests is complex once tokens start emitting,
+	// so we delegate directly to the base client.
+	return r.base.CompleteStream(ctx, req, onToken)
+}
+
 func isRetryable(err error) bool {
 	if err == nil {
 		return false

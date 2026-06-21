@@ -17,7 +17,6 @@ import 'package:supanotes/features/tasks/domain/task_model.dart';
 class NoteEditor extends StatefulWidget {
   final String noteId;
   final String content;
-  final String? title;
   final Map<String, TaskModel> taskMetadata;
   final bool hideCompleted;
   final bool isReadOnly;
@@ -33,7 +32,6 @@ class NoteEditor extends StatefulWidget {
     super.key,
     required this.noteId,
     required this.content,
-    this.title,
     required this.taskMetadata,
     this.hideCompleted = false,
     this.isReadOnly = false,
@@ -63,7 +61,7 @@ class _NoteEditorState extends State<NoteEditor> {
     super.initState();
     _controller = NoteEditorController(
       snapshotSave: widget.isReadOnly
-          ? (noteId, title, markdown, tasks) async {}
+          ? (noteId, markdown, tasks) async {}
           : widget.snapshotSave,
       emptyNoteExit: widget.isReadOnly ? null : widget.emptyNoteExit,
     );

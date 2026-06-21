@@ -1,21 +1,3 @@
-/// Shared controller for the note editor and inbox screens.
-///
-/// Owns the [MutableDocument], [Editor], [MutableDocumentComposer],
-/// [FocusNode], [TextEditingController] (when a title is editable),
-/// and a [SaveThrottle] instance that backs autosave and flush-on-pop.
-/// Concrete screens decide what UI to build around the document; the
-/// controller takes care of the lifecycle and the save path.
-///
-/// The controller holds the **document and save plumbing**; the host
-/// screen provides the save callbacks and binds the [noteId] so the
-/// controller never needs to cache a Riverpod [WidgetRef].
-///
-/// [flushBeforePop] evaluates the final document state: when both the
-/// title and markdown content are empty (after trimming), the row is
-/// deleted via [emptyNoteExit] instead of saved. If the host did not wire
-/// an [emptyNoteExit] callback (e.g. inbox screen), the delete is a no-op
-/// and the old content is preserved. This keeps "open and back out"
-/// from leaving orphan blank notes behind without a separate flag.
 library;
 
 import 'dart:developer' as dev;
@@ -27,20 +9,16 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/utils/save_throttle.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
-import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
+import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
+import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
+    show NoteEditorCommands, RandomDividerConversionReaction;
 import 'package:supanotes/features/notes/domain/task_entry.dart';
 
 const int _dividerCount = 35;
 
-/// Signature for the snapshot save and empty-note exit operations.
-///
-/// The host screen provides these so the controller does not depend on
-/// a particular [WidgetRef] or note id. Tests can supply a no-op or
-/// recording implementation.
 typedef SnapshotSave =
     Future<void> Function(
       String noteId,
-      String title,
       String markdown,
       List<TaskEntry> tasks,
     );
@@ -52,8 +30,6 @@ class NoteEditorController {
     this.emptyNoteExit,
   });
 
-  /// Provided by the host. Keeps the controller free of [WidgetRef]
-  /// references so it can be unit-tested in isolation.
   final SnapshotSave snapshotSave;
   final EmptyNoteExit? emptyNoteExit;
 
@@ -64,11 +40,9 @@ class NoteEditorController {
 
   final _saveThrottle = SaveThrottle();
 
-  /// The currently bound [noteId]. Non-null while the screen is mounted.
   String? _noteId;
 
-  /// Initializes the editor from the given [content]. Wires the document listener.
-  void init({required String content, String? title}) {
+  void init({required String content}) {
     dev.log(
       '[NoteEditorController.init] contentLength=${content.length}, content="$content"',
       name: 'NoteEditor',
@@ -79,14 +53,14 @@ class NoteEditorController {
       document: document!,
       composer: composer!,
     );
-    // Replace the default HorizontalRuleConversionReaction (which creates
-    // dividers without dividerIndex, always showing SVG #1) with one that
-    // assigns a random dividerIndex so "--- " gives a random divider.
     editor!.reactionPipeline.removeWhere(
       (r) => r is HorizontalRuleConversionReaction,
     );
     editor!.reactionPipeline.add(
       const RandomDividerConversionReaction(dividerCount: _dividerCount),
+    );
+    editor!.reactionPipeline.add(
+      const KeepFirstLineAsTitleReaction(),
     );
     focusNode = FocusNode();
     document!.addListener(_onDocumentChanged);
@@ -108,18 +82,6 @@ class NoteEditorController {
     );
   }
 
-  String _extractTitle(MutableDocument doc) {
-    for (final node in doc) {
-      if (node is TextNode) {
-        final text = node.text.toPlainText().trim();
-        if (text.isNotEmpty) {
-          return text;
-        }
-      }
-    }
-    return '';
-  }
-
   Future<void> _runSnapshotSave() async {
     final noteId = _noteId;
     final doc = document;
@@ -127,17 +89,11 @@ class NoteEditorController {
 
     await snapshotSave(
       noteId,
-      _extractTitle(doc),
       serializeNoteToMarkdown(doc),
       _extractTasks(doc),
     );
   }
 
-  /// Forces a snapshot save immediately, bypassing the debounce.
-  ///
-  /// Unlike [flushBeforePop], this method does NOT call [emptyNoteExit].
-  /// Use this before opening the task actions sheet so a newly typed
-  /// checklist item exists in the tasks table.
   Future<void> persistSnapshotNow() async {
     final noteId = _noteId;
     final doc = document;
@@ -159,24 +115,17 @@ class NoteEditorController {
     return true;
   }
 
-  /// Captures the current final state and persists it immediately,
-  /// bypassing the debounce. Call from [dispose] before cleaning up.
-  ///
-  /// When the markdown content is empty (after trimming), the row is
-  /// deleted instead of saved. Screens that did not wire an [emptyNoteExit]
-  /// callback (e.g. inbox) skip the delete, preserving the old content.
   void _flushAndSaveFinalState() {
     final noteId = _noteId;
     final doc = document;
     if (noteId == null || doc == null) return;
 
-    final title = _extractTitle(doc);
     final markdown = serializeNoteToMarkdown(doc);
     final tasks = _extractTasks(doc);
 
     dev.log(
       '[NoteEditorController] _flushAndSaveFinalState: noteId=$noteId, '
-      'markdownLength=${markdown.length}, titleLength=${title.length}',
+      'markdownLength=${markdown.length}',
       name: 'NoteEditor',
     );
 
@@ -190,7 +139,7 @@ class NoteEditorController {
       final generation = _saveThrottle.nextGeneration();
       _saveThrottle.flush(
         generation: generation,
-        operation: () => snapshotSave(noteId, title, markdown, tasks),
+        operation: () => snapshotSave(noteId, markdown, tasks),
       );
     }
   }
@@ -221,13 +170,9 @@ class NoteEditorController {
   }
 }
 
-/// Default save callbacks that write to the notes repository.
-/// Screens that don't need to customize the save path can
-/// pass these in directly.
 Future<void> defaultSnapshotSave(
   INotesRepository repo,
   String noteId,
-  String title,
   String markdown,
   List<TaskEntry> tasks,
 ) async {
@@ -237,7 +182,6 @@ Future<void> defaultSnapshotSave(
   );
   await repo.saveNoteSnapshot(
         id: noteId,
-        title: title,
         content: markdown,
         tasks: tasks,
       );

@@ -1,5 +1,5 @@
 -- name: SearchNotesFTS :many
-SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
        ts_rank(n.search_vector, plainto_tsquery('simple', sqlc.arg('query')::text)) AS score
 FROM notes n
 WHERE n.user_id = sqlc.arg('user_id')
@@ -11,7 +11,7 @@ ORDER BY score DESC
 LIMIT sqlc.arg('limit');
 
 -- name: SearchNotesSemantic :many
-SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
        (1.0 - (ne.embedding <=> sqlc.arg('embedding')::vector))::float8 AS score
 FROM notes n
 JOIN note_embeddings ne ON n.id = ne.note_id
@@ -24,7 +24,7 @@ LIMIT sqlc.arg('limit');
 
 -- name: SearchNotesHybrid :many
 WITH fts AS (
-  SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
          row_number() OVER (ORDER BY ts_rank(n.search_vector, to_tsquery('simple', sqlc.arg('query')::text)) DESC) as rank
   FROM notes n
   WHERE n.user_id = sqlc.arg('user_id')
@@ -35,7 +35,7 @@ WITH fts AS (
   LIMIT sqlc.arg('fts_limit')::int
 ),
 semantic AS (
-  SELECT n.id, n.title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s+|[-*]\s+(\[[ xX]\]\s+)?|\d+\.\s+)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
          row_number() OVER (ORDER BY ne.embedding <=> sqlc.arg('embedding')::vector) as rank
   FROM notes n
   JOIN note_embeddings ne ON n.id = ne.note_id

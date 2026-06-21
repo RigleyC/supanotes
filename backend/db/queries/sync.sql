@@ -27,11 +27,10 @@ WHERE deleted_at IS NOT NULL
   AND deleted_at < NOW() - INTERVAL '30 days';
 
 -- name: UpsertNote :one
-INSERT INTO notes (id, user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status, hide_completed, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)
+INSERT INTO notes (id, user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
 ON CONFLICT (id) DO UPDATE
 SET context_id = EXCLUDED.context_id,
-    title = EXCLUDED.title,
     content = EXCLUDED.content,
     is_inbox = EXCLUDED.is_inbox,
     favorite = EXCLUDED.favorite,

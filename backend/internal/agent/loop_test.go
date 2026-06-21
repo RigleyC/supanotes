@@ -104,6 +104,19 @@ func (s *stubLoopLLMClient) Complete(ctx context.Context, req llm.Request) (*llm
 	return s.response, nil
 }
 
+func (s *stubLoopLLMClient) CompleteStream(ctx context.Context, req llm.Request, onToken func(string) error) (*llm.Response, error) {
+	res, err := s.Complete(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if res.Content != "" {
+		if err := onToken(res.Content); err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 type stubLoopLLMFactory struct {
 	client llm.Client
 }

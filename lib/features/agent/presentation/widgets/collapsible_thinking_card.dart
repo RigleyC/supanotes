@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supanotes/features/agent/presentation/widgets/shimmer_text.dart';
 
 class CollapsibleThinkingCard extends StatefulWidget {
   const CollapsibleThinkingCard({
@@ -41,17 +40,23 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final headerText = widget.isFinished ? 'Raciocínio concluído' : 'Pensando…';
+    final headerText = widget.isFinished ? 'Raciocínio concluído' : 'Pensando...';
+    final iconColor = widget.isFinished ? theme.colorScheme.primary : theme.colorScheme.secondary;
 
-    final iconColor = widget.isFinished
-        ? theme.colorScheme.primary
-        : theme.colorScheme.secondary;
-
-    final icon = widget.isFinished
+    final Widget icon = widget.isFinished
         ? Icon(Icons.check_circle_outline, size: 16, color: iconColor)
-        : Icon(Icons.lightbulb_outline, size: 16, color: iconColor);
+        : SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(iconColor),
+            ),
+          );
 
-    Widget headerContent = Row(
+    final backgroundColor = isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7);
+
+    final headerContent = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         icon,
@@ -72,20 +77,17 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
       ],
     );
 
-    if (!widget.isFinished) {
-      headerContent = ShimmerText(child: headerContent);
-    }
+    final textStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+      height: 1.5,
+      fontStyle: widget.isFinished ? FontStyle.normal : FontStyle.italic,
+    ) ?? const TextStyle();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark
-            ? theme.colorScheme.surfaceContainerLowest
-            : theme.colorScheme.surfaceContainerLow,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant,
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,7 +97,7 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.all(12),
               child: headerContent,
             ),
           ),
@@ -109,13 +111,17 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
                       right: 12,
                       bottom: 12,
                     ),
-                    child: Text(
-                      widget.thinkingText,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.4,
-                      ),
-                    ),
+                    child: widget.thinkingText.isEmpty && !widget.isFinished
+                        ? Text(
+                            'Escrevendo raciocínio...',
+                            style: textStyle.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                            ),
+                          )
+                        : Text(
+                            widget.thinkingText,
+                            style: textStyle,
+                          ),
                   )
                 : const SizedBox.shrink(),
           ),

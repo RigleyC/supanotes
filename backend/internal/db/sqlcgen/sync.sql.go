@@ -115,7 +115,7 @@ func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]No
 }
 
 const getSyncNotes = `-- name: GetSyncNotes :many
-SELECT n.id, n.user_id, n.context_id, n.title, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed,
+SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.hide_completed,
   COALESCE(ns.permission, '')::text AS shared_permission,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
@@ -138,7 +138,6 @@ type GetSyncNotesRow struct {
 	ID               pgtype.UUID        `json:"id"`
 	UserID           pgtype.UUID        `json:"user_id"`
 	ContextID        pgtype.UUID        `json:"context_id"`
-	Title            pgtype.Text        `json:"title"`
 	Content          string             `json:"content"`
 	Excerpt          pgtype.Text        `json:"excerpt"`
 	IsInbox          bool               `json:"is_inbox"`
@@ -168,7 +167,6 @@ func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]G
 			&i.ID,
 			&i.UserID,
 			&i.ContextID,
-			&i.Title,
 			&i.Content,
 			&i.Excerpt,
 			&i.IsInbox,
@@ -399,11 +397,10 @@ func (q *Queries) UpsertContext(ctx context.Context, arg UpsertContextParams) (C
 }
 
 const upsertNote = `-- name: UpsertNote :one
-INSERT INTO notes (id, user_id, context_id, title, content, is_inbox, favorite, archived, embedding_status, hide_completed, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)
+INSERT INTO notes (id, user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
 ON CONFLICT (id) DO UPDATE
 SET context_id = EXCLUDED.context_id,
-    title = EXCLUDED.title,
     content = EXCLUDED.content,
     is_inbox = EXCLUDED.is_inbox,
     favorite = EXCLUDED.favorite,
@@ -413,14 +410,13 @@ SET context_id = EXCLUDED.context_id,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 WHERE notes.user_id = EXCLUDED.user_id
-RETURNING id, user_id, context_id, title, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
+RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, hide_completed
 `
 
 type UpsertNoteParams struct {
 	ID              pgtype.UUID        `json:"id"`
 	UserID          pgtype.UUID        `json:"user_id"`
 	ContextID       pgtype.UUID        `json:"context_id"`
-	Title           pgtype.Text        `json:"title"`
 	Content         string             `json:"content"`
 	IsInbox         bool               `json:"is_inbox"`
 	Favorite        bool               `json:"favorite"`
@@ -436,7 +432,6 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 		arg.ID,
 		arg.UserID,
 		arg.ContextID,
-		arg.Title,
 		arg.Content,
 		arg.IsInbox,
 		arg.Favorite,
@@ -451,7 +446,6 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 		&i.ID,
 		&i.UserID,
 		&i.ContextID,
-		&i.Title,
 		&i.Content,
 		&i.Excerpt,
 		&i.IsInbox,

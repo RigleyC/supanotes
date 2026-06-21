@@ -519,7 +519,7 @@ packages:
     source: hosted
     version: "0.7.0"
   flutter_streaming_text_markdown:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: flutter_streaming_text_markdown
       sha256: ccb9f98b2ee93a43551065c49c810e306620fa6ec00400a6ec7c9a18bcdd69c7
