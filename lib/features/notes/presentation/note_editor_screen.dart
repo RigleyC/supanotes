@@ -1,6 +1,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
@@ -155,9 +156,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               ref.read(tasksRepositoryProvider).reopenTask(taskId),
           onUploadFile: isReadOnly
               ? null
-              : (noteId, file, mimeType) =>
+              : (noteId, filePath, mimeType) =>
                   ref.read(attachmentsRepositoryProvider).upload(
-                    noteId: noteId, file: file, mimeType: mimeType,
+                    noteId: noteId, file: File(filePath), mimeType: mimeType,
                   ),
         ),
       ),

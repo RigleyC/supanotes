@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'attachment_nodes.dart';
+import '../../domain/attachment_nodes.dart';
 
-class ImageAttachmentComponentBuilder implements ComponentBuilder {
-  const ImageAttachmentComponentBuilder();
+class AttachmentComponentBuilder implements ComponentBuilder {
+  const AttachmentComponentBuilder();
 
   @override
   SingleColumnLayoutComponentViewModel? createViewModel(
       Document document, DocumentNode node) {
-    if (node is! ImageAttachmentNode) return null;
-    return _ImageAttachmentViewModel(
+    if (node is! AttachmentNode) return null;
+    return _AttachmentViewModel(
       nodeId: node.id,
       node: node,
       createdAt: node.metadata[NodeMetadata.createdAt],
@@ -21,36 +21,41 @@ class ImageAttachmentComponentBuilder implements ComponentBuilder {
   @override
   Widget? createComponent(SingleColumnDocumentComponentContext context,
       SingleColumnLayoutComponentViewModel viewModel) {
-    if (viewModel is! _ImageAttachmentViewModel) return null;
-    return _ImageAttachmentComponent(viewModel: viewModel);
+    if (viewModel is! _AttachmentViewModel) return null;
+    return switch (viewModel.node) {
+      ImageAttachmentNode n => _ImageAttachmentWidget(node: n),
+      FileAttachmentNode n => _FileAttachmentWidget(node: n),
+      RichLinkNode n => _RichLinkAttachmentWidget(node: n),
+      _ => null,
+    };
   }
 }
 
-class _ImageAttachmentViewModel extends SingleColumnLayoutComponentViewModel {
-  _ImageAttachmentViewModel({
+class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel {
+  _AttachmentViewModel({
     required super.nodeId,
     required this.node,
     super.createdAt,
     super.padding = EdgeInsets.zero,
   });
 
-  final ImageAttachmentNode node;
+  final AttachmentNode node;
 
   @override
-  _ImageAttachmentViewModel copy() =>
-      _ImageAttachmentViewModel(nodeId: nodeId, node: node);
+  _AttachmentViewModel copy() =>
+      _AttachmentViewModel(nodeId: nodeId, node: node);
 
   @override
   bool operator ==(Object other) =>
-      other is _ImageAttachmentViewModel && other.node.url == node.url;
+      other is _AttachmentViewModel && other.node.url == node.url;
 
   @override
   int get hashCode => node.url.hashCode;
 }
 
-class _ImageAttachmentComponent extends StatelessWidget {
-  const _ImageAttachmentComponent({required this.viewModel});
-  final _ImageAttachmentViewModel viewModel;
+class _ImageAttachmentWidget extends StatelessWidget {
+  const _ImageAttachmentWidget({required this.node});
+  final ImageAttachmentNode node;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -58,65 +63,20 @@ class _ImageAttachmentComponent extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Image.network(
-            viewModel.node.url,
+            node.url,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+            errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
           ),
         ),
       );
 }
 
-class FileAttachmentComponentBuilder implements ComponentBuilder {
-  const FileAttachmentComponentBuilder();
-
-  @override
-  SingleColumnLayoutComponentViewModel? createViewModel(
-      Document document, DocumentNode node) {
-    if (node is! FileAttachmentNode) return null;
-    return _FileAttachmentViewModel(
-      nodeId: node.id,
-      node: node,
-      createdAt: node.metadata[NodeMetadata.createdAt],
-    );
-  }
-
-  @override
-  Widget? createComponent(SingleColumnDocumentComponentContext context,
-      SingleColumnLayoutComponentViewModel viewModel) {
-    if (viewModel is! _FileAttachmentViewModel) return null;
-    return _FileAttachmentComponent(viewModel: viewModel);
-  }
-}
-
-class _FileAttachmentViewModel extends SingleColumnLayoutComponentViewModel {
-  _FileAttachmentViewModel({
-    required super.nodeId,
-    required this.node,
-    super.createdAt,
-    super.padding = EdgeInsets.zero,
-  });
-
+class _FileAttachmentWidget extends StatelessWidget {
+  const _FileAttachmentWidget({required this.node});
   final FileAttachmentNode node;
 
   @override
-  _FileAttachmentViewModel copy() =>
-      _FileAttachmentViewModel(nodeId: nodeId, node: node);
-
-  @override
-  bool operator ==(Object other) =>
-      other is _FileAttachmentViewModel && other.node.url == node.url;
-
-  @override
-  int get hashCode => node.url.hashCode;
-}
-
-class _FileAttachmentComponent extends StatelessWidget {
-  const _FileAttachmentComponent({required this.viewModel});
-  final _FileAttachmentViewModel viewModel;
-
-  @override
   Widget build(BuildContext context) {
-    final node = viewModel.node;
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -133,8 +93,11 @@ class _FileAttachmentComponent extends StatelessWidget {
           ),
           child: Row(children: [
             Icon(
-              node.isVideo ? Icons.play_circle_outline : Icons.insert_drive_file,
-              color: cs.primary, size: 32,
+              node.isVideo
+                  ? Icons.play_circle_outline
+                  : Icons.insert_drive_file,
+              color: cs.primary,
+              size: 32,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -149,59 +112,13 @@ class _FileAttachmentComponent extends StatelessWidget {
   }
 }
 
-class RichLinkComponentBuilder implements ComponentBuilder {
-  const RichLinkComponentBuilder();
-
-  @override
-  SingleColumnLayoutComponentViewModel? createViewModel(
-      Document document, DocumentNode node) {
-    if (node is! RichLinkNode) return null;
-    return _RichLinkViewModel(
-      nodeId: node.id,
-      node: node,
-      createdAt: node.metadata[NodeMetadata.createdAt],
-    );
-  }
-
-  @override
-  Widget? createComponent(SingleColumnDocumentComponentContext context,
-      SingleColumnLayoutComponentViewModel viewModel) {
-    if (viewModel is! _RichLinkViewModel) return null;
-    return _RichLinkComponent(viewModel: viewModel);
-  }
-}
-
-class _RichLinkViewModel extends SingleColumnLayoutComponentViewModel {
-  _RichLinkViewModel({
-    required super.nodeId,
-    required this.node,
-    super.createdAt,
-    super.padding = EdgeInsets.zero,
-  });
-
+class _RichLinkAttachmentWidget extends StatelessWidget {
+  const _RichLinkAttachmentWidget({required this.node});
   final RichLinkNode node;
 
   @override
-  _RichLinkViewModel copy() =>
-      _RichLinkViewModel(nodeId: nodeId, node: node);
-
-  @override
-  bool operator ==(Object other) =>
-      other is _RichLinkViewModel && other.node.url == node.url;
-
-  @override
-  int get hashCode => node.url.hashCode;
-}
-
-class _RichLinkComponent extends StatelessWidget {
-  const _RichLinkComponent({required this.viewModel});
-  final _RichLinkViewModel viewModel;
-
-  @override
   Widget build(BuildContext context) {
-    final node = viewModel.node;
     final cs = Theme.of(context).colorScheme;
-
     final hasPreview = node.title != null || node.description != null;
 
     return Padding(
@@ -220,8 +137,10 @@ class _RichLinkComponent extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (node.imageUrl != null)
               Image.network(node.imageUrl!,
-                  height: 160, width: double.infinity, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox()),
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox()),
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(

@@ -1,17 +1,16 @@
 library;
 
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/domain/attachment_model.dart';
+import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/attachment_components.dart';
-import 'package:supanotes/features/notes/presentation/widgets/attachment_nodes.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
@@ -33,8 +32,11 @@ class NoteEditor extends StatefulWidget {
   onTaskLongPress;
   final Future<void> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
-  final Future<AttachmentModel> Function(String noteId, File file, String mimeType)?
-  onUploadFile;
+  final Future<AttachmentModel> Function(
+    String noteId,
+    String filePath,
+    String mimeType,
+  )? onUploadFile;
 
   const NoteEditor({
     super.key,
@@ -144,13 +146,11 @@ class _NoteEditorState extends State<NoteEditor> {
     final picked = result.files.single;
     final path = picked.path;
     if (path == null) return;
-    final file = File(path);
-    final ext = picked.extension?.toLowerCase() ?? '';
-    final mimeType = _mimeFromExtension(ext);
+    final mimeType = lookupMimeType(path) ?? 'application/octet-stream';
 
     late final AttachmentModel attachment;
     try {
-      attachment = await widget.onUploadFile!(widget.noteId, file, mimeType);
+      attachment = await widget.onUploadFile!(widget.noteId, path, mimeType);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -173,33 +173,6 @@ class _NoteEditorState extends State<NoteEditor> {
     _controller!.editor!.execute([
       InsertNodeAtCaretRequest(node: node),
     ]);
-  }
-
-  String _mimeFromExtension(String ext) {
-    switch (ext) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'webp':
-        return 'image/webp';
-      case 'mp4':
-        return 'video/mp4';
-      case 'mov':
-        return 'video/quicktime';
-      case 'pdf':
-        return 'application/pdf';
-      case 'doc':
-      case 'docx':
-        return 'application/msword';
-      case 'zip':
-        return 'application/zip';
-      default:
-        return 'application/octet-stream';
-    }
   }
 
   @override
@@ -285,9 +258,7 @@ class _NoteEditorState extends State<NoteEditor> {
                       componentBuilders: [
                         const CustomDividerComponentBuilder(),
                         _taskComponentBuilder,
-                        const ImageAttachmentComponentBuilder(),
-                        const FileAttachmentComponentBuilder(),
-                        const RichLinkComponentBuilder(),
+                        const AttachmentComponentBuilder(),
                         ...defaultComponentBuilders,
                       ],
                     ),
