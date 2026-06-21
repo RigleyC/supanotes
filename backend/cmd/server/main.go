@@ -26,6 +26,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/embeddings"
 	"github.com/RigleyC/supanotes/internal/gateway"
 	"github.com/RigleyC/supanotes/internal/handler"
+	"github.com/RigleyC/supanotes/internal/linkpreview"
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/notifications"
@@ -263,6 +264,11 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	attachmentsSvc := attachments.NewService(attachmentsRepo, storageBackend)
 	attachmentsH := attachments.NewHandler(attachmentsSvc)
 	protected.POST("/attachments/upload", attachmentsH.Upload)
+
+	// Link preview (OG scraping)
+	linkPreviewSvc := linkpreview.NewService()
+	linkPreviewH := linkpreview.NewHandler(linkPreviewSvc)
+	protected.GET("/links/preview", linkPreviewH.Preview)
 
 	// Agent Context Builder
 	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc, memoriesRepo, embeddingClient)
