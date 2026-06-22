@@ -120,6 +120,14 @@ func (m *mockRepository) GetNoteShareForUser(ctx context.Context, arg sqlcgen.Ge
 	return sqlcgen.NoteShare{}, pgx.ErrNoRows
 }
 
+func (m *mockRepository) GetSyncUserNotePreferences(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.UserNotePreference, error) {
+	return nil, nil
+}
+
+func (m *mockRepository) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
+	return sqlcgen.UserNotePreference{}, nil
+}
+
 func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }

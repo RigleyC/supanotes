@@ -23,13 +23,14 @@ import (
 //     client stamps user_id locally with the currently authenticated
 //     user because the table itself has no user_id column.
 type SyncPayload struct {
-	Notes           []sqlcgen.GetSyncNotesRow `json:"notes"`
-	Tasks           []SyncTask                `json:"tasks"`
-	Contexts        []sqlcgen.Context         `json:"contexts"`
-	Tags            []sqlcgen.Tag             `json:"tags"`
-	TaskCompletions []sqlcgen.TaskCompletion  `json:"task_completions"`
-	NoteTags        []sqlcgen.NoteTag         `json:"note_tags"`
-	NoteLinks       []sqlcgen.NoteLink        `json:"note_links"`
+	Notes               []sqlcgen.GetSyncNotesRow    `json:"notes"`
+	Tasks               []SyncTask                   `json:"tasks"`
+	Contexts            []sqlcgen.Context            `json:"contexts"`
+	Tags                []sqlcgen.Tag                `json:"tags"`
+	TaskCompletions     []sqlcgen.TaskCompletion     `json:"task_completions"`
+	NoteTags            []sqlcgen.NoteTag            `json:"note_tags"`
+	NoteLinks           []sqlcgen.NoteLink           `json:"note_links"`
+	UserNotePreferences []sqlcgen.UserNotePreference `json:"user_note_preferences"`
 }
 
 type Service interface {
@@ -112,14 +113,23 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		noteLinks = make([]sqlcgen.NoteLink, 0)
 	}
 
+	prefs, err := s.repo.GetSyncUserNotePreferences(ctx, userID, lastSyncedAt, limit)
+	if err != nil {
+		return nil, err
+	}
+	if prefs == nil {
+		prefs = make([]sqlcgen.UserNotePreference, 0)
+	}
+
 	return &SyncPayload{
-		Notes:           notes,
-		Tasks:           syncTasks,
-		Contexts:        contexts,
-		Tags:            tags,
-		TaskCompletions: completions,
-		NoteTags:        noteTags,
-		NoteLinks:       noteLinks,
+		Notes:               notes,
+		Tasks:               syncTasks,
+		Contexts:            contexts,
+		Tags:                tags,
+		TaskCompletions:     completions,
+		NoteTags:            noteTags,
+		NoteLinks:           noteLinks,
+		UserNotePreferences: prefs,
 	}, nil
 }
 
@@ -326,6 +336,22 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			UserID:    userID,
 		})
 		if err != nil {
+			return err
+		}
+	}
+
+	for _, p := range payload.UserNotePreferences {
+		_, err := r.UpsertUserNotePreference(ctx, sqlcgen.UpsertUserNotePreferenceParams{
+			UserID:        userID,
+			NoteID:        p.NoteID,
+			HideCompleted: p.HideCompleted,
+			Filters:       p.Filters,
+			CreatedAt:     p.CreatedAt,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrSyncConflict
+			}
 			return err
 		}
 	}
