@@ -1,10 +1,11 @@
 import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/notes.dart';
+import '../tables/user_note_preferences.dart';
 
 part 'notes_dao.g.dart';
 
-@DriftAccessor(tables: [Notes])
+@DriftAccessor(tables: [Notes, UserNotePreferences])
 class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   NotesDao(super.db);
 
@@ -32,6 +33,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
+      readsFrom: {notes, userNotePreferences},
     ).watch().map((rows) {
       if (rows.isEmpty) return (null, false);
       final row = rows.first;
@@ -120,6 +122,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return customSelect(
       sql,
       variables: [Variable.withString(userId), ...extraVariables],
+      readsFrom: {notes, userNotePreferences},
     ).watch().map((rows) {
       final result = <(NoteData, bool)>[];
       for (final row in rows) {
