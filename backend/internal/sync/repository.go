@@ -25,6 +25,7 @@ type Repository interface {
 	GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error)
 	UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error
 	GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error)
+	GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error)
 	GetSyncUserNotePreferences(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.UserNotePreference, error)
 	UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error)
 	WithQuerier(q sqlcgen.Querier) Repository
@@ -120,6 +121,10 @@ func (r *repo) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkPar
 
 func (r *repo) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
 	return r.q.GetNoteShareForUser(ctx, arg)
+}
+
+func (r *repo) GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
+	return r.q.GetNoteOwnerID(ctx, noteID)
 }
 
 func (r *repo) GetSyncUserNotePreferences(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.UserNotePreference, error) {

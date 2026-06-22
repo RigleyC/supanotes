@@ -475,6 +475,9 @@ func (s *stubLoopQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.Inse
 func (s *stubLoopQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return nil, nil
 }
+func (s *stubLoopQuerier) GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
 func (s *stubLoopQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sqlcgen.GetSyncUserNotePreferencesParams) ([]sqlcgen.UserNotePreference, error) {
 	return nil, nil
 }

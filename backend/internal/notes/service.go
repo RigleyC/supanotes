@@ -35,7 +35,7 @@ func isEmptyRegularNote(content string) bool {
 	return strings.TrimSpace(content) == ""
 }
 
-func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string, contextID *pgtype.UUID, favorite, archived, hideCompleted, collapseImages bool) (sqlcgen.Note, error) {
+func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string, contextID *pgtype.UUID, favorite, archived, collapseImages bool) (sqlcgen.Note, error) {
 	if isEmptyRegularNote(content) {
 		return sqlcgen.Note{}, ErrEmptyNote
 	}
@@ -46,7 +46,6 @@ func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content st
 		Favorite:        favorite,
 		Archived:        archived,
 		EmbeddingStatus: "pending",
-		HideCompleted:   hideCompleted,
 		CollapseImages:  collapseImages,
 	}
 	if contextID != nil {
@@ -66,7 +65,7 @@ func (s *Service) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype
 	return note, nil
 }
 
-func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, contextID *pgtype.UUID, favorite *bool, archived *bool, hideCompleted *bool, collapseImages *bool) (sqlcgen.Note, error) {
+func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, contextID *pgtype.UUID, favorite *bool, archived *bool, collapseImages *bool) (sqlcgen.Note, error) {
 	note, err := s.GetNoteByID(ctx, id, userID)
 	if err != nil {
 		return sqlcgen.Note{}, err
@@ -94,9 +93,6 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	}
 	if archived != nil {
 		arg.Archived = pgtype.Bool{Bool: *archived, Valid: true}
-	}
-	if hideCompleted != nil {
-		arg.HideCompleted = pgtype.Bool{Bool: *hideCompleted, Valid: true}
 	}
 	if collapseImages != nil {
 		arg.CollapseImages = pgtype.Bool{Bool: *collapseImages, Valid: true}
@@ -184,8 +180,8 @@ func (s *Service) AppendToInbox(ctx context.Context, userID pgtype.UUID, content
 }
 
 const (
-	batchCreateNoteSQL = `INSERT INTO notes (user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	batchCreateNoteSQL = `INSERT INTO notes (user_id, context_id, content, is_inbox, favorite, archived, embedding_status)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id`
 
 	batchAppendToNoteContentSQL = `UPDATE notes
@@ -288,7 +284,6 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 					false,
 					false,
 					"pending",
-					false,
 				)
 			}
 			for _, op := range appends {
@@ -323,7 +318,6 @@ func (s *Service) ApplyOrganization(ctx context.Context, userID pgtype.UUID, ite
 					Favorite:        false,
 					Archived:        false,
 					EmbeddingStatus: "pending",
-					HideCompleted:   false,
 				}); err != nil {
 					return fmt.Errorf("create note: %w", err)
 				}

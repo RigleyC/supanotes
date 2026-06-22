@@ -27,24 +27,29 @@ class NotesLocalRepository {
   /// `/sync/push` payload only contains the active user's data.
   String get userId => _userId;
 
-  Stream<List<NoteData>> watchActiveNotes() {
-    return _dao.watchAllActiveNotes();
+  Stream<List<(NoteData, bool)>> watchActiveNotes() {
+    return _dao.watchAllActiveNotes(_userId);
   }
 
-  Stream<List<NoteData>> watchNotesByContext(String contextId) {
-    return _dao.watchNotesByContext(contextId);
+  Stream<List<(NoteData, bool)>> watchNotesByContext(String contextId) {
+    return _dao.watchNotesByContext(contextId, _userId);
   }
 
-  Stream<List<NoteData>> watchFavorites() {
-    return _dao.watchFavorites();
+  Stream<List<(NoteData, bool)>> watchFavorites() {
+    return _dao.watchFavorites(_userId);
   }
 
-  Stream<NoteData?> watchInbox() => _dao.watchInboxNote(_userId);
+  Stream<(NoteData?, bool)> watchInbox() {
+    return _dao.watchInboxNote(_userId).map((d) => (d, false));
+  }
 
-  Stream<NoteData?> watchNoteById(String id) => _dao.watchNoteById(id);
+  Stream<(NoteData?, bool)> watchNoteById(String id) {
+    return _dao.watchNoteById(id, _userId);
+  }
 
-  Future<NoteData?> getNoteById(String id) {
-    return _dao.getNoteById(id);
+  Future<(NoteData?, bool)> getNoteById(String id) async {
+    final d = await _dao.getNoteById(id);
+    return (d, false);
   }
 
   Future<NoteData> createNote() async {
@@ -84,7 +89,7 @@ class NotesLocalRepository {
 
   /// Soft-delete the row with [id]. Marks `deletedAt` and flips
   /// `isDirty` so the tombstone reaches the backend on the next sync.
-  Future<NoteData> createNoteWithId(String id,
+  Future<(NoteData, bool)> createNoteWithId(String id,
       {String content = ''}) async {
     final now = DateTime.now().toUtc();
     final companion = NotesCompanion.insert(
@@ -97,7 +102,8 @@ class NotesLocalRepository {
       hasRemoteCopy: const Value(false),
     );
     await _dao.createNote(companion);
-    return (await _dao.getNoteById(id))!;
+    final note = (await _dao.getNoteById(id))!;
+    return (note, false);
   }
 
   Future<void> hardDeleteNote(String id) {
@@ -125,9 +131,9 @@ class NotesLocalRepository {
     await _dao.updateNote(companion);
   }
 
-  Future<NoteData> getOrCreateInboxNote() async {
+  Future<(NoteData, bool)> getOrCreateInboxNote() async {
     final existing = await _dao.getInboxNote(_userId);
-    if (existing != null) return existing;
+    if (existing != null) return (existing, false);
 
     final now = DateTime.now().toUtc();
     final id = _uuid.v4();
@@ -141,6 +147,7 @@ class NotesLocalRepository {
       isDirty: const Value(true),
     );
     await _dao.createNote(companion);
-    return (await _dao.getNoteById(id))!;
+    final note = (await _dao.getNoteById(id))!;
+    return (note, false);
   }
 }

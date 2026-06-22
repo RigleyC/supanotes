@@ -18,7 +18,6 @@ class Notes extends Table {
   BoolColumn get isDirty => boolean().withDefault(const Constant(true))();
   BoolColumn get hasRemoteCopy =>
       boolean().withDefault(const Constant(false))();
-  BoolColumn get hideCompleted => boolean().withDefault(const Constant(false))();
   BoolColumn get collapseImages => boolean().withDefault(const Constant(false))();
 
   TextColumn get permission => text().nullable()();

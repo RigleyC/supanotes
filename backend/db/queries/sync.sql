@@ -27,8 +27,8 @@ WHERE deleted_at IS NOT NULL
   AND deleted_at < NOW() - INTERVAL '30 days';
 
 -- name: UpsertNote :one
-INSERT INTO notes (id, user_id, context_id, content, is_inbox, favorite, archived, embedding_status, hide_completed, collapse_images, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)
+INSERT INTO notes (id, user_id, context_id, content, is_inbox, favorite, archived, embedding_status, collapse_images, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
 ON CONFLICT (id) DO UPDATE
 SET context_id = EXCLUDED.context_id,
     content = EXCLUDED.content,
@@ -36,7 +36,6 @@ SET context_id = EXCLUDED.context_id,
     favorite = EXCLUDED.favorite,
     archived = EXCLUDED.archived,
     embedding_status = EXCLUDED.embedding_status,
-    hide_completed = EXCLUDED.hide_completed,
     collapse_images = EXCLUDED.collapse_images,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
@@ -176,6 +175,9 @@ SELECT * FROM user_note_preferences
 WHERE user_id = $1 AND updated_at > sqlc.arg('last_synced_at')
 ORDER BY updated_at ASC
 LIMIT sqlc.arg('limit');
+
+-- name: GetNoteOwnerID :one
+SELECT user_id FROM notes WHERE id = $1;
 
 -- name: UpsertUserNotePreference :one
 INSERT INTO user_note_preferences (user_id, note_id, hide_completed, filters, created_at, updated_at)

@@ -18,4 +18,6 @@ SELECT user_id, id, hide_completed, created_at, updated_at FROM notes
 WHERE deleted_at IS NULL
 ON CONFLICT (user_id, note_id) DO NOTHING;
 
+ALTER TABLE notes DROP COLUMN IF EXISTS hide_completed;
+
 COMMIT;

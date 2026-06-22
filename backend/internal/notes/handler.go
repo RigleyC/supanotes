@@ -26,20 +26,18 @@ const (
 )
 
 type CreateNoteRequest struct {
-	Content       string  `json:"content" validate:"required"`
-	ContextID     *string `json:"context_id"`
-	Favorite      bool    `json:"favorite"`
-	Archived      bool    `json:"archived"`
-	HideCompleted  bool    `json:"hide_completed"`
+	Content        string  `json:"content" validate:"required"`
+	ContextID      *string `json:"context_id"`
+	Favorite       bool    `json:"favorite"`
+	Archived       bool    `json:"archived"`
 	CollapseImages bool    `json:"collapse_images"`
 }
 
 type UpdateNoteRequest struct {
-	Content       *string `json:"content"`
-	ContextID     *string `json:"context_id"`
-	Favorite      *bool   `json:"favorite"`
-	Archived      *bool   `json:"archived"`
-	HideCompleted  *bool   `json:"hide_completed"`
+	Content        *string `json:"content"`
+	ContextID      *string `json:"context_id"`
+	Favorite       *bool   `json:"favorite"`
+	Archived       *bool   `json:"archived"`
 	CollapseImages *bool   `json:"collapse_images"`
 }
 
@@ -55,7 +53,6 @@ type NoteResponse struct {
 	IsInbox        bool    `json:"is_inbox"`
 	Favorite       bool    `json:"favorite"`
 	Archived       bool    `json:"archived"`
-	HideCompleted  bool    `json:"hide_completed"`
 	CollapseImages bool    `json:"collapse_images"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
@@ -89,7 +86,7 @@ func (h *Handler) Create(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted, req.CollapseImages)
+	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, ctxID, req.Favorite, req.Archived, req.CollapseImages)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create note")
@@ -189,7 +186,7 @@ func (h *Handler) Update(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, ctxID, req.Favorite, req.Archived, req.HideCompleted, req.CollapseImages)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, ctxID, req.Favorite, req.Archived, req.CollapseImages)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
@@ -454,7 +451,6 @@ func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
 		IsInbox:        n.IsInbox,
 		Favorite:       n.Favorite,
 		Archived:       n.Archived,
-		HideCompleted:  n.HideCompleted,
 		CollapseImages: n.CollapseImages,
 		CreatedAt:      n.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:      n.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),

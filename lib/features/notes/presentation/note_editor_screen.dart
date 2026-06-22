@@ -87,9 +87,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
     final isOwner = note.isOwner;
     final isReadOnly = note.isReadOnly;
-
-    final prefAsync = ref.watch(userNotePreferenceStreamProvider(widget.noteId));
-    final hideCompleted = prefAsync.asData?.value?.hideCompleted ?? note.hideCompleted;
+    final hideCompleted = note.hideCompleted;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,

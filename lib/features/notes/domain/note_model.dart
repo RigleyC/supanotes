@@ -74,7 +74,7 @@ class NoteModel {
         sharedByName: sharedByName ?? this.sharedByName,
       );
 
-  factory NoteModel.fromData(NoteData d) {
+  factory NoteModel.fromData(NoteData d, {bool hideCompleted = false}) {
     return NoteModel(
       id: d.id,
       userId: d.userId,
@@ -85,7 +85,7 @@ class NoteModel {
       contextId: d.contextId,
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
-      hideCompleted: d.hideCompleted,
+      hideCompleted: hideCompleted,
       collapseImages: d.collapseImages,
       permission: d.permission?.isNotEmpty == true ? d.permission : null,
       sharedByEmail: d.sharedByEmail?.isNotEmpty == true ? d.sharedByEmail : null,

@@ -8,27 +8,36 @@ part 'notes_dao.g.dart';
 class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   NotesDao(super.db);
 
-  Stream<List<NoteData>> watchAllActiveNotes() {
-    return (select(notes)
-          ..where((t) => t.archived.equals(false))
-          ..where((t) => t.deletedAt.isNull())
-          ..where((t) => t.isInbox.equals(false))
-          ..where(_nonEmptyNote)
-          ..orderBy([
-            (t) =>
-                OrderingTerm(expression: t.favorite, mode: OrderingMode.desc),
-            (t) =>
-                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
-          ]))
-        .watch();
+  /// Streams all active notes with the user's hideCompleted preference.
+  Stream<List<(NoteData, bool)>> watchAllActiveNotes(String userId) {
+    return _watchWithPref(
+      'SELECT n.*, COALESCE(unp.hide_completed, 0) AS resolved_hide_completed '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.archived = 0 AND n.deleted_at IS NULL AND n.is_inbox = 0 AND trim(n.content) <> \'\' '
+      'ORDER BY n.favorite DESC, n.updated_at DESC',
+      userId,
+    );
   }
 
   Future<NoteData?> getNoteById(String id) async {
     return (select(notes)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  Stream<NoteData?> watchNoteById(String id) {
-    return (select(notes)..where((t) => t.id.equals(id))).watchSingleOrNull();
+  /// Streams a single note by id with the user's hideCompleted preference.
+  Stream<(NoteData?, bool)> watchNoteById(String id, String userId) {
+    return customSelect(
+      'SELECT n.*, COALESCE(unp.hide_completed, 0) AS resolved_hide_completed '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.id = ?',
+      variables: [Variable.withString(userId), Variable.withString(id)],
+    ).watch().map((rows) {
+      if (rows.isEmpty) return (null, false);
+      final row = rows.first;
+      final note = _noteFromRow(row);
+      return (note, row.read<bool>('resolved_hide_completed'));
+    });
   }
 
   /// Returns the first inbox note (the spec says there is exactly one) or
@@ -51,34 +60,76 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         .watchSingleOrNull();
   }
 
-  /// Streams every active (non-archived, non-deleted) note attached to the
-  /// given [contextId], newest first.
-  Stream<List<NoteData>> watchNotesByContext(String contextId) {
-    return (select(notes)
-          ..where((t) => t.contextId.equals(contextId))
-          ..where((t) => t.archived.equals(false))
-          ..where((t) => t.deletedAt.isNull())
-          ..where(_nonEmptyNote)
-          ..orderBy([
-            (t) =>
-                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
-          ]))
-        .watch();
+  /// Streams every active note attached to the given [contextId] with
+  /// the user's hideCompleted preference.
+  Stream<List<(NoteData, bool)>> watchNotesByContext(
+      String contextId, String userId) {
+    return _watchWithPref(
+      'SELECT n.*, COALESCE(unp.hide_completed, 0) AS resolved_hide_completed '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.context_id = ? AND n.archived = 0 AND n.deleted_at IS NULL AND trim(n.content) <> \'\' '
+      'ORDER BY n.updated_at DESC',
+      userId,
+      extraVariables: [Variable.withString(contextId)],
+    );
   }
 
-  /// Streams every active note that the user has marked as favorite,
-  /// newest first.
-  Stream<List<NoteData>> watchFavorites() {
-    return (select(notes)
-          ..where((t) => t.favorite.equals(true))
-          ..where((t) => t.archived.equals(false))
-          ..where((t) => t.deletedAt.isNull())
-          ..where(_nonEmptyNote)
-          ..orderBy([
-            (t) =>
-                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
-          ]))
-        .watch();
+  /// Streams every favorite note with the user's hideCompleted preference.
+  Stream<List<(NoteData, bool)>> watchFavorites(String userId) {
+    return _watchWithPref(
+      'SELECT n.*, COALESCE(unp.hide_completed, 0) AS resolved_hide_completed '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.favorite = 1 AND n.archived = 0 AND n.deleted_at IS NULL AND trim(n.content) <> \'\' '
+      'ORDER BY n.updated_at DESC',
+      userId,
+    );
+  }
+
+  NoteData? _noteFromRow(QueryRow row) {
+    final id = row.read<String>('id');
+    if (id.isEmpty) return null;
+    return NoteData(
+      id: id,
+      userId: row.read<String>('user_id'),
+      contextId: row.read<String?>('context_id'),
+      content: row.read<String>('content'),
+      excerpt: row.read<String?>('excerpt'),
+      isInbox: row.read<bool>('is_inbox'),
+      favorite: row.read<bool>('favorite'),
+      archived: row.read<bool>('archived'),
+      embeddingStatus: row.read<String?>('embedding_status'),
+      createdAt: row.read<DateTime>('created_at'),
+      updatedAt: row.read<DateTime>('updated_at'),
+      deletedAt: row.read<DateTime?>('deleted_at'),
+      isDirty: row.read<bool>('is_dirty'),
+      hasRemoteCopy: row.read<bool>('has_remote_copy'),
+      collapseImages: row.read<bool>('collapse_images'),
+      permission: row.read<String?>('permission'),
+      sharedByEmail: row.read<String?>('shared_by_email'),
+      sharedByName: row.read<String?>('shared_by_name'),
+    );
+  }
+
+  Stream<List<(NoteData, bool)>> _watchWithPref(
+    String sql,
+    String userId, {
+    List<Variable<Object>> extraVariables = const [],
+  }) {
+    return customSelect(
+      sql,
+      variables: [Variable.withString(userId), ...extraVariables],
+    ).watch().map((rows) {
+      final result = <(NoteData, bool)>[];
+      for (final row in rows) {
+        final note = _noteFromRow(row);
+        if (note != null) {
+          result.add((note, row.read<bool>('resolved_hide_completed')));
+        }
+      }
+      return result;
+    });
   }
 
   Future<void> createNote(NotesCompanion note) {
@@ -94,7 +145,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         excerpt: excluded.excerpt,
         updatedAt: excluded.updatedAt,
         isDirty: excluded.isDirty,
-        hideCompleted: excluded.hideCompleted,
       )),
     );
   }

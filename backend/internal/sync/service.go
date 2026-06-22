@@ -228,7 +228,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			Favorite:        n.Favorite,
 			Archived:        n.Archived,
 			EmbeddingStatus: embStatus,
-			HideCompleted:   n.HideCompleted,
 			CreatedAt:       n.CreatedAt,
 			DeletedAt:       n.DeletedAt,
 		})
@@ -341,7 +340,23 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	}
 
 	for _, p := range payload.UserNotePreferences {
-		_, err := r.UpsertUserNotePreference(ctx, sqlcgen.UpsertUserNotePreferenceParams{
+		ownerID, err := r.GetNoteOwnerID(ctx, p.NoteID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrSyncConflict
+			}
+			return err
+		}
+		if ownerID != userID {
+			_, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+				NoteID: p.NoteID,
+				UserID: userID,
+			})
+			if shareErr != nil {
+				return ErrSyncConflict
+			}
+		}
+		_, err = r.UpsertUserNotePreference(ctx, sqlcgen.UpsertUserNotePreferenceParams{
 			UserID:        userID,
 			NoteID:        p.NoteID,
 			HideCompleted: p.HideCompleted,

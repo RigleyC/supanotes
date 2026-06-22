@@ -42,7 +42,6 @@ class SyncMapper {
         'is_inbox': n.isInbox,
         'favorite': n.favorite,
         'archived': n.archived,
-        'hide_completed': n.hideCompleted,
         'collapse_images': n.collapseImages,
         'embedding_status': n.embeddingStatus,
         'shared_permission': n.permission,
@@ -127,7 +126,6 @@ class SyncMapper {
             : null,
         isDirty: false,
         hasRemoteCopy: true,
-        hideCompleted: (json['hide_completed'] as bool?) ?? false,
         collapseImages: (json['collapse_images'] as bool?) ?? false,
       );
 

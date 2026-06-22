@@ -303,6 +303,9 @@ func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen
 func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
+func (m *mockQuerier) GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
 func (m *mockQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sqlcgen.GetSyncUserNotePreferencesParams) ([]sqlcgen.UserNotePreference, error) {
 	return nil, nil
 }

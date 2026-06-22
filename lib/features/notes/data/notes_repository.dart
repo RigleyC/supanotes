@@ -32,7 +32,6 @@ abstract class INotesRepository {
     String? content,
     bool? favorite,
     bool? archived,
-    bool? hideCompleted,
     bool? collapseImages,
     String? contextId,
   });
@@ -67,7 +66,7 @@ class NotesRepository implements INotesRepository {
     String? contextId,
     bool favoritesOnly = false,
   }) {
-    final Stream<List<NoteData>> source;
+    final Stream<List<(NoteData, bool)>> source;
     if (contextId != null) {
       source = _local.watchNotesByContext(contextId);
     } else if (favoritesOnly) {
@@ -75,7 +74,9 @@ class NotesRepository implements INotesRepository {
     } else {
       source = _local.watchActiveNotes();
     }
-    return source.map((rows) => rows.map(NoteModel.fromData).toList());
+    return source.map((rows) => rows
+        .map((t) => NoteModel.fromData(t.$1, hideCompleted: t.$2))
+        .toList());
   }
 
   /// Streams the single inbox note, if any. The inbox is a singleton
@@ -83,22 +84,26 @@ class NotesRepository implements INotesRepository {
   @override
   Stream<NoteModel?> watchInbox() {
     return _local.watchInbox().map(
-      (d) => d == null ? null : NoteModel.fromData(d),
+      (tuple) => tuple.$1 == null ? null : NoteModel.fromData(tuple.$1!, hideCompleted: tuple.$2),
     );
   }
 
   /// Streams a single note by id.
   @override
   Stream<NoteModel?> watchNoteById(String id) {
-    return _local
-        .watchNoteById(id)
-        .map((d) => d == null ? null : NoteModel.fromData(d));
+    return _local.watchNoteById(id).map(
+      (tuple) => tuple.$1 == null
+          ? null
+          : NoteModel.fromData(tuple.$1!, hideCompleted: tuple.$2),
+    );
   }
 
   @override
   Future<NoteModel?> getNoteById(String id) async {
-    final d = await _local.getNoteById(id);
-    return d == null ? null : NoteModel.fromData(d);
+    final tuple = await _local.getNoteById(id);
+    return tuple.$1 == null
+        ? null
+        : NoteModel.fromData(tuple.$1!, hideCompleted: tuple.$2);
   }
 
   /// Insert-or-update a note by [id]. When the row does not exist (lazy
@@ -124,7 +129,7 @@ class NotesRepository implements INotesRepository {
     );
     await _local.upsertNoteRaw(companion);
     final saved = await _local.getNoteById(id);
-    return NoteModel.fromData(saved!);
+    return NoteModel.fromData(saved.$1!, hideCompleted: saved.$2);
   }
 
   /// Applies a partial update to the note with [id]. Only non-null
@@ -136,14 +141,13 @@ class NotesRepository implements INotesRepository {
     String? content,
     bool? favorite,
     bool? archived,
-    bool? hideCompleted,
     bool? collapseImages,
     String? contextId,
   }) async {
     final current = await _local.getNoteById(id);
-    if (current == null) return;
+    if (current.$1 == null) return;
 
-    final nextContent = content ?? current.content;
+    final nextContent = content ?? current.$1!.content;
     final companion = NotesCompanion(
       id: Value(id),
       content: content == null ? const Value.absent() : Value(nextContent),
@@ -152,8 +156,6 @@ class NotesRepository implements INotesRepository {
           : Value(_excerptFrom(nextContent)),
       favorite: favorite == null ? const Value.absent() : Value(favorite),
       archived: archived == null ? const Value.absent() : Value(archived),
-      hideCompleted:
-          hideCompleted == null ? const Value.absent() : Value(hideCompleted),
       collapseImages:
           collapseImages == null ? const Value.absent() : Value(collapseImages),
       contextId: contextId == null ? const Value.absent() : Value(contextId),
@@ -168,8 +170,8 @@ class NotesRepository implements INotesRepository {
   @override
   Future<void> toggleFavorite(String id) async {
     final current = await _local.getNoteById(id);
-    if (current == null) return;
-    await updateNote(id, favorite: !current.favorite);
+    if (current.$1 == null) return;
+    await updateNote(id, favorite: !current.$1!.favorite);
   }
 
   /// Soft-deletes the note. The row stays in the database with
@@ -183,7 +185,7 @@ class NotesRepository implements INotesRepository {
   @override
   Future<NoteModel> ensureInbox() async {
     final inbox = await _local.getOrCreateInboxNote();
-    return NoteModel.fromData(inbox);
+    return NoteModel.fromData(inbox.$1, hideCompleted: inbox.$2);
   }
 
   /// Appends [text] to the user's inbox note, creating the inbox row
@@ -192,17 +194,17 @@ class NotesRepository implements INotesRepository {
   @override
   Future<void> appendToInbox(String text) async {
     final existing = await _local.getOrCreateInboxNote();
-    final separator = existing.content.isEmpty ? '' : '\n\n';
-    final newContent = '${existing.content}$separator$text';
-    await _local.updateNoteContent(existing.id, newContent);
+    final separator = existing.$1.content.isEmpty ? '' : '\n\n';
+    final newContent = '${existing.$1.content}$separator$text';
+    await _local.updateNoteContent(existing.$1.id, newContent);
   }
 
   @override
   Future<NoteModel> createLocalNote({required String id}) async {
     final existing = await _local.getNoteById(id);
-    if (existing != null) return NoteModel.fromData(existing);
+    if (existing.$1 != null) return NoteModel.fromData(existing.$1!, hideCompleted: existing.$2);
     final created = await _local.createNoteWithId(id);
-    return NoteModel.fromData(created);
+    return NoteModel.fromData(created.$1, hideCompleted: created.$2);
   }
 
   @override
@@ -212,7 +214,7 @@ class NotesRepository implements INotesRepository {
     required List<TaskEntry> tasks,
   }) async {
     final current = await _local.getNoteById(id);
-    if (current == null) return;
+    if (current.$1 == null) return;
 
     await syncTasksFromDocument(id, tasks);
     await updateNote(
@@ -224,13 +226,13 @@ class NotesRepository implements INotesRepository {
   @override
   Future<void> deleteIfEmptyOrTombstone(String id) async {
     final note = await _local.getNoteById(id);
-    if (note == null) return;
-    if (!_isTextEmpty(note)) return;
+    if (note.$1 == null) return;
+    if (!_isTextEmpty(note.$1!)) return;
 
     final tasks = await _tasksLocal.getNoteTasks(id);
     if (tasks.isNotEmpty) return;
 
-    if (note.hasRemoteCopy) {
+    if (note.$1!.hasRemoteCopy) {
       await _local.softDeleteNote(id);
     } else {
       await _local.hardDeleteNote(id);

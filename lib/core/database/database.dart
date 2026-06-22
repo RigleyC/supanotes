@@ -69,7 +69,7 @@ class AppDatabase extends _$AppDatabase {
             } catch (_) {}
           }
           if (from < 6) {
-            await m.addColumn(notes, notes.hideCompleted);
+            await customStatement('ALTER TABLE notes ADD COLUMN hide_completed INTEGER NOT NULL DEFAULT 0');
           }
           if (from < 7) {
             await m.addColumn(notes, notes.permission);
@@ -91,6 +91,7 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 11) {
             await m.createTable(userNotePreferences);
+            await customStatement('ALTER TABLE notes DROP COLUMN hide_completed');
           }
         },
       );

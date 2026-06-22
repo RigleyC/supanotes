@@ -61,7 +61,6 @@ void main() {
         updatedAt: now,
         isDirty: true,
         hasRemoteCopy: false,
-        hideCompleted: false,
         collapseImages: false,
       );
 
@@ -237,7 +236,6 @@ void main() {
             updatedAt: now,
             isDirty: const Value(true),
             hasRemoteCopy: const Value(true),
-            hideCompleted: const Value(true),
           ),
         );
 
@@ -279,8 +277,7 @@ void main() {
 
         final note = await db.notesDao.getNoteById('note-1');
         expect(note, isNotNull);
-        expect(note!.hideCompleted, isTrue);
-        expect(note.content, 'local content');
+        expect(note!.content, 'local content');
         expect(note.isDirty, isTrue);
 
         await db.close();

@@ -66,8 +66,8 @@ void main() {
       );
 
       final saved = await local.getNoteById('note-1');
-      expect(saved, isNotNull);
-      expect(saved!.content, 'B');
+      expect(saved.$1, isNotNull);
+      expect(saved.$1!.content, 'B');
     });
   });
 }
@@ -81,30 +81,31 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   String get userId => 'test-user';
 
   @override
-  Stream<List<NoteData>> watchActiveNotes() => const Stream.empty();
+  Stream<List<(NoteData, bool)>> watchActiveNotes() => const Stream.empty();
 
   @override
-  Stream<List<NoteData>> watchNotesByContext(String contextId) =>
+  Stream<List<(NoteData, bool)>> watchNotesByContext(String contextId) =>
       const Stream.empty();
 
   @override
-  Stream<List<NoteData>> watchFavorites() => const Stream.empty();
+  Stream<List<(NoteData, bool)>> watchFavorites() => const Stream.empty();
 
   @override
-  Stream<NoteData?> watchInbox() => const Stream.empty();
+  Stream<(NoteData?, bool)> watchInbox() => const Stream.empty();
 
   @override
-  Stream<NoteData?> watchNoteById(String id) => const Stream.empty();
+  Stream<(NoteData?, bool)> watchNoteById(String id) => const Stream.empty();
 
   @override
-  Future<NoteData?> getNoteById(String id) async => _store[id];
+  Future<(NoteData?, bool)> getNoteById(String id) async =>
+      (_store[id], false);
 
   @override
   Future<NoteData> createNote() async =>
       throw UnimplementedError('not used in these tests');
 
   @override
-  Future<NoteData> createNoteWithId(String id,
+  Future<(NoteData, bool)> createNoteWithId(String id,
       {String content = ''}) async {
     final now = DateTime.now().toUtc();
     final data = NoteData(
@@ -118,11 +119,10 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       updatedAt: now,
       isDirty: false,
       hasRemoteCopy: false,
-      hideCompleted: false,
       collapseImages: false,
     );
     _store[id] = data;
-    return data;
+    return (data, false);
   }
 
   @override
@@ -172,7 +172,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   }
 
   @override
-  Future<NoteData> getOrCreateInboxNote() async =>
+  Future<(NoteData, bool)> getOrCreateInboxNote() async =>
       throw UnimplementedError('not used in these tests');
 }
 

@@ -300,6 +300,9 @@ func (m *mockQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAt
 func (m *mockQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return nil, nil
 }
+func (m *mockQuerier) GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
 func (m *mockQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sqlcgen.GetSyncUserNotePreferencesParams) ([]sqlcgen.UserNotePreference, error) {
 	return nil, nil
 }
