@@ -135,6 +135,7 @@ class SyncService {
     final completions = await _db.taskCompletionsDao.getDirtyCompletions();
     final noteLinks = await _db.noteLinksDao.getDirtyLinks();
     final noteTags = await _db.noteTagsDao.getDirtyNoteTags();
+    final prefs = await _db.userNotePreferencesDao.getDirtyPreferences();
 
     if (notes.isEmpty &&
         tasks.isEmpty &&
@@ -142,7 +143,8 @@ class SyncService {
         tags.isEmpty &&
         completions.isEmpty &&
         noteLinks.isEmpty &&
-        noteTags.isEmpty) {
+        noteTags.isEmpty &&
+        prefs.isEmpty) {
       return;
     }
 
@@ -155,6 +157,8 @@ class SyncService {
           completions.map(_mapper.taskCompletionToJson).toList(),
       'note_links': noteLinks.map(_mapper.noteLinkToJson).toList(),
       'note_tags': noteTags.map(_mapper.localNoteTagToJson).toList(),
+      'user_note_preferences':
+          prefs.map(_mapper.userNotePreferenceToJson).toList(),
     };
 
     await _repo.push(payload);
@@ -181,6 +185,9 @@ class SyncService {
       }
       for (final nt in noteTags) {
         await _db.noteTagsDao.clearDirtyFlag(nt.noteId, nt.tagId);
+      }
+      for (final p in prefs) {
+        await _db.userNotePreferencesDao.clearDirtyFlag(p.userId, p.noteId);
       }
     });
   }
@@ -265,6 +272,15 @@ class SyncService {
           _db.localNoteTags,
           noteTag,
           onConflict: DoUpdate((_) => noteTag),
+        );
+      }
+      for (final raw in (data['user_note_preferences'] as List? ?? [])) {
+        final pref = _mapper.userNotePreferenceFromJson(
+            raw as Map<String, dynamic>);
+        batch.insert(
+          _db.userNotePreferences,
+          pref,
+          onConflict: DoUpdate((_) => pref),
         );
       }
     });

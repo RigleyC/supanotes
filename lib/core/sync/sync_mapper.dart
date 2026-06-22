@@ -5,6 +5,7 @@
 /// Pull direction (fromJson): raw Map   → typed data for the DAOs.
 library;
 
+import 'package:drift/drift.dart';
 import 'package:intl/intl.dart';
 
 import '../../features/tasks/domain/task_recurrence.dart';
@@ -206,4 +207,30 @@ class SyncMapper {
         tagId: json['tag_id'] as String,
         isDirty: false,
       );
+
+  Map<String, dynamic> userNotePreferenceToJson(UserNotePreferenceData p) {
+    return {
+      'user_id': p.userId,
+      'note_id': p.noteId,
+      'hide_completed': p.hideCompleted,
+      'filters': p.filters,
+      'created_at': p.createdAt.toUtc().toIso8601String(),
+      'updated_at': p.updatedAt.toUtc().toIso8601String(),
+    };
+  }
+
+  UserNotePreferencesCompanion userNotePreferenceFromJson(
+      Map<String, dynamic> json) {
+    return UserNotePreferencesCompanion(
+      userId: Value(json['user_id'] as String),
+      noteId: Value(json['note_id'] as String),
+      hideCompleted: Value(json['hide_completed'] as bool? ?? false),
+      filters: Value(json['filters'] as String? ?? '{}'),
+      createdAt:
+          Value(DateTime.parse(json['created_at'] as String).toLocal()),
+      updatedAt:
+          Value(DateTime.parse(json['updated_at'] as String).toLocal()),
+      isDirty: const Value(false),
+    );
+  }
 }
