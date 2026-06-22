@@ -1,48 +1,60 @@
 -- name: SearchNotesFTS :many
-SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+       COALESCE(unp.favorite, FALSE) AS favorite,
+       COALESCE(unp.archived, FALSE) AS archived,
        ts_rank(n.search_vector, plainto_tsquery('simple', sqlc.arg('query')::text)) AS score
 FROM notes n
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = sqlc.arg('user_id')
 WHERE n.user_id = sqlc.arg('user_id')
   AND n.deleted_at IS NULL 
   AND NOT n.is_inbox
-  AND n.archived = false
+  AND COALESCE(unp.archived, FALSE) = false
   AND n.search_vector @@ plainto_tsquery('simple', sqlc.arg('query')::text)
 ORDER BY score DESC
 LIMIT sqlc.arg('limit');
 
 -- name: SearchNotesSemantic :many
-SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+       COALESCE(unp.favorite, FALSE) AS favorite,
+       COALESCE(unp.archived, FALSE) AS archived,
        (1.0 - (ne.embedding <=> sqlc.arg('embedding')::vector))::float8 AS score
 FROM notes n
 JOIN note_embeddings ne ON n.id = ne.note_id
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = sqlc.arg('user_id')
 WHERE n.user_id = sqlc.arg('user_id')
   AND n.deleted_at IS NULL 
   AND NOT n.is_inbox
-  AND n.archived = false
+  AND COALESCE(unp.archived, FALSE) = false
 ORDER BY ne.embedding <=> sqlc.arg('embedding')::vector
 LIMIT sqlc.arg('limit');
 
 -- name: SearchNotesHybrid :many
 WITH fts AS (
-  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+         COALESCE(unp.favorite, FALSE) AS favorite,
+         COALESCE(unp.archived, FALSE) AS archived,
          row_number() OVER (ORDER BY ts_rank(n.search_vector, to_tsquery('simple', sqlc.arg('query')::text)) DESC) as rank
   FROM notes n
+  LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = sqlc.arg('user_id')
   WHERE n.user_id = sqlc.arg('user_id')
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
-    AND n.archived = false
+    AND COALESCE(unp.archived, FALSE) = false
     AND n.search_vector @@ to_tsquery('simple', sqlc.arg('query')::text)
   LIMIT sqlc.arg('fts_limit')::int
 ),
 semantic AS (
-  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+         COALESCE(unp.favorite, FALSE) AS favorite,
+         COALESCE(unp.archived, FALSE) AS archived,
          row_number() OVER (ORDER BY ne.embedding <=> sqlc.arg('embedding')::vector) as rank
   FROM notes n
   JOIN note_embeddings ne ON n.id = ne.note_id
+  LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = sqlc.arg('user_id')
   WHERE n.user_id = sqlc.arg('user_id')
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
-    AND n.archived = false
+    AND COALESCE(unp.archived, FALSE) = false
   LIMIT sqlc.arg('semantic_limit')::int
 )
 SELECT 

@@ -35,7 +35,7 @@ void main() {
     final inbox = await db.notesDao.getInboxNote('user-1');
 
     expect(inbox, isNotNull);
-    expect(inbox!.id, 'inbox-user-1');
+    expect(inbox!.note.id, 'inbox-user-1');
 
     await db.close();
   });

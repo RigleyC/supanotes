@@ -55,8 +55,6 @@ void main() {
         userId: 'user-1',
         content: 'Hello World',
         isInbox: false,
-        favorite: false,
-        archived: false,
         createdAt: now,
         updatedAt: now,
         isDirty: true,

@@ -126,11 +126,14 @@ func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]No
 }
 
 const getSyncNotes = `-- name: GetSyncNotes :many
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.favorite, n.archived, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
   COALESCE(ns.permission, '')::text AS shared_permission,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
 FROM notes n
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1::uuid
 LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
 LEFT JOIN users u ON u.id = n.user_id
 WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
@@ -152,14 +155,14 @@ type GetSyncNotesRow struct {
 	Content          string             `json:"content"`
 	Excerpt          pgtype.Text        `json:"excerpt"`
 	IsInbox          bool               `json:"is_inbox"`
-	Favorite         bool               `json:"favorite"`
-	Archived         bool               `json:"archived"`
 	SearchVector     pgtype.Text        `json:"search_vector"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
 	EmbeddingStatus  string             `json:"embedding_status"`
 	CollapseImages   bool               `json:"collapse_images"`
+	Favorite         bool               `json:"favorite"`
+	Archived         bool               `json:"archived"`
 	SharedPermission string             `json:"shared_permission"`
 	SharedByEmail    string             `json:"shared_by_email"`
 	SharedByName     string             `json:"shared_by_name"`
@@ -181,14 +184,14 @@ func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]G
 			&i.Content,
 			&i.Excerpt,
 			&i.IsInbox,
-			&i.Favorite,
-			&i.Archived,
 			&i.SearchVector,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
 			&i.CollapseImages,
+			&i.Favorite,
+			&i.Archived,
 			&i.SharedPermission,
 			&i.SharedByEmail,
 			&i.SharedByName,
@@ -336,7 +339,7 @@ func (q *Queries) GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]T
 }
 
 const getSyncUserNotePreferences = `-- name: GetSyncUserNotePreferences :many
-SELECT user_id, note_id, hide_completed, filters, created_at, updated_at FROM user_note_preferences
+SELECT user_id, note_id, hide_completed, filters, created_at, updated_at, favorite, archived FROM user_note_preferences
 WHERE user_id = $1 AND updated_at > $2
 ORDER BY updated_at ASC
 LIMIT $3
@@ -364,6 +367,8 @@ func (q *Queries) GetSyncUserNotePreferences(ctx context.Context, arg GetSyncUse
 			&i.Filters,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Favorite,
+			&i.Archived,
 		); err != nil {
 			return nil, err
 		}
@@ -448,20 +453,18 @@ func (q *Queries) UpsertContext(ctx context.Context, arg UpsertContextParams) (C
 }
 
 const upsertNote = `-- name: UpsertNote :one
-INSERT INTO notes (id, user_id, context_id, content, is_inbox, favorite, archived, embedding_status, collapse_images, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
+INSERT INTO notes (id, user_id, context_id, content, is_inbox, embedding_status, collapse_images, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
 ON CONFLICT (id) DO UPDATE
 SET context_id = EXCLUDED.context_id,
     content = EXCLUDED.content,
     is_inbox = EXCLUDED.is_inbox,
-    favorite = EXCLUDED.favorite,
-    archived = EXCLUDED.archived,
     embedding_status = EXCLUDED.embedding_status,
     collapse_images = EXCLUDED.collapse_images,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 WHERE notes.user_id = EXCLUDED.user_id
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, favorite, archived, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
+RETURNING id, user_id, context_id, content, excerpt, is_inbox, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
 `
 
 type UpsertNoteParams struct {
@@ -470,8 +473,6 @@ type UpsertNoteParams struct {
 	ContextID       pgtype.UUID        `json:"context_id"`
 	Content         string             `json:"content"`
 	IsInbox         bool               `json:"is_inbox"`
-	Favorite        bool               `json:"favorite"`
-	Archived        bool               `json:"archived"`
 	EmbeddingStatus string             `json:"embedding_status"`
 	CollapseImages  bool               `json:"collapse_images"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
@@ -485,8 +486,6 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 		arg.ContextID,
 		arg.Content,
 		arg.IsInbox,
-		arg.Favorite,
-		arg.Archived,
 		arg.EmbeddingStatus,
 		arg.CollapseImages,
 		arg.CreatedAt,
@@ -500,8 +499,6 @@ func (q *Queries) UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, e
 		&i.Content,
 		&i.Excerpt,
 		&i.IsInbox,
-		&i.Favorite,
-		&i.Archived,
 		&i.SearchVector,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -705,13 +702,15 @@ func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskComple
 }
 
 const upsertUserNotePreference = `-- name: UpsertUserNotePreference :one
-INSERT INTO user_note_preferences (user_id, note_id, hide_completed, filters, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, NOW())
+INSERT INTO user_note_preferences (user_id, note_id, hide_completed, filters, favorite, archived, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 ON CONFLICT (user_id, note_id) DO UPDATE
 SET hide_completed = EXCLUDED.hide_completed,
     filters = EXCLUDED.filters,
+    favorite = EXCLUDED.favorite,
+    archived = EXCLUDED.archived,
     updated_at = NOW()
-RETURNING user_id, note_id, hide_completed, filters, created_at, updated_at
+RETURNING user_id, note_id, hide_completed, filters, created_at, updated_at, favorite, archived
 `
 
 type UpsertUserNotePreferenceParams struct {
@@ -719,6 +718,8 @@ type UpsertUserNotePreferenceParams struct {
 	NoteID        pgtype.UUID        `json:"note_id"`
 	HideCompleted bool               `json:"hide_completed"`
 	Filters       []byte             `json:"filters"`
+	Favorite      bool               `json:"favorite"`
+	Archived      bool               `json:"archived"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -728,6 +729,8 @@ func (q *Queries) UpsertUserNotePreference(ctx context.Context, arg UpsertUserNo
 		arg.NoteID,
 		arg.HideCompleted,
 		arg.Filters,
+		arg.Favorite,
+		arg.Archived,
 		arg.CreatedAt,
 	)
 	var i UserNotePreference
@@ -738,6 +741,8 @@ func (q *Queries) UpsertUserNotePreference(ctx context.Context, arg UpsertUserNo
 		&i.Filters,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Favorite,
+		&i.Archived,
 	)
 	return i, err
 }

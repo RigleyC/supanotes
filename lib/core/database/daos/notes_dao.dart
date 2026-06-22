@@ -5,102 +5,128 @@ import '../tables/user_note_preferences.dart';
 
 part 'notes_dao.g.dart';
 
+typedef NoteQueryResult = ({
+  NoteData note,
+  bool favorite,
+  bool archived,
+  bool hideCompleted,
+});
+
 @DriftAccessor(tables: [Notes, UserNotePreferences])
 class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   NotesDao(super.db);
 
-  /// Streams all active notes with the user's hideCompleted preference.
-  Stream<List<(NoteData, bool)>> watchAllActiveNotes(String userId) {
+  /// Streams all active notes with the user's preferences.
+  Stream<List<NoteQueryResult>> watchAllActiveNotes(String userId) {
     return _watchWithPref(
-      'SELECT n.*, COALESCE(unp.hide_completed, 0) AS resolved_hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE n.archived = 0 AND n.deleted_at IS NULL AND n.is_inbox = 0 AND trim(n.content) <> \'\' '
-      'ORDER BY n.favorite DESC, n.updated_at DESC',
+      'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND n.is_inbox = 0 AND trim(n.content) <> \'\' '
+      'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC',
       userId,
     );
   }
 
+  /// Returns a [NoteData] row without preference info. Prefer
+  /// [getNoteWithPrefsById] when the caller needs favorite/archived flags.
   Future<NoteData?> getNoteById(String id) async {
     return (select(notes)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  /// Streams a single note by id with the user's hideCompleted preference.
-  Stream<(NoteData?, bool)> watchNoteById(String id, String userId) {
+  /// Returns a note with the user's preference flags, or `null` when the
+  /// note does not exist.
+  Future<NoteQueryResult?> getNoteWithPrefsById(
+      String id, String userId) async {
     return customSelect(
-      'SELECT n.*, COALESCE(unp.hide_completed, 0) AS resolved_hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.id = ?',
+      variables: [Variable.withString(userId), Variable.withString(id)],
+      readsFrom: {notes, userNotePreferences},
+    ).get().then((rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first));
+  }
+
+  /// Streams a single note by id with the user's preferences.
+  Stream<NoteQueryResult?> watchNoteById(String id, String userId) {
+    return customSelect(
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
       readsFrom: {notes, userNotePreferences},
     ).watch().map((rows) {
-      if (rows.isEmpty) return (null, false);
-      final row = rows.first;
-      final note = _noteFromRow(row);
-      return (note, row.read<bool>('resolved_hide_completed'));
+      if (rows.isEmpty) return null;
+      return _queryResultFromRow(rows.first);
     });
   }
 
   /// Returns the first inbox note (the spec says there is exactly one) or
   /// `null` if none has been created yet.
-  Future<NoteData?> getInboxNote(String userId) {
-    return (select(notes)
-          ..where((t) => t.userId.equals(userId))
-          ..where((t) => t.isInbox.equals(true))
-          ..where((t) => t.deletedAt.isNull()))
-        .getSingleOrNull();
+  Future<NoteQueryResult?> getInboxNote(String userId) {
+    return customSelect(
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.user_id = ? AND n.is_inbox = 1 AND n.deleted_at IS NULL',
+      variables: [Variable.withString(userId), Variable.withString(userId)],
+      readsFrom: {notes, userNotePreferences},
+    ).get().then((rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first));
   }
 
   /// Streams the single inbox note, re-emitting whenever a new one is
   /// created.
-  Stream<NoteData?> watchInboxNote(String userId) {
-    return (select(notes)
-          ..where((t) => t.userId.equals(userId))
-          ..where((t) => t.isInbox.equals(true))
-          ..where((t) => t.deletedAt.isNull()))
-        .watchSingleOrNull();
+  Stream<NoteQueryResult?> watchInboxNote(String userId) {
+    return customSelect(
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.user_id = ? AND n.is_inbox = 1 AND n.deleted_at IS NULL',
+      variables: [Variable.withString(userId), Variable.withString(userId)],
+      readsFrom: {notes, userNotePreferences},
+    ).watchSingleOrNull().map(
+        (row) => row != null ? _queryResultFromRow(row) : null);
   }
 
   /// Streams every active note attached to the given [contextId] with
-  /// the user's hideCompleted preference.
-  Stream<List<(NoteData, bool)>> watchNotesByContext(
+  /// the user's preferences.
+  Stream<List<NoteQueryResult>> watchNotesByContext(
       String contextId, String userId) {
     return _watchWithPref(
-      'SELECT n.*, COALESCE(unp.hide_completed, 0) AS resolved_hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE n.context_id = ? AND n.archived = 0 AND n.deleted_at IS NULL AND trim(n.content) <> \'\' '
+      'WHERE n.context_id = ? AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND trim(n.content) <> \'\' '
       'ORDER BY n.updated_at DESC',
       userId,
       extraVariables: [Variable.withString(contextId)],
     );
   }
 
-  /// Streams every favorite note with the user's hideCompleted preference.
-  Stream<List<(NoteData, bool)>> watchFavorites(String userId) {
+  /// Streams every favorite note with the user's preferences.
+  Stream<List<NoteQueryResult>> watchFavorites(String userId) {
     return _watchWithPref(
-      'SELECT n.*, COALESCE(unp.hide_completed, 0) AS resolved_hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE n.favorite = 1 AND n.archived = 0 AND n.deleted_at IS NULL AND trim(n.content) <> \'\' '
+      'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND trim(n.content) <> \'\' '
       'ORDER BY n.updated_at DESC',
       userId,
     );
   }
 
-  NoteData? _noteFromRow(QueryRow row) {
+  NoteQueryResult? _queryResultFromRow(QueryRow row) {
     final id = row.read<String>('id');
     if (id.isEmpty) return null;
-    return NoteData(
+    final note = NoteData(
       id: id,
       userId: row.read<String>('user_id'),
       contextId: row.read<String?>('context_id'),
       content: row.read<String>('content'),
       excerpt: row.read<String?>('excerpt'),
       isInbox: row.read<bool>('is_inbox'),
-      favorite: row.read<bool>('favorite'),
-      archived: row.read<bool>('archived'),
       embeddingStatus: row.read<String?>('embedding_status'),
       createdAt: row.read<DateTime>('created_at'),
       updatedAt: row.read<DateTime>('updated_at'),
@@ -112,9 +138,15 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       sharedByEmail: row.read<String?>('shared_by_email'),
       sharedByName: row.read<String?>('shared_by_name'),
     );
+    return (
+      note: note,
+      favorite: row.read<bool>('favorite'),
+      archived: row.read<bool>('archived'),
+      hideCompleted: row.read<bool>('hide_completed'),
+    );
   }
 
-  Stream<List<(NoteData, bool)>> _watchWithPref(
+  Stream<List<NoteQueryResult>> _watchWithPref(
     String sql,
     String userId, {
     List<Variable<Object>> extraVariables = const [],
@@ -124,11 +156,11 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       variables: [Variable.withString(userId), ...extraVariables],
       readsFrom: {notes, userNotePreferences},
     ).watch().map((rows) {
-      final result = <(NoteData, bool)>[];
+      final result = <NoteQueryResult>[];
       for (final row in rows) {
-        final note = _noteFromRow(row);
-        if (note != null) {
-          result.add((note, row.read<bool>('resolved_hide_completed')));
+        final qr = _queryResultFromRow(row);
+        if (qr != null) {
+          result.add(qr);
         }
       }
       return result;

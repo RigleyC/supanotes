@@ -13,13 +13,16 @@ import (
 )
 
 const searchNotesFTS = `-- name: SearchNotesFTS :many
-SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+       COALESCE(unp.favorite, FALSE) AS favorite,
+       COALESCE(unp.archived, FALSE) AS archived,
        ts_rank(n.search_vector, plainto_tsquery('simple', $1::text)) AS score
 FROM notes n
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2
 WHERE n.user_id = $2
   AND n.deleted_at IS NULL 
   AND NOT n.is_inbox
-  AND n.archived = false
+  AND COALESCE(unp.archived, FALSE) = false
   AND n.search_vector @@ plainto_tsquery('simple', $1::text)
 ORDER BY score DESC
 LIMIT $3
@@ -75,25 +78,31 @@ func (q *Queries) SearchNotesFTS(ctx context.Context, arg SearchNotesFTSParams) 
 
 const searchNotesHybrid = `-- name: SearchNotesHybrid :many
 WITH fts AS (
-  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+         COALESCE(unp.favorite, FALSE) AS favorite,
+         COALESCE(unp.archived, FALSE) AS archived,
          row_number() OVER (ORDER BY ts_rank(n.search_vector, to_tsquery('simple', $2::text)) DESC) as rank
   FROM notes n
+  LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $3
   WHERE n.user_id = $3
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
-    AND n.archived = false
+    AND COALESCE(unp.archived, FALSE) = false
     AND n.search_vector @@ to_tsquery('simple', $2::text)
   LIMIT $4::int
 ),
 semantic AS (
-  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+  SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+         COALESCE(unp.favorite, FALSE) AS favorite,
+         COALESCE(unp.archived, FALSE) AS archived,
          row_number() OVER (ORDER BY ne.embedding <=> $5::vector) as rank
   FROM notes n
   JOIN note_embeddings ne ON n.id = ne.note_id
+  LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $3
   WHERE n.user_id = $3
     AND n.deleted_at IS NULL 
     AND NOT n.is_inbox
-    AND n.archived = false
+    AND COALESCE(unp.archived, FALSE) = false
   LIMIT $6::int
 )
 SELECT 
@@ -171,14 +180,17 @@ func (q *Queries) SearchNotesHybrid(ctx context.Context, arg SearchNotesHybridPa
 }
 
 const searchNotesSemantic = `-- name: SearchNotesSemantic :many
-SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id, n.favorite, n.archived,
+SELECT n.id, regexp_replace(split_part(n.content, E'\n', 1), '^(#+\s*|[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)', '') AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+       COALESCE(unp.favorite, FALSE) AS favorite,
+       COALESCE(unp.archived, FALSE) AS archived,
        (1.0 - (ne.embedding <=> $1::vector))::float8 AS score
 FROM notes n
 JOIN note_embeddings ne ON n.id = ne.note_id
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2
 WHERE n.user_id = $2
   AND n.deleted_at IS NULL 
   AND NOT n.is_inbox
-  AND n.archived = false
+  AND COALESCE(unp.archived, FALSE) = false
 ORDER BY ne.embedding <=> $1::vector
 LIMIT $3
 `

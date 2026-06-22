@@ -41,9 +41,10 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to 11 — v11 adds user_note_preferences.
+  /// Latest schema version. Bumped to 12 — v12 adds favorite/archived
+  /// to user_note_preferences and seeds from notes.
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -92,6 +93,16 @@ class AppDatabase extends _$AppDatabase {
           if (from < 11) {
             await m.createTable(userNotePreferences);
             await customStatement('ALTER TABLE notes DROP COLUMN hide_completed');
+          }
+          if (from < 12) {
+            await m.addColumn(userNotePreferences, userNotePreferences.favorite);
+            await m.addColumn(userNotePreferences, userNotePreferences.archived);
+            await customStatement(
+              'INSERT OR IGNORE INTO user_note_preferences (user_id, note_id, favorite, archived, created_at, updated_at, is_dirty) '
+              'SELECT n.user_id, n.id, n.favorite, n.archived, n.created_at, n.updated_at, 0 FROM notes n',
+            );
+            await customStatement('ALTER TABLE notes DROP COLUMN favorite');
+            await customStatement('ALTER TABLE notes DROP COLUMN archived');
           }
         },
       );

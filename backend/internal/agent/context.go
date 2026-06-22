@@ -120,10 +120,26 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 	})
 
 	g.Go(func() error {
-		var err error
-		recentNotes, err = cb.q.GetRecentNotes(gCtx, userID)
+		rows, err := cb.q.GetRecentNotes(gCtx, userID)
 		if err != nil {
 			return fmt.Errorf("get recent notes: %w", err)
+		}
+		recentNotes = make([]sqlcgen.Note, len(rows))
+		for i, r := range rows {
+			recentNotes[i] = sqlcgen.Note{
+				ID:              r.ID,
+				UserID:          r.UserID,
+				ContextID:       r.ContextID,
+				Content:         r.Content,
+				Excerpt:         r.Excerpt,
+				IsInbox:         r.IsInbox,
+				SearchVector:    r.SearchVector,
+				CreatedAt:       r.CreatedAt,
+				UpdatedAt:       r.UpdatedAt,
+				DeletedAt:       r.DeletedAt,
+				EmbeddingStatus: r.EmbeddingStatus,
+				CollapseImages:  r.CollapseImages,
+			}
 		}
 		return nil
 	})
@@ -153,6 +169,7 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		memResults      []sqlcgen.SearchMemoriesByEmbeddingRow
 		linkedNotes     []sqlcgen.Note
 	)
+	// linkedNotes remains sqlcgen.Note because GetLinkedNotes returns Note (no JOIN needed)
 
 	emb, embErr := cb.embedCL.GenerateEmbedding(ctx, query)
 	if embErr != nil {
@@ -290,9 +307,28 @@ func (cb *ContextBuilder) BuildForRoutine(ctx context.Context, userID pgtype.UUI
 	})
 
 	g.Go(func() error {
-		var err error
-		recentNotes, err = cb.q.GetRecentNotes(gCtx, userID)
-		return err
+		rows, err := cb.q.GetRecentNotes(gCtx, userID)
+		if err != nil {
+			return err
+		}
+		recentNotes = make([]sqlcgen.Note, len(rows))
+		for i, r := range rows {
+			recentNotes[i] = sqlcgen.Note{
+				ID:              r.ID,
+				UserID:          r.UserID,
+				ContextID:       r.ContextID,
+				Content:         r.Content,
+				Excerpt:         r.Excerpt,
+				IsInbox:         r.IsInbox,
+				SearchVector:    r.SearchVector,
+				CreatedAt:       r.CreatedAt,
+				UpdatedAt:       r.UpdatedAt,
+				DeletedAt:       r.DeletedAt,
+				EmbeddingStatus: r.EmbeddingStatus,
+				CollapseImages:  r.CollapseImages,
+			}
+		}
+		return nil
 	})
 
 	if err := g.Wait(); err != nil {

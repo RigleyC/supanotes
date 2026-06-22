@@ -94,8 +94,8 @@ func (m *mockQuerier) GetContexts(_ context.Context, _ pgtype.UUID) ([]sqlcgen.C
 func (m *mockQuerier) GetEnabledRoutines(_ context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetInboxNote(_ context.Context, _ pgtype.UUID) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
+func (m *mockQuerier) GetInboxNote(_ context.Context, _ pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
+	return sqlcgen.GetInboxNoteRow{}, nil
 }
 func (m *mockQuerier) GetLatestBriefByType(_ context.Context, _ sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
 	return sqlcgen.RoutineLog{}, nil
@@ -109,13 +109,13 @@ func (m *mockQuerier) GetMemories(_ context.Context, _ sqlcgen.GetMemoriesParams
 func (m *mockQuerier) GetMessages(_ context.Context, _ sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetNoteByID(_ context.Context, _ sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
+func (m *mockQuerier) GetNoteByID(_ context.Context, _ sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
+	return sqlcgen.GetNoteByIDRow{}, nil
 }
-func (m *mockQuerier) GetNotes(_ context.Context, _ sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
+func (m *mockQuerier) GetNotes(_ context.Context, _ sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetRecentNotes(_ context.Context, _ pgtype.UUID) ([]sqlcgen.Note, error) {
+func (m *mockQuerier) GetRecentNotes(_ context.Context, _ pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
 	return nil, nil
 }
 func (m *mockQuerier) GetRefreshToken(_ context.Context, _ string) (sqlcgen.RefreshToken, error) {

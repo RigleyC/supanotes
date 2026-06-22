@@ -28,16 +28,12 @@ const (
 type CreateNoteRequest struct {
 	Content        string  `json:"content" validate:"required"`
 	ContextID      *string `json:"context_id"`
-	Favorite       bool    `json:"favorite"`
-	Archived       bool    `json:"archived"`
 	CollapseImages bool    `json:"collapse_images"`
 }
 
 type UpdateNoteRequest struct {
 	Content        *string `json:"content"`
 	ContextID      *string `json:"context_id"`
-	Favorite       *bool   `json:"favorite"`
-	Archived       *bool   `json:"archived"`
 	CollapseImages *bool   `json:"collapse_images"`
 }
 
@@ -86,13 +82,13 @@ func (h *Handler) Create(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, ctxID, req.Favorite, req.Archived, req.CollapseImages)
+	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, ctxID, req.CollapseImages)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create note")
 	}
 
-	return c.JSON(http.StatusCreated, mapToNoteResponse(note))
+	return c.JSON(http.StatusCreated, mapToNoteResponse(noteToResponseFields(note)))
 }
 
 func (h *Handler) List(c echo.Context) error {
@@ -133,7 +129,11 @@ func (h *Handler) List(c echo.Context) error {
 
 	res := make([]NoteResponse, 0, len(notes))
 	for _, n := range notes {
-		res = append(res, mapToNoteResponse(n))
+		res = append(res, mapToNoteResponse(NoteResponseFields{
+			ID: n.ID, ContextID: n.ContextID, Content: n.Content, Excerpt: n.Excerpt,
+			IsInbox: n.IsInbox, Favorite: n.Favorite, Archived: n.Archived,
+			CollapseImages: n.CollapseImages, CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
+		}))
 	}
 
 	return c.JSON(http.StatusOK, res)
@@ -159,7 +159,12 @@ func (h *Handler) Get(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get note")
 	}
 
-	return c.JSON(http.StatusOK, mapToNoteResponse(note))
+	return c.JSON(http.StatusOK, mapToNoteResponse(NoteResponseFields{
+		ID: note.ID, ContextID: note.ContextID, Content: note.Content,
+		Excerpt: note.Excerpt, IsInbox: note.IsInbox, Favorite: note.Favorite,
+		Archived: note.Archived, CollapseImages: note.CollapseImages,
+		CreatedAt: note.CreatedAt, UpdatedAt: note.UpdatedAt,
+	}))
 }
 
 func (h *Handler) Update(c echo.Context) error {
@@ -186,7 +191,7 @@ func (h *Handler) Update(c echo.Context) error {
 		}
 	}
 
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, ctxID, req.Favorite, req.Archived, req.CollapseImages)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, ctxID, req.CollapseImages)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
@@ -198,7 +203,7 @@ func (h *Handler) Update(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to update note")
 	}
 
-	return c.JSON(http.StatusOK, mapToNoteResponse(note))
+	return c.JSON(http.StatusOK, mapToNoteResponse(noteToResponseFields(note)))
 }
 
 func (h *Handler) Delete(c echo.Context) error {
@@ -242,7 +247,12 @@ func (h *Handler) GetInbox(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get inbox note")
 	}
 
-	return c.JSON(http.StatusOK, mapToNoteResponse(note))
+	return c.JSON(http.StatusOK, mapToNoteResponse(NoteResponseFields{
+		ID: note.ID, ContextID: note.ContextID, Content: note.Content,
+		Excerpt: note.Excerpt, IsInbox: note.IsInbox, Favorite: note.Favorite,
+		Archived: note.Archived, CollapseImages: note.CollapseImages,
+		CreatedAt: note.CreatedAt, UpdatedAt: note.UpdatedAt,
+	}))
 }
 
 func (h *Handler) AppendToInbox(c echo.Context) error {
@@ -262,7 +272,7 @@ func (h *Handler) AppendToInbox(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to append to inbox note")
 	}
 
-	return c.JSON(http.StatusOK, mapToNoteResponse(note))
+	return c.JSON(http.StatusOK, mapToNoteResponse(noteToResponseFields(note)))
 }
 
 type PlanOrganizationResponse struct {
@@ -432,27 +442,57 @@ func (h *Handler) ApplyOrganization(c echo.Context) error {
 
 func ptr(s string) *string { return &s }
 
-func mapToNoteResponse(n sqlcgen.Note) NoteResponse {
+// NoteResponseFields carries the fields needed to build a NoteResponse.
+// It eliminates the long parameter list that was previously passed to a
+// mapper function, since the same set of fields comes from several
+// sqlc-generated row types (Note, GetNotesRow, GetNoteByIDRow, …).
+type NoteResponseFields struct {
+	ID             pgtype.UUID
+	ContextID      pgtype.UUID
+	Content        string
+	Excerpt        pgtype.Text
+	IsInbox        bool
+	Favorite       bool
+	Archived       bool
+	CollapseImages bool
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 	var ctxID *string
-	if n.ContextID.Valid {
-		id := uid.UUIDToString(n.ContextID)
-		ctxID = &id
+	if f.ContextID.Valid {
+		cid := uid.UUIDToString(f.ContextID)
+		ctxID = &cid
 	}
-	var excerpt *string
-	if n.Excerpt.Valid {
-		e := n.Excerpt.String
-		excerpt = &e
+	var exc *string
+	if f.Excerpt.Valid {
+		e := f.Excerpt.String
+		exc = &e
 	}
 	return NoteResponse{
-		ID:             uid.UUIDToString(n.ID),
+		ID:             uid.UUIDToString(f.ID),
 		ContextID:      ctxID,
+		Content:        f.Content,
+		Excerpt:        exc,
+		IsInbox:        f.IsInbox,
+		Favorite:       f.Favorite,
+		Archived:       f.Archived,
+		CollapseImages: f.CollapseImages,
+		CreatedAt:      f.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:      f.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
+func noteToResponseFields(n sqlcgen.Note) NoteResponseFields {
+	return NoteResponseFields{
+		ID:             n.ID,
+		ContextID:      n.ContextID,
 		Content:        n.Content,
-		Excerpt:        excerpt,
+		Excerpt:        n.Excerpt,
 		IsInbox:        n.IsInbox,
-		Favorite:       n.Favorite,
-		Archived:       n.Archived,
 		CollapseImages: n.CollapseImages,
-		CreatedAt:      n.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:      n.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:      n.CreatedAt,
+		UpdatedAt:      n.UpdatedAt,
 	}
 }

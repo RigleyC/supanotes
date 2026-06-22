@@ -18,11 +18,11 @@ import (
 type stubQuerier struct {
 	searchByEmbedding func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error)
 	createNoteLink    func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error
-	getNoteByID       func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error)
+	getNoteByID       func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error)
 	getSoul           func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error)
 	getMessages       func(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error)
-	getRecentNotes    func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error)
-	getInboxNote      func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error)
+	getRecentNotes    func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error)
+	getInboxNote      func(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error)
 	createNote        func(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error)
 	setInboxContent   func(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
 }
@@ -41,7 +41,7 @@ func (s *stubQuerier) GetMessages(ctx context.Context, arg sqlcgen.GetMessagesPa
 	panic("unimplemented")
 }
 
-func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error) {
+func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
 	if s.getRecentNotes != nil {
 		return s.getRecentNotes(ctx, userID)
 	}
@@ -66,7 +66,7 @@ func (s *stubQuerier) CreateNoteLink(ctx context.Context, arg sqlcgen.CreateNote
 	panic("unimplemented")
 }
 
-func (s *stubQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
+func (s *stubQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
 	if s.getNoteByID != nil {
 		return s.getNoteByID(ctx, arg)
 	}
@@ -175,7 +175,7 @@ func (s *stubQuerier) GetContexts(ctx context.Context, userID pgtype.UUID) ([]sq
 func (s *stubQuerier) GetEnabledRoutines(ctx context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+func (s *stubQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
 	if s.getInboxNote != nil {
 		return s.getInboxNote(ctx, userID)
 	}
@@ -190,7 +190,7 @@ func (s *stubQuerier) GetLinkedNotes(ctx context.Context, arg sqlcgen.GetLinkedN
 func (s *stubQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesParams) ([]sqlcgen.Memory, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
+func (s *stubQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetRefreshToken(ctx context.Context, tokenHash string) (sqlcgen.RefreshToken, error) {
@@ -444,8 +444,8 @@ func TestLinkNotesTool_Execute(t *testing.T) {
 		createNoteLink: func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
 			return nil
 		},
-		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
-			return sqlcgen.Note{
+		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
+			return sqlcgen.GetNoteByIDRow{
 				ID:     arg.ID,
 				UserID: arg.UserID,
 			}, nil
@@ -476,8 +476,8 @@ func TestLinkNotesTool_InvalidUUID(t *testing.T) {
 
 func TestLinkNotesTool_SourceNotFound(t *testing.T) {
 	q := &stubQuerier{
-		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
-			return sqlcgen.Note{}, notes.ErrNoteNotFound
+		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
+			return sqlcgen.GetNoteByIDRow{}, notes.ErrNoteNotFound
 		},
 		createNoteLink: func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
 			t.Fatal("should not be called")
@@ -508,7 +508,7 @@ func (m *mockNotesRepo) WithQuerier(q sqlcgen.Querier) notes.Repository {
 func (m *mockNotesRepo) CreateNote(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
 	return m.q.CreateNote(ctx, arg)
 }
-func (m *mockNotesRepo) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Note, error) {
+func (m *mockNotesRepo) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.GetNoteByIDRow, error) {
 	return m.q.GetNoteByID(ctx, sqlcgen.GetNoteByIDParams{ID: id, UserID: userID})
 }
 func (m *mockNotesRepo) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
@@ -517,10 +517,10 @@ func (m *mockNotesRepo) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNotePa
 func (m *mockNotesRepo) DeleteNote(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) error {
 	panic("unimplemented")
 }
-func (m *mockNotesRepo) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
+func (m *mockNotesRepo) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	panic("unimplemented")
 }
-func (m *mockNotesRepo) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+func (m *mockNotesRepo) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
 	return m.q.GetInboxNote(ctx, userID)
 }
 func (m *mockNotesRepo) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
@@ -538,8 +538,8 @@ func (m *mockNotesRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int
 
 func TestGetNoteTool_Execute(t *testing.T) {
 	q := &stubQuerier{
-		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
-			return sqlcgen.Note{
+		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
+			return sqlcgen.GetNoteByIDRow{
 				ID:      arg.ID,
 				UserID:  arg.UserID,
 				Content: "My Test Note\n\nHello world this is note content",
@@ -571,8 +571,8 @@ func TestApplyInboxOrganizationTool_Execute(t *testing.T) {
 	// [16]byte{15: 1} = last byte=1 → UUID string "00000000-0000-0000-0000-000000000001"
 	inboxID := pgtype.UUID{Bytes: [16]byte{15: 1}, Valid: true}
 	q := &stubQuerier{
-		getInboxNote: func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
-			return sqlcgen.Note{
+		getInboxNote: func(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
+			return sqlcgen.GetInboxNoteRow{
 				ID:      inboxID,
 				UserID:  userID,
 				IsInbox: true,
@@ -604,3 +604,4 @@ func TestApplyInboxOrganizationTool_Execute(t *testing.T) {
 		t.Fatalf("expected success message, got %q", result)
 	}
 }
+

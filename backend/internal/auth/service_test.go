@@ -194,16 +194,16 @@ func (m *mockQuerier) DeleteTag(ctx context.Context, arg sqlcgen.DeleteTagParams
 func (m *mockQuerier) GetContexts(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Context, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
+func (m *mockQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
+	return sqlcgen.GetInboxNoteRow{}, nil
 }
 func (m *mockQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
 	return sqlcgen.RoutineLog{}, nil
 }
-func (m *mockQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
+func (m *mockQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
+	return sqlcgen.GetNoteByIDRow{}, nil
 }
-func (m *mockQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
+func (m *mockQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	return nil, nil
 }
 func (m *mockQuerier) GetTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Tag, error) {
@@ -575,7 +575,7 @@ func TestService_IssuedTokenIsValid(t *testing.T) {
 	}
 }
 
-func (m *mockQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error) {
+func (m *mockQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
 	return nil, nil
 }
 
@@ -702,3 +702,4 @@ func (m *mockQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sqlcge
 func (m *mockQuerier) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
 	return sqlcgen.UserNotePreference{}, nil
 }
+

@@ -11,7 +11,7 @@ import (
 type Repository interface {
 	GetSyncNotes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.GetSyncNotesRow, error)
 	UpsertNote(ctx context.Context, arg sqlcgen.UpsertNoteParams) (sqlcgen.Note, error)
-	GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error)
+	GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error)
 	GetSyncTasks(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Task, error)
 	UpsertTask(ctx context.Context, arg sqlcgen.UpsertTaskParams) (sqlcgen.Task, error)
 	GetSyncContexts(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Context, error)
@@ -39,7 +39,7 @@ func NewRepository(q sqlcgen.Querier) Repository {
 	return &repo{q: q}
 }
 
-func (r *repo) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+func (r *repo) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
 	return r.q.GetInboxNote(ctx, userID)
 }
 

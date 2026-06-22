@@ -66,3 +66,4 @@ func TestHandler_DeleteTag_InvalidID(t *testing.T) {
 		t.Fatalf("status: want 400, got %d", rec.Code)
 	}
 }
+
