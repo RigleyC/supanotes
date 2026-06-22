@@ -4419,6 +4419,474 @@ class AttachmentsCompanion extends UpdateCompanion<AttachmentData> {
   }
 }
 
+class $UserNotePreferencesTable extends UserNotePreferences
+    with TableInfo<$UserNotePreferencesTable, UserNotePreferenceData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $UserNotePreferencesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hideCompletedMeta = const VerificationMeta(
+    'hideCompleted',
+  );
+  @override
+  late final GeneratedColumn<bool> hideCompleted = GeneratedColumn<bool>(
+    'hide_completed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("hide_completed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _filtersMeta = const VerificationMeta(
+    'filters',
+  );
+  @override
+  late final GeneratedColumn<String> filters = GeneratedColumn<String>(
+    'filters',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _isDirtyMeta = const VerificationMeta(
+    'isDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> isDirty = GeneratedColumn<bool>(
+    'is_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userId,
+    noteId,
+    hideCompleted,
+    filters,
+    createdAt,
+    updatedAt,
+    isDirty,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'user_note_preferences';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<UserNotePreferenceData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('hide_completed')) {
+      context.handle(
+        _hideCompletedMeta,
+        hideCompleted.isAcceptableOrUnknown(
+          data['hide_completed']!,
+          _hideCompletedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('filters')) {
+      context.handle(
+        _filtersMeta,
+        filters.isAcceptableOrUnknown(data['filters']!, _filtersMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('is_dirty')) {
+      context.handle(
+        _isDirtyMeta,
+        isDirty.isAcceptableOrUnknown(data['is_dirty']!, _isDirtyMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userId, noteId};
+  @override
+  UserNotePreferenceData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return UserNotePreferenceData(
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      )!,
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      hideCompleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}hide_completed'],
+      )!,
+      filters: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}filters'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      isDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_dirty'],
+      )!,
+    );
+  }
+
+  @override
+  $UserNotePreferencesTable createAlias(String alias) {
+    return $UserNotePreferencesTable(attachedDatabase, alias);
+  }
+}
+
+class UserNotePreferenceData extends DataClass
+    implements Insertable<UserNotePreferenceData> {
+  final String userId;
+  final String noteId;
+  final bool hideCompleted;
+  final String filters;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final bool isDirty;
+  const UserNotePreferenceData({
+    required this.userId,
+    required this.noteId,
+    required this.hideCompleted,
+    required this.filters,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.isDirty,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_id'] = Variable<String>(userId);
+    map['note_id'] = Variable<String>(noteId);
+    map['hide_completed'] = Variable<bool>(hideCompleted);
+    map['filters'] = Variable<String>(filters);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['is_dirty'] = Variable<bool>(isDirty);
+    return map;
+  }
+
+  UserNotePreferencesCompanion toCompanion(bool nullToAbsent) {
+    return UserNotePreferencesCompanion(
+      userId: Value(userId),
+      noteId: Value(noteId),
+      hideCompleted: Value(hideCompleted),
+      filters: Value(filters),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      isDirty: Value(isDirty),
+    );
+  }
+
+  factory UserNotePreferenceData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return UserNotePreferenceData(
+      userId: serializer.fromJson<String>(json['userId']),
+      noteId: serializer.fromJson<String>(json['noteId']),
+      hideCompleted: serializer.fromJson<bool>(json['hideCompleted']),
+      filters: serializer.fromJson<String>(json['filters']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      isDirty: serializer.fromJson<bool>(json['isDirty']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userId': serializer.toJson<String>(userId),
+      'noteId': serializer.toJson<String>(noteId),
+      'hideCompleted': serializer.toJson<bool>(hideCompleted),
+      'filters': serializer.toJson<String>(filters),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'isDirty': serializer.toJson<bool>(isDirty),
+    };
+  }
+
+  UserNotePreferenceData copyWith({
+    String? userId,
+    String? noteId,
+    bool? hideCompleted,
+    String? filters,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isDirty,
+  }) => UserNotePreferenceData(
+    userId: userId ?? this.userId,
+    noteId: noteId ?? this.noteId,
+    hideCompleted: hideCompleted ?? this.hideCompleted,
+    filters: filters ?? this.filters,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    isDirty: isDirty ?? this.isDirty,
+  );
+  UserNotePreferenceData copyWithCompanion(UserNotePreferencesCompanion data) {
+    return UserNotePreferenceData(
+      userId: data.userId.present ? data.userId.value : this.userId,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      hideCompleted: data.hideCompleted.present
+          ? data.hideCompleted.value
+          : this.hideCompleted,
+      filters: data.filters.present ? data.filters.value : this.filters,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      isDirty: data.isDirty.present ? data.isDirty.value : this.isDirty,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserNotePreferenceData(')
+          ..write('userId: $userId, ')
+          ..write('noteId: $noteId, ')
+          ..write('hideCompleted: $hideCompleted, ')
+          ..write('filters: $filters, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('isDirty: $isDirty')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    userId,
+    noteId,
+    hideCompleted,
+    filters,
+    createdAt,
+    updatedAt,
+    isDirty,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UserNotePreferenceData &&
+          other.userId == this.userId &&
+          other.noteId == this.noteId &&
+          other.hideCompleted == this.hideCompleted &&
+          other.filters == this.filters &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.isDirty == this.isDirty);
+}
+
+class UserNotePreferencesCompanion
+    extends UpdateCompanion<UserNotePreferenceData> {
+  final Value<String> userId;
+  final Value<String> noteId;
+  final Value<bool> hideCompleted;
+  final Value<String> filters;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<bool> isDirty;
+  final Value<int> rowid;
+  const UserNotePreferencesCompanion({
+    this.userId = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.hideCompleted = const Value.absent(),
+    this.filters = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.isDirty = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UserNotePreferencesCompanion.insert({
+    required String userId,
+    required String noteId,
+    this.hideCompleted = const Value.absent(),
+    this.filters = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.isDirty = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userId = Value(userId),
+       noteId = Value(noteId);
+  static Insertable<UserNotePreferenceData> custom({
+    Expression<String>? userId,
+    Expression<String>? noteId,
+    Expression<bool>? hideCompleted,
+    Expression<String>? filters,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? isDirty,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userId != null) 'user_id': userId,
+      if (noteId != null) 'note_id': noteId,
+      if (hideCompleted != null) 'hide_completed': hideCompleted,
+      if (filters != null) 'filters': filters,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (isDirty != null) 'is_dirty': isDirty,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UserNotePreferencesCompanion copyWith({
+    Value<String>? userId,
+    Value<String>? noteId,
+    Value<bool>? hideCompleted,
+    Value<String>? filters,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<bool>? isDirty,
+    Value<int>? rowid,
+  }) {
+    return UserNotePreferencesCompanion(
+      userId: userId ?? this.userId,
+      noteId: noteId ?? this.noteId,
+      hideCompleted: hideCompleted ?? this.hideCompleted,
+      filters: filters ?? this.filters,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isDirty: isDirty ?? this.isDirty,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (hideCompleted.present) {
+      map['hide_completed'] = Variable<bool>(hideCompleted.value);
+    }
+    if (filters.present) {
+      map['filters'] = Variable<String>(filters.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (isDirty.present) {
+      map['is_dirty'] = Variable<bool>(isDirty.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserNotePreferencesCompanion(')
+          ..write('userId: $userId, ')
+          ..write('noteId: $noteId, ')
+          ..write('hideCompleted: $hideCompleted, ')
+          ..write('filters: $filters, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('isDirty: $isDirty, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4431,6 +4899,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $LocalTaskCompletionsTable(this);
   late final $NoteLinksTable noteLinks = $NoteLinksTable(this);
   late final $AttachmentsTable attachments = $AttachmentsTable(this);
+  late final $UserNotePreferencesTable userNotePreferences =
+      $UserNotePreferencesTable(this);
   late final NotesDao notesDao = NotesDao(this as AppDatabase);
   late final ContextsDao contextsDao = ContextsDao(this as AppDatabase);
   late final TasksDao tasksDao = TasksDao(this as AppDatabase);
@@ -4443,6 +4913,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final AttachmentsDao attachmentsDao = AttachmentsDao(
     this as AppDatabase,
   );
+  late final UserNotePreferencesDao userNotePreferencesDao =
+      UserNotePreferencesDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4456,6 +4928,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     localTaskCompletions,
     noteLinks,
     attachments,
+    userNotePreferences,
   ];
 }
 
@@ -7269,6 +7742,262 @@ typedef $$AttachmentsTableProcessedTableManager =
       AttachmentData,
       PrefetchHooks Function()
     >;
+typedef $$UserNotePreferencesTableCreateCompanionBuilder =
+    UserNotePreferencesCompanion Function({
+      required String userId,
+      required String noteId,
+      Value<bool> hideCompleted,
+      Value<String> filters,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<bool> isDirty,
+      Value<int> rowid,
+    });
+typedef $$UserNotePreferencesTableUpdateCompanionBuilder =
+    UserNotePreferencesCompanion Function({
+      Value<String> userId,
+      Value<String> noteId,
+      Value<bool> hideCompleted,
+      Value<String> filters,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<bool> isDirty,
+      Value<int> rowid,
+    });
+
+class $$UserNotePreferencesTableFilterComposer
+    extends Composer<_$AppDatabase, $UserNotePreferencesTable> {
+  $$UserNotePreferencesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hideCompleted => $composableBuilder(
+    column: $table.hideCompleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filters => $composableBuilder(
+    column: $table.filters,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDirty => $composableBuilder(
+    column: $table.isDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$UserNotePreferencesTableOrderingComposer
+    extends Composer<_$AppDatabase, $UserNotePreferencesTable> {
+  $$UserNotePreferencesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hideCompleted => $composableBuilder(
+    column: $table.hideCompleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get filters => $composableBuilder(
+    column: $table.filters,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDirty => $composableBuilder(
+    column: $table.isDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$UserNotePreferencesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $UserNotePreferencesTable> {
+  $$UserNotePreferencesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<bool> get hideCompleted => $composableBuilder(
+    column: $table.hideCompleted,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get filters =>
+      $composableBuilder(column: $table.filters, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDirty =>
+      $composableBuilder(column: $table.isDirty, builder: (column) => column);
+}
+
+class $$UserNotePreferencesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $UserNotePreferencesTable,
+          UserNotePreferenceData,
+          $$UserNotePreferencesTableFilterComposer,
+          $$UserNotePreferencesTableOrderingComposer,
+          $$UserNotePreferencesTableAnnotationComposer,
+          $$UserNotePreferencesTableCreateCompanionBuilder,
+          $$UserNotePreferencesTableUpdateCompanionBuilder,
+          (
+            UserNotePreferenceData,
+            BaseReferences<
+              _$AppDatabase,
+              $UserNotePreferencesTable,
+              UserNotePreferenceData
+            >,
+          ),
+          UserNotePreferenceData,
+          PrefetchHooks Function()
+        > {
+  $$UserNotePreferencesTableTableManager(
+    _$AppDatabase db,
+    $UserNotePreferencesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$UserNotePreferencesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$UserNotePreferencesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$UserNotePreferencesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> userId = const Value.absent(),
+                Value<String> noteId = const Value.absent(),
+                Value<bool> hideCompleted = const Value.absent(),
+                Value<String> filters = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> isDirty = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => UserNotePreferencesCompanion(
+                userId: userId,
+                noteId: noteId,
+                hideCompleted: hideCompleted,
+                filters: filters,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                isDirty: isDirty,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userId,
+                required String noteId,
+                Value<bool> hideCompleted = const Value.absent(),
+                Value<String> filters = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> isDirty = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => UserNotePreferencesCompanion.insert(
+                userId: userId,
+                noteId: noteId,
+                hideCompleted: hideCompleted,
+                filters: filters,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                isDirty: isDirty,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$UserNotePreferencesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $UserNotePreferencesTable,
+      UserNotePreferenceData,
+      $$UserNotePreferencesTableFilterComposer,
+      $$UserNotePreferencesTableOrderingComposer,
+      $$UserNotePreferencesTableAnnotationComposer,
+      $$UserNotePreferencesTableCreateCompanionBuilder,
+      $$UserNotePreferencesTableUpdateCompanionBuilder,
+      (
+        UserNotePreferenceData,
+        BaseReferences<
+          _$AppDatabase,
+          $UserNotePreferencesTable,
+          UserNotePreferenceData
+        >,
+      ),
+      UserNotePreferenceData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7288,4 +8017,6 @@ class $AppDatabaseManager {
       $$NoteLinksTableTableManager(_db, _db.noteLinks);
   $$AttachmentsTableTableManager get attachments =>
       $$AttachmentsTableTableManager(_db, _db.attachments);
+  $$UserNotePreferencesTableTableManager get userNotePreferences =>
+      $$UserNotePreferencesTableTableManager(_db, _db.userNotePreferences);
 }

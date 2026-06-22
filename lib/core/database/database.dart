@@ -16,6 +16,7 @@ import 'daos/notes_dao.dart';
 import 'daos/tags_dao.dart';
 import 'daos/task_completions_dao.dart';
 import 'daos/tasks_dao.dart';
+import 'daos/user_note_preferences_dao.dart';
 import 'tables/attachments.dart';
 import 'tables/contexts.dart';
 import 'tables/note_links.dart';
@@ -24,14 +25,15 @@ import 'tables/notes.dart';
 import 'tables/tags.dart';
 import 'tables/task_completions.dart';
 import 'tables/tasks.dart';
+import 'tables/user_note_preferences.dart';
 
 import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNameConverter in tasks.dart
 
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions, NoteLinks, Attachments],
-  daos: [NotesDao, ContextsDao, TasksDao, TagsDao, TaskCompletionsDao, NoteLinksDao, NoteTagsDao, AttachmentsDao],
+  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions, NoteLinks, Attachments, UserNotePreferences],
+  daos: [NotesDao, ContextsDao, TasksDao, TagsDao, TaskCompletionsDao, NoteLinksDao, NoteTagsDao, AttachmentsDao, UserNotePreferencesDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -39,9 +41,9 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to `10` — v10 adds collapseImages.
+  /// Latest schema version. Bumped to 11 — v11 adds user_note_preferences.
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -86,6 +88,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 10) {
             await m.addColumn(notes, notes.collapseImages);
+          }
+          if (from < 11) {
+            await m.createTable(userNotePreferences);
           }
         },
       );
