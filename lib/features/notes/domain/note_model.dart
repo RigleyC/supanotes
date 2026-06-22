@@ -1,5 +1,6 @@
 import 'package:supanotes/features/notes/domain/note_display_text.dart';
 import '../../../core/database/database.dart';
+import '../../../core/database/daos/notes_dao.dart';
 
 class NoteModel {
   const NoteModel({
@@ -80,8 +81,8 @@ class NoteModel {
       userId: d.userId,
       content: d.content,
       isInbox: d.isInbox,
-      favorite: d.favorite,
-      archived: d.archived,
+      favorite: false,
+      archived: false,
       contextId: d.contextId,
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
@@ -90,6 +91,25 @@ class NoteModel {
       permission: d.permission?.isNotEmpty == true ? d.permission : null,
       sharedByEmail: d.sharedByEmail?.isNotEmpty == true ? d.sharedByEmail : null,
       sharedByName: d.sharedByName?.isNotEmpty == true ? d.sharedByName : null,
+    );
+  }
+
+  factory NoteModel.fromQueryResult(NoteQueryResult qr) {
+    return NoteModel(
+      id: qr.note.id,
+      userId: qr.note.userId,
+      content: qr.note.content,
+      isInbox: qr.note.isInbox,
+      favorite: qr.favorite,
+      archived: qr.archived,
+      contextId: qr.note.contextId,
+      createdAt: qr.note.createdAt,
+      updatedAt: qr.note.updatedAt,
+      hideCompleted: qr.hideCompleted,
+      collapseImages: qr.note.collapseImages,
+      permission: qr.note.permission?.isNotEmpty == true ? qr.note.permission : null,
+      sharedByEmail: qr.note.sharedByEmail?.isNotEmpty == true ? qr.note.sharedByEmail : null,
+      sharedByName: qr.note.sharedByName?.isNotEmpty == true ? qr.note.sharedByName : null,
     );
   }
 }

@@ -4,6 +4,8 @@ import 'package:drift/drift.dart';
 class UserNotePreferences extends Table {
   TextColumn get userId => text()();
   TextColumn get noteId => text()();
+  BoolColumn get favorite => boolean().withDefault(const Constant(false))();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
   BoolColumn get hideCompleted => boolean().withDefault(const Constant(false))();
   TextColumn get filters => text().withDefault(const Constant('{}'))();
 

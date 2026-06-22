@@ -40,8 +40,6 @@ class SyncMapper {
         'content': n.content,
         'excerpt': n.excerpt,
         'is_inbox': n.isInbox,
-        'favorite': n.favorite,
-        'archived': n.archived,
         'collapse_images': n.collapseImages,
         'embedding_status': n.embeddingStatus,
         'shared_permission': n.permission,
@@ -113,8 +111,6 @@ class SyncMapper {
         content: json['content'] as String,
         excerpt: json['excerpt'] as String?,
         isInbox: (json['is_inbox'] as bool?) ?? false,
-        favorite: (json['favorite'] as bool?) ?? false,
-        archived: (json['archived'] as bool?) ?? false,
         embeddingStatus: json['embedding_status'] as String?,
         permission: _nullIfEmpty(json['shared_permission'] as String?),
         sharedByEmail: _nullIfEmpty(json['shared_by_email'] as String?),
@@ -210,6 +206,8 @@ class SyncMapper {
     return {
       'user_id': p.userId,
       'note_id': p.noteId,
+      'favorite': p.favorite,
+      'archived': p.archived,
       'hide_completed': p.hideCompleted,
       'filters': p.filters,
       'created_at': p.createdAt.toUtc().toIso8601String(),
@@ -222,6 +220,8 @@ class SyncMapper {
     return UserNotePreferencesCompanion(
       userId: Value(json['user_id'] as String),
       noteId: Value(json['note_id'] as String),
+      favorite: Value(json['favorite'] as bool? ?? false),
+      archived: Value(json['archived'] as bool? ?? false),
       hideCompleted: Value(json['hide_completed'] as bool? ?? false),
       filters: Value(json['filters'] as String? ?? '{}'),
       createdAt:

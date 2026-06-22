@@ -8,8 +8,6 @@ class Notes extends Table {
   TextColumn get content => text()();
   TextColumn get excerpt => text().nullable()();
   BoolColumn get isInbox => boolean().withDefault(const Constant(false))();
-  BoolColumn get favorite => boolean().withDefault(const Constant(false))();
-  BoolColumn get archived => boolean().withDefault(const Constant(false))();
   TextColumn get embeddingStatus => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

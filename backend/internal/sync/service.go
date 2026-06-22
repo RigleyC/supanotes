@@ -244,9 +244,8 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			ContextID:       n.ContextID,
 			Content:         n.Content,
 			IsInbox:         n.IsInbox,
-			Favorite:        n.Favorite,
-			Archived:        n.Archived,
 			EmbeddingStatus: embStatus,
+			CollapseImages:  n.CollapseImages,
 			CreatedAt:       n.CreatedAt,
 			DeletedAt:       n.DeletedAt,
 		})
@@ -386,6 +385,8 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			NoteID:        p.NoteID,
 			HideCompleted: p.HideCompleted,
 			Filters:       p.Filters,
+			Favorite:      p.Favorite,
+			Archived:      p.Archived,
 			CreatedAt:     p.CreatedAt,
 		})
 		if err != nil {

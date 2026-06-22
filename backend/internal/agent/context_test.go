@@ -69,7 +69,7 @@ type stubQuerier struct {
 	searchByEmbedding func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error)
 	getSoul           func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error)
 	getMessages       func(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error)
-	getRecentNotes    func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error)
+	getRecentNotes    func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error)
 }
 
 func (s *stubQuerier) SearchNotesByEmbedding(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error) {
@@ -90,7 +90,7 @@ func (s *stubQuerier) GetMessages(ctx context.Context, arg sqlcgen.GetMessagesPa
 	}
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error) {
+func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
 	if s.getRecentNotes != nil {
 		return s.getRecentNotes(ctx, userID)
 	}
@@ -197,7 +197,7 @@ func (s *stubQuerier) GetContexts(context.Context, pgtype.UUID) ([]sqlcgen.Conte
 func (s *stubQuerier) GetEnabledRoutines(context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetInboxNote(context.Context, pgtype.UUID) (sqlcgen.Note, error) {
+func (s *stubQuerier) GetInboxNote(context.Context, pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetLatestBriefByType(context.Context, sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
@@ -209,10 +209,10 @@ func (s *stubQuerier) GetLinkedNotes(context.Context, sqlcgen.GetLinkedNotesPara
 func (s *stubQuerier) GetMemories(context.Context, sqlcgen.GetMemoriesParams) ([]sqlcgen.Memory, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetNoteByID(context.Context, sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
+func (s *stubQuerier) GetNoteByID(context.Context, sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetNotes(context.Context, sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
+func (s *stubQuerier) GetNotes(context.Context, sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetRefreshToken(context.Context, string) (sqlcgen.RefreshToken, error) {
@@ -424,7 +424,7 @@ func TestContextBuilder_Build(t *testing.T) {
 		getMessages: func(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error) {
 			return nil, nil
 		},
-		getRecentNotes: func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error) {
+		getRecentNotes: func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
 			return nil, nil
 		},
 	}
@@ -459,3 +459,4 @@ func TestContextBuilder_Build(t *testing.T) {
 		}
 	}
 }
+

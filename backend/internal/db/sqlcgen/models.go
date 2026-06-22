@@ -63,8 +63,6 @@ type Note struct {
 	Content         string             `json:"content"`
 	Excerpt         pgtype.Text        `json:"excerpt"`
 	IsInbox         bool               `json:"is_inbox"`
-	Favorite        bool               `json:"favorite"`
-	Archived        bool               `json:"archived"`
 	SearchVector    pgtype.Text        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
@@ -221,6 +219,8 @@ type UserNotePreference struct {
 	Filters       []byte             `json:"filters"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	Favorite      bool               `json:"favorite"`
+	Archived      bool               `json:"archived"`
 }
 
 type UserSetting struct {

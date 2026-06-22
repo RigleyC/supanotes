@@ -12,11 +12,11 @@ import (
 
 type mockRepo struct {
 	Repository
-	getNoteByIDFn func(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Note, error)
+	getNoteByIDFn func(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.GetNoteByIDRow, error)
 	updateNoteFn  func(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error)
 }
 
-func (m *mockRepo) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Note, error) {
+func (m *mockRepo) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.GetNoteByIDRow, error) {
 	return m.getNoteByIDFn(ctx, id, userID)
 }
 
@@ -27,8 +27,8 @@ func (m *mockRepo) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams)
 func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 	var capturedArg sqlcgen.UpdateNoteParams
 	svc := NewService(&mockRepo{
-		getNoteByIDFn: func(_ context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Note, error) {
-			return sqlcgen.Note{ID: id, UserID: userID}, nil
+		getNoteByIDFn: func(_ context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.GetNoteByIDRow, error) {
+			return sqlcgen.GetNoteByIDRow{ID: id, UserID: userID}, nil
 		},
 		updateNoteFn: func(_ context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
 			capturedArg = arg
@@ -37,7 +37,7 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 	}, nil)
 
 	newContent := "updated content"
-	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, nil, nil, nil)
+	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,36 +50,14 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 	}
 }
 
-func TestService_UpdateNote_DoesNotSetEmbeddingPendingOnFavoriteOnly(t *testing.T) {
-	var capturedArg sqlcgen.UpdateNoteParams
-	fav := true
-	svc := NewService(&mockRepo{
-		getNoteByIDFn: func(_ context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Note, error) {
-			return sqlcgen.Note{ID: id, UserID: userID}, nil
-		},
-		updateNoteFn: func(_ context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
-			capturedArg = arg
-			return sqlcgen.Note{ID: arg.ID}, nil
-		},
-	}, nil)
-
-	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, nil, nil, &fav, nil, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	_ = note
-	if capturedArg.EmbeddingStatus.Valid {
-		t.Fatal("expected embedding_status to NOT be set when only favorite changes")
-	}
-}
-
 func TestCreateNoteRejectsEmptyRegularNote(t *testing.T) {
 	svc := NewService(&mockRepo{}, nil)
 	userID := pgtype.UUID{Valid: true}
 
-	_, err := svc.CreateNote(context.Background(), userID, "   ", nil, false, false, false)
+	_, err := svc.CreateNote(context.Background(), userID, "   ", nil, false)
 
 	if !errors.Is(err, ErrEmptyNote) {
 		t.Fatalf("expected ErrEmptyNote, got %v", err)
 	}
 }
+

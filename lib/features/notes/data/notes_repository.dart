@@ -2,6 +2,8 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/database.dart';
+import '../../../core/database/daos/notes_dao.dart';
+import '../../../core/database/daos/user_note_preferences_dao.dart';
 import '../domain/note_model.dart';
 import '../domain/task_entry.dart';
 import '../../tasks/data/local/tasks_local_repository.dart';
@@ -30,12 +32,10 @@ abstract class INotesRepository {
   Future<void> updateNote(
     String id, {
     String? content,
-    bool? favorite,
-    bool? archived,
     bool? collapseImages,
     String? contextId,
   });
-  Future<void> toggleFavorite(String id);
+  Future<void> toggleFavorite(String noteId);
   Future<void> softDelete(String id);
   Future<NoteModel> ensureInbox();
   Future<void> appendToInbox(String text);
@@ -51,10 +51,11 @@ abstract class INotesRepository {
 }
 
 class NotesRepository implements INotesRepository {
-  NotesRepository(this._local, this._tasksLocal);
+  NotesRepository(this._local, this._tasksLocal, this._prefsDao);
 
   final NotesLocalRepository _local;
   final TasksLocalRepository _tasksLocal;
+  final UserNotePreferencesDao _prefsDao;
 
   /// Streams active (non-archived, non-deleted, non-inbox) notes, mapped
   /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
@@ -66,7 +67,7 @@ class NotesRepository implements INotesRepository {
     String? contextId,
     bool favoritesOnly = false,
   }) {
-    final Stream<List<(NoteData, bool)>> source;
+    final Stream<List<NoteQueryResult>> source;
     if (contextId != null) {
       source = _local.watchNotesByContext(contextId);
     } else if (favoritesOnly) {
@@ -75,7 +76,7 @@ class NotesRepository implements INotesRepository {
       source = _local.watchActiveNotes();
     }
     return source.map((rows) => rows
-        .map((t) => NoteModel.fromData(t.$1, hideCompleted: t.$2))
+        .map((qr) => NoteModel.fromQueryResult(qr))
         .toList());
   }
 
@@ -84,7 +85,7 @@ class NotesRepository implements INotesRepository {
   @override
   Stream<NoteModel?> watchInbox() {
     return _local.watchInbox().map(
-      (tuple) => tuple.$1 == null ? null : NoteModel.fromData(tuple.$1!, hideCompleted: tuple.$2),
+      (qr) => qr == null ? null : NoteModel.fromQueryResult(qr),
     );
   }
 
@@ -92,18 +93,14 @@ class NotesRepository implements INotesRepository {
   @override
   Stream<NoteModel?> watchNoteById(String id) {
     return _local.watchNoteById(id).map(
-      (tuple) => tuple.$1 == null
-          ? null
-          : NoteModel.fromData(tuple.$1!, hideCompleted: tuple.$2),
+      (qr) => qr == null ? null : NoteModel.fromQueryResult(qr),
     );
   }
 
   @override
   Future<NoteModel?> getNoteById(String id) async {
-    final tuple = await _local.getNoteById(id);
-    return tuple.$1 == null
-        ? null
-        : NoteModel.fromData(tuple.$1!, hideCompleted: tuple.$2);
+    final qr = await _local.getNoteById(id);
+    return qr == null ? null : NoteModel.fromQueryResult(qr);
   }
 
   /// Insert-or-update a note by [id]. When the row does not exist (lazy
@@ -129,7 +126,7 @@ class NotesRepository implements INotesRepository {
     );
     await _local.upsertNoteRaw(companion);
     final saved = await _local.getNoteById(id);
-    return NoteModel.fromData(saved.$1!, hideCompleted: saved.$2);
+    return NoteModel.fromQueryResult(saved!);
   }
 
   /// Applies a partial update to the note with [id]. Only non-null
@@ -139,23 +136,19 @@ class NotesRepository implements INotesRepository {
   Future<void> updateNote(
     String id, {
     String? content,
-    bool? favorite,
-    bool? archived,
     bool? collapseImages,
     String? contextId,
   }) async {
     final current = await _local.getNoteById(id);
-    if (current.$1 == null) return;
+    if (current == null) return;
 
-    final nextContent = content ?? current.$1!.content;
+    final nextContent = content ?? current.note.content;
     final companion = NotesCompanion(
       id: Value(id),
       content: content == null ? const Value.absent() : Value(nextContent),
       excerpt: content == null
           ? const Value.absent()
           : Value(_excerptFrom(nextContent)),
-      favorite: favorite == null ? const Value.absent() : Value(favorite),
-      archived: archived == null ? const Value.absent() : Value(archived),
       collapseImages:
           collapseImages == null ? const Value.absent() : Value(collapseImages),
       contextId: contextId == null ? const Value.absent() : Value(contextId),
@@ -165,13 +158,13 @@ class NotesRepository implements INotesRepository {
     await _local.updateNoteRaw(companion);
   }
 
-  /// Flips the favorite flag on the given note. No-op if the row no
-  /// longer exists (e.g. it was deleted in another tab).
+  /// Flips the favorite flag on the given note using the per-user
+  /// preferences table. No-op if the row no longer exists.
   @override
-  Future<void> toggleFavorite(String id) async {
-    final current = await _local.getNoteById(id);
-    if (current.$1 == null) return;
-    await updateNote(id, favorite: !current.$1!.favorite);
+  Future<void> toggleFavorite(String noteId) async {
+    final current = await _local.getNoteById(noteId);
+    if (current == null) return;
+    await _prefsDao.setFavorite(_local.userId, noteId, !current.favorite);
   }
 
   /// Soft-deletes the note. The row stays in the database with
@@ -185,7 +178,7 @@ class NotesRepository implements INotesRepository {
   @override
   Future<NoteModel> ensureInbox() async {
     final inbox = await _local.getOrCreateInboxNote();
-    return NoteModel.fromData(inbox.$1, hideCompleted: inbox.$2);
+    return NoteModel.fromQueryResult(inbox);
   }
 
   /// Appends [text] to the user's inbox note, creating the inbox row
@@ -194,17 +187,17 @@ class NotesRepository implements INotesRepository {
   @override
   Future<void> appendToInbox(String text) async {
     final existing = await _local.getOrCreateInboxNote();
-    final separator = existing.$1.content.isEmpty ? '' : '\n\n';
-    final newContent = '${existing.$1.content}$separator$text';
-    await _local.updateNoteContent(existing.$1.id, newContent);
+    final separator = existing.note.content.isEmpty ? '' : '\n\n';
+    final newContent = '${existing.note.content}$separator$text';
+    await _local.updateNoteContent(existing.note.id, newContent);
   }
 
   @override
   Future<NoteModel> createLocalNote({required String id}) async {
     final existing = await _local.getNoteById(id);
-    if (existing.$1 != null) return NoteModel.fromData(existing.$1!, hideCompleted: existing.$2);
+    if (existing != null) return NoteModel.fromQueryResult(existing);
     final created = await _local.createNoteWithId(id);
-    return NoteModel.fromData(created.$1, hideCompleted: created.$2);
+    return NoteModel.fromQueryResult(created);
   }
 
   @override
@@ -214,7 +207,7 @@ class NotesRepository implements INotesRepository {
     required List<TaskEntry> tasks,
   }) async {
     final current = await _local.getNoteById(id);
-    if (current.$1 == null) return;
+    if (current == null) return;
 
     await syncTasksFromDocument(id, tasks);
     await updateNote(
@@ -225,14 +218,14 @@ class NotesRepository implements INotesRepository {
 
   @override
   Future<void> deleteIfEmptyOrTombstone(String id) async {
-    final note = await _local.getNoteById(id);
-    if (note.$1 == null) return;
-    if (!_isTextEmpty(note.$1!)) return;
+    final qr = await _local.getNoteById(id);
+    if (qr == null) return;
+    if (!_isTextEmpty(qr.note)) return;
 
     final tasks = await _tasksLocal.getNoteTasks(id);
     if (tasks.isNotEmpty) return;
 
-    if (note.$1!.hasRemoteCopy) {
+    if (qr.note.hasRemoteCopy) {
       await _local.softDeleteNote(id);
     } else {
       await _local.hardDeleteNote(id);
@@ -308,5 +301,6 @@ class NotesRepository implements INotesRepository {
 final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   final local = ref.watch(notesLocalRepositoryProvider);
   final tasksLocal = ref.watch(tasksLocalRepositoryProvider);
-  return NotesRepository(local, tasksLocal);
+  final db = ref.watch(appDatabaseProvider);
+  return NotesRepository(local, tasksLocal, db.userNotePreferencesDao);
 });

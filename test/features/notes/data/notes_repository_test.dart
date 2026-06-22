@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/daos/notes_dao.dart';
+import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/features/notes/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
@@ -9,9 +11,10 @@ import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 void main() {
   group('NotesRepository lifecycle', () {
     test('createLocalNote creates an empty local-only note by id', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal);
+      final repo = NotesRepository(local, tasksLocal, prefsDao);
 
       final note = await repo.createLocalNote(id: 'note-1');
       expect(note.id, 'note-1');
@@ -20,10 +23,11 @@ void main() {
     });
 
     test('deleteIfEmpty hard-deletes empty local-only notes', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal);
+      final repo = NotesRepository(local, tasksLocal, prefsDao);
 
       await repo.deleteIfEmptyOrTombstone('note-1');
       expect(local.hardDeletedIds, contains('note-1'));
@@ -31,11 +35,12 @@ void main() {
     });
 
     test('deleteIfEmpty tombstones remote notes', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
       await local.markHasRemoteCopy('note-1');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal);
+      final repo = NotesRepository(local, tasksLocal, prefsDao);
 
       await repo.deleteIfEmptyOrTombstone('note-1');
       expect(local.softDeletedIds, contains('note-1'));
@@ -43,10 +48,11 @@ void main() {
     });
 
     test('deleteIfEmpty does nothing for non-empty notes', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1', content: 'Hello');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal);
+      final repo = NotesRepository(local, tasksLocal, prefsDao);
 
       await repo.deleteIfEmptyOrTombstone('note-1');
       expect(local.hardDeletedIds, isEmpty);
@@ -54,10 +60,11 @@ void main() {
     });
 
     test('saveSnapshot writes content and tasks together', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal);
+      final repo = NotesRepository(local, tasksLocal, prefsDao);
 
       await repo.saveNoteSnapshot(
         id: 'note-1',
@@ -66,8 +73,8 @@ void main() {
       );
 
       final saved = await local.getNoteById('note-1');
-      expect(saved.$1, isNotNull);
-      expect(saved.$1!.content, 'B');
+      expect(saved, isNotNull);
+      expect(saved!.note.content, 'B');
     });
   });
 }
@@ -81,31 +88,34 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   String get userId => 'test-user';
 
   @override
-  Stream<List<(NoteData, bool)>> watchActiveNotes() => const Stream.empty();
+  Stream<List<NoteQueryResult>> watchActiveNotes() => const Stream.empty();
 
   @override
-  Stream<List<(NoteData, bool)>> watchNotesByContext(String contextId) =>
+  Stream<List<NoteQueryResult>> watchNotesByContext(String contextId) =>
       const Stream.empty();
 
   @override
-  Stream<List<(NoteData, bool)>> watchFavorites() => const Stream.empty();
+  Stream<List<NoteQueryResult>> watchFavorites() => const Stream.empty();
 
   @override
-  Stream<(NoteData?, bool)> watchInbox() => const Stream.empty();
+  Stream<NoteQueryResult?> watchInbox() => const Stream.empty();
 
   @override
-  Stream<(NoteData?, bool)> watchNoteById(String id) => const Stream.empty();
+  Stream<NoteQueryResult?> watchNoteById(String id) => const Stream.empty();
 
   @override
-  Future<(NoteData?, bool)> getNoteById(String id) async =>
-      (_store[id], false);
+  Future<NoteQueryResult?> getNoteById(String id) async {
+    final data = _store[id];
+    if (data == null) return null;
+    return (note: data, favorite: false, archived: false, hideCompleted: false);
+  }
 
   @override
   Future<NoteData> createNote() async =>
       throw UnimplementedError('not used in these tests');
 
   @override
-  Future<(NoteData, bool)> createNoteWithId(String id,
+  Future<NoteQueryResult> createNoteWithId(String id,
       {String content = ''}) async {
     final now = DateTime.now().toUtc();
     final data = NoteData(
@@ -113,8 +123,6 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       userId: userId,
       content: content,
       isInbox: false,
-      favorite: false,
-      archived: false,
       createdAt: now,
       updatedAt: now,
       isDirty: false,
@@ -122,7 +130,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       collapseImages: false,
     );
     _store[id] = data;
-    return (data, false);
+    return (note: data, favorite: false, archived: false, hideCompleted: false);
   }
 
   @override
@@ -172,7 +180,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   }
 
   @override
-  Future<(NoteData, bool)> getOrCreateInboxNote() async =>
+  Future<NoteQueryResult> getOrCreateInboxNote() async =>
       throw UnimplementedError('not used in these tests');
 }
 
@@ -224,4 +232,39 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
 
   @override
   Future<void> deleteTask(String id) async {}
+}
+
+class FakeUserNotePreferencesDao implements UserNotePreferencesDao {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} not implemented');
+  @override
+  Stream<UserNotePreferenceData?> watchPreference(
+          String userId, String noteId) =>
+      const Stream.empty();
+
+  @override
+  Future<UserNotePreferenceData?> getPreference(
+          String userId, String noteId) =>
+      Future.value(null);
+
+  @override
+  Future<List<UserNotePreferenceData>> getDirtyPreferences() =>
+      Future.value([]);
+
+  @override
+  Future<void> clearDirtyFlag(String userId, String noteId) async {}
+
+  @override
+  Future<void> setFavorite(
+      String userId, String noteId, bool favorite) async {}
+
+  @override
+  Future<void> setArchived(
+      String userId, String noteId, bool archived) async {}
+
+  @override
+  Future<void> setHideCompleted(
+      String userId, String noteId, bool hideCompleted) async {}
+
 }

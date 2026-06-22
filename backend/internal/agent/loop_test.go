@@ -175,7 +175,7 @@ type stubLoopQuerier struct{}
 func (s *stubLoopQuerier) GetSoul(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error) {
 	return sqlcgen.Soul{Personality: "test"}, nil
 }
-func (s *stubLoopQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Note, error) {
+func (s *stubLoopQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
 	return nil, nil
 }
 func (s *stubLoopQuerier) SearchNotesByEmbedding(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error) {
@@ -286,7 +286,7 @@ func (s *stubLoopQuerier) GetContexts(ctx context.Context, userID pgtype.UUID) (
 func (s *stubLoopQuerier) GetEnabledRoutines(ctx context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
 	panic("unimplemented")
 }
-func (s *stubLoopQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.Note, error) {
+func (s *stubLoopQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
@@ -301,10 +301,10 @@ func (s *stubLoopQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemori
 func (s *stubLoopQuerier) GetMessages(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error) {
 	return nil, nil
 }
-func (s *stubLoopQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.Note, error) {
+func (s *stubLoopQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
 	panic("unimplemented")
 }
-func (s *stubLoopQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.Note, error) {
+func (s *stubLoopQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) GetRefreshToken(ctx context.Context, tokenHash string) (sqlcgen.RefreshToken, error) {
@@ -978,3 +978,4 @@ func (m *stubLoopMemRepo) DeleteMemory(ctx context.Context, id, userID pgtype.UU
 func (m *stubLoopMemRepo) SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
 	return nil, nil
 }
+

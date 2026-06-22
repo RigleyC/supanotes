@@ -290,8 +290,6 @@ func seedUserDefaults(ctx context.Context, q sqlcgen.Querier, userID pgtype.UUID
 		UserID:          userID,
 		Content:         content,
 		IsInbox:         true,
-		Favorite:        false,
-		Archived:        false,
 		EmbeddingStatus: "pending",
 	}); err != nil {
 		return fmt.Errorf("auth: seed inbox note: %w", err)

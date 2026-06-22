@@ -13,21 +13,23 @@ DELETE FROM contexts
 WHERE id = $1 AND user_id = $2;
 
 -- name: CreateNote :one
-INSERT INTO notes (user_id, context_id, content, is_inbox, favorite, archived, embedding_status, collapse_images)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO notes (user_id, context_id, content, is_inbox, embedding_status, collapse_images)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: GetNoteByID :one
-SELECT * FROM notes
-WHERE notes.id = $1 AND notes.deleted_at IS NULL
-  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2));
+SELECT n.*,
+  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
+  COALESCE(unp.archived, FALSE)::boolean AS archived
+FROM notes n
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2
+WHERE n.id = $1 AND n.deleted_at IS NULL
+  AND (n.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2));
 
 -- name: UpdateNote :one
 UPDATE notes
 SET content = COALESCE(sqlc.narg('content'), content),
     context_id = COALESCE(sqlc.narg('context_id'), context_id),
-    favorite = COALESCE(sqlc.narg('favorite'), favorite),
-    archived = COALESCE(sqlc.narg('archived'), archived),
     embedding_status = COALESCE(sqlc.narg('embedding_status'), embedding_status),
     collapse_images = COALESCE(sqlc.narg('collapse_images'), collapse_images),
     updated_at = NOW()
@@ -41,19 +43,27 @@ SET deleted_at = NOW()
 WHERE id = $1 AND user_id = $2;
 
 -- name: GetNotes :many
-SELECT * FROM notes
-WHERE is_inbox = false
-  AND deleted_at IS NULL
-  AND (notes.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = notes.id AND note_shares.user_id = $1))
-  AND (sqlc.narg('context_id')::uuid IS NULL OR context_id = sqlc.narg('context_id'))
-  AND (sqlc.narg('favorite')::boolean IS NULL OR favorite = sqlc.narg('favorite'))
-  AND (sqlc.narg('cursor_updated_at')::timestamptz IS NULL OR notes.updated_at < sqlc.narg('cursor_updated_at') OR (notes.updated_at = sqlc.narg('cursor_updated_at') AND notes.id < sqlc.narg('cursor_id')))
-ORDER BY notes.updated_at DESC, notes.id DESC
+SELECT n.*,
+  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
+  COALESCE(unp.archived, FALSE)::boolean AS archived
+FROM notes n
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
+WHERE n.is_inbox = false
+  AND n.deleted_at IS NULL
+  AND (n.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = n.id AND note_shares.user_id = $1))
+  AND (sqlc.narg('context_id')::uuid IS NULL OR n.context_id = sqlc.narg('context_id'))
+  AND (sqlc.narg('favorite')::boolean IS NULL OR COALESCE(unp.favorite, FALSE) = sqlc.narg('favorite'))
+  AND (sqlc.narg('cursor_updated_at')::timestamptz IS NULL OR n.updated_at < sqlc.narg('cursor_updated_at') OR (n.updated_at = sqlc.narg('cursor_updated_at') AND n.id < sqlc.narg('cursor_id')))
+ORDER BY n.updated_at DESC, n.id DESC
 LIMIT sqlc.arg('limit');
 
 -- name: GetInboxNote :one
-SELECT * FROM notes
-WHERE user_id = $1 AND is_inbox = true AND deleted_at IS NULL;
+SELECT n.*,
+  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
+  COALESCE(unp.archived, FALSE)::boolean AS archived
+FROM notes n
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
+WHERE n.user_id = $1 AND n.is_inbox = true AND n.deleted_at IS NULL;
 
 -- name: AppendToInbox :one
 UPDATE notes
@@ -91,12 +101,16 @@ DELETE FROM note_tags
 WHERE note_id = $1 AND tag_id = $2;
 
 -- name: GetRecentNotes :many
-SELECT * FROM notes
-WHERE user_id = $1
-  AND is_inbox = false
-  AND deleted_at IS NULL
-  AND updated_at >= NOW() - INTERVAL '48 hours'
-ORDER BY updated_at DESC
+SELECT n.*,
+  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
+  COALESCE(unp.archived, FALSE)::boolean AS archived
+FROM notes n
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
+WHERE n.user_id = $1
+  AND n.is_inbox = false
+  AND n.deleted_at IS NULL
+  AND n.updated_at >= NOW() - INTERVAL '48 hours'
+ORDER BY n.updated_at DESC
 LIMIT 10;
 
 -- name: GetLinkedNotes :many

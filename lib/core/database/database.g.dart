@@ -74,36 +74,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     ),
     defaultValue: const Constant(false),
   );
-  static const VerificationMeta _favoriteMeta = const VerificationMeta(
-    'favorite',
-  );
-  @override
-  late final GeneratedColumn<bool> favorite = GeneratedColumn<bool>(
-    'favorite',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("favorite" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
-  static const VerificationMeta _archivedMeta = const VerificationMeta(
-    'archived',
-  );
-  @override
-  late final GeneratedColumn<bool> archived = GeneratedColumn<bool>(
-    'archived',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("archived" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
   static const VerificationMeta _embeddingStatusMeta = const VerificationMeta(
     'embeddingStatus',
   );
@@ -234,8 +204,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     content,
     excerpt,
     isInbox,
-    favorite,
-    archived,
     embeddingStatus,
     createdAt,
     updatedAt,
@@ -296,18 +264,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
       context.handle(
         _isInboxMeta,
         isInbox.isAcceptableOrUnknown(data['is_inbox']!, _isInboxMeta),
-      );
-    }
-    if (data.containsKey('favorite')) {
-      context.handle(
-        _favoriteMeta,
-        favorite.isAcceptableOrUnknown(data['favorite']!, _favoriteMeta),
-      );
-    }
-    if (data.containsKey('archived')) {
-      context.handle(
-        _archivedMeta,
-        archived.isAcceptableOrUnknown(data['archived']!, _archivedMeta),
       );
     }
     if (data.containsKey('embedding_status')) {
@@ -422,14 +378,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_inbox'],
       )!,
-      favorite: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}favorite'],
-      )!,
-      archived: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}archived'],
-      )!,
       embeddingStatus: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}embedding_status'],
@@ -486,8 +434,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
   final String content;
   final String? excerpt;
   final bool isInbox;
-  final bool favorite;
-  final bool archived;
   final String? embeddingStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -505,8 +451,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     required this.content,
     this.excerpt,
     required this.isInbox,
-    required this.favorite,
-    required this.archived,
     this.embeddingStatus,
     required this.createdAt,
     required this.updatedAt,
@@ -531,8 +475,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       map['excerpt'] = Variable<String>(excerpt);
     }
     map['is_inbox'] = Variable<bool>(isInbox);
-    map['favorite'] = Variable<bool>(favorite);
-    map['archived'] = Variable<bool>(archived);
     if (!nullToAbsent || embeddingStatus != null) {
       map['embedding_status'] = Variable<String>(embeddingStatus);
     }
@@ -568,8 +510,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ? const Value.absent()
           : Value(excerpt),
       isInbox: Value(isInbox),
-      favorite: Value(favorite),
-      archived: Value(archived),
       embeddingStatus: embeddingStatus == null && nullToAbsent
           ? const Value.absent()
           : Value(embeddingStatus),
@@ -605,8 +545,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       content: serializer.fromJson<String>(json['content']),
       excerpt: serializer.fromJson<String?>(json['excerpt']),
       isInbox: serializer.fromJson<bool>(json['isInbox']),
-      favorite: serializer.fromJson<bool>(json['favorite']),
-      archived: serializer.fromJson<bool>(json['archived']),
       embeddingStatus: serializer.fromJson<String?>(json['embeddingStatus']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -629,8 +567,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       'content': serializer.toJson<String>(content),
       'excerpt': serializer.toJson<String?>(excerpt),
       'isInbox': serializer.toJson<bool>(isInbox),
-      'favorite': serializer.toJson<bool>(favorite),
-      'archived': serializer.toJson<bool>(archived),
       'embeddingStatus': serializer.toJson<String?>(embeddingStatus),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -651,8 +587,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     String? content,
     Value<String?> excerpt = const Value.absent(),
     bool? isInbox,
-    bool? favorite,
-    bool? archived,
     Value<String?> embeddingStatus = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -670,8 +604,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     content: content ?? this.content,
     excerpt: excerpt.present ? excerpt.value : this.excerpt,
     isInbox: isInbox ?? this.isInbox,
-    favorite: favorite ?? this.favorite,
-    archived: archived ?? this.archived,
     embeddingStatus: embeddingStatus.present
         ? embeddingStatus.value
         : this.embeddingStatus,
@@ -695,8 +627,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       content: data.content.present ? data.content.value : this.content,
       excerpt: data.excerpt.present ? data.excerpt.value : this.excerpt,
       isInbox: data.isInbox.present ? data.isInbox.value : this.isInbox,
-      favorite: data.favorite.present ? data.favorite.value : this.favorite,
-      archived: data.archived.present ? data.archived.value : this.archived,
       embeddingStatus: data.embeddingStatus.present
           ? data.embeddingStatus.value
           : this.embeddingStatus,
@@ -731,8 +661,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ..write('content: $content, ')
           ..write('excerpt: $excerpt, ')
           ..write('isInbox: $isInbox, ')
-          ..write('favorite: $favorite, ')
-          ..write('archived: $archived, ')
           ..write('embeddingStatus: $embeddingStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -755,8 +683,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     content,
     excerpt,
     isInbox,
-    favorite,
-    archived,
     embeddingStatus,
     createdAt,
     updatedAt,
@@ -778,8 +704,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           other.content == this.content &&
           other.excerpt == this.excerpt &&
           other.isInbox == this.isInbox &&
-          other.favorite == this.favorite &&
-          other.archived == this.archived &&
           other.embeddingStatus == this.embeddingStatus &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -799,8 +723,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   final Value<String> content;
   final Value<String?> excerpt;
   final Value<bool> isInbox;
-  final Value<bool> favorite;
-  final Value<bool> archived;
   final Value<String?> embeddingStatus;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -819,8 +741,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.content = const Value.absent(),
     this.excerpt = const Value.absent(),
     this.isInbox = const Value.absent(),
-    this.favorite = const Value.absent(),
-    this.archived = const Value.absent(),
     this.embeddingStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -840,8 +760,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     required String content,
     this.excerpt = const Value.absent(),
     this.isInbox = const Value.absent(),
-    this.favorite = const Value.absent(),
-    this.archived = const Value.absent(),
     this.embeddingStatus = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -865,8 +783,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Expression<String>? content,
     Expression<String>? excerpt,
     Expression<bool>? isInbox,
-    Expression<bool>? favorite,
-    Expression<bool>? archived,
     Expression<String>? embeddingStatus,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -886,8 +802,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       if (content != null) 'content': content,
       if (excerpt != null) 'excerpt': excerpt,
       if (isInbox != null) 'is_inbox': isInbox,
-      if (favorite != null) 'favorite': favorite,
-      if (archived != null) 'archived': archived,
       if (embeddingStatus != null) 'embedding_status': embeddingStatus,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -909,8 +823,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Value<String>? content,
     Value<String?>? excerpt,
     Value<bool>? isInbox,
-    Value<bool>? favorite,
-    Value<bool>? archived,
     Value<String?>? embeddingStatus,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -930,8 +842,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       content: content ?? this.content,
       excerpt: excerpt ?? this.excerpt,
       isInbox: isInbox ?? this.isInbox,
-      favorite: favorite ?? this.favorite,
-      archived: archived ?? this.archived,
       embeddingStatus: embeddingStatus ?? this.embeddingStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -966,12 +876,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     }
     if (isInbox.present) {
       map['is_inbox'] = Variable<bool>(isInbox.value);
-    }
-    if (favorite.present) {
-      map['favorite'] = Variable<bool>(favorite.value);
-    }
-    if (archived.present) {
-      map['archived'] = Variable<bool>(archived.value);
     }
     if (embeddingStatus.present) {
       map['embedding_status'] = Variable<String>(embeddingStatus.value);
@@ -1018,8 +922,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
           ..write('content: $content, ')
           ..write('excerpt: $excerpt, ')
           ..write('isInbox: $isInbox, ')
-          ..write('favorite: $favorite, ')
-          ..write('archived: $archived, ')
           ..write('embeddingStatus: $embeddingStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -4389,6 +4291,36 @@ class $UserNotePreferencesTable extends UserNotePreferences
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _favoriteMeta = const VerificationMeta(
+    'favorite',
+  );
+  @override
+  late final GeneratedColumn<bool> favorite = GeneratedColumn<bool>(
+    'favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _archivedMeta = const VerificationMeta(
+    'archived',
+  );
+  @override
+  late final GeneratedColumn<bool> archived = GeneratedColumn<bool>(
+    'archived',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("archived" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _hideCompletedMeta = const VerificationMeta(
     'hideCompleted',
   );
@@ -4459,6 +4391,8 @@ class $UserNotePreferencesTable extends UserNotePreferences
   List<GeneratedColumn> get $columns => [
     userId,
     noteId,
+    favorite,
+    archived,
     hideCompleted,
     filters,
     createdAt,
@@ -4492,6 +4426,18 @@ class $UserNotePreferencesTable extends UserNotePreferences
       );
     } else if (isInserting) {
       context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('favorite')) {
+      context.handle(
+        _favoriteMeta,
+        favorite.isAcceptableOrUnknown(data['favorite']!, _favoriteMeta),
+      );
+    }
+    if (data.containsKey('archived')) {
+      context.handle(
+        _archivedMeta,
+        archived.isAcceptableOrUnknown(data['archived']!, _archivedMeta),
+      );
     }
     if (data.containsKey('hide_completed')) {
       context.handle(
@@ -4543,6 +4489,14 @@ class $UserNotePreferencesTable extends UserNotePreferences
         DriftSqlType.string,
         data['${effectivePrefix}note_id'],
       )!,
+      favorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}favorite'],
+      )!,
+      archived: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}archived'],
+      )!,
       hideCompleted: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}hide_completed'],
@@ -4576,6 +4530,8 @@ class UserNotePreferenceData extends DataClass
     implements Insertable<UserNotePreferenceData> {
   final String userId;
   final String noteId;
+  final bool favorite;
+  final bool archived;
   final bool hideCompleted;
   final String filters;
   final DateTime createdAt;
@@ -4584,6 +4540,8 @@ class UserNotePreferenceData extends DataClass
   const UserNotePreferenceData({
     required this.userId,
     required this.noteId,
+    required this.favorite,
+    required this.archived,
     required this.hideCompleted,
     required this.filters,
     required this.createdAt,
@@ -4595,6 +4553,8 @@ class UserNotePreferenceData extends DataClass
     final map = <String, Expression>{};
     map['user_id'] = Variable<String>(userId);
     map['note_id'] = Variable<String>(noteId);
+    map['favorite'] = Variable<bool>(favorite);
+    map['archived'] = Variable<bool>(archived);
     map['hide_completed'] = Variable<bool>(hideCompleted);
     map['filters'] = Variable<String>(filters);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -4607,6 +4567,8 @@ class UserNotePreferenceData extends DataClass
     return UserNotePreferencesCompanion(
       userId: Value(userId),
       noteId: Value(noteId),
+      favorite: Value(favorite),
+      archived: Value(archived),
       hideCompleted: Value(hideCompleted),
       filters: Value(filters),
       createdAt: Value(createdAt),
@@ -4623,6 +4585,8 @@ class UserNotePreferenceData extends DataClass
     return UserNotePreferenceData(
       userId: serializer.fromJson<String>(json['userId']),
       noteId: serializer.fromJson<String>(json['noteId']),
+      favorite: serializer.fromJson<bool>(json['favorite']),
+      archived: serializer.fromJson<bool>(json['archived']),
       hideCompleted: serializer.fromJson<bool>(json['hideCompleted']),
       filters: serializer.fromJson<String>(json['filters']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -4636,6 +4600,8 @@ class UserNotePreferenceData extends DataClass
     return <String, dynamic>{
       'userId': serializer.toJson<String>(userId),
       'noteId': serializer.toJson<String>(noteId),
+      'favorite': serializer.toJson<bool>(favorite),
+      'archived': serializer.toJson<bool>(archived),
       'hideCompleted': serializer.toJson<bool>(hideCompleted),
       'filters': serializer.toJson<String>(filters),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -4647,6 +4613,8 @@ class UserNotePreferenceData extends DataClass
   UserNotePreferenceData copyWith({
     String? userId,
     String? noteId,
+    bool? favorite,
+    bool? archived,
     bool? hideCompleted,
     String? filters,
     DateTime? createdAt,
@@ -4655,6 +4623,8 @@ class UserNotePreferenceData extends DataClass
   }) => UserNotePreferenceData(
     userId: userId ?? this.userId,
     noteId: noteId ?? this.noteId,
+    favorite: favorite ?? this.favorite,
+    archived: archived ?? this.archived,
     hideCompleted: hideCompleted ?? this.hideCompleted,
     filters: filters ?? this.filters,
     createdAt: createdAt ?? this.createdAt,
@@ -4665,6 +4635,8 @@ class UserNotePreferenceData extends DataClass
     return UserNotePreferenceData(
       userId: data.userId.present ? data.userId.value : this.userId,
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      favorite: data.favorite.present ? data.favorite.value : this.favorite,
+      archived: data.archived.present ? data.archived.value : this.archived,
       hideCompleted: data.hideCompleted.present
           ? data.hideCompleted.value
           : this.hideCompleted,
@@ -4680,6 +4652,8 @@ class UserNotePreferenceData extends DataClass
     return (StringBuffer('UserNotePreferenceData(')
           ..write('userId: $userId, ')
           ..write('noteId: $noteId, ')
+          ..write('favorite: $favorite, ')
+          ..write('archived: $archived, ')
           ..write('hideCompleted: $hideCompleted, ')
           ..write('filters: $filters, ')
           ..write('createdAt: $createdAt, ')
@@ -4693,6 +4667,8 @@ class UserNotePreferenceData extends DataClass
   int get hashCode => Object.hash(
     userId,
     noteId,
+    favorite,
+    archived,
     hideCompleted,
     filters,
     createdAt,
@@ -4705,6 +4681,8 @@ class UserNotePreferenceData extends DataClass
       (other is UserNotePreferenceData &&
           other.userId == this.userId &&
           other.noteId == this.noteId &&
+          other.favorite == this.favorite &&
+          other.archived == this.archived &&
           other.hideCompleted == this.hideCompleted &&
           other.filters == this.filters &&
           other.createdAt == this.createdAt &&
@@ -4716,6 +4694,8 @@ class UserNotePreferencesCompanion
     extends UpdateCompanion<UserNotePreferenceData> {
   final Value<String> userId;
   final Value<String> noteId;
+  final Value<bool> favorite;
+  final Value<bool> archived;
   final Value<bool> hideCompleted;
   final Value<String> filters;
   final Value<DateTime> createdAt;
@@ -4725,6 +4705,8 @@ class UserNotePreferencesCompanion
   const UserNotePreferencesCompanion({
     this.userId = const Value.absent(),
     this.noteId = const Value.absent(),
+    this.favorite = const Value.absent(),
+    this.archived = const Value.absent(),
     this.hideCompleted = const Value.absent(),
     this.filters = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -4735,6 +4717,8 @@ class UserNotePreferencesCompanion
   UserNotePreferencesCompanion.insert({
     required String userId,
     required String noteId,
+    this.favorite = const Value.absent(),
+    this.archived = const Value.absent(),
     this.hideCompleted = const Value.absent(),
     this.filters = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -4746,6 +4730,8 @@ class UserNotePreferencesCompanion
   static Insertable<UserNotePreferenceData> custom({
     Expression<String>? userId,
     Expression<String>? noteId,
+    Expression<bool>? favorite,
+    Expression<bool>? archived,
     Expression<bool>? hideCompleted,
     Expression<String>? filters,
     Expression<DateTime>? createdAt,
@@ -4756,6 +4742,8 @@ class UserNotePreferencesCompanion
     return RawValuesInsertable({
       if (userId != null) 'user_id': userId,
       if (noteId != null) 'note_id': noteId,
+      if (favorite != null) 'favorite': favorite,
+      if (archived != null) 'archived': archived,
       if (hideCompleted != null) 'hide_completed': hideCompleted,
       if (filters != null) 'filters': filters,
       if (createdAt != null) 'created_at': createdAt,
@@ -4768,6 +4756,8 @@ class UserNotePreferencesCompanion
   UserNotePreferencesCompanion copyWith({
     Value<String>? userId,
     Value<String>? noteId,
+    Value<bool>? favorite,
+    Value<bool>? archived,
     Value<bool>? hideCompleted,
     Value<String>? filters,
     Value<DateTime>? createdAt,
@@ -4778,6 +4768,8 @@ class UserNotePreferencesCompanion
     return UserNotePreferencesCompanion(
       userId: userId ?? this.userId,
       noteId: noteId ?? this.noteId,
+      favorite: favorite ?? this.favorite,
+      archived: archived ?? this.archived,
       hideCompleted: hideCompleted ?? this.hideCompleted,
       filters: filters ?? this.filters,
       createdAt: createdAt ?? this.createdAt,
@@ -4795,6 +4787,12 @@ class UserNotePreferencesCompanion
     }
     if (noteId.present) {
       map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (favorite.present) {
+      map['favorite'] = Variable<bool>(favorite.value);
+    }
+    if (archived.present) {
+      map['archived'] = Variable<bool>(archived.value);
     }
     if (hideCompleted.present) {
       map['hide_completed'] = Variable<bool>(hideCompleted.value);
@@ -4822,6 +4820,8 @@ class UserNotePreferencesCompanion
     return (StringBuffer('UserNotePreferencesCompanion(')
           ..write('userId: $userId, ')
           ..write('noteId: $noteId, ')
+          ..write('favorite: $favorite, ')
+          ..write('archived: $archived, ')
           ..write('hideCompleted: $hideCompleted, ')
           ..write('filters: $filters, ')
           ..write('createdAt: $createdAt, ')
@@ -4886,8 +4886,6 @@ typedef $$NotesTableCreateCompanionBuilder =
       required String content,
       Value<String?> excerpt,
       Value<bool> isInbox,
-      Value<bool> favorite,
-      Value<bool> archived,
       Value<String?> embeddingStatus,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -4908,8 +4906,6 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<String> content,
       Value<String?> excerpt,
       Value<bool> isInbox,
-      Value<bool> favorite,
-      Value<bool> archived,
       Value<String?> embeddingStatus,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -4981,16 +4977,6 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<bool> get isInbox => $composableBuilder(
     column: $table.isInbox,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get favorite => $composableBuilder(
-    column: $table.favorite,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get archived => $composableBuilder(
-    column: $table.archived,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5109,16 +5095,6 @@ class $$NotesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get favorite => $composableBuilder(
-    column: $table.favorite,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get archived => $composableBuilder(
-    column: $table.archived,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get embeddingStatus => $composableBuilder(
     column: $table.embeddingStatus,
     builder: (column) => ColumnOrderings(column),
@@ -5196,12 +5172,6 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<bool> get isInbox =>
       $composableBuilder(column: $table.isInbox, builder: (column) => column);
-
-  GeneratedColumn<bool> get favorite =>
-      $composableBuilder(column: $table.favorite, builder: (column) => column);
-
-  GeneratedColumn<bool> get archived =>
-      $composableBuilder(column: $table.archived, builder: (column) => column);
 
   GeneratedColumn<String> get embeddingStatus => $composableBuilder(
     column: $table.embeddingStatus,
@@ -5305,8 +5275,6 @@ class $$NotesTableTableManager
                 Value<String> content = const Value.absent(),
                 Value<String?> excerpt = const Value.absent(),
                 Value<bool> isInbox = const Value.absent(),
-                Value<bool> favorite = const Value.absent(),
-                Value<bool> archived = const Value.absent(),
                 Value<String?> embeddingStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -5325,8 +5293,6 @@ class $$NotesTableTableManager
                 content: content,
                 excerpt: excerpt,
                 isInbox: isInbox,
-                favorite: favorite,
-                archived: archived,
                 embeddingStatus: embeddingStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -5347,8 +5313,6 @@ class $$NotesTableTableManager
                 required String content,
                 Value<String?> excerpt = const Value.absent(),
                 Value<bool> isInbox = const Value.absent(),
-                Value<bool> favorite = const Value.absent(),
-                Value<bool> archived = const Value.absent(),
                 Value<String?> embeddingStatus = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -5367,8 +5331,6 @@ class $$NotesTableTableManager
                 content: content,
                 excerpt: excerpt,
                 isInbox: isInbox,
-                favorite: favorite,
-                archived: archived,
                 embeddingStatus: embeddingStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -7671,6 +7633,8 @@ typedef $$UserNotePreferencesTableCreateCompanionBuilder =
     UserNotePreferencesCompanion Function({
       required String userId,
       required String noteId,
+      Value<bool> favorite,
+      Value<bool> archived,
       Value<bool> hideCompleted,
       Value<String> filters,
       Value<DateTime> createdAt,
@@ -7682,6 +7646,8 @@ typedef $$UserNotePreferencesTableUpdateCompanionBuilder =
     UserNotePreferencesCompanion Function({
       Value<String> userId,
       Value<String> noteId,
+      Value<bool> favorite,
+      Value<bool> archived,
       Value<bool> hideCompleted,
       Value<String> filters,
       Value<DateTime> createdAt,
@@ -7706,6 +7672,16 @@ class $$UserNotePreferencesTableFilterComposer
 
   ColumnFilters<String> get noteId => $composableBuilder(
     column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get favorite => $composableBuilder(
+    column: $table.favorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get archived => $composableBuilder(
+    column: $table.archived,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7754,6 +7730,16 @@ class $$UserNotePreferencesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get favorite => $composableBuilder(
+    column: $table.favorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get archived => $composableBuilder(
+    column: $table.archived,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get hideCompleted => $composableBuilder(
     column: $table.hideCompleted,
     builder: (column) => ColumnOrderings(column),
@@ -7794,6 +7780,12 @@ class $$UserNotePreferencesTableAnnotationComposer
 
   GeneratedColumn<String> get noteId =>
       $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<bool> get favorite =>
+      $composableBuilder(column: $table.favorite, builder: (column) => column);
+
+  GeneratedColumn<bool> get archived =>
+      $composableBuilder(column: $table.archived, builder: (column) => column);
 
   GeneratedColumn<bool> get hideCompleted => $composableBuilder(
     column: $table.hideCompleted,
@@ -7858,6 +7850,8 @@ class $$UserNotePreferencesTableTableManager
               ({
                 Value<String> userId = const Value.absent(),
                 Value<String> noteId = const Value.absent(),
+                Value<bool> favorite = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
                 Value<bool> hideCompleted = const Value.absent(),
                 Value<String> filters = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -7867,6 +7861,8 @@ class $$UserNotePreferencesTableTableManager
               }) => UserNotePreferencesCompanion(
                 userId: userId,
                 noteId: noteId,
+                favorite: favorite,
+                archived: archived,
                 hideCompleted: hideCompleted,
                 filters: filters,
                 createdAt: createdAt,
@@ -7878,6 +7874,8 @@ class $$UserNotePreferencesTableTableManager
               ({
                 required String userId,
                 required String noteId,
+                Value<bool> favorite = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
                 Value<bool> hideCompleted = const Value.absent(),
                 Value<String> filters = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -7887,6 +7885,8 @@ class $$UserNotePreferencesTableTableManager
               }) => UserNotePreferencesCompanion.insert(
                 userId: userId,
                 noteId: noteId,
+                favorite: favorite,
+                archived: archived,
                 hideCompleted: hideCompleted,
                 filters: filters,
                 createdAt: createdAt,

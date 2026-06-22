@@ -1,9 +1,12 @@
 -- name: GetSyncNotes :many
 SELECT n.*,
+  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
   COALESCE(ns.permission, '')::text AS shared_permission,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
 FROM notes n
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = sqlc.arg('user_id')::uuid
 LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
 LEFT JOIN users u ON u.id = n.user_id
 WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
@@ -27,14 +30,12 @@ WHERE deleted_at IS NOT NULL
   AND deleted_at < NOW() - INTERVAL '30 days';
 
 -- name: UpsertNote :one
-INSERT INTO notes (id, user_id, context_id, content, is_inbox, favorite, archived, embedding_status, collapse_images, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
+INSERT INTO notes (id, user_id, context_id, content, is_inbox, embedding_status, collapse_images, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
 ON CONFLICT (id) DO UPDATE
 SET context_id = EXCLUDED.context_id,
     content = EXCLUDED.content,
     is_inbox = EXCLUDED.is_inbox,
-    favorite = EXCLUDED.favorite,
-    archived = EXCLUDED.archived,
     embedding_status = EXCLUDED.embedding_status,
     collapse_images = EXCLUDED.collapse_images,
     updated_at = NOW(),
@@ -180,10 +181,12 @@ LIMIT sqlc.arg('limit');
 SELECT user_id FROM notes WHERE id = $1;
 
 -- name: UpsertUserNotePreference :one
-INSERT INTO user_note_preferences (user_id, note_id, hide_completed, filters, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, NOW())
+INSERT INTO user_note_preferences (user_id, note_id, hide_completed, filters, favorite, archived, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 ON CONFLICT (user_id, note_id) DO UPDATE
 SET hide_completed = EXCLUDED.hide_completed,
     filters = EXCLUDED.filters,
+    favorite = EXCLUDED.favorite,
+    archived = EXCLUDED.archived,
     updated_at = NOW()
 RETURNING *;
