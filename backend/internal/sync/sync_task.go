@@ -55,6 +55,45 @@ func toSyncTask(t sqlcgen.Task) SyncTask {
 	return st
 }
 
+// UserNotePreferencePayload is the wire shape of a user note preference
+// in the sync payload. It uses string for Filters instead of []byte to
+// avoid base64 encoding issues with the sqlcgen type.
+type UserNotePreferencePayload struct {
+	UserID        pgtype.UUID        `json:"user_id"`
+	NoteID        pgtype.UUID        `json:"note_id"`
+	HideCompleted bool               `json:"hide_completed"`
+	Filters       string             `json:"filters"`
+	Favorite      bool               `json:"favorite"`
+	Archived      bool               `json:"archived"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+func toUserNotePreferencePayload(p sqlcgen.UserNotePreference) UserNotePreferencePayload {
+	return UserNotePreferencePayload{
+		UserID:        p.UserID,
+		NoteID:        p.NoteID,
+		HideCompleted: p.HideCompleted,
+		Filters:       string(p.Filters),
+		Favorite:      p.Favorite,
+		Archived:      p.Archived,
+		CreatedAt:     p.CreatedAt,
+		UpdatedAt:     p.UpdatedAt,
+	}
+}
+
+func fromUserNotePreferencePayload(p UserNotePreferencePayload) sqlcgen.UpsertUserNotePreferenceParams {
+	return sqlcgen.UpsertUserNotePreferenceParams{
+		UserID:        p.UserID,
+		NoteID:        p.NoteID,
+		HideCompleted: p.HideCompleted,
+		Filters:       []byte(p.Filters),
+		Favorite:      p.Favorite,
+		Archived:      p.Archived,
+		CreatedAt:     p.CreatedAt,
+	}
+}
+
 func fromSyncTask(t SyncTask) (sqlcgen.Task, error) {
 	out := sqlcgen.Task{
 		ID:        t.ID,

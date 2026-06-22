@@ -31,7 +31,7 @@ type SyncPayload struct {
 	TaskCompletions     []sqlcgen.TaskCompletion     `json:"task_completions"`
 	NoteTags            []sqlcgen.NoteTag            `json:"note_tags"`
 	NoteLinks           []sqlcgen.NoteLink           `json:"note_links"`
-	UserNotePreferences []sqlcgen.UserNotePreference `json:"user_note_preferences"`
+	UserNotePreferences []UserNotePreferencePayload `json:"user_note_preferences"`
 }
 
 type Service interface {
@@ -114,12 +114,13 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		noteLinks = make([]sqlcgen.NoteLink, 0)
 	}
 
-	prefs, err := s.repo.GetSyncUserNotePreferences(ctx, userID, lastSyncedAt, limit)
+	rawPrefs, err := s.repo.GetSyncUserNotePreferences(ctx, userID, lastSyncedAt, limit)
 	if err != nil {
 		return nil, err
 	}
-	if prefs == nil {
-		prefs = make([]sqlcgen.UserNotePreference, 0)
+	prefs := make([]UserNotePreferencePayload, len(rawPrefs))
+	for i, p := range rawPrefs {
+		prefs[i] = toUserNotePreferencePayload(p)
 	}
 
 	return &SyncPayload{
@@ -380,15 +381,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				return ErrSyncConflict
 			}
 		}
-		_, err = r.UpsertUserNotePreference(ctx, sqlcgen.UpsertUserNotePreferenceParams{
-			UserID:        userID,
-			NoteID:        p.NoteID,
-			HideCompleted: p.HideCompleted,
-			Filters:       p.Filters,
-			Favorite:      p.Favorite,
-			Archived:      p.Archived,
-			CreatedAt:     p.CreatedAt,
-		})
+		_, err = r.UpsertUserNotePreference(ctx, fromUserNotePreferencePayload(p))
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				log.Error().Interface("pref_note_id", p.NoteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: UpsertUserNotePreference returned ErrNoRows")
