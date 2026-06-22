@@ -208,6 +208,16 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 						payload.NoteLinks[j].TargetID = existing.ID
 					}
 				}
+				for j, nt := range payload.NoteTags {
+					if nt.NoteID == n.ID {
+						payload.NoteTags[j].NoteID = existing.ID
+					}
+				}
+				for j, up := range payload.UserNotePreferences {
+					if up.NoteID == n.ID {
+						payload.UserNotePreferences[j].NoteID = existing.ID
+					}
+				}
 			}
 		}
 		editableNotes[noteID] = canEdit
