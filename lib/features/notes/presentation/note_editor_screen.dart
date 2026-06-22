@@ -7,8 +7,10 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
+import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
@@ -86,33 +88,42 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final isOwner = note.isOwner;
     final isReadOnly = note.isReadOnly;
 
+    final prefAsync = ref.watch(userNotePreferenceStreamProvider(widget.noteId));
+    final hideCompleted = prefAsync.asData?.value?.hideCompleted ?? note.hideCompleted;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : null,
         actions: [
-          if (isOwner)
-            AdaptivePopupMenuButton.icon<String>(
-              icon: PlatformInfo.isIOS26OrHigher()
-                  ? 'ellipsis'
-                  : Icons.more_vert,
-              onSelected: (index, entry) async {
-                switch (entry.value) {
-                  case 'share':
-                    await ShareNoteDialog.show(context, widget.noteId);
-                  case 'hide_completed':
-                    await repo.updateNote(
-                      widget.noteId,
-                      hideCompleted: !note.hideCompleted,
-                    );
-                  case 'collapse_images':
-                    await repo.updateNote(
-                      widget.noteId,
-                      collapseImages: !note.collapseImages,
-                    );
-                }
-              },
-              items: [
+          AdaptivePopupMenuButton.icon<String>(
+            icon: PlatformInfo.isIOS26OrHigher()
+                ? 'ellipsis'
+                : Icons.more_vert,
+            onSelected: (index, entry) async {
+              switch (entry.value) {
+                case 'share':
+                  await ShareNoteDialog.show(context, widget.noteId);
+                case 'hide_completed':
+                  final userId = ref.read(currentUserIdProvider);
+                  if (userId != null) {
+                    await ref
+                        .read(userNotePreferencesRepositoryProvider)
+                        .setHideCompleted(
+                          userId,
+                          widget.noteId,
+                          !hideCompleted,
+                        );
+                  }
+                case 'collapse_images':
+                  await repo.updateNote(
+                    widget.noteId,
+                    collapseImages: !note.collapseImages,
+                  );
+              }
+            },
+            items: [
+              if (isOwner)
                 AdaptivePopupMenuItem<String>(
                   label: NoteStrings.shareLabel,
                   icon: PlatformInfo.isIOS26OrHigher()
@@ -120,17 +131,18 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       : Icons.share_outlined,
                   value: 'share',
                 ),
-                AdaptivePopupMenuItem<String>(
-                  label: note.hideCompleted
-                      ? NoteStrings.showCompleted
-                      : NoteStrings.hideCompleted,
-                  icon: PlatformInfo.isIOS26OrHigher()
-                      ? (note.hideCompleted ? 'eye' : 'eye.slash')
-                      : (note.hideCompleted
-                          ? Icons.visibility
-                          : Icons.visibility_off),
-                  value: 'hide_completed',
-                ),
+              AdaptivePopupMenuItem<String>(
+                label: hideCompleted
+                    ? NoteStrings.showCompleted
+                    : NoteStrings.hideCompleted,
+                icon: PlatformInfo.isIOS26OrHigher()
+                    ? (hideCompleted ? 'eye' : 'eye.slash')
+                    : (hideCompleted
+                        ? Icons.visibility
+                        : Icons.visibility_off),
+                value: 'hide_completed',
+              ),
+              if (isOwner)
                 AdaptivePopupMenuItem<String>(
                   label: note.collapseImages
                       ? 'Expandir imagens'
@@ -142,8 +154,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           : Icons.image_outlined),
                   value: 'collapse_images',
                 ),
-              ],
-            ),
+            ],
+          ),
           if (!isReadOnly)
             IconButton(
               icon: const Icon(Icons.check),
@@ -157,7 +169,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           noteId: widget.noteId,
           content: note.content,
           taskMetadata: tasksMap,
-          hideCompleted: note.hideCompleted,
+          hideCompleted: hideCompleted,
           collapseImages: note.collapseImages,
           isReadOnly: isReadOnly,
           snapshotSave: (noteId, markdown, tasks) =>
