@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
@@ -180,6 +181,14 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			})
 			canEdit = err == nil && share.Permission == "edit"
 			if !canEdit {
+				hasView := err == nil && share.Permission == "view"
+				if hasView {
+					// User has view-only access. We skip updating the note
+					// on the server to prevent unauthorized edits, but return
+					// success so their client's sync isn't blocked.
+					continue
+				}
+				log.Error().Interface("note_id", n.ID).Interface("user_id", userID).Interface("note_owner_id", n.UserID).Msg("sync push conflict: note edit permission denied")
 				return ErrSyncConflict
 			}
 		}
@@ -243,6 +252,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				log.Error().Interface("note_id", noteID).Interface("user_id", upsertUserID).Err(err).Msg("sync push conflict: UpsertNote returned ErrNoRows")
 				return ErrSyncConflict
 			}
 			return err
@@ -275,6 +285,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				log.Error().Interface("task_id", t.ID).Interface("note_id", t.NoteID).Interface("user_id", upsertUserID).Err(err).Msg("sync push conflict: UpsertTask returned ErrNoRows")
 				return ErrSyncConflict
 			}
 			return err
@@ -291,6 +302,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				log.Error().Interface("context_id", c.ID).Err(err).Msg("sync push conflict: UpsertContext returned ErrNoRows")
 				return ErrSyncConflict
 			}
 			return err
@@ -306,6 +318,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				log.Error().Interface("tag_id", t.ID).Err(err).Msg("sync push conflict: UpsertTag returned ErrNoRows")
 				return ErrSyncConflict
 			}
 			return err
@@ -353,6 +366,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		ownerID, err := r.GetNoteOwnerID(ctx, p.NoteID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				log.Error().Interface("pref_note_id", p.NoteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: GetNoteOwnerID for preference note ID returned ErrNoRows")
 				return ErrSyncConflict
 			}
 			return err
@@ -363,6 +377,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				UserID: userID,
 			})
 			if shareErr != nil {
+				log.Error().Interface("pref_note_id", p.NoteID).Interface("owner_id", ownerID).Interface("user_id", userID).Err(shareErr).Msg("sync push conflict: preference note not owned and share not found/valid")
 				return ErrSyncConflict
 			}
 		}
@@ -375,6 +390,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				log.Error().Interface("pref_note_id", p.NoteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: UpsertUserNotePreference returned ErrNoRows")
 				return ErrSyncConflict
 			}
 			return err
