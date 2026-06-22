@@ -475,6 +475,12 @@ func (s *stubLoopQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.Inse
 func (s *stubLoopQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return nil, nil
 }
+func (s *stubLoopQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sqlcgen.GetSyncUserNotePreferencesParams) ([]sqlcgen.UserNotePreference, error) {
+	return nil, nil
+}
+func (s *stubLoopQuerier) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
+	return sqlcgen.UserNotePreference{}, nil
+}
 
 type trackingStubLoopRepo struct {
 	stubLoopRepo

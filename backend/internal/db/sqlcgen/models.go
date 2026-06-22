@@ -215,6 +215,15 @@ type User struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type UserNotePreference struct {
+	UserID        pgtype.UUID        `json:"user_id"`
+	NoteID        pgtype.UUID        `json:"note_id"`
+	HideCompleted bool               `json:"hide_completed"`
+	Filters       []byte             `json:"filters"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type UserSetting struct {
 	UserID    pgtype.UUID        `json:"user_id"`
 	Timezone  string             `json:"timezone"`

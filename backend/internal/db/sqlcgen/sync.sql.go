@@ -326,6 +326,46 @@ func (q *Queries) GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]T
 	return items, nil
 }
 
+const getSyncUserNotePreferences = `-- name: GetSyncUserNotePreferences :many
+SELECT user_id, note_id, hide_completed, filters, created_at, updated_at FROM user_note_preferences
+WHERE user_id = $1 AND updated_at > $2
+ORDER BY updated_at ASC
+LIMIT $3
+`
+
+type GetSyncUserNotePreferencesParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	LastSyncedAt pgtype.Timestamptz `json:"last_synced_at"`
+	Limit        int32              `json:"limit"`
+}
+
+func (q *Queries) GetSyncUserNotePreferences(ctx context.Context, arg GetSyncUserNotePreferencesParams) ([]UserNotePreference, error) {
+	rows, err := q.db.Query(ctx, getSyncUserNotePreferences, arg.UserID, arg.LastSyncedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserNotePreference
+	for rows.Next() {
+		var i UserNotePreference
+		if err := rows.Scan(
+			&i.UserID,
+			&i.NoteID,
+			&i.HideCompleted,
+			&i.Filters,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const hardDeleteExpiredContexts = `-- name: HardDeleteExpiredContexts :exec
 DELETE FROM contexts
 WHERE deleted_at IS NOT NULL
@@ -657,4 +697,42 @@ func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskComple
 		arg.UserID,
 	)
 	return err
+}
+
+const upsertUserNotePreference = `-- name: UpsertUserNotePreference :one
+INSERT INTO user_note_preferences (user_id, note_id, hide_completed, filters, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, NOW())
+ON CONFLICT (user_id, note_id) DO UPDATE
+SET hide_completed = EXCLUDED.hide_completed,
+    filters = EXCLUDED.filters,
+    updated_at = NOW()
+RETURNING user_id, note_id, hide_completed, filters, created_at, updated_at
+`
+
+type UpsertUserNotePreferenceParams struct {
+	UserID        pgtype.UUID        `json:"user_id"`
+	NoteID        pgtype.UUID        `json:"note_id"`
+	HideCompleted bool               `json:"hide_completed"`
+	Filters       []byte             `json:"filters"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) UpsertUserNotePreference(ctx context.Context, arg UpsertUserNotePreferenceParams) (UserNotePreference, error) {
+	row := q.db.QueryRow(ctx, upsertUserNotePreference,
+		arg.UserID,
+		arg.NoteID,
+		arg.HideCompleted,
+		arg.Filters,
+		arg.CreatedAt,
+	)
+	var i UserNotePreference
+	err := row.Scan(
+		&i.UserID,
+		&i.NoteID,
+		&i.HideCompleted,
+		&i.Filters,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

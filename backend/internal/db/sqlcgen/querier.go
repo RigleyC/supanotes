@@ -72,6 +72,7 @@ type Querier interface {
 	GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error)
 	GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error)
 	GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]Task, error)
+	GetSyncUserNotePreferences(ctx context.Context, arg GetSyncUserNotePreferencesParams) ([]UserNotePreference, error)
 	GetTags(ctx context.Context, userID pgtype.UUID) ([]Tag, error)
 	GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]Tag, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
@@ -113,6 +114,7 @@ type Querier interface {
 	UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, error)
 	UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, error)
 	UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error
+	UpsertUserNotePreference(ctx context.Context, arg UpsertUserNotePreferenceParams) (UserNotePreference, error)
 }
 
 var _ Querier = (*Queries)(nil)

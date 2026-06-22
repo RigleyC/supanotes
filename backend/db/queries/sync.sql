@@ -170,3 +170,18 @@ WHERE EXISTS (
 ON CONFLICT (id) DO UPDATE
 SET relation = EXCLUDED.relation,
     updated_at = NOW();
+
+-- name: GetSyncUserNotePreferences :many
+SELECT * FROM user_note_preferences
+WHERE user_id = $1 AND updated_at > sqlc.arg('last_synced_at')
+ORDER BY updated_at ASC
+LIMIT sqlc.arg('limit');
+
+-- name: UpsertUserNotePreference :one
+INSERT INTO user_note_preferences (user_id, note_id, hide_completed, filters, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, NOW())
+ON CONFLICT (user_id, note_id) DO UPDATE
+SET hide_completed = EXCLUDED.hide_completed,
+    filters = EXCLUDED.filters,
+    updated_at = NOW()
+RETURNING *;
