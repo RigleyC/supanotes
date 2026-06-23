@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/database.dart';
+import '../../../core/database/daos/note_links_dao.dart';
 import '../../../core/database/daos/notes_dao.dart';
 import '../../../core/database/daos/user_note_preferences_dao.dart';
 import '../domain/note_model.dart';
@@ -51,11 +52,12 @@ abstract class INotesRepository {
 }
 
 class NotesRepository implements INotesRepository {
-  NotesRepository(this._local, this._tasksLocal, this._prefsDao);
+  NotesRepository(this._local, this._tasksLocal, this._prefsDao, [this._noteLinksDao]);
 
   final NotesLocalRepository _local;
   final TasksLocalRepository _tasksLocal;
   final UserNotePreferencesDao _prefsDao;
+  final NoteLinksDao? _noteLinksDao;
 
   /// Streams active (non-archived, non-deleted, non-inbox) notes, mapped
   /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
@@ -214,6 +216,32 @@ class NotesRepository implements INotesRepository {
       id,
       content: content,
     );
+    await _syncNoteLinks(id, content);
+  }
+
+  Future<void> _syncNoteLinks(String sourceId, String content) async {
+    final dao = _noteLinksDao;
+    if (dao == null) return;
+
+    final linkRegex = RegExp(
+      r'note:\/\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
+    );
+    final matches = linkRegex.allMatches(content);
+    final targetIds = matches.map((m) => m.group(1)!).toSet();
+
+    final existingLinks = await dao.getLinksForNote(sourceId);
+    final outboundLinks = existingLinks.where((l) => l.sourceId == sourceId).toList();
+    final currentTargets = outboundLinks.map((l) => l.targetId).toSet();
+
+    final toAdd = targetIds.difference(currentTargets);
+    for (final targetId in toAdd) {
+      await dao.createLink(sourceId: sourceId, targetId: targetId);
+    }
+
+    final toRemove = outboundLinks.where((l) => !targetIds.contains(l.targetId));
+    for (final link in toRemove) {
+      await dao.deleteLink(link.id);
+    }
   }
 
   @override
@@ -302,5 +330,5 @@ final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   final local = ref.watch(notesLocalRepositoryProvider);
   final tasksLocal = ref.watch(tasksLocalRepositoryProvider);
   final db = ref.watch(appDatabaseProvider);
-  return NotesRepository(local, tasksLocal, db.userNotePreferencesDao);
+  return NotesRepository(local, tasksLocal, db.userNotePreferencesDao, db.noteLinksDao);
 });
