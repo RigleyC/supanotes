@@ -2,7 +2,7 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/domain/note_model.dart';
 
-void applyHashtagSuggestion({
+void applyNoteSuggestion({
   required Editor editor,
   required String nodeId,
   required int tagStartOffset,

@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
-import 'package:supanotes/features/notes/presentation/widgets/hashtag_suggestion_handler.dart';
+import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_handler.dart';
 
-class HashtagSuggestionOverlay extends ConsumerStatefulWidget {
+class NoteSuggestionOverlay extends ConsumerStatefulWidget {
   final Editor editor;
   final DocumentComposer composer;
   final String currentNoteId;
   final Future<void> Function() onPersist;
 
-  const HashtagSuggestionOverlay({
+  const NoteSuggestionOverlay({
     super.key,
     required this.editor,
     required this.composer,
@@ -20,19 +20,19 @@ class HashtagSuggestionOverlay extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<HashtagSuggestionOverlay> createState() => _HashtagSuggestionOverlayState();
+  ConsumerState<NoteSuggestionOverlay> createState() => _NoteSuggestionOverlayState();
 }
 
-class _HashtagMatch {
+class _NoteMatch {
   final String query;
   final String nodeId;
   final int tagStart;
   final int tagEnd;
-  const _HashtagMatch({required this.query, required this.nodeId, required this.tagStart, required this.tagEnd});
+  const _NoteMatch({required this.query, required this.nodeId, required this.tagStart, required this.tagEnd});
 }
 
-class _HashtagSuggestionOverlayState extends ConsumerState<HashtagSuggestionOverlay> {
-  _HashtagMatch? _match;
+class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
+  _NoteMatch? _match;
 
   @override
   void initState() {
@@ -42,7 +42,7 @@ class _HashtagSuggestionOverlayState extends ConsumerState<HashtagSuggestionOver
   }
 
   @override
-  void didUpdateWidget(HashtagSuggestionOverlay oldWidget) {
+  void didUpdateWidget(NoteSuggestionOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.composer != oldWidget.composer) {
       oldWidget.composer.selectionNotifier.removeListener(_updateMatch);
@@ -80,7 +80,7 @@ class _HashtagSuggestionOverlayState extends ConsumerState<HashtagSuggestionOver
     }
 
     final textBeforeCaret = text.substring(0, caretOffset);
-    final match = RegExp(r'#([^\s#]*)$').firstMatch(textBeforeCaret);
+    final match = RegExp(r'@([^\s@]*)$').firstMatch(textBeforeCaret);
 
     if (match == null) {
       if (_match != null) setState(() => _match = null);
@@ -88,14 +88,14 @@ class _HashtagSuggestionOverlayState extends ConsumerState<HashtagSuggestionOver
     }
 
     setState(() {
-      _match = _HashtagMatch(query: match.group(1)!, nodeId: node.id, tagStart: match.start, tagEnd: caretOffset);
+      _match = _NoteMatch(query: match.group(1)!, nodeId: node.id, tagStart: match.start, tagEnd: caretOffset);
     });
   }
 
   void _onNoteSelected(NoteModel note) {
     final match = _match;
     if (match == null) return;
-    applyHashtagSuggestion(
+    applyNoteSuggestion(
       editor: widget.editor,
       nodeId: match.nodeId,
       tagStartOffset: match.tagStart,

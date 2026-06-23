@@ -80,7 +80,7 @@ String serializeNoteToMarkdown(MutableDocument doc) {
   final nodes = doc.toList(growable: false);
   final serializableDoc = _withoutSyntheticTrailingParagraph(nodes);
 
-  return serializeDocumentToMarkdown(
+  var markdown = serializeDocumentToMarkdown(
     serializableDoc,
     syntax: MarkdownSyntax.superEditor,
     customNodeSerializers: [
@@ -89,6 +89,30 @@ String serializeNoteToMarkdown(MutableDocument doc) {
       ...attachmentNodeSerializers,
     ],
   );
+
+  markdown = _normalizeSerializedTasks(markdown);
+  return markdown;
+}
+
+String _normalizeSerializedTasks(String markdown) {
+  final lines = markdown.split('\n');
+  final result = <String>[];
+  var prevWasTask = false;
+  var inCodeBlock = false;
+
+  for (final line in lines) {
+    if (line.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+    }
+
+    if (!inCodeBlock && prevWasTask && line.trim().isNotEmpty && !_isTaskListLine(line) && !_isIndentedListLine(line)) {
+      result.add('');
+    }
+    result.add(line);
+    prevWasTask = !inCodeBlock && _isTaskListLine(line);
+  }
+
+  return result.join('\n');
 }
 
 Document _withoutSyntheticTrailingParagraph(List<DocumentNode> nodes) {

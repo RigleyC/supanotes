@@ -16,7 +16,7 @@ import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
-import 'package:supanotes/features/notes/presentation/widgets/hashtag_suggestion_overlay.dart';
+import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
@@ -290,7 +290,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             ),
           ),
           if (!widget.isReadOnly)
-            HashtagSuggestionOverlay(
+            NoteSuggestionOverlay(
               editor: controller.editor!,
               composer: controller.composer!,
               currentNoteId: widget.noteId,

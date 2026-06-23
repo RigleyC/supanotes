@@ -11,6 +11,20 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
 
   return defaultStylesheet.copyWith(
     documentPadding: EdgeInsets.symmetric(horizontal: 24),
+    inlineTextStyler: (attributions, existingStyle) {
+      for (final attribution in attributions) {
+        if (attribution is LinkAttribution && attribution.launchableUri.scheme == 'note') {
+          return existingStyle.copyWith(
+            color: const Color(0xFF7C3AED),
+            background: Paint()
+              ..color = const Color(0xFF7C3AED)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.0,
+          );
+        }
+      }
+      return defaultStylesheet.inlineTextStyler(attributions, existingStyle);
+    },
     rules: [
       // Override base rule: swap hardcoded Colors.black for theme colour.
       StyleRule(

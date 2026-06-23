@@ -22,19 +22,12 @@ class NoteLinkTapHandler extends ContentTapDelegate {
 
   @override
   MouseCursor? mouseCursorForContentHover(DocumentPosition hoverPosition) {
-    if (!composer.isInInteractionMode.value) {
-      return null;
-    }
     final noteId = _getNoteIdAtPosition(hoverPosition);
     return noteId != null ? SystemMouseCursors.click : null;
   }
 
   @override
   TapHandlingInstruction onTap(DocumentTapDetails details) {
-    if (!composer.isInInteractionMode.value) {
-      return TapHandlingInstruction.continueHandling;
-    }
-
     final tapPosition = details.documentLayout.getDocumentPositionNearestToOffset(details.layoutOffset);
     if (tapPosition == null) {
       return TapHandlingInstruction.continueHandling;
