@@ -24,6 +24,7 @@ import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart'
 import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
+import 'package:supanotes/features/notes/presentation/widgets/hashtag_suggestion_handler.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
@@ -67,6 +68,20 @@ class NoteEditor extends ConsumerStatefulWidget {
   ConsumerState<NoteEditor> createState() => _NoteEditorState();
 }
 
+class _HashtagMatch {
+  final String query;
+  final String nodeId;
+  final int tagStart;
+  final int tagEnd;
+
+  const _HashtagMatch({
+    required this.query,
+    required this.nodeId,
+    required this.tagStart,
+    required this.tagEnd,
+  });
+}
+
 class _NoteEditorState extends ConsumerState<NoteEditor> {
   NoteEditorController? _controller;
   final _docLayoutKey = GlobalKey();
@@ -75,6 +90,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   RichCommonEditorOperations? _richOps;
   String _lastContent = '';
   bool _hasLocalEdits = false;
+
+  final ValueNotifier<_HashtagMatch?> _hashtagMatch = ValueNotifier(null);
 
   late CustomTaskComponentBuilder _taskComponentBuilder;
 
@@ -92,6 +109,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _controller!.init(content: widget.content);
     if (!widget.isReadOnly) {
       _controller!.document?.addListener(_onDocumentChanged);
+      _controller!.composer?.selectionNotifier.addListener(_updateHashtagMatch);
+      _updateHashtagMatch();
       if (widget.content.isEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _controller?.focusNode?.requestFocus();
@@ -148,7 +167,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   void dispose() {
     if (!widget.isReadOnly) {
       _controller?.document?.removeListener(_onDocumentChanged);
+      _controller?.composer?.selectionNotifier.removeListener(_updateHashtagMatch);
     }
+    _hashtagMatch.dispose();
     _iosController?.dispose();
     _androidController?.dispose();
     _controller?.dispose();
@@ -158,6 +179,39 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   void _onDocumentChanged(DocumentChangeLog _) {
     _hasLocalEdits = true;
     _notifyContentChanged();
+    _updateHashtagMatch();
+  }
+
+  _HashtagMatch? _computeHashtagMatch() {
+    final composer = _controller?.composer;
+    final editor = _controller?.editor;
+    if (composer == null || editor == null) return null;
+
+    final selection = composer.selection;
+    if (selection == null || !selection.isCollapsed) return null;
+
+    final position = selection.extent;
+    final nodeId = position.nodeId;
+    final node = editor.document.getNodeById(nodeId);
+    if (node is! TextNode) return null;
+
+    final text = node.text.toPlainText();
+    final caretOffset = (position.nodePosition as TextNodePosition).offset;
+    if (caretOffset == 0) return null;
+    final textBeforeCaret = text.substring(0, caretOffset);
+    final match = RegExp(r'#([^\s#]*)$').firstMatch(textBeforeCaret);
+    if (match == null) return null;
+
+    return _HashtagMatch(
+      query: match.group(1)!,
+      nodeId: node.id,
+      tagStart: match.start,
+      tagEnd: caretOffset,
+    );
+  }
+
+  void _updateHashtagMatch() {
+    _hashtagMatch.value = _computeHashtagMatch();
   }
 
   void _notifyContentChanged() {
@@ -282,30 +336,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           ),
     );
 
-    final selection = controller.composer!.selection;
-    String? activeQuery;
-    int? tagStart;
-    int? tagEnd;
-    String? activeNodeId;
-
-    if (selection != null && selection.isCollapsed) {
-      final position = selection.extent;
-      final nodeId = position.nodeId;
-      final node = controller.editor!.document.getNodeById(nodeId);
-      if (node is TextNode) {
-        final text = node.text.toPlainText();
-        final caretOffset = (position.nodePosition as TextNodePosition).offset;
-        final textBeforeCaret = text.substring(0, caretOffset);
-        final match = RegExp(r'#([^\s#]*)$').firstMatch(textBeforeCaret);
-        if (match != null) {
-          activeQuery = match.group(1);
-          tagStart = match.start;
-          tagEnd = caretOffset;
-          activeNodeId = node.id;
-        }
-      }
-    }
-
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -371,8 +401,17 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
               ],
             ),
           ),
-          if (activeQuery != null && activeNodeId != null && tagStart != null && tagEnd != null && !widget.isReadOnly)
-            _buildNoteSuggestions(activeQuery, activeNodeId, tagStart, tagEnd),
+          ValueListenableBuilder<_HashtagMatch?>(
+            valueListenable: _hashtagMatch,
+            builder: (context, match, _) {
+              if (match == null || widget.isReadOnly) return const SizedBox.shrink();
+              return _NoteLinkSuggestions(
+                match: match,
+                currentNoteId: widget.noteId,
+                onNoteSelected: _onSuggestionTap,
+              );
+            },
+          ),
           if (!widget.isReadOnly)
             NoteToolbar(
               editor: controller.editor!,
@@ -385,12 +424,40 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
   }
 
-  Widget _buildNoteSuggestions(String query, String nodeId, int tagStart, int tagEnd) {
+  void _onSuggestionTap(NoteModel note) {
+    final match = _hashtagMatch.value;
+    if (match == null || _controller?.editor == null) return;
+    applyHashtagSuggestion(
+      editor: _controller!.editor!,
+      nodeId: match.nodeId,
+      tagStartOffset: match.tagStart,
+      tagEndOffset: match.tagEnd,
+      note: note,
+      onPersist: () => _controller?.persistSnapshotNow(),
+    );
+  }
+}
+
+class _NoteLinkSuggestions extends ConsumerWidget {
+  final _HashtagMatch match;
+  final String currentNoteId;
+  final ValueChanged<NoteModel> onNoteSelected;
+
+  const _NoteLinkSuggestions({
+    required this.match,
+    required this.currentNoteId,
+    required this.onNoteSelected,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final notes = ref.watch(activeNotesProvider).asData?.value;
     if (notes == null) return const SizedBox.shrink();
 
     final suggestions = notes
-        .where((n) => n.id != widget.noteId && n.title.toLowerCase().contains(query.toLowerCase()))
+        .where((n) =>
+            n.id != currentNoteId &&
+            n.title.toLowerCase().contains(match.query.toLowerCase()))
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
@@ -403,12 +470,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           child: InkWell(
-            onTap: () => _onSuggestionTap(
-              note: note,
-              nodeId: nodeId,
-              tagStartOffset: tagStart,
-              tagEndOffset: tagEnd,
-            ),
+            onTap: () => onNoteSelected(note),
             borderRadius: BorderRadius.circular(20),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -433,53 +495,5 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         itemBuilder: (_, i) => chips[i],
       ),
     );
-  }
-
-  void _onSuggestionTap({
-    required NoteModel note,
-    required String nodeId,
-    required int tagStartOffset,
-    required int tagEndOffset,
-  }) {
-    final editor = _controller!.editor!;
-
-    editor.execute([
-      DeleteContentRequest(
-        documentRange: DocumentRange(
-          start: DocumentPosition(
-            nodeId: nodeId,
-            nodePosition: TextNodePosition(offset: tagStartOffset),
-          ),
-          end: DocumentPosition(
-            nodeId: nodeId,
-            nodePosition: TextNodePosition(offset: tagEndOffset),
-          ),
-        ),
-      ),
-      InsertTextRequest(
-        documentPosition: DocumentPosition(
-          nodeId: nodeId,
-          nodePosition: TextNodePosition(offset: tagStartOffset),
-        ),
-        textToInsert: note.title,
-        attributions: {LinkAttribution.fromUri(Uri.parse('note://${note.id}'))},
-      ),
-    ]);
-
-    editor.execute([
-      ChangeSelectionRequest(
-        DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: nodeId,
-            nodePosition: TextNodePosition(offset: tagStartOffset + note.title.length),
-          ),
-        ),
-        SelectionChangeType.placeCaret,
-        SelectionReason.userInteraction,
-      ),
-    ]);
-
-    _controller?.persistSnapshotNow();
-    setState(() {});
   }
 }
