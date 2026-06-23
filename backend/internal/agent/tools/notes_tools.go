@@ -348,31 +348,15 @@ func (t *PlanInboxOrganizationTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
 func (t *PlanInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
-	note, err := t.notesSvc.GetInboxNote(ctx, userID)
+	items, err := t.notesSvc.PlanInboxOrganization(ctx, userID, t.llmClient)
 	if err != nil {
 		return "", err
 	}
-
-	systemPrompt := `Você é um organizador de notas. Analise o conteúdo do inbox abaixo e organize cada item.
-O inbox contém várias anotações separadas por linhas em branco. Para cada anotação, decida o destino:
-- "new_note": virar uma nova nota → forneça um título descritivo curto
-- "keep": permanecer no inbox
-Responda APENAS com um JSON array válido. Exemplo:
-[{"snippet": "primeira anotação", "destination": "new_note", "title": "Título Descritivo"},
- {"snippet": "segunda anotação", "destination": "keep"}]`
-
-	resp, err := t.llmClient.Complete(ctx, llm.Request{
-		System: systemPrompt,
-		Messages: []llm.Message{
-			{Role: llm.RoleUser, Content: "Aqui está meu inbox:\n\n" + note.Content},
-		},
-		MaxTokens:   2000,
-		Temperature: 0.3,
-	})
+	bytes, err := json.Marshal(items)
 	if err != nil {
 		return "", err
 	}
-	return resp.Content, nil
+	return string(bytes), nil
 }
 
 type ApplyInboxOrganizationTool struct {

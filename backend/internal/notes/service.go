@@ -2,8 +2,10 @@ package notes
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -21,6 +24,21 @@ var (
 	ErrInboxRule    = errors.New("operation not allowed on inbox note")
 	ErrEmptyNote    = errors.New("empty note")
 )
+
+const (
+	DestNewNote      = "new_note"
+	DestExistingNote = "existing_note"
+	DestKeep         = "keep"
+)
+
+type PlanOrganizationItem struct {
+	ItemID            string  `json:"item_id"`
+	OriginalSnippet   string  `json:"original_snippet"`
+	DestinationType   string  `json:"destination_type"`
+	DestinationNoteID *string `json:"destination_note_id,omitempty"`
+	DestinationTitle  *string `json:"destination_title,omitempty"`
+	Accepted          bool    `json:"accepted"`
+}
 
 type Service struct {
 	repo Repository
@@ -354,4 +372,114 @@ func DeriveTitle(content string) string {
 		}
 	}
 	return "Sem título"
+}
+
+type llmPlanItem struct {
+	Snippet     string `json:"snippet"`
+	Destination string `json:"destination"`
+	Title       string `json:"title,omitempty"`
+}
+
+func (s *Service) PlanInboxOrganization(ctx context.Context, userID pgtype.UUID, llmClient llm.Client) ([]PlanOrganizationItem, error) {
+	note, err := s.GetInboxNote(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(note.Content) == "" {
+		return []PlanOrganizationItem{}, nil
+	}
+
+	systemPrompt := `Você é um organizador de notas. Analise o conteúdo do inbox abaixo e organize cada item.
+
+O inbox contém várias anotações separadas por linhas em branco. Para cada anotação, decida o destino:
+- "new_note": virar uma nova nota → forneça um título descritivo curto
+- "keep": permanecer no inbox (anotações vagas, lembretes rápidos, ideas não desenvolvidas)
+
+Responda APENAS com um JSON array válido. Exemplo:
+[{"snippet": "primeira anotação", "destination": "new_note", "title": "Título Descritivo"},
+ {"snippet": "segunda anotação", "destination": "keep"}]`
+
+	resp, err := llmClient.Complete(ctx, llm.Request{
+		System: systemPrompt,
+		Messages: []llm.Message{
+			{Role: llm.RoleUser, Content: "Aqui está meu inbox:\n\n" + note.Content},
+		},
+		MaxTokens:   2000,
+		Temperature: 0.3,
+	})
+
+	var llmItems []llmPlanItem
+	if err != nil {
+		slog.Error("ai planning failed, falling back to mechanical split", "error", err)
+		llmItems = s.fallbackPlan(note.Content)
+	} else {
+		content := strings.TrimSpace(resp.Content)
+		content = strings.TrimPrefix(content, "```json")
+		content = strings.TrimPrefix(content, "```")
+		content = strings.TrimSpace(content)
+		content = strings.TrimSuffix(content, "```")
+		content = strings.TrimSpace(content)
+
+		if err := json.Unmarshal([]byte(content), &llmItems); err != nil {
+			slog.Error("failed to parse llm plan, falling back to mechanical split", "error", err)
+			llmItems = s.fallbackPlan(note.Content)
+		}
+	}
+
+	items := make([]PlanOrganizationItem, 0, len(llmItems))
+	noteIDStr := uid.UUIDToString(note.ID)
+	snippetIndex := 0
+
+	for _, li := range llmItems {
+		trimmedSnippet := strings.TrimSpace(li.Snippet)
+		if trimmedSnippet == "" {
+			continue
+		}
+		itemID := fmt.Sprintf("%s-%d", noteIDStr, snippetIndex)
+		snippetIndex++
+
+		displaySnippet := trimmedSnippet
+		if len(displaySnippet) > 150 {
+			displaySnippet = displaySnippet[:150] + "..."
+		}
+
+		item := PlanOrganizationItem{
+			ItemID:          itemID,
+			OriginalSnippet: displaySnippet,
+			DestinationType: li.Destination,
+			Accepted:        true,
+		}
+		if li.Destination == DestNewNote && li.Title != "" {
+			item.DestinationTitle = &li.Title
+		}
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+func (s *Service) fallbackPlan(noteContent string) []llmPlanItem {
+	lines := strings.Split(noteContent, "\n\n")
+	var items []llmPlanItem
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		items = append(items, llmPlanItem{
+			Snippet:     trimmed,
+			Destination: DestNewNote,
+		})
+	}
+	if len(items) == 0 {
+		trimmed := strings.TrimSpace(noteContent)
+		if trimmed != "" {
+			items = append(items, llmPlanItem{
+				Snippet:     trimmed,
+				Destination: DestKeep,
+			})
+		}
+	}
+	return items
 }

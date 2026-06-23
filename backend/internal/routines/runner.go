@@ -29,6 +29,12 @@ type TelegramNotifier interface {
 	NotifyUser(ctx context.Context, userID pgtype.UUID, text string) error
 }
 
+type activeRoutine struct {
+	entryID  cron.EntryID
+	cronExpr string
+	timezone string
+}
+
 type Runner struct {
 	ctx            context.Context
 	repo           Repository
@@ -42,7 +48,7 @@ type Runner struct {
 	reloadTicker   *time.Ticker
 	stopReload     chan struct{}
 	mu             sync.Mutex
-	entries        map[string]cron.EntryID
+	entries        map[string]activeRoutine
 }
 
 func NewRunner(
@@ -62,7 +68,7 @@ func NewRunner(
 		telegram:       telegram,
 		cronJob:        cron.New(),
 		maintenanceJob: cron.New(),
-		entries:        make(map[string]cron.EntryID),
+		entries:        make(map[string]activeRoutine),
 	}
 }
 
@@ -113,10 +119,8 @@ func (r *Runner) Stop() {
 }
 
 // reload reconciles the cron schedule with the database state.
-// It only adds new routines and removes deleted/disabled ones, leaving
-// unchanged entries in place. Note: edits to a routine's cron expression
-// or timezone are not picked up until the routine is removed and re-added
-// (e.g. via a delete/recreate or app restart).
+// It handles new routines, deleted/disabled routines, and edits to
+// cron expression or timezone dynamically.
 func (r *Runner) reload() {
 	routines, err := r.repo.GetEnabledRoutines(r.ctx)
 	if err != nil {
@@ -132,8 +136,12 @@ func (r *Runner) reload() {
 		id := uid.UUIDToString(rt.ID)
 		seen[id] = struct{}{}
 
-		if _, ok := r.entries[id]; ok {
-			continue
+		if entry, ok := r.entries[id]; ok {
+			if entry.cronExpr == rt.CronExpr && entry.timezone == rt.Timezone {
+				continue
+			}
+			r.cronJob.Remove(entry.entryID)
+			delete(r.entries, id)
 		}
 
 		expr := fmt.Sprintf("CRON_TZ=%s %s", rt.Timezone, rt.CronExpr)
@@ -145,12 +153,16 @@ func (r *Runner) reload() {
 			log.Warn().Err(err).Str("routine_id", id).Msg("invalid cron expression, skipping routine")
 			continue
 		}
-		r.entries[id] = eid
+		r.entries[id] = activeRoutine{
+			entryID:  eid,
+			cronExpr: rt.CronExpr,
+			timezone: rt.Timezone,
+		}
 	}
 
-	for id, eid := range r.entries {
+	for id, entry := range r.entries {
 		if _, ok := seen[id]; !ok {
-			r.cronJob.Remove(eid)
+			r.cronJob.Remove(entry.entryID)
 			delete(r.entries, id)
 		}
 	}

@@ -11,7 +11,7 @@ final soulProvider = FutureProvider.autoDispose<Soul>((ref) async {
   return ref.read(settingsRepositoryProvider).getSoul();
 });
 
-final soulSaveProvider = AsyncNotifierProvider<SoulSaveNotifier, void>(SoulSaveNotifier.new);
+final soulSaveProvider = AsyncNotifierProvider.autoDispose<SoulSaveNotifier, void>(SoulSaveNotifier.new);
 
 class SoulSaveNotifier extends AsyncNotifier<void> {
   @override
