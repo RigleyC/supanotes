@@ -3,23 +3,30 @@ library;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/domain/attachment_model.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
+import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 
-class NoteEditor extends StatefulWidget {
+class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
   final String content;
   final Map<String, TaskModel> taskMetadata;
@@ -57,10 +64,10 @@ class NoteEditor extends StatefulWidget {
   });
 
   @override
-  State<NoteEditor> createState() => _NoteEditorState();
+  ConsumerState<NoteEditor> createState() => _NoteEditorState();
 }
 
-class _NoteEditorState extends State<NoteEditor> {
+class _NoteEditorState extends ConsumerState<NoteEditor> {
   NoteEditorController? _controller;
   final _docLayoutKey = GlobalKey();
   RichSuperEditorIosControlsController? _iosController;
@@ -122,6 +129,15 @@ class _NoteEditorState extends State<NoteEditor> {
             taskId,
             () => _controller?.persistSnapshotNow() ?? Future.value(),
           );
+    final doc = _controller?.document;
+    if (doc != null) {
+      final currentMarkdown = serializeNoteToMarkdown(doc);
+      if (widget.content == currentMarkdown) {
+        _hasLocalEdits = false;
+        _lastContent = widget.content;
+      }
+    }
+
     if (widget.content != oldWidget.content && !_hasLocalEdits && widget.content != _lastContent) {
       _lastContent = widget.content;
       _controller?.init(content: widget.content);
@@ -266,6 +282,30 @@ class _NoteEditorState extends State<NoteEditor> {
           ),
     );
 
+    final selection = controller.composer!.selection;
+    String? activeQuery;
+    int? tagStart;
+    int? tagEnd;
+    String? activeNodeId;
+
+    if (selection != null && selection.isCollapsed) {
+      final position = selection.extent;
+      final nodeId = position.nodeId;
+      final node = controller.editor!.document.getNodeById(nodeId);
+      if (node is TextNode) {
+        final text = node.text.toPlainText();
+        final caretOffset = (position.nodePosition as TextNodePosition).offset;
+        final textBeforeCaret = text.substring(0, caretOffset);
+        final match = RegExp(r'#([^\s#]*)$').firstMatch(textBeforeCaret);
+        if (match != null) {
+          activeQuery = match.group(1);
+          tagStart = match.start;
+          tagEnd = caretOffset;
+          activeNodeId = node.id;
+        }
+      }
+    }
+
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -298,6 +338,17 @@ class _NoteEditorState extends State<NoteEditor> {
                               context,
                             ).colorScheme.primary.withValues(alpha: 0.4),
                       ),
+                      contentTapDelegateFactories: widget.isReadOnly
+                          ? null
+                          : [
+                              (editContext) => NoteLinkTapHandler(
+                                    editContext.document,
+                                    editContext.composer,
+                                    onNoteTap: (targetId) =>
+                                        context.push(AppRoutes.note(targetId)),
+                                  ),
+                              superEditorLaunchLinkTapHandlerFactory,
+                            ],
                       keyboardActions: buildRichKeyboardActions(
                         baseActions:
                             defaultTargetPlatform == TargetPlatform.iOS ||
@@ -320,6 +371,8 @@ class _NoteEditorState extends State<NoteEditor> {
               ],
             ),
           ),
+          if (activeQuery != null && activeNodeId != null && tagStart != null && tagEnd != null && !widget.isReadOnly)
+            _buildNoteSuggestions(activeQuery, activeNodeId, tagStart, tagEnd),
           if (!widget.isReadOnly)
             NoteToolbar(
               editor: controller.editor!,
@@ -330,5 +383,103 @@ class _NoteEditorState extends State<NoteEditor> {
         ],
       ),
     );
+  }
+
+  Widget _buildNoteSuggestions(String query, String nodeId, int tagStart, int tagEnd) {
+    final notes = ref.watch(activeNotesProvider).asData?.value;
+    if (notes == null) return const SizedBox.shrink();
+
+    final suggestions = notes
+        .where((n) => n.id != widget.noteId && n.title.toLowerCase().contains(query.toLowerCase()))
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+    final chips = suggestions.take(10).map((note) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Material(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            onTap: () => _onSuggestionTap(
+              note: note,
+              nodeId: nodeId,
+              tagStartOffset: tagStart,
+              tagEndOffset: tagEnd,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Text(
+                note.title,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }).toList();
+
+    return SizedBox(
+      height: 44,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: chips.length,
+        itemBuilder: (_, i) => chips[i],
+      ),
+    );
+  }
+
+  void _onSuggestionTap({
+    required NoteModel note,
+    required String nodeId,
+    required int tagStartOffset,
+    required int tagEndOffset,
+  }) {
+    final editor = _controller!.editor!;
+
+    editor.execute([
+      DeleteContentRequest(
+        documentRange: DocumentRange(
+          start: DocumentPosition(
+            nodeId: nodeId,
+            nodePosition: TextNodePosition(offset: tagStartOffset),
+          ),
+          end: DocumentPosition(
+            nodeId: nodeId,
+            nodePosition: TextNodePosition(offset: tagEndOffset),
+          ),
+        ),
+      ),
+      InsertTextRequest(
+        documentPosition: DocumentPosition(
+          nodeId: nodeId,
+          nodePosition: TextNodePosition(offset: tagStartOffset),
+        ),
+        textToInsert: note.title,
+        attributions: {LinkAttribution.fromUri(Uri.parse('note://${note.id}'))},
+      ),
+    ]);
+
+    editor.execute([
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: nodeId,
+            nodePosition: TextNodePosition(offset: tagStartOffset + note.title.length),
+          ),
+        ),
+        SelectionChangeType.placeCaret,
+        SelectionReason.userInteraction,
+      ),
+    ]);
+
+    _controller?.persistSnapshotNow();
+    setState(() {});
   }
 }

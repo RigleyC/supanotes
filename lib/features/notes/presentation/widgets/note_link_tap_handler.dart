@@ -11,7 +11,7 @@ class NoteLinkTapHandler extends ContentTapDelegate {
   }
 
   final Document document;
-  final MutableDocumentComposer composer;
+  final DocumentComposer composer;
   final void Function(String noteId) onNoteTap;
 
   @override
