@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_routes.dart';
 import '../../../shared/theme/app_spacing.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_error_view.dart';
 import '../domain/routine_model.dart';
 import 'controllers/routines_controller.dart';
@@ -20,21 +21,27 @@ class RoutinesScreen extends ConsumerWidget {
     final routinesAsync = ref.watch(routinesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(_appBarTitle),
-      ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(routinesProvider),
-        child: routinesAsync.when(
-          data: (routines) => _Body(
-            routines: routines,
-            onSeeHistory: () => context.push(AppRoutes.routinesLogs),
-          ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => AppErrorView(
-            title: '$err',
-            onRetry: () => ref.invalidate(routinesProvider),
-          ),
+        child: CustomScrollView(
+          slivers: [
+            const SliverAppBar.medium(title: Text(_appBarTitle)),
+            routinesAsync.when(
+              data: (routines) => _Body(
+                routines: routines,
+                onSeeHistory: () => context.push(AppRoutes.routinesLogs),
+              ),
+              loading: () => const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (err, _) => SliverFillRemaining(
+                child: AppErrorView(
+                  title: '$err',
+                  onRetry: () => ref.invalidate(routinesProvider),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -50,54 +57,62 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (routines.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+      return SliverPadding(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        children: [
-          const SizedBox(height: 80),
-          Icon(
-            Icons.event_note_outlined,
-            size: 56,
-            color: Theme.of(context).colorScheme.outline,
+        sliver: SliverFillRemaining(
+          hasScrollBody: false,
+          child: Column(
+            children: [
+              const SizedBox(height: 80),
+              Icon(
+                Icons.event_note_outlined,
+                size: 56,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const Text(
+                'Nenhuma rotina cadastrada',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: AppSpacing.sm),
+              Text(
+                'Crie uma rotina no backend para começar a receber briefs.',
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          const Text(
-            'Nenhuma rotina cadastrada',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          SizedBox(height: AppSpacing.sm),
-          Text(
-            'Crie uma rotina no backend para começar a receber briefs.',
-            textAlign: TextAlign.center,
-          ),
-        ],
+        ),
       );
     }
 
     final sorted = [...routines]
       ..sort((a, b) => a.briefType.index.compareTo(b.briefType.index));
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
+    return SliverPadding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.md,
         AppSpacing.md,
         AppSpacing.lg,
       ),
-      children: [
-        for (final routine in sorted) ...[
-          BriefScheduleCard(routine: routine),
-          const SizedBox(height: AppSpacing.md),
-        ],
-        const SizedBox(height: AppSpacing.sm),
-        FilledButton.tonalIcon(
-          onPressed: onSeeHistory,
-          icon: const Icon(Icons.history),
-          label: const Text(RoutinesScreen._seeHistory),
-        ),
-      ],
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          for (final routine in sorted) ...[
+            BriefScheduleCard(routine: routine),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          IntrinsicWidth(
+            child: AppButton(
+              text: RoutinesScreen._seeHistory,
+              variant: AppButtonVariant.tonal,
+              icon: const Icon(Icons.history),
+              onPressed: onSeeHistory,
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }

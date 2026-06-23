@@ -10,3 +10,24 @@ final soulProvider = FutureProvider.autoDispose<Soul>((ref) async {
   }
   return ref.read(settingsRepositoryProvider).getSoul();
 });
+
+final soulSaveProvider = AsyncNotifierProvider<SoulSaveNotifier, void>(SoulSaveNotifier.new);
+
+class SoulSaveNotifier extends AsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<void> save(String personality) async {
+    state = const AsyncValue.loading();
+    try {
+      final soul = await ref.read(settingsRepositoryProvider).updateSoul(personality);
+      await ref.read(sessionCacheProvider.notifier).updateSoul({
+        'personality': soul.personality,
+      });
+      ref.invalidate(soulProvider);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}

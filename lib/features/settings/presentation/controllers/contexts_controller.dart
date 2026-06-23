@@ -3,7 +3,7 @@ import 'package:supanotes/features/auth/data/session_cache.dart';
 import 'package:supanotes/features/settings/data/settings_models.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
 
-final contextsProvider = FutureProvider<List<UserContext>>((ref) async {
+final contextsProvider = FutureProvider.autoDispose<List<UserContext>>((ref) async {
   final cache = ref.read(sessionCacheProvider);
   if (cache.contexts.isNotEmpty) {
     return cache.contexts

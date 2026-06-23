@@ -28,6 +28,7 @@ void main() {
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(buildApp(container: container));
+      await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
@@ -45,28 +46,8 @@ void main() {
       await tester.pumpWidget(buildApp(container: container));
       await tester.pump();
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('Editar'), findsOneWidget);
       expect(find.text('Salvar'), findsOneWidget);
       expect(find.text('Restaurar padrão'), findsOneWidget);
-    });
-
-    testWidgets('toggle preview mode', (tester) async {
-      final container = ProviderContainer(
-        overrides: [
-          soulProvider.overrideWithValue(
-            const AsyncValue<Soul>.data(
-              Soul(personality: 'Seja útil e direto.'),
-            ),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-      await tester.pumpWidget(buildApp(container: container));
-      await tester.pump();
-      await tester.tap(find.byIcon(Icons.visibility_outlined));
-      await tester.pump();
-      expect(find.text('Visualizar'), findsOneWidget);
-      expect(find.text('Seja útil e direto.'), findsOneWidget);
     });
 
     testWidgets('shows error state', (tester) async {

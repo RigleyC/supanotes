@@ -4,9 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/features/auth/data/session_cache.dart';
-import 'package:supanotes/features/settings/data/settings_models.dart';
-import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/controllers/soul_editor_controller.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
@@ -44,14 +41,8 @@ class _SoulStrings {
       'O texto atual será substituído pelo padrão. Esta ação não pode ser desfeita.';
   static const String restoreConfirmLabel = 'Restaurar';
 
-  static const String editMode = 'Editar';
-  static const String previewMode = 'Visualizar';
-  static const String previewTooltip = 'Alternar entre editar e visualizar';
-
   static const String hint =
       'Descreva como o agent deve se comportar (estilo, tom, escopo).';
-  static const String previewEmpty =
-      'Nada para visualizar. Volte ao modo Editar para escrever.';
 
   static const String savedSnackbar = 'Personalidade atualizada.';
   static const String restoredSnackbar = 'Texto restaurado.';
@@ -68,8 +59,6 @@ class SoulEditorScreen extends ConsumerStatefulWidget {
 class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _initialized = false;
-  bool _isEditing = true;
-  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -83,21 +72,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       AppMessenger.showError(context, _SoulStrings.emptyError);
       return;
     }
-    setState(() => _isSaving = true);
-    try {
-      final soul = await ref.read(settingsRepositoryProvider).updateSoul(text);
-      await ref.read(sessionCacheProvider.notifier).updateSoul({
-        'personality': soul.personality,
-      });
-      ref.invalidate(soulProvider);
-      if (!mounted) return;
-      AppMessenger.showSuccess(context, _SoulStrings.savedSnackbar);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      AppMessenger.showError(context, e.message);
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
+    await ref.read(soulSaveProvider.notifier).save(text);
   }
 
   Future<void> _restoreDefault() async {
@@ -115,7 +90,19 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(soulSaveProvider, (prev, next) {
+      if (prev == next || next.isLoading || !mounted) return;
+      next.whenOrNull(
+        data: (_) => AppMessenger.showSuccess(context, _SoulStrings.savedSnackbar),
+        error: (err, _) => AppMessenger.showError(
+          context,
+          err is ApiException ? err.message : err.toString(),
+        ),
+      );
+    });
+
     final soulAsync = ref.watch(soulProvider);
+    final saveState = ref.watch(soulSaveProvider);
     final soul = soulAsync.asData?.value;
 
     if (!_initialized && soul != null) {
@@ -124,82 +111,49 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(_SoulStrings.title),
-        actions: [
-          IconButton(
-            tooltip: _SoulStrings.previewTooltip,
-            icon: Icon(
-              _isEditing ? Icons.visibility_outlined : Icons.edit_outlined,
+      bottomNavigationBar: _SoulFooter(
+        isSaving: saveState.isLoading,
+        onSave: _save,
+        onRestore: _restoreDefault,
+      ),
+      body: CustomScrollView(
+        slivers: [
+          const SliverAppBar.medium(title: Text(_SoulStrings.title)),
+          soulAsync.when(
+            loading: () => const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
             ),
-            onPressed: () => setState(() => _isEditing = !_isEditing),
-          ),
-        ],
-      ),
-      body: SafeArea(child: _buildBody(context, soulAsync)),
-    );
-  }
-
-  Widget _buildBody(BuildContext context, AsyncValue<Soul> soulAsync) {
-    return soulAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => AppErrorView(
-        title: err is ApiException ? err.message : err.toString(),
-        onRetry: () => ref.invalidate(soulProvider),
-      ),
-      data: (_) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _modeBanner(context),
-            const SizedBox(height: AppSpacing.sm),
-            Expanded(child: _isEditing ? _editor(context) : _preview(context)),
-            const SizedBox(height: AppSpacing.md),
-            _footerActions(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _modeBanner(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _isEditing ? Icons.edit_outlined : Icons.visibility_outlined,
-            size: 18,
-            color: scheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            _isEditing ? _SoulStrings.editMode : _SoulStrings.previewMode,
-            style: textTheme.labelLarge?.copyWith(
-              color: scheme.onSurfaceVariant,
+            error: (err, _) => SliverFillRemaining(
+              child: AppErrorView(
+                title: err is ApiException ? err.message : err.toString(),
+                onRetry: () => ref.invalidate(soulProvider),
+              ),
+            ),
+            data: (_) => SliverPadding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              sliver: SliverFillRemaining(
+                hasScrollBody: true,
+                child: _SoulForm(controller: _controller),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _editor(BuildContext context) {
+class _SoulForm extends StatelessWidget {
+  const _SoulForm({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
     return TextField(
-      controller: _controller,
+      controller: controller,
       maxLines: null,
-      minLines: 10,
-      expands: false,
+      expands: true,
       keyboardType: TextInputType.multiline,
       textAlignVertical: TextAlignVertical.top,
       decoration: const InputDecoration(
@@ -209,52 +163,44 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       ),
     );
   }
+}
 
-  Widget _preview(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final text = _controller.text;
-    if (text.trim().isEmpty) {
-      return Center(
-        child: Text(
-          _SoulStrings.previewEmpty,
-          style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-        ),
-      );
-    }
-    return SingleChildScrollView(
-      child: Container(
-        width: double.infinity,
+class _SoulFooter extends StatelessWidget {
+  const _SoulFooter({
+    required this.isSaving,
+    required this.onSave,
+    required this.onRestore,
+  });
+
+  final bool isSaving;
+  final VoidCallback onSave;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          border: Border.all(color: scheme.outlineVariant),
+        child: Row(
+          children: [
+            Expanded(
+              child: AppButton(
+                text: _SoulStrings.restore,
+                variant: AppButtonVariant.secondary,
+                onPressed: onRestore,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: AppButton(
+                text: isSaving ? _SoulStrings.saving : _SoulStrings.save,
+                isLoading: isSaving,
+                onPressed: onSave,
+              ),
+            ),
+          ],
         ),
-        child: SelectableText(text, style: textTheme.bodyMedium),
       ),
-    );
-  }
-
-  Widget _footerActions(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: AppButton(
-            text: _SoulStrings.restore,
-            variant: AppButtonVariant.secondary,
-            onPressed: _restoreDefault,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: AppButton(
-            text: _isSaving ? _SoulStrings.saving : _SoulStrings.save,
-            isLoading: _isSaving,
-            onPressed: _save,
-          ),
-        ),
-      ],
     );
   }
 }

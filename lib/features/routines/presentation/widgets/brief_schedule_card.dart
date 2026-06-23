@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/api_exceptions.dart';
 import '../../../../shared/theme/app_spacing.dart';
-import '../../../../shared/widgets/error_snackbar.dart';
+import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../data/routines_repository.dart';
 import '../../domain/routine_model.dart';
 import 'day_selector.dart';
@@ -154,10 +155,13 @@ class _BriefScheduleCardState extends ConsumerState<BriefScheduleCard> {
                   const SizedBox(width: AppSpacing.sm),
                 ],
                 const Spacer(),
-                FilledButton.tonalIcon(
-                  onPressed: (_testing || _saving) ? null : _onTestPressed,
-                  icon: const Icon(Icons.science_outlined, size: 18),
-                  label: Text(_testing ? _labelTestando : _labelTestar),
+                IntrinsicWidth(
+                  child: AppButton(
+                    text: _testing ? _labelTestando : _labelTestar,
+                    variant: AppButtonVariant.tonal,
+                    icon: const Icon(Icons.science_outlined, size: 18),
+                    onPressed: (_testing || _saving) ? null : _onTestPressed,
+                  ),
                 ),
               ],
             ),
@@ -181,7 +185,7 @@ class _BriefScheduleCardState extends ConsumerState<BriefScheduleCard> {
           );
     } on ApiException catch (e) {
       if (mounted) {
-        showErrorSnackBar(context, message: '$_errorSaveFailed: ${e.message}');
+        AppMessenger.showError(context, '$_errorSaveFailed: ${e.message}');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -226,10 +230,7 @@ class _BriefScheduleCardState extends ConsumerState<BriefScheduleCard> {
       await _showResultSheet(content);
     } on ApiException catch (e) {
       if (mounted) {
-        showErrorSnackBar(
-          context,
-          message: '$_errorTestFailed: ${e.message}',
-        );
+        AppMessenger.showError(context, '$_errorTestFailed: ${e.message}');
       }
     } finally {
       if (mounted) setState(() => _testing = false);
@@ -274,9 +275,11 @@ class _BriefScheduleCardState extends ConsumerState<BriefScheduleCard> {
                 const SizedBox(height: AppSpacing.md),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: FilledButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    child: const Text(_labelFechar),
+                  child: IntrinsicWidth(
+                    child: AppButton(
+                      text: _labelFechar,
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                    ),
                   ),
                 ),
               ],

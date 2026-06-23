@@ -66,12 +66,15 @@ class _NoteEditorState extends State<NoteEditor> {
   RichSuperEditorIosControlsController? _iosController;
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
+  String _lastContent = '';
+  bool _hasLocalEdits = false;
 
   late CustomTaskComponentBuilder _taskComponentBuilder;
 
   @override
   void initState() {
     super.initState();
+    _lastContent = widget.content;
     _controller = NoteEditorController(
       snapshotSave: widget.isReadOnly
           ? (noteId, markdown, tasks) async {}
@@ -119,6 +122,10 @@ class _NoteEditorState extends State<NoteEditor> {
             taskId,
             () => _controller?.persistSnapshotNow() ?? Future.value(),
           );
+    if (widget.content != oldWidget.content && !_hasLocalEdits && widget.content != _lastContent) {
+      _lastContent = widget.content;
+      _controller?.init(content: widget.content);
+    }
   }
 
   @override
@@ -132,7 +139,10 @@ class _NoteEditorState extends State<NoteEditor> {
     super.dispose();
   }
 
-  void _onDocumentChanged(DocumentChangeLog _) => _notifyContentChanged();
+  void _onDocumentChanged(DocumentChangeLog _) {
+    _hasLocalEdits = true;
+    _notifyContentChanged();
+  }
 
   void _notifyContentChanged() {
     final doc = _controller?.document;

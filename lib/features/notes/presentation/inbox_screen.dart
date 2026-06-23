@@ -82,61 +82,56 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final asyncValue = ref.watch(inboxProvider);
+    return ref.watch(inboxProvider).when(
+      data: (inbox) {
+        if (inbox == null) {
+          return const Scaffold(body: Center(child: Text('Inbox not found')));
+        }
+        final repo = ref.read(notesRepositoryProvider);
+        final noteId = inbox.id;
+        _inboxNoteId = noteId;
+        final tasksAsync = ref.watch(tasksByNoteStreamProvider(noteId));
+        final tasksMap = tasksAsync.asData?.value != null
+            ? {for (final t in tasksAsync.asData!.value) t.id: t}
+            : const <String, TaskModel>{};
 
-    if (asyncValue.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (asyncValue.hasError) {
-      return Scaffold(
-        body: Center(child: Text('Error: ${asyncValue.error}')),
-      );
-    }
-
-    final inbox = asyncValue.asData?.value;
-    if (inbox == null) {
-      return const Scaffold(body: Center(child: Text('Inbox not found')));
-    }
-
-    final repo = ref.read(notesRepositoryProvider);
-    final noteId = inbox.id;
-    _inboxNoteId = noteId;
-    final tasksAsync = ref.watch(tasksByNoteStreamProvider(noteId));
-    final tasksMap = tasksAsync.asData?.value != null
-        ? {for (final t in tasksAsync.asData!.value) t.id: t}
-        : const <String, TaskModel>{};
-
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      appBar: AppBar(
-        title: Text(inbox.title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+        return Scaffold(
+          resizeToAvoidBottomInset: false,
+          appBar: AppBar(
+            title: Text(inbox.title),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.check),
+                onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+              ),
+            ],
           ),
-        ],
+          body: SafeArea(
+            top: false,
+            child: NoteEditor(
+              noteId: noteId,
+              content: inbox.content,
+              taskMetadata: tasksMap,
+              snapshotSave: (noteId, markdown, tasks) =>
+                  defaultSnapshotSave(repo, noteId, markdown, tasks),
+              onHasContentChanged: (hasContent) {
+                if (mounted) setState(() => _hasContent = hasContent);
+              },
+              onTaskLongPress: (taskId, flushSnapshot) =>
+                  _openTaskActions(taskId, flushSnapshot),
+              onTaskComplete: (taskId) =>
+                  ref.read(tasksRepositoryProvider).completeTask(taskId),
+              onTaskReopen: (taskId) =>
+                  ref.read(tasksRepositoryProvider).reopenTask(taskId),
+            ),
+          ),
+          floatingActionButton: _hasContent ? _buildOrganizeFab : null,
+        );
+      },
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, _) => Scaffold(
+        body: Center(child: Text('Error: $error')),
       ),
-      body: SafeArea(
-        top: false,
-        child: NoteEditor(
-          noteId: noteId,
-          content: inbox.content,
-          taskMetadata: tasksMap,
-          snapshotSave: (noteId, markdown, tasks) =>
-              defaultSnapshotSave(repo, noteId, markdown, tasks),
-          onHasContentChanged: (hasContent) {
-            if (mounted) setState(() => _hasContent = hasContent);
-          },
-          onTaskLongPress: (taskId, flushSnapshot) =>
-              _openTaskActions(taskId, flushSnapshot),
-          onTaskComplete: (taskId) =>
-              ref.read(tasksRepositoryProvider).completeTask(taskId),
-          onTaskReopen: (taskId) =>
-              ref.read(tasksRepositoryProvider).reopenTask(taskId),
-        ),
-      ),
-      floatingActionButton: _hasContent ? _buildOrganizeFab : null,
     );
   }
 
