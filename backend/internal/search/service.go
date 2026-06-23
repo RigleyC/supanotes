@@ -45,6 +45,9 @@ func (s *Service) Search(ctx context.Context, userID pgtype.UUID, query string, 
 	vec := pgvector.NewVector(emb)
 
 	ftsQuery := toPrefixTsQuery(query)
+	if ftsQuery == "" {
+		return []SearchResult{}, nil
+	}
 
 	rows, err := s.q.SearchNotesHybrid(ctx, sqlcgen.SearchNotesHybridParams{
 		UserID:        userID,

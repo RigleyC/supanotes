@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -14,6 +15,10 @@ import (
 )
 
 func JSONError(c echo.Context, status int, msg string) error {
+	if status >= 500 {
+		slog.Error("internal server error", "details", msg)
+		msg = "Internal server error"
+	}
 	return c.JSON(status, map[string]string{"error": msg})
 }
 

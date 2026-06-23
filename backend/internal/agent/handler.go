@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -93,7 +94,7 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-cache")
 	c.Response().Header().Set(echo.HeaderConnection, "keep-alive")
 
-	events := make(chan SSEEvent, 10)
+	events := make(chan StreamEvent, 10)
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -104,7 +105,7 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 		if err := h.loop.ChatStream(c.Request().Context(), userID, req.SessionID, req.Content, events); err != nil {
 			slog.Error("agent chat stream failed", "session_id", req.SessionID, "error", err)
 			writer := NewStreamEventWriter(req.SessionID, "")
-			sendStreamEvent(events, writer.Event(EventError, ErrorPayload{Message: err.Error()}))
+			sendStreamEvent(c.Request().Context(), events, writer.Event(EventError, ErrorPayload{Message: err.Error()}))
 		}
 	}()
 
@@ -114,7 +115,12 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 	}
 
 	for event := range events {
-		_, err := fmt.Fprintf(c.Response().Writer, "data: %s\n\n", event.Data)
+		data, err := json.Marshal(event)
+		if err != nil {
+			slog.Error("marshal stream event", "error", err)
+			break
+		}
+		_, err = fmt.Fprintf(c.Response().Writer, "data: %s\n\n", data)
 		if err != nil {
 			slog.Error("agent chat stream write failed", "session_id", req.SessionID, "error", err)
 			break

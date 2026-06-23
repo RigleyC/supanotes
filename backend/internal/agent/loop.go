@@ -32,27 +32,14 @@ func NewLoop(repo Repository, llmFact llm.Factory, ctxBldr *ContextBuilder, tool
 	}
 }
 
-type SSEEvent struct {
-	Type string
-	Data string
-}
-
-func sendEvent(events chan<- SSEEvent, typ, data string) {
-	if events != nil {
-		events <- SSEEvent{Type: typ, Data: data}
-	}
-}
-
-func sendStreamEvent(events chan<- SSEEvent, event StreamEvent) {
+func sendStreamEvent(ctx context.Context, events chan<- StreamEvent, event StreamEvent) {
 	if events == nil {
 		return
 	}
-	payload, err := json.Marshal(event)
-	if err != nil {
-		slog.Error("marshal stream event", "error", err)
-		return
+	select {
+	case events <- event:
+	case <-ctx.Done():
 	}
-	events <- SSEEvent{Type: string(event.Type), Data: string(payload)}
 }
 
 func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string) (<-chan string, error) {
@@ -61,41 +48,33 @@ func (l *Loop) Chat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userM
 	go func() {
 		defer close(ch)
 
-		events := make(chan SSEEvent, 20)
+		events := make(chan StreamEvent, 20)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for evt := range events {
-				switch EventType(evt.Type) {
+			for event := range events {
+				switch event.Type {
 				case EventContentDelta:
-					var event StreamEvent
-					if err := json.Unmarshal([]byte(evt.Data), &event); err != nil {
+					payload, ok := event.Payload.(ContentDeltaPayload)
+					if !ok {
 						continue
 					}
-					payloadBytes, err := json.Marshal(event.Payload)
-					if err != nil {
-						continue
+					select {
+					case ch <- payload.Delta:
+					case <-ctx.Done():
+						return
 					}
-					var payload ContentDeltaPayload
-					if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-						continue
-					}
-					ch <- payload.Delta
 				case EventMessageFinished:
-					var event StreamEvent
-					if err := json.Unmarshal([]byte(evt.Data), &event); err != nil {
+					payload, ok := event.Payload.(MessageFinishedPayload)
+					if !ok {
 						continue
 					}
-					payloadBytes, err := json.Marshal(event.Payload)
-					if err != nil {
-						continue
+					select {
+					case ch <- payload.Content:
+					case <-ctx.Done():
+						return
 					}
-					var payload MessageFinishedPayload
-					if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-						continue
-					}
-					ch <- payload.Content
 				}
 			}
 		}()
@@ -124,12 +103,12 @@ func (l *Loop) ExecuteTool(ctx context.Context, userID pgtype.UUID, toolName, ar
 	return l.tools.Execute(ctx, userID, toolName, argsJSON)
 }
 
-func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) error {
+func (l *Loop) ChatStream(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- StreamEvent) error {
 	_, err := l.doChat(ctx, userID, sessionIDStr, userMessage, events)
 	return err
 }
 
-func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- SSEEvent) (string, error) {
+func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, userMessage string, events chan<- StreamEvent) (string, error) {
 	sessionID, err := uuid.Parse(sessionIDStr)
 	if err != nil {
 		return "", fmt.Errorf("invalid session id: %w", err)
@@ -139,7 +118,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 	assistantMessageID := uuid.NewString()
 	writer := NewStreamEventWriter(sessionIDStr, assistantMessageID)
-	sendStreamEvent(events, writer.Event(
+	sendStreamEvent(ctx, events, writer.Event(
 		EventMessageStarted,
 		MessageStartedPayload{
 			Role:  string(llm.RoleAssistant),
@@ -172,7 +151,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 	var lastToolResults []string
 
 	streamCallback := func(token string) error {
-		sendStreamEvent(events, writer.Event(
+		sendStreamEvent(ctx, events, writer.Event(
 			EventContentDelta,
 			ContentDeltaPayload{Delta: token},
 		))
@@ -194,7 +173,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 			if len(lastToolResults) > 0 {
 				slog.Warn("llm call failed after tool execution; finishing with tool result", "error", err, "iteration", i)
 				finalContent = strings.Join(lastToolResults, "\n")
-				sendStreamEvent(events, writer.Event(
+				sendStreamEvent(ctx, events, writer.Event(
 					EventMessageFinished,
 					MessageFinishedPayload{Content: finalContent},
 				))
@@ -235,7 +214,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 		if len(res.ToolCalls) > 0 {
 			for _, tc := range res.ToolCalls {
-				sendStreamEvent(events, writer.Event(
+				sendStreamEvent(ctx, events, writer.Event(
 					EventToolStarted,
 					ToolActivityPayload{Name: tc.Name, Label: labelForTool(tc.Name)},
 				))
@@ -244,7 +223,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 		if len(res.ToolCalls) == 0 {
 			finalContent = res.Content
-			sendStreamEvent(events, writer.Event(
+			sendStreamEvent(ctx, events, writer.Event(
 				EventMessageFinished,
 				MessageFinishedPayload{Content: finalContent},
 			))
@@ -258,7 +237,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 					return "", fmt.Errorf("create pending tool confirmation: %w", err)
 				}
 
-				sendStreamEvent(events, writer.Event(
+				sendStreamEvent(ctx, events, writer.Event(
 					EventConfirmationRequired,
 					ConfirmationRequiredPayload{
 						ConfirmationID: uuid.UUID(pending.ID.Bytes).String(),
@@ -267,7 +246,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 					},
 				))
 				finalContent = "Preciso da sua confirmação antes de aplicar essa alteração."
-				sendStreamEvent(events, writer.Event(
+				sendStreamEvent(ctx, events, writer.Event(
 					EventMessageFinished,
 					MessageFinishedPayload{Content: finalContent},
 				))
@@ -277,12 +256,12 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 			resultStr, err := l.tools.Execute(ctx, userID, tc.Name, tc.ArgsJSON)
 			if err != nil {
 				resultStr = fmt.Sprintf("Error executing tool: %v", err)
-				sendStreamEvent(events, writer.Event(
+				sendStreamEvent(ctx, events, writer.Event(
 					EventToolFailed,
 					ToolFailedPayload{Name: tc.Name, Label: labelForTool(tc.Name), Message: err.Error()},
 				))
 			} else {
-				sendStreamEvent(events, writer.Event(
+				sendStreamEvent(ctx, events, writer.Event(
 					EventToolFinished,
 					ToolActivityPayload{Name: tc.Name, Label: labelForTool(tc.Name)},
 				))
@@ -304,7 +283,7 @@ func (l *Loop) doChat(ctx context.Context, userID pgtype.UUID, sessionIDStr, use
 
 	if finalContent == "" {
 		finalContent = "Agent reached maximum iterations without final answer."
-		sendStreamEvent(events, writer.Event(
+		sendStreamEvent(ctx, events, writer.Event(
 			EventMessageFinished,
 			MessageFinishedPayload{Content: finalContent},
 		))

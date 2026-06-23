@@ -534,7 +534,7 @@ func TestLoopConfirmationRequired(t *testing.T) {
 	repo := &trackingStubLoopRepo{}
 	loop := NewLoop(repo, llmFact, ctxBldr, toolReg)
 
-	events := make(chan SSEEvent, 10)
+	events := make(chan StreamEvent, 10)
 	go func() {
 		defer close(events)
 		if err := loop.ChatStream(
@@ -556,15 +556,11 @@ func TestLoopConfirmationRequired(t *testing.T) {
 	}
 	var confirmationPayloadJSON string
 	for evt := range events {
-		if evt.Type != string(EventConfirmationRequired) {
+		if evt.Type != EventConfirmationRequired {
 			continue
 		}
 		foundConfirmation = true
-		var streamEvent StreamEvent
-		if err := json.Unmarshal([]byte(evt.Data), &streamEvent); err != nil {
-			t.Fatalf("unmarshal stream event: %v", err)
-		}
-		payloadBytes, err := json.Marshal(streamEvent.Payload)
+		payloadBytes, err := json.Marshal(evt.Payload)
 		if err != nil {
 			t.Fatalf("marshal payload: %v", err)
 		}
@@ -623,7 +619,7 @@ func TestLoopRejectsEmptyLLMResponse(t *testing.T) {
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
 
-	events := make(chan SSEEvent, 10)
+	events := make(chan StreamEvent, 10)
 	err := loop.ChatStream(
 		context.Background(),
 		pgtype.UUID{},
@@ -665,7 +661,7 @@ func TestLoopFallsBackWithoutToolsWhenLLMReturnsEmptyResponse(t *testing.T) {
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
 
-	events := make(chan SSEEvent, 10)
+	events := make(chan StreamEvent, 10)
 	err := loop.ChatStream(
 		context.Background(),
 		pgtype.UUID{},
@@ -690,7 +686,7 @@ func TestLoopFallsBackWithoutToolsWhenLLMReturnsEmptyResponse(t *testing.T) {
 
 	var foundFinal bool
 	for evt := range events {
-		if evt.Type == string(EventMessageFinished) {
+		if evt.Type == EventMessageFinished {
 			foundFinal = true
 		}
 	}
@@ -732,7 +728,7 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
 
-	events := make(chan SSEEvent, 10)
+	events := make(chan StreamEvent, 10)
 	err := loop.ChatStream(
 		context.Background(),
 		pgtype.UUID{},
@@ -748,20 +744,12 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 
 	var final string
 	for evt := range events {
-		if evt.Type != string(EventMessageFinished) {
+		if evt.Type != EventMessageFinished {
 			continue
 		}
-		var streamEvent StreamEvent
-		if err := json.Unmarshal([]byte(evt.Data), &streamEvent); err != nil {
-			t.Fatalf("unmarshal stream event: %v", err)
-		}
-		payloadBytes, err := json.Marshal(streamEvent.Payload)
-		if err != nil {
-			t.Fatalf("marshal payload: %v", err)
-		}
-		var payload MessageFinishedPayload
-		if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-			t.Fatalf("unmarshal payload: %v", err)
+		payload, ok := evt.Payload.(MessageFinishedPayload)
+		if !ok {
+			continue
 		}
 		final = payload.Content
 	}
@@ -806,7 +794,7 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
 
-	events := make(chan SSEEvent, 10)
+	events := make(chan StreamEvent, 10)
 	err := loop.ChatStream(
 		context.Background(),
 		pgtype.UUID{},
@@ -822,20 +810,12 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 
 	var final string
 	for evt := range events {
-		if evt.Type != string(EventMessageFinished) {
+		if evt.Type != EventMessageFinished {
 			continue
 		}
-		var streamEvent StreamEvent
-		if err := json.Unmarshal([]byte(evt.Data), &streamEvent); err != nil {
-			t.Fatalf("unmarshal stream event: %v", err)
-		}
-		payloadBytes, err := json.Marshal(streamEvent.Payload)
-		if err != nil {
-			t.Fatalf("marshal payload: %v", err)
-		}
-		var payload MessageFinishedPayload
-		if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-			t.Fatalf("unmarshal payload: %v", err)
+		payload, ok := evt.Payload.(MessageFinishedPayload)
+		if !ok {
+			continue
 		}
 		final = payload.Content
 	}
@@ -978,4 +958,3 @@ func (m *stubLoopMemRepo) DeleteMemory(ctx context.Context, id, userID pgtype.UU
 func (m *stubLoopMemRepo) SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
 	return nil, nil
 }
-
