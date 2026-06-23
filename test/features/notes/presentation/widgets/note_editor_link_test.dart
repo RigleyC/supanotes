@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
@@ -75,11 +74,10 @@ void main() {
 
       composer.setIsInteractionMode(true);
 
-      String? capturedId;
       final handler = NoteLinkTapHandler(
         document,
         composer,
-        onNoteTap: (id) => capturedId = id,
+        onNoteTap: (_) {},
       );
 
       final position = DocumentPosition(
@@ -133,11 +131,10 @@ void main() {
 
       composer.setIsInteractionMode(true);
 
-      String? capturedId;
       final handler = NoteLinkTapHandler(
         document,
         composer,
-        onNoteTap: (id) => capturedId = id,
+        onNoteTap: (_) {},
       );
 
       final position = DocumentPosition(
@@ -192,16 +189,12 @@ void main() {
 
       composer.setIsInteractionMode(true);
 
-      String? capturedId;
       final handler = NoteLinkTapHandler(
         document,
         composer,
-        onNoteTap: (id) => capturedId = id,
+        onNoteTap: (_) {},
       );
 
-      // Simulate tap by calling the handler directly
-      // We can't test onTap without a document layout, but we verify
-      // the handler was properly constructed
       expect(handler, isA<NoteLinkTapHandler>());
 
       handler.dispose();
