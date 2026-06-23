@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/features/notes/data/local/notes_local_repository.dart';
@@ -75,6 +76,77 @@ void main() {
       final saved = await local.getNoteById('note-1');
       expect(saved, isNotNull);
       expect(saved!.note.content, 'B');
+    });
+
+    test('saveSnapshot syncs note links from content', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
+      final local = FakeNotesLocalRepository();
+      await local.createNoteWithId('source-1');
+      final tasksLocal = FakeTasksLocalRepository();
+      final linksDao = FakeNoteLinksDao();
+      final repo = NotesRepository(local, tasksLocal, prefsDao, linksDao);
+
+      const content = 'Check out [Note A](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890) '
+          'and [Note B](note://b2c3d4e5-f6a7-8901-bcde-f12345678901)';
+
+      await repo.saveNoteSnapshot(
+        id: 'source-1',
+        content: content,
+        tasks: const [],
+      );
+
+      final links = await linksDao.getLinksForNote('source-1');
+      expect(links.length, 2);
+      expect(links.any((l) => l.targetId == 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'), true);
+      expect(links.any((l) => l.targetId == 'b2c3d4e5-f6a7-8901-bcde-f12345678901'), true);
+    });
+
+    test('saveSnapshot removes stale links and adds new ones', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
+      final local = FakeNotesLocalRepository();
+      await local.createNoteWithId('source-1');
+      final tasksLocal = FakeTasksLocalRepository();
+      final linksDao = FakeNoteLinksDao();
+
+      await linksDao.createLink(
+        sourceId: 'source-1',
+        targetId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      );
+
+      final repo = NotesRepository(local, tasksLocal, prefsDao, linksDao);
+
+      const content = 'Only [New Note](note://bbbbbbbb-cccc-dddd-eeee-ffffffffffff)';
+
+      await repo.saveNoteSnapshot(
+        id: 'source-1',
+        content: content,
+        tasks: const [],
+      );
+
+      final links = await linksDao.getLinksForNote('source-1');
+      expect(links.length, 1);
+      expect(links.single.targetId, 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff');
+    });
+
+    test('saveSnapshot does nothing when NoteLinksDao is null', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
+      final local = FakeNotesLocalRepository();
+      await local.createNoteWithId('note-1');
+      final tasksLocal = FakeTasksLocalRepository();
+      final repo = NotesRepository(local, tasksLocal, prefsDao);
+
+      const content = '[Test](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890)';
+
+      // Should not throw when dao is null
+      await repo.saveNoteSnapshot(
+        id: 'note-1',
+        content: content,
+        tasks: const [],
+      );
+
+      final saved = await local.getNoteById('note-1');
+      expect(saved, isNotNull);
+      expect(saved!.note.content, content);
     });
   });
 }
@@ -267,4 +339,57 @@ class FakeUserNotePreferencesDao implements UserNotePreferencesDao {
   Future<void> setHideCompleted(
       String userId, String noteId, bool hideCompleted) async {}
 
+}
+
+class FakeNoteLinksDao implements NoteLinksDao {
+  final Map<String, NoteLinkData> _store = {};
+  int _counter = 0;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} not implemented');
+
+  @override
+  Future<void> createLink({
+    required String sourceId,
+    required String targetId,
+    String? relation,
+  }) async {
+    final id = 'link-${_counter++}';
+    final now = DateTime.now().toUtc();
+    _store[id] = NoteLinkData(
+      id: id,
+      sourceId: sourceId,
+      targetId: targetId,
+      relation: relation ?? 'related',
+      createdAt: now,
+      updatedAt: now,
+      isDirty: true,
+    );
+  }
+
+  @override
+  Future<List<NoteLinkData>> getLinksForNote(String noteId) async {
+    return _store.values
+        .where((l) => l.sourceId == noteId || l.targetId == noteId)
+        .toList();
+  }
+
+  @override
+  Future<void> deleteLink(String id) async {
+    _store.remove(id);
+  }
+
+  @override
+  Stream<List<NoteLinkData>> watchLinksForNote(String noteId) =>
+      const Stream.empty();
+
+  @override
+  Future<List<NoteLinkData>> getDirtyLinks() async => [];
+
+  @override
+  Future<void> clearDirtyFlag(String id, DateTime pushedUpdatedAt) async {}
+
+  @override
+  Future<void> upsertFromRemote(NoteLinkData link) async {}
 }
