@@ -14,6 +14,7 @@ import 'package:supanotes/features/notes/data/user_note_preferences_repository.d
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_dialog.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
@@ -39,19 +40,11 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Future<void> _openTaskActions(
-    String taskId,
+    TaskModel? task,
     Future<void> Function() flushSnapshot,
   ) async {
     await flushSnapshot();
-    if (!mounted) return;
-
-    ref.invalidate(tasksByNoteStreamProvider(widget.noteId));
-    final freshTasks = await ref.read(
-      tasksByNoteStreamProvider(widget.noteId).future,
-    );
-    final freshMap = {for (final t in freshTasks) t.id: t};
-    final task = freshMap[taskId];
-    if (task == null || !mounted) return;
+    if (!mounted || task == null) return;
 
     await TaskEditSheet.show(
       context,
@@ -162,23 +155,25 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               hideCompleted: hideCompleted,
               collapseImages: note.collapseImages,
               isReadOnly: isReadOnly,
-              snapshotSave: (noteId, markdown, tasks) =>
-                  defaultSnapshotSave(repo, noteId, markdown, tasks),
-              emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
-              onTaskLongPress: isReadOnly
-                  ? null
-                  : (taskId, flushSnapshot) =>
-                      _openTaskActions(taskId, flushSnapshot),
-              onTaskComplete: (taskId) =>
-                  ref.read(tasksRepositoryProvider).completeTask(taskId),
-              onTaskReopen: (taskId) =>
-                  ref.read(tasksRepositoryProvider).reopenTask(taskId),
-              onUploadFile: isReadOnly
-                  ? null
-                  : (noteId, filePath, mimeType) =>
-                      ref.read(attachmentsRepositoryProvider).upload(
-                        noteId: noteId, file: File(filePath), mimeType: mimeType,
-                      ),
+              delegate: NoteEditorDelegate(
+                snapshotSave: (noteId, markdown, tasks) =>
+                    defaultSnapshotSave(repo, noteId, markdown, tasks),
+                emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
+                onTaskLongPress: isReadOnly
+                    ? null
+                    : (task, flushSnapshot) =>
+                        _openTaskActions(task, flushSnapshot),
+                onTaskComplete: (taskId) =>
+                    ref.read(tasksRepositoryProvider).completeTask(taskId),
+                onTaskReopen: (taskId) =>
+                    ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                onUploadFile: isReadOnly
+                    ? null
+                    : (noteId, filePath, mimeType) =>
+                        ref.read(attachmentsRepositoryProvider).upload(
+                          noteId: noteId, file: File(filePath), mimeType: mimeType,
+                        ),
+              ),
             ),
           ),
         );

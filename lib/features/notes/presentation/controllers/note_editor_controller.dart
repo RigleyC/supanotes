@@ -8,6 +8,8 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/utils/save_throttle.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
+import 'package:supanotes/features/notes/domain/attachment_model.dart';
+import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
@@ -103,6 +105,45 @@ class NoteEditorController {
       generation: generation,
       operation: _runSnapshotSave,
     );
+  }
+
+  Future<void> attachFileFromPath({
+    required String filePath,
+    required String fileName,
+    required int fileSize,
+    required String mimeType,
+    required Future<AttachmentModel> Function(String, String, String) onUploadFile,
+    required void Function() onError,
+  }) async {
+    final noteId = _noteId;
+    final editor = this.editor;
+    if (noteId == null || editor == null) return;
+
+    final tempId = Editor.createNodeId();
+    final isImage = mimeType.startsWith('image/');
+
+    final placeholderNode = isImage
+        ? ImageAttachmentNode(id: tempId, url: '', fileName: fileName, metadata: {'isUploading': true})
+        : FileAttachmentNode(id: tempId, url: '', fileName: fileName, mimeType: mimeType, fileSize: fileSize, metadata: {'isUploading': true});
+
+    editor.execute([InsertNodeAtCaretRequest(node: placeholderNode)]);
+
+    try {
+      final attachment = await onUploadFile(noteId, filePath, mimeType);
+      final url = attachment.displayUrl ?? '';
+      final DocumentNode finalNode = attachment.type == AttachmentType.image
+          ? ImageAttachmentNode(id: attachment.id, url: url, fileName: attachment.fileName)
+          : FileAttachmentNode(id: attachment.id, url: url, fileName: attachment.fileName, mimeType: attachment.mimeType, fileSize: attachment.fileSize);
+
+      if (editor.document.getNodeById(tempId) != null) {
+        editor.execute([ReplaceNodeRequest(existingNodeId: tempId, newNode: finalNode)]);
+      }
+    } catch (_) {
+      if (editor.document.getNodeById(tempId) != null) {
+        editor.execute([DeleteNodeRequest(nodeId: tempId)]);
+      }
+      onError();
+    }
   }
 
   bool _isDocEmpty(MutableDocument doc) {

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/agent/domain/destination_type.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
@@ -22,7 +23,6 @@ class InboxScreen extends ConsumerStatefulWidget {
 }
 
 class _InboxScreenState extends ConsumerState<InboxScreen> {
-  String? _inboxNoteId;
   bool _hasContent = false;
 
   @override
@@ -35,20 +35,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   }
 
   Future<void> _openTaskActions(
-    String taskId,
+    TaskModel? task,
     Future<void> Function() flushSnapshot,
   ) async {
     await flushSnapshot();
-    if (!mounted) return;
-
-    final noteId = _inboxNoteId;
-    if (noteId == null) return;
-
-    ref.invalidate(tasksByNoteStreamProvider(noteId));
-    final freshTasks = await ref.read(tasksByNoteStreamProvider(noteId).future);
-    final freshMap = {for (final t in freshTasks) t.id: t};
-    final task = freshMap[taskId];
-    if (task == null || !mounted) return;
+    if (!mounted || task == null) return;
 
     await TaskEditSheet.show(
       context,
@@ -89,7 +80,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         }
         final repo = ref.read(notesRepositoryProvider);
         final noteId = inbox.id;
-        _inboxNoteId = noteId;
         final tasksAsync = ref.watch(tasksByNoteStreamProvider(noteId));
         final tasksMap = tasksAsync.asData?.value != null
             ? {for (final t in tasksAsync.asData!.value) t.id: t}
@@ -112,17 +102,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               noteId: noteId,
               content: inbox.content,
               taskMetadata: tasksMap,
-              snapshotSave: (noteId, markdown, tasks) =>
-                  defaultSnapshotSave(repo, noteId, markdown, tasks),
-              onHasContentChanged: (hasContent) {
-                if (mounted) setState(() => _hasContent = hasContent);
-              },
-              onTaskLongPress: (taskId, flushSnapshot) =>
-                  _openTaskActions(taskId, flushSnapshot),
-              onTaskComplete: (taskId) =>
-                  ref.read(tasksRepositoryProvider).completeTask(taskId),
-              onTaskReopen: (taskId) =>
-                  ref.read(tasksRepositoryProvider).reopenTask(taskId),
+              delegate: NoteEditorDelegate(
+                snapshotSave: (noteId, markdown, tasks) =>
+                    defaultSnapshotSave(repo, noteId, markdown, tasks),
+                onHasContentChanged: (hasContent) {
+                  if (mounted) setState(() => _hasContent = hasContent);
+                },
+                onTaskLongPress: (task, flushSnapshot) =>
+                    _openTaskActions(task, flushSnapshot),
+                onTaskComplete: (taskId) =>
+                    ref.read(tasksRepositoryProvider).completeTask(taskId),
+                onTaskReopen: (taskId) =>
+                    ref.read(tasksRepositoryProvider).reopenTask(taskId),
+              ),
             ),
           ),
           floatingActionButton: _hasContent ? _buildOrganizeFab : null,

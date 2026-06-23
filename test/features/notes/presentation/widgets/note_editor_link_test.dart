@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
@@ -21,7 +22,9 @@ void main() {
                 noteId: 'test-note',
                 content: 'Hello world',
                 taskMetadata: {},
-                snapshotSave: (id, content, tasks) async {},
+                delegate: NoteEditorDelegate(
+                  snapshotSave: (id, content, tasks) async {},
+                ),
               ),
             ),
           ),

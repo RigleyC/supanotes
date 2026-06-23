@@ -10,6 +10,7 @@ import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/domain/task_entry.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
@@ -177,7 +178,9 @@ void main() {
                 '- [x] tarefa concluida <!-- task:task-1 -->\n\ntexto visivel',
             taskMetadata: const {},
             hideCompleted: true,
-            snapshotSave: (noteId, markdown, tasks) async {},
+            delegate: NoteEditorDelegate(
+              snapshotSave: (noteId, markdown, tasks) async {},
+            ),
           ),
         ),
       ),
@@ -218,7 +221,9 @@ void main() {
                           '- [x] tarefa concluida <!-- task:task-1 -->\n\ntexto visivel',
                       taskMetadata: const {},
                       hideCompleted: hideCompleted,
-            snapshotSave: (noteId, markdown, tasks) async {},
+            delegate: NoteEditorDelegate(
+              snapshotSave: (noteId, markdown, tasks) async {},
+            ),
                     ),
                   ),
                 ],
