@@ -7,6 +7,7 @@ import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/controllers/contexts_controller.dart';
 import 'package:supanotes/features/settings/presentation/widgets/new_context_sheet.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -37,16 +38,24 @@ class ContextsScreen extends ConsumerWidget {
     final async = ref.watch(contextsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text(_ContextsStrings.title)),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(contextsProvider),
-        child: async.when(
-          data: (contexts) => _ContextsList(contexts: contexts),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => AppErrorView(
-            title: err is ApiException ? err.message : err.toString(),
-            onRetry: () => ref.invalidate(contextsProvider),
-          ),
+        child: CustomScrollView(
+          slivers: [
+            const AdaptiveSliverNavBar(title: Text(_ContextsStrings.title)),
+            async.when(
+              data: (contexts) => _ContextsList(contexts: contexts),
+              loading: () => const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (err, _) => SliverFillRemaining(
+                child: AppErrorView(
+                  title: err is ApiException ? err.message : err.toString(),
+                  onRetry: () => ref.invalidate(contextsProvider),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -76,48 +85,55 @@ class _ContextsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (contexts.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 120),
-          EmptyState(
-            icon: Icons.folder_open_outlined,
-            title: _ContextsStrings.emptyTitle,
-            subtitle: _ContextsStrings.emptySubtitle,
-          ),
-        ],
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: ListView(
+          physics: const NeverScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            EmptyState(
+              icon: Icons.folder_open_outlined,
+              title: _ContextsStrings.emptyTitle,
+              subtitle: _ContextsStrings.emptySubtitle,
+            ),
+          ],
+        ),
       );
     }
 
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      itemCount: contexts.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final ctx = contexts[index];
-        return Dismissible(
-          key: ValueKey(ctx.id),
-          direction: DismissDirection.endToStart,
-          background: _DismissBackground(),
-          confirmDismiss: (_) => _confirmDelete(context),
-          onDismissed: (_) => _delete(context, ref, ctx.id),
-          child: ListTile(
-            leading: const Icon(Icons.folder_outlined),
-            title: Text(ctx.name),
-            subtitle: Text(ctx.slug),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: _ContextsStrings.deleteConfirmLabel,
-              onPressed: () async {
-                if (!await _confirmDelete(context)) return;
-                if (!context.mounted) return;
-                await _delete(context, ref, ctx.id);
-              },
-            ),
-          ),
-        );
-      },
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final ctx = contexts[index];
+          return Column(
+            children: [
+              if (index > 0) const Divider(height: 1),
+              Dismissible(
+                key: ValueKey(ctx.id),
+                direction: DismissDirection.endToStart,
+                background: _DismissBackground(),
+                confirmDismiss: (_) => _confirmDelete(context),
+                onDismissed: (_) => _delete(context, ref, ctx.id),
+                child: ListTile(
+                  leading: const Icon(Icons.folder_outlined),
+                  title: Text(ctx.name),
+                  subtitle: Text(ctx.slug),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: _ContextsStrings.deleteConfirmLabel,
+                    onPressed: () async {
+                      if (!await _confirmDelete(context)) return;
+                      if (!context.mounted) return;
+                      await _delete(context, ref, ctx.id);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        childCount: contexts.length,
+      ),
     );
   }
 

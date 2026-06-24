@@ -15,11 +15,10 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
       for (final attribution in attributions) {
         if (attribution is LinkAttribution && attribution.launchableUri.scheme == 'note') {
           return existingStyle.copyWith(
-            color: const Color(0xFF7C3AED),
+            color: Colors.white,
             background: Paint()
               ..color = const Color(0xFF7C3AED)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.0,
+              ..style = PaintingStyle.fill,
           );
         }
       }

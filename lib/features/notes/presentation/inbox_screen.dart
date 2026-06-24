@@ -13,6 +13,7 @@ import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_edit_sheet.dart';
+import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
@@ -87,35 +88,39 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
         return Scaffold(
           resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            title: Text(inbox.title),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.check),
-                onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+          body: CustomScrollView(
+            slivers: [
+              AdaptiveSliverNavBar(
+                title: Text(inbox.title),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.check),
+                    onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+                  ),
+                ],
+              ),
+              SliverFillRemaining(
+                hasScrollBody: true,
+                child: NoteEditor(
+                  noteId: noteId,
+                  content: inbox.content,
+                  taskMetadata: tasksMap,
+                  delegate: NoteEditorDelegate(
+                    snapshotSave: (noteId, markdown, tasks) =>
+                        defaultSnapshotSave(repo, noteId, markdown, tasks),
+                    onHasContentChanged: (hasContent) {
+                      if (mounted) setState(() => _hasContent = hasContent);
+                    },
+                    onTaskLongPress: (task, flushSnapshot) =>
+                        _openTaskActions(task, flushSnapshot),
+                    onTaskComplete: (taskId) =>
+                        ref.read(tasksRepositoryProvider).completeTask(taskId),
+                    onTaskReopen: (taskId) =>
+                        ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                  ),
+                ),
               ),
             ],
-          ),
-          body: SafeArea(
-            top: false,
-            child: NoteEditor(
-              noteId: noteId,
-              content: inbox.content,
-              taskMetadata: tasksMap,
-              delegate: NoteEditorDelegate(
-                snapshotSave: (noteId, markdown, tasks) =>
-                    defaultSnapshotSave(repo, noteId, markdown, tasks),
-                onHasContentChanged: (hasContent) {
-                  if (mounted) setState(() => _hasContent = hasContent);
-                },
-                onTaskLongPress: (task, flushSnapshot) =>
-                    _openTaskActions(task, flushSnapshot),
-                onTaskComplete: (taskId) =>
-                    ref.read(tasksRepositoryProvider).completeTask(taskId),
-                onTaskReopen: (taskId) =>
-                    ref.read(tasksRepositoryProvider).reopenTask(taskId),
-              ),
-            ),
           ),
           floatingActionButton: _hasContent ? _buildOrganizeFab : null,
         );
