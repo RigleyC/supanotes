@@ -6,8 +6,7 @@ import 'package:super_editor/super_editor.dart';
 import '../domain/attachment_nodes.dart';
 
 final List<DocumentNodeMarkdownSerializer> attachmentNodeSerializers = [
-  const _ImageAttachmentSerializer(),
-  const _FileAttachmentSerializer(),
+  const _DocumentAttachmentSerializer(),
   const _RichLinkSerializer(),
 ];
 
@@ -19,43 +18,18 @@ final List<ElementToNodeConverter> attachmentElementConverters = [
   const _AttachmentElementConverter(),
 ];
 
-class _ImageAttachmentSerializer
-    extends NodeTypedDocumentNodeMarkdownSerializer<ImageAttachmentNode> {
-  const _ImageAttachmentSerializer();
+class _DocumentAttachmentSerializer
+    extends NodeTypedDocumentNodeMarkdownSerializer<DocumentAttachmentNode> {
+  const _DocumentAttachmentSerializer();
 
   @override
   String doSerialization(
     Document document,
-    ImageAttachmentNode node, {
+    DocumentAttachmentNode node, {
     NodeSelection? selection,
   }) {
-    final data = {
-      'id': node.id,
-      'url': node.url,
-      'filename': node.fileName,
-    };
-    return '--- <!-- attachment:img ${jsonEncode(data)} -->';
-  }
-}
-
-class _FileAttachmentSerializer
-    extends NodeTypedDocumentNodeMarkdownSerializer<FileAttachmentNode> {
-  const _FileAttachmentSerializer();
-
-  @override
-  String doSerialization(
-    Document document,
-    FileAttachmentNode node, {
-    NodeSelection? selection,
-  }) {
-    final data = {
-      'id': node.id,
-      'url': node.url,
-      'filename': node.fileName,
-      'mime': node.mimeType,
-      if (node.fileSize != null) 'size': node.fileSize,
-    };
-    return '--- <!-- attachment:file ${jsonEncode(data)} -->';
+    final data = {'id': node.id};
+    return '--- <!-- attachment:doc ${jsonEncode(data)} -->';
   }
 }
 
@@ -70,8 +44,7 @@ class _RichLinkSerializer
     NodeSelection? selection,
   }) {
     final data = {
-      'id': node.id,
-      'url': node.url,
+      if (node.url != null) 'url': node.url,
       if (node.title != null) 'title': node.title,
       if (node.description != null) 'description': node.description,
       if (node.imageUrl != null) 'image': node.imageUrl,
@@ -83,7 +56,7 @@ class _RichLinkSerializer
 
 class _AttachmentBlockSyntax extends md.BlockSyntax {
   static final _pattern =
-      RegExp(r'^---\s+<!--\s*attachment:(img|file|link)\s+(.+?)\s*-->$');
+      RegExp(r'^---\s+<!--\s*attachment:(doc|img|file|link)\s+(.+?)\s*-->$');
 
   @override
   RegExp get pattern => _pattern;
@@ -117,26 +90,17 @@ class _AttachmentElementConverter implements ElementToNodeConverter {
 
     try {
       final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-      final id = data['id'] as String? ?? Editor.createNodeId();
-      final url = data['url'] as String? ?? '';
-      final filename = data['filename'] as String? ?? '';
 
       switch (type) {
+        case 'doc':
         case 'img':
-          return ImageAttachmentNode(
-            id: id, url: url, fileName: filename,
-          );
         case 'file':
-          final mime = data['mime'] as String? ?? 'application/octet-stream';
-          final size = data['size'] as int?;
-          return FileAttachmentNode(
-            id: id, url: url, fileName: filename, mimeType: mime,
-            fileSize: size,
-          );
+          final id = data['id'] as String? ?? Editor.createNodeId();
+          return DocumentAttachmentNode(id: id);
         case 'link':
           return RichLinkNode(
-            id: id,
-            url: url,
+            id: data['id'] as String? ?? Editor.createNodeId(),
+            url: data['url'] as String?,
             title: data['title'] as String?,
             description: data['description'] as String?,
             imageUrl: data['image'] as String?,

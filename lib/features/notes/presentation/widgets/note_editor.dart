@@ -196,10 +196,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
     final mimeType = lookupMimeType(path) ?? 'application/octet-stream';
 
-    await _controller!.attachFileFromPath(
+    _controller!.attachFileFromPath(
       filePath: path,
-      fileName: picked.name,
-      fileSize: picked.size,
       mimeType: mimeType,
       onUploadFile: uploader,
       onError: () {

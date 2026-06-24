@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/database/database.dart';
@@ -22,12 +21,15 @@ class AttachmentsRepository {
             (rows) => rows.map(AttachmentModel.fromData).toList(),
           );
 
-  Future<AttachmentModel> upload({
+  Stream<AttachmentModel?> watchById(String id) =>
+      _local.watchById(id).map((row) => row != null ? AttachmentModel.fromData(row) : null);
+
+  Future<void> upload({
+    required String id,
     required String noteId,
     required File file,
     required String mimeType,
   }) async {
-    final id = const Uuid().v4();
     final fileName = file.uri.pathSegments.last;
     final fileSize = await file.length();
     final now = DateTime.now().toUtc();
@@ -56,12 +58,8 @@ class AttachmentsRepository {
       );
       final remoteUrl = response.data!['url'] as String;
       await _local.updateRemoteUrl(id, remoteUrl);
-
-      final rows = await _local.getByNote(noteId);
-      return AttachmentModel.fromData(rows.firstWhere((r) => r.id == id));
     } catch (e) {
       await _local.updateStatus(id, 'failed');
-      rethrow;
     }
   }
 
@@ -73,4 +71,10 @@ final attachmentsRepositoryProvider =
   final local = ref.watch(attachmentsLocalRepositoryProvider);
   final api = ref.watch(apiClientProvider);
   return AttachmentsRepository(local, api);
+});
+
+final attachmentByIdProvider =
+    StreamProvider.autoDispose.family<AttachmentModel?, String>((ref, id) {
+  final repo = ref.watch(attachmentsRepositoryProvider);
+  return repo.watchById(id);
 });
