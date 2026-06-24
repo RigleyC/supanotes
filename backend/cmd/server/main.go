@@ -27,6 +27,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/gateway"
 	"github.com/RigleyC/supanotes/internal/handler"
 	"github.com/RigleyC/supanotes/internal/linkpreview"
+	mcpapp "github.com/RigleyC/supanotes/internal/mcp"
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/notifications"
@@ -42,7 +43,9 @@ import (
 	"github.com/RigleyC/supanotes/pkg/db"
 	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/migrate"
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/robfig/cron/v3"
+
 )
 
 func main() {
@@ -304,6 +307,16 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	routinesRunner := routines.NewRunner(cronCtx, routinesRepo, agentCtxBldr, llmFactory, pushSender, gatewayBot)
 	routinesRunner.Start()
+	// MCP Server
+	mcpServer := mcpapp.NewServer(notesSvc, tasksSvc, memoriesSvc, tagsSvc, soulSvc)
+	mcpHandler := mcpsdk.NewStreamableHTTPHandler(func(req *http.Request) *mcpsdk.Server { return mcpServer }, nil)
+
+	// Personal Token Generation Route
+	protected.POST("/auth/mcp-token", mcpapp.GenerateMCPTokenHandler(cfg))
+
+	// MCP HTTP/SSE Route
+	mcpWrapped := http.StripPrefix("/api/v1/mcp", mcpHandler)
+	protected.Any("/mcp/*", mcpapp.PropagateUserContext(mcpWrapped))
 
 	// Settings
 	settingsSvc := settings.NewService(queries)
