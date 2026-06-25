@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 class AdaptiveSliverNavBar extends StatelessWidget {
   const AdaptiveSliverNavBar({
     super.key,
-    required this.title,
+    this.title,
     this.actions,
     this.leading,
   });
 
-  final Widget title;
+  final Widget? title;
   final List<Widget>? actions;
   final Widget? leading;
 
@@ -25,10 +25,19 @@ class AdaptiveSliverNavBar extends StatelessWidget {
       );
     }
 
+    if (title == null) {
+      return SliverAppBar.medium(
+        actions: actions,
+        leading: leading,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      );
+    }
+
     return SliverAppBar.medium(
-      title: title,
+      title: title!,
       actions: actions,
       leading: leading,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
     );
   }
 

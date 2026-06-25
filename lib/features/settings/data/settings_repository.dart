@@ -33,6 +33,7 @@ class _SettingsRoutes {
   static const String settings = '/settings';
   static const String soul = '/soul';
   static const String contexts = '/contexts';
+  static const String mcpToken = '/auth/mcp-token';
 
   static String contextById(String id) => '/contexts/$id';
 }
@@ -45,6 +46,7 @@ abstract class ISettingsRepository {
   Future<List<UserContext>> getContexts();
   Future<UserContext> createContext(String name);
   Future<void> deleteContext(String id);
+  Future<String> generateMcpToken();
 }
 
 class SettingsRepository implements ISettingsRepository {
@@ -194,6 +196,30 @@ class SettingsRepository implements ISettingsRepository {
   Future<void> deleteContext(String id) async {
     try {
       await _api.delete<dynamic>(_SettingsRoutes.contextById(id));
+    } on DioException catch (e) {
+      throw fromDioError(e);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // MCP token
+  // ---------------------------------------------------------------------------
+
+  /// `POST /auth/mcp-token` → a fresh MCP bearer token.
+  @override
+  Future<String> generateMcpToken() async {
+    try {
+      final response = await _api.post<Map<String, dynamic>>(
+        _SettingsRoutes.mcpToken,
+      );
+      final body = response.data;
+      if (body == null) {
+        throw const ServerException(
+          message: 'Resposta vazia do servidor',
+          statusCode: 500,
+        );
+      }
+      return body['mcp_token'] as String;
     } on DioException catch (e) {
       throw fromDioError(e);
     }

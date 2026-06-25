@@ -15,6 +15,120 @@ import (
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
+// Schemas
+var noParamSchema = map[string]any{"type": "object", "properties": map[string]any{}}
+
+var idParamSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"id": map[string]any{
+			"type":        "string",
+			"description": "ID",
+		},
+	},
+	"required": []any{"id"},
+}
+
+var noteContentSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"content": map[string]any{
+			"type":        "string",
+			"description": "Note content",
+		},
+	},
+	"required": []any{"content"},
+}
+
+var updateNoteSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"id": map[string]any{
+			"type":        "string",
+			"description": "Note ID",
+		},
+		"content": map[string]any{
+			"type":        "string",
+			"description": "Note content",
+		},
+	},
+	"required": []any{"id", "content"},
+}
+
+var taskTitleSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"title": map[string]any{
+			"type":        "string",
+			"description": "Task title",
+		},
+	},
+	"required": []any{"title"},
+}
+
+var updateTaskSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"id": map[string]any{
+			"type":        "string",
+			"description": "Task ID",
+		},
+		"title": map[string]any{
+			"type":        "string",
+			"description": "Task title",
+		},
+	},
+	"required": []any{"id", "title"},
+}
+
+var contentSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"content": map[string]any{
+			"type":        "string",
+			"description": "Content",
+		},
+	},
+	"required": []any{"content"},
+}
+
+var createTagSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name": map[string]any{
+			"type":        "string",
+			"description": "Tag name",
+		},
+	},
+	"required": []any{"name"},
+}
+
+var noteTagSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"note_id": map[string]any{
+			"type":        "string",
+			"description": "Note ID",
+		},
+		"tag_id": map[string]any{
+			"type":        "string",
+			"description": "Tag ID",
+		},
+	},
+	"required": []any{"note_id", "tag_id"},
+}
+
+var updateSoulSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"personality": map[string]any{
+			"type":        "string",
+			"description": "Personality description",
+		},
+	},
+	"required": []any{"personality"},
+}
+
 func asText(v any) []mcp.Content {
 	b, _ := json.Marshal(v)
 	return []mcp.Content{&mcp.TextContent{Text: string(b)}}
@@ -48,10 +162,8 @@ func RegisterTools(
 	tagsSvc *tags.Service,
 	soulSvc *soul.Service,
 ) {
-	emptySchema := map[string]any{"type": "object", "properties": map[string]any{}}
-
 	// Notes
-	server.AddTool(&mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: noParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -64,7 +176,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "get_note", Description: "Get note", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "get_note", Description: "Get note", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -83,7 +195,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "create_note", Description: "Create note", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "create_note", Description: "Create note", InputSchema: noteContentSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -98,7 +210,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "update_note", Description: "Update note", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "update_note", Description: "Update note", InputSchema: updateNoteSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -118,7 +230,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "delete_note", Description: "Delete note", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "delete_note", Description: "Delete note", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -139,7 +251,7 @@ func RegisterTools(
 	)
 
 	// Tasks
-	server.AddTool(&mcp.Tool{Name: "list_tasks", Description: "List tasks", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "list_tasks", Description: "List tasks", InputSchema: noParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -152,7 +264,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "create_task", Description: "Create task", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "create_task", Description: "Create task", InputSchema: taskTitleSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -167,7 +279,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "update_task", Description: "Update task", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "update_task", Description: "Update task", InputSchema: updateTaskSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -188,7 +300,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "complete_task", Description: "Complete task", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "complete_task", Description: "Complete task", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -207,7 +319,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "reopen_task", Description: "Reopen task", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "reopen_task", Description: "Reopen task", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -226,7 +338,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "delete_task", Description: "Delete task", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "delete_task", Description: "Delete task", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -247,7 +359,7 @@ func RegisterTools(
 	)
 
 	// Memories
-	server.AddTool(&mcp.Tool{Name: "list_memories", Description: "List memories", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "list_memories", Description: "List memories", InputSchema: noParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -260,7 +372,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "create_memory", Description: "Create memory", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "create_memory", Description: "Create memory", InputSchema: contentSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -275,7 +387,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "delete_memory", Description: "Delete memory", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "delete_memory", Description: "Delete memory", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -296,7 +408,7 @@ func RegisterTools(
 	)
 
 	// Tags
-	server.AddTool(&mcp.Tool{Name: "list_tags", Description: "List tags", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "list_tags", Description: "List tags", InputSchema: noParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -309,7 +421,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "create_tag", Description: "Create tag", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "create_tag", Description: "Create tag", InputSchema: createTagSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -324,7 +436,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "add_tag_to_note", Description: "Add tag to note", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "add_tag_to_note", Description: "Add tag to note", InputSchema: noteTagSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -348,7 +460,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText("added")}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "remove_tag_from_note", Description: "Remove tag from note", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "remove_tag_from_note", Description: "Remove tag from note", InputSchema: noteTagSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
@@ -374,7 +486,7 @@ func RegisterTools(
 	)
 
 	// Soul
-	server.AddTool(&mcp.Tool{Name: "get_soul", Description: "Get soul", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "get_soul", Description: "Get soul", InputSchema: noParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -387,7 +499,7 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "update_soul", Description: "Update soul", InputSchema: emptySchema},
+	server.AddTool(&mcp.Tool{Name: "update_soul", Description: "Update soul", InputSchema: updateSoulSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)

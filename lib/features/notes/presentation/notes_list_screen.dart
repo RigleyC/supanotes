@@ -29,7 +29,6 @@ import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
 
 class _Strings {
   _Strings._();
-  static const String appTitle = 'Notas';
   static const String brainDump = 'Brain Dump';
   static const String notesSection = 'Notas';
   static const String noteDeleted = 'Nota movida para a lixeira';
@@ -80,7 +79,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
     final headerSlivers = [
       AdaptiveSliverNavBar(
-        title: const Text(_Strings.appTitle),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),

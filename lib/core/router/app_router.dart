@@ -21,6 +21,7 @@ import 'package:supanotes/features/notes/presentation/inbox_screen.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
 import 'package:supanotes/features/settings/presentation/contexts_screen.dart';
+import 'package:supanotes/features/settings/presentation/mcp_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart';
 import 'package:supanotes/features/routines/presentation/brief_history_screen.dart';
@@ -99,6 +100,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.memories,
         builder: (_, _) => const MemoriesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.mcp,
+        builder: (_, _) => const McpScreen(),
       ),
     ],
     redirect: (context, state) {

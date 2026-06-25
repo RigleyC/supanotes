@@ -40,6 +40,9 @@ class _FakeSettingsRepository implements ISettingsRepository {
 
   @override
   Future<void> deleteContext(String id) => throw UnimplementedError();
+
+  @override
+  Future<String> generateMcpToken() => throw UnimplementedError();
 }
 
 void main() {

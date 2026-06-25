@@ -42,6 +42,8 @@ class _SettingsStrings {
   static const String contextsSubtitle = 'Pastas que agrupam suas notas.';
   static const String telegramTile = 'Telegram';
   static const String telegramSubtitle = 'Conecte sua conta do Telegram.';
+  static const String mcpTile = 'Protocolo de Contexto (MCP)';
+  static const String mcpSubtitle = 'Token de acesso e configuração.';
   static const String dataTile = 'Dados';
   static const String dataSubtitle = 'Informações da última sincronização.';
 
@@ -126,6 +128,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: _SettingsStrings.telegramTile,
                   subtitle: _SettingsStrings.telegramSubtitle,
                   onTap: () => context.push(AppRoutes.telegram),
+                ),
+                SettingsTile.navigation(
+                  icon: Icons.developer_mode_outlined,
+                  title: _SettingsStrings.mcpTile,
+                  subtitle: _SettingsStrings.mcpSubtitle,
+                  onTap: () => context.push(AppRoutes.mcp),
                 ),
                 SettingsTile.navigation(
                   icon: Icons.cloud_sync_outlined,
