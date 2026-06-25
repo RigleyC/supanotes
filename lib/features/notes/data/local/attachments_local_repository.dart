@@ -13,6 +13,8 @@ class AttachmentsLocalRepository {
   Future<List<AttachmentData>> getByNote(String noteId) =>
       _dao.getByNote(noteId);
 
+  Stream<AttachmentData?> watchById(String id) => _dao.watchById(id);
+
   Future<void> insert(AttachmentsCompanion companion) => _dao.upsert(companion);
 
   Future<void> updateStatus(String id, String status) =>

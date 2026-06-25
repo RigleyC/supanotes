@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +21,7 @@ import 'package:supanotes/features/search/presentation/widgets/search_error_view
 import 'package:supanotes/features/search/presentation/widgets/search_loading_view.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_results_view.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/offline_indicator.dart';
@@ -30,6 +29,7 @@ import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
 
 class _Strings {
   _Strings._();
+  static const String appTitle = 'Notas';
   static const String brainDump = 'Brain Dump';
   static const String notesSection = 'Notas';
   static const String noteDeleted = 'Nota movida para a lixeira';
@@ -79,6 +79,25 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         : ref.watch(searchResultsProvider(trimmedSearchQuery));
 
     final headerSlivers = [
+      AdaptiveSliverNavBar(
+        title: const Text(_Strings.appTitle),
+        actions: [
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            tooltip: _isSearching
+                ? _Strings.closeSearchTooltip
+                : _Strings.searchTooltip,
+            onPressed: _isSearching ? _closeSearch : _openSearch,
+          ),
+
+          NotesMoreMenu(
+            isListView: _viewMode == _NotesViewMode.list,
+            onToggleViewMode: _toggleViewMode,
+            onOpenSettings: () => context.push(AppRoutes.settings),
+            onLogout: () => ref.read(authControllerProvider.notifier).logout(),
+          ),
+        ],
+      ),
       const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
       if (_isSearching)
         SliverToBoxAdapter(
@@ -110,25 +129,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
-            tooltip: _isSearching
-                ? _Strings.closeSearchTooltip
-                : _Strings.searchTooltip,
-            onPressed: _isSearching ? _closeSearch : _openSearch,
-          ),
-
-          NotesMoreMenu(
-            isListView: _viewMode == _NotesViewMode.list,
-            onToggleViewMode: _toggleViewMode,
-            onOpenSettings: () => context.push(AppRoutes.settings),
-            onLogout: () => ref.read(authControllerProvider.notifier).logout(),
-          ),
-          if (Platform.isIOS) SizedBox(width: 24),
-        ],
-      ),
       body: trimmedSearchQuery.isEmpty
           ? notesAsync.when(
               loading: () => _NotesLoadingView(headerSlivers: headerSlivers),

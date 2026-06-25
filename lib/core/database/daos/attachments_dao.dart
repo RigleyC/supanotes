@@ -16,6 +16,9 @@ class AttachmentsDao extends DatabaseAccessor<AppDatabase>
   Future<List<AttachmentData>> getByNote(String noteId) =>
       (select(attachments)..where((a) => a.noteId.equals(noteId))).get();
 
+  Stream<AttachmentData?> watchById(String id) =>
+      (select(attachments)..where((a) => a.id.equals(id))).watchSingleOrNull();
+
   Future<void> upsert(AttachmentsCompanion companion) =>
       into(attachments).insertOnConflictUpdate(companion);
 

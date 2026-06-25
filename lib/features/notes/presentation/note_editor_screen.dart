@@ -5,6 +5,8 @@ import 'dart:io';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
+
+import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/auth/current_user.dart';
@@ -76,79 +78,81 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
         return Scaffold(
           resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : null,
-            actions: [
-              AdaptivePopupMenuButton.icon<String>(
-                icon: PlatformInfo.isIOS26OrHigher()
-                    ? 'ellipsis'
-                    : Icons.more_vert,
-                onSelected: (index, entry) async {
-                  switch (entry.value) {
-                    case 'share':
-                      await ShareNoteDialog.show(context, widget.noteId);
-                    case 'hide_completed':
-                      final userId = ref.read(currentUserIdProvider);
-                      if (userId != null) {
-                        await ref
-                            .read(userNotePreferencesRepositoryProvider)
-                            .setHideCompleted(
-                              userId,
-                              widget.noteId,
-                              !hideCompleted,
-                            );
-                      }
-                    case 'collapse_images':
-                      await repo.updateNote(
-                        widget.noteId,
-                        collapseImages: !note.collapseImages,
-                      );
-                  }
-                },
-                items: [
-                  if (isOwner)
-                    AdaptivePopupMenuItem<String>(
-                      label: NoteStrings.shareLabel,
-                      icon: PlatformInfo.isIOS26OrHigher()
-                          ? 'square.and.arrow.up'
-                          : Icons.share_outlined,
-                      value: 'share',
-                    ),
-                  AdaptivePopupMenuItem<String>(
-                    label: hideCompleted
-                        ? NoteStrings.showCompleted
-                        : NoteStrings.hideCompleted,
+          body: CustomScrollView(
+            slivers: [
+              AdaptiveSliverNavBar(
+                title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : const Text(''),
+                actions: [
+                  AdaptivePopupMenuButton.icon<String>(
                     icon: PlatformInfo.isIOS26OrHigher()
-                        ? (hideCompleted ? 'eye' : 'eye.slash')
-                        : (hideCompleted
-                            ? Icons.visibility
-                            : Icons.visibility_off),
-                    value: 'hide_completed',
+                        ? 'ellipsis'
+                        : Icons.more_vert,
+                    onSelected: (index, entry) async {
+                      switch (entry.value) {
+                        case 'share':
+                          await ShareNoteDialog.show(context, widget.noteId);
+                        case 'hide_completed':
+                          final userId = ref.read(currentUserIdProvider);
+                          if (userId != null) {
+                            await ref
+                                .read(userNotePreferencesRepositoryProvider)
+                                .setHideCompleted(
+                                  userId,
+                                  widget.noteId,
+                                  !hideCompleted,
+                                );
+                          }
+                        case 'collapse_images':
+                          await repo.updateNote(
+                            widget.noteId,
+                            collapseImages: !note.collapseImages,
+                          );
+                      }
+                    },
+                    items: [
+                      if (isOwner)
+                        AdaptivePopupMenuItem<String>(
+                          label: NoteStrings.shareLabel,
+                          icon: PlatformInfo.isIOS26OrHigher()
+                              ? 'square.and.arrow.up'
+                              : Icons.share_outlined,
+                          value: 'share',
+                        ),
+                      AdaptivePopupMenuItem<String>(
+                        label: hideCompleted
+                            ? NoteStrings.showCompleted
+                            : NoteStrings.hideCompleted,
+                        icon: PlatformInfo.isIOS26OrHigher()
+                            ? (hideCompleted ? 'eye' : 'eye.slash')
+                            : (hideCompleted
+                                ? Icons.visibility
+                                : Icons.visibility_off),
+                        value: 'hide_completed',
+                      ),
+                      if (isOwner)
+                        AdaptivePopupMenuItem<String>(
+                          label: note.collapseImages
+                              ? 'Expandir imagens'
+                              : 'Colapsar imagens',
+                          icon: PlatformInfo.isIOS26OrHigher()
+                              ? (note.collapseImages ? 'photo.fill' : 'photo')
+                              : (note.collapseImages
+                                  ? Icons.image
+                                  : Icons.image_outlined),
+                          value: 'collapse_images',
+                        ),
+                    ],
                   ),
-                  if (isOwner)
-                    AdaptivePopupMenuItem<String>(
-                      label: note.collapseImages
-                          ? 'Expandir imagens'
-                          : 'Colapsar imagens',
-                      icon: PlatformInfo.isIOS26OrHigher()
-                          ? (note.collapseImages ? 'photo.fill' : 'photo')
-                          : (note.collapseImages
-                              ? Icons.image
-                              : Icons.image_outlined),
-                      value: 'collapse_images',
+                  if (!isReadOnly)
+                    IconButton(
+                      icon: const Icon(Icons.check),
+                      onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
                     ),
                 ],
               ),
-              if (!isReadOnly)
-                IconButton(
-                  icon: const Icon(Icons.check),
-                  onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
-                ),
-            ],
-          ),
-          body: SafeArea(
-            top: false,
-            child: NoteEditor(
+              SliverFillRemaining(
+                hasScrollBody: true,
+                child: NoteEditor(
               noteId: widget.noteId,
               content: note.content,
               taskMetadata: tasksMap,
@@ -169,14 +173,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     ref.read(tasksRepositoryProvider).reopenTask(taskId),
                 onUploadFile: isReadOnly
                     ? null
-                    : (noteId, filePath, mimeType) =>
+                    : (id, noteId, filePath, mimeType) =>
                         ref.read(attachmentsRepositoryProvider).upload(
-                          noteId: noteId, file: File(filePath), mimeType: mimeType,
+                          id: id, noteId: noteId, file: File(filePath), mimeType: mimeType,
                         ),
               ),
             ),
           ),
-        );
+        ],
+      ),
+    );
       },
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(

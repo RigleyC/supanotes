@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_routes.dart';
 import '../../../shared/theme/app_spacing.dart';
+import '../../../shared/widgets/adaptive_sliver_nav_bar.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_error_view.dart';
 import '../domain/routine_model.dart';
@@ -25,7 +26,7 @@ class RoutinesScreen extends ConsumerWidget {
         onRefresh: () async => ref.invalidate(routinesProvider),
         child: CustomScrollView(
           slivers: [
-            const SliverAppBar.medium(title: Text(_appBarTitle)),
+            const AdaptiveSliverNavBar(title: Text(_appBarTitle)),
             routinesAsync.when(
               data: (routines) => _Body(
                 routines: routines,

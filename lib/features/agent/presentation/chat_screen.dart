@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 import 'package:supanotes/features/agent/presentation/widgets/agent_chat_view.dart';
 import 'package:supanotes/features/agent/presentation/widgets/new_session_button.dart';
+import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class ChatScreen extends ConsumerWidget {
@@ -27,7 +28,7 @@ class ChatScreen extends ConsumerWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar.medium(
+          const AdaptiveSliverNavBar(
             title: Text('Assistente'),
             actions: [
               NewSessionButton(),

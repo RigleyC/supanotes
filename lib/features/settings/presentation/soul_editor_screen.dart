@@ -9,6 +9,7 @@ import 'package:supanotes/features/settings/presentation/controllers/soul_editor
 import 'package:supanotes/features/settings/presentation/widgets/soul_footer.dart';
 import 'package:supanotes/features/settings/presentation/widgets/soul_form.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
@@ -82,7 +83,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       ),
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar.medium(title: Text(SettingsStrings.title)),
+          const AdaptiveSliverNavBar(title: Text(SettingsStrings.title)),
           soulAsync.when(
             loading: () => const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),

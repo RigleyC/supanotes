@@ -4,93 +4,43 @@ abstract class AttachmentNode extends BlockNode {
   AttachmentNode({Map<String, dynamic>? metadata})
       : super(metadata: metadata);
 
-  String get url;
+  String get id;
 
   @override
   String? copyContent(dynamic selection) {
     if (selection is! UpstreamDownstreamNodeSelection) return null;
-    return !selection.isCollapsed ? url : null;
+    return !selection.isCollapsed ? id : null;
   }
 
   @override
   bool hasEquivalentContent(DocumentNode other) =>
       other.runtimeType == runtimeType &&
       other is AttachmentNode &&
-      other.url == url;
+      other.id == id;
 }
 
-class ImageAttachmentNode extends AttachmentNode {
-  ImageAttachmentNode({
+class DocumentAttachmentNode extends AttachmentNode {
+  DocumentAttachmentNode({
     required this.id,
-    required this.url,
-    required this.fileName,
     super.metadata,
   });
 
   @override
   final String id;
-  @override
-  final String url;
-  final String fileName;
 
   @override
   DocumentNode copyWithAddedMetadata(Map<String, dynamic> newProperties) =>
-      ImageAttachmentNode(
-        id: id, url: url, fileName: fileName,
+      DocumentAttachmentNode(
+        id: id,
         metadata: {...metadata, ...newProperties},
       );
 
   @override
   DocumentNode copyAndReplaceMetadata(Map<String, dynamic> newMetadata) =>
-      ImageAttachmentNode(
-        id: id, url: url, fileName: fileName, metadata: newMetadata,
-      );
+      DocumentAttachmentNode(id: id, metadata: newMetadata);
 
-  ImageAttachmentNode copy() => ImageAttachmentNode(
-        id: id, url: url, fileName: fileName,
-        metadata: Map.from(metadata),
-      );
-}
-
-class FileAttachmentNode extends AttachmentNode {
-  FileAttachmentNode({
-    required this.id,
-    required this.url,
-    required this.fileName,
-    required this.mimeType,
-    this.fileSize,
-    super.metadata,
-  });
-
-  @override
-  final String id;
-  @override
-  final String url;
-  final String fileName;
-  final String mimeType;
-  final int? fileSize;
-
-  bool get isVideo => mimeType.startsWith('video/');
-
-  @override
-  DocumentNode copyWithAddedMetadata(Map<String, dynamic> newProperties) =>
-      FileAttachmentNode(
-        id: id, url: url, fileName: fileName, mimeType: mimeType,
-        fileSize: fileSize,
-        metadata: {...metadata, ...newProperties},
-      );
-
-  @override
-  DocumentNode copyAndReplaceMetadata(Map<String, dynamic> newMetadata) =>
-      FileAttachmentNode(
-        id: id, url: url, fileName: fileName, mimeType: mimeType,
-        fileSize: fileSize,
-        metadata: newMetadata,
-      );
-
-  FileAttachmentNode copy() => FileAttachmentNode(
-        id: id, url: url, fileName: fileName, mimeType: mimeType,
-        fileSize: fileSize,
+  DocumentAttachmentNode copy() => DocumentAttachmentNode(
+        id: id,
         metadata: Map.from(metadata),
       );
 }
@@ -98,7 +48,7 @@ class FileAttachmentNode extends AttachmentNode {
 class RichLinkNode extends AttachmentNode {
   RichLinkNode({
     required this.id,
-    required this.url,
+    this.url,
     this.title,
     this.description,
     this.imageUrl,
@@ -108,8 +58,7 @@ class RichLinkNode extends AttachmentNode {
 
   @override
   final String id;
-  @override
-  final String url;
+  final String? url;
   final String? title;
   final String? description;
   final String? imageUrl;

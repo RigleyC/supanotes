@@ -10,6 +10,7 @@ import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
 import 'package:supanotes/features/settings/presentation/widgets/settings_tile.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
 class _SettingsStrings {
@@ -68,7 +69,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar.medium(title: const Text(_SettingsStrings.title)),
+          const AdaptiveSliverNavBar(title: Text(_SettingsStrings.title)),
           SliverPadding(
             padding: const EdgeInsets.only(bottom: AppSpacing.lg),
             sliver: SliverList(
