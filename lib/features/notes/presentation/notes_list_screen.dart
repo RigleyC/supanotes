@@ -27,19 +27,6 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/offline_indicator.dart';
 import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
 
-class _Strings {
-  _Strings._();
-  static const String brainDump = 'Brain Dump';
-  static const String notesSection = 'Notas';
-  static const String noteDeleted = 'Nota movida para a lixeira';
-  static const String errorTitle = 'Erro ao carregar as notas';
-  static const String newNoteTooltip = 'Criar nota';
-  static const String chatTooltip = 'Conversar com o assistente';
-  static const String searchTooltip = 'Buscar notas';
-  static const String closeSearchTooltip = 'Fechar busca';
-  static const String searchHint = 'Buscar notas';
-}
-
 enum _NotesViewMode { list, grid }
 
 class NotesListScreen extends ConsumerStatefulWidget {
@@ -83,8 +70,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
             tooltip: _isSearching
-                ? _Strings.closeSearchTooltip
-                : _Strings.searchTooltip,
+                ? 'Fechar busca'
+                : 'Buscar notas',
             onPressed: _isSearching ? _closeSearch : _openSearch,
           ),
 
@@ -109,20 +96,20 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
             child: SearchInputBar(
               key: const ValueKey('notes-inline-search-field'),
               initialQuery: _searchQuery,
-              hintText: _Strings.searchHint,
+              hintText: 'Buscar notas',
               onQueryChanged: _onSearchQueryChanged,
             ),
           ),
         ),
       SliverToBoxAdapter(
         child: BrainDumpTile(
-          title: _Strings.brainDump,
+          title: 'Brain Dump',
           onTap: () => context.push(AppRoutes.inbox),
         ),
       ),
       const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
       const SliverToBoxAdapter(
-        child: SectionTitle(title: _Strings.notesSection),
+        child: SectionTitle(title: 'Notas'),
       ),
     ];
 
@@ -131,7 +118,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ? notesAsync.when(
               loading: () => _NotesLoadingView(headerSlivers: headerSlivers),
               error: (e, _) => AppErrorView(
-                title: _Strings.errorTitle,
+                title: 'Erro ao carregar as notas',
                 subtitle: e.toString(),
               ),
               data: (notes) => _buildNotesBody(notes, headerSlivers),
@@ -154,12 +141,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         smallFabKey: const ValueKey('home-chat-fab'),
         smallHeroTag: 'home-chat-fab',
         smallIcon: 'assets/icons/agent.svg',
-        smallTooltip: _Strings.chatTooltip,
+        smallTooltip: 'Conversar com o assistente',
         onSmallPressed: () => context.push(AppRoutes.chat),
         primaryFabKey: const ValueKey('home-create-note-fab'),
         primaryHeroTag: 'home-create-note-fab',
         primaryIcon: 'assets/icons/feather.svg',
-        primaryTooltip: _Strings.newNoteTooltip,
+        primaryTooltip: 'Criar nota',
         onPrimaryPressed: () => _openNewNote(context),
       ),
     );
@@ -177,7 +164,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   void _deleteNote(NoteModel note) {
     ref.read(notesRepositoryProvider).softDelete(note.id);
     if (!mounted) return;
-    AppMessenger.showSuccess(context, _Strings.noteDeleted);
+    AppMessenger.showSuccess(context, 'Nota movida para a lixeira');
   }
 
   void _toggleFavorite(NoteModel note) {

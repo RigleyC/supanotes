@@ -10,31 +10,6 @@ import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
-class _McpStrings {
-  _McpStrings._();
-
-  static const String title = 'MCP';
-  static const String tokenCardTitle = 'Token de Acesso';
-  static const String generateToken = 'Gerar Token';
-  static const String generatedTokenLabel = 'Seu token (mostrado apenas uma vez):';
-  static const String copyToken = 'Copiar Token';
-  static const String tokenWarning =
-      'Este token será exibido apenas uma vez. Copie-o agora e armazene em um local seguro.';
-  static const String tokenCopied = 'Token copiado!';
-  static const String tokenGenerated = 'Token gerado com sucesso.';
-
-  static const String claudeCardTitle = 'Claude Desktop';
-  static const String claudeInstructions =
-      'Adicione esta configuração ao seu arquivo claude_desktop_config.json:';
-  static const String copyConfig = 'Copiar Configuração';
-  static const String configCopied = 'Configuração copiada!';
-
-  static const String cursorCardTitle = 'Cursor';
-  static const String cursorInstructions =
-      'No Cursor, vá em Settings > Features > MCP Servers e adicione um novo servidor MCP com:';
-  static const String cursorSseUrl = 'URL (SSE):';
-  static const String cursorHeader = 'Header:';
-}
 
 String _sseUrl() => '${ApiConstants.baseUrl}/mcp';
 
@@ -77,7 +52,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
         _generatedToken = token;
         _isGenerating = false;
       });
-      AppMessenger.showSuccess(context, _McpStrings.tokenGenerated);
+      AppMessenger.showSuccess(context, 'Token gerado com sucesso.');
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _isGenerating = false);
@@ -90,7 +65,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const AdaptiveSliverNavBar(title: Text(_McpStrings.title)),
+          const AdaptiveSliverNavBar(title: Text('MCP')),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -148,7 +123,7 @@ class _TokenCard extends StatelessWidget {
                 Icon(Icons.vpn_key_outlined, color: theme.colorScheme.primary),
                 const SizedBox(width: AppSpacing.sm),
                 Text(
-                  _McpStrings.tokenCardTitle,
+                  'Token de Acesso',
                   style: theme.textTheme.titleMedium,
                 ),
               ],
@@ -156,7 +131,7 @@ class _TokenCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             if (generatedToken != null) ...[
               Text(
-                _McpStrings.generatedTokenLabel,
+                'Seu token (mostrado apenas uma vez):',
                 style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -176,11 +151,11 @@ class _TokenCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               AppButton(
-                text: _McpStrings.copyToken,
+                text: 'Copiar Token',
                 variant: AppButtonVariant.secondary,
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: generatedToken!));
-                  AppMessenger.showSuccess(context, _McpStrings.tokenCopied);
+                  AppMessenger.showSuccess(context, 'Token copiado!');
                 },
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -201,7 +176,7 @@ class _TokenCard extends StatelessWidget {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        _McpStrings.tokenWarning,
+                        'Este token será exibido apenas uma vez. Copie-o agora e armazene em um local seguro.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onErrorContainer,
                         ),
@@ -212,7 +187,7 @@ class _TokenCard extends StatelessWidget {
               ),
             ] else ...[
               AppButton(
-                text: _McpStrings.generateToken,
+                text: 'Gerar Token',
                 isLoading: isGenerating,
                 onPressed: isGenerating ? null : onGenerate,
               ),
@@ -246,14 +221,14 @@ class _ClaudeCard extends StatelessWidget {
                 Icon(Icons.terminal_outlined, color: theme.colorScheme.primary),
                 const SizedBox(width: AppSpacing.sm),
                 Text(
-                  _McpStrings.claudeCardTitle,
+                  'Claude Desktop',
                   style: theme.textTheme.titleMedium,
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              _McpStrings.claudeInstructions,
+              'Adicione esta configuração ao seu arquivo claude_desktop_config.json:',
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -274,11 +249,11 @@ class _ClaudeCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             AppButton(
-              text: _McpStrings.copyConfig,
+              text: 'Copiar Configuração',
               variant: AppButtonVariant.tonal,
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: configJson));
-                AppMessenger.showSuccess(context, _McpStrings.configCopied);
+                AppMessenger.showSuccess(context, 'Configuração copiada!');
               },
             ),
           ],
@@ -312,14 +287,14 @@ class _CursorCard extends StatelessWidget {
                 const Icon(Icons.terminal_outlined),
                 const SizedBox(width: AppSpacing.sm),
                 Text(
-                  _McpStrings.cursorCardTitle,
+                  'Cursor',
                   style: theme.textTheme.titleMedium,
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              _McpStrings.cursorInstructions,
+              'No Cursor, vá em Settings > Features > MCP Servers e adicione um novo servidor MCP com:',
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -334,7 +309,7 @@ class _CursorCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _McpStrings.cursorSseUrl,
+                    'URL (SSE):',
                     style: theme.textTheme.labelSmall,
                   ),
                   const SizedBox(height: AppSpacing.xs),
@@ -346,7 +321,7 @@ class _CursorCard extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    _McpStrings.cursorHeader,
+                    'Header:',
                     style: theme.textTheme.labelSmall,
                   ),
                   const SizedBox(height: AppSpacing.xs),
@@ -370,14 +345,14 @@ class _CursorCard extends StatelessWidget {
                         if (token != null)
                           IconButton(
                             icon: const Icon(Icons.copy, size: AppSpacing.iconSm),
-                            tooltip: _McpStrings.copyToken,
+                            tooltip: 'Copiar Token',
                             onPressed: () {
                               Clipboard.setData(
                                 ClipboardData(text: 'Bearer $token'),
                               );
                               AppMessenger.showSuccess(
                                 context,
-                                _McpStrings.tokenCopied,
+                                'Token copiado!',
                               );
                             },
                           ),

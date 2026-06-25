@@ -14,22 +14,6 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
 
-class _ContextsStrings {
-  _ContextsStrings._();
-
-  static const String title = 'Contextos';
-  static const String emptyTitle = 'Nenhum contexto ainda';
-  static const String emptySubtitle =
-      'Crie um contexto para agrupar notas relacionadas.';
-  static const String fabTooltip = 'Novo contexto';
-  static const String deleteConfirmTitle = 'Apagar contexto?';
-  static const String deleteConfirmMessage =
-      'As notas vinculadas a este contexto perderão a referência.';
-  static const String deleteConfirmLabel = 'Apagar';
-  static const String deletedSnackbar = 'Contexto apagado.';
-  static const String createdSnackbar = 'Contexto criado.';
-}
-
 class ContextsScreen extends ConsumerWidget {
   const ContextsScreen({super.key});
 
@@ -42,7 +26,7 @@ class ContextsScreen extends ConsumerWidget {
         onRefresh: () async => ref.invalidate(contextsProvider),
         child: CustomScrollView(
           slivers: [
-            const AdaptiveSliverNavBar(title: Text(_ContextsStrings.title)),
+            const AdaptiveSliverNavBar(title: Text('Contextos')),
             async.when(
               data: (contexts) => _ContextsList(contexts: contexts),
               loading: () => const SliverFillRemaining(
@@ -59,7 +43,7 @@ class ContextsScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        tooltip: _ContextsStrings.fabTooltip,
+        tooltip: 'Novo contexto',
         onPressed: () => _showCreateSheet(context, ref),
         child: const Icon(Icons.add),
       ),
@@ -72,7 +56,7 @@ class ContextsScreen extends ConsumerWidget {
       builder: (_) => const NewContextSheet(),
     );
     if (created == true && context.mounted) {
-      AppMessenger.showSuccess(context, _ContextsStrings.createdSnackbar);
+      AppMessenger.showSuccess(context, 'Contexto criado.');
     }
   }
 }
@@ -93,8 +77,8 @@ class _ContextsList extends ConsumerWidget {
             SizedBox(height: 120),
             EmptyState(
               icon: Icons.folder_open_outlined,
-              title: _ContextsStrings.emptyTitle,
-              subtitle: _ContextsStrings.emptySubtitle,
+              title: 'Nenhum contexto ainda',
+              subtitle: 'Crie um contexto para agrupar notas relacionadas.',
             ),
           ],
         ),
@@ -120,7 +104,7 @@ class _ContextsList extends ConsumerWidget {
                   subtitle: Text(ctx.slug),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
-                    tooltip: _ContextsStrings.deleteConfirmLabel,
+                    tooltip: 'Apagar',
                     onPressed: () async {
                       if (!await _confirmDelete(context)) return;
                       if (!context.mounted) return;
@@ -140,9 +124,9 @@ class _ContextsList extends ConsumerWidget {
   Future<bool> _confirmDelete(BuildContext context) {
     return showConfirmDialog(
       context: context,
-      title: _ContextsStrings.deleteConfirmTitle,
-      message: _ContextsStrings.deleteConfirmMessage,
-      confirmLabel: _ContextsStrings.deleteConfirmLabel,
+      title: 'Apagar contexto?',
+      message: 'As notas vinculadas a este contexto perderão a referência.',
+      confirmLabel: 'Apagar',
       destructive: true,
     );
   }
@@ -152,7 +136,7 @@ class _ContextsList extends ConsumerWidget {
       await ref.read(settingsRepositoryProvider).deleteContext(id);
       ref.invalidate(contextsProvider);
       if (context.mounted) {
-        AppMessenger.showSuccess(context, _ContextsStrings.deletedSnackbar);
+        AppMessenger.showSuccess(context, 'Contexto apagado.');
       }
     } on ApiException catch (e) {
       ref.invalidate(contextsProvider);
