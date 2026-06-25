@@ -81,7 +81,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           body: CustomScrollView(
             slivers: [
               AdaptiveSliverNavBar(
-                title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : const Text(''),
+                title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : null,
                 actions: [
                   AdaptivePopupMenuButton.icon<String>(
                     icon: PlatformInfo.isIOS26OrHigher()

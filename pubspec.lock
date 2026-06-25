@@ -1265,8 +1265,8 @@ packages:
     dependency: "direct main"
     description:
       path: super_editor
-      ref: a26abb380be1a1d0e747fd5d1043190fdb93de14
-      resolved-ref: a26abb380be1a1d0e747fd5d1043190fdb93de14
+      ref: main
+      resolved-ref: "937282664f909f88f856adb9f6e3e3af3a81d876"
       url: "https://github.com/Flutter-Bounty-Hunters/super_editor.git"
     source: git
     version: "0.3.0-dev.52"
@@ -1274,8 +1274,8 @@ packages:
     dependency: "direct main"
     description:
       path: super_editor_clipboard
-      ref: a26abb380be1a1d0e747fd5d1043190fdb93de14
-      resolved-ref: a26abb380be1a1d0e747fd5d1043190fdb93de14
+      ref: main
+      resolved-ref: "937282664f909f88f856adb9f6e3e3af3a81d876"
       url: "https://github.com/Flutter-Bounty-Hunters/super_editor.git"
     source: git
     version: "0.2.10"
@@ -1283,8 +1283,8 @@ packages:
     dependency: "direct overridden"
     description:
       path: super_keyboard
-      ref: a26abb380be1a1d0e747fd5d1043190fdb93de14
-      resolved-ref: a26abb380be1a1d0e747fd5d1043190fdb93de14
+      ref: main
+      resolved-ref: "937282664f909f88f856adb9f6e3e3af3a81d876"
       url: "https://github.com/Flutter-Bounty-Hunters/super_editor.git"
     source: git
     version: "0.4.0"
@@ -1300,8 +1300,8 @@ packages:
     dependency: "direct overridden"
     description:
       path: super_text_layout
-      ref: a26abb380be1a1d0e747fd5d1043190fdb93de14
-      resolved-ref: a26abb380be1a1d0e747fd5d1043190fdb93de14
+      ref: main
+      resolved-ref: "937282664f909f88f856adb9f6e3e3af3a81d876"
       url: "https://github.com/Flutter-Bounty-Hunters/super_editor.git"
     source: git
     version: "0.1.21"

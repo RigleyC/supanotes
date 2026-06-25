@@ -109,7 +109,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     snapshotSave: (noteId, markdown, tasks) =>
                         defaultSnapshotSave(repo, noteId, markdown, tasks),
                     onHasContentChanged: (hasContent) {
-                      if (mounted) setState(() => _hasContent = hasContent);
+                      if (mounted) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) setState(() => _hasContent = hasContent);
+                        });
+                      }
                     },
                     onTaskLongPress: (task, flushSnapshot) =>
                         _openTaskActions(task, flushSnapshot),

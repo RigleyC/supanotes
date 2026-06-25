@@ -13,7 +13,8 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
     documentPadding: EdgeInsets.symmetric(horizontal: 24),
     inlineTextStyler: (attributions, existingStyle) {
       for (final attribution in attributions) {
-        if (attribution is LinkAttribution && attribution.launchableUri.scheme == 'note') {
+        if (attribution is LinkAttribution &&
+            attribution.launchableUri.scheme == 'note') {
           return existingStyle.copyWith(
             color: Colors.white,
             background: Paint()

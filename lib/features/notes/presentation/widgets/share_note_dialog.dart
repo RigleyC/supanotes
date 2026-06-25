@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/api_exceptions.dart';
+import '../../../../shared/theme/app_spacing.dart';
+import '../../../../shared/widgets/app_bottom_sheet.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
@@ -11,16 +13,17 @@ import '../../domain/share_model.dart';
 import '../controllers/share_note_controller.dart';
 import '../controllers/share_list_controller.dart';
 
-
-//Transformar isso aqui num modal
+/// Bottom-sheet for sharing a note with other users.
+///
+/// Displays an e-mail input, permission selector, and a list of
+/// existing shares for the given note.
 class ShareNoteDialog extends ConsumerStatefulWidget {
   final String noteId;
 
   const ShareNoteDialog({super.key, required this.noteId});
 
-  //Isso aqui não existe, o certo é criar o widget e usar o showDialogGlobal passando ele.
   static Future<void> show(BuildContext context, String noteId) {
-    return showDialog(
+    return showAppBottomSheet(
       context: context,
       builder: (_) => ShareNoteDialog(noteId: noteId),
     );
@@ -72,68 +75,76 @@ class _ShareNoteDialogState extends ConsumerState<ShareNoteDialog> {
     final shareState = ref.watch(shareNoteControllerProvider);
     final errorMessage = _errorMessage(shareState);
 
-    return AlertDialog(
-      title: Text(NoteStrings.shareDialogTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _emailCtrl,
-            decoration: InputDecoration(labelText: NoteStrings.emailLabel),
-            enabled: !shareState.isLoading,
-            keyboardType: TextInputType.emailAddress,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          NoteStrings.shareDialogTitle,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          controller: _emailCtrl,
+          decoration: InputDecoration(labelText: NoteStrings.emailLabel),
+          enabled: !shareState.isLoading,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        InputDecorator(
+          decoration: InputDecoration(labelText: NoteStrings.permissionLabel),
+          child: DropdownButton<String>(
+            value: _permission,
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            items: const [
+              DropdownMenuItem(
+                value: 'view',
+                child: Text(NoteStrings.permissionView),
+              ),
+              DropdownMenuItem(
+                value: 'edit',
+                child: Text(NoteStrings.permissionEdit),
+              ),
+            ],
+            onChanged: shareState.isLoading
+                ? null
+                : (val) => setState(() => _permission = val!),
           ),
-          const SizedBox(height: 16),
-          InputDecorator(
-            decoration: InputDecoration(labelText: NoteStrings.permissionLabel),
-            child: DropdownButton<String>(
-              value: _permission,
-              isExpanded: true,
-              underline: const SizedBox.shrink(),
-              items: const [
-                DropdownMenuItem(
-                  value: 'view',
-                  child: Text(NoteStrings.permissionView),
+        ),
+        if (errorMessage != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            errorMessage,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
                 ),
-                DropdownMenuItem(
-                  value: 'edit',
-                  child: Text(NoteStrings.permissionEdit),
-                ),
-              ],
-              onChanged: shareState.isLoading
-                  ? null
-                  : (val) => setState(() => _permission = val!),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.lg),
+        Row(
+          children: [
+            Expanded(
+              child: AppButton(
+                text: NoteStrings.closeLabel,
+                variant: AppButtonVariant.secondary,
+                onPressed:
+                    shareState.isLoading ? null : () => Navigator.pop(context),
+              ),
             ),
-          ),
-          if (errorMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              errorMessage,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: AppButton(
+                text: NoteStrings.addLabel,
+                isLoading: shareState.isLoading,
+                onPressed: shareState.isLoading ? null : _submit,
+              ),
             ),
           ],
-          const Divider(height: 32),
-          _ShareListSection(noteId: widget.noteId),
-        ],
-      ),
-      actions: [
-        IntrinsicWidth(
-          child: AppButton(
-            text: NoteStrings.closeLabel,
-            variant: AppButtonVariant.secondary,
-            onPressed: shareState.isLoading ? null : () => Navigator.pop(context),
-          ),
         ),
-        IntrinsicWidth(
-          child: AppButton(
-            text: NoteStrings.addLabel,
-            isLoading: shareState.isLoading,
-            onPressed: shareState.isLoading ? null : _submit,
-          ),
-        ),
+        const SizedBox(height: AppSpacing.lg),
+        const Divider(height: 32),
+        _ShareListSection(noteId: widget.noteId),
       ],
     );
   }
@@ -182,20 +193,20 @@ class _ShareListSection extends ConsumerWidget {
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
-        switch (shareList) {
-          AsyncLoading() => const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(),
-              ),
+        shareList.when(
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(),
             ),
-          AsyncError(:final error) => Text(
-              error is ApiException ? error.message : error.toString(),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-            ),
-          AsyncData(:final value) => value.isEmpty
+          ),
+          error: (error, _) => Text(
+            error is ApiException ? error.message : error.toString(),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+          ),
+          data: (value) => value.isEmpty
               ? Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
@@ -229,7 +240,7 @@ class _ShareListSection extends ConsumerWidget {
                     ],
                   ],
                 ),
-        },
+        ),
       ],
     );
   }

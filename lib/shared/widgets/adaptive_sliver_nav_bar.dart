@@ -26,10 +26,9 @@ class AdaptiveSliverNavBar extends StatelessWidget {
     }
 
     if (title == null) {
-      return SliverAppBar.medium(
+      return SliverAppBar(
         actions: actions,
         leading: leading,
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       );
     }
 
@@ -37,7 +36,6 @@ class AdaptiveSliverNavBar extends StatelessWidget {
       title: title!,
       actions: actions,
       leading: leading,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
     );
   }
 
