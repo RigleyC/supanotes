@@ -13,47 +13,7 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
-class _SettingsStrings {
-  _SettingsStrings._();
 
-  static const String title = 'Configurações';
-
-  static const String accountSection = 'Conta';
-  static const String notificationsSection = 'Notificações';
-  static const String advancedSection = 'Avançado';
-
-  static const String emailTile = 'Email';
-  static const String nameTile = 'Nome';
-  static const String fallbackName = '—';
-  static const String fallbackEmail = '—';
-  static const String logoutTile = 'Sair da conta';
-  static const String logoutConfirmTitle = 'Sair da conta?';
-  static const String logoutConfirmMessage =
-      'Você precisará fazer login novamente para acessar suas notas.';
-  static const String logoutConfirmLabel = 'Sair';
-
-  static const String pushTile = 'Receber push';
-  static const String pushSubtitle =
-      'Notificações de briefs e lembretes (em breve).';
-
-  static const String soulTile = 'Personalidade do agent';
-  static const String soulSubtitle = 'Edite o prompt da SOUL.';
-  static const String contextsTile = 'Contextos';
-  static const String contextsSubtitle = 'Pastas que agrupam suas notas.';
-  static const String telegramTile = 'Telegram';
-  static const String telegramSubtitle = 'Conecte sua conta do Telegram.';
-  static const String mcpTile = 'Protocolo de Contexto (MCP)';
-  static const String mcpSubtitle = 'Token de acesso e configuração.';
-  static const String dataTile = 'Dados';
-  static const String dataSubtitle = 'Informações da última sincronização.';
-
-  static const String dataDialogTitle = 'Sincronização';
-  static const String dataDialogNoSync = 'Nenhuma sincronização registrada.';
-  static String dataDialogLastSynced(String relative) =>
-      'Última sync: $relative';
-  static const String dataDialogClose = 'Fechar';
-
-}
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -71,74 +31,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const AdaptiveSliverNavBar(title: Text(_SettingsStrings.title)),
+          const AdaptiveSliverNavBar(title: Text('Configurações')),
           SliverPadding(
             padding: const EdgeInsets.only(bottom: AppSpacing.lg),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                const SettingsSectionHeader(
-                  title: _SettingsStrings.accountSection,
-                ),
+                const SettingsSectionHeader(title: 'Conta'),
                 SettingsTile.action(
                   icon: Icons.alternate_email,
-                  title: _SettingsStrings.emailTile,
-                  subtitle: account?.email ?? _SettingsStrings.fallbackEmail,
+                  title: 'Email',
+                  subtitle: account?.email ?? '—',
                 ),
                 SettingsTile.action(
                   icon: Icons.person_outline,
-                  title: _SettingsStrings.nameTile,
-                  subtitle: account?.name ?? _SettingsStrings.fallbackName,
+                  title: 'Nome',
+                  subtitle: account?.name ?? '—',
                 ),
                 SettingsTile.action(
                   icon: Icons.logout,
-                  title: _SettingsStrings.logoutTile,
+                  title: 'Sair da conta',
                   onTap: () => _confirmLogout(context, ref),
                   enabled: account != null,
                 ),
 
-                const SettingsSectionHeader(
-                  title: _SettingsStrings.notificationsSection,
-                ),
+                const SettingsSectionHeader(title: 'Notificações'),
                 SettingsTile.toggle(
                   icon: Icons.notifications_outlined,
-                  title: _SettingsStrings.pushTile,
-                  subtitle: _SettingsStrings.pushSubtitle,
+                  title: 'Receber push',
+                  subtitle: 'Notificações de briefs e lembretes (em breve).',
                   value: pushEnabled,
                   onChanged: (v) =>
                       ref.read(pushServiceProvider.notifier).toggle(v),
                 ),
 
-                const SettingsSectionHeader(
-                  title: _SettingsStrings.advancedSection,
-                ),
+                const SettingsSectionHeader(title: 'Avançado'),
                 SettingsTile.navigation(
                   icon: Icons.auto_awesome_outlined,
-                  title: _SettingsStrings.soulTile,
-                  subtitle: _SettingsStrings.soulSubtitle,
+                  title: 'Personalidade do agent',
+                  subtitle: 'Edite o prompt da SOUL.',
                   onTap: () => context.push(AppRoutes.soul),
                 ),
                 SettingsTile.navigation(
                   icon: Icons.folder_outlined,
-                  title: _SettingsStrings.contextsTile,
-                  subtitle: _SettingsStrings.contextsSubtitle,
+                  title: 'Contextos',
+                  subtitle: 'Pastas que agrupam suas notas.',
                   onTap: () => context.push(AppRoutes.contexts),
                 ),
                 SettingsTile.navigation(
                   icon: Icons.send_outlined,
-                  title: _SettingsStrings.telegramTile,
-                  subtitle: _SettingsStrings.telegramSubtitle,
+                  title: 'Telegram',
+                  subtitle: 'Conecte sua conta do Telegram.',
                   onTap: () => context.push(AppRoutes.telegram),
                 ),
                 SettingsTile.navigation(
                   icon: Icons.developer_mode_outlined,
-                  title: _SettingsStrings.mcpTile,
-                  subtitle: _SettingsStrings.mcpSubtitle,
+                  title: 'Protocolo de Contexto (MCP)',
+                  subtitle: 'Token de acesso e configuração.',
                   onTap: () => context.push(AppRoutes.mcp),
                 ),
                 SettingsTile.navigation(
                   icon: Icons.cloud_sync_outlined,
-                  title: _SettingsStrings.dataTile,
-                  subtitle: _SettingsStrings.dataSubtitle,
+                  title: 'Dados',
+                  subtitle: 'Informações da última sincronização.',
                   onTap: () => _showSyncDialog(context, ref),
                 ),
               ]),
@@ -152,9 +106,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
     final confirmed = await showConfirmDialog(
       context: context,
-      title: _SettingsStrings.logoutConfirmTitle,
-      message: _SettingsStrings.logoutConfirmMessage,
-      confirmLabel: _SettingsStrings.logoutConfirmLabel,
+      title: 'Sair da conta?',
+      message: 'Você precisará fazer login novamente para acessar suas notas.',
+      confirmLabel: 'Sair',
       destructive: true,
     );
     if (!confirmed) return;
@@ -165,20 +119,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final sync = ref.read(syncStateProvider);
     final lastSynced = sync.lastSyncedAt;
     final message = lastSynced == null
-        ? _SettingsStrings.dataDialogNoSync
-        : _SettingsStrings.dataDialogLastSynced(
-            timeago.format(lastSynced, locale: 'pt_BR'),
-          );
+        ? 'Nenhuma sincronização registrada.'
+        : 'Última sync: ${timeago.format(lastSynced, locale: 'pt_BR')}';
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text(_SettingsStrings.dataDialogTitle),
+        title: const Text('Sincronização'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text(_SettingsStrings.dataDialogClose),
+            child: const Text('Fechar'),
           ),
         ],
       ),
