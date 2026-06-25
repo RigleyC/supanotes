@@ -16,7 +16,15 @@ class AdaptiveSliverNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (PlatformInfo.isIOS && title != null) {
+    if (PlatformInfo.isIOS) {
+      if (title == null) {
+        return SliverToBoxAdapter(
+          child: CupertinoNavigationBar(
+            leading: leading,
+            trailing: _buildTrailing(),
+          ),
+        );
+      }
       return CupertinoSliverNavigationBar(
         largeTitle: title,
         middle: title,
