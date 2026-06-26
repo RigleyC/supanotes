@@ -109,7 +109,7 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
 /// State is [AsyncValue<User?>]: loading, data(user) → authenticated,
 /// data(null) → unauthenticated, error → unauthenticated with feedback.
 final authControllerProvider =
-    NotifierProvider<AuthController, AsyncValue<User?>>(AuthController.new);
+    AsyncNotifierProvider<AuthController, User?>(AuthController.new);
 
 // ---------------------------------------------------------------------------
 // Database DAOs

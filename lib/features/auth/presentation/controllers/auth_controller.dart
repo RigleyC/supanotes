@@ -11,36 +11,30 @@ import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/data/session_cache.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
-class AuthController extends Notifier<AsyncValue<User?>> {
+class AuthController extends AsyncNotifier<User?> {
   late final IAuthRepository _repository;
   late final AuthLocalStorage _storage;
   late final SessionCacheNotifier _sessionCache;
 
   @override
-  AsyncValue<User?> build() {
+  Future<User?> build() async {
     _repository = ref.read(authRepositoryProvider);
     _storage = ref.read(authLocalStorageProvider);
     _sessionCache = ref.read(sessionCacheProvider.notifier);
-    Future.microtask(_restore);
-    return const AsyncValue.loading();
-  }
 
-  Future<void> _restore() async {
     await _sessionCache.restore();
     final accessToken = await _storage.getAccessToken();
-    if (accessToken == null || accessToken.isEmpty) {
-      state = const AsyncValue.data(null);
-      return;
-    }
+    if (accessToken == null || accessToken.isEmpty) return null;
+
     final user = await _storage.getUser();
     if (user == null) {
       await _storage.clear();
       _sessionCache.clear();
-      state = const AsyncValue.data(null);
-      return;
+      return null;
     }
-    state = AsyncValue.data(user);
+
     await _registerFcmToken();
+    return user;
   }
 
   Future<void> _registerFcmToken() async {
