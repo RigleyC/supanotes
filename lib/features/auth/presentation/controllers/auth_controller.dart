@@ -6,10 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/last_route_store.dart';
+import 'package:supanotes/core/sync/sync_service.dart';
+import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/data/session_cache.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/memories/presentation/memories_controller.dart';
+import 'package:supanotes/features/routines/presentation/controllers/brief_history_controller.dart';
+import 'package:supanotes/features/routines/presentation/controllers/routines_controller.dart';
+import 'package:supanotes/features/settings/presentation/controllers/contexts_controller.dart';
+import 'package:supanotes/features/settings/presentation/controllers/soul_editor_controller.dart';
+import 'package:supanotes/features/telegram/presentation/controllers/telegram_link_controller.dart';
 
 class AuthController extends AsyncNotifier<User?> {
   late final IAuthRepository _repository;
@@ -118,6 +126,16 @@ class AuthController extends AsyncNotifier<User?> {
     // On explicit logout, clear the saved route so the user starts fresh.
     await ref.read(lastRouteStoreProvider).clear();
     await _clearSession();
+
+    // Invalidar providers dependentes
+    ref.invalidate(soulProvider);
+    ref.invalidate(contextsProvider);
+    ref.invalidate(routinesProvider);
+    ref.invalidate(briefHistoryProvider);
+    ref.invalidate(chatControllerProvider);
+    ref.invalidate(syncServiceProvider);
+    ref.invalidate(telegramStatusProvider);
+    ref.invalidate(memoriesControllerProvider);
   }
 
   /// Called by the [AuthInterceptor] when a refresh has failed.
