@@ -64,9 +64,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Widget build(BuildContext context) {
     final repo = ref.read(notesRepositoryProvider);
     final tasksAsync = ref.watch(tasksByNoteStreamProvider(widget.noteId));
-    final tasksMap = tasksAsync.asData?.value != null
-        ? {for (final t in tasksAsync.asData!.value) t.id: t}
-        : const <String, TaskModel>{};
+    final tasksMap = tasksAsync.when(
+      data: (tasks) => {for (final t in tasks) t.id: t},
+      loading: () => const <String, TaskModel>{},
+      error: (_, _) => const <String, TaskModel>{},
+    );
 
     return ref.watch(noteProvider(widget.noteId)).when(
       data: (note) {
