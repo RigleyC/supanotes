@@ -1,76 +1,65 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 class AppMessenger {
   AppMessenger._();
 
-  static void showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green.shade700,
-        behavior: SnackBarBehavior.floating,
-      ));
+  static final GlobalKey<ScaffoldMessengerState> key =
+      GlobalKey<ScaffoldMessengerState>();
+
+  static void showSuccess(String message, {Duration? duration}) {
+    _show(
+      message,
+      backgroundColor: Colors.green.shade700,
+      duration: duration,
+    );
   }
 
   static void showError(
-    BuildContext context,
     String message, {
     VoidCallback? onRetry,
+    Duration? duration,
   }) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        behavior: SnackBarBehavior.floating,
-        action: onRetry != null
-            ? SnackBarAction(
-                label: 'Tentar novamente',
-                onPressed: onRetry,
-              )
-            : null,
-      ));
+    _show(
+      message,
+      backgroundColor: Colors.red.shade700,
+      duration: duration,
+      action: onRetry != null
+          ? SnackBarAction(label: 'Tentar novamente', onPressed: onRetry)
+          : null,
+    );
   }
 
-  static void showInfo(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ));
+  static void showInfo(String message, {Duration? duration}) {
+    _show(message, duration: duration);
   }
 
-  /// Completes a task and shows a snackbar with "Desfazer" action.
-  /// Returns the next due date for recurring tasks.
-  static Future<DateTime?> completeTaskWithFeedback(
-    BuildContext context, {
-    required Future<DateTime?> Function() onComplete,
-    required VoidCallback onUndo,
-  }) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final nextDue = await onComplete();
+  static void showAction(
+    String message, {
+    required SnackBarAction action,
+    Duration? duration,
+  }) {
+    _show(message, duration: duration, action: action);
+  }
 
-    final message = nextDue != null
-        ? 'Tarefa concluída! Próx. ocorrência: ${DateFormat('dd/MM/yyyy').format(nextDue)}'
-        : 'Tarefa concluída!';
+  static void _show(
+    String message, {
+    Color? backgroundColor,
+    Duration? duration,
+    SnackBarAction? action,
+  }) {
+    final messenger = key.currentState;
+    if (messenger == null) return;
 
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green.shade700,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'Desfazer',
-          textColor: Colors.white,
-          onPressed: onUndo,
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: backgroundColor,
+          behavior: SnackBarBehavior.floating,
+          duration: duration ?? const Duration(seconds: 4),
+          action: action,
         ),
-      ));
-
-    return nextDue;
+      );
   }
 }
