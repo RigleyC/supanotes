@@ -82,9 +82,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         final repo = ref.read(notesRepositoryProvider);
         final noteId = inbox.id;
         final tasksAsync = ref.watch(tasksByNoteStreamProvider(noteId));
-        final tasksMap = tasksAsync.asData?.value != null
-            ? {for (final t in tasksAsync.asData!.value) t.id: t}
-            : const <String, TaskModel>{};
+        final tasksMap = tasksAsync.when(
+          data: (tasks) => {for (final t in tasks) t.id: t},
+          loading: () => const <String, TaskModel>{},
+          error: (_, _) => const <String, TaskModel>{},
+        );
 
         return Scaffold(
           resizeToAvoidBottomInset: false,
