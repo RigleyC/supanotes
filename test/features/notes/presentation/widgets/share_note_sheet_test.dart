@@ -6,11 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/data/shares_repository.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/domain/share_model.dart';
+import 'package:supanotes/features/notes/domain/share_permission.dart';
 import 'package:supanotes/features/notes/presentation/controllers/share_list_controller.dart';
-import 'package:supanotes/features/notes/presentation/widgets/share_note_dialog.dart';
+import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
+import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 
 class _FakeSharesRepository implements SharesRepository {
-  final List<({String noteId, String email, String permission})> shareCalls = [];
+  final List<({String noteId, String email, SharePermission permission})> shareCalls = [];
 
   Future<void> Function()? shareNoteFunc;
 
@@ -18,7 +20,7 @@ class _FakeSharesRepository implements SharesRepository {
   Future<void> shareNote({
     required String noteId,
     required String email,
-    required String permission,
+    required SharePermission permission,
   }) async {
     shareCalls.add((noteId: noteId, email: email, permission: permission));
     if (shareNoteFunc != null) await shareNoteFunc!();
@@ -48,7 +50,10 @@ Widget _buildTestHarness({
       home: Scaffold(
         body: Builder(
           builder: (ctx) => ElevatedButton(
-            onPressed: () => ShareNoteDialog.show(ctx, noteId),
+            onPressed: () => showAppBottomSheet(
+              context: ctx,
+              builder: (_) => ShareNoteSheet(noteId: noteId),
+            ),
             child: const Text('Open'),
           ),
         ),
@@ -102,7 +107,7 @@ void main() {
       expect(fakeRepo.shareCalls, hasLength(1));
       expect(fakeRepo.shareCalls[0].noteId, 'note-1');
       expect(fakeRepo.shareCalls[0].email, 'user@example.com');
-      expect(fakeRepo.shareCalls[0].permission, 'view');
+      expect(fakeRepo.shareCalls[0].permission, SharePermission.view);
     });
 
     testWidgets('shows loading indicator during submission and clears on success', (tester) async {
@@ -120,7 +125,7 @@ void main() {
       completer.complete();
       await tester.pumpAndSettle();
 
-      expect(find.byType(ShareNoteDialog), findsOneWidget);
+      expect(find.byType(ShareNoteSheet), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller?.text,
         isEmpty,
@@ -136,7 +141,7 @@ void main() {
       await tester.tap(find.text(NoteStrings.addLabel));
       await tester.pumpAndSettle();
 
-      expect(find.byType(ShareNoteDialog), findsOneWidget);
+      expect(find.byType(ShareNoteSheet), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller?.text,
         isEmpty,
@@ -179,7 +184,7 @@ void main() {
           userId: 'u-1',
           email: 'user1@test.com',
           name: 'User One',
-          permission: 'view',
+          permission: SharePermission.view,
         ),
         ShareModel(
           id: 's-2',
@@ -187,7 +192,7 @@ void main() {
           userId: 'u-2',
           email: 'user2@test.com',
           name: '',
-          permission: 'edit',
+          permission: SharePermission.edit,
         ),
       ];
 

@@ -81,7 +81,7 @@ ApiClient _apiClient(_StubAdapter adapter) {
   final dio = Dio()
     ..httpClientAdapter = adapter
     ..interceptors.add(interceptor);
-  return ApiClient(authInterceptor: interceptor, dio: dio);
+  return ApiClient.test(authInterceptor: interceptor, dio: dio);
 }
 
 class _NoopStorage implements AuthLocalStorage {

@@ -70,7 +70,7 @@ void main() {
     });
 
     final first = await container.read(soulProvider.future);
-    expect(first.personality, 'cached soul');
+    expect(first.soul.personality, 'cached soul');
 
     await container.read(sessionCacheProvider.notifier).updateSoul({
       'personality': 'fresh soul',
@@ -78,7 +78,7 @@ void main() {
     container.invalidate(soulProvider);
 
     final second = await container.read(soulProvider.future);
-    expect(second.personality, 'fresh soul');
+    expect(second.soul.personality, 'fresh soul');
     expect(repo.getSoulCalls, 0);
   });
 }

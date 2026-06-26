@@ -56,7 +56,7 @@ class ContextsScreen extends ConsumerWidget {
       builder: (_) => const NewContextSheet(),
     );
     if (created == true && context.mounted) {
-      AppMessenger.showSuccess(context, 'Contexto criado.');
+      AppMessenger.showSuccess('Contexto criado.');
     }
   }
 }
@@ -69,18 +69,15 @@ class _ContextsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (contexts.isEmpty) {
-      return SliverFillRemaining(
+      return const SliverFillRemaining(
         hasScrollBody: false,
-        child: ListView(
-          physics: const NeverScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 120),
-            EmptyState(
-              icon: Icons.folder_open_outlined,
-              title: 'Nenhum contexto ainda',
-              subtitle: 'Crie um contexto para agrupar notas relacionadas.',
-            ),
-          ],
+        child: Padding(
+          padding: EdgeInsets.only(top: 120),
+          child: EmptyState(
+            icon: Icons.folder_open_outlined,
+            title: 'Nenhum contexto ainda',
+            subtitle: 'Crie um contexto para agrupar notas relacionadas.',
+          ),
         ),
       );
     }
@@ -136,12 +133,12 @@ class _ContextsList extends ConsumerWidget {
       await ref.read(settingsRepositoryProvider).deleteContext(id);
       ref.invalidate(contextsProvider);
       if (context.mounted) {
-        AppMessenger.showSuccess(context, 'Contexto apagado.');
+        AppMessenger.showSuccess('Contexto apagado.');
       }
     } on ApiException catch (e) {
       ref.invalidate(contextsProvider);
       if (context.mounted) {
-        AppMessenger.showError(context, e.message);
+        AppMessenger.showError(e.message);
       }
     }
   }

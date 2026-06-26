@@ -1,16 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
-import 'package:supanotes/shared/widgets/app_choice_chip.dart';
+import 'package:supanotes/shared/widgets/app_selection_tile.dart';
 
-/// Quick-pick chips for setting a task's `dueDate`.
-///
-/// Renders a `Wrap` of chips the user can tap to set the due date in
-/// one tap: "Hoje", "Amanhã", "Próx. segunda", "Escolher data" (opens
-/// the native date picker) and "Sem data" (clears the field). The
-/// currently selected option is highlighted with the theme primary
-/// color and a check icon.
-class DueDatePicker extends StatelessWidget {
+class DueDatePicker extends StatefulWidget {
   const DueDatePicker({
     super.key,
     required this.initialDate,
@@ -21,68 +14,94 @@ class DueDatePicker extends StatelessWidget {
   final ValueChanged<DateTime?> onChanged;
 
   @override
+  State<DueDatePicker> createState() => _DueDatePickerState();
+}
+
+class _DueDatePickerState extends State<DueDatePicker> {
+  bool _isCalendarExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final now = DateTime.now();
     final today = now.startOfDay;
     final tomorrow = DateTime(now.year, now.month, now.day + 1);
-
     final nextMonday = today.add(Duration(days: 8 - today.weekday));
 
     bool isSelected(DateTime? value) {
-      if (value == null && initialDate == null) return true;
-      if (value == null || initialDate == null) return false;
-      return value.isSameDayAs(initialDate!);
+      if (value == null || widget.initialDate == null) return false;
+      return value.isSameDayAs(widget.initialDate!);
     }
 
-    Future<void> pickCustomDate() async {
-      final picked = await showDatePicker(
-        context: context,
-        initialDate: initialDate ?? today,
-        firstDate: DateTime(now.year - 1),
-        lastDate: DateTime(now.year + 5),
-      );
-      if (picked != null) onChanged(picked);
+    bool isCustomDate() {
+      if (widget.initialDate == null) return false;
+      return !_isQuickPick(widget.initialDate!, today, tomorrow, nextMonday);
     }
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppChoiceChip(
+        AppSelectionTile(
           label: 'Hoje',
+          icon: Icons.today_rounded,
           isSelected: isSelected(today),
-          selectedColor: scheme.primary,
-          onTap: () => onChanged(today),
+          onTap: () {
+            setState(() => _isCalendarExpanded = false);
+            widget.onChanged(today);
+          },
         ),
-        AppChoiceChip(
+        AppSelectionTile(
           label: 'Amanhã',
+          icon: Icons.wb_sunny_outlined,
           isSelected: isSelected(tomorrow),
-          selectedColor: scheme.primary,
-          onTap: () => onChanged(tomorrow),
+          onTap: () {
+            setState(() => _isCalendarExpanded = false);
+            widget.onChanged(tomorrow);
+          },
         ),
-        AppChoiceChip(
+        AppSelectionTile(
           label: 'Próx. segunda',
+          icon: Icons.date_range_rounded,
           isSelected: isSelected(nextMonday),
-          selectedColor: scheme.primary,
-          onTap: () => onChanged(nextMonday),
+          onTap: () {
+            setState(() => _isCalendarExpanded = false);
+            widget.onChanged(nextMonday);
+          },
         ),
-        AppChoiceChip(
-          label: initialDate != null && !_isQuickPick(initialDate!, today, tomorrow, nextMonday)
-              ? DateFormat('d MMM').format(initialDate!)
+        AppSelectionTile(
+          label: isCustomDate()
+              ? DateFormat('d MMM').format(widget.initialDate!)
               : 'Escolher data',
-          isSelected: initialDate != null &&
-              !_isQuickPick(initialDate!, today, tomorrow, nextMonday),
-          selectedColor: scheme.primary,
-          icon: Icons.calendar_today_outlined,
-          onTap: pickCustomDate,
+          icon: Icons.calendar_month_outlined,
+          isSelected: isCustomDate(),
+          onTap: () {
+            setState(() => _isCalendarExpanded = !_isCalendarExpanded);
+          },
         ),
-        AppChoiceChip(
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: _isCalendarExpanded
+              ? ClipRect(
+                  child: CalendarDatePicker(
+                    initialDate: widget.initialDate ?? today,
+                    firstDate: DateTime(now.year - 1),
+                    lastDate: DateTime(now.year + 5),
+                    onDateChanged: (date) {
+                      setState(() => _isCalendarExpanded = false);
+                      widget.onChanged(date);
+                    },
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+        AppSelectionTile(
           label: 'Sem data',
-          isSelected: initialDate == null,
-          selectedColor: scheme.primary,
           icon: Icons.block,
-          onTap: () => onChanged(null),
+          isSelected: widget.initialDate == null,
+          onTap: () {
+            setState(() => _isCalendarExpanded = false);
+            widget.onChanged(null);
+          },
         ),
       ],
     );
@@ -99,4 +118,3 @@ class DueDatePicker extends StatelessWidget {
         value.isSameDayAs(nextMonday);
   }
 }
-

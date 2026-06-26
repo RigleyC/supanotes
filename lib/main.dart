@@ -13,10 +13,13 @@ import 'core/router/last_route_store.dart';
 import 'firebase_options.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
+import 'shared/widgets/app_snackbar.dart';
 import 'core/notifications/fcm_message_listeners.dart';
 import 'core/router/app_router.dart';
 import 'core/sync/sync_service.dart';
 import 'features/auth/domain/user.dart';
+
+import 'package:intl/date_symbol_data_local.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -31,6 +34,7 @@ void main() async {
   final sharedPreferences = await SharedPreferences.getInstance();
 
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
+  await initializeDateFormatting('pt_BR', null);
   warnIfAndroidBackendUnreachable();
   runApp(
     ProviderScope(
@@ -89,6 +93,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
+      scaffoldMessengerKey: AppMessenger.key,
       builder: (context, child) {
         if (kDebugMode) {
           return CueDebugTools(child: child!);

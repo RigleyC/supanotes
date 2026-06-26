@@ -21,17 +21,14 @@ class TelegramLinkScreen extends ConsumerStatefulWidget {
 }
 
 class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
-  bool _waitingForLink = false;
-
   @override
   Widget build(BuildContext context) {
     ref.listen(telegramStatusProvider, (prev, next) {
       final prevLinked = prev?.asData?.value.linked ?? false;
       final nextLinked = next.asData?.value.linked ?? false;
-      if (!prevLinked && nextLinked && _waitingForLink && mounted) {
-        setState(() => _waitingForLink = false);
+      final isPairing = ref.read(telegramPairingProvider).value != null;
+      if (!prevLinked && nextLinked && isPairing && mounted) {
         AppMessenger.showSuccess(
-          context,
           'Telegram conectado com sucesso!',
         );
         if (context.canPop()) {
@@ -76,10 +73,9 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
   Future<void> _onGenerate() async {
     try {
       await ref.read(telegramPairingProvider.notifier).start();
-      if (mounted) setState(() => _waitingForLink = true);
     } on ApiException catch (e) {
       if (!mounted) return;
-      AppMessenger.showError(context, e.message);
+      AppMessenger.showError(e.message);
     }
   }
 
@@ -99,10 +95,10 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
       await ref.read(telegramRepositoryProvider).deleteLink();
       ref.invalidate(telegramStatusProvider);
       if (!mounted) return;
-      AppMessenger.showSuccess(context, 'Telegram desconectado');
+      AppMessenger.showSuccess('Telegram desconectado');
     } on ApiException catch (e) {
       if (!mounted) return;
-      AppMessenger.showError(context, e.message);
+      AppMessenger.showError(e.message);
     }
   }
 }

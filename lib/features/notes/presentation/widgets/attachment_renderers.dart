@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../domain/attachment_nodes.dart';
 
 class AttachmentUploadingCapsule extends StatelessWidget {
-  const AttachmentUploadingCapsule({
+  const AttachmentUploadingCapsule({super.key, 
     required this.fileName,
     required this.onCancel,
   });
@@ -80,7 +80,7 @@ class AttachmentUploadingCapsule extends StatelessWidget {
 }
 
 class AttachmentFailedCapsule extends StatelessWidget {
-  const AttachmentFailedCapsule({
+  const AttachmentFailedCapsule({super.key, 
     required this.fileName,
     required this.onDelete,
   });
@@ -150,7 +150,7 @@ class AttachmentFailedCapsule extends StatelessWidget {
 }
 
 class AttachmentFilePill extends StatelessWidget {
-  const AttachmentFilePill({
+  const AttachmentFilePill({super.key, 
     required this.fileName,
     required this.subtitle,
     required this.icon,
@@ -221,7 +221,7 @@ class AttachmentFilePill extends StatelessWidget {
 }
 
 class AttachmentExpandedImage extends StatelessWidget {
-  const AttachmentExpandedImage({required this.url});
+  const AttachmentExpandedImage({super.key, required this.url});
 
   final String url;
 
@@ -239,7 +239,7 @@ class AttachmentExpandedImage extends StatelessWidget {
 }
 
 class AttachmentRichLinkCard extends StatelessWidget {
-  const AttachmentRichLinkCard({
+  const AttachmentRichLinkCard({super.key, 
     required this.componentKey,
     required this.node,
     this.selection,

@@ -40,28 +40,34 @@ class McpScreen extends ConsumerStatefulWidget {
 }
 
 class _McpScreenState extends ConsumerState<McpScreen> {
-  String? _generatedToken;
-  bool _isGenerating = false;
+  AsyncValue<String?> _tokenAsync = const AsyncValue.data(null);
 
   Future<void> _generateToken() async {
-    setState(() => _isGenerating = true);
+    setState(() {
+      _tokenAsync = const AsyncValue.loading();
+    });
     try {
       final token = await ref.read(settingsRepositoryProvider).generateMcpToken();
       if (!mounted) return;
       setState(() {
-        _generatedToken = token;
-        _isGenerating = false;
+        _tokenAsync = AsyncValue.data(token);
       });
-      AppMessenger.showSuccess(context, 'Token gerado com sucesso.');
-    } on ApiException catch (e) {
+      AppMessenger.showSuccess('Token gerado com sucesso.');
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _isGenerating = false);
-      AppMessenger.showError(context, e.message);
+      setState(() {
+        _tokenAsync = AsyncValue.error(e, st);
+      });
+      AppMessenger.showError(
+        e is ApiException ? e.message : e.toString(),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final token = _tokenAsync.asData?.value;
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -76,17 +82,16 @@ class _McpScreenState extends ConsumerState<McpScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _TokenCard(
-                  generatedToken: _generatedToken,
-                  isGenerating: _isGenerating,
+                  tokenAsync: _tokenAsync,
                   onGenerate: _generateToken,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 _ClaudeCard(
-                  token: _generatedToken,
+                  token: token,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 _CursorCard(
-                  token: _generatedToken,
+                  token: token,
                 ),
               ]),
             ),
@@ -99,100 +104,97 @@ class _McpScreenState extends ConsumerState<McpScreen> {
 
 class _TokenCard extends StatelessWidget {
   const _TokenCard({
-    required this.generatedToken,
-    required this.isGenerating,
+    required this.tokenAsync,
     required this.onGenerate,
   });
 
-  final String? generatedToken;
-  final bool isGenerating;
+  final AsyncValue<String?> tokenAsync;
   final VoidCallback onGenerate;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.vpn_key_outlined, color: theme.colorScheme.primary),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'Token de Acesso',
-                  style: theme.textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            if (generatedToken != null) ...[
-              Text(
-                'Seu token (mostrado apenas uma vez):',
-                style: theme.textTheme.bodySmall,
+    return tokenAsync.when(
+      data: (token) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.vpn_key_outlined, color: theme.colorScheme.primary),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text('Token de Acesso', style: theme.textTheme.titleMedium),
+                ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                ),
-                child: SelectableText(
-                  generatedToken!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
+              const SizedBox(height: AppSpacing.md),
+              if (token != null) ...[
+                Text('Seu token (mostrado apenas uma vez):', style: theme.textTheme.bodySmall),
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
+                  child: SelectableText(
+                    token,
+                    style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              AppButton(
-                text: 'Copiar Token',
-                variant: AppButtonVariant.secondary,
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: generatedToken!));
-                  AppMessenger.showSuccess(context, 'Token copiado!');
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                const SizedBox(height: AppSpacing.sm),
+                AppButton(
+                  text: 'Copiar Token',
+                  variant: AppButtonVariant.secondary,
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: token));
+                    AppMessenger.showSuccess('Token copiado!');
+                  },
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      size: AppSpacing.iconSm,
-                      color: theme.colorScheme.onErrorContainer,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        'Este token será exibido apenas uma vez. Copie-o agora e armazene em um local seguro.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onErrorContainer,
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, size: AppSpacing.iconSm, color: theme.colorScheme.onErrorContainer),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Este token será exibido apenas uma vez. Copie-o agora e armazene em um local seguro.',
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ] else ...[
-              AppButton(
-                text: 'Gerar Token',
-                isLoading: isGenerating,
-                onPressed: isGenerating ? null : onGenerate,
-              ),
+              ] else ...[
+                AppButton(
+                  text: 'Gerar Token',
+                  onPressed: onGenerate,
+                ),
+              ],
             ],
-          ],
+          ),
+        ),
+      ),
+      loading: () => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (err, _) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Text('Erro: $err'),
         ),
       ),
     );
@@ -253,7 +255,7 @@ class _ClaudeCard extends StatelessWidget {
               variant: AppButtonVariant.tonal,
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: configJson));
-                AppMessenger.showSuccess(context, 'Configuração copiada!');
+                AppMessenger.showSuccess('Configuração copiada!');
               },
             ),
           ],
@@ -351,7 +353,6 @@ class _CursorCard extends StatelessWidget {
                                 ClipboardData(text: 'Bearer $token'),
                               );
                               AppMessenger.showSuccess(
-                                context,
                                 'Token copiado!',
                               );
                             },

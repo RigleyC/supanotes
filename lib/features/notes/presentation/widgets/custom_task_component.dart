@@ -221,12 +221,16 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   @override
   void didUpdateWidget(CustomTaskComponent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.hideCompleted && widget.viewModel.isComplete && !oldWidget.viewModel.isComplete) {
-      Future.delayed(_exitAnimationDelay, () {
-        if (mounted) {
-          _exitController.forward();
-        }
-      });
+    if (widget.hideCompleted) {
+      if (widget.viewModel.isComplete && !oldWidget.viewModel.isComplete) {
+        Future.delayed(_exitAnimationDelay, () {
+          if (mounted && widget.viewModel.isComplete) {
+            _exitController.forward();
+          }
+        });
+      } else if (!widget.viewModel.isComplete && oldWidget.viewModel.isComplete) {
+        _exitController.reverse();
+      }
     }
   }
 

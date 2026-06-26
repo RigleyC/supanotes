@@ -12,8 +12,9 @@ import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_she
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_edit_sheet.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
@@ -42,13 +43,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     await flushSnapshot();
     if (!mounted || task == null) return;
 
-    await TaskEditSheet.show(
+    await TaskMetadataSheet.show(
       context,
       noteId: task.noteId,
       task: task,
-      allowTitleEdit: false,
-      allowDelete: false,
-      readOnlyTitle: true,
     );
   }
 
@@ -67,7 +65,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         .length;
 
     AppMessenger.showSuccess(
-      context,
       '$created nota(s) criada(s), $moved atualizada(s), $kept mantida(s)',
     );
   }
@@ -82,9 +79,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         final repo = ref.read(notesRepositoryProvider);
         final noteId = inbox.id;
         final tasksAsync = ref.watch(tasksByNoteStreamProvider(noteId));
-        final tasksMap = tasksAsync.asData?.value != null
-            ? {for (final t in tasksAsync.asData!.value) t.id: t}
-            : const <String, TaskModel>{};
+        final tasksMap = tasksAsync.when(
+          data: (tasks) => {for (final t in tasks) t.id: t},
+          loading: () => const <String, TaskModel>{},
+          error: (_, _) => const <String, TaskModel>{},
+        );
 
         return Scaffold(
           resizeToAvoidBottomInset: false,
@@ -118,7 +117,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     onTaskLongPress: (task, flushSnapshot) =>
                         _openTaskActions(task, flushSnapshot),
                     onTaskComplete: (taskId) =>
-                        ref.read(tasksRepositoryProvider).completeTask(taskId),
+                        TaskSnackBarHelper.completeTaskWithFeedback(
+                      onComplete: () =>
+                          ref.read(tasksRepositoryProvider).completeTask(taskId),
+                      onUndo: () =>
+                          ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                    ),
                     onTaskReopen: (taskId) =>
                         ref.read(tasksRepositoryProvider).reopenTask(taskId),
                   ),

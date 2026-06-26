@@ -23,7 +23,7 @@ class SoulEditorScreen extends ConsumerStatefulWidget {
 
 class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   final TextEditingController _controller = TextEditingController();
-  bool _initialized = false;
+
 
   @override
   void dispose() {
@@ -34,10 +34,10 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   Future<void> _save() async {
     final text = _controller.text.trim();
     if (text.isEmpty) {
-      AppMessenger.showError(context, SettingsStrings.emptyError);
+      AppMessenger.showError(SettingsStrings.emptyError);
       return;
     }
-    await ref.read(soulSaveProvider.notifier).save(text);
+    await ref.read(soulProvider.notifier).save(text);
   }
 
   Future<void> _restoreDefault() async {
@@ -50,34 +50,34 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     );
     if (!confirmed || !mounted) return;
     _controller.text = SettingsStrings.defaultPersonality;
-    AppMessenger.showInfo(context, SettingsStrings.restoredSnackbar);
+    AppMessenger.showInfo(SettingsStrings.restoredSnackbar);
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(soulSaveProvider, (prev, next) {
-      if (prev == next || next.isLoading || !mounted) return;
-      next.whenOrNull(
-        data: (_) => AppMessenger.showSuccess(context, SettingsStrings.savedSnackbar),
-        error: (err, _) => AppMessenger.showError(
-          context,
-          err is ApiException ? err.message : err.toString(),
-        ),
-      );
+    ref.listen<AsyncValue<SoulState>>(soulProvider, (prev, next) {
+      next.whenOrNull(data: (state) {
+        if (_controller.text.isEmpty) {
+          _controller.text = state.soul.personality;
+        }
+        if (state.saveSuccess && prev?.value?.saveSuccess != true) {
+          AppMessenger.showSuccess(SettingsStrings.savedSnackbar);
+        }
+        if (state.saveError != null && prev?.value?.saveError != state.saveError) {
+          final err = state.saveError;
+          AppMessenger.showError(
+            err is ApiException ? err.message : err.toString(),
+          );
+        }
+      });
     });
 
     final soulAsync = ref.watch(soulProvider);
-    final saveState = ref.watch(soulSaveProvider);
-    final soul = soulAsync.asData?.value;
-
-    if (!_initialized && soul != null) {
-      _initialized = true;
-      _controller.text = soul.personality;
-    }
+    final isSaving = soulAsync.value?.isSaving ?? false;
 
     return Scaffold(
       bottomNavigationBar: SoulFooter(
-        isSaving: saveState.isLoading,
+        isSaving: isSaving,
         onSave: _save,
         onRestore: _restoreDefault,
       ),
@@ -94,7 +94,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
                 onRetry: () => ref.invalidate(soulProvider),
               ),
             ),
-            data: (_) => SliverPadding(
+            data: (state) => SliverPadding(
               padding: const EdgeInsets.all(AppSpacing.md),
               sliver: SliverFillRemaining(
                 hasScrollBody: true,

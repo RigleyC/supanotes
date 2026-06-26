@@ -128,6 +128,6 @@ class TelegramCodeCard extends StatelessWidget {
 
   void _onCopy(BuildContext context) {
     Clipboard.setData(ClipboardData(text: code));
-    AppMessenger.showInfo(context, 'Código copiado');
+    AppMessenger.showInfo('Código copiado');
   }
 }

@@ -6,5 +6,5 @@ import 'package:supanotes/core/di/providers.dart';
 
 /// Current authenticated user id, or null if signed out / loading.
 final currentUserIdProvider = Provider.autoDispose<String?>((ref) {
-  return ref.watch(authControllerProvider).asData?.value?.id;
+  return ref.watch(authControllerProvider).value?.id;
 });

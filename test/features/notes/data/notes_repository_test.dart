@@ -294,7 +294,7 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
   }
 
   @override
-  Future<void> completeTask(String id) async {}
+  Future<DateTime?> completeTask(String id) async => null;
 
   @override
   Future<void> reopenTask(String id) async {}

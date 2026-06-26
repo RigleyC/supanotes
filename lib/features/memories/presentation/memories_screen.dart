@@ -20,9 +20,11 @@ class MemoriesScreen extends ConsumerWidget {
     ref.listen<AsyncValue<List<MemoryModel>>>(
       memoriesControllerProvider,
       (prev, next) {
-        if (next.hasError && (prev == null || !prev.hasError)) {
-          AppMessenger.showError(context, next.error.toString());
-        }
+        next.whenOrNull(error: (err, _) {
+          if (prev == null || prev.hasError == false) {
+            AppMessenger.showError(err.toString());
+          }
+        });
       },
     );
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/agent/data/chat_repository.dart';
 import 'package:supanotes/features/agent/data/chat_sse.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
@@ -52,31 +53,26 @@ ChatState chatState({
 // NOT autoDispose: the SSE stream must stay alive across widget
 // unmount/remount to avoid killing in-flight tool confirmations.
 final chatControllerProvider =
-    NotifierProvider<ChatController, AsyncValue<ChatState>>(ChatController.new);
+    AsyncNotifierProvider<ChatController, ChatState>(ChatController.new);
 
-class ChatController extends Notifier<AsyncValue<ChatState>> {
+class ChatController extends AsyncNotifier<ChatState> {
   StreamSubscription<SSEChatEvent>? _sseSub;
 
   @override
-  AsyncValue<ChatState> build() {
+  Future<ChatState> build() async {
+    ref.watch(sessionResetProvider);
     final sessionId = ref.watch(sessionManagerProvider);
     ref.onDispose(() => _sseSub?.cancel());
 
-    Future.microtask(() => _loadHistory(sessionId));
-    return const AsyncValue.loading();
-  }
-
-  Future<void> _loadHistory(String sessionId) async {
-    state = const AsyncValue.loading();
     try {
       final messages = await ref
           .read(chatRepositoryProvider)
           .getHistory(sessionId);
-      state = AsyncValue.data(chatState(messages: messages));
-    } on ApiException catch (e, st) {
-      state = AsyncValue.error(e.message, st);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      return chatState(messages: messages);
+    } on ApiException catch (e, _) {
+      throw e.message;
+    } catch (e, _) {
+      rethrow;
     }
   }
 

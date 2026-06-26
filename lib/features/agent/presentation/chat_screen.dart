@@ -17,9 +17,11 @@ class ChatScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<AsyncValue<ChatState>>(chatControllerProvider, (prev, next) {
-      if (!next.isLoading && next.hasError && next.error != prev?.error) {
-        AppMessenger.showError(context, next.error.toString());
-      }
+      next.whenOrNull(error: (err, _) {
+        if (err.toString() != prev?.error?.toString()) {
+          AppMessenger.showError(err.toString());
+        }
+      });
     });
 
     void onSend(String text) =>

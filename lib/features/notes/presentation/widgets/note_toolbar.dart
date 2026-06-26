@@ -48,7 +48,7 @@ class NoteToolbar extends StatelessWidget {
         final isTask = activeNode is TaskNode;
 
         return Container(
-          margin: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           decoration: BoxDecoration(
             color: colorScheme.surface,
             borderRadius: BorderRadius.circular(30),
@@ -64,7 +64,7 @@ class NoteToolbar extends StatelessWidget {
             ),
           ),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
+            horizontal: AppSpacing.sm,
             vertical: 6,
           ),
           child: SingleChildScrollView(
@@ -231,8 +231,10 @@ class NoteToolbar extends StatelessWidget {
 
   ListItemType? _selectedListType(DocumentSelection? selection) {
     if (selection == null) return null;
-    for (final node
-        in NoteEditorCommands.selectedNodes(editor.context.document, selection)) {
+    for (final node in NoteEditorCommands.selectedNodes(
+      editor.context.document,
+      selection,
+    )) {
       if (node is ListItemNode) return node.type;
     }
     return null;

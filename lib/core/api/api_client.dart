@@ -23,10 +23,52 @@ import 'package:supanotes/core/constants/api_constants.dart';
 class ApiClient {
   final Dio _dio;
 
-  /// [dio] is exposed for testing — when not provided the interceptor
-  /// chain is built automatically by [_build].
-  ApiClient({required AuthInterceptor authInterceptor, Dio? dio})
-    : _dio = dio ?? _build(authInterceptor);
+  /// Production constructor — builds the [Dio] instance, creates the
+  /// [AuthInterceptor] internally, and wires refresh + replay to use the
+  /// same [Dio] (the interceptor's own path and retry guards prevent
+  /// recursion).
+  ApiClient({
+    required Future<String?> Function() getAccessToken,
+    required Future<String?> Function() getRefreshToken,
+    required Future<void> Function({
+      required String accessToken,
+      required String refreshToken,
+    }) saveTokens,
+    required AuthFailureHandler onAuthFailure,
+  }) : _dio = _buildDio() {
+    final interceptor = AuthInterceptor(
+      getAccessToken: getAccessToken,
+      getRefreshToken: getRefreshToken,
+      saveTokens: saveTokens,
+      onAuthFailure: onAuthFailure,
+      onRefresh: (refreshToken) async {
+        try {
+          final response = await _dio.post<Map<String, dynamic>>(
+            '/auth/refresh',
+            data: {'refresh_token': refreshToken},
+          );
+          final data = response.data;
+          if (data == null) return null;
+          final newAccess = data['access_token'] as String?;
+          final newRefresh = data['refresh_token'] as String?;
+          if (newAccess == null || newRefresh == null) return null;
+          return (accessToken: newAccess, refreshToken: newRefresh);
+        } on DioException {
+          return null;
+        }
+      },
+      replay: (options) => _dio.fetch<dynamic>(options),
+    );
+    _dio.interceptors.add(interceptor);
+    _dio.interceptors.add(_LogInterceptor());
+  }
+
+  /// Test constructor — accepts a pre-built [AuthInterceptor] and an
+  /// optional [Dio] for mocking HTTP responses.
+  ApiClient.test({required AuthInterceptor authInterceptor, Dio? dio})
+    : _dio = dio ?? _buildDio() {
+    _dio.interceptors.add(authInterceptor);
+  }
 
   Future<Response<T>> get<T>(
     String path, {
@@ -123,7 +165,7 @@ class ApiClient {
     );
   }
 
-  static Dio _build(AuthInterceptor authInterceptor) {
+  static Dio _buildDio() {
     final dio = Dio();
 
     dio.options
@@ -137,10 +179,6 @@ class ApiClient {
       ..contentType = Headers.jsonContentType
       ..responseType = ResponseType.json;
 
-    // Auth must be the first interceptor so the retry path (which replays
-    // the original RequestOptions) still goes through it on the way out.
-    dio.interceptors.add(authInterceptor);
-    dio.interceptors.add(_LogInterceptor());
     return dio;
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,23 @@ import 'package:supanotes/features/settings/data/settings_models.dart';
 import 'package:supanotes/features/settings/presentation/controllers/soul_editor_controller.dart';
 import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
+
+class _DataSoulNotifier extends SoulNotifier {
+  _DataSoulNotifier(this._soul);
+  final Soul _soul;
+  @override
+  Future<SoulState> build() async => SoulState(soul: _soul);
+}
+
+class _LoadingSoulNotifier extends SoulNotifier {
+  @override
+  Future<SoulState> build() async => Completer<SoulState>().future;
+}
+
+class _ErrorSoulNotifier extends SoulNotifier {
+  @override
+  Future<SoulState> build() async => throw Exception('server error');
+}
 
 Widget buildApp({required ProviderContainer container}) {
   return UncontrolledProviderScope(
@@ -21,9 +40,7 @@ void main() {
     testWidgets('shows loading indicator', (tester) async {
       final container = ProviderContainer(
         overrides: [
-          soulProvider.overrideWithValue(
-            const AsyncValue<Soul>.loading(),
-          ),
+          soulProvider.overrideWith(() => _LoadingSoulNotifier()),
         ],
       );
       addTearDown(container.dispose);
@@ -35,9 +52,9 @@ void main() {
     testWidgets('renders editor with loaded soul text', (tester) async {
       final container = ProviderContainer(
         overrides: [
-          soulProvider.overrideWithValue(
-            const AsyncValue<Soul>.data(
-              Soul(personality: 'Seja útil e direto.'),
+          soulProvider.overrideWith(
+            () => _DataSoulNotifier(
+              const Soul(personality: 'Seja útil e direto.'),
             ),
           ),
         ],
@@ -53,26 +70,22 @@ void main() {
     testWidgets('shows error state', (tester) async {
       final container = ProviderContainer(
         overrides: [
-          soulProvider.overrideWithValue(
-            AsyncValue<Soul>.error(
-              Exception('server error'),
-              StackTrace.current,
-            ),
-          ),
+          soulProvider.overrideWith(() => _ErrorSoulNotifier()),
         ],
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(buildApp(container: container));
-      await tester.pump();
+      // Allow the async build to complete with an error
+      await tester.pumpAndSettle(const Duration(seconds: 5));
       expect(find.text('Exception: server error'), findsOneWidget);
     });
 
     testWidgets('restore default opens confirmation dialog', (tester) async {
       final container = ProviderContainer(
         overrides: [
-          soulProvider.overrideWithValue(
-            const AsyncValue<Soul>.data(
-              Soul(personality: 'Seja útil e direto.'),
+          soulProvider.overrideWith(
+            () => _DataSoulNotifier(
+              const Soul(personality: 'Seja útil e direto.'),
             ),
           ),
         ],

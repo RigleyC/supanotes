@@ -11,36 +11,30 @@ import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/data/session_cache.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
-class AuthController extends Notifier<AsyncValue<User?>> {
+class AuthController extends AsyncNotifier<User?> {
   late final IAuthRepository _repository;
   late final AuthLocalStorage _storage;
   late final SessionCacheNotifier _sessionCache;
 
   @override
-  AsyncValue<User?> build() {
+  Future<User?> build() async {
     _repository = ref.read(authRepositoryProvider);
     _storage = ref.read(authLocalStorageProvider);
     _sessionCache = ref.read(sessionCacheProvider.notifier);
-    Future.microtask(_restore);
-    return const AsyncValue.loading();
-  }
 
-  Future<void> _restore() async {
     await _sessionCache.restore();
     final accessToken = await _storage.getAccessToken();
-    if (accessToken == null || accessToken.isEmpty) {
-      state = const AsyncValue.data(null);
-      return;
-    }
+    if (accessToken == null || accessToken.isEmpty) return null;
+
     final user = await _storage.getUser();
     if (user == null) {
       await _storage.clear();
       _sessionCache.clear();
-      state = const AsyncValue.data(null);
-      return;
+      return null;
     }
-    state = AsyncValue.data(user);
+
     await _registerFcmToken();
+    return user;
   }
 
   Future<void> _registerFcmToken() async {
@@ -54,13 +48,12 @@ class AuthController extends Notifier<AsyncValue<User?>> {
     }
   }
 
-  Future<AuthResult> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<AuthResult> _authenticate(
+    Future<AuthResult> Function() attempt,
+  ) async {
     state = const AsyncValue.loading();
     try {
-      final result = await _repository.login(email: email, password: password);
+      final result = await attempt();
       await _sessionCache.hydrate({
         'settings': result.session.settings,
         'soul': result.session.soul,
@@ -76,32 +69,24 @@ class AuthController extends Notifier<AsyncValue<User?>> {
     }
   }
 
+  Future<AuthResult> login({
+    required String email,
+    required String password,
+  }) =>
+      _authenticate(() => _repository.login(email: email, password: password));
+
   Future<AuthResult> register({
     required String email,
     required String password,
     required String name,
-  }) async {
-    state = const AsyncValue.loading();
-    try {
-      final result = await _repository.register(
-        email: email,
-        password: password,
-        name: name,
+  }) =>
+      _authenticate(
+        () => _repository.register(
+          email: email,
+          password: password,
+          name: name,
+        ),
       );
-      await _sessionCache.hydrate({
-        'settings': result.session.settings,
-        'soul': result.session.soul,
-        'contexts': result.session.contexts,
-        'routines': result.session.routines,
-      });
-      state = AsyncValue.data(result.user);
-      await _registerFcmToken();
-      return result;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
-  }
 
   Future<void> _clearSession() async {
     await _storage.clear();
@@ -124,10 +109,13 @@ class AuthController extends Notifier<AsyncValue<User?>> {
     // On explicit logout, clear the saved route so the user starts fresh.
     await ref.read(lastRouteStoreProvider).clear();
     await _clearSession();
+
+    ref.read(sessionResetProvider.notifier).update((state) => state + 1);
   }
 
   /// Called by the [AuthInterceptor] when a refresh has failed.
   Future<void> onSessionExpired() async {
     await _clearSession();
+    ref.read(sessionResetProvider.notifier).update((state) => state + 1);
   }
 }

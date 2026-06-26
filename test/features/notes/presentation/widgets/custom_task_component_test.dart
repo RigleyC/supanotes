@@ -470,6 +470,49 @@ void main() {
       expect(find.byType(CustomTaskComponent), findsNothing);
       expect(find.byType(SizeTransition), findsNothing);
     });
+
+    testWidgets('reversing completion cancels/reverses exit animation and widget remains visible', (
+      tester,
+    ) async {
+      var animationCompleted = false;
+
+      await tester.pumpWidget(
+        wrap(
+          CustomTaskComponent(
+            viewModel: incompleteVM(),
+            hideCompleted: true,
+            onAnimationComplete: () => animationCompleted = true,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        wrap(
+          CustomTaskComponent(
+            viewModel: completeVM(),
+            hideCompleted: true,
+            onAnimationComplete: () => animationCompleted = true,
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.pumpWidget(
+        wrap(
+          CustomTaskComponent(
+            viewModel: incompleteVM(),
+            hideCompleted: true,
+            onAnimationComplete: () => animationCompleted = true,
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 650));
+      await tester.pumpAndSettle();
+
+      expect(animationCompleted, isFalse);
+    });
   });
 
   testWidgets('un-checks recurring task after 400ms delay', (tester) async {

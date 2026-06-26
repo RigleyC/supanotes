@@ -70,8 +70,8 @@ class TasksLocalRepository {
     await _dao.updateTask(companion);
   }
 
-  Future<void> completeTask(String id) async {
-    await _dao.completeTask(id);
+  Future<DateTime?> completeTask(String id) async {
+    return await _dao.completeTask(id);
   }
 
   Future<void> reopenTask(String id) async {

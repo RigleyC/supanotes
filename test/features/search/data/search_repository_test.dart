@@ -49,7 +49,7 @@ ApiClient _clientWithResponse(int statusCode, dynamic data) {
       },
     );
   });
-  return ApiClient(authInterceptor: _stubInterceptor(), dio: dio);
+  return ApiClient.test(authInterceptor: _stubInterceptor(), dio: dio);
 }
 
 void main() {

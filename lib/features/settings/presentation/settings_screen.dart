@@ -25,7 +25,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
-    final account = ref.watch(authControllerProvider).asData?.value;
+    final account = ref.watch(authControllerProvider).value;
     final pushEnabled = ref.watch(pushServiceProvider);
 
     return Scaffold(
@@ -116,7 +116,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _showSyncDialog(BuildContext context, WidgetRef ref) async {
-    final sync = ref.read(syncStateProvider);
+    final sync = ref.watch(syncStateProvider);
     final lastSynced = sync.lastSyncedAt;
     final message = lastSynced == null
         ? 'Nenhuma sincronização registrada.'

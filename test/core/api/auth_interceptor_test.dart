@@ -481,7 +481,7 @@ void main() {
         ..interceptors.add(interceptor);
 
       await expectLater(
-        () => dio.post<dynamic>('/api/v1/auth/login', data: {
+        () => dio.post<dynamic>('/auth/login', data: {
           'email': 'a@b.com',
           'password': 'x',
         }),
