@@ -68,7 +68,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         .length;
 
     AppMessenger.showSuccess(
-      context,
       '$created nota(s) criada(s), $moved atualizada(s), $kept mantida(s)',
     );
   }

@@ -56,7 +56,7 @@ class ContextsScreen extends ConsumerWidget {
       builder: (_) => const NewContextSheet(),
     );
     if (created == true && context.mounted) {
-      AppMessenger.showSuccess(context, 'Contexto criado.');
+      AppMessenger.showSuccess('Contexto criado.');
     }
   }
 }
@@ -136,12 +136,12 @@ class _ContextsList extends ConsumerWidget {
       await ref.read(settingsRepositoryProvider).deleteContext(id);
       ref.invalidate(contextsProvider);
       if (context.mounted) {
-        AppMessenger.showSuccess(context, 'Contexto apagado.');
+        AppMessenger.showSuccess('Contexto apagado.');
       }
     } on ApiException catch (e) {
       ref.invalidate(contextsProvider);
       if (context.mounted) {
-        AppMessenger.showError(context, e.message);
+        AppMessenger.showError(e.message);
       }
     }
   }

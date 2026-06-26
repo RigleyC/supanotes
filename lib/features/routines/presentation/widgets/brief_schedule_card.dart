@@ -185,7 +185,7 @@ class _BriefScheduleCardState extends ConsumerState<BriefScheduleCard> {
           );
     } on ApiException catch (e) {
       if (mounted) {
-        AppMessenger.showError(context, '$_errorSaveFailed: ${e.message}');
+        AppMessenger.showError('$_errorSaveFailed: ${e.message}');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -230,7 +230,7 @@ class _BriefScheduleCardState extends ConsumerState<BriefScheduleCard> {
       await _showResultSheet(content);
     } on ApiException catch (e) {
       if (mounted) {
-        AppMessenger.showError(context, '$_errorTestFailed: ${e.message}');
+        AppMessenger.showError('$_errorTestFailed: ${e.message}');
       }
     } finally {
       if (mounted) setState(() => _testing = false);

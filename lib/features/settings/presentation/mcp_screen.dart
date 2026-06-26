@@ -52,11 +52,11 @@ class _McpScreenState extends ConsumerState<McpScreen> {
         _generatedToken = token;
         _isGenerating = false;
       });
-      AppMessenger.showSuccess(context, 'Token gerado com sucesso.');
+      AppMessenger.showSuccess('Token gerado com sucesso.');
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _isGenerating = false);
-      AppMessenger.showError(context, e.message);
+      AppMessenger.showError(e.message);
     }
   }
 
@@ -155,7 +155,7 @@ class _TokenCard extends StatelessWidget {
                 variant: AppButtonVariant.secondary,
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: generatedToken!));
-                  AppMessenger.showSuccess(context, 'Token copiado!');
+                  AppMessenger.showSuccess('Token copiado!');
                 },
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -253,7 +253,7 @@ class _ClaudeCard extends StatelessWidget {
               variant: AppButtonVariant.tonal,
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: configJson));
-                AppMessenger.showSuccess(context, 'Configuração copiada!');
+                AppMessenger.showSuccess('Configuração copiada!');
               },
             ),
           ],
@@ -351,7 +351,6 @@ class _CursorCard extends StatelessWidget {
                                 ClipboardData(text: 'Bearer $token'),
                               );
                               AppMessenger.showSuccess(
-                                context,
                                 'Token copiado!',
                               );
                             },

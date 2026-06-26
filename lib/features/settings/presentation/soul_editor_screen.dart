@@ -34,7 +34,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   Future<void> _save() async {
     final text = _controller.text.trim();
     if (text.isEmpty) {
-      AppMessenger.showError(context, SettingsStrings.emptyError);
+      AppMessenger.showError(SettingsStrings.emptyError);
       return;
     }
     await ref.read(soulSaveProvider.notifier).save(text);
@@ -50,7 +50,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     );
     if (!confirmed || !mounted) return;
     _controller.text = SettingsStrings.defaultPersonality;
-    AppMessenger.showInfo(context, SettingsStrings.restoredSnackbar);
+    AppMessenger.showInfo(SettingsStrings.restoredSnackbar);
   }
 
   @override
@@ -58,9 +58,8 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     ref.listen(soulSaveProvider, (prev, next) {
       if (prev == next || next.isLoading || !mounted) return;
       next.whenOrNull(
-        data: (_) => AppMessenger.showSuccess(context, SettingsStrings.savedSnackbar),
+        data: (_) => AppMessenger.showSuccess(SettingsStrings.savedSnackbar),
         error: (err, _) => AppMessenger.showError(
-          context,
           err is ApiException ? err.message : err.toString(),
         ),
       );

@@ -90,7 +90,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
   Future<void> _onSave() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      AppMessenger.showInfo(context, 'Digite um título para a tarefa.');
+      AppMessenger.showInfo('Digite um título para a tarefa.');
       return;
     }
 
@@ -138,7 +138,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
       }
     } catch (e) {
       if (!mounted) return;
-      AppMessenger.showError(context, 'Erro ao salvar tarefa: $e');
+      AppMessenger.showError('Erro ao salvar tarefa: $e');
       setState(() => _saving = false);
     }
   }
@@ -179,7 +179,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
       navigator.pop(TaskEditResult(task: task, deleted: true));
     } catch (e) {
       if (!mounted) return;
-      AppMessenger.showError(context, 'Erro ao excluir tarefa: $e');
+      AppMessenger.showError('Erro ao excluir tarefa: $e');
       setState(() => _saving = false);
     }
   }

@@ -36,7 +36,7 @@ class FcmMessageListeners {
     final title = message.notification?.title;
     if (title == null || title.isEmpty) return;
 
-    AppMessenger.showInfo(context, title);
+    AppMessenger.showInfo(title);
   }
 
   void _handleOpenedMessage(RemoteMessage message) {

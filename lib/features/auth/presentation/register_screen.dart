@@ -54,7 +54,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           );
     } on ApiException catch (e) {
       if (!mounted) return;
-      AppMessenger.showError(context, e.message);
+      AppMessenger.showError(e.message);
     }
   }
 

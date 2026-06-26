@@ -46,7 +46,7 @@ class _ShareNoteDialogState extends ConsumerState<ShareNoteDialog> {
   Future<void> _submit() async {
     final email = _emailCtrl.text.trim();
     if (email.isEmpty) {
-      AppMessenger.showError(context, NoteStrings.shareErrorEmptyEmail);
+      AppMessenger.showError(NoteStrings.shareErrorEmptyEmail);
       return;
     }
 
@@ -169,11 +169,10 @@ class _ShareListSection extends ConsumerWidget {
         userId: share.userId,
       );
       ref.invalidate(shareListProvider(noteId));
-      if (context.mounted) AppMessenger.showSuccess(context, NoteStrings.revokeSuccess);
+      if (context.mounted) AppMessenger.showSuccess(NoteStrings.revokeSuccess);
     } catch (e) {
       if (context.mounted) {
         AppMessenger.showError(
-          context,
           e is ApiException ? e.message : e.toString(),
         );
       }

@@ -164,7 +164,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   void _deleteNote(NoteModel note) {
     ref.read(notesRepositoryProvider).softDelete(note.id);
     if (!mounted) return;
-    AppMessenger.showSuccess(context, 'Nota movida para a lixeira');
+    AppMessenger.showSuccess('Nota movida para a lixeira');
   }
 
   void _toggleFavorite(NoteModel note) {

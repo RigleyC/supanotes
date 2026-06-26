@@ -21,7 +21,7 @@ class MemoriesScreen extends ConsumerWidget {
       memoriesControllerProvider,
       (prev, next) {
         if (next.hasError && (prev == null || !prev.hasError)) {
-          AppMessenger.showError(context, next.error.toString());
+          AppMessenger.showError(next.error.toString());
         }
       },
     );
