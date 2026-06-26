@@ -7,8 +7,8 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
-import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/data/attachments_repository.dart';
@@ -168,9 +168,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     ? null
                     : (task, flushSnapshot) =>
                         _openTaskActions(task, flushSnapshot),
-                onTaskComplete: (taskId) =>
-                    AppMessenger.completeTaskWithFeedback(
-                      context,
+                    onTaskComplete: (taskId) =>
+                        TaskSnackBarHelper.completeTaskWithFeedback(
                       onComplete: () =>
                           ref.read(tasksRepositoryProvider).completeTask(taskId),
                       onUndo: () =>

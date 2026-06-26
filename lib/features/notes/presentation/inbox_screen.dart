@@ -14,6 +14,7 @@ import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_edit_sheet.dart';
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
@@ -118,13 +119,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     onTaskLongPress: (task, flushSnapshot) =>
                         _openTaskActions(task, flushSnapshot),
                     onTaskComplete: (taskId) =>
-                        AppMessenger.completeTaskWithFeedback(
-                          context,
-                          onComplete: () =>
-                              ref.read(tasksRepositoryProvider).completeTask(taskId),
-                          onUndo: () =>
-                              ref.read(tasksRepositoryProvider).reopenTask(taskId),
-                        ),
+                        TaskSnackBarHelper.completeTaskWithFeedback(
+                      onComplete: () =>
+                          ref.read(tasksRepositoryProvider).completeTask(taskId),
+                      onUndo: () =>
+                          ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                    ),
                     onTaskReopen: (taskId) =>
                         ref.read(tasksRepositoryProvider).reopenTask(taskId),
                   ),
