@@ -4,13 +4,13 @@ import '../../data/shares_repository.dart';
 import '../../domain/share_permission.dart';
 
 final shareNoteControllerProvider =
-    NotifierProvider.autoDispose<ShareNoteController, AsyncValue<void>>(
+    AsyncNotifierProvider.autoDispose<ShareNoteController, void>(
   ShareNoteController.new,
 );
 
-class ShareNoteController extends Notifier<AsyncValue<void>> {
+class ShareNoteController extends AsyncNotifier<void> {
   @override
-  AsyncValue<void> build() => const AsyncValue.data(null);
+  Future<void> build() async {}
 
   Future<void> share({
     required String noteId,
