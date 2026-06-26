@@ -3,13 +3,19 @@ import 'package:supanotes/features/auth/data/session_cache.dart';
 import 'package:supanotes/features/settings/data/settings_models.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
 
-final soulProvider = FutureProvider.autoDispose<Soul>((ref) async {
-  final cache = ref.read(sessionCacheProvider);
-  if (cache.soul.isNotEmpty) {
-    return Soul(personality: cache.soul['personality'] as String? ?? '');
+final soulProvider =
+    AsyncNotifierProvider.autoDispose<SoulNotifier, Soul>(SoulNotifier.new);
+
+class SoulNotifier extends AsyncNotifier<Soul> {
+  @override
+  Future<Soul> build() async {
+    final cache = ref.read(sessionCacheProvider);
+    if (cache.soul.isNotEmpty) {
+      return Soul(personality: cache.soul['personality'] as String? ?? '');
+    }
+    return ref.read(settingsRepositoryProvider).getSoul();
   }
-  return ref.read(settingsRepositoryProvider).getSoul();
-});
+}
 
 final soulSaveProvider = AsyncNotifierProvider.autoDispose<SoulSaveNotifier, void>(SoulSaveNotifier.new);
 
