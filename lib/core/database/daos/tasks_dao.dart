@@ -234,6 +234,15 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       }
     });
   }
+
+  /// Runs [action] inside a Drift [Transaction] so that all batched
+  /// task writes in a single save are either committed or rolled
+  /// back together.
+  Future<void> runInTransaction(Future<void> Function() action) async {
+    await transaction(() async {
+      await action();
+    });
+  }
 }
 
 /// Pure helper that returns the next due date for a given [recurrence]

@@ -274,30 +274,33 @@ class NotesRepository implements INotesRepository {
     final currentIds = currentTasks.map((t) => t.id).toSet();
     final docIds = tasks.map((t) => t.id).toSet();
 
-    for (final task in tasks) {
-      if (currentIds.contains(task.id)) {
-        await _tasksLocal.updateTask(
-          TasksCompanion(
-            id: Value(task.id),
-            title: Value(task.text),
-            status: Value(task.isComplete ? 'done' : 'open'),
-          ),
-        );
-      } else {
-        await _tasksLocal.createTask(
-          id: task.id,
-          noteId: noteId,
-          title: task.text,
-          position: 0,
-          status: task.isComplete ? 'done' : 'open',
-        );
+    // Batch all writes inside a single transaction via the local repository.
+    await _tasksLocal.runInTransaction(() async {
+      for (final task in tasks) {
+        if (currentIds.contains(task.id)) {
+          await _tasksLocal.updateTask(
+            TasksCompanion(
+              id: Value(task.id),
+              title: Value(task.text),
+              status: Value(task.isComplete ? 'done' : 'open'),
+            ),
+          );
+        } else {
+          await _tasksLocal.createTask(
+            id: task.id,
+            noteId: noteId,
+            title: task.text,
+            position: 0,
+            status: task.isComplete ? 'done' : 'open',
+          );
+        }
       }
-    }
 
-    final removed = currentIds.difference(docIds);
-    for (final id in removed) {
-      await _tasksLocal.deleteTask(id);
-    }
+      final removed = currentIds.difference(docIds);
+      for (final id in removed) {
+        await _tasksLocal.deleteTask(id);
+      }
+    });
   }
 
   String? _excerptFrom(String content) {

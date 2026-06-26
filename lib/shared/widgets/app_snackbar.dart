@@ -64,7 +64,7 @@ class AppMessenger {
       subtitle: subtitle,
       type: _SnackType.task,
       action: action,
-      duration: duration,
+      duration: duration ?? const Duration(seconds: 6),
     );
   }
 
@@ -78,6 +78,11 @@ class AppMessenger {
     final messenger = key.currentState;
     if (messenger == null) return;
 
+    final context = key.currentContext;
+    final bgColor = context != null
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : null;
+
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -87,6 +92,7 @@ class AppMessenger {
             subtitle: subtitle,
             type: type,
           ),
+          backgroundColor: bgColor,
           behavior: SnackBarBehavior.floating,
           shape: const StadiumBorder(),
           duration: duration ?? const Duration(seconds: 4),

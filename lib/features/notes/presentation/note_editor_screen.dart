@@ -18,6 +18,7 @@ import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
+import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
@@ -25,12 +26,29 @@ import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.d
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 
-
 final noteProvider = StreamProvider.autoDispose.family<NoteModel?, String>((
   ref,
   id,
 ) {
   return ref.watch(notesRepositoryProvider).watchNoteById(id);
+});
+
+/// Streams a note together with its tasks in a single emission.
+///
+/// This avoids the jank caused by two independent providers emitting at
+/// different times (note first, tasks later), and lets the editor build
+/// once with all data already available.
+final noteWithTasksProvider =
+    StreamProvider.autoDispose.family<NoteWithTasks, String>((ref, noteId) {
+  final repo = ref.watch(notesRepositoryProvider);
+  final noteStream = repo.watchNoteById(noteId);
+  final taskRepo = ref.watch(tasksRepositoryProvider);
+
+  return noteStream.asyncMap((note) async {
+    if (note == null) return NoteWithTasks(note: null, tasks: []);
+    final tasks = await taskRepo.watchByNote(noteId).first;
+    return NoteWithTasks(note: note, tasks: tasks);
+  });
 });
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -60,18 +78,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(notesRepositoryProvider);
-    final tasksAsync = ref.watch(tasksByNoteStreamProvider(widget.noteId));
-    final tasksMap = tasksAsync.when(
-      data: (tasks) => {for (final t in tasks) t.id: t},
-      loading: () => const <String, TaskModel>{},
-      error: (_, _) => const <String, TaskModel>{},
-    );
-
-    return ref.watch(noteProvider(widget.noteId)).when(
-      data: (note) {
+    return ref.watch(noteWithTasksProvider(widget.noteId)).when(
+      data: (noteWithTasks) {
+        final note = noteWithTasks.note;
         if (note == null) {
           return Scaffold(body: Center(child: Text(NoteStrings.errorNotFound)));
         }
+        final tasksMap = noteWithTasks.taskById;
 
         final isOwner = note.isOwner;
         final isReadOnly = note.isReadOnly;
@@ -157,20 +170,20 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               SliverFillRemaining(
                 hasScrollBody: true,
                 child: NoteEditor(
-              noteId: widget.noteId,
-              content: note.content,
-              taskMetadata: tasksMap,
-              hideCompleted: hideCompleted,
-              collapseImages: note.collapseImages,
-              isReadOnly: isReadOnly,
-              delegate: NoteEditorDelegate(
-                snapshotSave: (noteId, markdown, tasks) =>
-                    defaultSnapshotSave(repo, noteId, markdown, tasks),
-                emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
-                onTaskLongPress: isReadOnly
-                    ? null
-                    : (task, flushSnapshot) =>
-                        _openTaskActions(task, flushSnapshot),
+                  noteId: widget.noteId,
+                  content: note.content,
+                  taskMetadata: tasksMap,
+                  hideCompleted: hideCompleted,
+                  collapseImages: note.collapseImages,
+                  isReadOnly: isReadOnly,
+                  delegate: NoteEditorDelegate(
+                    snapshotSave: (noteId, markdown, tasks) =>
+                        defaultSnapshotSave(repo, noteId, markdown, tasks),
+                    emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
+                    onTaskLongPress: isReadOnly
+                        ? null
+                        : (task, flushSnapshot) =>
+                            _openTaskActions(task, flushSnapshot),
                     onTaskComplete: (taskId) =>
                         TaskSnackBarHelper.completeTaskWithFeedback(
                       onComplete: () =>
@@ -178,20 +191,23 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       onUndo: () =>
                           ref.read(tasksRepositoryProvider).reopenTask(taskId),
                     ),
-                onTaskReopen: (taskId) =>
-                    ref.read(tasksRepositoryProvider).reopenTask(taskId),
-                onUploadFile: isReadOnly
-                    ? null
-                    : (id, noteId, filePath, mimeType) =>
-                        ref.read(attachmentsRepositoryProvider).upload(
-                          id: id, noteId: noteId, file: File(filePath), mimeType: mimeType,
-                        ),
-              ),
+                    onTaskReopen: (taskId) =>
+                        ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                    onUploadFile: isReadOnly
+                        ? null
+                        : (id, noteId, filePath, mimeType) =>
+                            ref.read(attachmentsRepositoryProvider).upload(
+                              id: id,
+                              noteId: noteId,
+                              file: File(filePath),
+                              mimeType: mimeType,
+                            ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+          );
       },
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(

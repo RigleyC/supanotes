@@ -304,6 +304,11 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
 
   @override
   Future<void> deleteTask(String id) async {}
+
+  @override
+  Future<void> runInTransaction(Future<void> Function() action) async {
+    await action();
+  }
 }
 
 class FakeUserNotePreferencesDao implements UserNotePreferencesDao {

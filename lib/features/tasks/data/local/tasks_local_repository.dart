@@ -89,4 +89,11 @@ class TasksLocalRepository {
   Future<void> deleteTask(String id) async {
     await _dao.deleteTaskById(id);
   }
+
+  /// Runs [action] inside a Drift [Transaction] so that all batched
+  /// task writes in a single save are either committed or rolled
+  /// back together.
+  Future<void> runInTransaction(Future<void> Function() action) async {
+    await _dao.runInTransaction(action);
+  }
 }

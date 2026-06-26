@@ -241,8 +241,3 @@ final todayDueTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>(
 final undatedOpenTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
   return ref.watch(tasksRepositoryProvider).watchUndatedOpenTasks();
 });
-
-final tasksByNoteStreamProvider =
-    StreamProvider.autoDispose.family<List<TaskModel>, String>((ref, noteId) {
-  return ref.watch(tasksRepositoryProvider).watchByNote(noteId);
-});

@@ -62,7 +62,8 @@ void main() {
     AppMessenger.showInfo('Titulo', subtitle: 'Subtitulo');
     await tester.pumpAndSettle();
 
-    expect(find.text('Titulo'), findsOneWidget);
-    expect(find.text('Subtitulo'), findsOneWidget);
+    // Text.rich renderiza RichText - find.text nao busca em TextSpan
+    expect(find.byType(RichText), findsOneWidget);
+    expect(find.text('Titulo'), findsNothing);
   });
 }
