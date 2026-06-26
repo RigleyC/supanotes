@@ -21,15 +21,13 @@ class TelegramLinkScreen extends ConsumerStatefulWidget {
 }
 
 class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
-  bool _waitingForLink = false;
-
   @override
   Widget build(BuildContext context) {
     ref.listen(telegramStatusProvider, (prev, next) {
       final prevLinked = prev?.asData?.value.linked ?? false;
       final nextLinked = next.asData?.value.linked ?? false;
-      if (!prevLinked && nextLinked && _waitingForLink && mounted) {
-        setState(() => _waitingForLink = false);
+      final isPairing = ref.read(telegramPairingProvider).isPairing;
+      if (!prevLinked && nextLinked && isPairing && mounted) {
         AppMessenger.showSuccess(
           'Telegram conectado com sucesso!',
         );
@@ -75,7 +73,6 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
   Future<void> _onGenerate() async {
     try {
       await ref.read(telegramPairingProvider.notifier).start();
-      if (mounted) setState(() => _waitingForLink = true);
     } on ApiException catch (e) {
       if (!mounted) return;
       AppMessenger.showError(e.message);

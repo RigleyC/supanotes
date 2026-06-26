@@ -6,7 +6,33 @@ final telegramStatusProvider = FutureProvider.autoDispose<TelegramLinkStatus>((r
   return ref.read(telegramRepositoryProvider).getLinkStatus();
 });
 
-typedef TelegramPairingState = ({String? code, int countdown});
+class TelegramPairingState {
+  final String? code;
+  final int countdown;
+  final bool isPairing;
+  final String? errorMessage;
+
+  const TelegramPairingState({
+    this.code,
+    this.countdown = 0,
+    this.isPairing = false,
+    this.errorMessage,
+  });
+
+  TelegramPairingState copyWith({
+    String? code,
+    int? countdown,
+    bool? isPairing,
+    String? errorMessage,
+  }) {
+    return TelegramPairingState(
+      code: code ?? this.code,
+      countdown: countdown ?? this.countdown,
+      isPairing: isPairing ?? this.isPairing,
+      errorMessage: errorMessage ?? this.errorMessage,
+    );
+  }
+}
 
 class TelegramPairingController extends Notifier<TelegramPairingState> {
   Timer? _countdownTimer;
@@ -18,14 +44,24 @@ class TelegramPairingController extends Notifier<TelegramPairingState> {
       _countdownTimer?.cancel();
       _statusTimer?.cancel();
     });
-    return (code: null, countdown: 0);
+    return const TelegramPairingState();
   }
 
   Future<void> start() async {
-    final linkCode =
-        await ref.read(telegramRepositoryProvider).generateLinkCode();
-    state = (code: linkCode.code, countdown: linkCode.remaining.inSeconds);
-    _startTimers();
+    state = state.copyWith(isPairing: true, errorMessage: null);
+    try {
+      final linkCode =
+          await ref.read(telegramRepositoryProvider).generateLinkCode();
+      state = state.copyWith(
+        isPairing: true,
+        code: linkCode.code,
+        countdown: linkCode.remaining.inSeconds,
+      );
+      _startTimers();
+    } catch (e) {
+      state = state.copyWith(isPairing: false, errorMessage: e.toString());
+      rethrow;
+    }
   }
 
   void _startTimers() {
@@ -34,7 +70,7 @@ class TelegramPairingController extends Notifier<TelegramPairingState> {
         stop();
         return;
       }
-      state = (code: state.code, countdown: state.countdown - 1);
+      state = state.copyWith(countdown: state.countdown - 1);
     });
     _statusTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       final status =
@@ -47,6 +83,7 @@ class TelegramPairingController extends Notifier<TelegramPairingState> {
   }
 
   void stop() {
+    state = state.copyWith(isPairing: false);
     _countdownTimer?.cancel();
     _statusTimer?.cancel();
     _countdownTimer = null;
