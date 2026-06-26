@@ -23,7 +23,7 @@ abstract class ITasksRepository {
   Stream<List<TaskModel>> watchUndatedOpenTasks();
   Stream<List<TaskModel>> watchByNote(String noteId);
   Future<TaskModel> createTask({required String noteId, required String title, DateTime? dueDate, TaskRecurrence? recurrence, int position = 0});
-  Future<void> completeTask(String id);
+  Future<DateTime?> completeTask(String id);
   Future<void> reopenTask(String id);
   Future<void> updateTask(String id, {String? title, DateTime? dueDate, TaskRecurrence? recurrence, int? position, bool clearDueDate = false, bool clearRecurrence = false});
   Future<void> deleteTask(String id);
@@ -136,7 +136,7 @@ class TasksRepository implements ITasksRepository {
   /// task is recurring, schedules the next occurrence in the same
   /// transaction.
   @override
-  Future<void> completeTask(String id) => _local.completeTask(id);
+  Future<DateTime?> completeTask(String id) => _local.completeTask(id);
 
   /// Reverses a completion: clears `completedAt` and re-opens the task.
   @override

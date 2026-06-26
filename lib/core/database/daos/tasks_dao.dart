@@ -112,12 +112,16 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   /// `status` stays `open`. Non-recurring tasks are marked `done`. The
   /// completion event is recorded in [LocalTaskCompletions]. Dirty flags
   /// are set so the sync layer propagates the change to the backend.
-  Future<void> completeTask(String id) async {
+  ///
+  /// Returns the next due date for recurring tasks, or null for
+  /// non-recurring tasks.
+  Future<DateTime?> completeTask(String id) async {
     final task = await (select(tasks)..where((t) => t.id.equals(id)))
         .getSingleOrNull();
-    if (task == null) return;
+    if (task == null) return null;
 
     final now = DateTime.now();
+    DateTime? nextDue;
 
     await transaction(() async {
       // 1. Record the completion event.
@@ -132,7 +136,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       // 2. If recurring, schedule the next occurrence on the same row.
       final recurrence = task.recurrence;
       if (recurrence != null) {
-        final nextDue = _nextDueDate(
+        nextDue = _nextDueDate(
           from: task.dueDate ?? now,
           recurrence: recurrence,
         );
@@ -160,6 +164,8 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         ),
       );
     });
+
+    return nextDue;
   }
 
   /// Hard-deletes a task (used when the user removes a task from the

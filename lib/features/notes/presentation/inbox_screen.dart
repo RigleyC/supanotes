@@ -118,7 +118,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     onTaskLongPress: (task, flushSnapshot) =>
                         _openTaskActions(task, flushSnapshot),
                     onTaskComplete: (taskId) =>
-                        ref.read(tasksRepositoryProvider).completeTask(taskId),
+                        AppMessenger.completeTaskWithFeedback(
+                          context,
+                          onComplete: () =>
+                              ref.read(tasksRepositoryProvider).completeTask(taskId),
+                          onUndo: () =>
+                              ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                        ),
                     onTaskReopen: (taskId) =>
                         ref.read(tasksRepositoryProvider).reopenTask(taskId),
                   ),

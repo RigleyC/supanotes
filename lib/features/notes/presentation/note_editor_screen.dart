@@ -7,6 +7,7 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/auth/current_user.dart';
@@ -168,7 +169,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     : (task, flushSnapshot) =>
                         _openTaskActions(task, flushSnapshot),
                 onTaskComplete: (taskId) =>
-                    ref.read(tasksRepositoryProvider).completeTask(taskId),
+                    AppMessenger.completeTaskWithFeedback(
+                      context,
+                      onComplete: () =>
+                          ref.read(tasksRepositoryProvider).completeTask(taskId),
+                      onUndo: () =>
+                          ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                    ),
                 onTaskReopen: (taskId) =>
                     ref.read(tasksRepositoryProvider).reopenTask(taskId),
                 onUploadFile: isReadOnly
