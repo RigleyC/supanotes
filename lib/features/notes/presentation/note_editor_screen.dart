@@ -7,6 +7,7 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
+import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 
@@ -19,7 +20,7 @@ import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
-import 'package:supanotes/features/notes/presentation/widgets/share_note_dialog.dart';
+import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_edit_sheet.dart';
@@ -91,7 +92,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     onSelected: (index, entry) async {
                       switch (entry.value) {
                         case 'share':
-                          await ShareNoteDialog.show(context, widget.noteId);
+                          await showAppBottomSheet(
+                            context: context,
+                            builder: (_) => ShareNoteSheet(noteId: widget.noteId),
+                          );
                         case 'hide_completed':
                           final userId = ref.read(currentUserIdProvider);
                           if (userId != null) {

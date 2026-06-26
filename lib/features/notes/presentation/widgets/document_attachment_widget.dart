@@ -8,7 +8,7 @@ import '../../domain/attachment_model.dart';
 import 'attachment_renderers.dart';
 
 class DocumentAttachmentWidget extends ConsumerWidget {
-  const DocumentAttachmentWidget({
+  const DocumentAttachmentWidget({super.key, 
     required this.componentKey,
     required this.nodeId,
     required this.onDelete,

@@ -5,6 +5,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_exceptions.dart';
 import '../../../../core/di/providers.dart';
 import '../domain/share_model.dart';
+import '../domain/share_permission.dart';
 
 final sharesRepositoryProvider = Provider.autoDispose<SharesRepository>(
   (ref) => SharesRepository(ref.watch(apiClientProvider)),
@@ -22,12 +23,12 @@ class SharesRepository {
   Future<void> shareNote({
     required String noteId,
     required String email,
-    required String permission,
+    required SharePermission permission,
   }) async {
     try {
       await _api.post('/notes/$noteId/shares', data: {
         'email': email,
-        'permission': permission,
+        'permission': permission.toJson(),
       });
     } on DioException catch (e) {
       throw fromDioError(e);

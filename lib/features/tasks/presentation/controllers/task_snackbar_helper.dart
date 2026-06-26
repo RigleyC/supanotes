@@ -10,7 +10,7 @@ class TaskSnackBarHelper {
     final nextDue = await onComplete();
 
     final message = nextDue != null
-        ? 'Tarefa concluída! Próx. ocorrência: ${DateFormat('dd/MM/yyyy').format(nextDue)}'
+        ? 'Tarefa concluída! Próx. em: ${DateFormat('pt_BR', 'MMMMd').format(nextDue)}'
         : 'Tarefa concluída!';
 
     AppMessenger.showAction(

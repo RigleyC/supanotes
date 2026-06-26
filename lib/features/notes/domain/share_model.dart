@@ -1,10 +1,12 @@
+import 'share_permission.dart';
+
 class ShareModel {
   final String id;
   final String noteId;
   final String userId;
   final String email;
   final String name;
-  final String permission;
+  final SharePermission permission;
 
   const ShareModel({
     required this.id,
@@ -21,6 +23,6 @@ class ShareModel {
         userId: json['user_id'] as String,
         email: json['email'] as String,
         name: (json['name'] as String?) ?? '',
-        permission: json['permission'] as String,
+        permission: SharePermission.fromJson(json['permission'] as String),
       );
 }

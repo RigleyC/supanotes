@@ -196,7 +196,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppSpacing.lg),
-          if (widget.allowTitleEdit)
+          /*   if (widget.allowTitleEdit)
             AppInput(
               controller: _titleController,
               autofocus: !_isEdit,
@@ -215,16 +215,19 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-          const SizedBox(height: AppSpacing.lg),
-          Text('Data de vencimento', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.lg), */
+          Text(
+            'Data de vencimento',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppSpacing.md),
           DueDatePicker(
             initialDate: _dueDate,
             onChanged: (d) => setState(() => _dueDate = d),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text('Repetição', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: AppSpacing.sm),
+          Text('Repetição', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.md),
           RecurrencePicker(
             initialRecurrence: _recurrence,
             onChanged: (r) => setState(() {
@@ -237,8 +240,8 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
           const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
-              if (_isEdit && widget.allowDelete)
-                IntrinsicWidth(
+              /*  if (_isEdit && widget.allowDelete)
+                Expanded(
                   child: AppButton(
                     text: 'Excluir',
                     onPressed: _saving ? null : _onDelete,
@@ -246,8 +249,8 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
                     isLoading: _saving,
                   ),
                 ),
-              const Spacer(),
-              IntrinsicWidth(
+              const SizedBox(width: 16), */
+              Expanded(
                 child: AppButton(
                   text: 'Cancelar',
                   onPressed: _saving ? null : () => Navigator.of(context).pop(),
@@ -255,7 +258,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              IntrinsicWidth(
+              Expanded(
                 child: AppButton(
                   text: 'Salvar',
                   onPressed: _saving ? null : _onSave,

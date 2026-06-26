@@ -7,11 +7,7 @@ class AppMessenger {
       GlobalKey<ScaffoldMessengerState>();
 
   static void showSuccess(String message, {Duration? duration}) {
-    _show(
-      message,
-      backgroundColor: Colors.green.shade700,
-      duration: duration,
-    );
+    _show(message, backgroundColor: Colors.green.shade700, duration: duration);
   }
 
   static void showError(
@@ -57,6 +53,7 @@ class AppMessenger {
           content: Text(message),
           backgroundColor: backgroundColor,
           behavior: SnackBarBehavior.floating,
+          shape: const StadiumBorder(),
           duration: duration ?? const Duration(seconds: 4),
           action: action,
         ),
