@@ -1,39 +1,79 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/data/session_cache.dart';
 import 'package:supanotes/features/settings/data/settings_models.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
 
-final soulProvider =
-    AsyncNotifierProvider.autoDispose<SoulNotifier, Soul>(SoulNotifier.new);
+class SoulState {
+  final Soul soul;
+  final bool isSaving;
+  final bool saveSuccess;
+  final Object? saveError;
 
-class SoulNotifier extends AsyncNotifier<Soul> {
-  @override
-  Future<Soul> build() async {
-    final cache = ref.read(sessionCacheProvider);
-    if (cache.soul.isNotEmpty) {
-      return Soul(personality: cache.soul['personality'] as String? ?? '');
-    }
-    return ref.read(settingsRepositoryProvider).getSoul();
+  const SoulState({
+    required this.soul,
+    this.isSaving = false,
+    this.saveSuccess = false,
+    this.saveError,
+  });
+
+  SoulState copyWith({
+    Soul? soul,
+    bool? isSaving,
+    bool? saveSuccess,
+    Object? saveError,
+  }) {
+    return SoulState(
+      soul: soul ?? this.soul,
+      isSaving: isSaving ?? this.isSaving,
+      saveSuccess: saveSuccess ?? this.saveSuccess,
+      saveError: saveError,
+    );
   }
 }
 
-final soulSaveProvider = AsyncNotifierProvider.autoDispose<SoulSaveNotifier, void>(SoulSaveNotifier.new);
+final soulProvider =
+    AsyncNotifierProvider.autoDispose<SoulNotifier, SoulState>(SoulNotifier.new);
 
-class SoulSaveNotifier extends AsyncNotifier<void> {
+class SoulNotifier extends AsyncNotifier<SoulState> {
   @override
-  Future<void> build() async {}
+  Future<SoulState> build() async {
+    ref.watch(sessionResetProvider);
+    final cache = ref.read(sessionCacheProvider);
+    final Soul soul;
+    if (cache.soul.isNotEmpty) {
+      soul = Soul(personality: cache.soul['personality'] as String? ?? '');
+    } else {
+      soul = await ref.read(settingsRepositoryProvider).getSoul();
+    }
+    return SoulState(soul: soul);
+  }
 
   Future<void> save(String personality) async {
-    state = const AsyncValue.loading();
+    final previousState = state.value;
+    if (previousState == null) return;
+
+    state = AsyncValue.data(previousState.copyWith(
+      isSaving: true,
+      saveSuccess: false,
+      saveError: null,
+    ));
+
     try {
       final soul = await ref.read(settingsRepositoryProvider).updateSoul(personality);
       await ref.read(sessionCacheProvider.notifier).updateSoul({
         'personality': soul.personality,
       });
-      ref.invalidate(soulProvider);
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      state = AsyncValue.data(SoulState(
+        soul: soul,
+        isSaving: false,
+        saveSuccess: true,
+      ));
+    } catch (e) {
+      state = AsyncValue.data(previousState.copyWith(
+        isSaving: false,
+        saveError: e,
+      ));
     }
   }
 }

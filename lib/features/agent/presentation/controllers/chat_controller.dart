@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/agent/data/chat_repository.dart';
 import 'package:supanotes/features/agent/data/chat_sse.dart';
 import 'package:supanotes/features/agent/domain/message_model.dart';
@@ -59,6 +60,7 @@ class ChatController extends AsyncNotifier<ChatState> {
 
   @override
   Future<ChatState> build() async {
+    ref.watch(sessionResetProvider);
     final sessionId = ref.watch(sessionManagerProvider);
     ref.onDispose(() => _sseSub?.cancel());
 

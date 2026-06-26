@@ -9,14 +9,15 @@ class TaskSnackBarHelper {
   }) async {
     final nextDue = await onComplete();
 
-    final message = nextDue != null
-        ? 'Tarefa concluída! Próx. em: ${DateFormat('pt_BR', 'MMMMd').format(nextDue)}'
-        : 'Tarefa concluída!';
+    final title = 'Concluída!';
+    final subtitle = nextDue != null
+        ? 'Próx. em: ${DateFormat.MMMMd('pt_BR').format(nextDue)}'
+        : null;
 
-    AppMessenger.showAction(
-      message,
+    AppMessenger.showTaskCompletion(
+      title: title,
+      subtitle: subtitle,
       action: SnackBarAction(label: 'Desfazer', onPressed: onUndo),
-      duration: const Duration(seconds: 5),
     );
 
     return nextDue;

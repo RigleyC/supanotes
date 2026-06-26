@@ -91,7 +91,7 @@ class AuthInterceptor extends Interceptor {
 
     // Skip auth endpoints (login/register) so failed credentials
     // don't trigger an unnecessary session-clear cycle.
-    if (err.requestOptions.path.startsWith('/api/v1/auth/')) {
+    if (err.requestOptions.path.startsWith('/auth/')) {
       handler.next(err);
       return;
     }

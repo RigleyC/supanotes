@@ -19,6 +19,8 @@ import 'core/router/app_router.dart';
 import 'core/sync/sync_service.dart';
 import 'features/auth/domain/user.dart';
 
+import 'package:intl/date_symbol_data_local.dart';
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -32,6 +34,7 @@ void main() async {
   final sharedPreferences = await SharedPreferences.getInstance();
 
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
+  await initializeDateFormatting('pt_BR', null);
   warnIfAndroidBackendUnreachable();
   runApp(
     ProviderScope(

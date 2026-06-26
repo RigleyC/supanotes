@@ -12,8 +12,7 @@ class TelegramUnlinkedView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pairing = ref.watch(telegramPairingProvider);
-    final code = pairing.code;
+    final pairingAsync = ref.watch(telegramPairingProvider);
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -41,19 +40,44 @@ class TelegramUnlinkedView extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.xl),
-            if (code == null)
-              FilledButton.icon(
-                icon: const Icon(Icons.link),
-                label: const Text('Conectar Telegram'),
-                onPressed: onGenerate,
-              )
-            else
-              TelegramCodeCard(
-                code: code,
-                countdown: pairing.countdown,
-                isExpired: pairing.countdown <= 0,
-                onRegenerate: pairing.countdown <= 0 ? onGenerate : null,
+            pairingAsync.when(
+              data: (pairing) {
+                if (pairing == null) {
+                  return FilledButton.icon(
+                    icon: const Icon(Icons.link),
+                    label: const Text('Conectar Telegram'),
+                    onPressed: onGenerate,
+                  );
+                }
+                return TelegramCodeCard(
+                  code: pairing.code,
+                  countdown: pairing.countdown,
+                  isExpired: pairing.countdown <= 0,
+                  onRegenerate: pairing.countdown <= 0 ? onGenerate : null,
+                );
+              },
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(AppSpacing.md),
+                  child: CircularProgressIndicator(),
+                ),
               ),
+              error: (err, _) => Column(
+                children: [
+                  Text(
+                    'Erro: $err',
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Tentar novamente'),
+                    onPressed: onGenerate,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

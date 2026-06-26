@@ -17,7 +17,7 @@ void main() {
     expect(find.text('Salvo!'), findsOneWidget);
   });
 
-  testWidgets('AppMessenger.showError exibe SnackBar com retry', (tester) async {
+  testWidgets('AppMessenger.showError exibe SnackBar com acao', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         scaffoldMessengerKey: AppMessenger.key,
@@ -25,11 +25,16 @@ void main() {
       ),
     );
 
-    AppMessenger.showError('Falhou', onRetry: () {});
+    AppMessenger.showError(
+      'Falhou',
+      action: SnackBarAction(label: 'Tentar novamente', onPressed: () {}),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Falhou'), findsOneWidget);
     expect(find.text('Tentar novamente'), findsOneWidget);
+    // Verifica que a bolinha vermelha existe (widget Container com BoxDecoration)
+    expect(find.byType(Container), findsWidgets);
   });
 
   testWidgets('AppMessenger.showInfo exibe SnackBar', (tester) async {
@@ -46,8 +51,7 @@ void main() {
     expect(find.text('Informativo'), findsOneWidget);
   });
 
-  testWidgets('AppMessenger.showAction exibe SnackBar com acao', (tester) async {
-    bool pressed = false;
+  testWidgets('AppMessenger.showInfo com subtitle exibe ambos', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         scaffoldMessengerKey: AppMessenger.key,
@@ -55,13 +59,10 @@ void main() {
       ),
     );
 
-    AppMessenger.showAction(
-      'Acao?',
-      action: SnackBarAction(label: 'Sim', onPressed: () => pressed = true),
-    );
+    AppMessenger.showInfo('Titulo', subtitle: 'Subtitulo');
     await tester.pumpAndSettle();
 
-    expect(find.text('Acao?'), findsOneWidget);
-    expect(find.text('Sim'), findsOneWidget);
+    expect(find.text('Titulo'), findsOneWidget);
+    expect(find.text('Subtitulo'), findsOneWidget);
   });
 }

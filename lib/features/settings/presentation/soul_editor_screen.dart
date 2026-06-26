@@ -37,7 +37,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
       AppMessenger.showError(SettingsStrings.emptyError);
       return;
     }
-    await ref.read(soulSaveProvider.notifier).save(text);
+    await ref.read(soulProvider.notifier).save(text);
   }
 
   Future<void> _restoreDefault() async {
@@ -55,30 +55,29 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(soulProvider, (prev, next) {
-      next.whenOrNull(data: (soul) {
+    ref.listen<AsyncValue<SoulState>>(soulProvider, (prev, next) {
+      next.whenOrNull(data: (state) {
         if (_controller.text.isEmpty) {
-          _controller.text = soul.personality;
+          _controller.text = state.soul.personality;
+        }
+        if (state.saveSuccess && prev?.value?.saveSuccess != true) {
+          AppMessenger.showSuccess(SettingsStrings.savedSnackbar);
+        }
+        if (state.saveError != null && prev?.value?.saveError != state.saveError) {
+          final err = state.saveError;
+          AppMessenger.showError(
+            err is ApiException ? err.message : err.toString(),
+          );
         }
       });
     });
 
-    ref.listen(soulSaveProvider, (prev, next) {
-      if (prev == next || next.isLoading || !mounted) return;
-      next.whenOrNull(
-        data: (_) => AppMessenger.showSuccess(SettingsStrings.savedSnackbar),
-        error: (err, _) => AppMessenger.showError(
-          err is ApiException ? err.message : err.toString(),
-        ),
-      );
-    });
-
     final soulAsync = ref.watch(soulProvider);
-    final saveState = ref.watch(soulSaveProvider);
+    final isSaving = soulAsync.value?.isSaving ?? false;
 
     return Scaffold(
       bottomNavigationBar: SoulFooter(
-        isSaving: saveState.isLoading,
+        isSaving: isSaving,
         onSave: _save,
         onRestore: _restoreDefault,
       ),
@@ -95,7 +94,7 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
                 onRetry: () => ref.invalidate(soulProvider),
               ),
             ),
-            data: (_) => SliverPadding(
+            data: (state) => SliverPadding(
               padding: const EdgeInsets.all(AppSpacing.md),
               sliver: SliverFillRemaining(
                 hasScrollBody: true,

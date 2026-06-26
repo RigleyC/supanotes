@@ -16,13 +16,14 @@ class AppTypography {
   // Font family
   // ---------------------------------------------------------------------------
 
-  static String get fontFamily => GoogleFonts.bricolageGrotesque().fontFamily ?? 'Bricolage Grotesque';
+  static String get fontFamily =>
+      GoogleFonts.bricolageGrotesque().fontFamily ?? 'Bricolage Grotesque';
 
   /// Monospace style for inline code and code blocks.
   static TextStyle get codeStyle => const TextStyle(
-        fontFamily: 'monospace',
-        fontFamilyFallback: ['Courier', 'monospace'],
-      );
+    fontFamily: 'monospace',
+    fontFamilyFallback: ['Courier', 'monospace'],
+  );
 
   // ---------------------------------------------------------------------------
   // Font sizes (Material 3 type scale, in logical pixels)
@@ -37,8 +38,8 @@ class AppTypography {
   static const double headlineSmallSize = 24.0;
 
   static const double titleLargeSize = 22.0;
-  static const double titleMediumSize = 16.0;
-  static const double titleSmallSize = 14.0;
+  static const double titleMediumSize = 18.0;
+  static const double titleSmallSize = 16.0;
 
   static const double bodyLargeSize = 16.0;
   static const double bodyMediumSize = 14.0;
@@ -116,12 +117,12 @@ class AppTypography {
       ),
       titleMedium: base.titleMedium?.copyWith(
         fontSize: titleMediumSize,
-        fontWeight: medium,
+        fontWeight: semibold,
         letterSpacing: titleLetterSpacing,
       ),
       titleSmall: base.titleSmall?.copyWith(
         fontSize: titleSmallSize,
-        fontWeight: medium,
+        fontWeight: semibold,
         letterSpacing: titleLetterSpacing,
       ),
       bodyLarge: base.bodyLarge?.copyWith(

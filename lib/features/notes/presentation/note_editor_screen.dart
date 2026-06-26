@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
@@ -23,7 +24,6 @@ import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_edit_sheet.dart';
 
 
 final noteProvider = StreamProvider.autoDispose.family<NoteModel?, String>((
@@ -50,13 +50,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     await flushSnapshot();
     if (!mounted || task == null) return;
 
-    await TaskEditSheet.show(
+    await TaskMetadataSheet.show(
       context,
       noteId: task.noteId,
       task: task,
-      allowTitleEdit: false,
-      allowDelete: false,
-      readOnlyTitle: true,
     );
   }
 

@@ -11,6 +11,7 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
@@ -48,6 +49,7 @@ Widget _wrap(Widget child, {required ProviderContainer container}) {
   return UncontrolledProviderScope(
     container: container,
     child: MaterialApp.router(
+      scaffoldMessengerKey: AppMessenger.key,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,

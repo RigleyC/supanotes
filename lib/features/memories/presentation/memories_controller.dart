@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/memories/data/memories_repository.dart';
 import 'package:supanotes/features/memories/domain/memory_model.dart';
 
@@ -10,6 +11,7 @@ final memoriesControllerProvider = AsyncNotifierProvider.autoDispose<
 class MemoriesController extends AsyncNotifier<List<MemoryModel>> {
   @override
   Future<List<MemoryModel>> build() {
+    ref.watch(sessionResetProvider);
     return _loadMemories();
   }
 

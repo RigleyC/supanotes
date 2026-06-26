@@ -311,7 +311,7 @@ class _FakeSessionManager extends SessionManager {
 class _FakeChatSSE extends ChatSSE {
   _FakeChatSSE(this._controller)
     : super(
-        apiClient: ApiClient(
+        apiClient: ApiClient.test(
           authInterceptor: AuthInterceptor(
             getAccessToken: () async => null,
             getRefreshToken: () async => null,

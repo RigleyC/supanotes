@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
-import 'package:supanotes/features/settings/presentation/controllers/mcp_token_controller.dart';
+import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
@@ -40,22 +40,33 @@ class McpScreen extends ConsumerStatefulWidget {
 }
 
 class _McpScreenState extends ConsumerState<McpScreen> {
+  AsyncValue<String?> _tokenAsync = const AsyncValue.data(null);
+
   Future<void> _generateToken() async {
-    await ref.read(mcpTokenProvider.notifier).generate();
-    if (!mounted) return;
-    final state = ref.read(mcpTokenProvider);
-    state.whenOrNull(
-      data: (_) => AppMessenger.showSuccess('Token gerado com sucesso.'),
-      error: (err, _) => AppMessenger.showError(
-        err is ApiException ? err.message : err.toString(),
-      ),
-    );
+    setState(() {
+      _tokenAsync = const AsyncValue.loading();
+    });
+    try {
+      final token = await ref.read(settingsRepositoryProvider).generateMcpToken();
+      if (!mounted) return;
+      setState(() {
+        _tokenAsync = AsyncValue.data(token);
+      });
+      AppMessenger.showSuccess('Token gerado com sucesso.');
+    } catch (e, st) {
+      if (!mounted) return;
+      setState(() {
+        _tokenAsync = AsyncValue.error(e, st);
+      });
+      AppMessenger.showError(
+        e is ApiException ? e.message : e.toString(),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final tokenAsync = ref.watch(mcpTokenProvider);
-    final token = tokenAsync.asData?.value;
+    final token = _tokenAsync.asData?.value;
 
     return Scaffold(
       body: CustomScrollView(
@@ -71,7 +82,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _TokenCard(
-                  tokenAsync: tokenAsync,
+                  tokenAsync: _tokenAsync,
                   onGenerate: _generateToken,
                 ),
                 const SizedBox(height: AppSpacing.md),

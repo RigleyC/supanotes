@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
-import 'package:supanotes/shared/widgets/app_input.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 import '../../data/tasks_repository.dart';
@@ -143,6 +142,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _onDelete() async {
     final task = widget.task;
     if (task == null) return;
@@ -192,38 +192,16 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            _isEdit ? 'Editar tarefa' : 'Nova tarefa',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          /*   if (widget.allowTitleEdit)
-            AppInput(
-              controller: _titleController,
-              autofocus: !_isEdit,
-              textInputAction: TextInputAction.done,
-              maxLines: 3,
-              labelText: 'Título',
-              hintText: 'O que precisa ser feito?',
-              onSubmitted: (_) => _onSave(),
-            )
-          else if (widget.readOnlyTitle && _isEdit)
-            Text(
-              widget.task!.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          const SizedBox(height: AppSpacing.lg), */
-          Text(
             'Data de vencimento',
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.md),
           DueDatePicker(
             initialDate: _dueDate,
-            onChanged: (d) => setState(() => _dueDate = d),
+            onChanged: (d) => setState(() {
+              _dueDate = d;
+              if (d == null) _recurrence = null;
+            }),
           ),
           const SizedBox(height: AppSpacing.lg),
           Text('Repetição', style: Theme.of(context).textTheme.titleLarge),
@@ -240,7 +218,7 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
           const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
-              /*  if (_isEdit && widget.allowDelete)
+              if (_isEdit && widget.allowDelete) ...[
                 Expanded(
                   child: AppButton(
                     text: 'Excluir',
@@ -249,7 +227,8 @@ class _TaskEditSheetState extends ConsumerState<TaskEditSheet> {
                     isLoading: _saving,
                   ),
                 ),
-              const SizedBox(width: 16), */
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Expanded(
                 child: AppButton(
                   text: 'Cancelar',
