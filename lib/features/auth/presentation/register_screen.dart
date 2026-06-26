@@ -42,7 +42,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _submit() async {
-    if (ref.read(authControllerProvider).isLoading) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     try {
       await ref
@@ -62,9 +61,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final isLoading = ref.watch(
-      authControllerProvider.select((s) => s.isLoading),
-    );
+    final isLoading = ref.watch(authControllerProvider).isLoading;
 
     return Scaffold(
       body: SafeArea(
