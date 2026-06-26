@@ -98,17 +98,15 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
                     }),
           ),
         ),
-        if (shareState.hasError) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            shareState.error is ApiException
-                ? (shareState.error as ApiException).message
-                : shareState.error.toString(),
+        ?shareState.whenOrNull(error: (err, _) => Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.sm),
+          child: Text(
+            err is ApiException ? err.message : err.toString(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
+              color: Theme.of(context).colorScheme.error,
+            ),
           ),
-        ],
+        )),
         const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
