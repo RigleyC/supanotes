@@ -23,7 +23,7 @@ class SoulEditorScreen extends ConsumerStatefulWidget {
 
 class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   final TextEditingController _controller = TextEditingController();
-  bool _initialized = false;
+
 
   @override
   void dispose() {
@@ -55,6 +55,14 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(soulProvider, (prev, next) {
+      next.whenOrNull(data: (soul) {
+        if (_controller.text.isEmpty) {
+          _controller.text = soul.personality;
+        }
+      });
+    });
+
     ref.listen(soulSaveProvider, (prev, next) {
       if (prev == next || next.isLoading || !mounted) return;
       next.whenOrNull(
@@ -67,12 +75,6 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
 
     final soulAsync = ref.watch(soulProvider);
     final saveState = ref.watch(soulSaveProvider);
-    final soul = soulAsync.asData?.value;
-
-    if (!_initialized && soul != null) {
-      _initialized = true;
-      _controller.text = soul.personality;
-    }
 
     return Scaffold(
       bottomNavigationBar: SoulFooter(
