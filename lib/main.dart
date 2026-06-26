@@ -13,6 +13,7 @@ import 'core/router/last_route_store.dart';
 import 'firebase_options.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
+import 'shared/widgets/app_snackbar.dart';
 import 'core/notifications/fcm_message_listeners.dart';
 import 'core/router/app_router.dart';
 import 'core/sync/sync_service.dart';
@@ -89,6 +90,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
+      scaffoldMessengerKey: AppMessenger.key,
       builder: (context, child) {
         if (kDebugMode) {
           return CueDebugTools(child: child!);
