@@ -14,7 +14,7 @@ class _TestChatController extends ChatController {
   final resolvedConfirmations = <(String, bool)>[];
 
   @override
-  AsyncValue<ChatState> build() => AsyncValue.data(initialState);
+  Future<ChatState> build() async => initialState;
 
   @override
   Future<void> sendMessage(String content) async {

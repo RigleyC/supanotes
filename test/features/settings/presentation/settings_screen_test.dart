@@ -16,7 +16,7 @@ class _TestAuthController extends AuthController {
   final User? _user;
 
   @override
-  AsyncValue<User?> build() => AsyncValue.data(_user);
+  Future<User?> build() async => _user;
 
   @override
   Future<void> logout() async {}
