@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
-import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:supanotes/core/database/database.dart';
 
 void main() {
@@ -12,7 +11,7 @@ void main() {
       expect(local.catchUpCalledCount, 0);
 
       // Constructing repository should trigger catchUpRecurringTasks (fire-and-forget)
-      final repo = TasksRepository(local);
+      TasksRepository(local);
 
       // Since catchUpRecurringTasks is async but called in constructor, let's wait a microtask or a frame
       await Future.delayed(Duration.zero);
