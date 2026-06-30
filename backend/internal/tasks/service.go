@@ -98,6 +98,10 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 			baseTime = time.Date(baseTime.Year(), baseTime.Month(), baseTime.Day(), 0, 0, 0, 0, time.UTC)
 			nextDue, ok := calculateNextDueDate(baseTime, *opts.Recurrence)
 			if ok {
+				today := time.Now().UTC()
+				today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+				nextDue = catchUpDueDate(nextDue, *opts.Recurrence, today)
+
 				statusOpen := "open"
 				opts.Status = &statusOpen
 				opts.DueDate = &nextDue
@@ -176,12 +180,7 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 	if task.Recurrence.Valid && task.Recurrence.String != "" && task.DueDate.Valid {
 		now := time.Now().UTC()
 		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-
-		nextDue, ok := calculateNextDueDate(taskDueDate, task.Recurrence.String)
-		for ok && (nextDue.Before(today) || nextDue.Equal(today)) {
-			taskDueDate = nextDue
-			nextDue, ok = calculateNextDueDate(taskDueDate, task.Recurrence.String)
-		}
+		taskDueDate = catchUpDueDate(taskDueDate, task.Recurrence.String, today)
 	}
 
 	// Record completion with the caught-up due date.
@@ -319,4 +318,14 @@ func calculateNextDueDate(current time.Time, recurrence string) (time.Time, bool
 	default:
 		return time.Time{}, false
 	}
+}
+
+func catchUpDueDate(from time.Time, recurrence string, today time.Time) time.Time {
+	taskDueDate := from
+	nextDue, ok := calculateNextDueDate(taskDueDate, recurrence)
+	for ok && (nextDue.Before(today) || nextDue.Equal(today)) {
+		taskDueDate = nextDue
+		nextDue, ok = calculateNextDueDate(taskDueDate, recurrence)
+	}
+	return taskDueDate
 }

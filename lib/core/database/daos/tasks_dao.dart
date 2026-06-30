@@ -99,8 +99,10 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         if (current != null && current.status == 'done') {
           final recurrence = companion.recurrence.value!;
           final baseTime = current.completedAt ?? current.dueDate ?? now;
-          final nextDue = _nextDueDate(from: baseTime, recurrence: recurrence);
+          var nextDue = _nextDueDate(from: baseTime, recurrence: recurrence);
           if (nextDue != null) {
+            final today = DateTime(now.year, now.month, now.day);
+            nextDue = _catchUpDueDate(from: nextDue, recurrence: recurrence, today: today);
             updatedCompanion = updatedCompanion.copyWith(
               status: const Value('open'),
               dueDate: Value(nextDue),
@@ -131,16 +133,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     await transaction(() async {
       for (final task in overdue) {
         final recurrence = task.recurrence!;
-        var currentDue = task.dueDate!;
-
-        var next = _nextDueDate(from: currentDue, recurrence: recurrence);
-        while (next != null && next.isBefore(today)) {
-          currentDue = next;
-          next = _nextDueDate(from: currentDue, recurrence: recurrence);
-        }
-        if (next != null && next.isAtSameMomentAs(today)) {
-          currentDue = next;
-        }
+        final currentDue = _catchUpDueDate(
+          from: task.dueDate!,
+          recurrence: recurrence,
+          today: today,
+        );
 
         if (currentDue != task.dueDate) {
           await (update(tasks)..where((t) => t.id.equals(task.id))).write(
@@ -192,14 +189,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       final recurrence = task.recurrence;
       var taskDueDate = task.dueDate;
       if (recurrence != null && taskDueDate != null && taskDueDate.isBefore(today)) {
-        var next = _nextDueDate(from: taskDueDate, recurrence: recurrence);
-        while (next != null && next.isBefore(today)) {
-          taskDueDate = next;
-          next = _nextDueDate(from: taskDueDate, recurrence: recurrence);
-        }
-        if (next != null && next.isAtSameMomentAs(today)) {
-          taskDueDate = next;
-        }
+        taskDueDate = _catchUpDueDate(
+          from: taskDueDate,
+          recurrence: recurrence,
+          today: today,
+        );
       }
 
       // 2. Record the completion event.
@@ -330,8 +324,6 @@ DateTime? _nextDueDate({
   required DateTime from,
   required TaskRecurrence recurrence,
 }) {
-  final today = DateTime.now().startOfDay;
-
   DateTime? raw;
   switch (recurrence) {
     case TaskRecurrence.daily:
@@ -360,9 +352,22 @@ DateTime? _nextDueDate({
       raw = DateTime(year, month, day);
   }
 
-  if (raw.isBefore(today)) {
-    raw = today;
-  }
-
   return raw;
+}
+
+DateTime _catchUpDueDate({
+  required DateTime from,
+  required TaskRecurrence recurrence,
+  required DateTime today,
+}) {
+  var currentDue = from;
+  var next = _nextDueDate(from: currentDue, recurrence: recurrence);
+  while (next != null && next.isBefore(today)) {
+    currentDue = next;
+    next = _nextDueDate(from: currentDue, recurrence: recurrence);
+  }
+  if (next != null && next.isAtSameMomentAs(today)) {
+    currentDue = next;
+  }
+  return currentDue;
 }

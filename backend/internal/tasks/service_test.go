@@ -44,31 +44,16 @@ func TestCalculateNextDueDate(t *testing.T) {
 }
 
 func TestCalculateNextDueDateCatchUp(t *testing.T) {
-	// Simulates a 3-day overdue daily task. Walking from 3 days ago:
-	// day-3 → day-2 → day-1 → today → tomorrow.
-	// The catch-up loop should stop at today, then calculateNextDueDate
-	// from today gives tomorrow.
+	// Simulates a 3-day overdue daily task.
+	// The catch-up helper should stop at today.
 	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	threeDaysAgo := today.AddDate(0, 0, -3)
 
-	// Walk forward like CompleteTask does
-	taskDueDate := threeDaysAgo
-	nextDue, ok := calculateNextDueDate(taskDueDate, "daily")
-	for ok && (nextDue.Before(today) || nextDue.Equal(today)) {
-		taskDueDate = nextDue
-		nextDue, ok = calculateNextDueDate(taskDueDate, "daily")
-	}
+	taskDueDate := catchUpDueDate(threeDaysAgo, "daily", today)
 
 	if !taskDueDate.Equal(today) {
-		t.Errorf("catch-up taskDueDate = %v, want %v", taskDueDate, today)
-	}
-	if !ok {
-		t.Fatal("expected ok=true for next due after today")
-	}
-	expectedNext := today.AddDate(0, 0, 1)
-	if !nextDue.Equal(expectedNext) {
-		t.Errorf("next due after catch-up = %v, want %v", nextDue, expectedNext)
+		t.Errorf("catchUpDueDate = %v, want %v", taskDueDate, today)
 	}
 }
 
@@ -189,7 +174,8 @@ func TestUpdateTask_ReopenOnRecurrence(t *testing.T) {
 	taskID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
 	userID := pgtype.UUID{Bytes: [16]byte{2}, Valid: true}
 	completedTime := time.Date(2026, 6, 20, 15, 30, 0, 0, time.UTC)
-	expectedNextDue := time.Date(2026, 6, 21, 0, 0, 0, 0, time.UTC) // daily after completion date
+	now := time.Now().UTC()
+	expectedNextDue := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC) // caught up to today
 
 	var updatedParams sqlcgen.UpdateTaskParams
 
