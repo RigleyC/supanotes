@@ -10,8 +10,10 @@ import (
 )
 
 type Repository interface {
+	CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error)
 	GetMemories(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.Memory, error)
 	CreateMemory(ctx context.Context, userID pgtype.UUID, content string, embedding pgvector.Vector) (sqlcgen.Memory, error)
+	UpdateMemory(ctx context.Context, id, userID pgtype.UUID, content string, embedding pgvector.Vector) (sqlcgen.Memory, error)
 	DeleteMemory(ctx context.Context, id, userID pgtype.UUID) error
 	SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error)
 }
@@ -22,6 +24,10 @@ type repository struct {
 
 func NewRepository(q sqlcgen.Querier) Repository {
 	return &repository{q: q}
+}
+
+func (r *repository) CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return r.q.CountMemories(ctx, userID)
 }
 
 func (r *repository) GetMemories(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.Memory, error) {
@@ -44,6 +50,15 @@ func (r *repository) DeleteMemory(ctx context.Context, id, userID pgtype.UUID) e
 	return r.q.DeleteMemory(ctx, sqlcgen.DeleteMemoryParams{
 		ID:     id,
 		UserID: userID,
+	})
+}
+
+func (r *repository) UpdateMemory(ctx context.Context, id, userID pgtype.UUID, content string, embedding pgvector.Vector) (sqlcgen.Memory, error) {
+	return r.q.UpdateMemory(ctx, sqlcgen.UpdateMemoryParams{
+		ID:        id,
+		UserID:    userID,
+		Content:   content,
+		Embedding: embedding,
 	})
 }
 

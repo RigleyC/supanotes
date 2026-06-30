@@ -21,7 +21,7 @@ func (t *ListRoutinesTool) Description() string {
 func (t *ListRoutinesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
-func (t *ListRoutinesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *ListRoutinesTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	rs, err := t.routinesSvc.GetRoutines(ctx, userID)
 	if err != nil {
 		return "", err
@@ -45,7 +45,7 @@ func (t *TestDailyBriefTool) Description() string {
 func (t *TestDailyBriefTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
-func (t *TestDailyBriefTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *TestDailyBriefTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	resp, err := t.routinesSvc.TestRoutine(ctx, userID, "daily")
 	if err != nil {
 		return "", err
@@ -64,7 +64,7 @@ func (t *TestWeeklyBriefTool) Description() string {
 func (t *TestWeeklyBriefTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
-func (t *TestWeeklyBriefTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *TestWeeklyBriefTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	resp, err := t.routinesSvc.TestRoutine(ctx, userID, "weekly")
 	if err != nil {
 		return "", err
@@ -83,7 +83,7 @@ func (t *SetDailyBriefScheduleTool) Description() string {
 func (t *SetDailyBriefScheduleTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"cron_expr":{"type":"string"},"enabled":{"type":"boolean"}}}`
 }
-func (t *SetDailyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *SetDailyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		CronExpr *string `json:"cron_expr"`
 		Enabled  *bool   `json:"enabled"`
@@ -123,7 +123,7 @@ func (t *SetWeeklyBriefScheduleTool) Description() string {
 func (t *SetWeeklyBriefScheduleTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"cron_expr":{"type":"string"},"enabled":{"type":"boolean"}}}`
 }
-func (t *SetWeeklyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *SetWeeklyBriefScheduleTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		CronExpr *string `json:"cron_expr"`
 		Enabled  *bool   `json:"enabled"`

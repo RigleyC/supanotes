@@ -12,6 +12,18 @@ import (
 	"github.com/pgvector/pgvector-go"
 )
 
+const countMemories = `-- name: CountMemories :one
+SELECT COUNT(*) FROM memories
+WHERE user_id = $1
+`
+
+func (q *Queries) CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countMemories, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createMemory = `-- name: CreateMemory :one
 INSERT INTO memories (user_id, content, embedding)
 VALUES ($1, $2, $3)
@@ -130,7 +142,7 @@ func (q *Queries) GetRetryableEmbeddings(ctx context.Context, limit int32) ([]Ge
 }
 
 const getSoul = `-- name: GetSoul :one
-SELECT id, user_id, personality, created_at, updated_at FROM souls
+SELECT id, user_id, personality, created_at, updated_at, profile FROM souls
 WHERE user_id = $1
 `
 
@@ -143,6 +155,7 @@ func (q *Queries) GetSoul(ctx context.Context, userID pgtype.UUID) (Soul, error)
 		&i.Personality,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Profile,
 	)
 	return i, err
 }
@@ -242,6 +255,39 @@ func (q *Queries) SearchNotesByEmbedding(ctx context.Context, arg SearchNotesByE
 	return items, nil
 }
 
+const updateMemory = `-- name: UpdateMemory :one
+UPDATE memories
+SET content = $2, embedding = $3, updated_at = NOW()
+WHERE id = $1 AND user_id = $4
+RETURNING id, user_id, content, embedding, created_at, updated_at
+`
+
+type UpdateMemoryParams struct {
+	ID        pgtype.UUID     `json:"id"`
+	Content   string          `json:"content"`
+	Embedding pgvector.Vector `json:"embedding"`
+	UserID    pgtype.UUID     `json:"user_id"`
+}
+
+func (q *Queries) UpdateMemory(ctx context.Context, arg UpdateMemoryParams) (Memory, error) {
+	row := q.db.QueryRow(ctx, updateMemory,
+		arg.ID,
+		arg.Content,
+		arg.Embedding,
+		arg.UserID,
+	)
+	var i Memory
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Content,
+		&i.Embedding,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateNoteEmbeddingStatus = `-- name: UpdateNoteEmbeddingStatus :exec
 UPDATE notes
 SET embedding_status = $2,
@@ -257,6 +303,32 @@ type UpdateNoteEmbeddingStatusParams struct {
 func (q *Queries) UpdateNoteEmbeddingStatus(ctx context.Context, arg UpdateNoteEmbeddingStatusParams) error {
 	_, err := q.db.Exec(ctx, updateNoteEmbeddingStatus, arg.ID, arg.EmbeddingStatus)
 	return err
+}
+
+const updateSoulProfile = `-- name: UpdateSoulProfile :one
+UPDATE souls
+SET profile = $2, updated_at = NOW()
+WHERE user_id = $1
+RETURNING id, user_id, personality, created_at, updated_at, profile
+`
+
+type UpdateSoulProfileParams struct {
+	UserID  pgtype.UUID `json:"user_id"`
+	Profile []byte      `json:"profile"`
+}
+
+func (q *Queries) UpdateSoulProfile(ctx context.Context, arg UpdateSoulProfileParams) (Soul, error) {
+	row := q.db.QueryRow(ctx, updateSoulProfile, arg.UserID, arg.Profile)
+	var i Soul
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Personality,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Profile,
+	)
+	return i, err
 }
 
 const upsertNoteEmbedding = `-- name: UpsertNoteEmbedding :exec
@@ -283,7 +355,7 @@ VALUES ($1, $2)
 ON CONFLICT (user_id) DO UPDATE SET 
     personality = EXCLUDED.personality,
     updated_at = NOW()
-RETURNING id, user_id, personality, created_at, updated_at
+RETURNING id, user_id, personality, created_at, updated_at, profile
 `
 
 type UpsertSoulParams struct {
@@ -300,6 +372,7 @@ func (q *Queries) UpsertSoul(ctx context.Context, arg UpsertSoulParams) (Soul, e
 		&i.Personality,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Profile,
 	)
 	return i, err
 }

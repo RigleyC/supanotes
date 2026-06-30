@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -78,129 +79,234 @@ func NewContextBuilder(q sqlcgen.Querier, tasksSvc *tasks.Service, memoriesRepo 
 	return &ContextBuilder{q: q, tasksSvc: tasksSvc, memoriesRepo: memoriesRepo, embedCL: embedCL}
 }
 
-// Build compiles the tiered context RAG string by fetching data concurrently.
-func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UUID, query string) (string, error) {
-	var tzLoc *time.Location = time.UTC
+type buildPolicy struct {
+	fetchTasks       bool
+	fetchRecentNotes bool
+	searchNotes      bool
+	searchMemories   bool
+	fetchLinkedNotes bool
+}
 
-	var (
-		soul           sqlcgen.Soul
-		todayTasks     []sqlcgen.Task
-		recentNotes    []sqlcgen.Note
-		completedTasks []sqlcgen.Task
-	)
+func policyForIntent(intent Intent) buildPolicy {
+	switch intent {
+	case IntentDailySummary:
+		return buildPolicy{
+			fetchTasks:       true,
+			fetchRecentNotes: false,
+			searchNotes:      false,
+			searchMemories:   true,
+			fetchLinkedNotes: false,
+		}
+	case IntentSearchKnowledge:
+		return buildPolicy{
+			fetchTasks:       false,
+			fetchRecentNotes: true,
+			searchNotes:      true,
+			searchMemories:   true,
+			fetchLinkedNotes: false,
+		}
+	case IntentProjectPlanning:
+		return buildPolicy{
+			fetchTasks:       true,
+			fetchRecentNotes: false,
+			searchNotes:      true,
+			searchMemories:   false,
+			fetchLinkedNotes: true,
+		}
+	case IntentTaskManagement:
+		return buildPolicy{
+			fetchTasks:       true,
+			fetchRecentNotes: false,
+			searchNotes:      false,
+			searchMemories:   false,
+			fetchLinkedNotes: false,
+		}
+	case IntentMemoryQuestion:
+		return buildPolicy{
+			fetchTasks:       false,
+			fetchRecentNotes: true,
+			searchNotes:      false,
+			searchMemories:   true,
+			fetchLinkedNotes: false,
+		}
+	case IntentOrganization:
+		return buildPolicy{
+			fetchTasks:       false,
+			fetchRecentNotes: true,
+			searchNotes:      false,
+			searchMemories:   false,
+			fetchLinkedNotes: false,
+		}
+	case IntentBrainstorming:
+		return buildPolicy{
+			fetchTasks:       false,
+			fetchRecentNotes: true,
+			searchNotes:      true,
+			searchMemories:   true,
+			fetchLinkedNotes: false,
+		}
+	case IntentGeneralChat:
+		return buildPolicy{
+			fetchTasks:       false,
+			fetchRecentNotes: false,
+			searchNotes:      false,
+			searchMemories:   false,
+			fetchLinkedNotes: false,
+		}
+	default:
+		return buildPolicy{
+			fetchTasks:       true,
+			fetchRecentNotes: true,
+			searchNotes:      true,
+			searchMemories:   true,
+			fetchLinkedNotes: true,
+		}
+	}
+}
+
+type contextData struct {
+	soul            sqlcgen.Soul
+	tzLoc           *time.Location
+	todayTasks      []sqlcgen.Task
+	recentNotes     []sqlcgen.Note
+	completedTasks  []sqlcgen.Task
+	overdueCount    int64
+	semanticResults []sqlcgen.SearchNotesByEmbeddingRow
+	memResults      []sqlcgen.SearchMemoriesByEmbeddingRow
+	linkedNotes     []sqlcgen.Note
+}
+
+// Build compiles the tiered context RAG string by fetching data concurrently
+// based on the given intent's retrieval policy.
+func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UUID, query string, intent Intent) (string, error) {
+	policy := policyForIntent(intent)
+	data, err := cb.fetchContextData(ctx, userID, sessionID, query, policy)
+	if err != nil {
+		return "", err
+	}
+	return cb.formatContextPrompt(data, policy), nil
+}
+
+func (cb *ContextBuilder) fetchContextData(ctx context.Context, userID, sessionID pgtype.UUID, query string, policy buildPolicy) (*contextData, error) {
+	data := &contextData{
+		tzLoc: time.UTC,
+	}
 
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		var err error
-		soul, err = cb.q.GetSoul(gCtx, userID)
+		data.soul, err = cb.q.GetSoul(gCtx, userID)
 		if err != nil {
 			return fmt.Errorf("get soul: %w", err)
 		}
 		return nil
 	})
 
-	g.Go(func() error {
-		// Fetch timezone preference and today's tasks sequentially in the same goroutine
-		userSettings, err := cb.q.GetUserSettings(gCtx, userID)
-		if err == nil && userSettings.Timezone != "" {
-			if loc, locErr := time.LoadLocation(userSettings.Timezone); locErr == nil {
-				tzLoc = loc
-			} else {
-				log.Warn().Err(locErr).Str("timezone", userSettings.Timezone).Msg("failed to load user timezone; falling back to UTC")
+	if policy.fetchTasks {
+		g.Go(func() error {
+			// Fetch timezone preference and today's tasks sequentially in the same goroutine
+			userSettings, err := cb.q.GetUserSettings(gCtx, userID)
+			if err == nil && userSettings.Timezone != "" {
+				if loc, locErr := time.LoadLocation(userSettings.Timezone); locErr == nil {
+					data.tzLoc = loc
+				} else {
+					log.Warn().Err(locErr).Str("timezone", userSettings.Timezone).Msg("failed to load user timezone; falling back to UTC")
+				}
 			}
-		}
 
-		var errToday error
-		todayTasks, errToday = cb.tasksSvc.GetTodayTasksInTimezone(gCtx, userID, tzLoc)
-		if errToday != nil {
-			return fmt.Errorf("get today tasks: %w", errToday)
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		rows, err := cb.q.GetRecentNotes(gCtx, userID)
-		if err != nil {
-			return fmt.Errorf("get recent notes: %w", err)
-		}
-		recentNotes = make([]sqlcgen.Note, len(rows))
-		for i, r := range rows {
-			recentNotes[i] = sqlcgen.Note{
-				ID:              r.ID,
-				UserID:          r.UserID,
-				ContextID:       r.ContextID,
-				Content:         r.Content,
-				Excerpt:         r.Excerpt,
-				IsInbox:         r.IsInbox,
-				SearchVector:    r.SearchVector,
-				CreatedAt:       r.CreatedAt,
-				UpdatedAt:       r.UpdatedAt,
-				DeletedAt:       r.DeletedAt,
-				EmbeddingStatus: r.EmbeddingStatus,
-				CollapseImages:  r.CollapseImages,
+			var errToday error
+			data.todayTasks, errToday = cb.tasksSvc.GetTodayTasksInTimezone(gCtx, userID, data.tzLoc)
+			if errToday != nil {
+				return fmt.Errorf("get today tasks: %w", errToday)
 			}
-		}
-		return nil
-	})
+			return nil
+		})
 
-	g.Go(func() error {
-		var err error
-		completedTasks, err = cb.tasksSvc.GetRecentlyCompletedTasks(gCtx, userID, 7)
-		return err
-	})
+		g.Go(func() error {
+			var err error
+			data.completedTasks, err = cb.tasksSvc.GetRecentlyCompletedTasks(gCtx, userID, 7)
+			return err
+		})
+	}
+
+	if policy.fetchRecentNotes {
+		g.Go(func() error {
+			rows, err := cb.q.GetRecentNotes(gCtx, userID)
+			if err != nil {
+				return fmt.Errorf("get recent notes: %w", err)
+			}
+			data.recentNotes = make([]sqlcgen.Note, len(rows))
+			for i, r := range rows {
+				data.recentNotes[i] = sqlcgen.Note{
+					ID:              r.ID,
+					UserID:          r.UserID,
+					ContextID:       r.ContextID,
+					Content:         r.Content,
+					Excerpt:         r.Excerpt,
+					IsInbox:         r.IsInbox,
+					SearchVector:    r.SearchVector,
+					CreatedAt:       r.CreatedAt,
+					UpdatedAt:       r.UpdatedAt,
+					DeletedAt:       r.DeletedAt,
+					EmbeddingStatus: r.EmbeddingStatus,
+					CollapseImages:  r.CollapseImages,
+				}
+			}
+			return nil
+		})
+	}
 
 	if err := g.Wait(); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// Calculate overdue count in-memory in the user's local timezone
-	var overdueCount int64
-	nowLocal := time.Now().In(tzLoc)
-	todayBoundary := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, tzLoc)
-	for _, task := range todayTasks {
-		if task.DueDate.Valid && task.DueDate.Time.Before(todayBoundary) {
-			overdueCount++
+	if policy.fetchTasks {
+		nowLocal := time.Now().In(data.tzLoc)
+		todayBoundary := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, data.tzLoc)
+		for _, task := range data.todayTasks {
+			if task.DueDate.Valid && task.DueDate.Time.Before(todayBoundary) {
+				data.overdueCount++
+			}
 		}
 	}
 
-	var (
-		semanticResults []sqlcgen.SearchNotesByEmbeddingRow
-		memResults      []sqlcgen.SearchMemoriesByEmbeddingRow
-		linkedNotes     []sqlcgen.Note
-	)
-	// linkedNotes remains sqlcgen.Note because GetLinkedNotes returns Note (no JOIN needed)
+	if policy.searchNotes || policy.searchMemories {
+		emb, embErr := cb.embedCL.GenerateEmbedding(ctx, query)
+		if embErr != nil {
+			log.Warn().Err(embErr).Msg("generate query embedding failed; skipping semantic search")
+		} else {
+			vec := pgvector.NewVector(float64ToFloat32(emb))
 
-	emb, embErr := cb.embedCL.GenerateEmbedding(ctx, query)
-	if embErr != nil {
-		log.Warn().Err(embErr).Msg("generate query embedding failed; skipping semantic search")
-	} else {
-		vec := pgvector.NewVector(float64ToFloat32(emb))
+			if policy.searchNotes {
+				var sErr error
+				data.semanticResults, sErr = cb.q.SearchNotesByEmbedding(ctx, sqlcgen.SearchNotesByEmbeddingParams{
+					UserID:  userID,
+					Column2: vec,
+					Limit:   5,
+				})
+				if sErr != nil {
+					log.Warn().Err(sErr).Msg("search notes by embedding failed; skipping semantic results")
+				}
+			}
 
-		var sErr error
-		semanticResults, sErr = cb.q.SearchNotesByEmbedding(ctx, sqlcgen.SearchNotesByEmbeddingParams{
-			UserID:  userID,
-			Column2: vec,
-			Limit:   5,
-		})
-		if sErr != nil {
-			log.Warn().Err(sErr).Msg("search notes by embedding failed; skipping semantic results")
-		}
-
-		var mErr error
-		memResults, mErr = cb.memoriesRepo.SearchMemories(ctx, userID, vec, 5)
-		if mErr != nil {
-			log.Warn().Err(mErr).Msg("search memories by embedding failed; skipping semantic results")
+			if policy.searchMemories {
+				var mErr error
+				data.memResults, mErr = cb.memoriesRepo.SearchMemories(ctx, userID, vec, 5)
+				if mErr != nil {
+					log.Warn().Err(mErr).Msg("search memories by embedding failed; skipping semantic results")
+				}
+			}
 		}
 	}
 
-	noteIDs := make([]pgtype.UUID, 0, len(recentNotes))
-	for _, n := range recentNotes {
-		noteIDs = append(noteIDs, n.ID)
-	}
-	if len(noteIDs) > 0 {
+	if policy.fetchLinkedNotes && len(data.recentNotes) > 0 {
+		noteIDs := make([]pgtype.UUID, 0, len(data.recentNotes))
+		for _, n := range data.recentNotes {
+			noteIDs = append(noteIDs, n.ID)
+		}
 		var lErr error
-		linkedNotes, lErr = cb.q.GetLinkedNotes(ctx, sqlcgen.GetLinkedNotesParams{
+		data.linkedNotes, lErr = cb.q.GetLinkedNotes(ctx, sqlcgen.GetLinkedNotesParams{
 			Column1: noteIDs,
 			UserID:  userID,
 		})
@@ -209,62 +315,97 @@ func (cb *ContextBuilder) Build(ctx context.Context, userID, sessionID pgtype.UU
 		}
 	}
 
+	return data, nil
+}
+
+func (cb *ContextBuilder) formatContextPrompt(data *contextData, policy buildPolicy) string {
 	var b strings.Builder
 
-	b.WriteString(truncate(fmt.Sprintf("IDENTITY:\n%s\n\n", soul.Personality), MaxTier0Tokens))
+	b.WriteString(truncate(fmt.Sprintf("IDENTITY:\n%s\n\n", data.soul.Personality), MaxTier0Tokens))
+	b.WriteString(formatProfile(data.soul.Profile))
 
-	nowStr := time.Now().In(tzLoc).Format("2006-01-02 15:04:05 MST")
-	weekday := time.Now().In(tzLoc).Weekday().String()
+	nowStr := time.Now().In(data.tzLoc).Format("2006-01-02 15:04:05 MST")
+	weekday := time.Now().In(data.tzLoc).Weekday().String()
 
-	b.WriteString(fmt.Sprintf("CURRENT CONTEXT:\nDate/Time: %s\nDay: %s\nTimezone: %s\n\n", nowStr, weekday, tzLoc.String()))
+	b.WriteString(fmt.Sprintf("CURRENT CONTEXT:\nDate/Time: %s\nDay: %s\nTimezone: %s\n\n", nowStr, weekday, data.tzLoc.String()))
 
-	briefing := buildIntelligenceBriefing(todayTasks, completedTasks, recentNotes, overdueCount)
+	briefing := buildIntelligenceBriefing(data.todayTasks, data.completedTasks, data.recentNotes, data.overdueCount)
 	b.WriteString(truncate(briefing, MaxTierIBTokens))
 	b.WriteString("\n")
 
-	tier2 := &strings.Builder{}
-	tier2.WriteString("\nTODAY/OVERDUE TASKS:\n")
-	writeTasksWithStatus(tier2, todayTasks)
+	if policy.fetchTasks {
+		tier2 := &strings.Builder{}
+		tier2.WriteString("\nTODAY/OVERDUE TASKS:\n")
+		writeTasksWithStatus(tier2, data.todayTasks)
 
-	tier2.WriteString("\nRECENTLY COMPLETED (last 7 days):\n")
-	writeTasksWithStatus(tier2, completedTasks)
+		tier2.WriteString("\nRECENTLY COMPLETED (last 7 days):\n")
+		writeTasksWithStatus(tier2, data.completedTasks)
+		b.WriteString(truncate(tier2.String(), MaxTier2Tokens))
+	}
 
-	tier2.WriteString("\nRECENT NOTES (Last 48h):\n")
-	writeNotesWithID(tier2, recentNotes)
-	b.WriteString(truncate(tier2.String(), MaxTier2Tokens))
+	if policy.fetchRecentNotes {
+		tier2 := &strings.Builder{}
+		tier2.WriteString("\nRECENT NOTES (Last 48h):\n")
+		writeNotesWithID(tier2, data.recentNotes)
+		b.WriteString(truncate(tier2.String(), MaxTier2Tokens))
+	}
 
-	tier3 := &strings.Builder{}
-	tier3.WriteString("\nSEMANTIC SEARCH RESULTS:\n")
-	for _, r := range semanticResults {
-		tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f):\n%s\n", uid.UUIDToString(r.ID), notes.DeriveTitle(r.Content), r.Similarity, r.Content))
+	if policy.searchNotes {
+		tier3 := &strings.Builder{}
+		tier3.WriteString("\nSEMANTIC SEARCH RESULTS:\n")
+		for _, r := range data.semanticResults {
+			tier3.WriteString(fmt.Sprintf("- [%s] %s (similarity: %.4f):\n%s\n", uid.UUIDToString(r.ID), notes.DeriveTitle(r.Content), r.Similarity, r.Content))
+		}
+		if len(data.semanticResults) == 0 {
+			tier3.WriteString("(none)\n")
+		}
+		b.WriteString(truncate(tier3.String(), MaxTier3Tokens))
 	}
-	if len(semanticResults) == 0 {
-		tier3.WriteString("(none)\n")
-	}
-	b.WriteString(truncate(tier3.String(), MaxTier3Tokens))
 
-	tier4 := &strings.Builder{}
-	tier4.WriteString("\nRELATED NOTES:\n")
-	writeNotesWithID(tier4, linkedNotes)
-	if len(linkedNotes) == 0 {
-		tier4.WriteString("(none)\n")
+	if policy.fetchLinkedNotes {
+		tier4 := &strings.Builder{}
+		tier4.WriteString("\nRELATED NOTES:\n")
+		writeNotesWithID(tier4, data.linkedNotes)
+		if len(data.linkedNotes) == 0 {
+			tier4.WriteString("(none)\n")
+		}
+		b.WriteString(truncate(tier4.String(), MaxTier4Tokens))
 	}
-	b.WriteString(truncate(tier4.String(), MaxTier4Tokens))
 
-	tier5 := &strings.Builder{}
-	tier5.WriteString("\nRELEVANT MEMORIES:\n")
-	for _, m := range memResults {
-		tier5.WriteString(fmt.Sprintf("- %s (similarity: %.4f)\n", m.Content, m.Similarity))
+	if policy.searchMemories {
+		tier5 := &strings.Builder{}
+		tier5.WriteString("\nRELEVANT MEMORIES:\n")
+		for _, m := range data.memResults {
+			tier5.WriteString(fmt.Sprintf("- %s (similarity: %.4f)\n", m.Content, m.Similarity))
+		}
+		if len(data.memResults) == 0 {
+			tier5.WriteString("(none)\n")
+		}
+		b.WriteString(truncate(tier5.String(), MaxTier5Tokens))
 	}
-	if len(memResults) == 0 {
-		tier5.WriteString("(none)\n")
-	}
-	b.WriteString(truncate(tier5.String(), MaxTier5Tokens))
 
 	b.WriteString("\n")
 	b.WriteString(systemPrompt)
 
-	return b.String(), nil
+	return b.String()
+}
+
+func formatProfile(profile []byte) string {
+	if len(profile) == 0 {
+		return ""
+	}
+	var m map[string]any
+	if err := json.Unmarshal(profile, &m); err != nil {
+		return ""
+	}
+	if len(m) == 0 {
+		return ""
+	}
+	pretty, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return "USER PROFILE (stable preferences):\n" + string(pretty) + "\n"
 }
 
 func truncate(s string, maxBytes int) string {
@@ -364,9 +505,15 @@ Routine Type: %s
 
 SOUL (User Personality/Settings):
 %s
-
-TODAY / OVERDUE TASKS:
 `, now.Format(time.RFC3339), routineType, soul.Personality))
+
+	profileStr := formatProfile(soul.Profile)
+	if profileStr != "" {
+		b.WriteString(fmt.Sprintf("\nUSER PROFILE:\n%s\n", profileStr))
+	}
+
+	b.WriteString(`TODAY / OVERDUE TASKS:
+`)
 
 	writeTasksWithDueDate(&b, todayTasks)
 

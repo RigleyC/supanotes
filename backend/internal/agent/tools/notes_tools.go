@@ -24,7 +24,7 @@ func (t *AddNoteTool) Description() string { return "Create a new note in the va
 func (t *AddNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
-func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		Content string `json:"content"`
 	}](argsJSON)
@@ -49,7 +49,7 @@ func (t *GetInboxNoteTool) Description() string {
 func (t *GetInboxNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
-func (t *GetInboxNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *GetInboxNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	note, err := t.notesSvc.GetInboxNote(ctx, userID)
 	if err != nil {
 		return "", err
@@ -66,7 +66,7 @@ func (t *AppendToInboxTool) Description() string { return "Append text to the us
 func (t *AppendToInboxTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
-func (t *AppendToInboxTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *AppendToInboxTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		Content string `json:"content"`
 	}](argsJSON)
@@ -92,7 +92,7 @@ func (t *SearchNotesTool) Description() string {
 func (t *SearchNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`
 }
-func (t *SearchNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *SearchNotesTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		Query string `json:"query"`
 	}](argsJSON)
@@ -136,7 +136,7 @@ func (t *GetNotesTool) Description() string {
 func (t *GetNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"limit":{"type":"integer"}},"required":[]}`
 }
-func (t *GetNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *GetNotesTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		Limit int32 `json:"limit"`
 	}](argsJSON)
@@ -171,7 +171,7 @@ func (t *GetNoteTool) Description() string {
 func (t *GetNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"}},"required":["note_id"]}`
 }
-func (t *GetNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *GetNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		NoteID string `json:"note_id"`
 	}](argsJSON)
@@ -198,7 +198,7 @@ func (t *UpdateNoteTool) Description() string { return "Update content of a note
 func (t *UpdateNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"},"content":{"type":"string"}},"required":["note_id"]}`
 }
-func (t *UpdateNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *UpdateNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		NoteID  string  `json:"note_id"`
 		Content *string `json:"content"`
@@ -226,7 +226,7 @@ func (t *AppendToNoteTool) Description() string { return "Append text to an exis
 func (t *AppendToNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"},"content":{"type":"string"}},"required":["note_id","content"]}`
 }
-func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		NoteID  string `json:"note_id"`
 		Content string `json:"content"`
@@ -260,7 +260,7 @@ func (t *LinkNotesTool) Description() string { return "Create a bi-directional l
 func (t *LinkNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"source_id":{"type":"string"},"target_id":{"type":"string"}},"required":["source_id","target_id"]}`
 }
-func (t *LinkNotesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *LinkNotesTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		SourceID string `json:"source_id"`
 		TargetID string `json:"target_id"`
@@ -306,7 +306,7 @@ func (t *GetVaultContextTool) Description() string {
 func (t *GetVaultContextTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
-func (t *GetVaultContextTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *GetVaultContextTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	noteCount, err := t.q.CountNotes(ctx, userID)
 	if err != nil {
 		return "", fmt.Errorf("count notes: %w", err)
@@ -347,7 +347,7 @@ func (t *PlanInboxOrganizationTool) Description() string {
 func (t *PlanInboxOrganizationTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
-func (t *PlanInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *PlanInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	items, err := t.notesSvc.PlanInboxOrganization(ctx, userID, t.llmClient)
 	if err != nil {
 		return "", err
@@ -370,7 +370,7 @@ func (t *ApplyInboxOrganizationTool) Description() string {
 func (t *ApplyInboxOrganizationTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"item_id":{"type":"string"},"destination_type":{"type":"string"},"destination_note_id":{"type":"string"},"destination_title":{"type":"string"},"accepted":{"type":"boolean"}},"required":["item_id","destination_type","accepted"]}}},"required":["items"]}`
 }
-func (t *ApplyInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *ApplyInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	var args struct {
 		Items []notes.PlanOrganizationItem `json:"items"`
 	}

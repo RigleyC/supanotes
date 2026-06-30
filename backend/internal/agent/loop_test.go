@@ -63,7 +63,7 @@ func (s *stubLoopRepo) ResolvePendingToolConfirmation(ctx context.Context, id, u
 
 func TestLoopResetSessionDeletesSessionMessages(t *testing.T) {
 	repo := &stubLoopRepo{}
-	loop := NewLoop(repo, nil, nil, nil)
+	loop := NewLoop(repo, nil, nil, nil, nil)
 	userID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
 	sessionID := "00000000-0000-0000-0000-000000000001"
 
@@ -295,6 +295,9 @@ func (s *stubLoopQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.
 func (s *stubLoopQuerier) GetLinkedNotes(ctx context.Context, arg sqlcgen.GetLinkedNotesParams) ([]sqlcgen.Note, error) {
 	panic("unimplemented")
 }
+func (s *stubLoopQuerier) CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
 func (s *stubLoopQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesParams) ([]sqlcgen.Memory, error) {
 	panic("unimplemented")
 }
@@ -390,6 +393,9 @@ func (s *stubLoopQuerier) SearchNotesSemantic(ctx context.Context, arg sqlcgen.S
 func (s *stubLoopQuerier) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
+func (s *stubLoopQuerier) UpdateMemory(ctx context.Context, arg sqlcgen.UpdateMemoryParams) (sqlcgen.Memory, error) {
+	panic("unimplemented")
+}
 func (s *stubLoopQuerier) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
@@ -415,6 +421,9 @@ func (s *stubLoopQuerier) UpsertNoteEmbedding(ctx context.Context, arg sqlcgen.U
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) UpsertSoul(ctx context.Context, arg sqlcgen.UpsertSoulParams) (sqlcgen.Soul, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) UpdateSoulProfile(ctx context.Context, arg sqlcgen.UpdateSoulProfileParams) (sqlcgen.Soul, error) {
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {
@@ -469,6 +478,18 @@ func (s *stubLoopQuerier) ResolvePendingToolConfirmation(context.Context, sqlcge
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (s *stubLoopQuerier) SetWorkingMemoryValue(ctx context.Context, arg sqlcgen.SetWorkingMemoryValueParams) (sqlcgen.AgentWorkingMemory, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) GetWorkingMemoryValue(ctx context.Context, arg sqlcgen.GetWorkingMemoryValueParams) (string, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) GetWorkingMemoryForSession(ctx context.Context, arg sqlcgen.GetWorkingMemoryForSessionParams) ([]sqlcgen.GetWorkingMemoryForSessionRow, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) DeleteWorkingMemoryForSession(ctx context.Context, arg sqlcgen.DeleteWorkingMemoryForSessionParams) error {
+	panic("unimplemented")
+}
 func (s *stubLoopQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
 	panic("unimplemented")
 }
@@ -526,15 +547,15 @@ func TestLoopConfirmationRequired(t *testing.T) {
 		},
 	}
 
-	memSvc := memories.NewService(memRepo, embedCL)
+	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
+		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
 	)
 
 	repo := &trackingStubLoopRepo{}
-	loop := NewLoop(repo, llmFact, ctxBldr, toolReg)
+	loop := NewLoop(repo, llmFact, ctxBldr, toolReg, nil)
 
-	events := make(chan StreamEvent, 10)
+	events := make(chan StreamEvent, 200)
 	go func() {
 		defer close(events)
 		if err := loop.ChatStream(
@@ -612,14 +633,14 @@ func TestLoopRejectsEmptyLLMResponse(t *testing.T) {
 		},
 	}
 
-	memSvc := memories.NewService(memRepo, embedCL)
+	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
+		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
 	)
 
-	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
 
-	events := make(chan StreamEvent, 10)
+	events := make(chan StreamEvent, 200)
 	err := loop.ChatStream(
 		context.Background(),
 		pgtype.UUID{},
@@ -654,14 +675,14 @@ func TestLoopFallsBackWithoutToolsWhenLLMReturnsEmptyResponse(t *testing.T) {
 	}
 	llmFact := &stubLoopLLMFactory{client: llmClient}
 
-	memSvc := memories.NewService(memRepo, embedCL)
+	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
+		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
 	)
 
-	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
 
-	events := make(chan StreamEvent, 10)
+	events := make(chan StreamEvent, 200)
 	err := loop.ChatStream(
 		context.Background(),
 		pgtype.UUID{},
@@ -721,14 +742,14 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 		},
 	}
 
-	memSvc := memories.NewService(memRepo, embedCL)
+	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
+		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
 	)
 
-	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
 
-	events := make(chan StreamEvent, 10)
+	events := make(chan StreamEvent, 200)
 	err := loop.ChatStream(
 		context.Background(),
 		pgtype.UUID{},
@@ -787,14 +808,14 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 		},
 	}
 
-	memSvc := memories.NewService(memRepo, embedCL)
+	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact,
+		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
 	)
 
-	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg)
+	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
 
-	events := make(chan StreamEvent, 10)
+	events := make(chan StreamEvent, 200)
 	err := loop.ChatStream(
 		context.Background(),
 		pgtype.UUID{},
@@ -889,7 +910,7 @@ func TestResolveToolConfirmationCancelDoesNotExecuteTool(t *testing.T) {
 			Status:    "pending",
 		},
 	}
-	h := &Handler{repo: repo, loop: NewLoop(&stubLoopRepo{}, nil, nil, nil)}
+	h := &Handler{repo: repo, loop: NewLoop(&stubLoopRepo{}, nil, nil, nil, nil)}
 
 	resp, status, err := h.resolveToolConfirmation(context.Background(), pgtype.UUID{}, uid.UUIDToString(repo.pending.ID), false)
 	if err != nil {
@@ -914,7 +935,7 @@ func TestResolveToolConfirmationRejectsAlreadyResolved(t *testing.T) {
 				Status: "approved",
 			},
 		},
-		loop: NewLoop(&stubLoopRepo{}, nil, nil, nil),
+		loop: NewLoop(&stubLoopRepo{}, nil, nil, nil, nil),
 	}
 
 	_, status, err := h.resolveToolConfirmation(context.Background(), userID, uid.UUIDToString(id), true)
@@ -928,7 +949,7 @@ func TestResolveToolConfirmationRejectsAlreadyResolved(t *testing.T) {
 
 func TestResolveToolConfirmationNotFound(t *testing.T) {
 	repo := &resolveTestRepo{}
-	h := NewHandler(NewLoop(&stubLoopRepo{}, nil, nil, nil), repo)
+	h := NewHandler(NewLoop(&stubLoopRepo{}, nil, nil, nil, nil), repo)
 
 	_, status, err := h.resolveToolConfirmation(
 		context.Background(),
@@ -946,6 +967,9 @@ func TestResolveToolConfirmationNotFound(t *testing.T) {
 
 type stubLoopMemRepo struct{}
 
+func (m *stubLoopMemRepo) CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
 func (m *stubLoopMemRepo) GetMemories(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.Memory, error) {
 	return nil, nil
 }
@@ -953,6 +977,9 @@ func (m *stubLoopMemRepo) CreateMemory(ctx context.Context, userID pgtype.UUID, 
 	panic("unimplemented")
 }
 func (m *stubLoopMemRepo) DeleteMemory(ctx context.Context, id, userID pgtype.UUID) error {
+	panic("unimplemented")
+}
+func (m *stubLoopMemRepo) UpdateMemory(ctx context.Context, id, userID pgtype.UUID, content string, embedding pgvector.Vector) (sqlcgen.Memory, error) {
 	panic("unimplemented")
 }
 func (m *stubLoopMemRepo) SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {

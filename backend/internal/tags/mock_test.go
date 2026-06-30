@@ -8,7 +8,9 @@ import (
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
-type mockQuerier struct{}
+type mockQuerier struct {
+	sqlcgen.Querier
+}
 
 func newMockQuerier() *mockQuerier {
 	return &mockQuerier{}
@@ -226,6 +228,9 @@ func (m *mockQuerier) UpsertNoteEmbedding(_ context.Context, _ sqlcgen.UpsertNot
 	return nil
 }
 func (m *mockQuerier) UpsertSoul(_ context.Context, _ sqlcgen.UpsertSoulParams) (sqlcgen.Soul, error) {
+	return sqlcgen.Soul{}, nil
+}
+func (m *mockQuerier) UpdateSoulProfile(_ context.Context, _ sqlcgen.UpdateSoulProfileParams) (sqlcgen.Soul, error) {
 	return sqlcgen.Soul{}, nil
 }
 func (m *mockQuerier) UpsertTag(_ context.Context, _ sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {

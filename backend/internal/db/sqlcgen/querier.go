@@ -16,6 +16,7 @@ type Querier interface {
 	AppendToNoteContent(ctx context.Context, arg AppendToNoteContentParams) (Note, error)
 	CleanupOldMessages(ctx context.Context) error
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
@@ -45,6 +46,7 @@ type Querier interface {
 	DeleteSessionMessages(ctx context.Context, arg DeleteSessionMessagesParams) error
 	DeleteTag(ctx context.Context, arg DeleteTagParams) error
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
+	DeleteWorkingMemoryForSession(ctx context.Context, arg DeleteWorkingMemoryForSessionParams) error
 	GetContexts(ctx context.Context, userID pgtype.UUID) ([]Context, error)
 	GetEnabledRoutines(ctx context.Context) ([]GetEnabledRoutinesRow, error)
 	GetInboxNote(ctx context.Context, userID pgtype.UUID) (GetInboxNoteRow, error)
@@ -83,6 +85,8 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserSettings(ctx context.Context, userID pgtype.UUID) (UserSetting, error)
+	GetWorkingMemoryForSession(ctx context.Context, arg GetWorkingMemoryForSessionParams) ([]GetWorkingMemoryForSessionRow, error)
+	GetWorkingMemoryValue(ctx context.Context, arg GetWorkingMemoryValueParams) (string, error)
 	HardDeleteExpiredContexts(ctx context.Context) error
 	HardDeleteExpiredNotes(ctx context.Context) error
 	HardDeleteExpiredTasks(ctx context.Context) error
@@ -100,10 +104,13 @@ type Querier interface {
 	SearchNotesSemantic(ctx context.Context, arg SearchNotesSemanticParams) ([]SearchNotesSemanticRow, error)
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Task, error)
 	SetInboxContent(ctx context.Context, arg SetInboxContentParams) (Note, error)
+	SetWorkingMemoryValue(ctx context.Context, arg SetWorkingMemoryValueParams) (AgentWorkingMemory, error)
+	UpdateMemory(ctx context.Context, arg UpdateMemoryParams) (Memory, error)
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteEmbeddingStatus(ctx context.Context, arg UpdateNoteEmbeddingStatusParams) error
 	UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (Routine, error)
 	UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error
+	UpdateSoulProfile(ctx context.Context, arg UpdateSoulProfileParams) (Soul, error)
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error)
 	UpsertContext(ctx context.Context, arg UpsertContextParams) (Context, error)

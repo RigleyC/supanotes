@@ -31,3 +31,23 @@ UPDATE pending_tool_confirmations
 SET status = $3, resolved_at = NOW()
 WHERE id = $1 AND user_id = $2 AND status = 'pending'
 RETURNING *;
+
+-- name: GetWorkingMemoryValue :one
+SELECT value FROM agent_working_memory
+WHERE user_id = $1 AND session_id = $2 AND key = $3;
+
+-- name: SetWorkingMemoryValue :one
+INSERT INTO agent_working_memory (user_id, session_id, key, value)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id, session_id, key) DO UPDATE SET 
+    value = EXCLUDED.value,
+    updated_at = NOW()
+RETURNING *;
+
+-- name: DeleteWorkingMemoryForSession :exec
+DELETE FROM agent_working_memory
+WHERE user_id = $1 AND session_id = $2;
+
+-- name: GetWorkingMemoryForSession :many
+SELECT key, value FROM agent_working_memory
+WHERE user_id = $1 AND session_id = $2;

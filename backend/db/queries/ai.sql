@@ -32,6 +32,10 @@ ON CONFLICT (user_id) DO UPDATE SET
     updated_at = NOW()
 RETURNING *;
 
+-- name: CountMemories :one
+SELECT COUNT(*) FROM memories
+WHERE user_id = $1;
+
 -- name: GetMemories :many
 SELECT * FROM memories
 WHERE user_id = $1
@@ -55,9 +59,21 @@ WHERE n.user_id = $1 AND n.deleted_at IS NULL AND NOT n.is_inbox
 ORDER BY ne.embedding <=> $2::vector
 LIMIT $3;
 
+-- name: UpdateMemory :one
+UPDATE memories
+SET content = $2, embedding = $3, updated_at = NOW()
+WHERE id = $1 AND user_id = $4
+RETURNING *;
+
 -- name: SearchMemoriesByEmbedding :many
 SELECT m.id, m.content, m.created_at, (1 - (m.embedding <=> $2::vector))::real AS similarity
 FROM memories m
 WHERE m.user_id = $1
 ORDER BY m.embedding <=> $2::vector
 LIMIT $3;
+
+-- name: UpdateSoulProfile :one
+UPDATE souls
+SET profile = $2, updated_at = NOW()
+WHERE user_id = $1
+RETURNING *;

@@ -9,6 +9,15 @@ import (
 	"github.com/pgvector/pgvector-go"
 )
 
+type AgentWorkingMemory struct {
+	UserID    pgtype.UUID        `json:"user_id"`
+	SessionID pgtype.UUID        `json:"session_id"`
+	Key       string             `json:"key"`
+	Value     string             `json:"value"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Attachment struct {
 	ID        pgtype.UUID        `json:"id"`
 	NoteID    pgtype.UUID        `json:"note_id"`
@@ -26,6 +35,7 @@ type Context struct {
 	Name      string             `json:"name"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type DeviceToken struct {
@@ -154,6 +164,7 @@ type Soul struct {
 	Personality string             `json:"personality"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	Profile     []byte             `json:"profile"`
 }
 
 type Tag struct {

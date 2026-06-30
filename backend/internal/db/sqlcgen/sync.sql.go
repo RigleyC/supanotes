@@ -23,7 +23,7 @@ func (q *Queries) GetNoteOwnerID(ctx context.Context, id pgtype.UUID) (pgtype.UU
 }
 
 const getSyncContexts = `-- name: GetSyncContexts :many
-SELECT id, user_id, slug, name, created_at, updated_at FROM contexts
+SELECT id, user_id, slug, name, created_at, updated_at, deleted_at FROM contexts
 WHERE user_id = $1 AND updated_at > $2
 ORDER BY updated_at ASC
 LIMIT $3
@@ -51,6 +51,7 @@ func (q *Queries) GetSyncContexts(ctx context.Context, arg GetSyncContextsParams
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -421,7 +422,7 @@ SET slug = EXCLUDED.slug,
     name = EXCLUDED.name,
     updated_at = NOW()
 WHERE contexts.user_id = EXCLUDED.user_id
-RETURNING id, user_id, slug, name, created_at, updated_at
+RETURNING id, user_id, slug, name, created_at, updated_at, deleted_at
 `
 
 type UpsertContextParams struct {
@@ -448,6 +449,7 @@ func (q *Queries) UpsertContext(ctx context.Context, arg UpsertContextParams) (C
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }

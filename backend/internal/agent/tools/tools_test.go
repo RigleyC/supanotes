@@ -187,6 +187,9 @@ func (s *stubQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.GetL
 func (s *stubQuerier) GetLinkedNotes(ctx context.Context, arg sqlcgen.GetLinkedNotesParams) ([]sqlcgen.Note, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesParams) ([]sqlcgen.Memory, error) {
 	panic("unimplemented")
 }
@@ -277,6 +280,9 @@ func (s *stubQuerier) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxC
 	}
 	panic("unimplemented")
 }
+func (s *stubQuerier) UpdateMemory(ctx context.Context, arg sqlcgen.UpdateMemoryParams) (sqlcgen.Memory, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
@@ -302,6 +308,9 @@ func (s *stubQuerier) UpsertNoteEmbedding(ctx context.Context, arg sqlcgen.Upser
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertSoul(ctx context.Context, arg sqlcgen.UpsertSoulParams) (sqlcgen.Soul, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpdateSoulProfile(ctx context.Context, arg sqlcgen.UpdateSoulProfileParams) (sqlcgen.Soul, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {
@@ -358,6 +367,18 @@ func (s *stubQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.Re
 	panic("unimplemented")
 }
 func (s *stubQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (s *stubQuerier) SetWorkingMemoryValue(ctx context.Context, arg sqlcgen.SetWorkingMemoryValueParams) (sqlcgen.AgentWorkingMemory, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetWorkingMemoryValue(ctx context.Context, arg sqlcgen.GetWorkingMemoryValueParams) (string, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetWorkingMemoryForSession(ctx context.Context, arg sqlcgen.GetWorkingMemoryForSessionParams) ([]sqlcgen.GetWorkingMemoryForSessionRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteWorkingMemoryForSession(ctx context.Context, arg sqlcgen.DeleteWorkingMemoryForSessionParams) error {
+	panic("unimplemented")
+}
 func (s *stubQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
 	panic("unimplemented")
 }
@@ -402,7 +423,7 @@ func TestSearchNotesTool_Execute(t *testing.T) {
 	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 	tool := &SearchNotesTool{q: q, embedCL: embedCL}
 
-	result, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"query":"test query"}`)
+	result, err := tool.Execute(context.Background(), pgtype.UUID{}, "", `{"query":"test query"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -430,7 +451,7 @@ func TestSearchNotesTool_EmptyResults(t *testing.T) {
 	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 	tool := &SearchNotesTool{q: q, embedCL: embedCL}
 
-	result, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"query":"nothing"}`)
+	result, err := tool.Execute(context.Background(), pgtype.UUID{}, "", `{"query":"nothing"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -457,7 +478,7 @@ func TestLinkNotesTool_Execute(t *testing.T) {
 	notesSvc := newMockNotesService(q)
 	tool := &LinkNotesTool{q: q, notesSvc: notesSvc}
 
-	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{1}, Valid: true}, `{"source_id":"00000000-0000-0000-0000-000000000001","target_id":"00000000-0000-0000-0000-000000000002"}`)
+	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{1}, Valid: true}, "", `{"source_id":"00000000-0000-0000-0000-000000000001","target_id":"00000000-0000-0000-0000-000000000002"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -468,7 +489,7 @@ func TestLinkNotesTool_Execute(t *testing.T) {
 
 func TestLinkNotesTool_InvalidUUID(t *testing.T) {
 	tool := &LinkNotesTool{}
-	_, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"source_id":"not-a-uuid","target_id":"00000000-0000-0000-0000-000000000002"}`)
+	_, err := tool.Execute(context.Background(), pgtype.UUID{}, "", `{"source_id":"not-a-uuid","target_id":"00000000-0000-0000-0000-000000000002"}`)
 	if err == nil {
 		t.Fatal("expected error for invalid UUID")
 	}
@@ -486,7 +507,7 @@ func TestLinkNotesTool_SourceNotFound(t *testing.T) {
 	}
 	notesSvc := newMockNotesService(q)
 	tool := &LinkNotesTool{q: q, notesSvc: notesSvc}
-	_, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"source_id":"00000000-0000-0000-0000-000000000001","target_id":"00000000-0000-0000-0000-000000000002"}`)
+	_, err := tool.Execute(context.Background(), pgtype.UUID{}, "", `{"source_id":"00000000-0000-0000-0000-000000000001","target_id":"00000000-0000-0000-0000-000000000002"}`)
 	if err == nil {
 		t.Fatal("expected error for missing source note")
 	}
@@ -549,7 +570,7 @@ func TestGetNoteTool_Execute(t *testing.T) {
 	notesSvc := newMockNotesService(q)
 	tool := &GetNoteTool{notesSvc: notesSvc}
 
-	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{1}, Valid: true}, `{"note_id":"00000000-0000-0000-0000-000000000001"}`)
+	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{1}, Valid: true}, "", `{"note_id":"00000000-0000-0000-0000-000000000001"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -561,7 +582,7 @@ func TestGetNoteTool_Execute(t *testing.T) {
 
 func TestGetNoteTool_InvalidUUID(t *testing.T) {
 	tool := &GetNoteTool{}
-	_, err := tool.Execute(context.Background(), pgtype.UUID{}, `{"note_id":"not-a-uuid"}`)
+	_, err := tool.Execute(context.Background(), pgtype.UUID{}, "", `{"note_id":"not-a-uuid"}`)
 	if err == nil {
 		t.Fatal("expected error for invalid UUID")
 	}
@@ -596,7 +617,7 @@ func TestApplyInboxOrganizationTool_Execute(t *testing.T) {
 	tool := &ApplyInboxOrganizationTool{notesSvc: notesSvc}
 
 	argsJSON := `{"items":[{"item_id":"00000000-0000-0000-0000-000000000001-0","original_snippet":"snippet 1","destination_type":"new_note","destination_title":"New Note Title","accepted":true}]}`
-	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{2}, Valid: true}, argsJSON)
+	result, err := tool.Execute(context.Background(), pgtype.UUID{Bytes: [16]byte{2}, Valid: true}, "", argsJSON)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

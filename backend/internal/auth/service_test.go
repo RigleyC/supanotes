@@ -23,6 +23,7 @@ import (
 // canned data or errors. Only the methods exercised by the Service are
 // fully featured; the rest are stubbed to fail loudly if invoked.
 type mockQuerier struct {
+	sqlcgen.Querier
 	mu sync.Mutex
 
 	users       map[string]sqlcgen.User // key: email
@@ -267,6 +268,9 @@ func (m *mockQuerier) UpsertNoteEmbedding(ctx context.Context, arg sqlcgen.Upser
 	return nil
 }
 func (m *mockQuerier) UpsertSoul(ctx context.Context, arg sqlcgen.UpsertSoulParams) (sqlcgen.Soul, error) {
+	return sqlcgen.Soul{}, nil
+}
+func (m *mockQuerier) UpdateSoulProfile(ctx context.Context, arg sqlcgen.UpdateSoulProfileParams) (sqlcgen.Soul, error) {
 	return sqlcgen.Soul{}, nil
 }
 

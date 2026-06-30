@@ -11,6 +11,7 @@ const (
 	EventMessageFinished      EventType = "message_finished"
 	EventError                EventType = "error"
 	EventConfirmationRequired EventType = "confirmation_required"
+	EventTimelineMilestone    EventType = "timeline_milestone"
 )
 
 type StreamEvent struct {
@@ -53,6 +54,12 @@ type ConfirmationRequiredPayload struct {
 	ConfirmationID string `json:"confirmation_id"`
 	ToolName       string `json:"tool_name"`
 	Label          string `json:"label"`
+}
+
+type TimelineMilestonePayload struct {
+	Milestone string `json:"milestone"`
+	Status    string `json:"status"` // pending, completed, failed
+	Label     string `json:"label"`
 }
 
 type StreamEventWriter struct {

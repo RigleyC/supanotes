@@ -21,7 +21,7 @@ func (t *SaveMemoryTool) Description() string {
 func (t *SaveMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
-func (t *SaveMemoryTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *SaveMemoryTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		Content string `json:"content"`
 	}](argsJSON)
@@ -44,7 +44,7 @@ func (t *ListMemoriesTool) Description() string { return "List all saved memorie
 func (t *ListMemoriesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
-func (t *ListMemoriesTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *ListMemoriesTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	mems, err := t.memoriesSvc.GetMemories(ctx, userID, 100, 0)
 	if err != nil {
 		return "", err
@@ -65,7 +65,7 @@ func (t *DeleteMemoryTool) Description() string { return "Delete a specific memo
 func (t *DeleteMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"memory_id":{"type":"string"}},"required":["memory_id"]}`
 }
-func (t *DeleteMemoryTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *DeleteMemoryTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		MemoryID string `json:"memory_id"`
 	}](argsJSON)

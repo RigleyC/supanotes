@@ -109,7 +109,7 @@ func (q *Queries) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, er
 const createContext = `-- name: CreateContext :one
 INSERT INTO contexts (user_id, slug, name)
 VALUES ($1, $2, $3)
-RETURNING id, user_id, slug, name, created_at, updated_at
+RETURNING id, user_id, slug, name, created_at, updated_at, deleted_at
 `
 
 type CreateContextParams struct {
@@ -128,6 +128,7 @@ func (q *Queries) CreateContext(ctx context.Context, arg CreateContextParams) (C
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -260,7 +261,7 @@ func (q *Queries) DeleteTag(ctx context.Context, arg DeleteTagParams) error {
 }
 
 const getContexts = `-- name: GetContexts :many
-SELECT id, user_id, slug, name, created_at, updated_at FROM contexts
+SELECT id, user_id, slug, name, created_at, updated_at, deleted_at FROM contexts
 WHERE user_id = $1
 ORDER BY created_at DESC
 `
@@ -281,6 +282,7 @@ func (q *Queries) GetContexts(ctx context.Context, userID pgtype.UUID) ([]Contex
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -206,6 +206,9 @@ func (s *stubQuerier) GetLatestBriefByType(context.Context, sqlcgen.GetLatestBri
 func (s *stubQuerier) GetLinkedNotes(context.Context, sqlcgen.GetLinkedNotesParams) ([]sqlcgen.Note, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) CountMemories(context.Context, pgtype.UUID) (int64, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetMemories(context.Context, sqlcgen.GetMemoriesParams) ([]sqlcgen.Memory, error) {
 	panic("unimplemented")
 }
@@ -294,6 +297,9 @@ func (s *stubQuerier) SearchNotesSemantic(context.Context, sqlcgen.SearchNotesSe
 func (s *stubQuerier) SetInboxContent(context.Context, sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) UpdateMemory(context.Context, sqlcgen.UpdateMemoryParams) (sqlcgen.Memory, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) UpdateNote(context.Context, sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
@@ -319,6 +325,9 @@ func (s *stubQuerier) UpsertNoteEmbedding(context.Context, sqlcgen.UpsertNoteEmb
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertSoul(context.Context, sqlcgen.UpsertSoulParams) (sqlcgen.Soul, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) UpdateSoulProfile(ctx context.Context, arg sqlcgen.UpdateSoulProfileParams) (sqlcgen.Soul, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertTag(context.Context, sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {
@@ -373,6 +382,18 @@ func (s *stubQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.Re
 	panic("unimplemented")
 }
 func (s *stubQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (s *stubQuerier) SetWorkingMemoryValue(ctx context.Context, arg sqlcgen.SetWorkingMemoryValueParams) (sqlcgen.AgentWorkingMemory, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetWorkingMemoryValue(ctx context.Context, arg sqlcgen.GetWorkingMemoryValueParams) (string, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetWorkingMemoryForSession(ctx context.Context, arg sqlcgen.GetWorkingMemoryForSessionParams) ([]sqlcgen.GetWorkingMemoryForSessionRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) DeleteWorkingMemoryForSession(ctx context.Context, arg sqlcgen.DeleteWorkingMemoryForSessionParams) error {
+	panic("unimplemented")
+}
 func (s *stubQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
 	panic("unimplemented")
 }
@@ -391,6 +412,9 @@ func (s *stubQuerier) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.
 
 type stubMemRepo struct{}
 
+func (m *stubMemRepo) CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
 func (m *stubMemRepo) GetMemories(ctx context.Context, userID pgtype.UUID, limit, offset int32) ([]sqlcgen.Memory, error) {
 	return nil, nil
 }
@@ -398,6 +422,9 @@ func (m *stubMemRepo) CreateMemory(ctx context.Context, userID pgtype.UUID, cont
 	panic("unimplemented")
 }
 func (m *stubMemRepo) DeleteMemory(ctx context.Context, id, userID pgtype.UUID) error {
+	panic("unimplemented")
+}
+func (m *stubMemRepo) UpdateMemory(ctx context.Context, id, userID pgtype.UUID, content string, embedding pgvector.Vector) (sqlcgen.Memory, error) {
 	panic("unimplemented")
 }
 func (m *stubMemRepo) SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
@@ -434,7 +461,7 @@ func TestContextBuilder_Build(t *testing.T) {
 	tasksSvc := tasks.NewService(&stubTasksRepo{})
 
 	cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
-	result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "test query")
+	result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "test query", IntentProjectPlanning)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -448,15 +475,375 @@ func TestContextBuilder_Build(t *testing.T) {
 		"IDENTITY:",
 		"CURRENT CONTEXT:",
 		"TODAY/OVERDUE TASKS:",
-		"RECENT NOTES",
 		"SEMANTIC SEARCH RESULTS:",
 		"RELATED NOTES:",
-		"RELEVANT MEMORIES:",
 	}
 	for _, section := range requiredSections {
 		if !strings.Contains(result, section) {
 			t.Fatalf("expected context to contain %q, got:\n%s", section, result)
 		}
 	}
+}
+
+func TestContextBuilderSmartPolicies(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
+				{"embedding": make([]float64, 1536), "index": 0},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	q := &stubQuerier{
+		searchByEmbedding: func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error) {
+			return nil, nil
+		},
+		getSoul: func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error) {
+			return sqlcgen.Soul{Personality: "test soul"}, nil
+		},
+		getMessages: func(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error) {
+			return nil, nil
+		},
+		getRecentNotes: func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
+			return nil, nil
+		},
+	}
+
+	t.Run("GeneralChat_fetches_only_soul", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "hello", IntentGeneralChat)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"BEHAVIORAL GUIDELINES:",
+			"TOOL RULES:",
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+
+		absent := []string{
+			"TODAY/OVERDUE TASKS:",
+			"RECENT NOTES",
+			"SEMANTIC SEARCH RESULTS:",
+			"RELATED NOTES:",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range absent {
+			if strings.Contains(result, s) {
+				t.Fatalf("expected context NOT to contain %q", s)
+			}
+		}
+	})
+
+	t.Run("DailySummary_skips_note_embedding_search", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "what's my day like", IntentDailySummary)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+			"TODAY/OVERDUE TASKS:",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+
+		absent := []string{
+			"SEMANTIC SEARCH RESULTS:",
+			"RECENT NOTES",
+			"RELATED NOTES:",
+		}
+		for _, s := range absent {
+			if strings.Contains(result, s) {
+				t.Fatalf("expected context NOT to contain %q for DailySummary", s)
+			}
+		}
+	})
+
+	t.Run("SearchKnowledge_fetches_notes_memories_and_semantic", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "find info about X", IntentSearchKnowledge)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+			"RECENT NOTES",
+			"SEMANTIC SEARCH RESULTS:",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+
+		absent := []string{
+			"TODAY/OVERDUE TASKS:",
+			"RELATED NOTES:",
+		}
+		for _, s := range absent {
+			if strings.Contains(result, s) {
+				t.Fatalf("expected context NOT to contain %q for SearchKnowledge", s)
+			}
+		}
+	})
+
+	t.Run("ProjectPlanning_fetches_tasks_semantic_and_linked", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "plan a feature", IntentProjectPlanning)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+			"TODAY/OVERDUE TASKS:",
+			"SEMANTIC SEARCH RESULTS:",
+			"RELATED NOTES:",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+
+		absent := []string{
+			"RECENT NOTES",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range absent {
+			if strings.Contains(result, s) {
+				t.Fatalf("expected context NOT to contain %q for ProjectPlanning", s)
+			}
+		}
+	})
+
+	t.Run("TaskManagement_fetches_tasks_only", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "show my tasks", IntentTaskManagement)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+			"TODAY/OVERDUE TASKS:",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+
+		absent := []string{
+			"RECENT NOTES",
+			"SEMANTIC SEARCH RESULTS:",
+			"RELATED NOTES:",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range absent {
+			if strings.Contains(result, s) {
+				t.Fatalf("expected context NOT to contain %q for TaskManagement", s)
+			}
+		}
+	})
+
+	t.Run("MemoryQuestion_fetches_memories_and_recent_notes", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "what do I remember about Go", IntentMemoryQuestion)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+			"RECENT NOTES",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+
+		absent := []string{
+			"TODAY/OVERDUE TASKS:",
+			"SEMANTIC SEARCH RESULTS:",
+			"RELATED NOTES:",
+		}
+		for _, s := range absent {
+			if strings.Contains(result, s) {
+				t.Fatalf("expected context NOT to contain %q for MemoryQuestion", s)
+			}
+		}
+	})
+
+	t.Run("Organization_fetches_recent_notes_only", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "organize my notes", IntentOrganization)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+			"RECENT NOTES",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+
+		absent := []string{
+			"TODAY/OVERDUE TASKS:",
+			"SEMANTIC SEARCH RESULTS:",
+			"RELATED NOTES:",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range absent {
+			if strings.Contains(result, s) {
+				t.Fatalf("expected context NOT to contain %q for Organization", s)
+			}
+		}
+	})
+
+	t.Run("Brainstorming_fetches_notes_semantic_and_memories", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "brainstorm ideas", IntentBrainstorming)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+			"RECENT NOTES",
+			"SEMANTIC SEARCH RESULTS:",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+
+		absent := []string{
+			"TODAY/OVERDUE TASKS:",
+			"RELATED NOTES:",
+		}
+		for _, s := range absent {
+			if strings.Contains(result, s) {
+				t.Fatalf("expected context NOT to contain %q for Brainstorming", s)
+			}
+		}
+	})
+
+	t.Run("default_unknown_intent_fetches_everything", func(t *testing.T) {
+		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
+		memRepo := &stubMemRepo{}
+		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
+
+		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "something else", Intent("UnknownIntent"))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result == "" {
+			t.Fatal("expected non-empty context")
+		}
+
+		present := []string{
+			"IDENTITY:",
+			"CURRENT CONTEXT:",
+			"TODAY/OVERDUE TASKS:",
+			"RECENT NOTES",
+			"SEMANTIC SEARCH RESULTS:",
+			"RELATED NOTES:",
+			"RELEVANT MEMORIES:",
+		}
+		for _, s := range present {
+			if !strings.Contains(result, s) {
+				t.Fatalf("expected context to contain %q", s)
+			}
+		}
+	})
 }
 

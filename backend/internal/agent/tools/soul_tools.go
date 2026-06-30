@@ -21,7 +21,7 @@ func (t *GetSoulTool) Description() string {
 func (t *GetSoulTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
-func (t *GetSoulTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *GetSoulTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	soul, err := t.q.GetSoul(ctx, userID)
 	if err != nil {
 		return "", err
@@ -38,7 +38,7 @@ func (t *UpdateSoulTool) Description() string { return "Update the agent's perso
 func (t *UpdateSoulTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
-func (t *UpdateSoulTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *UpdateSoulTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		Content string `json:"content"`
 	}](argsJSON)

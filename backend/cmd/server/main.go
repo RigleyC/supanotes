@@ -218,9 +218,12 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.GET("/soul", soulH.Get)
 	protected.PUT("/soul", soulH.Update)
 
+	// LLM Factory
+	llmFactory := llm.NewFactory(cfg)
+
 	// Memories
 	memoriesRepo := memories.NewRepository(queries)
-	memoriesSvc := memories.NewService(memoriesRepo, embeddingClient)
+	memoriesSvc := memories.NewService(memoriesRepo, embeddingClient, llmFactory.For(llm.TaskTypeInboxOrganize))
 	memoriesH := memories.NewHandler(memoriesSvc)
 	protected.GET("/memories", memoriesH.List)
 	protected.POST("/memories", memoriesH.Create)
@@ -230,9 +233,6 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	searchSvc := search.NewService(queries, embeddingClient)
 	searchH := search.NewHandler(searchSvc)
 	search.RegisterRoutes(protected, searchH)
-
-	// LLM Factory
-	llmFactory := llm.NewFactory(cfg)
 
 	// Notes (needs llmFactory for inbox organization)
 	notesH := notes.NewHandler(notesSvc, llmFactory.For(llm.TaskTypeInboxOrganize))
@@ -285,14 +285,17 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// Agent Loop (built before the runner so the runner and the
 	// gateway can both depend on it).
 	agentRepo := agent.NewRepository(queries)
-	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient, llmFactory)
-	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools)
+	workingMemSvc := agent.NewWorkingMemoryService(queries)
+	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient, llmFactory, workingMemSvc)
+	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools, workingMemSvc)
 	agentH := agent.NewHandler(agentLoop, agentRepo)
 	protected.POST("/agent/chat", agentH.Chat)
 	protected.POST("/agent/chat/stream", agentH.ChatSSE)
 	protected.GET("/agent/messages", agentH.ListMessages)
 	protected.DELETE("/agent/messages", agentH.DeleteMessages)
 	protected.POST("/agent/tool-confirmations/:id/resolve", agentH.ResolveToolConfirmation)
+	protected.GET("/agent/traces/:id", agentH.GetSessionTraces)
+
 
 	// FCM push + Telegram sender — feed both into the routines runner
 	// so a fired brief triggers real notifications.

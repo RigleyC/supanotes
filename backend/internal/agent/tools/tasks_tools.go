@@ -24,7 +24,7 @@ func (t *AddTaskTool) Description() string {
 func (t *AddTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"title":{"type":"string"},"note_id":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date"},"recurrence":{"type":"string","enum":["none","daily","weekdays","weekly","monthly"]}},"required":["title"]}`
 }
-func (t *AddTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *AddTaskTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		Title      string  `json:"title"`
 		NoteID     *string `json:"note_id"`
@@ -68,7 +68,7 @@ func (t *CompleteTaskTool) Description() string {
 func (t *CompleteTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]}`
 }
-func (t *CompleteTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *CompleteTaskTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		TaskID string `json:"task_id"`
 	}](argsJSON)
@@ -98,7 +98,7 @@ func (t *QueryTasksTool) Description() string {
 func (t *QueryTasksTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"status":{"type":"string","enum":["open","done","all"],"description":"Filter by status. Default: open"},"timeframe":{"type":"string","enum":["today","overdue","all"],"description":"Filter by timeframe. 'today' means due today or earlier. 'overdue' means due before today. Default: all"},"query":{"type":"string","description":"Optional keyword to search in task titles"}},"required":[]}`
 }
-func (t *QueryTasksTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *QueryTasksTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		Status    *string `json:"status"`
 		Timeframe *string `json:"timeframe"`
@@ -181,7 +181,7 @@ func (t *UpdateTaskTool) Description() string {
 func (t *UpdateTaskTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"task_id":{"type":"string"},"title":{"type":"string"},"due_date":{"type":"string","description":"ISO 8601 date, omit to leave unchanged"},"clear_due_date":{"type":"boolean","description":"Set to true to remove the due date"},"recurrence":{"type":"string","enum":["daily","weekdays","weekly","monthly"]},"clear_recurrence":{"type":"boolean","description":"Set to true to remove the recurrence"}},"required":["task_id"]}`
 }
-func (t *UpdateTaskTool) Execute(ctx context.Context, userID pgtype.UUID, argsJSON string) (string, error) {
+func (t *UpdateTaskTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
 	args, err := parseArgs[struct {
 		TaskID          string  `json:"task_id"`
 		Title           *string `json:"title"`

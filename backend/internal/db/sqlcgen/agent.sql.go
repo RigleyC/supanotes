@@ -98,6 +98,21 @@ func (q *Queries) DeleteSessionMessages(ctx context.Context, arg DeleteSessionMe
 	return err
 }
 
+const deleteWorkingMemoryForSession = `-- name: DeleteWorkingMemoryForSession :exec
+DELETE FROM agent_working_memory
+WHERE user_id = $1 AND session_id = $2
+`
+
+type DeleteWorkingMemoryForSessionParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	SessionID pgtype.UUID `json:"session_id"`
+}
+
+func (q *Queries) DeleteWorkingMemoryForSession(ctx context.Context, arg DeleteWorkingMemoryForSessionParams) error {
+	_, err := q.db.Exec(ctx, deleteWorkingMemoryForSession, arg.UserID, arg.SessionID)
+	return err
+}
+
 const getMessages = `-- name: GetMessages :many
 SELECT id, user_id, session_id, role, content, tool_calls, tool_call_id, created_at FROM (
   SELECT id, user_id, session_id, role, content, tool_calls, tool_call_id, created_at FROM messages
@@ -176,6 +191,59 @@ func (q *Queries) GetPendingToolConfirmation(ctx context.Context, arg GetPending
 	return i, err
 }
 
+const getWorkingMemoryForSession = `-- name: GetWorkingMemoryForSession :many
+SELECT key, value FROM agent_working_memory
+WHERE user_id = $1 AND session_id = $2
+`
+
+type GetWorkingMemoryForSessionParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	SessionID pgtype.UUID `json:"session_id"`
+}
+
+type GetWorkingMemoryForSessionRow struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func (q *Queries) GetWorkingMemoryForSession(ctx context.Context, arg GetWorkingMemoryForSessionParams) ([]GetWorkingMemoryForSessionRow, error) {
+	rows, err := q.db.Query(ctx, getWorkingMemoryForSession, arg.UserID, arg.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetWorkingMemoryForSessionRow
+	for rows.Next() {
+		var i GetWorkingMemoryForSessionRow
+		if err := rows.Scan(&i.Key, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getWorkingMemoryValue = `-- name: GetWorkingMemoryValue :one
+SELECT value FROM agent_working_memory
+WHERE user_id = $1 AND session_id = $2 AND key = $3
+`
+
+type GetWorkingMemoryValueParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	SessionID pgtype.UUID `json:"session_id"`
+	Key       string      `json:"key"`
+}
+
+func (q *Queries) GetWorkingMemoryValue(ctx context.Context, arg GetWorkingMemoryValueParams) (string, error) {
+	row := q.db.QueryRow(ctx, getWorkingMemoryValue, arg.UserID, arg.SessionID, arg.Key)
+	var value string
+	err := row.Scan(&value)
+	return value, err
+}
+
 const resolvePendingToolConfirmation = `-- name: ResolvePendingToolConfirmation :one
 UPDATE pending_tool_confirmations
 SET status = $3, resolved_at = NOW()
@@ -201,6 +269,41 @@ func (q *Queries) ResolvePendingToolConfirmation(ctx context.Context, arg Resolv
 		&i.Status,
 		&i.CreatedAt,
 		&i.ResolvedAt,
+	)
+	return i, err
+}
+
+const setWorkingMemoryValue = `-- name: SetWorkingMemoryValue :one
+INSERT INTO agent_working_memory (user_id, session_id, key, value)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id, session_id, key) DO UPDATE SET 
+    value = EXCLUDED.value,
+    updated_at = NOW()
+RETURNING user_id, session_id, key, value, created_at, updated_at
+`
+
+type SetWorkingMemoryValueParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	SessionID pgtype.UUID `json:"session_id"`
+	Key       string      `json:"key"`
+	Value     string      `json:"value"`
+}
+
+func (q *Queries) SetWorkingMemoryValue(ctx context.Context, arg SetWorkingMemoryValueParams) (AgentWorkingMemory, error) {
+	row := q.db.QueryRow(ctx, setWorkingMemoryValue,
+		arg.UserID,
+		arg.SessionID,
+		arg.Key,
+		arg.Value,
+	)
+	var i AgentWorkingMemory
+	err := row.Scan(
+		&i.UserID,
+		&i.SessionID,
+		&i.Key,
+		&i.Value,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

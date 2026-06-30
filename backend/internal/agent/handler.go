@@ -194,7 +194,7 @@ func (h *Handler) resolveToolConfirmation(ctx context.Context, userID pgtype.UUI
 		return ResolveToolConfirmationResponse{}, http.StatusConflict, fmt.Errorf("confirmation already resolved")
 	}
 
-	result, err := h.loop.ExecuteTool(ctx, userID, resolved.ToolName, string(resolved.ArgsJson))
+	result, err := h.loop.ExecuteTool(ctx, userID, uid.UUIDToString(resolved.SessionID), resolved.ToolName, string(resolved.ArgsJson))
 	if err != nil {
 		return ResolveToolConfirmationResponse{}, http.StatusInternalServerError, fmt.Errorf("execute confirmed tool: %w", err)
 	}
@@ -252,3 +252,13 @@ func (h *Handler) DeleteMessages(c echo.Context) error {
 
 	return c.NoContent(http.StatusNoContent)
 }
+
+func (h *Handler) GetSessionTraces(c echo.Context) error {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		return web.JSONError(c, http.StatusBadRequest, "session id is required")
+	}
+	traces := GlobalTraceStore.GetTraces(sessionID)
+	return c.JSON(http.StatusOK, traces)
+}
+
