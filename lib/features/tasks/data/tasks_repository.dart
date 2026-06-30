@@ -28,16 +28,24 @@ abstract class ITasksRepository {
   Future<void> updateTask(String id, {String? title, DateTime? dueDate, TaskRecurrence? recurrence, int? position, bool clearDueDate = false, bool clearRecurrence = false});
   Future<void> deleteTask(String id);
   Future<void> reorderTasks(String noteId, List<String> orderedIds);
+  Future<void> catchUpRecurringTasks();
 }
 
 class TasksRepository implements ITasksRepository {
-  TasksRepository(this._local);
+  TasksRepository(this._local) {
+    // Fire-and-forget: advance overdue recurring tasks to today.
+    // Errors are swallowed — the fast-forward in _nextDueDate is a safety net.
+    _local.catchUpRecurringTasks();
+  }
 
   final TasksLocalRepository _local;
   final Uuid _uuid = const Uuid();
 
   @override
   String get userId => _local.userId;
+
+  @override
+  Future<void> catchUpRecurringTasks() => _local.catchUpRecurringTasks();
 
   // ---------------------------------------------------------------------------
   // Reads

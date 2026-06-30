@@ -264,6 +264,9 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
   String get userId => 'test-user';
 
   @override
+  Future<void> catchUpRecurringTasks() async {}
+
+  @override
   Stream<List<TaskData>> watchTodayTasks() => const Stream.empty();
 
   @override

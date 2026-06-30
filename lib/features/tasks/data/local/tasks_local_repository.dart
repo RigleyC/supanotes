@@ -90,6 +90,10 @@ class TasksLocalRepository {
     await _dao.deleteTaskById(id);
   }
 
+  Future<void> catchUpRecurringTasks() async {
+    await _dao.catchUpRecurringTasks();
+  }
+
   /// Runs [action] inside a Drift [Transaction] so that all batched
   /// task writes in a single save are either committed or rolled
   /// back together.
