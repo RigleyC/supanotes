@@ -85,11 +85,74 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
   Future<void> updateTask(TasksCompanion companion) async {
     final now = DateTime.now();
-    final updatedCompanion = companion.copyWith(
-      updatedAt: Value(now),
-      isDirty: const Value(true),
-    );
-    await (update(tasks)..where((t) => t.id.equals(companion.id.value))).write(updatedCompanion);
+    await transaction(() async {
+      var updatedCompanion = companion.copyWith(
+        updatedAt: Value(now),
+        isDirty: const Value(true),
+      );
+
+      if (companion.recurrence.present && companion.recurrence.value != null) {
+        final current = await (select(tasks)
+              ..where((t) => t.id.equals(companion.id.value)))
+            .getSingleOrNull();
+
+        if (current != null && current.status == 'done') {
+          final recurrence = companion.recurrence.value!;
+          final baseTime = current.completedAt ?? current.dueDate ?? now;
+          final nextDue = _nextDueDate(from: baseTime, recurrence: recurrence);
+          if (nextDue != null) {
+            updatedCompanion = updatedCompanion.copyWith(
+              status: const Value('open'),
+              dueDate: Value(nextDue),
+              completedAt: const Value(null),
+            );
+          }
+        }
+      }
+
+      await (update(tasks)..where((t) => t.id.equals(companion.id.value)))
+          .write(updatedCompanion);
+    });
+  }
+
+  Future<void> catchUpRecurringTasks() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final query = select(tasks)
+      ..where((t) => t.status.equals('open'))
+      ..where((t) => t.dueDate.isSmallerThanValue(today))
+      ..where((t) => t.recurrence.isNotNull())
+      ..where((t) => t.deletedAt.isNull());
+
+    final overdue = await query.get();
+    if (overdue.isEmpty) return;
+
+    await transaction(() async {
+      for (final task in overdue) {
+        final recurrence = task.recurrence!;
+        var currentDue = task.dueDate!;
+
+        var next = _nextDueDate(from: currentDue, recurrence: recurrence);
+        while (next != null && next.isBefore(today)) {
+          currentDue = next;
+          next = _nextDueDate(from: currentDue, recurrence: recurrence);
+        }
+        if (next != null && next.isAtSameMomentAs(today)) {
+          currentDue = next;
+        }
+
+        if (currentDue != task.dueDate) {
+          await (update(tasks)..where((t) => t.id.equals(task.id))).write(
+            TasksCompanion(
+              dueDate: Value(currentDue),
+              updatedAt: Value(now),
+              isDirty: const Value(true),
+            ),
+          );
+        }
+      }
+    });
   }
 
   /// Marks the row with [id] as completed, records the completion event

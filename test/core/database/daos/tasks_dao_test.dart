@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
@@ -142,6 +143,147 @@ void main() {
     expect(task.dueDate!.year, 2026);
     expect(task.dueDate!.month, 9);
     expect(task.dueDate!.day, 30);  // Sep has 30 days, clamped from 31
+
+    await db.close();
+  });
+
+  test('catchUpRecurringTasks advances overdue daily task to today', () async {
+    final db = AppDatabase.test();
+    db.tasksDao.completionsDao = db.taskCompletionsDao;
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final twoDaysAgo = todayStart.subtract(const Duration(days: 2));
+
+    await db.tasksDao.insertTask(TaskData(
+      id: 'catchup-1',
+      userId: 'user-1',
+      noteId: 'note-1',
+      title: 'Daily standup',
+      status: 'open',
+      position: 0,
+      recurrence: TaskRecurrence.daily,
+      dueDate: twoDaysAgo,
+      completedAt: null,
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+      deletedAt: null,
+      isDirty: true,
+    ));
+
+    await db.tasksDao.catchUpRecurringTasks();
+
+    final tasks = await db.select(db.tasks).get();
+    expect(tasks, hasLength(1));
+    final task = tasks.single;
+    expect(task.status, 'open');
+    expect(task.dueDate, todayStart);
+    expect(task.isDirty, isTrue);
+
+    // No completion records — the missed days are just skipped
+    final completions = await db.select(db.localTaskCompletions).get();
+    expect(completions, isEmpty);
+
+    await db.close();
+  });
+
+  test('catchUpRecurringTasks does not touch tasks already due today or in the future', () async {
+    final db = AppDatabase.test();
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+
+    await db.tasksDao.insertTask(TaskData(
+      id: 'catchup-2',
+      userId: 'user-1',
+      noteId: 'note-1',
+      title: 'Already current',
+      status: 'open',
+      position: 0,
+      recurrence: TaskRecurrence.daily,
+      dueDate: todayStart,
+      completedAt: null,
+      createdAt: todayStart,
+      updatedAt: todayStart,
+      deletedAt: null,
+      isDirty: false,
+    ));
+
+    await db.tasksDao.catchUpRecurringTasks();
+
+    final tasks = await db.select(db.tasks).get();
+    final task = tasks.single;
+    expect(task.dueDate, todayStart);
+    expect(task.isDirty, isFalse); // Not touched
+
+    await db.close();
+  });
+
+  test('catchUpRecurringTasks does not touch non-recurring tasks', () async {
+    final db = AppDatabase.test();
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final yesterday = todayStart.subtract(const Duration(days: 1));
+
+    await db.tasksDao.insertTask(TaskData(
+      id: 'catchup-3',
+      userId: 'user-1',
+      noteId: 'note-1',
+      title: 'One-off overdue',
+      status: 'open',
+      position: 0,
+      recurrence: null,
+      dueDate: yesterday,
+      completedAt: null,
+      createdAt: yesterday,
+      updatedAt: yesterday,
+      deletedAt: null,
+      isDirty: false,
+    ));
+
+    await db.tasksDao.catchUpRecurringTasks();
+
+    final tasks = await db.select(db.tasks).get();
+    final task = tasks.single;
+    expect(task.dueDate, yesterday); // Unchanged
+    expect(task.isDirty, isFalse);
+
+    await db.close();
+  });
+
+  test('adding recurrence to a completed task re-opens it with next due date', () async {
+    final db = AppDatabase.test();
+    db.tasksDao.completionsDao = db.taskCompletionsDao;
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final completedAt = todayStart.subtract(const Duration(hours: 2));
+
+    await db.tasksDao.insertTask(TaskData(
+      id: 'reopen-1',
+      userId: 'user-1',
+      noteId: 'note-1',
+      title: 'Was one-off',
+      status: 'done',
+      position: 0,
+      recurrence: null,
+      dueDate: todayStart,
+      completedAt: completedAt,
+      createdAt: todayStart,
+      updatedAt: todayStart,
+      deletedAt: null,
+      isDirty: false,
+    ));
+
+    await db.tasksDao.updateTask(TasksCompanion(
+      id: const Value('reopen-1'),
+      recurrence: const Value(TaskRecurrence.daily),
+    ));
+
+    final tasks = await db.select(db.tasks).get();
+    final task = tasks.single;
+    expect(task.status, 'open');
+    expect(task.completedAt, isNull);
+    expect(task.recurrence, TaskRecurrence.daily);
+    expect(task.dueDate!.isAfter(todayStart.subtract(const Duration(days: 1))), isTrue);
+    expect(task.isDirty, isTrue);
 
     await db.close();
   });
