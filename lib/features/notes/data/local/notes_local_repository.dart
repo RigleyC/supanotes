@@ -47,6 +47,10 @@ class NotesLocalRepository {
     return _dao.watchNoteById(id, _userId);
   }
 
+  Stream<NoteWithTasksQueryResult?> watchNoteWithTasks(String id) {
+    return _dao.watchNoteWithTasks(id, _userId);
+  }
+
   Future<NoteQueryResult?> getNoteById(String id) async {
     return _dao.getNoteWithPrefsById(id, _userId);
   }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/domain/task_entry.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
@@ -93,6 +94,10 @@ class _FakeNotesRepository implements INotesRepository {
 
   @override
   Future<void> markHasRemoteCopy(String id) async {}
+
+  @override
+  Stream<NoteWithTasks> watchNoteWithTasks(String noteId) =>
+      Stream.value(const NoteWithTasks(note: null, tasks: []));
 
   NoteModel _note({
     required String id,

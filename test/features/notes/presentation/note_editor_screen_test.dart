@@ -9,6 +9,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
+import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/domain/task_entry.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
@@ -18,7 +19,6 @@ import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-
 class _FakeNotesRepository implements INotesRepository {
   _FakeNotesRepository(this.controller);
 
@@ -38,10 +38,22 @@ class _FakeNotesRepository implements INotesRepository {
   Future<void> deleteIfEmptyOrTombstone(String id) async {}
 
   @override
+  Stream<NoteWithTasks> watchNoteWithTasks(String noteId) =>
+      controller.stream.map((note) => NoteWithTasks(note: note, tasks: []));
+
+  @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _MockTasksRepository extends Mock implements ITasksRepository {}
+
+_MockTasksRepository _defaultMockTasksRepo() {
+  final mock = _MockTasksRepository();
+  when(() => mock.watchByNote(any())).thenAnswer((_) => Stream.value([]));
+  when(() => mock.completeTask(any())).thenAnswer((_) async => null);
+  when(() => mock.reopenTask(any())).thenAnswer((_) async {});
+  return mock;
+}
 
 void main() {
   testWidgets(
@@ -57,9 +69,7 @@ void main() {
             notesRepositoryProvider.overrideWithValue(
               _FakeNotesRepository(streamController),
             ),
-            tasksByNoteStreamProvider.overrideWith(
-              (ref, arg) => Stream.value(<TaskModel>[]),
-            ),
+            tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
           ],
           child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
         ),
@@ -117,9 +127,7 @@ void main() {
           notesRepositoryProvider.overrideWithValue(
             _FakeNotesRepository(streamController),
           ),
-          tasksByNoteStreamProvider.overrideWith(
-            (ref, arg) => Stream.value(<TaskModel>[]),
-          ),
+          tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
         ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,
@@ -297,9 +305,7 @@ void main() {
           notesRepositoryProvider.overrideWithValue(
             _FakeNotesRepository(streamController),
           ),
-          tasksByNoteStreamProvider.overrideWith(
-            (ref, arg) => Stream.value(<TaskModel>[]),
-          ),
+          tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
         ],
         child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
       ),
@@ -354,7 +360,7 @@ void main() {
         ),
       ]),
     );
-    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async {});
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => null);
     when(() => mockTasksRepo.reopenTask(any())).thenAnswer((_) async {});
 
     const noteContent = '# Test note\n\n- [ ] buy milk <!-- task:task-1 -->\n';
@@ -419,7 +425,7 @@ void main() {
           ),
         ]),
       );
-      when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async {});
+      when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => null);
       when(() => mockTasksRepo.reopenTask(any())).thenAnswer((_) async {});
 
       const noteContent =

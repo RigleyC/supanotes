@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../../../features/tasks/domain/task_recurrence.dart';
 import '../database.dart';
 import '../tables/notes.dart';
 import '../tables/user_note_preferences.dart';
@@ -10,6 +11,11 @@ typedef NoteQueryResult = ({
   bool favorite,
   bool archived,
   bool hideCompleted,
+});
+
+typedef NoteWithTasksQueryResult = ({
+  NoteQueryResult note,
+  List<TaskData> tasks,
 });
 
 @DriftAccessor(tables: [Notes, UserNotePreferences])
@@ -90,6 +96,38 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         (row) => row != null ? _queryResultFromRow(row) : null);
   }
 
+  /// Streams a note with its tasks in a single reactive emission via a
+  /// LEFT JOIN. Drift re-executes the query whenever the `notes`, `tasks`
+  /// or `user_note_preferences` tables change, so the combined stream
+  /// stays in sync without manual stream merging.
+  Stream<NoteWithTasksQueryResult?> watchNoteWithTasks(
+      String id, String userId) {
+    return customSelect(
+      'SELECT n.*, '
+      'COALESCE(unp.favorite, 0) AS favorite, '
+      'COALESCE(unp.archived, 0) AS archived, '
+      'COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      't.id AS task_id, t.user_id AS task_user_id, t.note_id AS task_note_id, '
+      't.title AS task_title, t.status AS task_status, '
+      't.position AS task_position, '
+      't.due_date AS task_due_date, t.recurrence AS task_recurrence, '
+      't.completed_at AS task_completed_at, '
+      't.created_at AS task_created_at, '
+      't.updated_at AS task_updated_at, '
+      't.deleted_at AS task_deleted_at '
+      'FROM notes n '
+      'LEFT JOIN tasks t ON t.note_id = n.id AND t.deleted_at IS NULL '
+      'LEFT JOIN user_note_preferences unp '
+      '  ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.id = ?',
+      variables: [Variable.withString(userId), Variable.withString(id)],
+      readsFrom: {notes, attachedDatabase.tasks, userNotePreferences},
+    ).watch().map((rows) {
+      if (rows.isEmpty) return null;
+      return _noteWithTasksFromRows(rows);
+    });
+  }
+
   /// Streams every active note attached to the given [contextId] with
   /// the user's preferences.
   Stream<List<NoteQueryResult>> watchNotesByContext(
@@ -143,6 +181,39 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       favorite: row.read<bool>('favorite'),
       archived: row.read<bool>('archived'),
       hideCompleted: row.read<bool>('hide_completed'),
+    );
+  }
+
+  NoteWithTasksQueryResult _noteWithTasksFromRows(List<QueryRow> rows) {
+    final first = rows.first;
+    final note = _queryResultFromRow(first)!;
+    final tasks = <TaskData>[];
+    for (final row in rows) {
+      final taskId = row.read<String?>('task_id');
+      if (taskId == null || taskId.isEmpty) continue;
+      tasks.add(_taskDataFromRow(row));
+    }
+    return (note: note, tasks: tasks);
+  }
+
+  TaskData _taskDataFromRow(QueryRow row) {
+    final recurrenceRaw = row.read<String?>('task_recurrence');
+    return TaskData(
+      id: row.read<String>('task_id'),
+      userId: row.read<String>('task_user_id'),
+      noteId: row.read<String>('task_note_id'),
+      title: row.read<String>('task_title'),
+      status: row.read<String>('task_status'),
+      position: row.read<int>('task_position'),
+      dueDate: row.read<DateTime?>('task_due_date'),
+      recurrence: recurrenceRaw != null
+          ? TaskRecurrence.values.byName(recurrenceRaw)
+          : null,
+      completedAt: row.read<DateTime?>('task_completed_at'),
+      createdAt: row.read<DateTime>('task_created_at'),
+      updatedAt: row.read<DateTime>('task_updated_at'),
+      deletedAt: row.read<DateTime?>('task_deleted_at'),
+      isDirty: true,
     );
   }
 

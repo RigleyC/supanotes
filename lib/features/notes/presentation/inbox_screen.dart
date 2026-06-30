@@ -10,9 +10,7 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_co
     show defaultSnapshotSave;
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart'
-    show inboxProvider;
-import 'package:supanotes/features/notes/presentation/note_editor_screen.dart'
-    show noteWithTasksProvider;
+    show inboxProvider, noteWithTasksProvider;
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart'

@@ -16,40 +16,14 @@ import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
-import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-
-final noteProvider = StreamProvider.autoDispose.family<NoteModel?, String>((
-  ref,
-  id,
-) {
-  return ref.watch(notesRepositoryProvider).watchNoteById(id);
-});
-
-/// Streams a note together with its tasks in a single emission.
-///
-/// This avoids the jank caused by two independent providers emitting at
-/// different times (note first, tasks later), and lets the editor build
-/// once with all data already available.
-final noteWithTasksProvider =
-    StreamProvider.autoDispose.family<NoteWithTasks, String>((ref, noteId) {
-  final repo = ref.watch(notesRepositoryProvider);
-  final noteStream = repo.watchNoteById(noteId);
-  final taskRepo = ref.watch(tasksRepositoryProvider);
-
-  return noteStream.asyncMap((note) async {
-    if (note == null) return NoteWithTasks(note: null, tasks: []);
-    final tasks = await taskRepo.watchByNote(noteId).first;
-    return NoteWithTasks(note: note, tasks: tasks);
-  });
-});
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;

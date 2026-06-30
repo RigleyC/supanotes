@@ -6,8 +6,10 @@ import '../../../core/database/daos/note_links_dao.dart';
 import '../../../core/database/daos/notes_dao.dart';
 import '../../../core/database/daos/user_note_preferences_dao.dart';
 import '../domain/note_model.dart';
+import '../domain/note_with_tasks.dart';
 import '../domain/task_entry.dart';
 import '../../tasks/data/local/tasks_local_repository.dart';
+import '../../tasks/domain/task_model.dart';
 import 'local/notes_local_repository.dart';
 
 /// Presentation-facing facade over the local notes database.
@@ -24,6 +26,7 @@ abstract class INotesRepository {
   });
   Stream<NoteModel?> watchInbox();
   Stream<NoteModel?> watchNoteById(String id);
+  Stream<NoteWithTasks> watchNoteWithTasks(String noteId);
   Future<NoteModel?> getNoteById(String id);
   Future<NoteModel> upsertNote({
     required String id,
@@ -97,6 +100,17 @@ class NotesRepository implements INotesRepository {
     return _local.watchNoteById(id).map(
       (qr) => qr == null ? null : NoteModel.fromQueryResult(qr),
     );
+  }
+
+  @override
+  Stream<NoteWithTasks> watchNoteWithTasks(String noteId) {
+    return _local.watchNoteWithTasks(noteId).map((result) {
+      if (result == null) return const NoteWithTasks(note: null, tasks: []);
+      return NoteWithTasks(
+        note: NoteModel.fromQueryResult(result.note),
+        tasks: result.tasks.map(TaskModel.fromData).toList(),
+      );
+    });
   }
 
   @override
@@ -274,7 +288,8 @@ class NotesRepository implements INotesRepository {
     final currentIds = currentTasks.map((t) => t.id).toSet();
     final docIds = tasks.map((t) => t.id).toSet();
 
-    // Batch all writes inside a single transaction via the local repository.
+    // Wrap all writes inside a single transaction so that either every
+    // operation is committed or the whole save is rolled back.
     await _tasksLocal.runInTransaction(() async {
       for (final task in tasks) {
         if (currentIds.contains(task.id)) {

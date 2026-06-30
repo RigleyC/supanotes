@@ -176,6 +176,9 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   Stream<NoteQueryResult?> watchNoteById(String id) => const Stream.empty();
 
   @override
+  Stream<NoteWithTasksQueryResult?> watchNoteWithTasks(String id) => const Stream.empty();
+
+  @override
   Future<NoteQueryResult?> getNoteById(String id) async {
     final data = _store[id];
     if (data == null) return null;
