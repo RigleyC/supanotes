@@ -9,7 +9,7 @@ void main() {
     db.tasksDao.completionsDao = db.taskCompletionsDao;
     final today = DateTime.now();
     final todayStart = DateTime(today.year, today.month, today.day);
-    final due = todayStart.subtract(const Duration(days: 1));
+    final due = todayStart;
     await db.tasksDao.insertTask(TaskData(
       id: 'task-1',
       userId: 'user-1',
@@ -34,7 +34,7 @@ void main() {
     expect(task.id, 'task-1');
     expect(task.status, 'open');
     expect(task.completedAt, isNull);
-    expect(task.dueDate, todayStart);
+    expect(task.dueDate, todayStart.add(const Duration(days: 1)));
     expect(task.recurrence, TaskRecurrence.daily);
 
     final completions = await db.select(db.localTaskCompletions).get();
@@ -287,4 +287,47 @@ void main() {
 
     await db.close();
   });
+
+  test('completing a 3-day overdue daily task completes today and advances to tomorrow', () async {
+    final db = AppDatabase.test();
+    db.tasksDao.completionsDao = db.taskCompletionsDao;
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final threeDaysAgo = todayStart.subtract(const Duration(days: 3));
+
+    await db.tasksDao.insertTask(TaskData(
+      id: 'complete-catchup-1',
+      userId: 'user-1',
+      noteId: 'note-1',
+      title: 'Overdue 3 days',
+      status: 'open',
+      position: 0,
+      recurrence: TaskRecurrence.daily,
+      dueDate: threeDaysAgo,
+      completedAt: null,
+      createdAt: threeDaysAgo,
+      updatedAt: threeDaysAgo,
+      deletedAt: null,
+      isDirty: true,
+    ));
+
+    final nextDue = await db.tasksDao.completeTask('complete-catchup-1');
+
+    // Should advance to tomorrow (today + 1)
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
+    expect(nextDue, tomorrowStart);
+
+    // Task row: open, due tomorrow
+    final tasks = await db.select(db.tasks).get();
+    final task = tasks.single;
+    expect(task.status, 'open');
+    expect(task.dueDate, tomorrowStart);
+
+    // Exactly 1 completion record
+    final completions = await db.select(db.localTaskCompletions).get();
+    expect(completions, hasLength(1));
+
+    await db.close();
+  });
 }
+

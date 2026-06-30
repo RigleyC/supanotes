@@ -184,10 +184,25 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     if (task == null) return null;
 
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     DateTime? nextDue;
 
     await transaction(() async {
-      // 1. Record the completion event.
+      // 1. If recurring and overdue, catch up to the current active date.
+      final recurrence = task.recurrence;
+      var taskDueDate = task.dueDate;
+      if (recurrence != null && taskDueDate != null && taskDueDate.isBefore(today)) {
+        var next = _nextDueDate(from: taskDueDate, recurrence: recurrence);
+        while (next != null && next.isBefore(today)) {
+          taskDueDate = next;
+          next = _nextDueDate(from: taskDueDate, recurrence: recurrence);
+        }
+        if (next != null && next.isAtSameMomentAs(today)) {
+          taskDueDate = next;
+        }
+      }
+
+      // 2. Record the completion event.
       if (completionsDao != null) {
         await completionsDao!.recordCompletion(
           taskId: task.id,
@@ -196,11 +211,10 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         );
       }
 
-      // 2. If recurring, schedule the next occurrence on the same row.
-      final recurrence = task.recurrence;
+      // 3. If recurring, schedule the next occurrence on the same row.
       if (recurrence != null) {
         nextDue = _nextDueDate(
-          from: task.dueDate ?? now,
+          from: taskDueDate ?? now,
           recurrence: recurrence,
         );
         if (nextDue != null) {
@@ -217,7 +231,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         }
       }
 
-      // 3. Non-recurring or unsupported recurrence: mark completed.
+      // 4. Non-recurring or unsupported recurrence: mark completed.
       await (update(tasks)..where((t) => t.id.equals(id))).write(
         TasksCompanion(
           status: const Value('done'),
