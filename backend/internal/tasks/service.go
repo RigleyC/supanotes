@@ -81,6 +81,32 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 	if err := opts.Validate(); err != nil {
 		return sqlcgen.Task{}, err
 	}
+
+	// If adding recurrence to a completed task, re-open it.
+	if opts.Recurrence != nil {
+		existing, err := s.repo.GetTaskByID(ctx, id, userID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return sqlcgen.Task{}, err
+		}
+		if err == nil && existing.Status == "done" {
+			baseTime := time.Now().UTC()
+			if existing.CompletedAt.Valid {
+				baseTime = existing.CompletedAt.Time
+			} else if existing.DueDate.Valid {
+				baseTime = existing.DueDate.Time
+			}
+			baseTime = time.Date(baseTime.Year(), baseTime.Month(), baseTime.Day(), 0, 0, 0, 0, time.UTC)
+			nextDue, ok := calculateNextDueDate(baseTime, *opts.Recurrence)
+			if ok {
+				statusOpen := "open"
+				opts.Status = &statusOpen
+				opts.DueDate = &nextDue
+				// ClearDueDate must be false since we're setting a due date
+				opts.ClearDueDate = false
+			}
+		}
+	}
+
 	arg := sqlcgen.UpdateTaskParams{
 		ID:     id,
 		UserID: userID,
@@ -98,18 +124,22 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 		arg.DueDate = pgtype.Date{Time: *opts.DueDate, Valid: true}
 	} else if opts.ClearDueDate {
 		arg.SetDueDate = pgtype.Bool{Bool: true, Valid: true}
-		// arg.DueDate stays as zero value, Valid: false -> SQL receives NULL
 	}
 	if opts.Recurrence != nil {
 		arg.SetRecurrence = pgtype.Bool{Bool: true, Valid: true}
 		arg.Recurrence = pgtype.Text{String: *opts.Recurrence, Valid: true}
 	} else if opts.ClearRecurrence {
 		arg.SetRecurrence = pgtype.Bool{Bool: true, Valid: true}
-		// arg.Recurrence stays as zero value -> NULL
 	}
 	if opts.Position != nil {
 		arg.SetPosition = pgtype.Bool{Bool: true, Valid: true}
 		arg.Position = pgtype.Int4{Int32: int32(*opts.Position), Valid: true}
+	}
+
+	// Clear completed_at when re-opening
+	if opts.Status != nil && *opts.Status == "open" {
+		arg.SetCompletedAt = pgtype.Bool{Bool: true, Valid: true}
+		// CompletedAt stays zero-value (NULL)
 	}
 
 	task, err := s.repo.UpdateTask(ctx, arg)
@@ -141,17 +171,31 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 		return sqlcgen.Task{}, err
 	}
 
-	dueDate := pgtype.Date{}
-	if task.DueDate.Valid {
-		dueDate = pgtype.Date{Time: task.DueDate.Time, Valid: true}
+	// Catch up: if recurring and overdue, walk forward to the current active date.
+	taskDueDate := task.DueDate.Time
+	if task.Recurrence.Valid && task.Recurrence.String != "" && task.DueDate.Valid {
+		now := time.Now().UTC()
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+		nextDue, ok := calculateNextDueDate(taskDueDate, task.Recurrence.String)
+		for ok && (nextDue.Before(today) || nextDue.Equal(today)) {
+			taskDueDate = nextDue
+			nextDue, ok = calculateNextDueDate(taskDueDate, task.Recurrence.String)
+		}
 	}
-	if _, err := s.repo.CreateTaskCompletion(ctx, id, dueDate); err != nil {
+
+	// Record completion with the caught-up due date.
+	dueDateParam := pgtype.Date{}
+	if task.DueDate.Valid {
+		dueDateParam = pgtype.Date{Time: taskDueDate, Valid: true}
+	}
+	if _, err := s.repo.CreateTaskCompletion(ctx, id, dueDateParam); err != nil {
 		return sqlcgen.Task{}, err
 	}
 
-	// Recurring task: calculate next due_date, keep 'open'
+	// Recurring task: schedule next occurrence from caught-up date.
 	if task.Recurrence.Valid && task.Recurrence.String != "" && task.DueDate.Valid {
-		nextDue, ok := calculateNextDueDate(task.DueDate.Time, task.Recurrence.String)
+		nextDue, ok := calculateNextDueDate(taskDueDate, task.Recurrence.String)
 		if ok {
 			task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
 				ID:         id,
@@ -171,7 +215,7 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 		}
 	}
 
-	// Non-recurring: mark completed
+	// Non-recurring: mark completed.
 	now := time.Now()
 	task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
 		ID:             id,
