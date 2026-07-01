@@ -290,7 +290,7 @@ func (q *Queries) GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCom
 }
 
 const getSyncTasks = `-- name: GetSyncTasks :many
-SELECT t.id, t.note_id, t.user_id, t.title, t.status, t.due_date, t.recurrence, t.position, t.created_at, t.updated_at, t.deleted_at, t.completed_at
+SELECT t.id, t.note_id, t.user_id, t.title, t.status, t.due_date, t.recurrence, t.position, t.created_at, t.updated_at, t.deleted_at, t.completed_at, t.node_id
 FROM tasks t
 JOIN notes n ON n.id = t.note_id
 LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
@@ -328,6 +328,7 @@ func (q *Queries) GetSyncTasks(ctx context.Context, arg GetSyncTasksParams) ([]T
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.CompletedAt,
+			&i.NodeID,
 		); err != nil {
 			return nil, err
 		}
@@ -624,7 +625,7 @@ SET note_id = EXCLUDED.note_id,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 WHERE tasks.user_id = EXCLUDED.user_id
-RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at
+RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, node_id
 `
 
 type UpsertTaskParams struct {
@@ -667,6 +668,7 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.CompletedAt,
+		&i.NodeID,
 	)
 	return i, err
 }

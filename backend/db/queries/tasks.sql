@@ -1,7 +1,12 @@
 -- name: CreateTask :one
-INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position, node_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
+
+-- name: GetTasksByNodeID :many
+SELECT * FROM tasks
+WHERE node_id = $1 AND deleted_at IS NULL
+ORDER BY position ASC, created_at ASC;
 
 -- name: GetTaskByID :one
 SELECT * FROM tasks
