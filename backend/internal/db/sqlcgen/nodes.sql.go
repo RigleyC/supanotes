@@ -21,7 +21,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getNodesByNoteId = `-- name: GetNodesByNoteId :many
-SELECT id, note_id, parent_id, position, type, data, created_at, updated_at FROM note_nodes WHERE note_id = $1 ORDER BY position ASC
+SELECT id, note_id, parent_id, position, type, data, created_at, updated_at, deleted_at FROM note_nodes WHERE note_id = $1 ORDER BY position ASC
 `
 
 func (q *Queries) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]NoteNode, error) {
@@ -42,6 +42,7 @@ func (q *Queries) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]N
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -56,7 +57,7 @@ func (q *Queries) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]N
 const insertNode = `-- name: InsertNode :one
 INSERT INTO note_nodes (id, note_id, parent_id, position, type, data)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, note_id, parent_id, position, type, data, created_at, updated_at
+RETURNING id, note_id, parent_id, position, type, data, created_at, updated_at, deleted_at
 `
 
 type InsertNodeParams struct {
@@ -87,6 +88,7 @@ func (q *Queries) InsertNode(ctx context.Context, arg InsertNodeParams) (NoteNod
 		&i.Data,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -95,7 +97,7 @@ const updateNode = `-- name: UpdateNode :one
 UPDATE note_nodes
 SET position = $2, data = $3, updated_at = NOW()
 WHERE id = $1
-RETURNING id, note_id, parent_id, position, type, data, created_at, updated_at
+RETURNING id, note_id, parent_id, position, type, data, created_at, updated_at, deleted_at
 `
 
 type UpdateNodeParams struct {
@@ -116,6 +118,7 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (NoteNod
 		&i.Data,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }

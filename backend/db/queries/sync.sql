@@ -190,3 +190,26 @@ SET hide_completed = EXCLUDED.hide_completed,
     archived = EXCLUDED.archived,
     updated_at = NOW()
 RETURNING *;
+
+-- name: GetSyncNoteNodes :many
+SELECT nn.*
+FROM note_nodes nn
+JOIN notes n ON n.id = nn.note_id
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
+WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
+  AND nn.updated_at > sqlc.arg('last_synced_at')
+ORDER BY nn.updated_at ASC
+LIMIT sqlc.arg('limit');
+
+-- name: UpsertNoteNode :one
+INSERT INTO note_nodes (id, note_id, parent_id, position, type, data, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
+ON CONFLICT (id) DO UPDATE
+SET note_id = EXCLUDED.note_id,
+    parent_id = EXCLUDED.parent_id,
+    position = EXCLUDED.position,
+    type = EXCLUDED.type,
+    data = EXCLUDED.data,
+    updated_at = NOW(),
+    deleted_at = EXCLUDED.deleted_at
+RETURNING *;

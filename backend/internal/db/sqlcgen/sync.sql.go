@@ -98,6 +98,53 @@ func (q *Queries) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]N
 	return items, nil
 }
 
+const getSyncNoteNodes = `-- name: GetSyncNoteNodes :many
+SELECT nn.id, nn.note_id, nn.parent_id, nn.position, nn.type, nn.data, nn.created_at, nn.updated_at, nn.deleted_at
+FROM note_nodes nn
+JOIN notes n ON n.id = nn.note_id
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
+WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
+  AND nn.updated_at > $2
+ORDER BY nn.updated_at ASC
+LIMIT $3
+`
+
+type GetSyncNoteNodesParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	LastSyncedAt pgtype.Timestamptz `json:"last_synced_at"`
+	Limit        int32              `json:"limit"`
+}
+
+func (q *Queries) GetSyncNoteNodes(ctx context.Context, arg GetSyncNoteNodesParams) ([]NoteNode, error) {
+	rows, err := q.db.Query(ctx, getSyncNoteNodes, arg.UserID, arg.LastSyncedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NoteNode
+	for rows.Next() {
+		var i NoteNode
+		if err := rows.Scan(
+			&i.ID,
+			&i.NoteID,
+			&i.ParentID,
+			&i.Position,
+			&i.Type,
+			&i.Data,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSyncNoteTags = `-- name: GetSyncNoteTags :many
 SELECT nt.note_id, nt.tag_id
 FROM note_tags nt
@@ -552,6 +599,57 @@ func (q *Queries) UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) 
 		arg.UserID,
 	)
 	return err
+}
+
+const upsertNoteNode = `-- name: UpsertNoteNode :one
+INSERT INTO note_nodes (id, note_id, parent_id, position, type, data, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
+ON CONFLICT (id) DO UPDATE
+SET note_id = EXCLUDED.note_id,
+    parent_id = EXCLUDED.parent_id,
+    position = EXCLUDED.position,
+    type = EXCLUDED.type,
+    data = EXCLUDED.data,
+    updated_at = NOW(),
+    deleted_at = EXCLUDED.deleted_at
+RETURNING id, note_id, parent_id, position, type, data, created_at, updated_at, deleted_at
+`
+
+type UpsertNoteNodeParams struct {
+	ID        pgtype.UUID        `json:"id"`
+	NoteID    pgtype.UUID        `json:"note_id"`
+	ParentID  pgtype.UUID        `json:"parent_id"`
+	Position  int32              `json:"position"`
+	Type      string             `json:"type"`
+	Data      []byte             `json:"data"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+func (q *Queries) UpsertNoteNode(ctx context.Context, arg UpsertNoteNodeParams) (NoteNode, error) {
+	row := q.db.QueryRow(ctx, upsertNoteNode,
+		arg.ID,
+		arg.NoteID,
+		arg.ParentID,
+		arg.Position,
+		arg.Type,
+		arg.Data,
+		arg.CreatedAt,
+		arg.DeletedAt,
+	)
+	var i NoteNode
+	err := row.Scan(
+		&i.ID,
+		&i.NoteID,
+		&i.ParentID,
+		&i.Position,
+		&i.Type,
+		&i.Data,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }
 
 const upsertNoteTag = `-- name: UpsertNoteTag :exec

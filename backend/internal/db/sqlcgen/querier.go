@@ -73,6 +73,7 @@ type Querier interface {
 	GetSoul(ctx context.Context, userID pgtype.UUID) (Soul, error)
 	GetSyncContexts(ctx context.Context, arg GetSyncContextsParams) ([]Context, error)
 	GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]NoteLink, error)
+	GetSyncNoteNodes(ctx context.Context, arg GetSyncNoteNodesParams) ([]NoteNode, error)
 	GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]NoteTag, error)
 	GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]GetSyncNotesRow, error)
 	GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error)
@@ -124,6 +125,7 @@ type Querier interface {
 	UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, error)
 	UpsertNoteEmbedding(ctx context.Context, arg UpsertNoteEmbeddingParams) error
 	UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error
+	UpsertNoteNode(ctx context.Context, arg UpsertNoteNodeParams) (NoteNode, error)
 	UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error
 	UpsertSoul(ctx context.Context, arg UpsertSoulParams) (Soul, error)
 	UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, error)
