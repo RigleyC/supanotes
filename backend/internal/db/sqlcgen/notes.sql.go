@@ -260,6 +260,35 @@ func (q *Queries) DeleteTag(ctx context.Context, arg DeleteTagParams) error {
 	return err
 }
 
+const getAllNotesForMigration = `-- name: GetAllNotesForMigration :many
+SELECT id, content FROM notes WHERE content IS NOT NULL AND content != ''
+`
+
+type GetAllNotesForMigrationRow struct {
+	ID      pgtype.UUID `json:"id"`
+	Content string      `json:"content"`
+}
+
+func (q *Queries) GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesForMigrationRow, error) {
+	rows, err := q.db.Query(ctx, getAllNotesForMigration)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllNotesForMigrationRow
+	for rows.Next() {
+		var i GetAllNotesForMigrationRow
+		if err := rows.Scan(&i.ID, &i.Content); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getContexts = `-- name: GetContexts :many
 SELECT id, user_id, slug, name, created_at, updated_at, deleted_at FROM contexts
 WHERE user_id = $1
@@ -751,4 +780,18 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		&i.CollapseImages,
 	)
 	return i, err
+}
+
+const updateNoteSearchVector = `-- name: UpdateNoteSearchVector :exec
+UPDATE notes SET search_vector = $2 WHERE id = $1
+`
+
+type UpdateNoteSearchVectorParams struct {
+	ID           pgtype.UUID `json:"id"`
+	SearchVector pgtype.Text `json:"search_vector"`
+}
+
+func (q *Queries) UpdateNoteSearchVector(ctx context.Context, arg UpdateNoteSearchVectorParams) error {
+	_, err := q.db.Exec(ctx, updateNoteSearchVector, arg.ID, arg.SearchVector)
+	return err
 }

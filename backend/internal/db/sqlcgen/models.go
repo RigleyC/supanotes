@@ -98,6 +98,17 @@ type NoteLink struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type NoteNode struct {
+	ID        pgtype.UUID        `json:"id"`
+	NoteID    pgtype.UUID        `json:"note_id"`
+	ParentID  pgtype.UUID        `json:"parent_id"`
+	Position  int32              `json:"position"`
+	Type      string             `json:"type"`
+	Data      []byte             `json:"data"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type NoteShare struct {
 	ID         pgtype.UUID        `json:"id"`
 	NoteID     pgtype.UUID        `json:"note_id"`
@@ -187,6 +198,7 @@ type Task struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	NodeID      pgtype.UUID        `json:"node_id"`
 }
 
 type TaskCompletion struct {

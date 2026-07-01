@@ -985,3 +985,9 @@ func (m *stubLoopMemRepo) UpdateMemory(ctx context.Context, id, userID pgtype.UU
 func (m *stubLoopMemRepo) SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
 	return nil, nil
 }
+func (m *stubLoopQuerier) InsertNode(_ context.Context, _ sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
+func (m *stubLoopQuerier) UpdateNode(_ context.Context, _ sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
+func (m *stubLoopQuerier) DeleteNode(_ context.Context, _ pgtype.UUID) error { return nil }
+func (m *stubLoopQuerier) GetNodesByNoteId(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteNode, error) { return nil, nil }
+func (m *stubLoopQuerier) UpdateNoteSearchVector(_ context.Context, _ sqlcgen.UpdateNoteSearchVectorParams) error { return nil }
+func (m *stubLoopQuerier) GetAllNotesForMigration(_ context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) { return nil, nil }

@@ -141,5 +141,11 @@ INSERT INTO note_links (source_id, target_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING;
 
+-- name: UpdateNoteSearchVector :exec
+UPDATE notes SET search_vector = $2 WHERE id = $1;
+
+-- name: GetAllNotesForMigration :many
+SELECT id, content FROM notes WHERE content IS NOT NULL AND content != '';
+
 -- name: CountNotes :one
 SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL AND NOT is_inbox;

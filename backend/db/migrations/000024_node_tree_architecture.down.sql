@@ -1,0 +1,2 @@
+ALTER TABLE tasks DROP COLUMN IF EXISTS node_id;
+DROP TABLE IF EXISTS note_nodes;

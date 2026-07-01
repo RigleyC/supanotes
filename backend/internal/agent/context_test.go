@@ -846,4 +846,9 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 		}
 	})
 }
-
+func (m *stubQuerier) InsertNode(_ context.Context, _ sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
+func (m *stubQuerier) UpdateNode(_ context.Context, _ sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
+func (m *stubQuerier) DeleteNode(_ context.Context, _ pgtype.UUID) error { return nil }
+func (m *stubQuerier) GetNodesByNoteId(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteNode, error) { return nil, nil }
+func (m *stubQuerier) UpdateNoteSearchVector(_ context.Context, _ sqlcgen.UpdateNoteSearchVectorParams) error { return nil }
+func (m *stubQuerier) GetAllNotesForMigration(_ context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) { return nil, nil }

@@ -1,0 +1,12 @@
+CREATE TABLE note_nodes (
+    id UUID PRIMARY KEY,
+    note_id UUID NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES note_nodes(id) ON DELETE CASCADE,
+    position INT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE tasks ADD COLUMN node_id UUID REFERENCES note_nodes(id) ON DELETE CASCADE;

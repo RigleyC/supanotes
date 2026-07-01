@@ -41,12 +41,14 @@ type Querier interface {
 	DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error
 	DeleteDeviceTokenByToken(ctx context.Context, arg DeleteDeviceTokenByTokenParams) error
 	DeleteMemory(ctx context.Context, arg DeleteMemoryParams) error
+	DeleteNode(ctx context.Context, id pgtype.UUID) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
 	DeleteSessionMessages(ctx context.Context, arg DeleteSessionMessagesParams) error
 	DeleteTag(ctx context.Context, arg DeleteTagParams) error
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteWorkingMemoryForSession(ctx context.Context, arg DeleteWorkingMemoryForSessionParams) error
+	GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesForMigrationRow, error)
 	GetContexts(ctx context.Context, userID pgtype.UUID) ([]Context, error)
 	GetEnabledRoutines(ctx context.Context) ([]GetEnabledRoutinesRow, error)
 	GetInboxNote(ctx context.Context, userID pgtype.UUID) (GetInboxNoteRow, error)
@@ -54,6 +56,7 @@ type Querier interface {
 	GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) ([]Note, error)
 	GetMemories(ctx context.Context, arg GetMemoriesParams) ([]Memory, error)
 	GetMessages(ctx context.Context, arg GetMessagesParams) ([]Message, error)
+	GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]NoteNode, error)
 	GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNoteByIDRow, error)
 	GetNoteOwner(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 	GetNoteOwnerID(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
@@ -91,6 +94,7 @@ type Querier interface {
 	HardDeleteExpiredNotes(ctx context.Context) error
 	HardDeleteExpiredTasks(ctx context.Context) error
 	InsertAttachment(ctx context.Context, arg InsertAttachmentParams) (Attachment, error)
+	InsertNode(ctx context.Context, arg InsertNodeParams) (NoteNode, error)
 	ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]Attachment, error)
 	ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]DeviceToken, error)
 	RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error
@@ -106,8 +110,10 @@ type Querier interface {
 	SetInboxContent(ctx context.Context, arg SetInboxContentParams) (Note, error)
 	SetWorkingMemoryValue(ctx context.Context, arg SetWorkingMemoryValueParams) (AgentWorkingMemory, error)
 	UpdateMemory(ctx context.Context, arg UpdateMemoryParams) (Memory, error)
+	UpdateNode(ctx context.Context, arg UpdateNodeParams) (NoteNode, error)
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteEmbeddingStatus(ctx context.Context, arg UpdateNoteEmbeddingStatusParams) error
+	UpdateNoteSearchVector(ctx context.Context, arg UpdateNoteSearchVectorParams) error
 	UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (Routine, error)
 	UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error
 	UpdateSoulProfile(ctx context.Context, arg UpdateSoulProfileParams) (Soul, error)
