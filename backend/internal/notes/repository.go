@@ -19,6 +19,12 @@ type Repository interface {
 	SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
 	AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
+	GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error)
+	InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error)
+	DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error
+	CreateTask(ctx context.Context, arg sqlcgen.CreateTaskParams) (sqlcgen.Task, error)
+	DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error
+	GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error)
 	WithQuerier(q sqlcgen.Querier) Repository
 }
 
@@ -72,4 +78,31 @@ func (r *repository) AppendToNoteContent(ctx context.Context, arg sqlcgen.Append
 
 func (r *repository) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return r.q.CountNotes(ctx, userID)
+}
+
+func (r *repository) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
+	return r.q.GetNodesByNoteId(ctx, noteID)
+}
+
+func (r *repository) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
+	return r.q.InsertNode(ctx, arg)
+}
+
+func (r *repository) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
+	return r.q.DeleteNodesByNoteID(ctx, noteID)
+}
+
+func (r *repository) CreateTask(ctx context.Context, arg sqlcgen.CreateTaskParams) (sqlcgen.Task, error) {
+	return r.q.CreateTask(ctx, arg)
+}
+
+func (r *repository) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
+	return r.q.DeleteTaskByNodeID(ctx, arg)
+}
+
+func (r *repository) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error) {
+	return r.q.GetTasksByNoteID(ctx, sqlcgen.GetTasksByNoteIDParams{
+		UserID: userID,
+		NoteID: noteID,
+	})
 }

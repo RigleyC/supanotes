@@ -60,7 +60,11 @@ func (t *GetInboxNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Inbox:\n%s", note.Content), nil
+	markdown, err := t.notesSvc.GetNoteMarkdownByID(ctx, note.ID, userID)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Inbox:\n%s", markdown), nil
 }
 
 type AppendToInboxTool struct {
@@ -204,7 +208,11 @@ func (t *GetNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Note [%s] %s:\n%s", formatID(note.ID), notes.DeriveTitle(note.Content), note.Content), nil
+	markdown, err := t.notesSvc.GetNoteMarkdownByID(ctx, nid, userID)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Note [%s] %s:\n%s", formatID(note.ID), notes.DeriveTitle(markdown), markdown), nil
 }
 
 type AppendToNoteTool struct {

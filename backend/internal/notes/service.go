@@ -67,7 +67,17 @@ func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content st
 	if contextID != nil {
 		arg.ContextID = *contextID
 	}
-	return s.repo.CreateNote(ctx, arg)
+	note, err := s.repo.CreateNote(ctx, arg)
+	if err != nil {
+		return sqlcgen.Note{}, err
+	}
+
+	err = s.overwriteNoteNodes(ctx, userID, note.ID, content)
+	if err != nil {
+		return sqlcgen.Note{}, err
+	}
+
+	return note, nil
 }
 
 func (s *Service) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.GetNoteByIDRow, error) {
@@ -97,6 +107,11 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	if content != nil {
 		arg.Content = pgtype.Text{String: *content, Valid: true}
 		arg.EmbeddingStatus = pgtype.Text{String: "pending", Valid: true}
+
+		err = s.overwriteNoteNodes(ctx, userID, id, *content)
+		if err != nil {
+			return sqlcgen.Note{}, err
+		}
 	}
 	if contextID != nil {
 		arg.ContextID = *contextID
@@ -154,6 +169,10 @@ func (s *Service) SetInboxContent(ctx context.Context, userID pgtype.UUID, conte
 	if err != nil {
 		return sqlcgen.Note{}, err
 	}
+	err = s.overwriteNoteNodes(ctx, userID, note.ID, content)
+	if err != nil {
+		return sqlcgen.Note{}, err
+	}
 	return s.repo.SetInboxContent(ctx, sqlcgen.SetInboxContentParams{
 		ID:      note.ID,
 		UserID:  userID,
@@ -167,6 +186,42 @@ func (s *Service) AppendToNoteContent(ctx context.Context, userID pgtype.UUID, n
 	if err != nil {
 		return sqlcgen.Note{}, err
 	}
+
+	currentNodes, err := s.repo.GetNodesByNoteId(ctx, noteID)
+	if err != nil {
+		return sqlcgen.Note{}, err
+	}
+	startPos := len(currentNodes)
+
+	nodes := ParseMarkdownToNodes(content)
+	for i, node := range nodes {
+		_, err := s.repo.InsertNode(ctx, sqlcgen.InsertNodeParams{
+			ID:       node.ID,
+			NoteID:   noteID,
+			Position: int32(startPos + i),
+			Type:     node.Type,
+			Data:     node.Data,
+		})
+		if err != nil {
+			return sqlcgen.Note{}, fmt.Errorf("append to note: insert node: %w", err)
+		}
+
+		if node.IsTask {
+			_, err = s.repo.CreateTask(ctx, sqlcgen.CreateTaskParams{
+				NoteID:     noteID,
+				UserID:     userID,
+				Title:      node.Text,
+				DueDate:    pgtype.Date{Valid: false},
+				Recurrence: pgtype.Text{Valid: false},
+				Position:   int32(startPos + i),
+				NodeID:     node.ID,
+			})
+			if err != nil {
+				return sqlcgen.Note{}, fmt.Errorf("append to note: create task: %w", err)
+			}
+		}
+	}
+
 	return s.repo.AppendToNoteContent(ctx, sqlcgen.AppendToNoteContentParams{
 		ID:      noteID,
 		UserID:  userID,
@@ -179,11 +234,7 @@ func (s *Service) AppendToInbox(ctx context.Context, userID pgtype.UUID, content
 	if err != nil {
 		return sqlcgen.Note{}, err
 	}
-	return s.repo.AppendToInbox(ctx, sqlcgen.AppendToInboxParams{
-		ID:      note.ID,
-		UserID:  userID,
-		Content: content,
-	})
+	return s.AppendToNoteContent(ctx, userID, note.ID, content)
 }
 
 const (
@@ -482,4 +533,83 @@ func (s *Service) fallbackPlan(noteContent string) []llmPlanItem {
 		}
 	}
 	return items
+}
+
+func (s *Service) overwriteNoteNodes(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID, content string) error {
+	// 1. Fetch current nodes to find task nodes to delete
+	currentNodes, err := s.repo.GetNodesByNoteId(ctx, noteID)
+	if err == nil {
+		for _, node := range currentNodes {
+			if node.Type == "task" {
+				_ = s.repo.DeleteTaskByNodeID(ctx, sqlcgen.DeleteTaskByNodeIDParams{
+					NodeID: node.ID,
+					UserID: userID,
+				})
+			}
+		}
+	}
+
+	// 2. Delete all existing nodes
+	err = s.repo.DeleteNodesByNoteID(ctx, noteID)
+	if err != nil {
+		return err
+	}
+
+	// 3. Parse and insert new nodes
+	nodes := ParseMarkdownToNodes(content)
+	for i, node := range nodes {
+		_, err := s.repo.InsertNode(ctx, sqlcgen.InsertNodeParams{
+			ID:       node.ID,
+			NoteID:   noteID,
+			Position: int32(i),
+			Type:     node.Type,
+			Data:     node.Data,
+		})
+		if err != nil {
+			return fmt.Errorf("overwrite node: insert: %w", err)
+		}
+
+		if node.IsTask {
+			_, err = s.repo.CreateTask(ctx, sqlcgen.CreateTaskParams{
+				NoteID:     noteID,
+				UserID:     userID,
+				Title:      node.Text,
+				DueDate:    pgtype.Date{Valid: false},
+				Recurrence: pgtype.Text{Valid: false},
+				Position:   int32(i),
+				NodeID:     node.ID,
+			})
+			if err != nil {
+				return fmt.Errorf("overwrite node: create task: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) GetNoteMarkdownByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (string, error) {
+	_, err := s.GetNoteByID(ctx, id, userID)
+	if err != nil {
+		return "", err
+	}
+
+	nodes, err := s.repo.GetNodesByNoteId(ctx, id)
+	if err != nil {
+		return "", err
+	}
+
+	tasks, err := s.repo.GetTasksByNoteID(ctx, userID, id)
+	if err != nil {
+		return "", err
+	}
+
+	taskMap := make(map[pgtype.UUID]sqlcgen.Task)
+	for _, t := range tasks {
+		if t.NodeID.Valid {
+			taskMap[t.NodeID] = t
+		}
+	}
+
+	return RenderNoteToMarkdown(nodes, taskMap), nil
 }
