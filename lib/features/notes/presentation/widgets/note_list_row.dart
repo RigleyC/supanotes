@@ -73,21 +73,22 @@ class NoteListRow extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                     if (note.sharedByEmail != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Row(
                           children: [
-                            Icon(Icons.person_outline,
-                                size: 14, color: scheme.onSurfaceVariant),
+                            Icon(
+                              Icons.person_outline,
+                              size: 14,
+                              color: scheme.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${NoteStrings.sharedFromPrefix} ${note.sharedByEmail}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(color: scheme.onSurfaceVariant),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

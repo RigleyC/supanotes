@@ -8,8 +8,6 @@ class AnimatedTaskCheckbox extends StatefulWidget {
     required this.activeColor,
     required this.inactiveColor,
     required this.checkmarkColor,
-    required this.onChanged,
-    this.onLongPress,
   });
 
   final double size;
@@ -17,8 +15,6 @@ class AnimatedTaskCheckbox extends StatefulWidget {
   final Color activeColor;
   final Color inactiveColor;
   final Color checkmarkColor;
-  final void Function(bool)? onChanged;
-  final VoidCallback? onLongPress;
 
   @override
   State<AnimatedTaskCheckbox> createState() => _AnimatedTaskCheckboxState();
@@ -75,15 +71,7 @@ class _AnimatedTaskCheckboxState extends State<AnimatedTaskCheckbox>
   Widget build(BuildContext context) {
     final size = widget.size;
 
-    return InkWell(
-      highlightColor: Colors.transparent,
-      splashColor: Colors.transparent,
-      onTap: widget.onChanged != null
-          ? () => widget.onChanged!(!widget.value)
-          : null,
-      onLongPress: widget.onLongPress,
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
+    return SizedBox(
         width: size,
         height: size,
         child: AnimatedBuilder(
@@ -115,8 +103,7 @@ class _AnimatedTaskCheckboxState extends State<AnimatedTaskCheckbox>
             );
           },
         ),
-      ),
-    );
+      );
   }
 }
 

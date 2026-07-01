@@ -382,8 +382,6 @@ class _TaskCheckboxHitTarget extends StatelessWidget {
                 activeColor: activeColor,
                 inactiveColor: inactiveColor,
                 checkmarkColor: checkmarkColor,
-                onChanged: onChanged,
-                onLongPress: onLongPress,
               ),
             ),
           ],
