@@ -63,6 +63,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             if (note == null) {
               return Scaffold(body: Center(child: Text(NoteStrings.errorNotFound)));
             }
+            if (nodes.isEmpty && note.content.trim().isNotEmpty) {
+              Future.microtask(() {
+                ref.read(notesRepositoryProvider).migrateMarkdownToNodes(note.id, note.content);
+              });
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
             final tasksMap = noteWithTasks.taskById;
 
             final isOwner = note.isOwner;

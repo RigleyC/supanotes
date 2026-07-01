@@ -624,9 +624,9 @@ func TestGetNoteTool_Execute(t *testing.T) {
 		},
 		getNodesByNoteId: func(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
 			return []sqlcgen.NoteNode{
-				{ID: pgtype.UUID{Bytes: [16]byte{10}, Valid: true}, NoteID: noteUUID, Position: 0, Type: "paragraph", Data: `{"text":"My Test Note"}`, UserID: pgtype.UUID{Bytes: [16]byte{1}, Valid: true}},
-				{ID: pgtype.UUID{Bytes: [16]byte{11}, Valid: true}, NoteID: noteUUID, Position: 1, Type: "paragraph", Data: `{"text":""}`, UserID: pgtype.UUID{Bytes: [16]byte{1}, Valid: true}},
-				{ID: pgtype.UUID{Bytes: [16]byte{12}, Valid: true}, NoteID: noteUUID, Position: 2, Type: "paragraph", Data: `{"text":"Hello world this is note content"}`, UserID: pgtype.UUID{Bytes: [16]byte{1}, Valid: true}},
+				{ID: pgtype.UUID{Bytes: [16]byte{10}, Valid: true}, NoteID: noteUUID, Position: 0, Type: "paragraph", Data: []byte(`{"text":"My Test Note"}`)},
+				{ID: pgtype.UUID{Bytes: [16]byte{11}, Valid: true}, NoteID: noteUUID, Position: 1, Type: "paragraph", Data: []byte(`{"text":""}`)},
+				{ID: pgtype.UUID{Bytes: [16]byte{12}, Valid: true}, NoteID: noteUUID, Position: 2, Type: "paragraph", Data: []byte(`{"text":"Hello world this is note content"}`)},
 			}, nil
 		},
 	}

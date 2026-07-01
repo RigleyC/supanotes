@@ -92,6 +92,9 @@ class _FakeNotesRepository implements INotesRepository {
   Future<void> markHasRemoteCopy(String id) async {}
 
   @override
+  Future<void> migrateMarkdownToNodes(String noteId, String content) async {}
+
+  @override
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId) =>
       Stream.value(const NoteWithTasks(note: null, tasks: []));
 

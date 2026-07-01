@@ -50,6 +50,7 @@ abstract class INotesRepository {
   });
   Future<void> deleteIfEmptyOrTombstone(String id);
   Future<void> markHasRemoteCopy(String id);
+  Future<void> migrateMarkdownToNodes(String noteId, String content);
 }
 
 class NotesRepository implements INotesRepository {
@@ -304,6 +305,87 @@ class NotesRepository implements INotesRepository {
 
   bool _isTextEmpty(NoteData note) {
     return note.content.trim().isEmpty;
+  }
+
+  @override
+  Future<void> migrateMarkdownToNodes(String noteId, String content) async {
+    final now = DateTime.now().toUtc();
+    final lines = content.split('\n');
+    await _db.transaction(() async {
+      final existing = await (_db.select(_db.noteNodes)..where((t) => t.noteId.equals(noteId))).get();
+      if (existing.isNotEmpty) return;
+
+      final existingTasks = await (_db.select(_db.tasks)..where((t) => t.noteId.equals(noteId))).get();
+
+      for (var i = 0; i < lines.length; i++) {
+        final line = lines[i];
+        if (line.isEmpty) continue;
+
+        final isTask = line.startsWith('- [ ]') || line.startsWith('- [x]');
+        final type = isTask ? 'task' : 'paragraph';
+
+        var title = line;
+        var isComplete = false;
+        if (isTask) {
+          isComplete = line.startsWith('- [x]');
+          title = line.substring(5).trim();
+        }
+
+        var id = 'node-$noteId-$i';
+        if (title.contains('<!-- task:')) {
+          final startIdx = title.indexOf('<!-- task:') + 10;
+          final endIdx = title.indexOf('-->', startIdx);
+          id = title.substring(startIdx, endIdx).trim();
+          title = title.substring(0, title.indexOf('<!-- task:')).trim();
+        }
+
+        final companion = NoteNodesCompanion.insert(
+          id: id,
+          noteId: noteId,
+          position: i,
+          type: type,
+          data: isTask
+              ? '{"text":"$title","completed":$isComplete}'
+              : '{"text":"$title"}',
+          createdAt: now,
+          updatedAt: now,
+        );
+        await _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
+
+        if (isTask) {
+          TaskData? matchedTask;
+          for (final t in existingTasks) {
+            if (t.title.trim() == title.trim()) {
+              matchedTask = t;
+              break;
+            }
+          }
+
+          if (matchedTask != null) {
+            await (_db.update(_db.tasks)..where((t) => t.id.equals(matchedTask!.id))).write(
+              TasksCompanion(
+                nodeId: Value(id),
+                isDirty: const Value(true),
+              ),
+            );
+          } else {
+            final taskCompanion = TasksCompanion.insert(
+              id: id,
+              userId: _local.userId,
+              noteId: noteId,
+              title: title,
+              status: isComplete ? 'completed' : 'pending',
+              position: Value(i),
+              createdAt: now,
+              updatedAt: now,
+              nodeId: Value(id),
+              isDirty: const Value(true),
+            );
+            await _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
+          }
+        }
+      }
+    });
   }
 }
 
