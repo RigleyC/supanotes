@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../features/tasks/domain/task_recurrence.dart';
+import 'note_nodes.dart';
 
 @DataClassName('TaskData')
 class Tasks extends Table {
@@ -16,6 +17,8 @@ class Tasks extends Table {
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  TextColumn get nodeId => text().nullable().references(NoteNodes, #id)();
 
   BoolColumn get isDirty => boolean().withDefault(const Constant(true))();
 
