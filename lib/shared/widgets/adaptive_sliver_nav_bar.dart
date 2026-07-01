@@ -1,5 +1,3 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AdaptiveSliverNavBar extends StatelessWidget {
@@ -16,30 +14,11 @@ class AdaptiveSliverNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (PlatformInfo.isIOS) {
-      final bgColor = Theme.of(context).colorScheme.surface;
-
-      if (title == null) {
-        return SliverToBoxAdapter(
-          child: CupertinoNavigationBar(
-            backgroundColor: bgColor,
-            leading: leading,
-            trailing: _buildTrailing(),
-          ),
-        );
-      }
-      return CupertinoSliverNavigationBar(
-        largeTitle: title,
-        backgroundColor: bgColor,
-        leading: leading,
-        trailing: _buildTrailing(),
-      );
-    }
-
     if (title == null) {
       return SliverAppBar(
         actions: actions,
         leading: leading,
+        pinned: true,
       );
     }
 
@@ -47,15 +26,7 @@ class AdaptiveSliverNavBar extends StatelessWidget {
       title: title!,
       actions: actions,
       leading: leading,
-    );
-  }
-
-  Widget? _buildTrailing() {
-    if (actions == null || actions!.isEmpty) return null;
-    if (actions!.length == 1) return actions!.first;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: actions!,
+      pinned: true,
     );
   }
 }
