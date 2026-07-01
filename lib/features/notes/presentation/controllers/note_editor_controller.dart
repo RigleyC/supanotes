@@ -5,11 +5,13 @@ import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/utils/save_throttle.dart';
 import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
+import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
 import 'package:supanotes/features/notes/domain/task_entry.dart';
@@ -28,10 +30,12 @@ class NoteEditorController {
   NoteEditorController({
     required this.snapshotSave,
     this.emptyNoteExit,
-  });
+    AppDatabase? database,
+  }) : _database = database;
 
   final SnapshotSave snapshotSave;
   final EmptyNoteExit? emptyNoteExit;
+  final AppDatabase? _database;
 
   MutableDocument? document;
   Editor? editor;
@@ -39,6 +43,7 @@ class NoteEditorController {
   FocusNode? focusNode;
 
   final _saveThrottle = SaveThrottle();
+  NodeSyncManager? _nodeSyncManager;
 
   String? _noteId;
 
@@ -48,6 +53,26 @@ class NoteEditorController {
       name: 'NoteEditor',
     );
     document = parseNoteToMarkdown(content);
+    _setupEditor();
+    document!.addListener(_onDocumentChanged);
+  }
+
+  void initFromNodes({
+    required List<NoteNode> nodes,
+    String? noteId,
+  }) {
+    dev.log(
+      '[NoteEditorController.initFromNodes] nodeCount=${nodes.length}',
+      name: 'NoteEditor',
+    );
+    document = NodeSyncManager.documentFromNodes(nodes);
+    _noteId = noteId;
+    _setupEditor();
+    _setupNodeSyncManager();
+    document!.addListener(_onDocumentChanged);
+  }
+
+  void _setupEditor() {
     composer = MutableDocumentComposer();
     editor = createDefaultDocumentEditor(
       document: document!,
@@ -63,7 +88,18 @@ class NoteEditorController {
       const KeepFirstLineAsTitleReaction(),
     );
     focusNode = FocusNode();
-    document!.addListener(_onDocumentChanged);
+  }
+
+  void _setupNodeSyncManager() {
+    final db = _database;
+    final noteId = _noteId;
+    final doc = document;
+    if (db == null || noteId == null || doc == null) return;
+    _nodeSyncManager = NodeSyncManager(
+      database: db,
+      noteId: noteId,
+      document: doc,
+    );
   }
 
   void bind(String noteId) {
@@ -183,6 +219,7 @@ class NoteEditorController {
 
   void dispose() {
     _flushAndSaveFinalState();
+    _nodeSyncManager?.dispose();
     _saveThrottle.dispose();
     document?.removeListener(_onDocumentChanged);
     document?.dispose();
