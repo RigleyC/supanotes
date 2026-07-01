@@ -5,6 +5,15 @@ import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_handler.dart';
 
+final noteSuggestionsProvider = Provider.family.autoDispose<List<NoteModel>, ({String query, String currentNoteId})>((ref, params) {
+  final notes = ref.watch(activeNotesProvider).asData?.value ?? [];
+  final lowercaseQuery = params.query.toLowerCase();
+  return notes
+      .where((n) => n.id != params.currentNoteId && n.title.toLowerCase().contains(lowercaseQuery))
+      .toList()
+    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+});
+
 class NoteSuggestionOverlay extends ConsumerStatefulWidget {
   final Editor editor;
   final DocumentComposer composer;
@@ -110,49 +119,41 @@ class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
     final match = _match;
     if (match == null) return const SizedBox.shrink();
 
-    final notesAsync = ref.watch(activeNotesProvider);
-    return notesAsync.when(
-      data: (notes) {
-        final suggestions = notes
-            .where((n) => n.id != widget.currentNoteId && n.title.toLowerCase().contains(match.query.toLowerCase()))
-            .toList()
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final suggestions = ref.watch(noteSuggestionsProvider((
+      query: match.query,
+      currentNoteId: widget.currentNoteId,
+    )));
+    if (suggestions.isEmpty) return const SizedBox.shrink();
 
-        if (suggestions.isEmpty) return const SizedBox.shrink();
-
-        final chips = suggestions.take(10).map((note) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Material(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(20),
-              child: InkWell(
-                onTap: () => _onNoteSelected(note),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  child: Text(
-                    note.title,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
-                  ),
-                ),
+    final chips = suggestions.take(10).map((note) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Material(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            onTap: () => _onNoteSelected(note),
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Text(
+                note.title,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
-          );
-        }).toList();
-
-        return SizedBox(
-          height: 44,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: chips.length,
-            itemBuilder: (_, i) => chips[i],
           ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+        ),
+      );
+    }).toList();
+
+    return SizedBox(
+      height: 44,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: chips.length,
+        itemBuilder: (_, i) => chips[i],
+      ),
     );
   }
 }

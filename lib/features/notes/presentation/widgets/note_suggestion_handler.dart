@@ -31,9 +31,6 @@ void applyNoteSuggestion({
       textToInsert: note.title,
       attributions: {LinkAttribution.fromUri(Uri.parse('note://${note.id}'))},
     ),
-  ]);
-
-  editor.execute([
     ChangeSelectionRequest(
       DocumentSelection.collapsed(
         position: DocumentPosition(
