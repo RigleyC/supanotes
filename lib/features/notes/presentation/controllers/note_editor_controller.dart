@@ -65,7 +65,8 @@ class NoteEditorController {
     editor!.reactionPipeline.add(
       const KeepFirstLineAsTitleReaction(),
     );
-    focusNode = FocusNode();
+    // Reuse existing focus node if controller is re-initialized
+    focusNode ??= FocusNode();
   }
 
   void _setupNodeSyncManager() {
