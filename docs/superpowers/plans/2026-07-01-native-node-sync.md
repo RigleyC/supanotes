@@ -1,6 +1,6 @@
-# Plano de Implementação: Sincronização e Migração de Nodes Nativa
+# Plano de Implementação: Sincronização, Migração e Tradução de Nodes para o Agente
 
-**Objetivo:** Remover de vez o formato Markdown (.md) da sincronização e do armazenamento principal. Passaremos a trafegar `note_nodes` estruturados diretamente na API de Sincronização e no editor Flutter. Também criaremos um script de migração no backend para transformar as notas antigas em nodes.
+**Objetivo:** Remover por completo o Markdown (.md) como formato de persistência e sincronização de dados. O Flutter e o Go backend sincronizarão `note_nodes` nativos diretamente. O Go backend atuará como "tradutor on-demand" para o Agente de IA, gerando Markdown dinamicamente quando o Agente ler uma nota, e parseando o Markdown gerado pelo Agente de volta para a estrutura de Nós ao criar ou anexar conteúdo.
 
 ---
 
@@ -11,7 +11,7 @@
 - Create: `backend/db/migrations/000025_add_deleted_at_to_note_nodes.down.sql`
 
 - [ ] **Step 1: Criar arquivos de migração**
-Adicionar coluna `deleted_at TIMESTAMPTZ` na tabela `note_nodes` para que o motor de sincronização saiba quando um nó foi excluído.
+Adicionar coluna `deleted_at TIMESTAMPTZ` na tabela `note_nodes` no PostgreSQL para permitir soft-deletes no motor de sincronização.
 
 - [ ] **Step 2: Rodar migração local**
 Rodar: `migrate -path backend/db/migrations -database "postgres://postgres:postgres@localhost:5432/supanotes?sslmode=disable" up`
@@ -61,7 +61,7 @@ Rodar `cd backend && sqlc generate`.
 - Modify: `backend/internal/sync/service.go`
 
 - [ ] **Step 1: Atualizar struct `SyncPayload`**
-Adicionar `NoteNodes []sqlcgen.NoteNode `json:"note_nodes"`` no payload de entrada/saída do sync.
+Adicionar `NoteNodes []sqlcgen.NoteNode `json:"note_nodes"`` no payload de sync.
 
 - [ ] **Step 2: Atualizar métodos de Push e Pull**
 No `Push()`, fazer o loop por `payload.NoteNodes` e salvar usando `UpsertNoteNode`. No `Pull()`, consultar os nós atualizados usando `GetSyncNoteNodes`.
@@ -121,3 +121,24 @@ Atualizar `NoteEditor` para aceitar `List<NoteNodeData> nodes` no construtor em 
 
 - [ ] **Step 3: Plugar inicialização no Editor**
 Na tela `NoteEditorScreen`, aguardar o `noteNodesProvider` e passar os nós para o widget. O widget chamará `controller.initFromNodes(nodes: widget.nodes)` em vez do `init(content)`.
+
+---
+
+### Task 8: Tradução de Nodes/Markdown no Backend para o Agente
+
+**Arquivos:**
+- Create: `backend/internal/notes/parser.go`
+- Modify: `backend/internal/notes/service.go`
+- Modify: `backend/internal/agent/tools/notes_tools.go`
+
+- [ ] **Step 1: Criar Parser no Backend**
+Escrever em `backend/internal/notes/parser.go` um parser de Markdown estruturado para converter strings Markdown escritas pelo Agente em fatias de Nós (`InsertNodeParams`). Ele deve identificar parágrafos, cabeçalhos (`#`, `##`, `###`), divisores (`---`) e tarefas (`- [ ]`, `- [x]`).
+
+- [ ] **Step 2: Atualizar Métodos de Escrita do Notes Service**
+Ajustar `CreateNote` e `AppendToNoteContent` para usar o novo parser e salvar como nós na tabela `note_nodes` do PostgreSQL.
+
+- [ ] **Step 3: Atualizar Tools de Leitura do Agente**
+Ajustar as ferramentas `get_note` e `get_inbox_note` em `notes_tools.go` para:
+  1. Buscar os nós da nota do banco.
+  2. Converter esses nós para Markdown on-demand usando `notes.RenderNoteToMarkdown`.
+  3. Retornar a string de Markdown resultante para o LLM.
