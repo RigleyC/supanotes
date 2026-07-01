@@ -20,6 +20,15 @@ func (q *Queries) DeleteNode(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const deleteNodesByNoteID = `-- name: DeleteNodesByNoteID :exec
+DELETE FROM note_nodes WHERE note_id = $1
+`
+
+func (q *Queries) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteNodesByNoteID, noteID)
+	return err
+}
+
 const getNodesByNoteId = `-- name: GetNodesByNoteId :many
 SELECT id, note_id, parent_id, position, type, data, created_at, updated_at, deleted_at FROM note_nodes WHERE note_id = $1 ORDER BY position ASC
 `

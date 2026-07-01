@@ -128,6 +128,22 @@ func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
 	return err
 }
 
+const deleteTaskByNodeID = `-- name: DeleteTaskByNodeID :exec
+UPDATE tasks
+SET deleted_at = NOW()
+WHERE node_id = $1 AND user_id = $2
+`
+
+type DeleteTaskByNodeIDParams struct {
+	NodeID pgtype.UUID `json:"node_id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTaskByNodeID(ctx context.Context, arg DeleteTaskByNodeIDParams) error {
+	_, err := q.db.Exec(ctx, deleteTaskByNodeID, arg.NodeID, arg.UserID)
+	return err
+}
+
 const getRecentlyCompletedTasks = `-- name: GetRecentlyCompletedTasks :many
 SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, node_id FROM tasks
 WHERE user_id = $1

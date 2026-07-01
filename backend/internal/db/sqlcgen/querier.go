@@ -42,11 +42,13 @@ type Querier interface {
 	DeleteDeviceTokenByToken(ctx context.Context, arg DeleteDeviceTokenByTokenParams) error
 	DeleteMemory(ctx context.Context, arg DeleteMemoryParams) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
+	DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
 	DeleteSessionMessages(ctx context.Context, arg DeleteSessionMessagesParams) error
 	DeleteTag(ctx context.Context, arg DeleteTagParams) error
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
+	DeleteTaskByNodeID(ctx context.Context, arg DeleteTaskByNodeIDParams) error
 	DeleteWorkingMemoryForSession(ctx context.Context, arg DeleteWorkingMemoryForSessionParams) error
 	GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesForMigrationRow, error)
 	GetContexts(ctx context.Context, userID pgtype.UUID) ([]Context, error)

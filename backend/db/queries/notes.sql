@@ -44,6 +44,7 @@ WHERE id = $1 AND user_id = $2;
 
 -- name: GetNotes :many
 SELECT n.*,
+  COALESCE((SELECT (data->>'text')::text FROM note_nodes WHERE note_id = n.id AND type IN ('paragraph', 'header') ORDER BY position ASC LIMIT 1), 'Untitled')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -102,6 +103,7 @@ WHERE note_id = $1 AND tag_id = $2;
 
 -- name: GetRecentNotes :many
 SELECT n.*,
+  COALESCE((SELECT (data->>'text')::text FROM note_nodes WHERE note_id = n.id AND type IN ('paragraph', 'header') ORDER BY position ASC LIMIT 1), 'Untitled')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n

@@ -171,7 +171,7 @@ func (t *GetNotesTool) Execute(ctx context.Context, userID pgtype.UUID, sessionI
 	}
 	var b strings.Builder
 	for _, n := range notesList {
-		b.WriteString(fmt.Sprintf("- [%s] %s\n", formatID(n.ID), notes.DeriveTitle(n.Content)))
+		b.WriteString(fmt.Sprintf("- [%s] %s\n", formatID(n.ID), n.Title))
 	}
 	if b.Len() == 0 {
 		return "No notes found", nil

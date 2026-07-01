@@ -476,6 +476,7 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 
 const getNotes = `-- name: GetNotes :many
 SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+  COALESCE((SELECT (data->>'text')::text FROM note_nodes WHERE note_id = n.id AND type IN ('paragraph', 'header') ORDER BY position ASC LIMIT 1), 'Untitled')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -512,6 +513,7 @@ type GetNotesRow struct {
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 	EmbeddingStatus string             `json:"embedding_status"`
 	CollapseImages  bool               `json:"collapse_images"`
+	Title           string             `json:"title"`
 	Favorite        bool               `json:"favorite"`
 	Archived        bool               `json:"archived"`
 }
@@ -545,6 +547,7 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
 			&i.CollapseImages,
+			&i.Title,
 			&i.Favorite,
 			&i.Archived,
 		); err != nil {
@@ -560,6 +563,7 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 
 const getRecentNotes = `-- name: GetRecentNotes :many
 SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+  COALESCE((SELECT (data->>'text')::text FROM note_nodes WHERE note_id = n.id AND type IN ('paragraph', 'header') ORDER BY position ASC LIMIT 1), 'Untitled')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -585,6 +589,7 @@ type GetRecentNotesRow struct {
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 	EmbeddingStatus string             `json:"embedding_status"`
 	CollapseImages  bool               `json:"collapse_images"`
+	Title           string             `json:"title"`
 	Favorite        bool               `json:"favorite"`
 	Archived        bool               `json:"archived"`
 }
@@ -611,6 +616,7 @@ func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Get
 			&i.DeletedAt,
 			&i.EmbeddingStatus,
 			&i.CollapseImages,
+			&i.Title,
 			&i.Favorite,
 			&i.Archived,
 		); err != nil {
