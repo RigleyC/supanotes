@@ -184,10 +184,12 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   late AnimationController _exitController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _sizeAnimation;
+  late bool _isComplete;
 
   @override
   void initState() {
     super.initState();
+    _isComplete = widget.viewModel.isComplete;
     _exitController = AnimationController(
       vsync: this,
       duration: _exitAnimationDuration,
@@ -221,6 +223,10 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   @override
   void didUpdateWidget(CustomTaskComponent oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
+      _isComplete = widget.viewModel.isComplete;
+    }
+    
     if (widget.hideCompleted) {
       if (widget.viewModel.isComplete && !oldWidget.viewModel.isComplete) {
         Future.delayed(_exitAnimationDelay, () {
@@ -252,11 +258,16 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
             ),
           ),
           _TaskCheckboxHitTarget(
-            value: widget.viewModel.isComplete,
+            value: _isComplete,
             activeColor: taskColor,
             inactiveColor: colorScheme.outline,
             checkmarkColor: Colors.white,
-            onChanged: widget.viewModel.setComplete,
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _isComplete = val);
+                widget.viewModel.setComplete?.call(val);
+              }
+            },
             onLongPress: widget.onLongPress,
             firstLineHeight: _firstLineHeight(context),
           ),

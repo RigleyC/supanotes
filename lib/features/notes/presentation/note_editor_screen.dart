@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
@@ -143,7 +144,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       if (!isReadOnly)
                         IconButton(
                           icon: const Icon(Icons.check),
-                          onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+                          onPressed: () {
+                            FocusManager.instance.primaryFocus?.unfocus();
+                            SystemChannels.textInput.invokeMethod('TextInput.hide');
+                          },
                         ),
                     ],
                   ),

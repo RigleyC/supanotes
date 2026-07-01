@@ -64,7 +64,7 @@ class AppMessenger {
       subtitle: subtitle,
       type: _SnackType.task,
       action: action,
-      duration: duration ?? const Duration(seconds: 6),
+      duration: duration ?? const Duration(seconds: 3),
     );
   }
 

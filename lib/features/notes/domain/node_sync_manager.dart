@@ -98,6 +98,22 @@ class NodeSyncManager {
         }
       }
     }
+
+    // Always update the parent note's content so lists and search continue to work.
+    final fullText = _document.map((n) {
+      if (n is TextNode) return n.text.toPlainText();
+      if (n is TaskNode) return n.text.toPlainText();
+      if (n is ListItemNode) return n.text.toPlainText();
+      return '';
+    }).join('\n');
+
+    (_db.update(_db.notes)..where((t) => t.id.equals(_noteId))).write(
+      NotesCompanion(
+        content: Value(fullText),
+        updatedAt: Value(now),
+        isDirty: const Value(true),
+      ),
+    );
   }
 
   NoteNodesCompanion? _nodeToCompanion(DocumentNode node, int position) {
@@ -205,6 +221,7 @@ class NodeSyncManager {
       return jsonEncode({
         ..._serializeAttributedText(node.text),
         'completed': node.isComplete,
+        'indent': node.indent,
       });
     }
     if (node is ParagraphNode) {
@@ -239,6 +256,7 @@ class NodeSyncManager {
       return jsonEncode({
         ..._serializeAttributedText(node.text),
         'type': node.type == ListItemType.ordered ? 'ordered' : 'unordered',
+        'indent': node.indent,
       });
     }
     if (node is TextNode) {
@@ -326,9 +344,18 @@ class NodeSyncManager {
   }
 
   static DocumentNode? _nodeFromData(NoteNode node) {
-    final data = node.data.isNotEmpty
-        ? jsonDecode(node.data) as Map<String, dynamic>
-        : <String, dynamic>{};
+    Map<String, dynamic> data;
+    try {
+      data = node.data.isNotEmpty
+          ? jsonDecode(node.data) as Map<String, dynamic>
+          : <String, dynamic>{};
+    } catch (_) {
+      try {
+        data = jsonDecode(utf8.decode(base64Decode(node.data))) as Map<String, dynamic>;
+      } catch (_) {
+        data = <String, dynamic>{};
+      }
+    }
 
     switch (node.type) {
       case 'header':
@@ -356,6 +383,7 @@ class NodeSyncManager {
           id: node.id,
           itemType: typeStr == 'ordered' ? ListItemType.ordered : ListItemType.unordered,
           text: _deserializeAttributedText(data),
+          indent: data['indent'] as int? ?? 0,
         );
       case 'paragraph':
         return ParagraphNode(
@@ -367,6 +395,7 @@ class NodeSyncManager {
           id: node.id,
           text: _deserializeAttributedText(data),
           isComplete: data['completed'] == true || data['isComplete'] == true,
+          indent: data['indent'] as int? ?? 0,
         );
       case 'divider':
         return HorizontalRuleNode(id: node.id);
@@ -391,9 +420,18 @@ class NodeSyncManager {
     final tasks = <TaskEntry>[];
     for (final node in nodes) {
       if (node.type != 'task') continue;
-      final data = node.data.isNotEmpty
-          ? jsonDecode(node.data) as Map<String, dynamic>
-          : <String, dynamic>{};
+      Map<String, dynamic> data;
+      try {
+        data = node.data.isNotEmpty
+            ? jsonDecode(node.data) as Map<String, dynamic>
+            : <String, dynamic>{};
+      } catch (_) {
+        try {
+          data = jsonDecode(utf8.decode(base64Decode(node.data))) as Map<String, dynamic>;
+        } catch (_) {
+          data = <String, dynamic>{};
+        }
+      }
       final text = data['text'] as String? ?? '';
       tasks.add(TaskEntry(id: node.id, text: text, isComplete: false));
     }

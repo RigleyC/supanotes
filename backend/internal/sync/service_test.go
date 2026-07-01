@@ -148,23 +148,6 @@ func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }
 
-func TestSyncPushRejectsEmptyNewRegularNote(t *testing.T) {
-	repo := &mockRepository{}
-	svc := NewService(repo, nil)
-
-	err := svc.Push(context.Background(), testUserID(), &SyncPayload{
-		Notes: []sqlcgen.GetSyncNotesRow{
-			testNote(func(n *sqlcgen.GetSyncNotesRow) {
-				n.Content = "   "
-			}),
-		},
-	})
-
-	if !errors.Is(err, ErrEmptyNote) {
-		t.Fatalf("expected ErrEmptyNote, got %v", err)
-	}
-}
-
 func TestSyncServicePushRejectsSharedNoteWithoutEditPermission(t *testing.T) {
 	repo := &mockRepository{}
 	svc := NewService(repo, nil)

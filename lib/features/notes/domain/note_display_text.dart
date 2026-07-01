@@ -7,11 +7,7 @@ String deriveNoteTitle(String content) {
   for (final line in lines) {
     final trimmed = line.trim();
     if (trimmed.isNotEmpty) {
-      var clean = trimmed.replaceFirst(RegExp(r'^#+\s*'), '');
-      clean = clean.replaceFirst(RegExp(r'^[-*]\s*\[[ xX]\]\s*'), '');
-      clean = clean.replaceFirst(RegExp(r'^[-*]\s*'), '');
-      clean = clean.replaceFirst(RegExp(r'^\d+\.\s*'), '');
-      return clean.trim().isNotEmpty ? clean.trim() : NoteStrings.fallbackTitle;
+      return trimmed;
     }
   }
   return NoteStrings.fallbackTitle;

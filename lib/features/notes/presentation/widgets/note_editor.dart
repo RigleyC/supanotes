@@ -55,6 +55,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   RichSuperEditorIosControlsController? _iosController;
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
+  DateTime? _lastLocalEditTime;
 
   late CustomTaskComponentBuilder _taskComponentBuilder;
 
@@ -144,7 +145,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
              () async {},
           );
     
-    if (!listEquals(widget.nodes, oldWidget.nodes) && !(_controller?.focusNode?.hasFocus ?? false)) {
+    final timeSinceLastEdit = _lastLocalEditTime != null
+        ? DateTime.now().difference(_lastLocalEditTime!)
+        : const Duration(days: 1);
+
+    if (!listEquals(widget.nodes, oldWidget.nodes) && 
+        !(_controller?.focusNode?.hasFocus ?? false) &&
+        timeSinceLastEdit > const Duration(seconds: 2)) {
       _controller?.initFromNodes(nodes: widget.nodes, noteId: widget.noteId);
     }
   }
@@ -161,6 +168,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   void _onDocumentChanged(DocumentChangeLog _) {
+    _lastLocalEditTime = DateTime.now();
     _notifyContentChanged();
   }
 

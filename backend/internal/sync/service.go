@@ -3,7 +3,6 @@ package sync
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -157,9 +156,10 @@ func sanitizeTaskStatus(status string) string {
 }
 
 func isEmptyIncomingRegularNote(n sqlcgen.GetSyncNotesRow) bool {
-	return !n.IsInbox &&
-		!n.DeletedAt.Valid &&
-		strings.TrimSpace(n.Content) == ""
+	// In the new architecture, notes.content can legitimately be empty
+	// because the content is stored in note_nodes. We no longer reject
+	// notes based on the legacy content field.
+	return false
 }
 
 func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPayload) error {

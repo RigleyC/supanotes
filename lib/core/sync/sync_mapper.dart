@@ -5,6 +5,7 @@
 /// Pull direction (fromJson): raw Map   → typed data for the DAOs.
 library;
 
+import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:intl/intl.dart';
 
@@ -106,7 +107,7 @@ class SyncMapper {
         'parent_id': nn.parentId,
         'position': nn.position,
         'type': nn.type,
-        'data': nn.data,
+        'data': base64Encode(utf8.encode(nn.data)),
         'created_at': nn.createdAt.toUtc().toIso8601String(),
         'updated_at': nn.updatedAt.toUtc().toIso8601String(),
         'deleted_at': nn.deletedAt?.toUtc().toIso8601String(),
@@ -220,7 +221,7 @@ class SyncMapper {
         parentId: json['parent_id'] as String?,
         position: json['position'] as int,
         type: json['type'] as String,
-        data: json['data'] as String,
+        data: utf8.decode(base64Decode(json['data'] as String)),
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
         updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
         deletedAt: json['deleted_at'] != null
