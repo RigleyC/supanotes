@@ -505,6 +505,21 @@ func (s *stubLoopQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sq
 func (s *stubLoopQuerier) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
 	return sqlcgen.UserNotePreference{}, nil
 }
+func (s *stubLoopQuerier) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) UpdateNode(ctx context.Context, arg sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) {
+	panic("unimplemented")
+}
+func (s *stubLoopQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error {
+	return nil
+}
+func (s *stubLoopQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
+	return nil, nil
+}
+func (s *stubLoopQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
 
 type trackingStubLoopRepo struct {
 	stubLoopRepo
