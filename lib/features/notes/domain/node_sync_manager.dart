@@ -123,13 +123,134 @@ class NodeSyncManager {
     if (node is TaskNode) return 'task';
     if (node is AttachmentNode) return 'attachment';
     if (node is HorizontalRuleNode) return 'divider';
-    if (node is TextNode) return 'paragraph';
+    if (node is ParagraphNode) {
+      final blockType = node.metadata['blockType'];
+      if (blockType == header1Attribution || 
+          blockType == header2Attribution || 
+          blockType == header3Attribution || 
+          blockType == header4Attribution || 
+          blockType == header5Attribution || 
+          blockType == header6Attribution) {
+        return 'header';
+      }
+      if (blockType == blockquoteAttribution) {
+        return 'blockquote';
+      }
+      return 'paragraph';
+    }
+    if (node is ListItemNode) return 'list_item';
+    if (node is ImageNode) return 'image';
     return null;
   }
 
+  Map<String, dynamic> _serializeAttributedText(AttributedText text) {
+    final spansList = <Map<String, dynamic>>[];
+    for (final span in text.spans.markers) {
+      if (span.isStart) {
+        String attributionName;
+        final attribution = span.attribution;
+        if (attribution == boldAttribution) {
+          attributionName = 'bold';
+        } else if (attribution == italicsAttribution) {
+          attributionName = 'italics';
+        } else if (attribution == strikethroughAttribution) {
+          attributionName = 'strikethrough';
+        } else if (attribution == underlineAttribution) {
+          attributionName = 'underline';
+        } else if (attribution is LinkAttribution) {
+          attributionName = 'link:${attribution.url.toString()}';
+        } else {
+          attributionName = attribution.id;
+        }
+
+        spansList.add({
+          'attribution': attributionName,
+          'start': span.offset,
+          'end': -1, // Will be filled when we find the end marker
+        });
+      } else {
+        String attributionName;
+        final attribution = span.attribution;
+        if (attribution == boldAttribution) {
+          attributionName = 'bold';
+        } else if (attribution == italicsAttribution) {
+          attributionName = 'italics';
+        } else if (attribution == strikethroughAttribution) {
+          attributionName = 'strikethrough';
+        } else if (attribution == underlineAttribution) {
+          attributionName = 'underline';
+        } else if (attribution is LinkAttribution) {
+          attributionName = 'link:${attribution.url.toString()}';
+        } else {
+          attributionName = attribution.id;
+        }
+
+        // Find the last opened span of this type that hasn't been closed
+        for (int i = spansList.length - 1; i >= 0; i--) {
+          if (spansList[i]['attribution'] == attributionName && spansList[i]['end'] == -1) {
+            spansList[i]['end'] = span.offset;
+            break;
+          }
+        }
+      }
+    }
+    return {
+      'text': text.toPlainText(),
+      'spans': spansList,
+    };
+  }
+
   String _nodeData(DocumentNode node) {
+    if (node is TaskNode) {
+      return jsonEncode({
+        ..._serializeAttributedText(node.text),
+        'completed': node.isComplete,
+      });
+    }
+    if (node is ParagraphNode) {
+      final blockType = node.metadata['blockType'];
+      if (blockType == header1Attribution || 
+          blockType == header2Attribution || 
+          blockType == header3Attribution || 
+          blockType == header4Attribution || 
+          blockType == header5Attribution || 
+          blockType == header6Attribution) {
+        int level = 1;
+        if (blockType == header2Attribution) level = 2;
+        if (blockType == header3Attribution) level = 3;
+        if (blockType == header4Attribution) level = 4;
+        if (blockType == header5Attribution) level = 5;
+        if (blockType == header6Attribution) level = 6;
+        return jsonEncode({
+          ..._serializeAttributedText(node.text),
+          'level': level,
+        });
+      }
+      if (blockType == blockquoteAttribution) {
+        return jsonEncode({
+          ..._serializeAttributedText(node.text),
+        });
+      }
+      return jsonEncode({
+        ..._serializeAttributedText(node.text),
+      });
+    }
+    if (node is ListItemNode) {
+      return jsonEncode({
+        ..._serializeAttributedText(node.text),
+        'type': node.type == ListItemType.ordered ? 'ordered' : 'unordered',
+      });
+    }
     if (node is TextNode) {
-      return jsonEncode({'text': node.text.toPlainText()});
+      return jsonEncode({
+        ..._serializeAttributedText(node.text),
+      });
+    }
+    if (node is ImageNode) {
+      return jsonEncode({
+        'url': node.imageUrl,
+        'alt': node.altText,
+      });
     }
     if (node is HorizontalRuleNode) {
       return '{}';
@@ -164,33 +285,104 @@ class NodeSyncManager {
     return MutableDocument(nodes: documentNodes);
   }
 
+  static AttributedText _deserializeAttributedText(Map<String, dynamic> data) {
+    final text = data['text'] as String? ?? '';
+    final spansData = data['spans'] as List<dynamic>? ?? [];
+    final spans = AttributedSpans();
+    
+    for (final s in spansData) {
+      final spanMap = s as Map<String, dynamic>;
+      final attributionName = spanMap['attribution'] as String?;
+      final start = spanMap['start'] as int?;
+      final end = spanMap['end'] as int?;
+      
+      if (attributionName == null || start == null || end == null || end == -1) continue;
+      
+      Attribution attribution;
+      if (attributionName == 'bold') {
+        attribution = boldAttribution;
+      } else if (attributionName == 'italics') {
+        attribution = italicsAttribution;
+      } else if (attributionName == 'strikethrough') {
+        attribution = strikethroughAttribution;
+      } else if (attributionName == 'underline') {
+        attribution = underlineAttribution;
+      } else if (attributionName.startsWith('link:')) {
+        final urlStr = attributionName.substring(5);
+        attribution = LinkAttribution.fromUri(Uri.parse(urlStr));
+      } else {
+        attribution = NamedAttribution(attributionName);
+      }
+      
+      // Ensure bounds are valid
+      final safeStart = start.clamp(0, text.length);
+      final safeEnd = end.clamp(safeStart, text.length);
+      if (safeEnd > safeStart) {
+        spans.addAttribution(newAttribution: attribution, start: safeStart, end: safeEnd - 1);
+      }
+    }
+    
+    return AttributedText(text, spans);
+  }
+
   static DocumentNode? _nodeFromData(NoteNode node) {
     final data = node.data.isNotEmpty
         ? jsonDecode(node.data) as Map<String, dynamic>
         : <String, dynamic>{};
-    final text = data['text'] as String? ?? '';
 
     switch (node.type) {
+      case 'header':
+        final level = data['level'] as int? ?? 1;
+        NamedAttribution blockType = header1Attribution;
+        if (level == 2) blockType = header2Attribution;
+        if (level == 3) blockType = header3Attribution;
+        if (level == 4) blockType = header4Attribution;
+        if (level == 5) blockType = header5Attribution;
+        if (level == 6) blockType = header6Attribution;
+        return ParagraphNode(
+          id: node.id,
+          text: _deserializeAttributedText(data),
+          metadata: {'blockType': blockType},
+        );
+      case 'blockquote':
+        return ParagraphNode(
+          id: node.id,
+          text: _deserializeAttributedText(data),
+          metadata: {'blockType': blockquoteAttribution},
+        );
+      case 'list_item':
+        final typeStr = data['type'] as String? ?? 'unordered';
+        return ListItemNode(
+          id: node.id,
+          itemType: typeStr == 'ordered' ? ListItemType.ordered : ListItemType.unordered,
+          text: _deserializeAttributedText(data),
+        );
       case 'paragraph':
         return ParagraphNode(
           id: node.id,
-          text: AttributedText(text),
+          text: _deserializeAttributedText(data),
         );
       case 'task':
         return TaskNode(
           id: node.id,
-          text: AttributedText(text),
-          isComplete: data['completed'] == true,
+          text: _deserializeAttributedText(data),
+          isComplete: data['completed'] == true || data['isComplete'] == true,
         );
       case 'divider':
         return HorizontalRuleNode(id: node.id);
       case 'attachment':
         final attachmentId = data['id'] as String? ?? node.id;
         return DocumentAttachmentNode(id: attachmentId);
+      case 'image':
+        return ImageNode(
+          id: node.id,
+          imageUrl: data['url'] as String? ?? '',
+          altText: data['alt'] as String? ?? '',
+        );
       default:
         return ParagraphNode(
           id: node.id,
-          text: AttributedText(text),
+          text: _deserializeAttributedText(data),
         );
     }
   }
