@@ -15,7 +15,7 @@ void main() {
       final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = NotesRepository(local, tasksLocal, prefsDao, AppDatabase.test());
 
       final note = await repo.createLocalNote(id: 'note-1');
       expect(note.id, 'note-1');
@@ -28,7 +28,7 @@ void main() {
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = NotesRepository(local, tasksLocal, prefsDao, AppDatabase.test());
 
       await repo.deleteIfEmptyOrTombstone('note-1');
       expect(local.hardDeletedIds, contains('note-1'));
@@ -41,7 +41,7 @@ void main() {
       await local.createNoteWithId('note-1');
       await local.markHasRemoteCopy('note-1');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = NotesRepository(local, tasksLocal, prefsDao, AppDatabase.test());
 
       await repo.deleteIfEmptyOrTombstone('note-1');
       expect(local.softDeletedIds, contains('note-1'));
@@ -53,7 +53,7 @@ void main() {
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1', content: 'Hello');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = NotesRepository(local, tasksLocal, prefsDao, AppDatabase.test());
 
       await repo.deleteIfEmptyOrTombstone('note-1');
       expect(local.hardDeletedIds, isEmpty);
@@ -65,7 +65,7 @@ void main() {
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = NotesRepository(local, tasksLocal, prefsDao, AppDatabase.test());
 
       await repo.saveNoteSnapshot(
         id: 'note-1',
@@ -83,7 +83,7 @@ void main() {
       await local.createNoteWithId('source-1');
       final tasksLocal = FakeTasksLocalRepository();
       final linksDao = FakeNoteLinksDao();
-      final repo = NotesRepository(local, tasksLocal, prefsDao, linksDao);
+      final repo = NotesRepository(local, tasksLocal, prefsDao, AppDatabase.test(), linksDao);
 
       const content = 'Check out [Note A](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890) '
           'and [Note B](note://b2c3d4e5-f6a7-8901-bcde-f12345678901)';
@@ -111,7 +111,7 @@ void main() {
         targetId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       );
 
-      final repo = NotesRepository(local, tasksLocal, prefsDao, linksDao);
+      final repo = NotesRepository(local, tasksLocal, prefsDao, AppDatabase.test(), linksDao);
 
       const content = 'Only [New Note](note://bbbbbbbb-cccc-dddd-eeee-ffffffffffff)';
 
@@ -130,7 +130,7 @@ void main() {
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
       final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = NotesRepository(local, tasksLocal, prefsDao, AppDatabase.test());
 
       const content = '[Test](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890)';
 

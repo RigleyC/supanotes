@@ -26,6 +26,7 @@ abstract class INotesRepository {
   Stream<NoteModel?> watchInbox();
   Stream<NoteModel?> watchNoteById(String id);
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId);
+  Stream<List<NoteNode>> watchNodes(String noteId);
   Future<NoteModel?> getNoteById(String id);
   Future<NoteModel> upsertNote({
     required String id,
@@ -52,11 +53,12 @@ abstract class INotesRepository {
 }
 
 class NotesRepository implements INotesRepository {
-  NotesRepository(this._local, this._tasksLocal, this._prefsDao, [this._noteLinksDao]);
+  NotesRepository(this._local, this._tasksLocal, this._prefsDao, this._db, [this._noteLinksDao]);
 
   final NotesLocalRepository _local;
   final TasksLocalRepository _tasksLocal;
   final UserNotePreferencesDao _prefsDao;
+  final AppDatabase _db;
   final NoteLinksDao? _noteLinksDao;
 
   /// Streams active (non-archived, non-deleted, non-inbox) notes, mapped
@@ -108,6 +110,14 @@ class NotesRepository implements INotesRepository {
         tasks: result.tasks.map(TaskModel.fromData).toList(),
       );
     });
+  }
+
+  @override
+  Stream<List<NoteNode>> watchNodes(String noteId) {
+    return (_db.select(_db.noteNodes)
+          ..where((t) => t.noteId.equals(noteId) & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.position)]))
+        .watch();
   }
 
   @override
@@ -304,5 +314,5 @@ final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   final local = ref.watch(notesLocalRepositoryProvider);
   final tasksLocal = ref.watch(tasksLocalRepositoryProvider);
   final db = ref.watch(appDatabaseProvider);
-  return NotesRepository(local, tasksLocal, db.userNotePreferencesDao, db.noteLinksDao);
+  return NotesRepository(local, tasksLocal, db.userNotePreferencesDao, db, db.noteLinksDao);
 });

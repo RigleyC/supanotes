@@ -100,7 +100,7 @@ class SyncMapper {
         'tag_id': t.tagId,
       };
 
-  Map<String, dynamic> noteNodeToJson(NoteNodeData nn) => {
+  Map<String, dynamic> noteNodeToJson(NoteNode nn) => {
         'id': nn.id,
         'note_id': nn.noteId,
         'parent_id': nn.parentId,
@@ -214,7 +214,7 @@ class SyncMapper {
         isDirty: false,
       );
 
-  NoteNodeData noteNodeFromJson(Map<String, dynamic> json) => NoteNodeData(
+  NoteNode noteNodeFromJson(Map<String, dynamic> json) => NoteNode(
         id: json['id'] as String,
         noteId: json['note_id'] as String,
         parentId: json['parent_id'] as String?,

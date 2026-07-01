@@ -29,6 +29,11 @@ UPDATE tasks
 SET deleted_at = NOW()
 WHERE id = $1 AND user_id = $2;
 
+-- name: DeleteTaskByNodeID :exec
+UPDATE tasks
+SET deleted_at = NOW()
+WHERE node_id = $1 AND user_id = $2;
+
 -- name: GetTasks :many
 SELECT * FROM tasks
 WHERE user_id = $1

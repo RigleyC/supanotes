@@ -4,8 +4,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
@@ -19,12 +22,14 @@ import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 class _FakeNotesRepository implements INotesRepository {
-  _FakeNotesRepository(this.controller);
+  _FakeNotesRepository(this.controller)
+      : _broadcast = controller.stream.asBroadcastStream();
 
   final StreamController<NoteModel?> controller;
+  final Stream<NoteModel?> _broadcast;
 
   @override
-  Stream<NoteModel?> watchNoteById(String id) => controller.stream;
+  Stream<NoteModel?> watchNoteById(String id) => _broadcast;
 
   @override
   Future<void> saveNoteSnapshot({
@@ -36,8 +41,53 @@ class _FakeNotesRepository implements INotesRepository {
   Future<void> deleteIfEmptyOrTombstone(String id) async {}
 
   @override
+  Stream<List<NoteNode>> watchNodes(String noteId) {
+    return _broadcast.map((note) {
+      if (note == null) return const [];
+      final lines = note.content.split('\n');
+      final nodes = <NoteNode>[];
+      for (var i = 0; i < lines.length; i++) {
+        final line = lines[i];
+        if (line.isEmpty) continue;
+
+        final isTask = line.startsWith('- [ ]') || line.startsWith('- [x]');
+        final type = isTask ? 'task' : 'paragraph';
+
+        var title = line;
+        var isComplete = false;
+        if (isTask) {
+          isComplete = line.startsWith('- [x]');
+          title = line.substring(5).trim();
+        }
+
+        var id = 'node-$i';
+        if (title.contains('<!-- task:')) {
+          final startIdx = title.indexOf('<!-- task:') + 10;
+          final endIdx = title.indexOf('-->', startIdx);
+          id = title.substring(startIdx, endIdx).trim();
+          title = title.substring(0, title.indexOf('<!-- task:')).trim();
+        }
+
+        nodes.add(NoteNode(
+          id: id,
+          noteId: noteId,
+          position: i,
+          type: type,
+          data: isTask
+              ? '{"text":"$title","completed":$isComplete}'
+              : '{"text":"$title"}',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          isDirty: false,
+        ));
+      }
+      return nodes;
+    });
+  }
+
+  @override
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId) =>
-      controller.stream.map((note) => NoteWithTasks(note: note, tasks: []));
+      _broadcast.map((note) => NoteWithTasks(note: note, tasks: []));
 
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -126,6 +176,8 @@ void main() {
             _FakeNotesRepository(streamController),
           ),
           tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
         ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,
@@ -176,16 +228,40 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: NoteEditor(
-            noteId: 'note-1',
-            content:
-                '- [x] tarefa concluida <!-- task:task-1 -->\n\ntexto visivel',
-            taskMetadata: const {},
-            hideCompleted: true,
-            delegate: NoteEditorDelegate(
-              snapshotSave: (noteId, content) async {},
+      ProviderScope(
+        overrides: [
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: NoteEditor(
+              noteId: 'note-1',
+              nodes: [
+                NoteNode(
+                  id: 'task-1',
+                  noteId: 'note-1',
+                  position: 0,
+                  type: 'task',
+                  data: '{"text":"tarefa concluida","completed":true}',
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                  isDirty: false,
+                ),
+                NoteNode(
+                  id: 'node-2',
+                  noteId: 'note-1',
+                  position: 1,
+                  type: 'paragraph',
+                  data: '{"text":"texto visivel"}',
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                  isDirty: false,
+                ),
+              ],
+              taskMetadata: const {},
+              hideCompleted: true,
+              delegate: const NoteEditorDelegate(),
             ),
           ),
         ),
@@ -210,32 +286,56 @@ void main() {
     var hideCompleted = false;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: StatefulBuilder(
-          builder: (context, setState) {
-            return Scaffold(
-              body: Column(
-                children: [
-                  TextButton(
-                    onPressed: () => setState(() => hideCompleted = true),
-                    child: const Text('toggle hide'),
-                  ),
-                  Expanded(
-                    child: NoteEditor(
-                      noteId: 'note-1',
-                      content:
-                          '- [x] tarefa concluida <!-- task:task-1 -->\n\ntexto visivel',
-                      taskMetadata: const {},
-                      hideCompleted: hideCompleted,
-            delegate: NoteEditorDelegate(
-              snapshotSave: (noteId, content) async {},
-            ),
+      ProviderScope(
+        overrides: [
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+        ],
+        child: MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                body: Column(
+                  children: [
+                    TextButton(
+                      onPressed: () => setState(() => hideCompleted = true),
+                      child: const Text('toggle hide'),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                    Expanded(
+                      child: NoteEditor(
+                        noteId: 'note-1',
+                        nodes: [
+                          NoteNode(
+                            id: 'task-1',
+                            noteId: 'note-1',
+                            position: 0,
+                            type: 'task',
+                            data: '{"text":"tarefa concluida","completed":true}',
+                            createdAt: DateTime.now(),
+                            updatedAt: DateTime.now(),
+                            isDirty: false,
+                          ),
+                          NoteNode(
+                            id: 'node-2',
+                            noteId: 'note-1',
+                            position: 1,
+                            type: 'paragraph',
+                            data: '{"text":"texto visivel"}',
+                            createdAt: DateTime.now(),
+                            updatedAt: DateTime.now(),
+                            isDirty: false,
+                          ),
+                        ],
+                        taskMetadata: const {},
+                        hideCompleted: hideCompleted,
+                        delegate: const NoteEditorDelegate(),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -304,6 +404,8 @@ void main() {
             _FakeNotesRepository(streamController),
           ),
           tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
         ],
         child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
       ),
@@ -327,7 +429,7 @@ void main() {
 
     expect(find.byIcon(Icons.share_outlined), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.more_vert).first);
     await tester.pumpAndSettle();
 
     expect(find.text(NoteStrings.shareLabel), findsOneWidget);
@@ -370,6 +472,8 @@ void main() {
             _FakeNotesRepository(streamController),
           ),
           tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
         ],
         child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
       ),
@@ -436,6 +540,8 @@ void main() {
               _FakeNotesRepository(streamController),
             ),
             tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
+            currentUserIdProvider.overrideWithValue('test-user'),
+            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
           ],
           child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
         ),

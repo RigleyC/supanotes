@@ -6,11 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/agent/domain/destination_type.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart'
-    show defaultSnapshotSave;
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart'
-    show inboxProvider, noteWithTasksProvider;
+    show inboxProvider, noteWithTasksProvider, noteNodesProvider;
 import 'package:supanotes/features/notes/presentation/widgets/inbox_organize_sheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart'
@@ -98,60 +96,69 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   }
 
   Widget _buildEditor(NoteModel inbox) {
-    return ref.watch(noteWithTasksProvider(inbox.id)).when(
-      data: (noteWithTasks) {
-        final tasksMap = noteWithTasks.taskById;
-        final repo = ref.read(notesRepositoryProvider);
+    final nodesAsync = ref.watch(noteNodesProvider(inbox.id));
+    final noteWithTasksAsync = ref.watch(noteWithTasksProvider(inbox.id));
 
-        return Scaffold(
-          resizeToAvoidBottomInset: false,
-          body: CustomScrollView(
-            slivers: [
-              AdaptiveSliverNavBar(
-                title: Text(inbox.title),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.check),
-                    onPressed: () =>
-                        FocusManager.instance.primaryFocus?.unfocus(),
+    return nodesAsync.when(
+      data: (nodes) {
+        return noteWithTasksAsync.when(
+          data: (noteWithTasks) {
+            final tasksMap = noteWithTasks.taskById;
+
+            return Scaffold(
+              resizeToAvoidBottomInset: false,
+              body: CustomScrollView(
+                slivers: [
+                  AdaptiveSliverNavBar(
+                    title: Text(inbox.title),
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.check),
+                        onPressed: () =>
+                            FocusManager.instance.primaryFocus?.unfocus(),
+                      ),
+                    ],
+                  ),
+                  SliverFillRemaining(
+                    hasScrollBody: true,
+                    child: NoteEditor(
+                      noteId: inbox.id,
+                      nodes: nodes,
+                      taskMetadata: tasksMap,
+                      delegate: NoteEditorDelegate(
+                        onHasContentChanged: (hasContent) {
+                          if (mounted) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                setState(() => _hasContent = hasContent);
+                              }
+                            });
+                          }
+                        },
+                        onTaskLongPress: (task, flushSnapshot) =>
+                            _openTaskActions(task, flushSnapshot),
+                        onTaskComplete: (taskId) =>
+                            TaskSnackBarHelper.completeTaskWithFeedback(
+                          onComplete: () =>
+                              ref.read(tasksRepositoryProvider).completeTask(taskId),
+                          onUndo: () =>
+                              ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                        ),
+                        onTaskReopen: (taskId) =>
+                            ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              SliverFillRemaining(
-                hasScrollBody: true,
-                child: NoteEditor(
-                  noteId: inbox.id,
-                  content: inbox.content,
-                  taskMetadata: tasksMap,
-                  delegate: NoteEditorDelegate(
-                    snapshotSave: (noteId, content) =>
-                        defaultSnapshotSave(repo, noteId, content),
-                    onHasContentChanged: (hasContent) {
-                      if (mounted) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) {
-                            setState(() => _hasContent = hasContent);
-                          }
-                        });
-                      }
-                    },
-                    onTaskLongPress: (task, flushSnapshot) =>
-                        _openTaskActions(task, flushSnapshot),
-                    onTaskComplete: (taskId) =>
-                        TaskSnackBarHelper.completeTaskWithFeedback(
-                      onComplete: () =>
-                          ref.read(tasksRepositoryProvider).completeTask(taskId),
-                      onUndo: () =>
-                          ref.read(tasksRepositoryProvider).reopenTask(taskId),
-                    ),
-                    onTaskReopen: (taskId) =>
-                        ref.read(tasksRepositoryProvider).reopenTask(taskId),
-                  ),
-                ),
-              ),
-            ],
+              floatingActionButton: _hasContent ? _buildOrganizeFab : null,
+            );
+          },
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (error, _) => Scaffold(
+            body: Center(child: Text('Error: $error')),
           ),
-          floatingActionButton: _hasContent ? _buildOrganizeFab : null,
         );
       },
       loading: () =>

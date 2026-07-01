@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
@@ -20,4 +21,9 @@ final activeNotesProvider = StreamProvider.autoDispose<List<NoteModel>>((ref) {
 final noteWithTasksProvider =
     StreamProvider.autoDispose.family<NoteWithTasks, String>((ref, noteId) {
   return ref.watch(notesRepositoryProvider).watchNoteWithTasks(noteId);
+});
+
+final noteNodesProvider =
+    StreamProvider.autoDispose.family<List<NoteNode>, String>((ref, noteId) {
+  return ref.watch(notesRepositoryProvider).watchNodes(noteId);
 });

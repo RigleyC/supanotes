@@ -1,13 +1,15 @@
 library;
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
@@ -25,7 +27,7 @@ import 'package:supanotes/features/tasks/domain/task_model.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
-  final String content;
+  final List<NoteNode> nodes;
   final Map<String, TaskModel> taskMetadata;
   final bool hideCompleted;
   final bool collapseImages;
@@ -35,7 +37,7 @@ class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({
     super.key,
     required this.noteId,
-    required this.content,
+    required this.nodes,
     required this.taskMetadata,
     this.hideCompleted = false,
     this.collapseImages = false,
@@ -53,26 +55,23 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   RichSuperEditorIosControlsController? _iosController;
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
-  String _lastContent = '';
-  bool _hasLocalEdits = false;
 
   late CustomTaskComponentBuilder _taskComponentBuilder;
 
   @override
   void initState() {
     super.initState();
-    _lastContent = widget.content;
+    final userId = ref.read(currentUserIdProvider)!;
     _controller = NoteEditorController(
-      snapshotSave: widget.isReadOnly
-          ? (noteId, content) async {}
-          : widget.delegate.snapshotSave,
+      userId: userId,
       emptyNoteExit: widget.isReadOnly ? null : widget.delegate.emptyNoteExit,
+      database: ref.read(appDatabaseProvider),
     );
     _controller!.bind(widget.noteId);
-    _controller!.init(content: widget.content);
+    _controller!.initFromNodes(nodes: widget.nodes, noteId: widget.noteId);
     if (!widget.isReadOnly) {
       _controller!.document?.addListener(_onDocumentChanged);
-      if (widget.content.isEmpty) {
+      if (widget.nodes.isEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _controller?.focusNode?.requestFocus();
         });
@@ -88,7 +87,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           ? null
           : (taskId) => widget.delegate.onTaskLongPress?.call(
               widget.taskMetadata[taskId],
-              () => _controller!.persistSnapshotNow(),
+              () async {},
             ),
       onTaskComplete: widget.delegate.onTaskComplete,
       onTaskReopen: widget.delegate.onTaskReopen,
@@ -142,23 +141,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         ? null
         : (taskId) => widget.delegate.onTaskLongPress?.call(
             widget.taskMetadata[taskId],
-            () => _controller?.persistSnapshotNow() ?? Future.value(),
+             () async {},
           );
-    final doc = _controller?.document;
-    if (doc != null) {
-      final currentContent = doc
-          .map((n) => n is TextNode ? n.text.toPlainText() : '')
-          .where((t) => t.isNotEmpty)
-          .join('\n');
-      if (widget.content == currentContent) {
-        _hasLocalEdits = false;
-        _lastContent = widget.content;
-      }
-    }
-
-    if (widget.content != oldWidget.content && !_hasLocalEdits && widget.content != _lastContent) {
-      _lastContent = widget.content;
-      _controller?.init(content: widget.content);
+    
+    if (!listEquals(widget.nodes, oldWidget.nodes) && !(_controller?.focusNode?.hasFocus ?? false)) {
+      _controller?.initFromNodes(nodes: widget.nodes, noteId: widget.noteId);
     }
   }
 
@@ -174,7 +161,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   void _onDocumentChanged(DocumentChangeLog _) {
-    _hasLocalEdits = true;
     _notifyContentChanged();
   }
 
@@ -294,7 +280,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
               editor: controller.editor!,
               composer: controller.composer!,
               currentNoteId: widget.noteId,
-              onPersist: () => controller.persistSnapshotNow(),
+              onPersist: () async {},
             ),
           if (!widget.isReadOnly)
             NoteToolbar(

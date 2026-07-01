@@ -517,8 +517,26 @@ func (s *stubLoopQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error 
 func (s *stubLoopQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
 	return nil, nil
 }
+func (s *stubLoopQuerier) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
+	return nil
+}
+func (s *stubLoopQuerier) UpdateNoteSearchVector(ctx context.Context, arg sqlcgen.UpdateNoteSearchVectorParams) error {
+	return nil
+}
+func (s *stubLoopQuerier) GetAllNotesForMigration(ctx context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) {
+	return nil, nil
+}
 func (s *stubLoopQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) ([]sqlcgen.Task, error) {
 	return nil, nil
+}
+func (s *stubLoopQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
+	return nil
+}
+func (s *stubLoopQuerier) GetSyncNoteNodes(ctx context.Context, arg sqlcgen.GetSyncNoteNodesParams) ([]sqlcgen.NoteNode, error) {
+	return nil, nil
+}
+func (s *stubLoopQuerier) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
+	return sqlcgen.NoteNode{}, nil
 }
 
 type trackingStubLoopRepo struct {
@@ -1000,9 +1018,3 @@ func (m *stubLoopMemRepo) UpdateMemory(ctx context.Context, id, userID pgtype.UU
 func (m *stubLoopMemRepo) SearchMemories(ctx context.Context, userID pgtype.UUID, embedding pgvector.Vector, limit int32) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
 	return nil, nil
 }
-func (m *stubLoopQuerier) InsertNode(_ context.Context, _ sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
-func (m *stubLoopQuerier) UpdateNode(_ context.Context, _ sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
-func (m *stubLoopQuerier) DeleteNode(_ context.Context, _ pgtype.UUID) error { return nil }
-func (m *stubLoopQuerier) GetNodesByNoteId(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteNode, error) { return nil, nil }
-func (m *stubLoopQuerier) UpdateNoteSearchVector(_ context.Context, _ sqlcgen.UpdateNoteSearchVectorParams) error { return nil }
-func (m *stubLoopQuerier) GetAllNotesForMigration(_ context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) { return nil, nil }

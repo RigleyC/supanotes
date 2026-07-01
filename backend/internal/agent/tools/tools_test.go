@@ -16,15 +16,16 @@ import (
 
 // stubQuerier panics on any method call.
 type stubQuerier struct {
-	searchByEmbedding func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error)
-	createNoteLink    func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error
-	getNoteByID       func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error)
-	getSoul           func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error)
-	getMessages       func(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error)
-	getRecentNotes    func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error)
-	getInboxNote      func(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error)
-	createNote        func(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error)
-	setInboxContent   func(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
+	searchByEmbedding  func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error)
+	createNoteLink     func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error
+	getNoteByID        func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error)
+	getSoul            func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error)
+	getMessages        func(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error)
+	getRecentNotes     func(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error)
+	getInboxNote       func(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error)
+	createNote         func(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error)
+	setInboxContent    func(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
+	getNodesByNoteId   func(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error)
 }
 
 func (s *stubQuerier) GetSoul(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error) {
@@ -58,10 +59,31 @@ func (s *stubQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error {
 	return nil
 }
 func (s *stubQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
+	if s.getNodesByNoteId != nil {
+		return s.getNodesByNoteId(ctx, noteID)
+	}
+	return nil, nil
+}
+func (s *stubQuerier) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
+	return nil
+}
+func (s *stubQuerier) UpdateNoteSearchVector(ctx context.Context, arg sqlcgen.UpdateNoteSearchVectorParams) error {
+	return nil
+}
+func (s *stubQuerier) GetAllNotesForMigration(ctx context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) {
 	return nil, nil
 }
 func (s *stubQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) ([]sqlcgen.Task, error) {
 	return nil, nil
+}
+func (s *stubQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
+	return nil
+}
+func (s *stubQuerier) GetSyncNoteNodes(ctx context.Context, arg sqlcgen.GetSyncNoteNodesParams) ([]sqlcgen.NoteNode, error) {
+	return nil, nil
+}
+func (s *stubQuerier) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
+	return sqlcgen.NoteNode{}, nil
 }
 
 func (s *stubQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
@@ -249,7 +271,7 @@ func (s *stubQuerier) GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) 
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetTasksByNoteID(ctx context.Context, arg sqlcgen.GetTasksByNoteIDParams) ([]sqlcgen.Task, error) {
-	panic("unimplemented")
+	return nil, nil
 }
 func (s *stubQuerier) GetTodayTasks(ctx context.Context, arg sqlcgen.GetTodayTasksParams) ([]sqlcgen.Task, error) {
 	panic("unimplemented")
@@ -572,14 +594,39 @@ func (m *mockNotesRepo) AppendToNoteContent(ctx context.Context, arg sqlcgen.App
 func (m *mockNotesRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
 }
+func (m *mockNotesRepo) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
+	return m.q.GetNodesByNoteId(ctx, noteID)
+}
+func (m *mockNotesRepo) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
+	return m.q.InsertNode(ctx, arg)
+}
+func (m *mockNotesRepo) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
+	return m.q.DeleteNodesByNoteID(ctx, noteID)
+}
+func (m *mockNotesRepo) CreateTask(ctx context.Context, arg sqlcgen.CreateTaskParams) (sqlcgen.Task, error) {
+	return m.q.CreateTask(ctx, arg)
+}
+func (m *mockNotesRepo) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
+	return m.q.DeleteTaskByNodeID(ctx, sqlcgen.DeleteTaskByNodeIDParams(arg))
+}
+func (m *mockNotesRepo) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error) {
+	return m.q.GetTasksByNoteID(ctx, sqlcgen.GetTasksByNoteIDParams{UserID: userID, NoteID: noteID})
+}
 
 func TestGetNoteTool_Execute(t *testing.T) {
+	noteUUID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
 	q := &stubQuerier{
 		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
 			return sqlcgen.GetNoteByIDRow{
-				ID:      arg.ID,
-				UserID:  arg.UserID,
-				Content: "My Test Note\n\nHello world this is note content",
+				ID:     arg.ID,
+				UserID: arg.UserID,
+			}, nil
+		},
+		getNodesByNoteId: func(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
+			return []sqlcgen.NoteNode{
+				{ID: pgtype.UUID{Bytes: [16]byte{10}, Valid: true}, NoteID: noteUUID, Position: 0, Type: "paragraph", Data: `{"text":"My Test Note"}`, UserID: pgtype.UUID{Bytes: [16]byte{1}, Valid: true}},
+				{ID: pgtype.UUID{Bytes: [16]byte{11}, Valid: true}, NoteID: noteUUID, Position: 1, Type: "paragraph", Data: `{"text":""}`, UserID: pgtype.UUID{Bytes: [16]byte{1}, Valid: true}},
+				{ID: pgtype.UUID{Bytes: [16]byte{12}, Valid: true}, NoteID: noteUUID, Position: 2, Type: "paragraph", Data: `{"text":"Hello world this is note content"}`, UserID: pgtype.UUID{Bytes: [16]byte{1}, Valid: true}},
 			}, nil
 		},
 	}
@@ -590,7 +637,7 @@ func TestGetNoteTool_Execute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expected := "Note [00000000-0000-0000-0000-000000000001] My Test Note:\nMy Test Note\n\nHello world this is note content"
+	expected := "Note [00000000-0000-0000-0000-000000000001] My Test Note:\nMy Test Note\n\nHello world this is note content\n"
 	if result != expected {
 		t.Fatalf("expected:\n%q\ngot:\n%q", expected, result)
 	}
@@ -641,9 +688,3 @@ func TestApplyInboxOrganizationTool_Execute(t *testing.T) {
 		t.Fatalf("expected success message, got %q", result)
 	}
 }
-func (m *stubQuerier) InsertNode(_ context.Context, _ sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
-func (m *stubQuerier) UpdateNode(_ context.Context, _ sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
-func (m *stubQuerier) DeleteNode(_ context.Context, _ pgtype.UUID) error { return nil }
-func (m *stubQuerier) GetNodesByNoteId(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteNode, error) { return nil, nil }
-func (m *stubQuerier) UpdateNoteSearchVector(_ context.Context, _ sqlcgen.UpdateNoteSearchVectorParams) error { return nil }
-func (m *stubQuerier) GetAllNotesForMigration(_ context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) { return nil, nil }

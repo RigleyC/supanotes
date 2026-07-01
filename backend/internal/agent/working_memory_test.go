@@ -368,8 +368,26 @@ func (s *stubWMQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error {
 func (s *stubWMQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
 	return nil, nil
 }
+func (s *stubWMQuerier) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
+	return nil
+}
+func (s *stubWMQuerier) UpdateNoteSearchVector(ctx context.Context, arg sqlcgen.UpdateNoteSearchVectorParams) error {
+	return nil
+}
+func (s *stubWMQuerier) GetAllNotesForMigration(ctx context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) {
+	return nil, nil
+}
 func (s *stubWMQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) ([]sqlcgen.Task, error) {
 	return nil, nil
+}
+func (s *stubWMQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
+	return nil
+}
+func (s *stubWMQuerier) GetSyncNoteNodes(ctx context.Context, arg sqlcgen.GetSyncNoteNodesParams) ([]sqlcgen.NoteNode, error) {
+	return nil, nil
+}
+func (s *stubWMQuerier) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
+	return sqlcgen.NoteNode{}, nil
 }
 
 var _ sqlcgen.Querier = (*stubWMQuerier)(nil)
@@ -482,9 +500,3 @@ func TestWorkingMemory_ScopedBySession(t *testing.T) {
 		t.Fatalf("session2: want %q, got %q", "session2", val2)
 	}
 }
-func (m *stubWMQuerier) InsertNode(_ context.Context, _ sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
-func (m *stubWMQuerier) UpdateNode(_ context.Context, _ sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) { return sqlcgen.NoteNode{}, nil }
-func (m *stubWMQuerier) DeleteNode(_ context.Context, _ pgtype.UUID) error { return nil }
-func (m *stubWMQuerier) GetNodesByNoteId(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteNode, error) { return nil, nil }
-func (m *stubWMQuerier) UpdateNoteSearchVector(_ context.Context, _ sqlcgen.UpdateNoteSearchVectorParams) error { return nil }
-func (m *stubWMQuerier) GetAllNotesForMigration(_ context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) { return nil, nil }

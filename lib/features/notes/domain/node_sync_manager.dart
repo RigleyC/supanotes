@@ -11,18 +11,22 @@ class NodeSyncManager {
   NodeSyncManager({
     required AppDatabase database,
     required String noteId,
+    required String userId,
     required MutableDocument document,
   })  : _db = database,
         _noteId = noteId,
+        _userId = userId,
         _document = document {
     _document.addListener(_onDocumentChanged);
   }
 
   final AppDatabase _db;
   final String _noteId;
+  final String _userId;
   final MutableDocument _document;
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
+    final now = DateTime.now().toUtc();
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
         final node = _document.getNodeById(change.nodeId);
@@ -30,13 +34,46 @@ class NodeSyncManager {
         final companion = _nodeToCompanion(node, change.insertionIndex);
         if (companion == null) continue;
         _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
+
+        if (node is TaskNode) {
+          final taskCompanion = TasksCompanion.insert(
+            id: node.id,
+            userId: _userId,
+            noteId: _noteId,
+            title: node.text.toPlainText(),
+            status: node.isComplete ? 'completed' : 'pending',
+            position: Value(change.insertionIndex),
+            createdAt: now,
+            updatedAt: now,
+            isDirty: const Value(true),
+          );
+          _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
+        }
       } else if (change is NodeRemovedEvent) {
-        (_db.delete(_db.noteNodes)..where((t) => t.id.equals(change.nodeId)))
-            .go();
+        (_db.update(_db.noteNodes)..where((t) => t.id.equals(change.nodeId)))
+            .write(NoteNodesCompanion(
+              deletedAt: Value(now),
+              isDirty: const Value(true),
+            ));
+
+        (_db.update(_db.tasks)..where((t) => t.id.equals(change.nodeId)))
+            .write(TasksCompanion(
+              deletedAt: Value(now),
+              isDirty: const Value(true),
+            ));
       } else if (change is NodeMovedEvent) {
         (_db.update(_db.noteNodes)
               ..where((t) => t.id.equals(change.nodeId)))
-            .write(NoteNodesCompanion(position: Value(change.to)));
+            .write(NoteNodesCompanion(
+              position: Value(change.to),
+              isDirty: const Value(true),
+            ));
+
+        (_db.update(_db.tasks)..where((t) => t.id.equals(change.nodeId)))
+            .write(TasksCompanion(
+              position: Value(change.to),
+              isDirty: const Value(true),
+            ));
       } else if (change is NodeChangeEvent) {
         final node = _document.getNodeById(change.nodeId);
         if (node == null) continue;
@@ -44,6 +81,21 @@ class NodeSyncManager {
         final companion = _nodeToCompanion(node, index);
         if (companion == null) continue;
         _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
+
+        if (node is TaskNode) {
+          final taskCompanion = TasksCompanion.insert(
+            id: node.id,
+            userId: _userId,
+            noteId: _noteId,
+            title: node.text.toPlainText(),
+            status: node.isComplete ? 'completed' : 'pending',
+            position: Value(index),
+            createdAt: now,
+            updatedAt: now,
+            isDirty: const Value(true),
+          );
+          _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
+        }
       }
     }
   }
@@ -63,6 +115,7 @@ class NodeSyncManager {
       data: data,
       createdAt: now,
       updatedAt: now,
+      isDirty: const Value(true),
     );
   }
 
@@ -127,7 +180,7 @@ class NodeSyncManager {
         return TaskNode(
           id: node.id,
           text: AttributedText(text),
-          isComplete: false,
+          isComplete: data['completed'] == true,
         );
       case 'divider':
         return HorizontalRuleNode(id: node.id);

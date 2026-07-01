@@ -132,6 +132,18 @@ func (m *mockRepository) GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID)
 	return pgtype.UUID{}, nil
 }
 
+func (m *mockRepository) GetSyncNoteNodes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteNode, error) {
+	return nil, nil
+}
+
+func (m *mockRepository) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
+	return sqlcgen.NoteNode{}, nil
+}
+
+func (m *mockRepository) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
+	return sqlcgen.GetNoteByIDRow{ID: arg.ID, UserID: arg.UserID}, nil
+}
+
 func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }

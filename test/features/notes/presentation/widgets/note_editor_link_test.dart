@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
@@ -15,16 +17,16 @@ void main() {
         ProviderScope(
           overrides: [
             activeNotesProvider.overrideWith((ref) => const Stream.empty()),
+            currentUserIdProvider.overrideWithValue('test-user'),
+            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
           ],
           child: MaterialApp(
             home: Scaffold(
               body: NoteEditor(
                 noteId: 'test-note',
-                content: 'Hello world',
-                taskMetadata: {},
-                delegate: NoteEditorDelegate(
-                  snapshotSave: (id, content) async {},
-                ),
+                nodes: const [],
+                taskMetadata: const {},
+                delegate: const NoteEditorDelegate(),
               ),
             ),
           ),

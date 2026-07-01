@@ -12,5 +12,8 @@ RETURNING *;
 -- name: DeleteNode :exec
 DELETE FROM note_nodes WHERE id = $1;
 
+-- name: DeleteNodesByNoteID :exec
+DELETE FROM note_nodes WHERE note_id = $1;
+
 -- name: GetNodesByNoteId :many
 SELECT * FROM note_nodes WHERE note_id = $1 ORDER BY position ASC;

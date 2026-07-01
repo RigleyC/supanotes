@@ -71,7 +71,7 @@ func main() {
 				Data:     node.Data,
 			})
 			if err != nil {
-				log.Printf("error inserting node for note %s: %v", note.ID, err)
+				log.Printf("error inserting node for note %v: %v", note.ID, err)
 				continue
 			}
 
