@@ -70,7 +70,6 @@ void main() {
       await repo.saveNoteSnapshot(
         id: 'note-1',
         content: 'B',
-        tasks: const [],
       );
 
       final saved = await local.getNoteById('note-1');
@@ -92,7 +91,6 @@ void main() {
       await repo.saveNoteSnapshot(
         id: 'source-1',
         content: content,
-        tasks: const [],
       );
 
       final links = await linksDao.getLinksForNote('source-1');
@@ -120,7 +118,6 @@ void main() {
       await repo.saveNoteSnapshot(
         id: 'source-1',
         content: content,
-        tasks: const [],
       );
 
       final links = await linksDao.getLinksForNote('source-1');
@@ -141,7 +138,6 @@ void main() {
       await repo.saveNoteSnapshot(
         id: 'note-1',
         content: content,
-        tasks: const [],
       );
 
       final saved = await local.getNoteById('note-1');

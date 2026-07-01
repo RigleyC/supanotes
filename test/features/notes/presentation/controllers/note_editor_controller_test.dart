@@ -1,15 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/domain/task_entry.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 
 void main() {
   group('NoteEditorController snapshot save', () {
     test('document changes schedule one snapshot save', () async {
-      final savedCalls = <(String, String, List<TaskEntry>)>[];
+      final savedCalls = <(String, String)>[];
       final controller = NoteEditorController(
-        snapshotSave: (noteId, markdown, tasks) async {
-          savedCalls.add((noteId, markdown, tasks));
+        snapshotSave: (noteId, content) async {
+          savedCalls.add((noteId, content));
         },
       );
 
@@ -31,13 +30,13 @@ void main() {
 
       await Future.delayed(const Duration(milliseconds: 600));
       expect(savedCalls.length, 1);
-      expect(savedCalls.first.$2, '# new titlehello');
+      expect(savedCalls.first.$2, 'new titlehello');
     });
 
     test('flushBeforePop deletes empty regular note through lifecycle callback', () async {
       String? deletedNoteId;
       final controller = NoteEditorController(
-        snapshotSave: (noteId, markdown, tasks) async {},
+        snapshotSave: (noteId, content) async {},
         emptyNoteExit: (noteId) async {
           deletedNoteId = noteId;
         },

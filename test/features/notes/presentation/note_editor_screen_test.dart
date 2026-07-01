@@ -10,7 +10,6 @@ import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
-import 'package:supanotes/features/notes/domain/task_entry.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
@@ -31,7 +30,6 @@ class _FakeNotesRepository implements INotesRepository {
   Future<void> saveNoteSnapshot({
     required String id,
     required String content,
-    required List<TaskEntry> tasks,
   }) async {}
 
   @override
@@ -187,7 +185,7 @@ void main() {
             taskMetadata: const {},
             hideCompleted: true,
             delegate: NoteEditorDelegate(
-              snapshotSave: (noteId, markdown, tasks) async {},
+              snapshotSave: (noteId, content) async {},
             ),
           ),
         ),
@@ -230,7 +228,7 @@ void main() {
                       taskMetadata: const {},
                       hideCompleted: hideCompleted,
             delegate: NoteEditorDelegate(
-              snapshotSave: (noteId, markdown, tasks) async {},
+              snapshotSave: (noteId, content) async {},
             ),
                     ),
                   ),

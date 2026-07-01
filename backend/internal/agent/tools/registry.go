@@ -24,6 +24,17 @@ type ToolExecutor interface {
 	Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error)
 }
 
+type defaultToolExecutor struct{}
+
+func (defaultToolExecutor) Name() string                                          { return "" }
+func (defaultToolExecutor) Description() string                                   { return "" }
+func (defaultToolExecutor) SchemaJSON() string                                    { return "{}" }
+func (defaultToolExecutor) Label() string                                         { return "Executando..." }
+func (defaultToolExecutor) Summary(string) string                                 { return "[Tool executed]" }
+func (defaultToolExecutor) Execute(context.Context, pgtype.UUID, string, string) (string, error) {
+	return "", fmt.Errorf("unknown tool")
+}
+
 type ToolRegistry struct {
 	tools map[string]ToolExecutor
 }
@@ -61,7 +72,6 @@ func NewToolRegistry(
 		&SetWeeklyBriefScheduleTool{routinesSvc: routinesSvc},
 		&GetNotesTool{notesSvc: notesSvc},
 		&GetNoteTool{notesSvc: notesSvc},
-		&UpdateNoteTool{notesSvc: notesSvc},
 		&AppendToNoteTool{notesSvc: notesSvc},
 		&LinkNotesTool{q: q, notesSvc: notesSvc},
 		&DeleteMemoryTool{memoriesSvc: memoriesSvc},
@@ -94,9 +104,9 @@ func (tr *ToolRegistry) Risk(toolName string) ToolRisk {
 	switch toolName {
 	case "search_notes", "get_note", "get_notes", "query_tasks", "list_memories", "get_soul", "list_routines", "get_vault_context", "get_inbox_note", "plan_inbox_organization", "test_daily_brief", "test_weekly_brief", "get_working_memory":
 		return ToolRiskRead
-	case "add_note", "add_task", "save_memory", "append_to_inbox", "update_soul", "update_user_profile", "link_notes", "set_working_memory":
+	case "add_note", "add_task", "save_memory", "append_to_inbox", "update_soul", "update_user_profile", "link_notes", "set_working_memory", "append_to_note":
 		return ToolRiskLowWrite
-	case "update_note", "append_to_note", "delete_memory", "apply_inbox_organization", "set_daily_brief_schedule", "set_weekly_brief_schedule", "update_task", "complete_task":
+	case "delete_memory", "apply_inbox_organization", "set_daily_brief_schedule", "set_weekly_brief_schedule", "update_task", "complete_task":
 		return ToolRiskSensitiveWrite
 	default:
 		return ToolRiskSensitiveWrite
@@ -104,7 +114,11 @@ func (tr *ToolRegistry) Risk(toolName string) ToolRisk {
 }
 
 func (tr *ToolRegistry) Get(name string) ToolExecutor {
-	return tr.tools[name]
+	exec, ok := tr.tools[name]
+	if !ok {
+		return defaultToolExecutor{}
+	}
+	return exec
 }
 
 func (tr *ToolRegistry) GetTools() []llm.Tool {

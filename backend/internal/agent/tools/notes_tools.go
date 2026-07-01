@@ -207,37 +207,6 @@ func (t *GetNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 	return fmt.Sprintf("Note [%s] %s:\n%s", formatID(note.ID), notes.DeriveTitle(note.Content), note.Content), nil
 }
 
-type UpdateNoteTool struct {
-	notesSvc *notes.Service
-}
-
-func (t *UpdateNoteTool) Name() string        { return "update_note" }
-func (t *UpdateNoteTool) Description() string { return "Update content of a note" }
-func (t *UpdateNoteTool) Label() string { return "Atualizando notas" }
-func (t *UpdateNoteTool) Summary(string) string { return "[UpdateNoteTool executed successfully]" }
-
-func (t *UpdateNoteTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"note_id":{"type":"string"},"content":{"type":"string"}},"required":["note_id"]}`
-}
-func (t *UpdateNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
-	args, err := parseArgs[struct {
-		NoteID  string  `json:"note_id"`
-		Content *string `json:"content"`
-	}](argsJSON)
-	if err != nil {
-		return "", err
-	}
-	nid, err := uid.UUIDFromString(args.NoteID)
-	if err != nil {
-		return "", err
-	}
-	note, err := t.notesSvc.UpdateNote(ctx, userID, nid, args.Content, nil, nil)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("Note updated: [%s] %s", formatID(note.ID), notes.DeriveTitle(note.Content)), nil
-}
-
 type AppendToNoteTool struct {
 	notesSvc *notes.Service
 }
@@ -262,12 +231,7 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 	if err != nil {
 		return "", err
 	}
-	note, err := t.notesSvc.GetNoteByID(ctx, nid, userID)
-	if err != nil {
-		return "", err
-	}
-	newContent := note.Content + "\n" + args.Content
-	updated, err := t.notesSvc.UpdateNote(ctx, userID, nid, &newContent, nil, nil)
+	updated, err := t.notesSvc.AppendToNoteContent(ctx, userID, nid, args.Content)
 	if err != nil {
 		return "", err
 	}

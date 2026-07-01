@@ -151,8 +151,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   collapseImages: note.collapseImages,
                   isReadOnly: isReadOnly,
                   delegate: NoteEditorDelegate(
-                    snapshotSave: (noteId, markdown, tasks) =>
-                        defaultSnapshotSave(repo, noteId, markdown, tasks),
+                    snapshotSave: (noteId, content) =>
+                        defaultSnapshotSave(repo, noteId, content),
                     emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
                     onTaskLongPress: isReadOnly
                         ? null

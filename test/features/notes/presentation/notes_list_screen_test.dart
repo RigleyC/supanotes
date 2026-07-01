@@ -6,7 +6,6 @@ import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
-import 'package:supanotes/features/notes/domain/task_entry.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
 import 'package:supanotes/features/search/domain/search_result_model.dart';
@@ -59,7 +58,6 @@ class _FakeNotesRepository implements INotesRepository {
   Future<void> saveNoteSnapshot({
     required String id,
     required String content,
-    required List<TaskEntry> tasks,
   }) async {
     await updateNote(id, content: content);
   }
@@ -75,12 +73,6 @@ class _FakeNotesRepository implements INotesRepository {
 
   @override
   Future<void> appendToInbox(String text) async {}
-
-  @override
-  Future<void> syncTasksFromDocument(
-    String noteId,
-    List<TaskEntry> tasks,
-  ) async {}
 
   @override
   Future<NoteModel> createLocalNote({required String id}) async {

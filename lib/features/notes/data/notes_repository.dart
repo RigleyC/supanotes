@@ -7,7 +7,6 @@ import '../../../core/database/daos/notes_dao.dart';
 import '../../../core/database/daos/user_note_preferences_dao.dart';
 import '../domain/note_model.dart';
 import '../domain/note_with_tasks.dart';
-import '../domain/task_entry.dart';
 import '../../tasks/data/local/tasks_local_repository.dart';
 import '../../tasks/domain/task_model.dart';
 import 'local/notes_local_repository.dart';
@@ -43,12 +42,10 @@ abstract class INotesRepository {
   Future<void> softDelete(String id);
   Future<NoteModel> ensureInbox();
   Future<void> appendToInbox(String text);
-  Future<void> syncTasksFromDocument(String noteId, List<TaskEntry> tasks);
   Future<NoteModel> createLocalNote({required String id});
   Future<void> saveNoteSnapshot({
     required String id,
     required String content,
-    required List<TaskEntry> tasks,
   });
   Future<void> deleteIfEmptyOrTombstone(String id);
   Future<void> markHasRemoteCopy(String id);
@@ -220,12 +217,10 @@ class NotesRepository implements INotesRepository {
   Future<void> saveNoteSnapshot({
     required String id,
     required String content,
-    required List<TaskEntry> tasks,
   }) async {
     final current = await _local.getNoteById(id);
     if (current == null) return;
 
-    await syncTasksFromDocument(id, tasks);
     await updateNote(
       id,
       content: content,
@@ -277,45 +272,6 @@ class NotesRepository implements INotesRepository {
   @override
   Future<void> markHasRemoteCopy(String id) {
     return _local.markHasRemoteCopy(id);
-  }
-
-  @override
-  Future<void> syncTasksFromDocument(
-    String noteId,
-    List<TaskEntry> tasks,
-  ) async {
-    final currentTasks = await _tasksLocal.getNoteTasks(noteId);
-    final currentIds = currentTasks.map((t) => t.id).toSet();
-    final docIds = tasks.map((t) => t.id).toSet();
-
-    // Wrap all writes inside a single transaction so that either every
-    // operation is committed or the whole save is rolled back.
-    await _tasksLocal.runInTransaction(() async {
-      for (final task in tasks) {
-        if (currentIds.contains(task.id)) {
-          await _tasksLocal.updateTask(
-            TasksCompanion(
-              id: Value(task.id),
-              title: Value(task.text),
-              status: Value(task.isComplete ? 'done' : 'open'),
-            ),
-          );
-        } else {
-          await _tasksLocal.createTask(
-            id: task.id,
-            noteId: noteId,
-            title: task.text,
-            position: 0,
-            status: task.isComplete ? 'done' : 'open',
-          );
-        }
-      }
-
-      final removed = currentIds.difference(docIds);
-      for (final id in removed) {
-        await _tasksLocal.deleteTask(id);
-      }
-    });
   }
 
   String? _excerptFrom(String content) {

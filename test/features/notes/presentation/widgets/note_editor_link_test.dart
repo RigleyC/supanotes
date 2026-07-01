@@ -23,7 +23,7 @@ void main() {
                 content: 'Hello world',
                 taskMetadata: {},
                 delegate: NoteEditorDelegate(
-                  snapshotSave: (id, content, tasks) async {},
+                  snapshotSave: (id, content) async {},
                 ),
               ),
             ),

@@ -9,7 +9,6 @@ import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/router/app_routes.dart';
-import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
@@ -65,7 +64,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _lastContent = widget.content;
     _controller = NoteEditorController(
       snapshotSave: widget.isReadOnly
-          ? (noteId, markdown, tasks) async {}
+          ? (noteId, content) async {}
           : widget.delegate.snapshotSave,
       emptyNoteExit: widget.isReadOnly ? null : widget.delegate.emptyNoteExit,
     );
@@ -147,8 +146,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           );
     final doc = _controller?.document;
     if (doc != null) {
-      final currentMarkdown = serializeNoteToMarkdown(doc);
-      if (widget.content == currentMarkdown) {
+      final currentContent = doc
+          .map((n) => n is TextNode ? n.text.toPlainText() : '')
+          .where((t) => t.isNotEmpty)
+          .join('\n');
+      if (widget.content == currentContent) {
         _hasLocalEdits = false;
         _lastContent = widget.content;
       }

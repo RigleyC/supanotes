@@ -124,8 +124,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                   content: inbox.content,
                   taskMetadata: tasksMap,
                   delegate: NoteEditorDelegate(
-                    snapshotSave: (noteId, markdown, tasks) =>
-                        defaultSnapshotSave(repo, noteId, markdown, tasks),
+                    snapshotSave: (noteId, content) =>
+                        defaultSnapshotSave(repo, noteId, content),
                     onHasContentChanged: (hasContent) {
                       if (mounted) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
