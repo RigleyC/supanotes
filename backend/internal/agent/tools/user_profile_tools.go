@@ -22,6 +22,9 @@ func (t *UpdateUserProfileTool) Name() string { return "update_user_profile" }
 func (t *UpdateUserProfileTool) Description() string {
 	return "Update stable user preferences and profile information (JSON object)"
 }
+func (t *UpdateUserProfileTool) Label() string { return "Atualizando perfil" }
+func (t *UpdateUserProfileTool) Summary(string) string { return "[UpdateUserProfileTool executed successfully]" }
+
 func (t *UpdateUserProfileTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"profile":{"type":"object"}},"required":["profile"]}`
 }

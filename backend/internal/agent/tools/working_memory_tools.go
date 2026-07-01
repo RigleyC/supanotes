@@ -20,6 +20,9 @@ func (t *GetWorkingMemoryTool) Name() string { return "get_working_memory" }
 func (t *GetWorkingMemoryTool) Description() string {
 	return "Retrieve a value from the working session memory"
 }
+func (t *GetWorkingMemoryTool) Label() string { return "Gerenciando memoria" }
+func (t *GetWorkingMemoryTool) Summary(string) string { return "[GetWorkingMemoryTool executed successfully]" }
+
 func (t *GetWorkingMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"key":{"type":"string"}},"required":["key"]}`
 }
@@ -45,6 +48,9 @@ func (t *SetWorkingMemoryTool) Name() string { return "set_working_memory" }
 func (t *SetWorkingMemoryTool) Description() string {
 	return "Store a value in the working session memory. Use this to remember information relevant to the current conversation (e.g., the user's current goal, a decision made mid-conversation, or context that should persist across turns)."
 }
+func (t *SetWorkingMemoryTool) Label() string { return "Gerenciando memoria" }
+func (t *SetWorkingMemoryTool) Summary(string) string { return "[SetWorkingMemoryTool executed successfully]" }
+
 func (t *SetWorkingMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"key":{"type":"string"},"value":{"type":"string"}},"required":["key","value"]}`
 }

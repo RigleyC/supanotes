@@ -18,6 +18,9 @@ func (t *SaveMemoryTool) Name() string { return "save_memory" }
 func (t *SaveMemoryTool) Description() string {
 	return "Save a persistent fact or preference about the user (e.g., 'O usuário treina Seg/Ter/Qui/Sex', 'O usuário é vegetariano', 'Reunião de trabalho toda segunda às 14h'). Use this when the user tells you something about themselves that you should remember for future conversations."
 }
+func (t *SaveMemoryTool) Label() string { return "Gerenciando memorias" }
+func (t *SaveMemoryTool) Summary(string) string { return "[SaveMemoryTool executed successfully]" }
+
 func (t *SaveMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
@@ -41,6 +44,9 @@ type ListMemoriesTool struct {
 
 func (t *ListMemoriesTool) Name() string        { return "list_memories" }
 func (t *ListMemoriesTool) Description() string { return "List all saved memories for the user" }
+func (t *ListMemoriesTool) Label() string { return "Gerenciando memorias" }
+func (t *ListMemoriesTool) Summary(string) string { return "[ListMemoriesTool executed successfully]" }
+
 func (t *ListMemoriesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -62,6 +68,9 @@ type DeleteMemoryTool struct {
 
 func (t *DeleteMemoryTool) Name() string        { return "delete_memory" }
 func (t *DeleteMemoryTool) Description() string { return "Delete a specific memory by ID" }
+func (t *DeleteMemoryTool) Label() string { return "Gerenciando memorias" }
+func (t *DeleteMemoryTool) Summary(string) string { return "[DeleteMemoryTool executed successfully]" }
+
 func (t *DeleteMemoryTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"memory_id":{"type":"string"}},"required":["memory_id"]}`
 }

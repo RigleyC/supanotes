@@ -18,6 +18,9 @@ func (t *GetSoulTool) Name() string { return "get_soul" }
 func (t *GetSoulTool) Description() string {
 	return "Get the agent's Soul (personality and core directives)"
 }
+func (t *GetSoulTool) Label() string { return "Gerenciando alma" }
+func (t *GetSoulTool) Summary(string) string { return "[GetSoulTool executed successfully]" }
+
 func (t *GetSoulTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -35,6 +38,9 @@ type UpdateSoulTool struct {
 
 func (t *UpdateSoulTool) Name() string        { return "update_soul" }
 func (t *UpdateSoulTool) Description() string { return "Update the agent's personality (Soul)" }
+func (t *UpdateSoulTool) Label() string { return "Gerenciando alma" }
+func (t *UpdateSoulTool) Summary(string) string { return "[UpdateSoulTool executed successfully]" }
+
 func (t *UpdateSoulTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }

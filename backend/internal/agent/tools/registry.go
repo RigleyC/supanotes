@@ -19,6 +19,8 @@ type ToolExecutor interface {
 	Name() string
 	Description() string
 	SchemaJSON() string
+	Label() string
+	Summary(rawOutput string) string
 	Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error)
 }
 
@@ -101,23 +103,8 @@ func (tr *ToolRegistry) Risk(toolName string) ToolRisk {
 	}
 }
 
-func (tr *ToolRegistry) Label(toolName string) string {
-	switch toolName {
-	case "search_notes":
-		return "Buscando notas"
-	case "get_note", "get_notes":
-		return "Lendo notas"
-	case "query_tasks":
-		return "Consultando tarefas"
-	case "add_note", "append_to_note", "append_to_inbox":
-		return "Atualizando notas"
-	case "update_user_profile":
-		return "Atualizando perfil"
-	case "add_task", "update_task", "complete_task":
-		return "Atualizando tarefas"
-	default:
-		return "Executando acao"
-	}
+func (tr *ToolRegistry) Get(name string) ToolExecutor {
+	return tr.tools[name]
 }
 
 func (tr *ToolRegistry) GetTools() []llm.Tool {

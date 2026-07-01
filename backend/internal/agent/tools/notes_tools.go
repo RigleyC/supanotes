@@ -21,6 +21,9 @@ type AddNoteTool struct {
 
 func (t *AddNoteTool) Name() string        { return "add_note" }
 func (t *AddNoteTool) Description() string { return "Create a new note in the vault" }
+func (t *AddNoteTool) Label() string       { return "Atualizando notas" }
+func (t *AddNoteTool) Summary(string) string { return "[Note created successfully]" }
+
 func (t *AddNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
@@ -46,6 +49,9 @@ func (t *GetInboxNoteTool) Name() string { return "get_inbox_note" }
 func (t *GetInboxNoteTool) Description() string {
 	return "Get the content of the user's Inbox note. The Inbox is a special note where the user quickly dumps ideas, reminders, and random thoughts. Read this when the user asks about quick notes or unorganized items."
 }
+func (t *GetInboxNoteTool) Label() string { return "Lendo notas" }
+func (t *GetInboxNoteTool) Summary(string) string { return "[GetInboxNoteTool executed successfully]" }
+
 func (t *GetInboxNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -63,6 +69,9 @@ type AppendToInboxTool struct {
 
 func (t *AppendToInboxTool) Name() string        { return "append_to_inbox" }
 func (t *AppendToInboxTool) Description() string { return "Append text to the user's Inbox note" }
+func (t *AppendToInboxTool) Label() string { return "Atualizando notas" }
+func (t *AppendToInboxTool) Summary(string) string { return "[AppendToInboxTool executed successfully]" }
+
 func (t *AppendToInboxTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
 }
@@ -89,6 +98,9 @@ func (t *SearchNotesTool) Name() string { return "search_notes" }
 func (t *SearchNotesTool) Description() string {
 	return "Search notes semantically by query. Returns matching notes with similarity scores. Use this to find relevant notes before answering user questions about specific topics (e.g., 'treino', 'mercado', 'trabalho')."
 }
+func (t *SearchNotesTool) Label() string { return "Buscando notas" }
+func (t *SearchNotesTool) Summary(string) string { return "[Search results retrieved]" }
+
 func (t *SearchNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`
 }
@@ -133,6 +145,9 @@ func (t *GetNotesTool) Name() string { return "get_notes" }
 func (t *GetNotesTool) Description() string {
 	return "List notes in the vault with their titles and IDs. Use get_note to read the full content of a specific note after listing."
 }
+func (t *GetNotesTool) Label() string { return "Lendo notas" }
+func (t *GetNotesTool) Summary(string) string { return "[GetNotesTool executed successfully]" }
+
 func (t *GetNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"limit":{"type":"integer"}},"required":[]}`
 }
@@ -168,6 +183,9 @@ func (t *GetNoteTool) Name() string { return "get_note" }
 func (t *GetNoteTool) Description() string {
 	return "Retrieve the full content of a specific note by ID. Returns title and complete markdown content including all tasks and bullet points. Always use this when you need the full context of a note to answer the user."
 }
+func (t *GetNoteTool) Label() string { return "Lendo notas" }
+func (t *GetNoteTool) Summary(string) string { return "[Retrieved note contents successfully]" }
+
 func (t *GetNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"}},"required":["note_id"]}`
 }
@@ -195,6 +213,9 @@ type UpdateNoteTool struct {
 
 func (t *UpdateNoteTool) Name() string        { return "update_note" }
 func (t *UpdateNoteTool) Description() string { return "Update content of a note" }
+func (t *UpdateNoteTool) Label() string { return "Atualizando notas" }
+func (t *UpdateNoteTool) Summary(string) string { return "[UpdateNoteTool executed successfully]" }
+
 func (t *UpdateNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"},"content":{"type":"string"}},"required":["note_id"]}`
 }
@@ -223,6 +244,9 @@ type AppendToNoteTool struct {
 
 func (t *AppendToNoteTool) Name() string        { return "append_to_note" }
 func (t *AppendToNoteTool) Description() string { return "Append text to an existing note by ID" }
+func (t *AppendToNoteTool) Label() string { return "Atualizando notas" }
+func (t *AppendToNoteTool) Summary(string) string { return "[AppendToNoteTool executed successfully]" }
+
 func (t *AppendToNoteTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"note_id":{"type":"string"},"content":{"type":"string"}},"required":["note_id","content"]}`
 }
@@ -257,6 +281,9 @@ type LinkNotesTool struct {
 
 func (t *LinkNotesTool) Name() string        { return "link_notes" }
 func (t *LinkNotesTool) Description() string { return "Create a bi-directional link between two notes" }
+func (t *LinkNotesTool) Label() string { return "Atualizando notas" }
+func (t *LinkNotesTool) Summary(string) string { return "[LinkNotesTool executed successfully]" }
+
 func (t *LinkNotesTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"source_id":{"type":"string"},"target_id":{"type":"string"}},"required":["source_id","target_id"]}`
 }
@@ -303,6 +330,9 @@ func (t *GetVaultContextTool) Name() string { return "get_vault_context" }
 func (t *GetVaultContextTool) Description() string {
 	return "Returns stats about the vault: total notes, tasks, contexts, tags"
 }
+func (t *GetVaultContextTool) Label() string { return "Lendo notas" }
+func (t *GetVaultContextTool) Summary(string) string { return "[GetVaultContextTool executed successfully]" }
+
 func (t *GetVaultContextTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -344,6 +374,9 @@ func (t *PlanInboxOrganizationTool) Name() string { return "plan_inbox_organizat
 func (t *PlanInboxOrganizationTool) Description() string {
 	return "Analyze the inbox content and propose how to organize snippets into notes, without editing anything"
 }
+func (t *PlanInboxOrganizationTool) Label() string { return "Analisando notas" }
+func (t *PlanInboxOrganizationTool) Summary(string) string { return "[PlanInboxOrganizationTool executed successfully]" }
+
 func (t *PlanInboxOrganizationTool) SchemaJSON() string {
 	return `{"type":"object","properties":{}}`
 }
@@ -367,6 +400,9 @@ func (t *ApplyInboxOrganizationTool) Name() string { return "apply_inbox_organiz
 func (t *ApplyInboxOrganizationTool) Description() string {
 	return "Apply a confirmed inbox organization plan and remove organized items from the inbox"
 }
+func (t *ApplyInboxOrganizationTool) Label() string { return "Atualizando notas" }
+func (t *ApplyInboxOrganizationTool) Summary(string) string { return "[ApplyInboxOrganizationTool executed successfully]" }
+
 func (t *ApplyInboxOrganizationTool) SchemaJSON() string {
 	return `{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"item_id":{"type":"string"},"destination_type":{"type":"string"},"destination_note_id":{"type":"string"},"destination_title":{"type":"string"},"accepted":{"type":"boolean"}},"required":["item_id","destination_type","accepted"]}}},"required":["items"]}`
 }
