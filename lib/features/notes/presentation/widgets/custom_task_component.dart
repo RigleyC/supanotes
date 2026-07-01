@@ -17,6 +17,7 @@ const Duration _recurrenceResetDelay = Duration(milliseconds: 400);
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
     this._editor, {
+    this.composer,
     this.taskMetadataById = const {},
     this.hideCompleted = false,
     this.onTaskLongPress,
@@ -26,6 +27,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   });
 
   final Editor _editor;
+  final MutableDocumentComposer? composer;
   Map<String, TaskModel> taskMetadataById;
   bool hideCompleted;
   ValueChanged<String>? onTaskLongPress;
@@ -54,6 +56,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
         if (isComplete && hideCompleted) {
           _animatingNodeIds.add(node.id);
           FocusManager.instance.primaryFocus?.unfocus();
+          composer?.clearSelection();
         }
         _editor.execute([
           ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),

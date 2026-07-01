@@ -78,6 +78,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
       _controller!.editor!,
+      composer: _controller!.composer,
       taskMetadataById: widget.taskMetadata,
       hideCompleted: widget.hideCompleted,
       onTaskLongPress: widget.isReadOnly
@@ -201,7 +202,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = _controller!;
+    final controller = ref.watch(noteEditorControllerProvider(widget.noteId));
+    _controller = controller;
 
     if (controller.document == null ||
         controller.editor == null ||
