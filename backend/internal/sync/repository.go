@@ -28,6 +28,9 @@ type Repository interface {
 	GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error)
 	GetSyncUserNotePreferences(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.UserNotePreference, error)
 	UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error)
+	GetSyncNoteNodes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteNode, error)
+	UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error)
+	GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error)
 	WithQuerier(q sqlcgen.Querier) Repository
 }
 
@@ -137,6 +140,22 @@ func (r *repo) GetSyncUserNotePreferences(ctx context.Context, userID pgtype.UUI
 
 func (r *repo) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
 	return r.q.UpsertUserNotePreference(ctx, arg)
+}
+
+func (r *repo) GetSyncNoteNodes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteNode, error) {
+	return r.q.GetSyncNoteNodes(ctx, sqlcgen.GetSyncNoteNodesParams{
+		UserID:       userID,
+		LastSyncedAt: lastSyncedAt,
+		Limit:        limit,
+	})
+}
+
+func (r *repo) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
+	return r.q.UpsertNoteNode(ctx, arg)
+}
+
+func (r *repo) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
+	return r.q.GetNoteByID(ctx, arg)
 }
 
 func (r *repo) WithQuerier(q sqlcgen.Querier) Repository {

@@ -25,6 +25,7 @@ import (
 //     user because the table itself has no user_id column.
 type SyncPayload struct {
 	Notes               []sqlcgen.GetSyncNotesRow    `json:"notes"`
+	NoteNodes           []sqlcgen.NoteNode           `json:"note_nodes"`
 	Tasks               []SyncTask                   `json:"tasks"`
 	Contexts            []sqlcgen.Context            `json:"contexts"`
 	Tags                []sqlcgen.Tag                `json:"tags"`
@@ -123,8 +124,17 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		prefs[i] = toUserNotePreferencePayload(p)
 	}
 
+	noteNodes, err := s.repo.GetSyncNoteNodes(ctx, userID, lastSyncedAt, limit)
+	if err != nil {
+		return nil, err
+	}
+	if noteNodes == nil {
+		noteNodes = make([]sqlcgen.NoteNode, 0)
+	}
+
 	return &SyncPayload{
 		Notes:               notes,
+		NoteNodes:           noteNodes,
 		Tasks:               syncTasks,
 		Contexts:            contexts,
 		Tags:                tags,
@@ -358,6 +368,58 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			UserID:    userID,
 		})
 		if err != nil {
+			return err
+		}
+	}
+
+	for _, nn := range payload.NoteNodes {
+		noteID := nn.NoteID
+		canEdit, exists := editableNotes[noteID]
+		if !exists {
+			note, err := r.GetNoteByID(ctx, sqlcgen.GetNoteByIDParams{
+				ID:     noteID,
+				UserID: userID,
+			})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+						NoteID: noteID,
+						UserID: userID,
+					})
+					if shareErr != nil || share.Permission != "edit" {
+						log.Error().Interface("note_id", noteID).Interface("user_id", userID).Msg("sync push conflict: note not owned and share not found/valid for note node")
+						return ErrSyncConflict
+					}
+					canEdit = true
+				} else {
+					return err
+				}
+			} else {
+				canEdit = note.UserID == userID
+			}
+			editableNotes[noteID] = canEdit
+		}
+
+		if !canEdit {
+			log.Error().Interface("note_id", noteID).Interface("user_id", userID).Msg("sync push conflict: user unauthorized to write note node")
+			return ErrSyncConflict
+		}
+
+		_, err := r.UpsertNoteNode(ctx, sqlcgen.UpsertNoteNodeParams{
+			ID:        nn.ID,
+			NoteID:    nn.NoteID,
+			ParentID:  nn.ParentID,
+			Position:  nn.Position,
+			Type:      nn.Type,
+			Data:      nn.Data,
+			CreatedAt: nn.CreatedAt,
+			DeletedAt: nn.DeletedAt,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				log.Error().Interface("node_id", nn.ID).Err(err).Msg("sync push conflict: UpsertNoteNode returned ErrNoRows")
+				return ErrSyncConflict
+			}
 			return err
 		}
 	}
