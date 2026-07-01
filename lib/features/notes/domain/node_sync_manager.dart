@@ -306,6 +306,93 @@ class NodeSyncManager {
     return MutableDocument(nodes: documentNodes);
   }
 
+  static DocumentNode createNodeFromSchema(NoteNode schema) {
+    final type = schema.type;
+    final data = jsonDecode(schema.data) as Map<String, dynamic>;
+    final text = data['text'] as String? ?? '';
+    final spans = data['spans'] as List? ?? [];
+    final attributedText = AttributedText(
+      text,
+      deserializeSpans(spans),
+    );
+
+    if (type == 'task') {
+      return TaskNode(
+        id: schema.id,
+        text: attributedText,
+        isComplete: data['completed'] as bool? ?? false,
+        indent: data['indent'] as int? ?? 0,
+      );
+    }
+    if (type == 'list_item') {
+      return ListItemNode(
+        id: schema.id,
+        itemType: (data['itemType'] as String?) == 'ordered' ? ListItemType.ordered : ListItemType.unordered,
+        text: attributedText,
+        indent: data['indent'] as int? ?? 0,
+      );
+    }
+    if (type == 'divider') {
+      return HorizontalRuleNode(id: schema.id);
+    }
+    if (type == 'header') {
+      final level = data['level'] as int? ?? 1;
+      final blockType = switch (level) {
+        1 => header1Attribution,
+        2 => header2Attribution,
+        3 => header3Attribution,
+        4 => header4Attribution,
+        5 => header5Attribution,
+        _ => header6Attribution,
+      };
+      return ParagraphNode(
+        id: schema.id,
+        text: attributedText,
+        metadata: {'blockType': blockType},
+      );
+    }
+    return ParagraphNode(id: schema.id, text: attributedText);
+  }
+
+  static SpanMarker parseSpan(Map<String, dynamic> spanMap) {
+    final name = spanMap['attribution'] as String;
+    final Attribution attribution;
+    if (name == 'bold') {
+      attribution = boldAttribution;
+    } else if (name == 'italics') {
+      attribution = italicsAttribution;
+    } else if (name == 'strikethrough') {
+      attribution = strikethroughAttribution;
+    } else if (name == 'underline') {
+      attribution = underlineAttribution;
+    } else if (name.startsWith('link:')) {
+      attribution = LinkAttribution.fromUri(Uri.parse(name.substring(5)));
+    } else {
+      attribution = NamedAttribution(name);
+    }
+    return SpanMarker(
+      attribution: attribution,
+      offset: spanMap['start'] as int,
+      markerType: SpanMarkerType.start,
+    );
+  }
+
+  static AttributedSpans deserializeSpans(List spansJson) {
+    final list = <SpanMarker>[];
+    for (final s in spansJson) {
+      final m = s as Map<String, dynamic>;
+      final end = m['end'] as int;
+      final parsed = parseSpan(m);
+      list.add(parsed);
+      list.add(SpanMarker(
+        attribution: parsed.attribution,
+        offset: end,
+        markerType: SpanMarkerType.end,
+      ));
+    }
+    return AttributedSpans(attributions: list);
+  }
+
   static AttributedText _deserializeAttributedText(Map<String, dynamic> data) {
     final text = data['text'] as String? ?? '';
     final spansData = data['spans'] as List<dynamic>? ?? [];

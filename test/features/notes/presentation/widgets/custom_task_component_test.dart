@@ -419,7 +419,7 @@ void main() {
       expect(animationCompleted, isFalse);
     });
 
-    testWidgets('does not fire onAnimationComplete when task was already complete', (
+    testWidgets('fires onAnimationComplete when task was already complete with hideCompleted', (
       tester,
     ) async {
       var animationCompleted = false;
@@ -436,7 +436,7 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 650));
 
-      expect(animationCompleted, isFalse);
+      expect(animationCompleted, isTrue);
     });
 
     testWidgets('builder creates SizedBox for hidden completed tasks', (tester) async {

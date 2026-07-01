@@ -8,11 +8,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
@@ -33,6 +33,7 @@ class NoteEditor extends ConsumerStatefulWidget {
   final bool collapseImages;
   final bool isReadOnly;
   final NoteEditorDelegate delegate;
+  final Widget? appBar;
 
   const NoteEditor({
     super.key,
@@ -43,6 +44,7 @@ class NoteEditor extends ConsumerStatefulWidget {
     this.collapseImages = false,
     this.isReadOnly = false,
     required this.delegate,
+    this.appBar,
   });
 
   @override
@@ -55,21 +57,15 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   RichSuperEditorIosControlsController? _iosController;
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
-  DateTime? _lastLocalEditTime;
-
   late CustomTaskComponentBuilder _taskComponentBuilder;
 
   @override
   void initState() {
     super.initState();
-    final userId = ref.read(currentUserIdProvider)!;
-    _controller = NoteEditorController(
-      userId: userId,
-      emptyNoteExit: widget.isReadOnly ? null : widget.delegate.emptyNoteExit,
-      database: ref.read(appDatabaseProvider),
-    );
-    _controller!.bind(widget.noteId);
-    _controller!.initFromNodes(nodes: widget.nodes, noteId: widget.noteId);
+    _controller = ref.read(noteEditorControllerProvider(widget.noteId));
+    if (_controller!.document == null) {
+      _controller!.initFromNodes(nodes: widget.nodes, noteId: widget.noteId);
+    }
     if (!widget.isReadOnly) {
       _controller!.document?.addListener(_onDocumentChanged);
       if (widget.nodes.isEmpty) {
@@ -145,14 +141,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
              () async {},
           );
     
-    final timeSinceLastEdit = _lastLocalEditTime != null
-        ? DateTime.now().difference(_lastLocalEditTime!)
-        : const Duration(days: 1);
+    if (widget.hideCompleted != oldWidget.hideCompleted ||
+        widget.taskMetadata != oldWidget.taskMetadata) {
+      setState(() {});
+    }
 
-    if (!listEquals(widget.nodes, oldWidget.nodes) && 
-        !(_controller?.focusNode?.hasFocus ?? false) &&
-        timeSinceLastEdit > const Duration(seconds: 2)) {
-      _controller?.initFromNodes(nodes: widget.nodes, noteId: widget.noteId);
+    if (!listEquals(widget.nodes, oldWidget.nodes)) {
+      _controller?.updateNodesIncrementally(widget.nodes);
     }
   }
 
@@ -163,12 +158,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     }
     _iosController?.dispose();
     _androidController?.dispose();
-    _controller?.dispose();
     super.dispose();
   }
 
   void _onDocumentChanged(DocumentChangeLog _) {
-    _lastLocalEditTime = DateTime.now();
     _notifyContentChanged();
   }
 
@@ -227,6 +220,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           Expanded(
             child: CustomScrollView(
               slivers: [
+                if (widget.appBar != null) widget.appBar!,
                 SuperEditorAndroidControlsScope(
                   controller: _androidController!,
                   child: SuperEditorIosControlsScope(

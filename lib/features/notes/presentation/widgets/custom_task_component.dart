@@ -205,6 +205,10 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
         widget.onAnimationComplete?.call();
       }
     });
+
+    if (widget.hideCompleted && _isComplete) {
+      _exitController.forward();
+    }
   }
 
   @override

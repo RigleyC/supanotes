@@ -107,6 +107,69 @@ class NoteEditorController {
     });
   }
 
+  void updateNodesIncrementally(List<NoteNode> incomingNodes) {
+    final doc = document;
+    final ed = editor;
+    if (doc == null || ed == null) return;
+
+    final requests = <EditRequest>[];
+    final incomingIds = incomingNodes.map((n) => n.id).toSet();
+
+    for (final node in doc) {
+      if (!incomingIds.contains(node.id)) {
+        requests.add(DeleteNodeRequest(nodeId: node.id));
+      }
+    }
+
+    for (int i = 0; i < incomingNodes.length; i++) {
+      final incoming = incomingNodes[i];
+      final existingNode = doc.getNodeById(incoming.id);
+
+      if (existingNode == null) {
+        final newNode = NodeSyncManager.createNodeFromSchema(incoming);
+        requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
+      } else {
+        final newNode = NodeSyncManager.createNodeFromSchema(incoming);
+        if (_isNodeModified(existingNode, newNode)) {
+          requests.add(
+            ReplaceNodeRequest(
+              existingNodeId: incoming.id,
+              newNode: newNode,
+            ),
+          );
+        }
+      }
+    }
+
+    if (requests.isNotEmpty) {
+      ed.execute(requests);
+    }
+  }
+
+  bool _isNodeModified(DocumentNode existing, DocumentNode incoming) {
+    if (existing.runtimeType != incoming.runtimeType) return true;
+
+    if (existing is TextNode && incoming is TextNode) {
+      if (existing.text != incoming.text) return true;
+    }
+
+    if (existing is ParagraphNode && incoming is ParagraphNode) {
+      if (existing.metadata['blockType'] != incoming.metadata['blockType']) return true;
+    }
+
+    if (existing is TaskNode && incoming is TaskNode) {
+      if (existing.isComplete != incoming.isComplete) return true;
+      if (existing.indent != incoming.indent) return true;
+    }
+
+    if (existing is ListItemNode && incoming is ListItemNode) {
+      if (existing.indent != incoming.indent) return true;
+      if (existing.type != incoming.type) return true;
+    }
+
+    return false;
+  }
+
   bool _isDocEmpty(MutableDocument doc) {
     for (final node in doc) {
       if (node is TextNode && node.text.toPlainText().trim().isNotEmpty) {
