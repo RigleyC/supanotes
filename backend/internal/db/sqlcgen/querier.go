@@ -118,6 +118,7 @@ type Querier interface {
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteEmbeddingStatus(ctx context.Context, arg UpdateNoteEmbeddingStatusParams) error
 	UpdateNoteSearchVector(ctx context.Context, arg UpdateNoteSearchVectorParams) error
+	UpdateNotesContentFromNodes(ctx context.Context, dollar_1 []pgtype.UUID) error
 	UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (Routine, error)
 	UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error
 	UpdateSoulProfile(ctx context.Context, arg UpdateSoulProfileParams) (Soul, error)

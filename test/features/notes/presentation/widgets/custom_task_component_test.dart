@@ -105,7 +105,7 @@ void main() {
 
     await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: vm)));
 
-    await tester.tap(find.byType(InkWell));
+    await tester.tap(find.byType(AnimatedTaskCheckbox));
     await tester.pump();
 
     expect(completed, isTrue);

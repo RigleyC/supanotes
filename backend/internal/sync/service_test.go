@@ -148,6 +148,10 @@ func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }
 
+func (m *mockRepository) UpdateNotesContentFromNodes(ctx context.Context, noteIDs []pgtype.UUID) error {
+	return nil
+}
+
 func TestSyncServicePushRejectsSharedNoteWithoutEditPermission(t *testing.T) {
 	repo := &mockRepository{}
 	svc := NewService(repo, nil)

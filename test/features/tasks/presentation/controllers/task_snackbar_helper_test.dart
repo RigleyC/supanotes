@@ -57,7 +57,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Tarefa concluída! Próx. em:'), findsOneWidget);
+    expect(find.textContaining('Tarefa concluída!  Próx. em:'), findsOneWidget);
     expect(find.text('Desfazer'), findsOneWidget);
   });
 }

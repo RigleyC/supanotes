@@ -5,6 +5,7 @@ import 'package:super_editor/super_editor.dart';
 
 import '../../../core/database/database.dart';
 import 'attachment_nodes.dart';
+import 'note_display_text.dart';
 import 'task_entry.dart';
 
 class NodeSyncManager {
@@ -99,7 +100,6 @@ class NodeSyncManager {
       }
     }
 
-    // Always update the parent note's content so lists and search continue to work.
     final fullText = _document.map((n) {
       if (n is TextNode) return n.text.toPlainText();
       if (n is TaskNode) return n.text.toPlainText();
@@ -107,9 +107,12 @@ class NodeSyncManager {
       return '';
     }).join('\n');
 
+    final excerpt = deriveNoteExcerpt(fullText);
+
     (_db.update(_db.notes)..where((t) => t.id.equals(_noteId))).write(
       NotesCompanion(
         content: Value(fullText),
+        excerpt: Value(excerpt),
         updatedAt: Value(now),
         isDirty: const Value(true),
       ),

@@ -151,3 +151,20 @@ SELECT id, content FROM notes WHERE content IS NOT NULL AND content != '';
 
 -- name: CountNotes :one
 SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL AND NOT is_inbox;
+
+-- name: UpdateNotesContentFromNodes :exec
+UPDATE notes n
+SET content = (
+    SELECT COALESCE(string_agg(
+        CASE 
+            WHEN type = 'header' THEN repeat('#', COALESCE((data->>'level')::int, 1)) || ' ' || COALESCE(data->>'text', '')
+            WHEN type = 'task' THEN '- [' || CASE WHEN (data->>'completed')::boolean = TRUE THEN 'x' ELSE ' ' END || '] ' || COALESCE(data->>'text', '')
+            WHEN type = 'list_item' THEN '- ' || COALESCE(data->>'text', '')
+            ELSE COALESCE(data->>'text', '')
+        END,
+        E'\n' ORDER BY position
+    ), '')
+    FROM note_nodes
+    WHERE note_id = n.id AND deleted_at IS NULL
+)
+WHERE n.id = ANY($1::uuid[]);

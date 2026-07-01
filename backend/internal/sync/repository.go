@@ -31,6 +31,7 @@ type Repository interface {
 	GetSyncNoteNodes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteNode, error)
 	UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error)
 	GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error)
+	UpdateNotesContentFromNodes(ctx context.Context, noteIDs []pgtype.UUID) error
 	WithQuerier(q sqlcgen.Querier) Repository
 }
 
@@ -156,6 +157,10 @@ func (r *repo) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodePar
 
 func (r *repo) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
 	return r.q.GetNoteByID(ctx, arg)
+}
+
+func (r *repo) UpdateNotesContentFromNodes(ctx context.Context, noteIDs []pgtype.UUID) error {
+	return r.q.UpdateNotesContentFromNodes(ctx, noteIDs)
 }
 
 func (r *repo) WithQuerier(q sqlcgen.Querier) Repository {

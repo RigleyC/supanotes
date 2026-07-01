@@ -178,6 +178,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 
 	// Track note IDs the authenticated user can edit (owned or shared with edit).
 	editableNotes := make(map[pgtype.UUID]bool)
+	affectedNotes := make(map[pgtype.UUID]bool)
 
 	for i, n := range payload.Notes {
 		if isEmptyIncomingRegularNote(n) {
@@ -253,7 +254,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			ID:              noteID,
 			UserID:          upsertUserID,
 			ContextID:       n.ContextID,
-			Content:         n.Content,
+			Content:         "", // Derived automatically by trigger from note_nodes
 			IsInbox:         n.IsInbox,
 			EmbeddingStatus: embStatus,
 			CollapseImages:  n.CollapseImages,
@@ -422,6 +423,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			}
 			return err
 		}
+		affectedNotes[nn.NoteID] = true
 	}
 
 	for _, p := range payload.UserNotePreferences {
@@ -449,6 +451,16 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				log.Error().Interface("pref_note_id", p.NoteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: UpsertUserNotePreference returned ErrNoRows")
 				return ErrSyncConflict
 			}
+			return err
+		}
+	}
+
+	if len(affectedNotes) > 0 {
+		noteIDs := make([]pgtype.UUID, 0, len(affectedNotes))
+		for id := range affectedNotes {
+			noteIDs = append(noteIDs, id)
+		}
+		if err := r.UpdateNotesContentFromNodes(ctx, noteIDs); err != nil {
 			return err
 		}
 	}

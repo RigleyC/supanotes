@@ -65,7 +65,8 @@ void main() {
       final json = SyncMapper().noteToJson(note);
 
       expect(json['user_id'], 'user-1');
-      expect(json['content'], 'Hello World');
+      // content is no longer sent from the client; the server derives it via DB trigger
+      expect(json.containsKey('content'), isFalse);
     });
   });
 

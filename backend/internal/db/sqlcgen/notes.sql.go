@@ -801,3 +801,26 @@ func (q *Queries) UpdateNoteSearchVector(ctx context.Context, arg UpdateNoteSear
 	_, err := q.db.Exec(ctx, updateNoteSearchVector, arg.ID, arg.SearchVector)
 	return err
 }
+
+const updateNotesContentFromNodes = `-- name: UpdateNotesContentFromNodes :exec
+UPDATE notes n
+SET content = (
+    SELECT COALESCE(string_agg(
+        CASE 
+            WHEN type = 'header' THEN repeat('#', COALESCE((data->>'level')::int, 1)) || ' ' || COALESCE(data->>'text', '')
+            WHEN type = 'task' THEN '- [' || CASE WHEN (data->>'completed')::boolean = TRUE THEN 'x' ELSE ' ' END || '] ' || COALESCE(data->>'text', '')
+            WHEN type = 'list_item' THEN '- ' || COALESCE(data->>'text', '')
+            ELSE COALESCE(data->>'text', '')
+        END,
+        E'\n' ORDER BY position
+    ), '')
+    FROM note_nodes
+    WHERE note_id = n.id AND deleted_at IS NULL
+)
+WHERE n.id = ANY($1::uuid[])
+`
+
+func (q *Queries) UpdateNotesContentFromNodes(ctx context.Context, dollar_1 []pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, updateNotesContentFromNodes, dollar_1)
+	return err
+}
