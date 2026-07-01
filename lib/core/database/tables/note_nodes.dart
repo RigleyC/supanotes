@@ -11,6 +11,8 @@ class NoteNodes extends Table {
   TextColumn get data => text()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  BoolColumn get isDirty => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};

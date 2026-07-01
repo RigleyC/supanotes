@@ -100,6 +100,18 @@ class SyncMapper {
         'tag_id': t.tagId,
       };
 
+  Map<String, dynamic> noteNodeToJson(NoteNodeData nn) => {
+        'id': nn.id,
+        'note_id': nn.noteId,
+        'parent_id': nn.parentId,
+        'position': nn.position,
+        'type': nn.type,
+        'data': nn.data,
+        'created_at': nn.createdAt.toUtc().toIso8601String(),
+        'updated_at': nn.updatedAt.toUtc().toIso8601String(),
+        'deleted_at': nn.deletedAt?.toUtc().toIso8601String(),
+      };
+
   // ---------------------------------------------------------------------------
   // Pull direction — Map → typed
   // ---------------------------------------------------------------------------
@@ -199,6 +211,21 @@ class SyncMapper {
       LocalNoteTagData(
         noteId: json['note_id'] as String,
         tagId: json['tag_id'] as String,
+        isDirty: false,
+      );
+
+  NoteNodeData noteNodeFromJson(Map<String, dynamic> json) => NoteNodeData(
+        id: json['id'] as String,
+        noteId: json['note_id'] as String,
+        parentId: json['parent_id'] as String?,
+        position: json['position'] as int,
+        type: json['type'] as String,
+        data: json['data'] as String,
+        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+        updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+        deletedAt: json['deleted_at'] != null
+            ? DateTime.parse(json['deleted_at'] as String).toLocal()
+            : null,
         isDirty: false,
       );
 

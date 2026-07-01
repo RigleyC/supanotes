@@ -129,6 +129,7 @@ class SyncService {
 
   Future<void> push() async {
     final notes = await _db.notesDao.getDirtyNotes();
+    final noteNodes = await (_db.select(_db.noteNodes)..where((t) => t.isDirty.equals(true))).get();
     final tasks = await _db.tasksDao.getDirtyTasks();
     final contexts = await _db.contextsDao.getDirtyContexts();
     final tags = await _db.tagsDao.getDirtyTags();
@@ -138,6 +139,7 @@ class SyncService {
     final prefs = await _db.userNotePreferencesDao.getDirtyPreferences();
 
     if (notes.isEmpty &&
+        noteNodes.isEmpty &&
         tasks.isEmpty &&
         contexts.isEmpty &&
         tags.isEmpty &&
@@ -150,6 +152,7 @@ class SyncService {
 
     final payload = <String, dynamic>{
       'notes': notes.map(_mapper.noteToJson).toList(),
+      'note_nodes': noteNodes.map(_mapper.noteNodeToJson).toList(),
       'tasks': tasks.map(_mapper.taskToJson).toList(),
       'contexts': contexts.map(_mapper.contextToJson).toList(),
       'tags': tags.map(_mapper.tagToJson).toList(),
@@ -167,6 +170,9 @@ class SyncService {
       for (final n in notes) {
         await _db.notesDao.markHasRemoteCopy(n.id);
         await _db.notesDao.clearDirtyFlag(n.id, n.updatedAt);
+      }
+      for (final nn in noteNodes) {
+        await (_db.update(_db.noteNodes)..where((t) => t.id.equals(nn.id))).write(const NoteNodesCompanion(isDirty: Value(false)));
       }
       for (final tsk in tasks) {
         await _db.tasksDao.clearDirtyFlag(tsk.id, tsk.updatedAt);
@@ -218,6 +224,12 @@ class SyncService {
           continue;
         }
         batch.insert(_db.notes, note, onConflict: DoUpdate((_) => note));
+      }
+      for (final raw in (data['note_nodes'] as List? ?? [])) {
+        final node = _mapper
+            .noteNodeFromJson(raw as Map<String, dynamic>)
+            .copyWith(isDirty: false);
+        batch.insert(_db.noteNodes, node, onConflict: DoUpdate((_) => node));
       }
       for (final raw in (data['tasks'] as List? ?? [])) {
         final task = _mapper

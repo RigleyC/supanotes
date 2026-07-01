@@ -1030,6 +1030,32 @@ class $NoteNodesTable extends NoteNodes
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isDirtyMeta = const VerificationMeta(
+    'isDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> isDirty = GeneratedColumn<bool>(
+    'is_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1040,6 +1066,8 @@ class $NoteNodesTable extends NoteNodes
     data,
     createdAt,
     updatedAt,
+    deletedAt,
+    isDirty,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1112,6 +1140,18 @@ class $NoteNodesTable extends NoteNodes
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('is_dirty')) {
+      context.handle(
+        _isDirtyMeta,
+        isDirty.isAcceptableOrUnknown(data['is_dirty']!, _isDirtyMeta),
+      );
+    }
     return context;
   }
 
@@ -1153,6 +1193,14 @@ class $NoteNodesTable extends NoteNodes
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      isDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_dirty'],
+      )!,
     );
   }
 
@@ -1171,6 +1219,8 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
   final String data;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final bool isDirty;
   const NoteNode({
     required this.id,
     required this.noteId,
@@ -1180,6 +1230,8 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
     required this.data,
     required this.createdAt,
     required this.updatedAt,
+    this.deletedAt,
+    required this.isDirty,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1194,6 +1246,10 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
     map['data'] = Variable<String>(data);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['is_dirty'] = Variable<bool>(isDirty);
     return map;
   }
 
@@ -1209,6 +1265,10 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
       data: Value(data),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      isDirty: Value(isDirty),
     );
   }
 
@@ -1226,6 +1286,8 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
       data: serializer.fromJson<String>(json['data']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      isDirty: serializer.fromJson<bool>(json['isDirty']),
     );
   }
   @override
@@ -1240,6 +1302,8 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
       'data': serializer.toJson<String>(data),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'isDirty': serializer.toJson<bool>(isDirty),
     };
   }
 
@@ -1252,6 +1316,8 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
     String? data,
     DateTime? createdAt,
     DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    bool? isDirty,
   }) => NoteNode(
     id: id ?? this.id,
     noteId: noteId ?? this.noteId,
@@ -1261,6 +1327,8 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
     data: data ?? this.data,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    isDirty: isDirty ?? this.isDirty,
   );
   NoteNode copyWithCompanion(NoteNodesCompanion data) {
     return NoteNode(
@@ -1272,6 +1340,8 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
       data: data.data.present ? data.data.value : this.data,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      isDirty: data.isDirty.present ? data.isDirty.value : this.isDirty,
     );
   }
 
@@ -1285,7 +1355,9 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
           ..write('type: $type, ')
           ..write('data: $data, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('isDirty: $isDirty')
           ..write(')'))
         .toString();
   }
@@ -1300,6 +1372,8 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
     data,
     createdAt,
     updatedAt,
+    deletedAt,
+    isDirty,
   );
   @override
   bool operator ==(Object other) =>
@@ -1312,7 +1386,9 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
           other.type == this.type &&
           other.data == this.data &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.isDirty == this.isDirty);
 }
 
 class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
@@ -1324,6 +1400,8 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
   final Value<String> data;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<bool> isDirty;
   final Value<int> rowid;
   const NoteNodesCompanion({
     this.id = const Value.absent(),
@@ -1334,6 +1412,8 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
     this.data = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.isDirty = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NoteNodesCompanion.insert({
@@ -1345,6 +1425,8 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
     required String data,
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.isDirty = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        noteId = Value(noteId),
@@ -1362,6 +1444,8 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
     Expression<String>? data,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<bool>? isDirty,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1373,6 +1457,8 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
       if (data != null) 'data': data,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (isDirty != null) 'is_dirty': isDirty,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1386,6 +1472,8 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
     Value<String>? data,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<bool>? isDirty,
     Value<int>? rowid,
   }) {
     return NoteNodesCompanion(
@@ -1397,6 +1485,8 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
       data: data ?? this.data,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      isDirty: isDirty ?? this.isDirty,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1428,6 +1518,12 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (isDirty.present) {
+      map['is_dirty'] = Variable<bool>(isDirty.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1445,6 +1541,8 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
           ..write('data: $data, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('isDirty: $isDirty, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6067,6 +6165,8 @@ typedef $$NoteNodesTableCreateCompanionBuilder =
       required String data,
       required DateTime createdAt,
       required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<bool> isDirty,
       Value<int> rowid,
     });
 typedef $$NoteNodesTableUpdateCompanionBuilder =
@@ -6079,6 +6179,8 @@ typedef $$NoteNodesTableUpdateCompanionBuilder =
       Value<String> data,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<bool> isDirty,
       Value<int> rowid,
     });
 
@@ -6176,6 +6278,16 @@ class $$NoteNodesTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDirty => $composableBuilder(
+    column: $table.isDirty,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6290,6 +6402,16 @@ class $$NoteNodesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDirty => $composableBuilder(
+    column: $table.isDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$NotesTableOrderingComposer get noteId {
     final $$NotesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6363,6 +6485,12 @@ class $$NoteNodesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDirty =>
+      $composableBuilder(column: $table.isDirty, builder: (column) => column);
 
   $$NotesTableAnnotationComposer get noteId {
     final $$NotesTableAnnotationComposer composer = $composerBuilder(
@@ -6472,6 +6600,8 @@ class $$NoteNodesTableTableManager
                 Value<String> data = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> isDirty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NoteNodesCompanion(
                 id: id,
@@ -6482,6 +6612,8 @@ class $$NoteNodesTableTableManager
                 data: data,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                isDirty: isDirty,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6494,6 +6626,8 @@ class $$NoteNodesTableTableManager
                 required String data,
                 required DateTime createdAt,
                 required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> isDirty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NoteNodesCompanion.insert(
                 id: id,
@@ -6504,6 +6638,8 @@ class $$NoteNodesTableTableManager
                 data: data,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                isDirty: isDirty,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
