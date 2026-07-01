@@ -5,18 +5,24 @@ import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/utils/save_throttle.dart';
+import 'package:supanotes/features/notes/data/markdown_serializer.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
+import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
+import 'package:supanotes/features/notes/domain/task_entry.dart';
 
 const int _dividerCount = 35;
 
 typedef SnapshotSave =
     Future<void> Function(
       String noteId,
-      String content,
+      String markdown,
+      List<TaskEntry> tasks,
     );
 typedef EmptyNoteExit = Future<void> Function(String noteId);
 
@@ -24,15 +30,20 @@ class NoteEditorController {
   NoteEditorController({
     required this.snapshotSave,
     this.emptyNoteExit,
-  });
+    AppDatabase? database,
+  }) : _database = database;
 
   final SnapshotSave snapshotSave;
   final EmptyNoteExit? emptyNoteExit;
+  final AppDatabase? _database;
 
   MutableDocument? document;
   Editor? editor;
   MutableDocumentComposer? composer;
   FocusNode? focusNode;
+
+  final _saveThrottle = SaveThrottle();
+  NodeSyncManager? _nodeSyncManager;
 
   String? _noteId;
 
@@ -41,7 +52,27 @@ class NoteEditorController {
       '[NoteEditorController.init] contentLength=${content.length}, content="$content"',
       name: 'NoteEditor',
     );
-    document = _parseContentToDocument(content);
+    document = parseNoteToMarkdown(content);
+    _setupEditor();
+    document!.addListener(_onDocumentChanged);
+  }
+
+  void initFromNodes({
+    required List<NoteNode> nodes,
+    String? noteId,
+  }) {
+    dev.log(
+      '[NoteEditorController.initFromNodes] nodeCount=${nodes.length}',
+      name: 'NoteEditor',
+    );
+    document = NodeSyncManager.documentFromNodes(nodes);
+    _noteId = noteId;
+    _setupEditor();
+    _setupNodeSyncManager();
+    document!.addListener(_onDocumentChanged);
+  }
+
+  void _setupEditor() {
     composer = MutableDocumentComposer();
     editor = createDefaultDocumentEditor(
       document: document!,
@@ -57,15 +88,34 @@ class NoteEditorController {
       const KeepFirstLineAsTitleReaction(),
     );
     focusNode = FocusNode();
-    document!.addListener(_onDocumentChanged);
+  }
+
+  void _setupNodeSyncManager() {
+    final db = _database;
+    final noteId = _noteId;
+    final doc = document;
+    if (db == null || noteId == null || doc == null) return;
+    _nodeSyncManager = NodeSyncManager(
+      database: db,
+      noteId: noteId,
+      document: doc,
+    );
   }
 
   void bind(String noteId) {
     _noteId = noteId;
   }
 
-  void _onDocumentChanged(DocumentChangeLog _) {
-    _runSnapshotSave();
+  void _onDocumentChanged(DocumentChangeLog _) => _scheduleSnapshotSave();
+
+  void _scheduleSnapshotSave() {
+    final doc = document;
+    if (doc == null) return;
+    final generation = _saveThrottle.nextGeneration();
+    _saveThrottle.schedule(
+      generation: generation,
+      operation: _runSnapshotSave,
+    );
   }
 
   Future<void> _runSnapshotSave() async {
@@ -73,18 +123,23 @@ class NoteEditorController {
     final doc = document;
     if (noteId == null || doc == null) return;
 
-    final content = doc
-        .map((n) => n is TextNode ? n.text.toPlainText() : '')
-        .where((t) => t.isNotEmpty)
-        .join('\n');
     await snapshotSave(
       noteId,
-      content,
+      serializeNoteToMarkdown(doc),
+      _extractTasks(doc),
     );
   }
 
   Future<void> persistSnapshotNow() async {
-    await _runSnapshotSave();
+    final noteId = _noteId;
+    final doc = document;
+    if (noteId == null || doc == null) return;
+
+    final generation = _saveThrottle.nextGeneration();
+    await _saveThrottle.flush(
+      generation: generation,
+      operation: _runSnapshotSave,
+    );
   }
 
   void attachFileFromPath({
@@ -122,14 +177,12 @@ class NoteEditorController {
     final doc = document;
     if (noteId == null || doc == null) return;
 
-    final content = doc
-        .map((n) => n is TextNode ? n.text.toPlainText() : '')
-        .where((t) => t.isNotEmpty)
-        .join('\n');
+    final markdown = serializeNoteToMarkdown(doc);
+    final tasks = _extractTasks(doc);
 
     dev.log(
       '[NoteEditorController] _flushAndSaveFinalState: noteId=$noteId, '
-      'contentLength=${content.length}',
+      'markdownLength=${markdown.length}',
       name: 'NoteEditor',
     );
 
@@ -140,59 +193,56 @@ class NoteEditorController {
       );
       emptyNoteExit?.call(noteId);
     } else {
-      snapshotSave(noteId, content);
+      final generation = _saveThrottle.nextGeneration();
+      _saveThrottle.flush(
+        generation: generation,
+        operation: () => snapshotSave(noteId, markdown, tasks),
+      );
     }
   }
 
-  void dispose() {
-    _flushAndSaveFinalState();
-    document?.removeListener(_onDocumentChanged);
-    document?.dispose();
-    composer?.dispose();
-    focusNode?.dispose();
-  }
-
-  static MutableDocument _parseContentToDocument(String content) {
-    final nodes = <DocumentNode>[];
-    for (final line in content.split('\n')) {
-      if (line.trimLeft().startsWith('- [ ] ') || line.trimLeft().startsWith('- [x] ')) {
-        final isComplete = line.trimLeft().startsWith('- [x] ');
-        final text = line.substring(line.indexOf('] ') + 2);
-        nodes.add(
-          TaskNode(
-            id: Editor.createNodeId(),
-            text: AttributedText(text.trimLeft()),
-            isComplete: isComplete,
-          ),
-        );
-      } else if (line.trim().isEmpty) {
-        // skip blank lines between content blocks
-      } else {
-        nodes.add(
-          TextNode(
-            id: Editor.createNodeId(),
-            text: AttributedText(line.trimLeft()),
+  List<TaskEntry> _extractTasks(MutableDocument doc) {
+    final tasks = <TaskEntry>[];
+    for (final node in doc) {
+      if (node is TaskNode) {
+        tasks.add(
+          TaskEntry(
+            id: node.id,
+            text: node.text.toPlainText(),
+            isComplete: node.isComplete,
           ),
         );
       }
     }
-    return MutableDocument(nodes: nodes);
+    return tasks;
+  }
+
+  void dispose() {
+    _flushAndSaveFinalState();
+    _nodeSyncManager?.dispose();
+    _saveThrottle.dispose();
+    document?.removeListener(_onDocumentChanged);
+    document?.dispose();
+    composer?.dispose();
+    focusNode?.dispose();
   }
 }
 
 Future<void> defaultSnapshotSave(
   INotesRepository repo,
   String noteId,
-  String content,
+  String markdown,
+  List<TaskEntry> tasks,
 ) async {
   dev.log(
-    '[defaultSnapshotSave] noteId=$noteId, contentLength=${content.length}',
+    '[defaultSnapshotSave] noteId=$noteId, markdownLength=${markdown.length}, tasks=${tasks.length}',
     name: 'NoteEditor',
   );
   await repo.saveNoteSnapshot(
-    id: noteId,
-    content: content,
-  );
+        id: noteId,
+        content: markdown,
+        tasks: tasks,
+      );
   dev.log(
     '[defaultSnapshotSave] Completed noteId=$noteId',
     name: 'NoteEditor',

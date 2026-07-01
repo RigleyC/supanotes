@@ -45,8 +45,8 @@ func (q *Queries) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, er
 }
 
 const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position, node_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, node_id
 `
 
@@ -57,6 +57,7 @@ type CreateTaskParams struct {
 	DueDate    pgtype.Date `json:"due_date"`
 	Recurrence pgtype.Text `json:"recurrence"`
 	Position   int32       `json:"position"`
+	NodeID     pgtype.UUID `json:"node_id"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error) {
@@ -67,6 +68,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		arg.DueDate,
 		arg.Recurrence,
 		arg.Position,
+		arg.NodeID,
 	)
 	var i Task
 	err := row.Scan(
@@ -237,6 +239,46 @@ func (q *Queries) GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, err
 		arg.DueAfter,
 		arg.DueBefore,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Task
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.NoteID,
+			&i.UserID,
+			&i.Title,
+			&i.Status,
+			&i.DueDate,
+			&i.Recurrence,
+			&i.Position,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.CompletedAt,
+			&i.NodeID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTasksByNodeID = `-- name: GetTasksByNodeID :many
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, node_id FROM tasks
+WHERE node_id = $1 AND deleted_at IS NULL
+ORDER BY position ASC, created_at ASC
+`
+
+func (q *Queries) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) ([]Task, error) {
+	rows, err := q.db.Query(ctx, getTasksByNodeID, nodeID)
 	if err != nil {
 		return nil, err
 	}

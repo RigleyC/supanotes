@@ -20,6 +20,7 @@ import 'daos/user_note_preferences_dao.dart';
 import 'tables/attachments.dart';
 import 'tables/contexts.dart';
 import 'tables/note_links.dart';
+import 'tables/note_nodes.dart';
 import 'tables/note_tags.dart';
 import 'tables/notes.dart';
 import 'tables/tags.dart';
@@ -32,7 +33,7 @@ import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNam
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions, NoteLinks, Attachments, UserNotePreferences],
+  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions, NoteLinks, Attachments, UserNotePreferences, NoteNodes],
   daos: [NotesDao, ContextsDao, TasksDao, TagsDao, TaskCompletionsDao, NoteLinksDao, NoteTagsDao, AttachmentsDao, UserNotePreferencesDao],
 )
 class AppDatabase extends _$AppDatabase {
@@ -41,10 +42,10 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
       : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to 12 — v12 adds favorite/archived
-  /// to user_note_preferences and seeds from notes.
+  /// Latest schema version. Bumped to 13 — v13 adds note_nodes table and
+  /// node_id column to tasks.
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -103,6 +104,10 @@ class AppDatabase extends _$AppDatabase {
             );
             await customStatement('ALTER TABLE notes DROP COLUMN favorite');
             await customStatement('ALTER TABLE notes DROP COLUMN archived');
+          }
+          if (from < 13) {
+            await m.createTable(noteNodes);
+            await m.addColumn(tasks, tasks.nodeId);
           }
         },
       );

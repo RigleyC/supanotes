@@ -165,15 +165,16 @@ func policyForIntent(intent Intent) buildPolicy {
 }
 
 type contextData struct {
-	soul            sqlcgen.Soul
-	tzLoc           *time.Location
-	todayTasks      []sqlcgen.Task
-	recentNotes     []sqlcgen.Note
-	completedTasks  []sqlcgen.Task
-	overdueCount    int64
-	semanticResults []sqlcgen.SearchNotesByEmbeddingRow
-	memResults      []sqlcgen.SearchMemoriesByEmbeddingRow
-	linkedNotes     []sqlcgen.Note
+	soul                sqlcgen.Soul
+	tzLoc               *time.Location
+	todayTasks          []sqlcgen.Task
+	recentNotes         []sqlcgen.Note
+	completedTasks      []sqlcgen.Task
+	overdueCount        int64
+	semanticResults     []sqlcgen.SearchNotesByEmbeddingRow
+	memResults          []sqlcgen.SearchMemoriesByEmbeddingRow
+	linkedNotes         []sqlcgen.Note
+	recentNotesRendered []string
 }
 
 // Build compiles the tiered context RAG string by fetching data concurrently
@@ -315,6 +316,38 @@ func (cb *ContextBuilder) fetchContextData(ctx context.Context, userID, sessionI
 		}
 	}
 
+	if policy.fetchRecentNotes && len(data.recentNotes) > 0 {
+		data.recentNotesRendered = make([]string, 0, len(data.recentNotes))
+		for _, n := range data.recentNotes {
+			nodes, err := cb.q.GetNodesByNoteId(ctx, n.ID)
+			if err != nil {
+				log.Warn().Err(err).Str("note_id", uid.UUIDToString(n.ID)).Msg("failed to fetch nodes for recent note; using content directly")
+				data.recentNotesRendered = append(data.recentNotesRendered, n.Content)
+				continue
+			}
+
+			noteTasks, err := cb.q.GetTasksByNoteID(ctx, sqlcgen.GetTasksByNoteIDParams{
+				UserID: userID,
+				NoteID: n.ID,
+			})
+			if err != nil {
+				log.Warn().Err(err).Str("note_id", uid.UUIDToString(n.ID)).Msg("failed to fetch tasks for recent note; rendering without tasks")
+				data.recentNotesRendered = append(data.recentNotesRendered, notes.RenderNoteToMarkdown(nodes, nil))
+				continue
+			}
+
+			taskMap := make(map[pgtype.UUID]sqlcgen.Task)
+			for _, t := range noteTasks {
+				if t.NodeID.Valid {
+					taskMap[t.NodeID] = t
+				}
+			}
+
+			rendered := notes.RenderNoteToMarkdown(nodes, taskMap)
+			data.recentNotesRendered = append(data.recentNotesRendered, rendered)
+		}
+	}
+
 	return data, nil
 }
 
@@ -346,7 +379,15 @@ func (cb *ContextBuilder) formatContextPrompt(data *contextData, policy buildPol
 	if policy.fetchRecentNotes {
 		tier2 := &strings.Builder{}
 		tier2.WriteString("\nRECENT NOTES (Last 48h):\n")
-		writeNotesWithID(tier2, data.recentNotes)
+		for i, n := range data.recentNotes {
+			tier2.WriteString(fmt.Sprintf("--- [%s] %s ---\n", uid.UUIDToString(n.ID), notes.DeriveTitle(n.Content)))
+			if i < len(data.recentNotesRendered) {
+				tier2.WriteString(data.recentNotesRendered[i])
+			} else {
+				tier2.WriteString(n.Content)
+			}
+			tier2.WriteString("\n")
+		}
 		b.WriteString(truncate(tier2.String(), MaxTier2Tokens))
 	}
 

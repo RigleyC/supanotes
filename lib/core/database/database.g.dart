@@ -938,6 +938,519 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   }
 }
 
+class $NoteNodesTable extends NoteNodes
+    with TableInfo<$NoteNodesTable, NoteNode> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NoteNodesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES notes (id)',
+    ),
+  );
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES note_nodes (id)',
+    ),
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dataMeta = const VerificationMeta('data');
+  @override
+  late final GeneratedColumn<String> data = GeneratedColumn<String>(
+    'data',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    noteId,
+    parentId,
+    position,
+    type,
+    data,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'note_nodes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NoteNode> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('data')) {
+      context.handle(
+        _dataMeta,
+        this.data.isAcceptableOrUnknown(data['data']!, _dataMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dataMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  NoteNode map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NoteNode(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_id'],
+      ),
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      data: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}data'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NoteNodesTable createAlias(String alias) {
+    return $NoteNodesTable(attachedDatabase, alias);
+  }
+}
+
+class NoteNode extends DataClass implements Insertable<NoteNode> {
+  final String id;
+  final String noteId;
+  final String? parentId;
+  final int position;
+  final String type;
+  final String data;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const NoteNode({
+    required this.id,
+    required this.noteId,
+    this.parentId,
+    required this.position,
+    required this.type,
+    required this.data,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['note_id'] = Variable<String>(noteId);
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<String>(parentId);
+    }
+    map['position'] = Variable<int>(position);
+    map['type'] = Variable<String>(type);
+    map['data'] = Variable<String>(data);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  NoteNodesCompanion toCompanion(bool nullToAbsent) {
+    return NoteNodesCompanion(
+      id: Value(id),
+      noteId: Value(noteId),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
+      position: Value(position),
+      type: Value(type),
+      data: Value(data),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory NoteNode.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NoteNode(
+      id: serializer.fromJson<String>(json['id']),
+      noteId: serializer.fromJson<String>(json['noteId']),
+      parentId: serializer.fromJson<String?>(json['parentId']),
+      position: serializer.fromJson<int>(json['position']),
+      type: serializer.fromJson<String>(json['type']),
+      data: serializer.fromJson<String>(json['data']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'noteId': serializer.toJson<String>(noteId),
+      'parentId': serializer.toJson<String?>(parentId),
+      'position': serializer.toJson<int>(position),
+      'type': serializer.toJson<String>(type),
+      'data': serializer.toJson<String>(data),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  NoteNode copyWith({
+    String? id,
+    String? noteId,
+    Value<String?> parentId = const Value.absent(),
+    int? position,
+    String? type,
+    String? data,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => NoteNode(
+    id: id ?? this.id,
+    noteId: noteId ?? this.noteId,
+    parentId: parentId.present ? parentId.value : this.parentId,
+    position: position ?? this.position,
+    type: type ?? this.type,
+    data: data ?? this.data,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  NoteNode copyWithCompanion(NoteNodesCompanion data) {
+    return NoteNode(
+      id: data.id.present ? data.id.value : this.id,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      position: data.position.present ? data.position.value : this.position,
+      type: data.type.present ? data.type.value : this.type,
+      data: data.data.present ? data.data.value : this.data,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteNode(')
+          ..write('id: $id, ')
+          ..write('noteId: $noteId, ')
+          ..write('parentId: $parentId, ')
+          ..write('position: $position, ')
+          ..write('type: $type, ')
+          ..write('data: $data, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    noteId,
+    parentId,
+    position,
+    type,
+    data,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NoteNode &&
+          other.id == this.id &&
+          other.noteId == this.noteId &&
+          other.parentId == this.parentId &&
+          other.position == this.position &&
+          other.type == this.type &&
+          other.data == this.data &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
+  final Value<String> id;
+  final Value<String> noteId;
+  final Value<String?> parentId;
+  final Value<int> position;
+  final Value<String> type;
+  final Value<String> data;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const NoteNodesCompanion({
+    this.id = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.type = const Value.absent(),
+    this.data = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NoteNodesCompanion.insert({
+    required String id,
+    required String noteId,
+    this.parentId = const Value.absent(),
+    required int position,
+    required String type,
+    required String data,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       noteId = Value(noteId),
+       position = Value(position),
+       type = Value(type),
+       data = Value(data),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<NoteNode> custom({
+    Expression<String>? id,
+    Expression<String>? noteId,
+    Expression<String>? parentId,
+    Expression<int>? position,
+    Expression<String>? type,
+    Expression<String>? data,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (noteId != null) 'note_id': noteId,
+      if (parentId != null) 'parent_id': parentId,
+      if (position != null) 'position': position,
+      if (type != null) 'type': type,
+      if (data != null) 'data': data,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NoteNodesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? noteId,
+    Value<String?>? parentId,
+    Value<int>? position,
+    Value<String>? type,
+    Value<String>? data,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return NoteNodesCompanion(
+      id: id ?? this.id,
+      noteId: noteId ?? this.noteId,
+      parentId: parentId ?? this.parentId,
+      position: position ?? this.position,
+      type: type ?? this.type,
+      data: data ?? this.data,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<String>(parentId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (data.present) {
+      map['data'] = Variable<String>(data.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteNodesCompanion(')
+          ..write('id: $id, ')
+          ..write('noteId: $noteId, ')
+          ..write('parentId: $parentId, ')
+          ..write('position: $position, ')
+          ..write('type: $type, ')
+          ..write('data: $data, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -1064,6 +1577,18 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _nodeIdMeta = const VerificationMeta('nodeId');
+  @override
+  late final GeneratedColumn<String> nodeId = GeneratedColumn<String>(
+    'node_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES note_nodes (id)',
+    ),
+  );
   static const VerificationMeta _isDirtyMeta = const VerificationMeta(
     'isDirty',
   );
@@ -1093,6 +1618,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     createdAt,
     updatedAt,
     deletedAt,
+    nodeId,
     isDirty,
   ];
   @override
@@ -1187,6 +1713,12 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('node_id')) {
+      context.handle(
+        _nodeIdMeta,
+        nodeId.isAcceptableOrUnknown(data['node_id']!, _nodeIdMeta),
+      );
+    }
     if (data.containsKey('is_dirty')) {
       context.handle(
         _isDirtyMeta,
@@ -1252,6 +1784,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
+      nodeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}node_id'],
+      ),
       isDirty: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_dirty'],
@@ -1283,6 +1819,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
+  final String? nodeId;
   final bool isDirty;
   const TaskData({
     required this.id,
@@ -1297,6 +1834,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
+    this.nodeId,
     required this.isDirty,
   });
   @override
@@ -1324,6 +1862,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
+    if (!nullToAbsent || nodeId != null) {
+      map['node_id'] = Variable<String>(nodeId);
+    }
     map['is_dirty'] = Variable<bool>(isDirty);
     return map;
   }
@@ -1350,6 +1891,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      nodeId: nodeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nodeId),
       isDirty: Value(isDirty),
     );
   }
@@ -1374,6 +1918,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      nodeId: serializer.fromJson<String?>(json['nodeId']),
       isDirty: serializer.fromJson<bool>(json['isDirty']),
     );
   }
@@ -1395,6 +1940,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'nodeId': serializer.toJson<String?>(nodeId),
       'isDirty': serializer.toJson<bool>(isDirty),
     };
   }
@@ -1412,6 +1958,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
+    Value<String?> nodeId = const Value.absent(),
     bool? isDirty,
   }) => TaskData(
     id: id ?? this.id,
@@ -1426,6 +1973,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    nodeId: nodeId.present ? nodeId.value : this.nodeId,
     isDirty: isDirty ?? this.isDirty,
   );
   TaskData copyWithCompanion(TasksCompanion data) {
@@ -1446,6 +1994,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      nodeId: data.nodeId.present ? data.nodeId.value : this.nodeId,
       isDirty: data.isDirty.present ? data.isDirty.value : this.isDirty,
     );
   }
@@ -1465,6 +2014,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('nodeId: $nodeId, ')
           ..write('isDirty: $isDirty')
           ..write(')'))
         .toString();
@@ -1484,6 +2034,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     createdAt,
     updatedAt,
     deletedAt,
+    nodeId,
     isDirty,
   );
   @override
@@ -1502,6 +2053,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
+          other.nodeId == this.nodeId &&
           other.isDirty == this.isDirty);
 }
 
@@ -1518,6 +2070,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
+  final Value<String?> nodeId;
   final Value<bool> isDirty;
   final Value<int> rowid;
   const TasksCompanion({
@@ -1533,6 +2086,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.nodeId = const Value.absent(),
     this.isDirty = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1549,6 +2103,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
+    this.nodeId = const Value.absent(),
     this.isDirty = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1571,6 +2126,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
+    Expression<String>? nodeId,
     Expression<bool>? isDirty,
     Expression<int>? rowid,
   }) {
@@ -1587,6 +2143,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (nodeId != null) 'node_id': nodeId,
       if (isDirty != null) 'is_dirty': isDirty,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1605,6 +2162,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
+    Value<String?>? nodeId,
     Value<bool>? isDirty,
     Value<int>? rowid,
   }) {
@@ -1621,6 +2179,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      nodeId: nodeId ?? this.nodeId,
       isDirty: isDirty ?? this.isDirty,
       rowid: rowid ?? this.rowid,
     );
@@ -1667,6 +2226,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
+    if (nodeId.present) {
+      map['node_id'] = Variable<String>(nodeId.value);
+    }
     if (isDirty.present) {
       map['is_dirty'] = Variable<bool>(isDirty.value);
     }
@@ -1691,6 +2253,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('nodeId: $nodeId, ')
           ..write('isDirty: $isDirty, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4837,6 +5400,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $NotesTable notes = $NotesTable(this);
+  late final $NoteNodesTable noteNodes = $NoteNodesTable(this);
   late final $TasksTable tasks = $TasksTable(this);
   late final $ContextsTable contexts = $ContextsTable(this);
   late final $TagsTable tags = $TagsTable(this);
@@ -4867,6 +5431,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     notes,
+    noteNodes,
     tasks,
     contexts,
     tags,
@@ -4923,10 +5488,28 @@ final class $$NotesTableReferences
     extends BaseReferences<_$AppDatabase, $NotesTable, NoteData> {
   $$NotesTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
+  static MultiTypedResultKey<$NoteNodesTable, List<NoteNode>>
+  _noteNodesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.noteNodes,
+    aliasName: 'notes__id__note_nodes__note_id',
+  );
+
+  $$NoteNodesTableProcessedTableManager get noteNodesRefs {
+    final manager = $$NoteNodesTableTableManager(
+      $_db,
+      $_db.noteNodes,
+    ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_noteNodesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$LocalNoteTagsTable, List<LocalNoteTagData>>
   _localNoteTagsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.localNoteTags,
-    aliasName: $_aliasNameGenerator(db.notes.id, db.localNoteTags.noteId),
+    aliasName: 'notes__id__local_note_tags__note_id',
   );
 
   $$LocalNoteTagsTableProcessedTableManager get localNoteTagsRefs {
@@ -5029,6 +5612,31 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
     column: $table.sharedByName,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> noteNodesRefs(
+    Expression<bool> Function($$NoteNodesTableFilterComposer f) f,
+  ) {
+    final $$NoteNodesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.noteNodes,
+      getReferencedColumn: (t) => t.noteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteNodesTableFilterComposer(
+            $db: $db,
+            $table: $db.noteNodes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 
   Expression<bool> localNoteTagsRefs(
     Expression<bool> Function($$LocalNoteTagsTableFilterComposer f) f,
@@ -5215,6 +5823,31 @@ class $$NotesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  Expression<T> noteNodesRefs<T extends Object>(
+    Expression<T> Function($$NoteNodesTableAnnotationComposer a) f,
+  ) {
+    final $$NoteNodesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.noteNodes,
+      getReferencedColumn: (t) => t.noteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteNodesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.noteNodes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> localNoteTagsRefs<T extends Object>(
     Expression<T> Function($$LocalNoteTagsTableAnnotationComposer a) f,
   ) {
@@ -5254,7 +5887,7 @@ class $$NotesTableTableManager
           $$NotesTableUpdateCompanionBuilder,
           (NoteData, $$NotesTableReferences),
           NoteData,
-          PrefetchHooks Function({bool localNoteTagsRefs})
+          PrefetchHooks Function({bool noteNodesRefs, bool localNoteTagsRefs})
         > {
   $$NotesTableTableManager(_$AppDatabase db, $NotesTable table)
     : super(
@@ -5349,37 +5982,63 @@ class $$NotesTableTableManager
                     (e.readTable(table), $$NotesTableReferences(db, table, e)),
               )
               .toList(),
-          prefetchHooksCallback: ({localNoteTagsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [
-                if (localNoteTagsRefs) db.localNoteTags,
-              ],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (localNoteTagsRefs)
-                    await $_getPrefetchedData<
-                      NoteData,
-                      $NotesTable,
-                      LocalNoteTagData
-                    >(
-                      currentTable: table,
-                      referencedTable: $$NotesTableReferences
-                          ._localNoteTagsRefsTable(db),
-                      managerFromTypedResult: (p0) => $$NotesTableReferences(
-                        db,
-                        table,
-                        p0,
-                      ).localNoteTagsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.noteId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({noteNodesRefs = false, localNoteTagsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (noteNodesRefs) db.noteNodes,
+                    if (localNoteTagsRefs) db.localNoteTags,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (noteNodesRefs)
+                        await $_getPrefetchedData<
+                          NoteData,
+                          $NotesTable,
+                          NoteNode
+                        >(
+                          currentTable: table,
+                          referencedTable: $$NotesTableReferences
+                              ._noteNodesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$NotesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).noteNodesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.noteId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (localNoteTagsRefs)
+                        await $_getPrefetchedData<
+                          NoteData,
+                          $NotesTable,
+                          LocalNoteTagData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$NotesTableReferences
+                              ._localNoteTagsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$NotesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).localNoteTagsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.noteId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -5396,7 +6055,559 @@ typedef $$NotesTableProcessedTableManager =
       $$NotesTableUpdateCompanionBuilder,
       (NoteData, $$NotesTableReferences),
       NoteData,
-      PrefetchHooks Function({bool localNoteTagsRefs})
+      PrefetchHooks Function({bool noteNodesRefs, bool localNoteTagsRefs})
+    >;
+typedef $$NoteNodesTableCreateCompanionBuilder =
+    NoteNodesCompanion Function({
+      required String id,
+      required String noteId,
+      Value<String?> parentId,
+      required int position,
+      required String type,
+      required String data,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$NoteNodesTableUpdateCompanionBuilder =
+    NoteNodesCompanion Function({
+      Value<String> id,
+      Value<String> noteId,
+      Value<String?> parentId,
+      Value<int> position,
+      Value<String> type,
+      Value<String> data,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$NoteNodesTableReferences
+    extends BaseReferences<_$AppDatabase, $NoteNodesTable, NoteNode> {
+  $$NoteNodesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $NotesTable _noteIdTable(_$AppDatabase db) =>
+      db.notes.createAlias('note_nodes__note_id__notes__id');
+
+  $$NotesTableProcessedTableManager get noteId {
+    final $_column = $_itemColumn<String>('note_id')!;
+
+    final manager = $$NotesTableTableManager(
+      $_db,
+      $_db.notes,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_noteIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $NoteNodesTable _parentIdTable(_$AppDatabase db) =>
+      db.noteNodes.createAlias('note_nodes__parent_id__note_nodes__id');
+
+  $$NoteNodesTableProcessedTableManager? get parentId {
+    final $_column = $_itemColumn<String>('parent_id');
+    if ($_column == null) return null;
+    final manager = $$NoteNodesTableTableManager(
+      $_db,
+      $_db.noteNodes,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_parentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$TasksTable, List<TaskData>> _tasksRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.tasks,
+    aliasName: 'note_nodes__id__tasks__node_id',
+  );
+
+  $$TasksTableProcessedTableManager get tasksRefs {
+    final manager = $$TasksTableTableManager(
+      $_db,
+      $_db.tasks,
+    ).filter((f) => f.nodeId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_tasksRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$NoteNodesTableFilterComposer
+    extends Composer<_$AppDatabase, $NoteNodesTable> {
+  $$NoteNodesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get data => $composableBuilder(
+    column: $table.data,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$NotesTableFilterComposer get noteId {
+    final $$NotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableFilterComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$NoteNodesTableFilterComposer get parentId {
+    final $$NoteNodesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentId,
+      referencedTable: $db.noteNodes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteNodesTableFilterComposer(
+            $db: $db,
+            $table: $db.noteNodes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> tasksRefs(
+    Expression<bool> Function($$TasksTableFilterComposer f) f,
+  ) {
+    final $$TasksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tasks,
+      getReferencedColumn: (t) => t.nodeId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TasksTableFilterComposer(
+            $db: $db,
+            $table: $db.tasks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$NoteNodesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NoteNodesTable> {
+  $$NoteNodesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get data => $composableBuilder(
+    column: $table.data,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$NotesTableOrderingComposer get noteId {
+    final $$NotesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableOrderingComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$NoteNodesTableOrderingComposer get parentId {
+    final $$NoteNodesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentId,
+      referencedTable: $db.noteNodes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteNodesTableOrderingComposer(
+            $db: $db,
+            $table: $db.noteNodes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NoteNodesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NoteNodesTable> {
+  $$NoteNodesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get data =>
+      $composableBuilder(column: $table.data, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$NotesTableAnnotationComposer get noteId {
+    final $$NotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$NoteNodesTableAnnotationComposer get parentId {
+    final $$NoteNodesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentId,
+      referencedTable: $db.noteNodes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteNodesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.noteNodes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> tasksRefs<T extends Object>(
+    Expression<T> Function($$TasksTableAnnotationComposer a) f,
+  ) {
+    final $$TasksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tasks,
+      getReferencedColumn: (t) => t.nodeId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TasksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.tasks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$NoteNodesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NoteNodesTable,
+          NoteNode,
+          $$NoteNodesTableFilterComposer,
+          $$NoteNodesTableOrderingComposer,
+          $$NoteNodesTableAnnotationComposer,
+          $$NoteNodesTableCreateCompanionBuilder,
+          $$NoteNodesTableUpdateCompanionBuilder,
+          (NoteNode, $$NoteNodesTableReferences),
+          NoteNode,
+          PrefetchHooks Function({bool noteId, bool parentId, bool tasksRefs})
+        > {
+  $$NoteNodesTableTableManager(_$AppDatabase db, $NoteNodesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NoteNodesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NoteNodesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NoteNodesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> noteId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> data = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteNodesCompanion(
+                id: id,
+                noteId: noteId,
+                parentId: parentId,
+                position: position,
+                type: type,
+                data: data,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String noteId,
+                Value<String?> parentId = const Value.absent(),
+                required int position,
+                required String type,
+                required String data,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => NoteNodesCompanion.insert(
+                id: id,
+                noteId: noteId,
+                parentId: parentId,
+                position: position,
+                type: type,
+                data: data,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$NoteNodesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({noteId = false, parentId = false, tasksRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [if (tasksRefs) db.tasks],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (noteId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.noteId,
+                                    referencedTable: $$NoteNodesTableReferences
+                                        ._noteIdTable(db),
+                                    referencedColumn: $$NoteNodesTableReferences
+                                        ._noteIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (parentId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.parentId,
+                                    referencedTable: $$NoteNodesTableReferences
+                                        ._parentIdTable(db),
+                                    referencedColumn: $$NoteNodesTableReferences
+                                        ._parentIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (tasksRefs)
+                        await $_getPrefetchedData<
+                          NoteNode,
+                          $NoteNodesTable,
+                          TaskData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$NoteNodesTableReferences
+                              ._tasksRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$NoteNodesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).tasksRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.nodeId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$NoteNodesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NoteNodesTable,
+      NoteNode,
+      $$NoteNodesTableFilterComposer,
+      $$NoteNodesTableOrderingComposer,
+      $$NoteNodesTableAnnotationComposer,
+      $$NoteNodesTableCreateCompanionBuilder,
+      $$NoteNodesTableUpdateCompanionBuilder,
+      (NoteNode, $$NoteNodesTableReferences),
+      NoteNode,
+      PrefetchHooks Function({bool noteId, bool parentId, bool tasksRefs})
     >;
 typedef $$TasksTableCreateCompanionBuilder =
     TasksCompanion Function({
@@ -5412,6 +6623,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
+      Value<String?> nodeId,
       Value<bool> isDirty,
       Value<int> rowid,
     });
@@ -5429,9 +6641,32 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
+      Value<String?> nodeId,
       Value<bool> isDirty,
       Value<int> rowid,
     });
+
+final class $$TasksTableReferences
+    extends BaseReferences<_$AppDatabase, $TasksTable, TaskData> {
+  $$TasksTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $NoteNodesTable _nodeIdTable(_$AppDatabase db) =>
+      db.noteNodes.createAlias('tasks__node_id__note_nodes__id');
+
+  $$NoteNodesTableProcessedTableManager? get nodeId {
+    final $_column = $_itemColumn<String>('node_id');
+    if ($_column == null) return null;
+    final manager = $$NoteNodesTableTableManager(
+      $_db,
+      $_db.noteNodes,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_nodeIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
 
 class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
   $$TasksTableFilterComposer({
@@ -5506,6 +6741,29 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
     column: $table.isDirty,
     builder: (column) => ColumnFilters(column),
   );
+
+  $$NoteNodesTableFilterComposer get nodeId {
+    final $$NoteNodesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.nodeId,
+      referencedTable: $db.noteNodes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteNodesTableFilterComposer(
+            $db: $db,
+            $table: $db.noteNodes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$TasksTableOrderingComposer
@@ -5581,6 +6839,29 @@ class $$TasksTableOrderingComposer
     column: $table.isDirty,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$NoteNodesTableOrderingComposer get nodeId {
+    final $$NoteNodesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.nodeId,
+      referencedTable: $db.noteNodes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteNodesTableOrderingComposer(
+            $db: $db,
+            $table: $db.noteNodes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$TasksTableAnnotationComposer
@@ -5635,6 +6916,29 @@ class $$TasksTableAnnotationComposer
 
   GeneratedColumn<bool> get isDirty =>
       $composableBuilder(column: $table.isDirty, builder: (column) => column);
+
+  $$NoteNodesTableAnnotationComposer get nodeId {
+    final $$NoteNodesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.nodeId,
+      referencedTable: $db.noteNodes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteNodesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.noteNodes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$TasksTableTableManager
@@ -5648,9 +6952,9 @@ class $$TasksTableTableManager
           $$TasksTableAnnotationComposer,
           $$TasksTableCreateCompanionBuilder,
           $$TasksTableUpdateCompanionBuilder,
-          (TaskData, BaseReferences<_$AppDatabase, $TasksTable, TaskData>),
+          (TaskData, $$TasksTableReferences),
           TaskData,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool nodeId})
         > {
   $$TasksTableTableManager(_$AppDatabase db, $TasksTable table)
     : super(
@@ -5677,6 +6981,7 @@ class $$TasksTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<String?> nodeId = const Value.absent(),
                 Value<bool> isDirty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion(
@@ -5692,6 +6997,7 @@ class $$TasksTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                nodeId: nodeId,
                 isDirty: isDirty,
                 rowid: rowid,
               ),
@@ -5709,6 +7015,7 @@ class $$TasksTableTableManager
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<String?> nodeId = const Value.absent(),
                 Value<bool> isDirty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion.insert(
@@ -5724,13 +7031,57 @@ class $$TasksTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                nodeId: nodeId,
                 isDirty: isDirty,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) =>
+                    (e.readTable(table), $$TasksTableReferences(db, table, e)),
+              )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({nodeId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (nodeId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.nodeId,
+                                referencedTable: $$TasksTableReferences
+                                    ._nodeIdTable(db),
+                                referencedColumn: $$TasksTableReferences
+                                    ._nodeIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
         ),
       );
 }
@@ -5745,9 +7096,9 @@ typedef $$TasksTableProcessedTableManager =
       $$TasksTableAnnotationComposer,
       $$TasksTableCreateCompanionBuilder,
       $$TasksTableUpdateCompanionBuilder,
-      (TaskData, BaseReferences<_$AppDatabase, $TasksTable, TaskData>),
+      (TaskData, $$TasksTableReferences),
       TaskData,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool nodeId})
     >;
 typedef $$ContextsTableCreateCompanionBuilder =
     ContextsCompanion Function({
@@ -6012,7 +7363,7 @@ final class $$TagsTableReferences
   static MultiTypedResultKey<$LocalNoteTagsTable, List<LocalNoteTagData>>
   _localNoteTagsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.localNoteTags,
-    aliasName: $_aliasNameGenerator(db.tags.id, db.localNoteTags.tagId),
+    aliasName: 'tags__id__local_note_tags__tag_id',
   );
 
   $$LocalNoteTagsTableProcessedTableManager get localNoteTagsRefs {
@@ -6325,9 +7676,8 @@ final class $$LocalNoteTagsTableReferences
     super.$_typedResult,
   );
 
-  static $NotesTable _noteIdTable(_$AppDatabase db) => db.notes.createAlias(
-    $_aliasNameGenerator(db.localNoteTags.noteId, db.notes.id),
-  );
+  static $NotesTable _noteIdTable(_$AppDatabase db) =>
+      db.notes.createAlias('local_note_tags__note_id__notes__id');
 
   $$NotesTableProcessedTableManager get noteId {
     final $_column = $_itemColumn<String>('note_id')!;
@@ -6343,9 +7693,8 @@ final class $$LocalNoteTagsTableReferences
     );
   }
 
-  static $TagsTable _tagIdTable(_$AppDatabase db) => db.tags.createAlias(
-    $_aliasNameGenerator(db.localNoteTags.tagId, db.tags.id),
-  );
+  static $TagsTable _tagIdTable(_$AppDatabase db) =>
+      db.tags.createAlias('local_note_tags__tag_id__tags__id');
 
   $$TagsTableProcessedTableManager get tagId {
     final $_column = $_itemColumn<String>('tag_id')!;
@@ -6918,9 +8267,8 @@ final class $$NoteLinksTableReferences
     extends BaseReferences<_$AppDatabase, $NoteLinksTable, NoteLinkData> {
   $$NoteLinksTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $NotesTable _sourceIdTable(_$AppDatabase db) => db.notes.createAlias(
-    $_aliasNameGenerator(db.noteLinks.sourceId, db.notes.id),
-  );
+  static $NotesTable _sourceIdTable(_$AppDatabase db) =>
+      db.notes.createAlias('note_links__source_id__notes__id');
 
   $$NotesTableProcessedTableManager get sourceId {
     final $_column = $_itemColumn<String>('source_id')!;
@@ -6936,9 +8284,8 @@ final class $$NoteLinksTableReferences
     );
   }
 
-  static $NotesTable _targetIdTable(_$AppDatabase db) => db.notes.createAlias(
-    $_aliasNameGenerator(db.noteLinks.targetId, db.notes.id),
-  );
+  static $NotesTable _targetIdTable(_$AppDatabase db) =>
+      db.notes.createAlias('note_links__target_id__notes__id');
 
   $$NotesTableProcessedTableManager get targetId {
     final $_column = $_itemColumn<String>('target_id')!;
@@ -7929,6 +9276,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$NotesTableTableManager get notes =>
       $$NotesTableTableManager(_db, _db.notes);
+  $$NoteNodesTableTableManager get noteNodes =>
+      $$NoteNodesTableTableManager(_db, _db.noteNodes);
   $$TasksTableTableManager get tasks =>
       $$TasksTableTableManager(_db, _db.tasks);
   $$ContextsTableTableManager get contexts =>

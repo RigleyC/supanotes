@@ -83,6 +83,7 @@ type Querier interface {
 	GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]Tag, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
 	GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, error)
+	GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) ([]Task, error)
 	GetTasksByNoteID(ctx context.Context, arg GetTasksByNoteIDParams) ([]Task, error)
 	GetTodayTasks(ctx context.Context, arg GetTodayTasksParams) ([]Task, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)

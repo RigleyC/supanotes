@@ -96,6 +96,21 @@ func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([
 	}
 	panic("unimplemented")
 }
+func (s *stubQuerier) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
+	return sqlcgen.NoteNode{}, nil
+}
+func (s *stubQuerier) UpdateNode(ctx context.Context, arg sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) {
+	return sqlcgen.NoteNode{}, nil
+}
+func (s *stubQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error {
+	return nil
+}
+func (s *stubQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
+	return nil, nil
+}
+func (s *stubQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
 func (s *stubQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
 }

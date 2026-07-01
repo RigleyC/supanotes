@@ -356,6 +356,21 @@ func (s *stubWMQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sqlc
 func (s *stubWMQuerier) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
 	return sqlcgen.UserNotePreference{}, nil
 }
+func (s *stubWMQuerier) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
+	return sqlcgen.NoteNode{}, nil
+}
+func (s *stubWMQuerier) UpdateNode(ctx context.Context, arg sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) {
+	return sqlcgen.NoteNode{}, nil
+}
+func (s *stubWMQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error {
+	return nil
+}
+func (s *stubWMQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
+	return nil, nil
+}
+func (s *stubWMQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
 
 var _ sqlcgen.Querier = (*stubWMQuerier)(nil)
 
