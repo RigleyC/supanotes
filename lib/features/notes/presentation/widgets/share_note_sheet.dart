@@ -29,7 +29,7 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
     _emailCtrl.dispose();
     super.dispose();
   }
-
+//Essa logica aqui deveria ta no controller
   Future<void> _submit() async {
     final email = _emailCtrl.text.trim();
     if (email.isEmpty) {
@@ -61,6 +61,7 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
+          //Remover essas strings simples e passar direto aqui
           NoteStrings.shareDialogTitle,
           style: Theme.of(context).textTheme.titleLarge,
         ),

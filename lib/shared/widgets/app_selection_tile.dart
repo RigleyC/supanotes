@@ -31,27 +31,25 @@ class AppSelectionTile extends StatelessWidget {
       selected: isSelected,
       onTap: onTap,
       tileColor: Colors.transparent,
-      selectedTileColor: scheme.onSurface.withValues(alpha: 0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-      ),
+      
+    //  selectedTileColor: scheme.onSurface.withValues(alpha: 0.08),
       leading: icon != null
           ? Icon(
               icon,
-              size: AppSpacing.iconMd,
+              size: AppSpacing.iconSm,
               color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
             )
           : null,
       title: Text(
         label,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: isSelected ? scheme.primary : scheme.onSurface,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             ),
       ),
       trailing: isSelected
           ? Icon(
-              Icons.check_circle,
+              Icons.check_rounded,
               size: AppSpacing.iconSm,
               color: scheme.primary,
             )

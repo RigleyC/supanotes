@@ -270,10 +270,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
             inactiveColor: colorScheme.outline,
             checkmarkColor: Colors.white,
             onChanged: (val) {
-              if (val != null) {
-                setState(() => _isComplete = val);
-                widget.viewModel.setComplete?.call(val);
-              }
+              setState(() => _isComplete = val);
+              widget.viewModel.setComplete?.call(val);
             },
             onLongPress: widget.onLongPress,
             firstLineHeight: _firstLineHeight(context),
