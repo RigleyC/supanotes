@@ -19,7 +19,11 @@ import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
 abstract class IAuthRepository {
-  Future<AuthResult> register({required String email, required String password, required String name});
+  Future<AuthResult> register({
+    required String email,
+    required String password,
+    required String name,
+  });
   Future<AuthResult> login({required String email, required String password});
   Future<void> logout();
   Future<bool> isAuthenticated();
@@ -30,8 +34,8 @@ class AuthRepository implements IAuthRepository {
   AuthRepository({
     required ApiClient apiClient,
     required AuthLocalStorage storage,
-  })  : _api = apiClient,
-        _storage = storage;
+  }) : _api = apiClient,
+       _storage = storage;
 
   final ApiClient _api;
   final AuthLocalStorage _storage;
@@ -46,11 +50,7 @@ class AuthRepository implements IAuthRepository {
     try {
       final response = await _api.post<Map<String, dynamic>>(
         '/auth/register',
-        data: {
-          'email': email,
-          'password': password,
-          'name': name,
-        },
+        data: {'email': email, 'password': password, 'name': name},
       );
       final body = response.data;
       if (body == null) {
@@ -86,10 +86,7 @@ class AuthRepository implements IAuthRepository {
     try {
       final response = await _api.post<Map<String, dynamic>>(
         '/auth/login',
-        data: {
-          'email': email,
-          'password': password,
-        },
+        data: {'email': email, 'password': password},
       );
       final body = response.data;
       if (body == null) {
@@ -153,10 +150,10 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> registerDeviceToken(String token) async {
     try {
-      await _api.post('/device-tokens', data: {
-        'token': token,
-        'platform': _getPlatformName(),
-      });
+      await _api.post(
+        '/device-tokens',
+        data: {'token': token, 'platform': _getPlatformName()},
+      );
     } on DioException {
       // Non-fatal — push will simply not work until the next registration.
     }

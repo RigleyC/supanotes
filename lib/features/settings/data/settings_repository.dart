@@ -40,7 +40,10 @@ class _SettingsRoutes {
 
 abstract class ISettingsRepository {
   Future<UserSettings> getSettings();
-  Future<UserSettings> updateSettings({String? timezone, Map<String, dynamic>? preferences});
+  Future<UserSettings> updateSettings({
+    String? timezone,
+    Map<String, dynamic>? preferences,
+  });
   Future<Soul> getSoul();
   Future<Soul> updateSoul(String personality);
   Future<List<UserContext>> getContexts();
@@ -159,9 +162,7 @@ class SettingsRepository implements ISettingsRepository {
   @override
   Future<List<UserContext>> getContexts() async {
     try {
-      final response = await _api.get<List<dynamic>>(
-        _SettingsRoutes.contexts,
-      );
+      final response = await _api.get<List<dynamic>>(_SettingsRoutes.contexts);
       final body = response.data ?? const [];
       return body
           .map((raw) => UserContext.fromJson(raw as Map<String, dynamic>))
@@ -250,6 +251,8 @@ String slugifyContextName(String name) {
 
 /// Single shared [SettingsRepository] wired to the app-wide
 /// [apiClientProvider].
-final settingsRepositoryProvider = Provider.autoDispose<ISettingsRepository>((ref) {
+final settingsRepositoryProvider = Provider.autoDispose<ISettingsRepository>((
+  ref,
+) {
   return SettingsRepository(apiClient: ref.watch(apiClientProvider));
 });

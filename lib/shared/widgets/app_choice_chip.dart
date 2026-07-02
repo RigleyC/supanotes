@@ -43,11 +43,7 @@ class AppChoiceChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: AppSpacing.iconSm,
-                  color: fg,
-                ),
+                Icon(icon, size: AppSpacing.iconSm, color: fg),
                 const SizedBox(width: AppSpacing.xs),
               ],
               Text(
@@ -59,11 +55,7 @@ class AppChoiceChip extends StatelessWidget {
               ),
               if (isSelected) ...[
                 const SizedBox(width: AppSpacing.xs),
-                Icon(
-                  Icons.check,
-                  size: AppSpacing.iconSm,
-                  color: fg,
-                ),
+                Icon(Icons.check, size: AppSpacing.iconSm, color: fg),
               ],
             ],
           ),

@@ -5,16 +5,18 @@ import '../../../../core/database/database.dart';
 import '../../../../core/database/daos/tasks_dao.dart';
 import '../../domain/task_recurrence.dart';
 
-final tasksLocalRepositoryProvider = Provider.autoDispose<TasksLocalRepository>((ref) {
-  final db = ref.watch(appDatabaseProvider);
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) {
-    throw StateError(
-      'tasksLocalRepositoryProvider read while unauthenticated',
-    );
-  }
-  return TasksLocalRepository(db.tasksDao, userId);
-});
+final tasksLocalRepositoryProvider = Provider.autoDispose<TasksLocalRepository>(
+  (ref) {
+    final db = ref.watch(appDatabaseProvider);
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null) {
+      throw StateError(
+        'tasksLocalRepositoryProvider read while unauthenticated',
+      );
+    }
+    return TasksLocalRepository(db.tasksDao, userId);
+  },
+);
 
 class TasksLocalRepository {
   TasksLocalRepository(this._dao, this._userId);
@@ -50,20 +52,22 @@ class TasksLocalRepository {
     DateTime? dueDate,
   }) async {
     final now = DateTime.now().toUtc();
-    await _dao.insertTask(TaskData(
-      id: id,
-      userId: _userId,
-      noteId: noteId,
-      title: title,
-      status: status,
-      position: position,
-      recurrence: recurrence,
-      dueDate: dueDate,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
-      isDirty: true,
-    ));
+    await _dao.insertTask(
+      TaskData(
+        id: id,
+        userId: _userId,
+        noteId: noteId,
+        title: title,
+        status: status,
+        position: position,
+        recurrence: recurrence,
+        dueDate: dueDate,
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: null,
+        isDirty: true,
+      ),
+    );
   }
 
   Future<void> updateTask(TasksCompanion companion) async {

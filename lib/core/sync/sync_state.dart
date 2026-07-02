@@ -26,11 +26,7 @@ enum SyncStatus {
 
 /// Immutable snapshot of the sync subsystem.
 class SyncState {
-  const SyncState({
-    required this.status,
-    this.lastSyncedAt,
-    this.errorMessage,
-  });
+  const SyncState({required this.status, this.lastSyncedAt, this.errorMessage});
 
   final SyncStatus status;
   final DateTime? lastSyncedAt;
@@ -45,8 +41,9 @@ class SyncState {
   }) {
     return SyncState(
       status: status ?? this.status,
-      lastSyncedAt:
-          clearLastSynced ? null : (lastSyncedAt ?? this.lastSyncedAt),
+      lastSyncedAt: clearLastSynced
+          ? null
+          : (lastSyncedAt ?? this.lastSyncedAt),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
@@ -61,33 +58,22 @@ class SyncStateNotifier extends Notifier<SyncState> {
   }
 
   void markSyncing() {
-    state = state.copyWith(
-      status: SyncStatus.syncing,
-      clearError: true,
-    );
+    state = state.copyWith(status: SyncStatus.syncing, clearError: true);
   }
 
   void markSynced(DateTime when) {
-    state = SyncState(
-      status: SyncStatus.idle,
-      lastSyncedAt: when,
-    );
+    state = SyncState(status: SyncStatus.idle, lastSyncedAt: when);
   }
 
   void markOffline() {
-    state = state.copyWith(
-      status: SyncStatus.offline,
-      clearError: true,
-    );
+    state = state.copyWith(status: SyncStatus.offline, clearError: true);
   }
 
   void markError(String message) {
-    state = state.copyWith(
-      status: SyncStatus.error,
-      errorMessage: message,
-    );
+    state = state.copyWith(status: SyncStatus.error, errorMessage: message);
   }
 }
 
-final syncStateProvider =
-    NotifierProvider<SyncStateNotifier, SyncState>(SyncStateNotifier.new);
+final syncStateProvider = NotifierProvider<SyncStateNotifier, SyncState>(
+  SyncStateNotifier.new,
+);

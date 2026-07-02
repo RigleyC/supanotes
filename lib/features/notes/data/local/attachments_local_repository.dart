@@ -28,6 +28,6 @@ class AttachmentsLocalRepository {
 
 final attachmentsLocalRepositoryProvider =
     Provider.autoDispose<AttachmentsLocalRepository>((ref) {
-  final db = ref.watch(appDatabaseProvider);
-  return AttachmentsLocalRepository(db.attachmentsDao);
-});
+      final db = ref.watch(appDatabaseProvider);
+      return AttachmentsLocalRepository(db.attachmentsDao);
+    });

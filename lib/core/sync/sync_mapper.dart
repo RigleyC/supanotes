@@ -35,145 +35,147 @@ class SyncMapper {
   // ---------------------------------------------------------------------------
 
   Map<String, dynamic> noteToJson(NoteData n) => {
-        'id': n.id,
-        'user_id': n.userId,
-        'context_id': n.contextId,
-        'is_inbox': n.isInbox,
-        'collapse_images': n.collapseImages,
-        'embedding_status': n.embeddingStatus,
-        'shared_permission': n.permission ?? '',
-        'shared_by_email': n.sharedByEmail ?? '',
-        'shared_by_name': n.sharedByName ?? '',
-        'created_at': n.createdAt.toUtc().toIso8601String(),
-        'updated_at': n.updatedAt.toUtc().toIso8601String(),
-        'deleted_at': n.deletedAt?.toUtc().toIso8601String(),
-      };
+    'id': n.id,
+    'user_id': n.userId,
+    'context_id': n.contextId,
+    'is_inbox': n.isInbox,
+    'collapse_images': n.collapseImages,
+    'embedding_status': n.embeddingStatus,
+    'shared_permission': n.permission ?? '',
+    'shared_by_email': n.sharedByEmail ?? '',
+    'shared_by_name': n.sharedByName ?? '',
+    'created_at': n.createdAt.toUtc().toIso8601String(),
+    'updated_at': n.updatedAt.toUtc().toIso8601String(),
+    'deleted_at': n.deletedAt?.toUtc().toIso8601String(),
+  };
 
   Map<String, dynamic> taskToJson(TaskData t) => {
-        'id': t.id,
-        'user_id': t.userId,
-        'note_id': t.noteId,
-        'title': t.title,
-        'status': t.status,
-        'position': t.position,
-        'recurrence': t.recurrence?.name,
-        'due_date': t.dueDate != null ? DateFormat('yyyy-MM-dd').format(t.dueDate!) : null,
-        'completed_at': t.completedAt?.toUtc().toIso8601String(),
-        'created_at': t.createdAt.toUtc().toIso8601String(),
-        'updated_at': t.updatedAt.toUtc().toIso8601String(),
-        'deleted_at': t.deletedAt?.toUtc().toIso8601String(),
-      };
+    'id': t.id,
+    'user_id': t.userId,
+    'note_id': t.noteId,
+    'title': t.title,
+    'status': t.status,
+    'position': t.position,
+    'recurrence': t.recurrence?.name,
+    'due_date': t.dueDate != null
+        ? DateFormat('yyyy-MM-dd').format(t.dueDate!)
+        : null,
+    'completed_at': t.completedAt?.toUtc().toIso8601String(),
+    'created_at': t.createdAt.toUtc().toIso8601String(),
+    'updated_at': t.updatedAt.toUtc().toIso8601String(),
+    'deleted_at': t.deletedAt?.toUtc().toIso8601String(),
+  };
 
   Map<String, dynamic> contextToJson(ContextData c) => {
-        'id': c.id,
-        'slug': c.slug,
-        'name': c.name,
-        'created_at': c.createdAt.toUtc().toIso8601String(),
-        'updated_at': c.updatedAt.toUtc().toIso8601String(),
-      };
+    'id': c.id,
+    'slug': c.slug,
+    'name': c.name,
+    'created_at': c.createdAt.toUtc().toIso8601String(),
+    'updated_at': c.updatedAt.toUtc().toIso8601String(),
+  };
 
   Map<String, dynamic> tagToJson(TagData t) => {
-        'id': t.id,
-        'name': t.name,
-        'created_at': t.createdAt.toUtc().toIso8601String(),
-        'updated_at': t.updatedAt.toUtc().toIso8601String(),
-      };
+    'id': t.id,
+    'name': t.name,
+    'created_at': t.createdAt.toUtc().toIso8601String(),
+    'updated_at': t.updatedAt.toUtc().toIso8601String(),
+  };
 
   Map<String, dynamic> taskCompletionToJson(LocalTaskCompletionData c) => {
-        'id': c.id,
-        'task_id': c.taskId,
-        'completed_at': c.completedAt.toUtc().toIso8601String(),
-      };
+    'id': c.id,
+    'task_id': c.taskId,
+    'completed_at': c.completedAt.toUtc().toIso8601String(),
+  };
 
   Map<String, dynamic> noteLinkToJson(NoteLinkData l) => {
-        'id': l.id,
-        'source_id': l.sourceId,
-        'target_id': l.targetId,
-        'relation': l.relation,
-        'created_at': l.createdAt.toUtc().toIso8601String(),
-        'updated_at': l.updatedAt.toUtc().toIso8601String(),
-      };
+    'id': l.id,
+    'source_id': l.sourceId,
+    'target_id': l.targetId,
+    'relation': l.relation,
+    'created_at': l.createdAt.toUtc().toIso8601String(),
+    'updated_at': l.updatedAt.toUtc().toIso8601String(),
+  };
 
   Map<String, dynamic> localNoteTagToJson(LocalNoteTagData t) => {
-        'note_id': t.noteId,
-        'tag_id': t.tagId,
-      };
+    'note_id': t.noteId,
+    'tag_id': t.tagId,
+  };
 
   Map<String, dynamic> noteNodeToJson(NoteNode nn) => {
-        'id': nn.id,
-        'note_id': nn.noteId,
-        'parent_id': nn.parentId,
-        'position': nn.position,
-        'type': nn.type,
-        'data': base64Encode(utf8.encode(nn.data)),
-        'created_at': nn.createdAt.toUtc().toIso8601String(),
-        'updated_at': nn.updatedAt.toUtc().toIso8601String(),
-        'deleted_at': nn.deletedAt?.toUtc().toIso8601String(),
-      };
+    'id': nn.id,
+    'note_id': nn.noteId,
+    'parent_id': nn.parentId,
+    'position': nn.position,
+    'type': nn.type,
+    'data': base64Encode(utf8.encode(nn.data)),
+    'created_at': nn.createdAt.toUtc().toIso8601String(),
+    'updated_at': nn.updatedAt.toUtc().toIso8601String(),
+    'deleted_at': nn.deletedAt?.toUtc().toIso8601String(),
+  };
 
   // ---------------------------------------------------------------------------
   // Pull direction — Map → typed
   // ---------------------------------------------------------------------------
 
   NoteData noteFromJson(Map<String, dynamic> json) => NoteData(
-        id: json['id'] as String,
-        userId: json['user_id'] as String,
-        contextId: json['context_id'] as String?,
-        content: json['content'] as String,
-        excerpt: json['excerpt'] as String?,
-        isInbox: (json['is_inbox'] as bool?) ?? false,
-        embeddingStatus: json['embedding_status'] as String?,
-        permission: _nullIfEmpty(json['shared_permission'] as String?),
-        sharedByEmail: _nullIfEmpty(json['shared_by_email'] as String?),
-        sharedByName: _nullIfEmpty(json['shared_by_name'] as String?),
-        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-        updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
-        deletedAt: json['deleted_at'] != null
-            ? DateTime.parse(json['deleted_at'] as String).toLocal()
-            : null,
-        isDirty: false,
-        hasRemoteCopy: true,
-        collapseImages: (json['collapse_images'] as bool?) ?? false,
-      );
+    id: json['id'] as String,
+    userId: json['user_id'] as String,
+    contextId: json['context_id'] as String?,
+    content: json['content'] as String,
+    excerpt: json['excerpt'] as String?,
+    isInbox: (json['is_inbox'] as bool?) ?? false,
+    embeddingStatus: json['embedding_status'] as String?,
+    permission: _nullIfEmpty(json['shared_permission'] as String?),
+    sharedByEmail: _nullIfEmpty(json['shared_by_email'] as String?),
+    sharedByName: _nullIfEmpty(json['shared_by_name'] as String?),
+    createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+    deletedAt: json['deleted_at'] != null
+        ? DateTime.parse(json['deleted_at'] as String).toLocal()
+        : null,
+    isDirty: false,
+    hasRemoteCopy: true,
+    collapseImages: (json['collapse_images'] as bool?) ?? false,
+  );
 
   TaskData taskFromJson(Map<String, dynamic> json) => TaskData(
-        id: json['id'] as String,
-        userId: json['user_id'] as String,
-        noteId: json['note_id'] as String,
-        title: json['title'] as String,
-        status: json['status'] as String,
-        position: (json['position'] as int?) ?? 0,
-        recurrence: TaskRecurrence.parse(json['recurrence'] as String?),
-        dueDate: _parseDueDate(json['due_date'] as String?),
-        completedAt: json['completed_at'] != null
-            ? DateTime.parse(json['completed_at'] as String).toLocal()
-            : null,
-        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-        updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
-        deletedAt: json['deleted_at'] != null
-            ? DateTime.parse(json['deleted_at'] as String).toLocal()
-            : null,
-        isDirty: false,
-      );
+    id: json['id'] as String,
+    userId: json['user_id'] as String,
+    noteId: json['note_id'] as String,
+    title: json['title'] as String,
+    status: json['status'] as String,
+    position: (json['position'] as int?) ?? 0,
+    recurrence: TaskRecurrence.parse(json['recurrence'] as String?),
+    dueDate: _parseDueDate(json['due_date'] as String?),
+    completedAt: json['completed_at'] != null
+        ? DateTime.parse(json['completed_at'] as String).toLocal()
+        : null,
+    createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+    deletedAt: json['deleted_at'] != null
+        ? DateTime.parse(json['deleted_at'] as String).toLocal()
+        : null,
+    isDirty: false,
+  );
 
   ContextData contextFromJson(Map<String, dynamic> json) => ContextData(
-        id: json['id'] as String,
-        userId: json['user_id'] as String,
-        slug: json['slug'] as String,
-        name: json['name'] as String,
-        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-        updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
-        isDirty: false,
-      );
+    id: json['id'] as String,
+    userId: json['user_id'] as String,
+    slug: json['slug'] as String,
+    name: json['name'] as String,
+    createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+    isDirty: false,
+  );
 
   TagData tagFromJson(Map<String, dynamic> json) => TagData(
-        id: json['id'] as String,
-        userId: json['user_id'] as String,
-        name: json['name'] as String,
-        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-        updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
-        isDirty: false,
-      );
+    id: json['id'] as String,
+    userId: json['user_id'] as String,
+    name: json['name'] as String,
+    createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+    isDirty: false,
+  );
 
   /// Pull-side completion mapper. Wire format omits `user_id` (server
   /// derives ownership from the parent task) — caller stamps the row
@@ -182,29 +184,27 @@ class SyncMapper {
   LocalTaskCompletionData taskCompletionFromJson(
     Map<String, dynamic> json, {
     required String userId,
-  }) =>
-      LocalTaskCompletionData(
-        id: json['id'] as String,
-        taskId: json['task_id'] as String,
-        userId: userId,
-        completedAt:
-            DateTime.parse(json['completed_at'] as String).toLocal(),
-        isDirty: false,
-      );
+  }) => LocalTaskCompletionData(
+    id: json['id'] as String,
+    taskId: json['task_id'] as String,
+    userId: userId,
+    completedAt: DateTime.parse(json['completed_at'] as String).toLocal(),
+    isDirty: false,
+  );
 
   NoteLinkData noteLinkFromJson(Map<String, dynamic> json) => NoteLinkData(
-        id: json['id'] as String,
-        sourceId: json['source_id'] as String,
-        targetId: json['target_id'] as String,
-        relation: (json['relation'] as String?) ?? 'related',
-        createdAt: json['created_at'] != null
-            ? DateTime.parse(json['created_at'] as String).toLocal()
-            : DateTime.now(),
-        updatedAt: json['updated_at'] != null
-            ? DateTime.parse(json['updated_at'] as String).toLocal()
-            : DateTime.now(),
-        isDirty: false,
-      );
+    id: json['id'] as String,
+    sourceId: json['source_id'] as String,
+    targetId: json['target_id'] as String,
+    relation: (json['relation'] as String?) ?? 'related',
+    createdAt: json['created_at'] != null
+        ? DateTime.parse(json['created_at'] as String).toLocal()
+        : DateTime.now(),
+    updatedAt: json['updated_at'] != null
+        ? DateTime.parse(json['updated_at'] as String).toLocal()
+        : DateTime.now(),
+    isDirty: false,
+  );
 
   LocalNoteTagData localNoteTagFromJson(Map<String, dynamic> json) =>
       LocalNoteTagData(
@@ -214,19 +214,19 @@ class SyncMapper {
       );
 
   NoteNode noteNodeFromJson(Map<String, dynamic> json) => NoteNode(
-        id: json['id'] as String,
-        noteId: json['note_id'] as String,
-        parentId: json['parent_id'] as String?,
-        position: json['position'] as int,
-        type: json['type'] as String,
-        data: utf8.decode(base64Decode(json['data'] as String)),
-        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-        updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
-        deletedAt: json['deleted_at'] != null
-            ? DateTime.parse(json['deleted_at'] as String).toLocal()
-            : null,
-        isDirty: false,
-      );
+    id: json['id'] as String,
+    noteId: json['note_id'] as String,
+    parentId: json['parent_id'] as String?,
+    position: json['position'] as int,
+    type: json['type'] as String,
+    data: utf8.decode(base64Decode(json['data'] as String)),
+    createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+    deletedAt: json['deleted_at'] != null
+        ? DateTime.parse(json['deleted_at'] as String).toLocal()
+        : null,
+    isDirty: false,
+  );
 
   Map<String, dynamic> userNotePreferenceToJson(UserNotePreferenceData p) {
     return {
@@ -242,7 +242,8 @@ class SyncMapper {
   }
 
   UserNotePreferencesCompanion userNotePreferenceFromJson(
-      Map<String, dynamic> json) {
+    Map<String, dynamic> json,
+  ) {
     return UserNotePreferencesCompanion(
       userId: Value(json['user_id'] as String),
       noteId: Value(json['note_id'] as String),
@@ -250,10 +251,8 @@ class SyncMapper {
       archived: Value(json['archived'] as bool? ?? false),
       hideCompleted: Value(json['hide_completed'] as bool? ?? false),
       filters: Value(json['filters'] as String? ?? '{}'),
-      createdAt:
-          Value(DateTime.parse(json['created_at'] as String).toLocal()),
-      updatedAt:
-          Value(DateTime.parse(json['updated_at'] as String).toLocal()),
+      createdAt: Value(DateTime.parse(json['created_at'] as String).toLocal()),
+      updatedAt: Value(DateTime.parse(json['updated_at'] as String).toLocal()),
       isDirty: const Value(false),
     );
   }

@@ -18,12 +18,12 @@ final activeNotesProvider = StreamProvider.autoDispose<List<NoteModel>>((ref) {
 /// Delegates to a Drift JOIN query that watches both `notes` and `tasks`
 /// tables, so the UI rebuilds whenever *either* changes without manual
 /// stream merging.
-final noteWithTasksProvider =
-    StreamProvider.autoDispose.family<NoteWithTasks, String>((ref, noteId) {
-  return ref.watch(notesRepositoryProvider).watchNoteWithTasks(noteId);
-});
+final noteWithTasksProvider = StreamProvider.autoDispose
+    .family<NoteWithTasks, String>((ref, noteId) {
+      return ref.watch(notesRepositoryProvider).watchNoteWithTasks(noteId);
+    });
 
-final noteNodesProvider =
-    StreamProvider.autoDispose.family<List<NoteNode>, String>((ref, noteId) {
-  return ref.watch(notesRepositoryProvider).watchNodes(noteId);
-});
+final noteNodesProvider = StreamProvider.autoDispose
+    .family<List<NoteNode>, String>((ref, noteId) {
+      return ref.watch(notesRepositoryProvider).watchNodes(noteId);
+    });

@@ -13,7 +13,11 @@ class ShareListSection extends ConsumerWidget {
 
   final String noteId;
 
-  Future<void> _revoke(BuildContext context, WidgetRef ref, ShareModel share) async {
+  Future<void> _revoke(
+    BuildContext context,
+    WidgetRef ref,
+    ShareModel share,
+  ) async {
     final confirmed = await showConfirmDialog(
       context: context,
       title: 'Remover compartilhamento?',
@@ -21,10 +25,9 @@ class ShareListSection extends ConsumerWidget {
     );
     if (confirmed != true) return;
 
-    await ref.read(shareNoteControllerProvider.notifier).revoke(
-      noteId: noteId,
-      userId: share.userId,
-    );
+    await ref
+        .read(shareNoteControllerProvider.notifier)
+        .revoke(noteId: noteId, userId: share.userId);
 
     if (ref.read(shareNoteControllerProvider).hasError) {
       if (context.mounted) {
@@ -60,22 +63,19 @@ class ShareListSection extends ConsumerWidget {
           error: (error, _) => Text(
             error.toString(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
+              color: Theme.of(context).colorScheme.error,
+            ),
           ),
           data: (value) => value.isEmpty
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    'Nenhum compartilhamento',
-                    style: TextStyle(),
-                  ),
+                  child: Text('Nenhum compartilhamento', style: TextStyle()),
                 )
               : ListView.separated(
                   shrinkWrap: true,
                   physics: NeverScrollableScrollPhysics(),
                   itemCount: value.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, i) {
                     final share = value[i];
                     return ListTile(

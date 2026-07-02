@@ -102,9 +102,7 @@ class _NewContextSheetState extends ConsumerState<NewContextSheet> {
               Expanded(
                 child: FilledButton(
                   onPressed: _submitting ? null : _submit,
-                  child: Text(
-                    _submitting ? 'Criando…' : 'Criar',
-                  ),
+                  child: Text(_submitting ? 'Criando…' : 'Criar'),
                 ),
               ),
             ],

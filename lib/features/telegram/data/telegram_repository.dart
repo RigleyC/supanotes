@@ -23,11 +23,7 @@ import 'package:supanotes/core/di/providers.dart';
 /// `linked == true` implies that both [chatId] and [username] are
 /// populated; `linked == false` leaves them as `null`.
 class TelegramLinkStatus {
-  const TelegramLinkStatus({
-    required this.linked,
-    this.chatId,
-    this.username,
-  });
+  const TelegramLinkStatus({required this.linked, this.chatId, this.username});
 
   final bool linked;
   final int? chatId;
@@ -47,10 +43,7 @@ class TelegramLinkStatus {
 /// The [expiresAt] timestamp is in UTC and parsed from the RFC-3339
 /// string the backend returns.
 class TelegramLinkCode {
-  const TelegramLinkCode({
-    required this.code,
-    required this.expiresAt,
-  });
+  const TelegramLinkCode({required this.code, required this.expiresAt});
 
   final String code;
   final DateTime expiresAt;
@@ -143,6 +136,8 @@ class TelegramRepository implements ITelegramRepository {
 /// Single shared [TelegramRepository] wired to the app-wide
 /// [apiClientProvider]. Stateless and safe to read from any consumer
 /// that is authenticated.
-final telegramRepositoryProvider = Provider.autoDispose<ITelegramRepository>((ref) {
+final telegramRepositoryProvider = Provider.autoDispose<ITelegramRepository>((
+  ref,
+) {
   return TelegramRepository(apiClient: ref.watch(apiClientProvider));
 });

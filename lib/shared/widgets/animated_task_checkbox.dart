@@ -72,38 +72,38 @@ class _AnimatedTaskCheckboxState extends State<AnimatedTaskCheckbox>
     final size = widget.size;
 
     return SizedBox(
-        width: size,
-        height: size,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            final scale = 1.0 - (0.15 * (1.0 - _scaleAnim.value));
-            final checkProgress = _checkAnim.value;
+      width: size,
+      height: size,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final scale = 1.0 - (0.15 * (1.0 - _scaleAnim.value));
+          final checkProgress = _checkAnim.value;
 
-            return Transform.scale(
-              scale: scale,
-              child: Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  color: widget.value ? widget.activeColor : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: widget.value
-                        ? widget.activeColor
-                        : widget.inactiveColor,
-                    width: 2,
-                  ),
-                ),
-                child: _CheckmarkPainter(
-                  progress: checkProgress,
-                  color: widget.checkmarkColor,
+          return Transform.scale(
+            scale: scale,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: widget.value ? widget.activeColor : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: widget.value
+                      ? widget.activeColor
+                      : widget.inactiveColor,
+                  width: 2,
                 ),
               ),
-            );
-          },
-        ),
-      );
+              child: _CheckmarkPainter(
+                progress: checkProgress,
+                color: widget.checkmarkColor,
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 

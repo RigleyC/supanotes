@@ -4,5 +4,5 @@ import 'package:supanotes/features/search/domain/search_result_model.dart';
 
 final searchResultsProvider = FutureProvider.autoDispose
     .family<List<SearchResultModel>, String>((ref, query) async {
-  return ref.read(searchRepositoryProvider).search(query: query);
-});
+      return ref.read(searchRepositoryProvider).search(query: query);
+    });

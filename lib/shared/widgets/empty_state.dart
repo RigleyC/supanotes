@@ -41,9 +41,7 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               title,
-              style: textTheme.titleLarge?.copyWith(
-                color: scheme.onSurface,
-              ),
+              style: textTheme.titleLarge?.copyWith(color: scheme.onSurface),
               textAlign: TextAlign.center,
             ),
             if (subtitle != null) ...[

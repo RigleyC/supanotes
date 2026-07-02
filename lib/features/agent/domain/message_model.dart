@@ -70,11 +70,9 @@ class MessageModel {
       sessionId: (json['session_id'] ?? '') as String,
       role: messageRoleFromString((json['role'] ?? 'user') as String),
       content: (json['content'] ?? '') as String,
-      createdAt: DateTime.tryParse((json['created_at'] ?? '') as String) ??
+      createdAt:
+          DateTime.tryParse((json['created_at'] ?? '') as String) ??
           DateTime.now(),
     );
   }
 }
-
-
-

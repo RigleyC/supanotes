@@ -5,7 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../domain/attachment_nodes.dart';
 
 class AttachmentUploadingCapsule extends StatelessWidget {
-  const AttachmentUploadingCapsule({super.key, 
+  const AttachmentUploadingCapsule({
+    super.key,
     required this.fileName,
     required this.onCancel,
   });
@@ -37,7 +38,9 @@ class AttachmentUploadingCapsule extends StatelessWidget {
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: cs.primary),
+                  strokeWidth: 2,
+                  color: cs.primary,
+                ),
               ),
             ),
           ),
@@ -50,18 +53,17 @@ class AttachmentUploadingCapsule extends StatelessWidget {
                 Text(
                   fileName,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w500),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Enviando...',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cs.outline, fontSize: 12),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.outline,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -80,7 +82,8 @@ class AttachmentUploadingCapsule extends StatelessWidget {
 }
 
 class AttachmentFailedCapsule extends StatelessWidget {
-  const AttachmentFailedCapsule({super.key, 
+  const AttachmentFailedCapsule({
+    super.key,
     required this.fileName,
     required this.onDelete,
   });
@@ -120,18 +123,17 @@ class AttachmentFailedCapsule extends StatelessWidget {
                 Text(
                   fileName,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w500),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Falha ao enviar',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cs.error, fontSize: 12),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.error,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -150,7 +152,8 @@ class AttachmentFailedCapsule extends StatelessWidget {
 }
 
 class AttachmentFilePill extends StatelessWidget {
-  const AttachmentFilePill({super.key, 
+  const AttachmentFilePill({
+    super.key,
     required this.fileName,
     required this.subtitle,
     required this.icon,
@@ -197,18 +200,17 @@ class AttachmentFilePill extends StatelessWidget {
                   Text(
                     fileName,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w500),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: cs.outline, fontSize: 12),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.outline,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -239,7 +241,8 @@ class AttachmentExpandedImage extends StatelessWidget {
 }
 
 class AttachmentRichLinkCard extends StatelessWidget {
-  const AttachmentRichLinkCard({super.key, 
+  const AttachmentRichLinkCard({
+    super.key,
     required this.componentKey,
     required this.node,
     this.selection,
@@ -275,48 +278,53 @@ class AttachmentRichLinkCard extends StatelessWidget {
                 color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: cs.outlineVariant.withValues(alpha: 0.4)),
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
+                ),
               ),
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (node.imageUrl != null)
-                      Image.network(node.imageUrl!,
-                          height: 160,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const SizedBox()),
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(node.domain ?? linkUrl,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: cs.outline)),
-                            if (hasPreview) ...[
-                              if (node.title != null)
-                                Text(node.title!,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall),
-                              if (node.description != null)
-                                Text(node.description!,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                            color: cs.onSurfaceVariant)),
-                            ],
-                          ]),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (node.imageUrl != null)
+                    Image.network(
+                      node.imageUrl!,
+                      height: 160,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox(),
                     ),
-                  ]),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          node.domain ?? linkUrl,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.labelSmall?.copyWith(color: cs.outline),
+                        ),
+                        if (hasPreview) ...[
+                          if (node.title != null)
+                            Text(
+                              node.title!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          if (node.description != null)
+                            Text(
+                              node.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

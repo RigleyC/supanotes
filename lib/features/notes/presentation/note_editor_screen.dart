@@ -43,11 +43,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     await flushSnapshot();
     if (!mounted || task == null) return;
 
-    await TaskMetadataSheet.show(
-      context,
-      noteId: task.noteId,
-      task: task,
-    );
+    await TaskMetadataSheet.show(context, noteId: task.noteId, task: task);
   }
 
   @override
@@ -62,7 +58,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           data: (noteWithTasks) {
             final note = noteWithTasks.note;
             if (note == null) {
-              return Scaffold(body: Center(child: Text(NoteStrings.errorNotFound)));
+              return Scaffold(
+                body: Center(child: Text(NoteStrings.errorNotFound)),
+              );
             }
 
             final tasksMap = noteWithTasks.taskById;
@@ -81,7 +79,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 collapseImages: note.collapseImages,
                 isReadOnly: isReadOnly,
                 appBar: AdaptiveSliverNavBar(
-                  title: isReadOnly ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}') : null,
+                  title: isReadOnly
+                      ? Text(
+                          '${NoteStrings.sharedByPrefix} ${note.sharedByEmail}',
+                        )
+                      : null,
                   actions: [
                     AdaptivePopupMenuButton.icon<String>(
                       icon: PlatformInfo.isIOS26OrHigher()
@@ -92,7 +94,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           case 'share':
                             await showAppBottomSheet(
                               context: context,
-                              builder: (_) => ShareNoteSheet(noteId: widget.noteId),
+                              builder: (_) =>
+                                  ShareNoteSheet(noteId: widget.noteId),
                             );
                           case 'hide_completed':
                             final userId = ref.read(currentUserIdProvider);
@@ -128,8 +131,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           icon: PlatformInfo.isIOS26OrHigher()
                               ? (hideCompleted ? 'eye' : 'eye.slash')
                               : (hideCompleted
-                                  ? Icons.visibility
-                                  : Icons.visibility_off),
+                                    ? Icons.visibility
+                                    : Icons.visibility_off),
                           value: 'hide_completed',
                         ),
                         if (isOwner)
@@ -140,8 +143,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             icon: PlatformInfo.isIOS26OrHigher()
                                 ? (note.collapseImages ? 'photo.fill' : 'photo')
                                 : (note.collapseImages
-                                    ? Icons.image
-                                    : Icons.image_outlined),
+                                      ? Icons.image
+                                      : Icons.image_outlined),
                             value: 'collapse_images',
                           ),
                       ],
@@ -151,7 +154,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         icon: const Icon(Icons.check),
                         onPressed: () {
                           FocusManager.instance.primaryFocus?.unfocus();
-                          SystemChannels.textInput.invokeMethod('TextInput.hide');
+                          SystemChannels.textInput.invokeMethod(
+                            'TextInput.hide',
+                          );
                         },
                       ),
                   ],
@@ -161,34 +166,40 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   onTaskLongPress: isReadOnly
                       ? null
                       : (task, flushSnapshot) =>
-                          _openTaskActions(task, flushSnapshot),
+                            _openTaskActions(task, flushSnapshot),
                   onTaskComplete: (taskId) =>
                       TaskSnackBarHelper.completeTaskWithFeedback(
-                    onComplete: () =>
-                        ref.read(tasksRepositoryProvider).completeTask(taskId),
-                    onUndo: () =>
-                        ref.read(tasksRepositoryProvider).reopenTask(taskId),
-                  ),
+                        onComplete: () => ref
+                            .read(tasksRepositoryProvider)
+                            .completeTask(taskId),
+                        onUndo: () => ref
+                            .read(tasksRepositoryProvider)
+                            .reopenTask(taskId),
+                      ),
                   onTaskReopen: (taskId) =>
                       ref.read(tasksRepositoryProvider).reopenTask(taskId),
                   onUploadFile: isReadOnly
                       ? null
-                      : (id, noteId, filePath, mimeType) =>
-                          ref.read(attachmentsRepositoryProvider).upload(
-                            id: id,
-                            noteId: noteId,
-                            file: File(filePath),
-                            mimeType: mimeType,
-                          ),
+                      : (id, noteId, filePath, mimeType) => ref
+                            .read(attachmentsRepositoryProvider)
+                            .upload(
+                              id: id,
+                              noteId: noteId,
+                              file: File(filePath),
+                              mimeType: mimeType,
+                            ),
                 ),
               ),
             );
           },
-          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (error, _) => Scaffold(body: Center(child: Text('Error: $error'))),
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (error, _) =>
+              Scaffold(body: Center(child: Text('Error: $error'))),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(body: Center(child: Text('Error: $error'))),
     );
   }

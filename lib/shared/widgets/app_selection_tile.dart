@@ -27,25 +27,24 @@ class AppSelectionTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return ListTile(
+      minVerticalPadding: 0,
       dense: true,
       selected: isSelected,
       onTap: onTap,
       tileColor: Colors.transparent,
-      
-    //  selectedTileColor: scheme.onSurface.withValues(alpha: 0.08),
       leading: icon != null
           ? Icon(
               icon,
-              size: AppSpacing.iconSm,
+              size: AppSpacing.iconMd,
               color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
             )
           : null,
       title: Text(
         label,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: isSelected ? scheme.primary : scheme.onSurface,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            ),
+          color: isSelected ? scheme.primary : scheme.onSurface,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+        ),
       ),
       trailing: isSelected
           ? Icon(

@@ -91,12 +91,12 @@ class AppMessenger {
             title: title,
             subtitle: subtitle,
             type: type,
+            action: action,
           ),
           backgroundColor: bgColor,
           behavior: SnackBarBehavior.floating,
           shape: const StadiumBorder(),
           duration: duration ?? const Duration(seconds: 4),
-          action: action,
         ),
       );
   }
@@ -107,17 +107,20 @@ class _SnackContent extends StatelessWidget {
     required this.title,
     this.subtitle,
     required this.type,
+    this.action,
   });
 
   final String title;
   final String? subtitle;
   final _SnackType type;
+  final SnackBarAction? action;
 
   Color _dotColor(BuildContext context) {
     return switch (type) {
       _SnackType.success => Colors.green,
       _SnackType.error => Colors.red,
-      _SnackType.info || _SnackType.task => Theme.of(context).colorScheme.primary,
+      _SnackType.info ||
+      _SnackType.task => Theme.of(context).colorScheme.primary,
     };
   }
 
@@ -175,6 +178,17 @@ class _SnackContent extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
+        if (action != null)
+          TextButton(
+            onPressed: () {
+              action!.onPressed();
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+            ),
+            child: Text(action!.label),
+          ),
       ],
     );
   }

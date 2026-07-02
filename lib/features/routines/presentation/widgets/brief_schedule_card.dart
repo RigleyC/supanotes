@@ -178,7 +178,9 @@ class _BriefScheduleCardState extends ConsumerState<BriefScheduleCard> {
   Future<void> _persist({bool? enabled, String? cronExpr}) async {
     setState(() => _saving = true);
     try {
-      await ref.read(routinesRepositoryProvider).updateRoutine(
+      await ref
+          .read(routinesRepositoryProvider)
+          .updateRoutine(
             widget.routine.id,
             enabled: enabled,
             cronExpr: cronExpr,
@@ -209,10 +211,10 @@ class _BriefScheduleCardState extends ConsumerState<BriefScheduleCard> {
   }
 
   String _currentCronExpr() => buildCronExpr(
-        daysOfWeek: _daysOfWeek,
-        hour: _time.hour,
-        minute: _time.minute,
-      );
+    daysOfWeek: _daysOfWeek,
+    hour: _time.hour,
+    minute: _time.minute,
+  );
 
   // ---------------------------------------------------------------------------
   // Dry-run

@@ -33,14 +33,35 @@ import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNam
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Notes, Tasks, Contexts, Tags, LocalNoteTags, LocalTaskCompletions, NoteLinks, Attachments, UserNotePreferences, NoteNodes],
-  daos: [NotesDao, ContextsDao, TasksDao, TagsDao, TaskCompletionsDao, NoteLinksDao, NoteTagsDao, AttachmentsDao, UserNotePreferencesDao],
+  tables: [
+    Notes,
+    Tasks,
+    Contexts,
+    Tags,
+    LocalNoteTags,
+    LocalTaskCompletions,
+    NoteLinks,
+    Attachments,
+    UserNotePreferences,
+    NoteNodes,
+  ],
+  daos: [
+    NotesDao,
+    ContextsDao,
+    TasksDao,
+    TagsDao,
+    TaskCompletionsDao,
+    NoteLinksDao,
+    NoteTagsDao,
+    AttachmentsDao,
+    UserNotePreferencesDao,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   AppDatabase.test({QueryExecutor? executor})
-      : super(executor ?? NativeDatabase.memory());
+    : super(executor ?? NativeDatabase.memory());
 
   /// Latest schema version. Bumped to 13 — v13 adds note_nodes table and
   /// node_id column to tasks.
@@ -49,68 +70,73 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) => m.createAll(),
-        onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await m.createTable(localNoteTags);
-            await m.createTable(localTaskCompletions);
-            await m.addColumn(tags, tags.updatedAt);
-            await m.addColumn(tasks, tasks.completedAt);
-          }
-          if (from < 3) {
-            await m.addColumn(notes, notes.hasRemoteCopy);
-          }
-          if (from < 4) {
-            await m.createTable(noteLinks);
-          } else if (from == 4) {
-            try {
-              await m.addColumn(noteLinks, noteLinks.createdAt);
-            } catch (_) {}
-            try {
-              await m.addColumn(noteLinks, noteLinks.updatedAt);
-            } catch (_) {}
-          }
-          if (from < 6) {
-            await customStatement('ALTER TABLE notes ADD COLUMN hide_completed INTEGER NOT NULL DEFAULT 0');
-          }
-          if (from < 7) {
-            await m.addColumn(notes, notes.permission);
-            await m.addColumn(notes, notes.sharedByEmail);
-            await m.addColumn(notes, notes.sharedByName);
-          }
-          if (from < 8) {
-            try {
-              await customStatement('ALTER TABLE notes DROP COLUMN title');
-            } catch (e) {
-              dev.log('Failed to drop note title column during migration: $e', name: 'DatabaseMigration');
-            }
-          }
-          if (from < 9) {
-            await m.createTable(attachments);
-          }
-          if (from < 10) {
-            await m.addColumn(notes, notes.collapseImages);
-          }
-          if (from < 11) {
-            await m.createTable(userNotePreferences);
-            await customStatement('ALTER TABLE notes DROP COLUMN hide_completed');
-          }
-          if (from < 12) {
-            await m.addColumn(userNotePreferences, userNotePreferences.favorite);
-            await m.addColumn(userNotePreferences, userNotePreferences.archived);
-            await customStatement(
-              'INSERT OR IGNORE INTO user_note_preferences (user_id, note_id, favorite, archived, created_at, updated_at, is_dirty) '
-              'SELECT n.user_id, n.id, n.favorite, n.archived, n.created_at, n.updated_at, 0 FROM notes n',
-            );
-            await customStatement('ALTER TABLE notes DROP COLUMN favorite');
-            await customStatement('ALTER TABLE notes DROP COLUMN archived');
-          }
-          if (from < 13) {
-            await m.createTable(noteNodes);
-            await m.addColumn(tasks, tasks.nodeId);
-          }
-        },
-      );
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(localNoteTags);
+        await m.createTable(localTaskCompletions);
+        await m.addColumn(tags, tags.updatedAt);
+        await m.addColumn(tasks, tasks.completedAt);
+      }
+      if (from < 3) {
+        await m.addColumn(notes, notes.hasRemoteCopy);
+      }
+      if (from < 4) {
+        await m.createTable(noteLinks);
+      } else if (from == 4) {
+        try {
+          await m.addColumn(noteLinks, noteLinks.createdAt);
+        } catch (_) {}
+        try {
+          await m.addColumn(noteLinks, noteLinks.updatedAt);
+        } catch (_) {}
+      }
+      if (from < 6) {
+        await customStatement(
+          'ALTER TABLE notes ADD COLUMN hide_completed INTEGER NOT NULL DEFAULT 0',
+        );
+      }
+      if (from < 7) {
+        await m.addColumn(notes, notes.permission);
+        await m.addColumn(notes, notes.sharedByEmail);
+        await m.addColumn(notes, notes.sharedByName);
+      }
+      if (from < 8) {
+        try {
+          await customStatement('ALTER TABLE notes DROP COLUMN title');
+        } catch (e) {
+          dev.log(
+            'Failed to drop note title column during migration: $e',
+            name: 'DatabaseMigration',
+          );
+        }
+      }
+      if (from < 9) {
+        await m.createTable(attachments);
+      }
+      if (from < 10) {
+        await m.addColumn(notes, notes.collapseImages);
+      }
+      if (from < 11) {
+        await m.createTable(userNotePreferences);
+        await customStatement('ALTER TABLE notes DROP COLUMN hide_completed');
+      }
+      if (from < 12) {
+        await m.addColumn(userNotePreferences, userNotePreferences.favorite);
+        await m.addColumn(userNotePreferences, userNotePreferences.archived);
+        await customStatement(
+          'INSERT OR IGNORE INTO user_note_preferences (user_id, note_id, favorite, archived, created_at, updated_at, is_dirty) '
+          'SELECT n.user_id, n.id, n.favorite, n.archived, n.created_at, n.updated_at, 0 FROM notes n',
+        );
+        await customStatement('ALTER TABLE notes DROP COLUMN favorite');
+        await customStatement('ALTER TABLE notes DROP COLUMN archived');
+      }
+      if (from < 13) {
+        await m.createTable(noteNodes);
+        await m.addColumn(tasks, tasks.nodeId);
+      }
+    },
+  );
 }
 
 LazyDatabase _openConnection() {

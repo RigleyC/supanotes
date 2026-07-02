@@ -12,7 +12,6 @@ const double _taskCheckboxGap = 9;
 
 const Duration _exitAnimationDelay = Duration(milliseconds: 300);
 const Duration _exitAnimationDuration = Duration(milliseconds: 350);
-const Duration _recurrenceResetDelay = Duration(milliseconds: 400);
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder(
@@ -23,6 +22,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
+    this.onError,
     this.requestRebuild,
   });
 
@@ -33,8 +33,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ValueChanged<String>? onTaskLongPress;
   final Future<void> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
+  final void Function(Object error)? onError;
   final VoidCallback? requestRebuild;
-  final Set<String> _pendingResetNodeIds = {};
   final Set<String> _animatingNodeIds = {};
 
   @override
@@ -62,31 +62,20 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
           ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),
         ]);
 
-        if (isComplete) {
-          await onTaskComplete?.call(node.id);
-        } else {
-          await onTaskReopen?.call(node.id);
-        }
-
-        final taskMeta = taskMetadataById[node.id];
-        if (isComplete && taskMeta?.recurrence != null) {
-          _pendingResetNodeIds.add(node.id);
-          Future.delayed(_recurrenceResetDelay, () {
-            if (!_pendingResetNodeIds.remove(node.id)) return;
-            final exists = document.getNodeById(node.id) != null;
-            if (exists) {
-              try {
-                _editor.execute([
-                  ChangeTaskCompletionRequest(nodeId: node.id, isComplete: false),
-                ]);
-              } catch (_) {
-                // Editor was disposed while the timer was pending — safe to ignore.
-              }
-            }
-          });
-        } else if (!isComplete) {
-          // User reopened the task — cancel any pending reset
-          _pendingResetNodeIds.remove(node.id);
+        try {
+          if (isComplete) {
+            await onTaskComplete?.call(node.id);
+          } else {
+            await onTaskReopen?.call(node.id);
+          }
+        } catch (e) {
+          _editor.execute([
+            ChangeTaskCompletionRequest(
+              nodeId: node.id,
+              isComplete: !isComplete,
+            ),
+          ]);
+          onError?.call(e);
         }
       },
       text: node.text,
@@ -108,7 +97,9 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     final nodeId = componentViewModel.nodeId;
 
-    if (hideCompleted && componentViewModel.isComplete && !_animatingNodeIds.contains(nodeId)) {
+    if (hideCompleted &&
+        componentViewModel.isComplete &&
+        !_animatingNodeIds.contains(nodeId)) {
       return SizedBox(key: componentContext.componentKey, height: 0);
     }
 
@@ -181,7 +172,10 @@ class CustomTaskComponent extends StatefulWidget {
 }
 
 class _CustomTaskComponentState extends State<CustomTaskComponent>
-    with ProxyDocumentComponent<CustomTaskComponent>, ProxyTextComposable, TickerProviderStateMixin {
+    with
+        ProxyDocumentComponent<CustomTaskComponent>,
+        ProxyTextComposable,
+        TickerProviderStateMixin {
   final _textKey = GlobalKey();
 
   late AnimationController _exitController;
@@ -197,9 +191,10 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       vsync: this,
       duration: _exitAnimationDuration,
     );
-    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _exitController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _exitController, curve: Curves.easeOut));
     _sizeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(parent: _exitController, curve: Curves.easeInOutCubic),
     );
@@ -233,7 +228,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
       _isComplete = widget.viewModel.isComplete;
     }
-    
+
     if (widget.hideCompleted) {
       if (widget.viewModel.isComplete && !oldWidget.viewModel.isComplete) {
         Future.delayed(_exitAnimationDelay, () {
@@ -241,7 +236,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
             _exitController.forward();
           }
         });
-      } else if (!widget.viewModel.isComplete && oldWidget.viewModel.isComplete) {
+      } else if (!widget.viewModel.isComplete &&
+          oldWidget.viewModel.isComplete) {
         _exitController.reverse();
       }
     }
@@ -316,10 +312,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     return SizeTransition(
       sizeFactor: _sizeAnimation,
       alignment: Alignment.topCenter,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: content,
-      ),
+      child: FadeTransition(opacity: _fadeAnimation, child: content),
     );
   }
 

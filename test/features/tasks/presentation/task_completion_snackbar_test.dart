@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -100,7 +101,17 @@ void main() {
 
     // Click to complete the task
     final checkbox = find.byType(AnimatedTaskCheckbox).first;
-    await tester.tap(checkbox);
+    
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: tester.getCenter(checkbox));
+    await tester.pump();
+    await gesture.down(tester.getCenter(checkbox));
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+    // REMOVE pointer to ensure MouseRegion.onExit is triggered!
+    await gesture.removePointer();
+    await tester.pump();
     
     // Pump a frame to show snackbar
     await tester.pump();
@@ -109,11 +120,10 @@ void main() {
     // Verify snackbar appears
     expect(find.textContaining('Tarefa concluída!'), findsOneWidget);
     
-    // In test environments, the SnackBar timer doesn't reliably dismiss floating snackbars 
-    // because the fake mouse pointer might remain hovered, pausing the timer.
-    // We manually hide it to verify the disappearance logic.
-    AppMessenger.key.currentState?.hideCurrentSnackBar();
-    await tester.pumpAndSettle();
+    // Advance time to allow the snackbar to disappear
+    for (int i = 0; i < 50; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
     // Verify snackbar disappears
     expect(find.textContaining('Tarefa concluída!'), findsNothing);

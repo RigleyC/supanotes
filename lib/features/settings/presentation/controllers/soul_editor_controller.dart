@@ -32,8 +32,9 @@ class SoulState {
   }
 }
 
-final soulProvider =
-    AsyncNotifierProvider.autoDispose<SoulNotifier, SoulState>(SoulNotifier.new);
+final soulProvider = AsyncNotifierProvider.autoDispose<SoulNotifier, SoulState>(
+  SoulNotifier.new,
+);
 
 class SoulNotifier extends AsyncNotifier<SoulState> {
   @override
@@ -53,27 +54,28 @@ class SoulNotifier extends AsyncNotifier<SoulState> {
     final previousState = state.value;
     if (previousState == null) return;
 
-    state = AsyncValue.data(previousState.copyWith(
-      isSaving: true,
-      saveSuccess: false,
-      saveError: null,
-    ));
+    state = AsyncValue.data(
+      previousState.copyWith(
+        isSaving: true,
+        saveSuccess: false,
+        saveError: null,
+      ),
+    );
 
     try {
-      final soul = await ref.read(settingsRepositoryProvider).updateSoul(personality);
+      final soul = await ref
+          .read(settingsRepositoryProvider)
+          .updateSoul(personality);
       await ref.read(sessionCacheProvider.notifier).updateSoul({
         'personality': soul.personality,
       });
-      state = AsyncValue.data(SoulState(
-        soul: soul,
-        isSaving: false,
-        saveSuccess: true,
-      ));
+      state = AsyncValue.data(
+        SoulState(soul: soul, isSaving: false, saveSuccess: true),
+      );
     } catch (e) {
-      state = AsyncValue.data(previousState.copyWith(
-        isSaving: false,
-        saveError: e,
-      ));
+      state = AsyncValue.data(
+        previousState.copyWith(isSaving: false, saveError: e),
+      );
     }
   }
 }

@@ -5,8 +5,8 @@ import '../../domain/share_permission.dart';
 
 final shareNoteControllerProvider =
     AsyncNotifierProvider.autoDispose<ShareNoteController, void>(
-  ShareNoteController.new,
-);
+      ShareNoteController.new,
+    );
 
 class ShareNoteController extends AsyncNotifier<void> {
   @override
@@ -19,24 +19,18 @@ class ShareNoteController extends AsyncNotifier<void> {
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(
-      () => ref.read(sharesRepositoryProvider).shareNote(
-            noteId: noteId,
-            email: email,
-            permission: permission,
-          ),
+      () => ref
+          .read(sharesRepositoryProvider)
+          .shareNote(noteId: noteId, email: email, permission: permission),
     );
   }
 
-  Future<void> revoke({
-    required String noteId,
-    required String userId,
-  }) async {
+  Future<void> revoke({required String noteId, required String userId}) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(
-      () => ref.read(sharesRepositoryProvider).deleteShare(
-            noteId: noteId,
-            userId: userId,
-          ),
+      () => ref
+          .read(sharesRepositoryProvider)
+          .deleteShare(noteId: noteId, userId: userId),
     );
   }
 }

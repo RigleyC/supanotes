@@ -28,9 +28,7 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
       final nextLinked = next.asData?.value.linked ?? false;
       final isPairing = ref.read(telegramPairingProvider).value != null;
       if (!prevLinked && nextLinked && isPairing && mounted) {
-        AppMessenger.showSuccess(
-          'Telegram conectado com sucesso!',
-        );
+        AppMessenger.showSuccess('Telegram conectado com sucesso!');
         if (context.canPop()) {
           context.pop();
         } else {

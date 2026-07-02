@@ -28,6 +28,7 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
     _emailCtrl.dispose();
     super.dispose();
   }
+
   Future<void> _submit() async {
     final email = _emailCtrl.text.trim();
     if (email.isEmpty) {
@@ -37,11 +38,9 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
 
     setState(() => _validationError = null);
 
-    await ref.read(shareNoteControllerProvider.notifier).share(
-          noteId: widget.noteId,
-          email: email,
-          permission: _permission,
-        );
+    await ref
+        .read(shareNoteControllerProvider.notifier)
+        .share(noteId: widget.noteId, email: email, permission: _permission);
 
     final state = ref.read(shareNoteControllerProvider);
     if (state.hasValue && mounted) {
@@ -89,19 +88,20 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
             onChanged: shareState.isLoading
                 ? null
                 : (val) => setState(() {
-                      if (val != null) _permission = val;
-                    }),
+                    if (val != null) _permission = val;
+                  }),
           ),
         ),
-        ?shareState.whenOrNull(error: (err, _) => Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.sm),
-          child: Text(
-            err.toString(),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.error,
+        if (shareState.hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: Text(
+              shareState.error.toString(),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
             ),
           ),
-        )),
         const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
@@ -109,8 +109,9 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
               child: AppButton(
                 text: 'Fechar',
                 variant: AppButtonVariant.secondary,
-                onPressed:
-                    shareState.isLoading ? null : () => Navigator.pop(context),
+                onPressed: shareState.isLoading
+                    ? null
+                    : () => Navigator.pop(context),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),

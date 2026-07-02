@@ -24,7 +24,6 @@ class SoulEditorScreen extends ConsumerStatefulWidget {
 class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   final TextEditingController _controller = TextEditingController();
 
-
   @override
   void dispose() {
     _controller.dispose();
@@ -56,20 +55,23 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<SoulState>>(soulProvider, (prev, next) {
-      next.whenOrNull(data: (state) {
-        if (_controller.text.isEmpty) {
-          _controller.text = state.soul.personality;
-        }
-        if (state.saveSuccess && prev?.value?.saveSuccess != true) {
-          AppMessenger.showSuccess(SettingsStrings.savedSnackbar);
-        }
-        if (state.saveError != null && prev?.value?.saveError != state.saveError) {
-          final err = state.saveError;
-          AppMessenger.showError(
-            err is ApiException ? err.message : err.toString(),
-          );
-        }
-      });
+      next.whenOrNull(
+        data: (state) {
+          if (_controller.text.isEmpty) {
+            _controller.text = state.soul.personality;
+          }
+          if (state.saveSuccess && prev?.value?.saveSuccess != true) {
+            AppMessenger.showSuccess(SettingsStrings.savedSnackbar);
+          }
+          if (state.saveError != null &&
+              prev?.value?.saveError != state.saveError) {
+            final err = state.saveError;
+            AppMessenger.showError(
+              err is ApiException ? err.message : err.toString(),
+            );
+          }
+        },
+      );
     });
 
     final soulAsync = ref.watch(soulProvider);

@@ -27,6 +27,7 @@ import 'package:supanotes/features/settings/presentation/soul_editor_screen.dart
 import 'package:supanotes/features/routines/presentation/brief_history_screen.dart';
 import 'package:supanotes/features/routines/presentation/routines_screen.dart';
 import 'package:supanotes/features/telegram/presentation/telegram_link_screen.dart';
+
 final goRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ValueNotifier<AsyncValue<User?>>(
     ref.read(authControllerProvider),
@@ -44,30 +45,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     debugLogDiagnostics: false,
     refreshListenable: notifier,
     routes: [
-      GoRoute(
-        path: AppRoutes.splash,
-        builder: (_, _) => const SplashScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.login,
-        builder: (_, _) => const LoginScreen(),
-      ),
+      GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),
+      GoRoute(path: AppRoutes.login, builder: (_, _) => const LoginScreen()),
       GoRoute(
         path: AppRoutes.register,
         builder: (_, _) => const RegisterScreen(),
       ),
-      GoRoute(
-        path: AppRoutes.home,
-        builder: (_, _) => const NotesListScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.chat,
-        builder: (_, _) => const ChatScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.inbox,
-        builder: (_, _) => const InboxScreen(),
-      ),
+      GoRoute(path: AppRoutes.home, builder: (_, _) => const NotesListScreen()),
+      GoRoute(path: AppRoutes.chat, builder: (_, _) => const ChatScreen()),
+      GoRoute(path: AppRoutes.inbox, builder: (_, _) => const InboxScreen()),
       GoRoute(
         path: AppRoutes.note(':id'),
         builder: (_, state) =>
@@ -101,10 +87,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.memories,
         builder: (_, _) => const MemoriesScreen(),
       ),
-      GoRoute(
-        path: AppRoutes.mcp,
-        builder: (_, _) => const McpScreen(),
-      ),
+      GoRoute(path: AppRoutes.mcp, builder: (_, _) => const McpScreen()),
     ],
     redirect: (context, state) {
       final result = authGuardRedirect(
@@ -112,7 +95,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         authState: notifier.value,
         persistedLocation: lastRouteStore.initialLocation(),
       );
-      debugPrint('[LastRoute] redirect result=$result for location=${state.matchedLocation}');
+      debugPrint(
+        '[LastRoute] redirect result=$result for location=${state.matchedLocation}',
+      );
       return result;
     },
   );

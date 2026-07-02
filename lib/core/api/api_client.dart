@@ -33,7 +33,8 @@ class ApiClient {
     required Future<void> Function({
       required String accessToken,
       required String refreshToken,
-    }) saveTokens,
+    })
+    saveTokens,
     required AuthFailureHandler onAuthFailure,
   }) : _dio = _buildDio() {
     final interceptor = AuthInterceptor(
@@ -203,7 +204,7 @@ class _LogInterceptor extends Interceptor {
         debugPrint('[ApiClient Response Data] ${err.response?.data}');
       }
     }
-    
+
     dev.log(
       '[ApiClient] ${err.requestOptions.method} '
       '${err.requestOptions.uri} -> '

@@ -2,9 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/tasks_repository.dart';
 import '../../domain/task_recurrence.dart';
 
-final taskControllerProvider = AsyncNotifierProvider.autoDispose<TaskController, void>(
-  TaskController.new,
-);
+final taskControllerProvider =
+    AsyncNotifierProvider.autoDispose<TaskController, void>(TaskController.new);
 
 class TaskController extends AsyncNotifier<void> {
   @override
@@ -20,7 +19,9 @@ class TaskController extends AsyncNotifier<void> {
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(
-      () => ref.read(tasksRepositoryProvider).updateTask(
+      () => ref
+          .read(tasksRepositoryProvider)
+          .updateTask(
             taskId,
             title: title,
             dueDate: dueDate,

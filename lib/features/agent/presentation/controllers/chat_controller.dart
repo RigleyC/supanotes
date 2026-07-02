@@ -52,8 +52,9 @@ ChatState chatState({
 
 // NOT autoDispose: the SSE stream must stay alive across widget
 // unmount/remount to avoid killing in-flight tool confirmations.
-final chatControllerProvider =
-    AsyncNotifierProvider<ChatController, ChatState>(ChatController.new);
+final chatControllerProvider = AsyncNotifierProvider<ChatController, ChatState>(
+  ChatController.new,
+);
 
 class ChatController extends AsyncNotifier<ChatState> {
   StreamSubscription<SSEChatEvent>? _sseSub;
@@ -129,9 +130,7 @@ class ChatController extends AsyncNotifier<ChatState> {
         chatState(
           messages: [
             ...messagesWithoutAssistant,
-            initialAssistant.copyWith(
-              content: content ?? buffer.toString(),
-            ),
+            initialAssistant.copyWith(content: content ?? buffer.toString()),
           ],
           actions: actions ?? current?.actions ?? const [],
           isStreaming: isStreaming ?? true,
@@ -155,66 +154,53 @@ class ChatController extends AsyncNotifier<ChatState> {
             } else if (event.isToolStarted) {
               final currentActions = state.value?.actions ?? const [];
               progress(
-                actions: _upsertAction(
-                  currentActions,
-                  (
-                    id: _actionIdFor(event),
-                    name: event.toolName ?? 'tool',
-                    label: event.toolLabel ?? 'Executando ação',
-                    status: ChatToolActionStatus.running,
-                    message: null,
-                    confirmationId: null,
-                  ),
-                ),
+                actions: _upsertAction(currentActions, (
+                  id: _actionIdFor(event),
+                  name: event.toolName ?? 'tool',
+                  label: event.toolLabel ?? 'Executando ação',
+                  status: ChatToolActionStatus.running,
+                  message: null,
+                  confirmationId: null,
+                )),
               );
             } else if (event.isToolFinished) {
               final currentActions = state.value?.actions ?? const [];
               progress(
-                actions: _upsertAction(
-                  currentActions,
-                  (
-                    id: _actionIdFor(event),
-                    name: event.toolName ?? 'tool',
-                    label: event.toolLabel ?? 'Executando ação',
-                    status: ChatToolActionStatus.completed,
-                    message: null,
-                    confirmationId: null,
-                  ),
-                ),
+                actions: _upsertAction(currentActions, (
+                  id: _actionIdFor(event),
+                  name: event.toolName ?? 'tool',
+                  label: event.toolLabel ?? 'Executando ação',
+                  status: ChatToolActionStatus.completed,
+                  message: null,
+                  confirmationId: null,
+                )),
               );
             } else if (event.isToolFailed || event.isToolResult) {
               final currentActions = state.value?.actions ?? const [];
               progress(
-                actions: _upsertAction(
-                  currentActions,
-                  (
-                    id: _actionIdFor(event),
-                    name: event.toolName ?? 'tool',
-                    label: event.toolLabel ?? 'Executando ação',
-                    status: ChatToolActionStatus.failed,
-                    message: event.errorMessage ?? event.data,
-                    confirmationId: null,
-                  ),
-                ),
+                actions: _upsertAction(currentActions, (
+                  id: _actionIdFor(event),
+                  name: event.toolName ?? 'tool',
+                  label: event.toolLabel ?? 'Executando ação',
+                  status: ChatToolActionStatus.failed,
+                  message: event.errorMessage ?? event.data,
+                  confirmationId: null,
+                )),
               );
             } else if (event.isConfirmationRequired) {
               final currentActions = state.value?.actions ?? const [];
               progress(
-                actions: _upsertAction(
-                  currentActions,
-                  (
-                    id: _actionIdFor(event),
-                    name: event.confirmationToolName ??
-                        event.toolName ??
-                        'tool',
-                    label: event.confirmationLabel ??
-                        event.toolLabel ??
-                        'Executando ação',
-                    status: ChatToolActionStatus.confirmationRequired,
-                    message: null,
-                    confirmationId: event.confirmationId,
-                  ),
-                ),
+                actions: _upsertAction(currentActions, (
+                  id: _actionIdFor(event),
+                  name: event.confirmationToolName ?? event.toolName ?? 'tool',
+                  label:
+                      event.confirmationLabel ??
+                      event.toolLabel ??
+                      'Executando ação',
+                  status: ChatToolActionStatus.confirmationRequired,
+                  message: null,
+                  confirmationId: event.confirmationId,
+                )),
               );
             } else if (event.isDone) {
               final content = event.finalContent ?? buffer.toString();
@@ -244,7 +230,9 @@ class ChatController extends AsyncNotifier<ChatState> {
     if (current == null) return;
 
     try {
-      final result = await ref.read(chatRepositoryProvider).resolveToolConfirmation(
+      final result = await ref
+          .read(chatRepositoryProvider)
+          .resolveToolConfirmation(
             confirmationId: confirmationId,
             approved: approved,
           );
@@ -277,14 +265,19 @@ class ChatController extends AsyncNotifier<ChatState> {
                 createdAt: DateTime.now(),
               ),
             ];
-      state = AsyncValue.data(chatState(
-        messages: nextMessages,
-        actions: nextActions,
-        isStreaming: current.isStreaming,
-      ));
+      state = AsyncValue.data(
+        chatState(
+          messages: nextMessages,
+          actions: nextActions,
+          isStreaming: current.isStreaming,
+        ),
+      );
     } on ApiException catch (e, st) {
       // ignore: invalid_use_of_internal_member
-      state = AsyncValue<ChatState>.error(e.message, st).copyWithPrevious(state);
+      state = AsyncValue<ChatState>.error(
+        e.message,
+        st,
+      ).copyWithPrevious(state);
     }
   }
 
@@ -294,11 +287,7 @@ class ChatController extends AsyncNotifier<ChatState> {
   ) {
     final index = actions.indexWhere((action) => action.id == next.id);
     if (index == -1) return [...actions, next];
-    return [
-      ...actions.take(index),
-      next,
-      ...actions.skip(index + 1),
-    ];
+    return [...actions.take(index), next, ...actions.skip(index + 1)];
   }
 
   String _actionIdFor(SSEChatEvent event) {
@@ -322,13 +311,16 @@ class ChatController extends AsyncNotifier<ChatState> {
       ),
     );
     // ignore: invalid_use_of_internal_member
-    state = AsyncValue<ChatState>.error(message, StackTrace.current).copyWithPrevious(nonStreamingState);
+    state = AsyncValue<ChatState>.error(
+      message,
+      StackTrace.current,
+    ).copyWithPrevious(nonStreamingState);
   }
 
   Future<void> retryLastMessage() async {
     final messages = state.value?.messages;
     if (messages == null || messages.isEmpty) return;
-    
+
     MessageModel? lastUserMsg;
     for (int i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role == MessageRole.user) {
@@ -336,7 +328,7 @@ class ChatController extends AsyncNotifier<ChatState> {
         break;
       }
     }
-    
+
     if (lastUserMsg == null || lastUserMsg.content.trim().isEmpty) return;
     await sendMessage(lastUserMsg.content);
   }

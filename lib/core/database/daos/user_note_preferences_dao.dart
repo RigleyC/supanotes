@@ -10,38 +10,33 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
   UserNotePreferencesDao(super.db);
 
   Stream<UserNotePreferenceData?> watchPreference(
-      String userId, String noteId) {
+    String userId,
+    String noteId,
+  ) {
     return (select(userNotePreferences)
-          ..where(
-              (t) => t.userId.equals(userId) & t.noteId.equals(noteId)))
+          ..where((t) => t.userId.equals(userId) & t.noteId.equals(noteId)))
         .watchSingleOrNull();
   }
 
-  Future<UserNotePreferenceData?> getPreference(
-      String userId, String noteId) {
+  Future<UserNotePreferenceData?> getPreference(String userId, String noteId) {
     return (select(userNotePreferences)
-          ..where(
-              (t) => t.userId.equals(userId) & t.noteId.equals(noteId)))
+          ..where((t) => t.userId.equals(userId) & t.noteId.equals(noteId)))
         .getSingleOrNull();
   }
 
   Future<List<UserNotePreferenceData>> getDirtyPreferences() {
-    return (select(userNotePreferences)
-          ..where((t) => t.isDirty.equals(true)))
-        .get();
+    return (select(
+      userNotePreferences,
+    )..where((t) => t.isDirty.equals(true))).get();
   }
 
   Future<void> clearDirtyFlag(String userId, String noteId) async {
     await (update(userNotePreferences)
-          ..where(
-              (t) => t.userId.equals(userId) & t.noteId.equals(noteId)))
-        .write(
-      const UserNotePreferencesCompanion(isDirty: Value(false)),
-    );
+          ..where((t) => t.userId.equals(userId) & t.noteId.equals(noteId)))
+        .write(const UserNotePreferencesCompanion(isDirty: Value(false)));
   }
 
-  Future<void> setFavorite(
-      String userId, String noteId, bool favorite) async {
+  Future<void> setFavorite(String userId, String noteId, bool favorite) async {
     final now = DateTime.now();
     await into(userNotePreferences).insert(
       UserNotePreferencesCompanion.insert(
@@ -61,8 +56,7 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  Future<void> setArchived(
-      String userId, String noteId, bool archived) async {
+  Future<void> setArchived(String userId, String noteId, bool archived) async {
     final now = DateTime.now();
     await into(userNotePreferences).insert(
       UserNotePreferencesCompanion.insert(
@@ -83,7 +77,10 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<void> setHideCompleted(
-      String userId, String noteId, bool hideCompleted) async {
+    String userId,
+    String noteId,
+    bool hideCompleted,
+  ) async {
     final now = DateTime.now();
     await into(userNotePreferences).insert(
       UserNotePreferencesCompanion.insert(

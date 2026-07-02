@@ -10,7 +10,10 @@ import 'package:supanotes/core/api/api_client.dart';
 
 abstract class ISyncRepository {
   Future<void> push(Map<String, dynamic> payload);
-  Future<Map<String, dynamic>> pull({required String lastSyncedAt, int limit = 500});
+  Future<Map<String, dynamic>> pull({
+    required String lastSyncedAt,
+    int limit = 500,
+  });
 }
 
 class SyncRepository implements ISyncRepository {

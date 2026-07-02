@@ -51,9 +51,7 @@ class TelegramCodeCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              isExpired
-                  ? 'Código expirado'
-                  : 'Expira em $mm:$ss',
+              isExpired ? 'Código expirado' : 'Expira em $mm:$ss',
               textAlign: TextAlign.center,
               style: textTheme.bodySmall?.copyWith(
                 color: isExpired ? scheme.error : scheme.onSurfaceVariant,

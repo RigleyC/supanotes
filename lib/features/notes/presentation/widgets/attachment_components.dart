@@ -16,7 +16,9 @@ class AttachmentComponentBuilder implements ComponentBuilder {
 
   @override
   SingleColumnLayoutComponentViewModel? createViewModel(
-      Document document, DocumentNode node) {
+    Document document,
+    DocumentNode node,
+  ) {
     if (node is! AttachmentNode) return null;
     return _AttachmentViewModel(
       nodeId: node.id,
@@ -24,34 +26,36 @@ class AttachmentComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt],
       collapseImages: collapseImages,
       onDelete: () {
-        editor.execute([
-          DeleteNodeRequest(nodeId: node.id),
-        ]);
+        editor.execute([DeleteNodeRequest(nodeId: node.id)]);
       },
     );
   }
 
   @override
-  Widget? createComponent(SingleColumnDocumentComponentContext context,
-      SingleColumnLayoutComponentViewModel viewModel) {
+  Widget? createComponent(
+    SingleColumnDocumentComponentContext context,
+    SingleColumnLayoutComponentViewModel viewModel,
+  ) {
     if (viewModel is! _AttachmentViewModel) return null;
     return switch (viewModel.node) {
       DocumentAttachmentNode n => DocumentAttachmentWidget(
-          componentKey: context.componentKey,
-          nodeId: n.id,
-          selection: viewModel.selection?.nodeSelection
-              as UpstreamDownstreamNodeSelection?,
-          selectionColor: viewModel.selectionColor,
-          onDelete: viewModel.onDelete,
-          collapseImages: viewModel.collapseImages,
-        ),
+        componentKey: context.componentKey,
+        nodeId: n.id,
+        selection:
+            viewModel.selection?.nodeSelection
+                as UpstreamDownstreamNodeSelection?,
+        selectionColor: viewModel.selectionColor,
+        onDelete: viewModel.onDelete,
+        collapseImages: viewModel.collapseImages,
+      ),
       RichLinkNode n => AttachmentRichLinkCard(
-          componentKey: context.componentKey,
-          node: n,
-          selection: viewModel.selection?.nodeSelection
-              as UpstreamDownstreamNodeSelection?,
-          selectionColor: viewModel.selectionColor,
-        ),
+        componentKey: context.componentKey,
+        node: n,
+        selection:
+            viewModel.selection?.nodeSelection
+                as UpstreamDownstreamNodeSelection?,
+        selectionColor: viewModel.selectionColor,
+      ),
       _ => null,
     };
   }
@@ -78,15 +82,14 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
   final bool collapseImages;
 
   @override
-  _AttachmentViewModel copy() =>
-      _AttachmentViewModel(
-        nodeId: nodeId,
-        node: node,
-        onDelete: onDelete,
-        collapseImages: collapseImages,
-        selection: selection,
-        selectionColor: selectionColor,
-      );
+  _AttachmentViewModel copy() => _AttachmentViewModel(
+    nodeId: nodeId,
+    node: node,
+    onDelete: onDelete,
+    collapseImages: collapseImages,
+    selection: selection,
+    selectionColor: selectionColor,
+  );
 
   @override
   bool operator ==(Object other) =>

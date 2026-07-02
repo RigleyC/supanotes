@@ -55,8 +55,7 @@ class _Applying extends _SheetState {
 // Convenience entry-point
 // ---------------------------------------------------------------------------
 
-Future<OrganizationPlan?> showInboxOrganizeSheet(
-    BuildContext context) async {
+Future<OrganizationPlan?> showInboxOrganizeSheet(BuildContext context) async {
   final result = await showModalBottomSheet<OrganizationPlan>(
     context: context,
     isScrollControlled: true,
@@ -106,8 +105,9 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
   Future<void> _fetch() async {
     setState(() => _state = _Loading());
     try {
-      final plan =
-          await ref.read(inboxOrganizeRepositoryProvider).planInboxOrganization();
+      final plan = await ref
+          .read(inboxOrganizeRepositoryProvider)
+          .planInboxOrganization();
       if (!mounted) return;
       setState(() => _state = _PlanReady(plan));
     } on ApiException catch (e) {
@@ -124,7 +124,9 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
     if (plan == null) return;
     setState(() => _state = _Applying(plan));
     try {
-      await ref.read(inboxOrganizeRepositoryProvider).applyOrganizationPlan(plan);
+      await ref
+          .read(inboxOrganizeRepositoryProvider)
+          .applyOrganizationPlan(plan);
       if (!mounted) return;
       Navigator.of(context).pop(_currentPlan());
     } on ApiException catch (e) {
@@ -140,14 +142,16 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
     final plan = _currentPlan();
     if (plan == null) return;
     setState(() {
-      _state = _PlanReady(OrganizationPlan(
-        planId: plan.planId,
-        items: List<OrganizationPlanItem>.generate(plan.items.length, (i) {
-          return i == index
-              ? plan.items[i].copyWith(accepted: value ?? false)
-              : plan.items[i];
-        }),
-      ));
+      _state = _PlanReady(
+        OrganizationPlan(
+          planId: plan.planId,
+          items: List<OrganizationPlanItem>.generate(plan.items.length, (i) {
+            return i == index
+                ? plan.items[i].copyWith(accepted: value ?? false)
+                : plan.items[i];
+          }),
+        ),
+      );
     });
   }
 
@@ -191,43 +195,42 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
   Widget _buildBody(ColorScheme colorScheme) {
     return switch (_state) {
       _Loading() => Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Analisando rascunho…',
+            style: AppTypography.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+      _Error(:final message) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Analisando rascunho…',
-              style: AppTypography.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+            Icon(Icons.error_outline, color: colorScheme.error, size: 32),
+            const SizedBox(height: AppSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                style: AppTypography.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
               ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FilledButton.tonal(
+              onPressed: _fetch,
+              child: const Text('Tentar novamente'),
             ),
           ],
         ),
-      _Error(:final message) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, color: colorScheme.error, size: 32),
-              const SizedBox(height: AppSpacing.sm),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              FilledButton.tonal(
-                onPressed: _fetch,
-                child: const Text('Tentar novamente'),
-              ),
-            ],
-          ),
-        ),
+      ),
       _PlanReady(:final plan) => _buildPlanItems(plan, colorScheme),
       _Applying(:final plan) => _buildPlanItems(plan, colorScheme),
     };
@@ -239,8 +242,11 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_outlined,
-                size: 48, color: colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.inbox_outlined,
+              size: 48,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Nada para organizar no momento.',
@@ -255,16 +261,11 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
     return ListView.separated(
       shrinkWrap: true,
       itemCount: plan.items.length,
-      separatorBuilder: (_, _) => Divider(
-        height: 1,
-        color: colorScheme.outlineVariant,
-      ),
+      separatorBuilder: (_, _) =>
+          Divider(height: 1, color: colorScheme.outlineVariant),
       itemBuilder: (context, index) {
         final item = plan.items[index];
-        return _PlanItemTile(
-          item: item,
-          onChanged: (v) => _toggle(index, v),
-        );
+        return _PlanItemTile(item: item, onChanged: (v) => _toggle(index, v));
       },
     );
   }
@@ -275,7 +276,9 @@ class _InboxOrganizeSheetState extends ConsumerState<InboxOrganizeSheet> {
       child: Row(
         children: [
           TextButton(
-            onPressed: _state is _Applying ? null : () => Navigator.of(context).pop(),
+            onPressed: _state is _Applying
+                ? null
+                : () => Navigator.of(context).pop(),
             child: const Text('Cancelar'),
           ),
           const Spacer(),
@@ -342,7 +345,8 @@ class _PlanItemTile extends StatelessWidget {
   }
 
   ({String label, IconData icon, Color color}) _destinationStyle(
-      ColorScheme s) {
+    ColorScheme s,
+  ) {
     return switch (item.destinationType) {
       DestinationType.newNote => (
         label: 'Nova nota: ${item.destinationTitle ?? "sem título"}',

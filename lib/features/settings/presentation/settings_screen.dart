@@ -13,8 +13,6 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
-
-
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 

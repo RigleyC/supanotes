@@ -12,7 +12,8 @@ ExecutionInstruction cutAsRichTextWhenCmdXOrCtrlXIsPressed({
     return ExecutionInstruction.continueExecution;
   }
 
-  if (!keyEvent.isPrimaryShortcutKeyPressed || keyEvent.logicalKey != LogicalKeyboardKey.keyX) {
+  if (!keyEvent.isPrimaryShortcutKeyPressed ||
+      keyEvent.logicalKey != LogicalKeyboardKey.keyX) {
     return ExecutionInstruction.continueExecution;
   }
   final selection = editContext.composer.selection;

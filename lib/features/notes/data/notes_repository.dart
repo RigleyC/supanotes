@@ -44,16 +44,19 @@ abstract class INotesRepository {
   Future<NoteModel> ensureInbox();
   Future<void> appendToInbox(String text);
   Future<NoteModel> createLocalNote({required String id});
-  Future<void> saveNoteSnapshot({
-    required String id,
-    required String content,
-  });
+  Future<void> saveNoteSnapshot({required String id, required String content});
   Future<void> deleteIfEmptyOrTombstone(String id);
   Future<void> markHasRemoteCopy(String id);
 }
 
 class NotesRepository implements INotesRepository {
-  NotesRepository(this._local, this._tasksLocal, this._prefsDao, this._db, [this._noteLinksDao]);
+  NotesRepository(
+    this._local,
+    this._tasksLocal,
+    this._prefsDao,
+    this._db, [
+    this._noteLinksDao,
+  ]);
 
   final NotesLocalRepository _local;
   final TasksLocalRepository _tasksLocal;
@@ -79,9 +82,9 @@ class NotesRepository implements INotesRepository {
     } else {
       source = _local.watchActiveNotes();
     }
-    return source.map((rows) => rows
-        .map((qr) => NoteModel.fromQueryResult(qr))
-        .toList());
+    return source.map(
+      (rows) => rows.map((qr) => NoteModel.fromQueryResult(qr)).toList(),
+    );
   }
 
   /// Streams the single inbox note, if any. The inbox is a singleton
@@ -96,9 +99,9 @@ class NotesRepository implements INotesRepository {
   /// Streams a single note by id.
   @override
   Stream<NoteModel?> watchNoteById(String id) {
-    return _local.watchNoteById(id).map(
-      (qr) => qr == null ? null : NoteModel.fromQueryResult(qr),
-    );
+    return _local
+        .watchNoteById(id)
+        .map((qr) => qr == null ? null : NoteModel.fromQueryResult(qr));
   }
 
   @override
@@ -172,8 +175,9 @@ class NotesRepository implements INotesRepository {
       excerpt: content == null
           ? const Value.absent()
           : Value(_excerptFrom(nextContent)),
-      collapseImages:
-          collapseImages == null ? const Value.absent() : Value(collapseImages),
+      collapseImages: collapseImages == null
+          ? const Value.absent()
+          : Value(collapseImages),
       contextId: contextId == null ? const Value.absent() : Value(contextId),
       updatedAt: Value(DateTime.now().toUtc()),
       isDirty: const Value(true),
@@ -231,10 +235,7 @@ class NotesRepository implements INotesRepository {
     final current = await _local.getNoteById(id);
     if (current == null) return;
 
-    await updateNote(
-      id,
-      content: content,
-    );
+    await updateNote(id, content: content);
     await _syncNoteLinks(id, content);
   }
 
@@ -249,7 +250,9 @@ class NotesRepository implements INotesRepository {
     final targetIds = matches.map((m) => m.group(1)!).toSet();
 
     final existingLinks = await dao.getLinksForNote(sourceId);
-    final outboundLinks = existingLinks.where((l) => l.sourceId == sourceId).toList();
+    final outboundLinks = existingLinks
+        .where((l) => l.sourceId == sourceId)
+        .toList();
     final currentTargets = outboundLinks.map((l) => l.targetId).toSet();
 
     final toAdd = targetIds.difference(currentTargets);
@@ -257,7 +260,9 @@ class NotesRepository implements INotesRepository {
       await dao.createLink(sourceId: sourceId, targetId: targetId);
     }
 
-    final toRemove = outboundLinks.where((l) => !targetIds.contains(l.targetId));
+    final toRemove = outboundLinks.where(
+      (l) => !targetIds.contains(l.targetId),
+    );
     for (final link in toRemove) {
       await dao.deleteLink(link.id);
     }
@@ -305,7 +310,6 @@ class NotesRepository implements INotesRepository {
   bool _isTextEmpty(NoteData note) {
     return note.content.trim().isEmpty;
   }
-
 }
 
 /// Riverpod entry point for the feature-level [NotesRepository]. Reads
@@ -315,5 +319,11 @@ final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   final local = ref.watch(notesLocalRepositoryProvider);
   final tasksLocal = ref.watch(tasksLocalRepositoryProvider);
   final db = ref.watch(appDatabaseProvider);
-  return NotesRepository(local, tasksLocal, db.userNotePreferencesDao, db, db.noteLinksDao);
+  return NotesRepository(
+    local,
+    tasksLocal,
+    db.userNotePreferencesDao,
+    db,
+    db.noteLinksDao,
+  );
 });

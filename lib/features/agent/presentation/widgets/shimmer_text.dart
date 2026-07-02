@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ShimmerText extends StatefulWidget {
-  const ShimmerText({
-    super.key,
-    required this.child,
-    this.enabled = true,
-  });
+  const ShimmerText({super.key, required this.child, this.enabled = true});
 
   final Widget child;
   final bool enabled;
@@ -61,7 +57,9 @@ class _ShimmerTextState extends State<ShimmerText>
                 baseColor,
                 baseColor,
               ],
-              transform: _SlidingGradientTransform(slidePercent: _controller.value),
+              transform: _SlidingGradientTransform(
+                slidePercent: _controller.value,
+              ),
             ).createShader(bounds);
           },
           child: child,
@@ -73,14 +71,16 @@ class _ShimmerTextState extends State<ShimmerText>
 }
 
 class _SlidingGradientTransform extends GradientTransform {
-  const _SlidingGradientTransform({
-    required this.slidePercent,
-  });
+  const _SlidingGradientTransform({required this.slidePercent});
 
   final double slidePercent;
 
   @override
   Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
-    return Matrix4.translationValues(bounds.width * (slidePercent - 0.5) * 2, 0.0, 0.0);
+    return Matrix4.translationValues(
+      bounds.width * (slidePercent - 0.5) * 2,
+      0.0,
+      0.0,
+    );
   }
 }

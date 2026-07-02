@@ -17,11 +17,13 @@ class ChatScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<AsyncValue<ChatState>>(chatControllerProvider, (prev, next) {
-      next.whenOrNull(error: (err, _) {
-        if (err.toString() != prev?.error?.toString()) {
-          AppMessenger.showError(err.toString());
-        }
-      });
+      next.whenOrNull(
+        error: (err, _) {
+          if (err.toString() != prev?.error?.toString()) {
+            AppMessenger.showError(err.toString());
+          }
+        },
+      );
     });
 
     void onSend(String text) =>
@@ -32,13 +34,12 @@ class ChatScreen extends ConsumerWidget {
         slivers: [
           const AdaptiveSliverNavBar(
             title: Text('Assistente'),
-            actions: [
-              NewSessionButton(),
-              SizedBox(width: 8),
-            ],
+            actions: [NewSessionButton(), SizedBox(width: 8)],
           ),
           SliverFillRemaining(
-            child: ref.watch(chatControllerProvider).when(
+            child: ref
+                .watch(chatControllerProvider)
+                .when(
                   skipError: true,
                   data: (state) => AgentChatView(
                     messages: state.messages,
@@ -48,12 +49,12 @@ class ChatScreen extends ConsumerWidget {
                     loadingLabel: state.loadingLabel,
                     onCancel: state.isStreaming
                         ? () => ref
-                            .read(chatControllerProvider.notifier)
-                            .cancelStreaming()
+                              .read(chatControllerProvider.notifier)
+                              .cancelStreaming()
                         : null,
                     onSend: onSend,
-                    onResolveConfirmation: (confirmationId, {required approved}) =>
-                        ref
+                    onResolveConfirmation:
+                        (confirmationId, {required approved}) => ref
                             .read(chatControllerProvider.notifier)
                             .resolveToolConfirmation(
                               confirmationId,

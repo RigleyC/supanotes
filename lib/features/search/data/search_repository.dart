@@ -34,10 +34,7 @@ class SearchRepository implements ISearchRepository {
     try {
       final response = await _api.post<List<dynamic>>(
         '/search',
-        data: {
-          'query': trimmed,
-          'limit': limit,
-        },
+        data: {'query': trimmed, 'limit': limit},
       );
       final body = response.data ?? const [];
       return body

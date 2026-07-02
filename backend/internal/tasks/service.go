@@ -96,12 +96,8 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 				baseTime = existing.DueDate.Time
 			}
 			baseTime = time.Date(baseTime.Year(), baseTime.Month(), baseTime.Day(), 0, 0, 0, 0, time.UTC)
-			nextDue, ok := calculateNextDueDate(baseTime, *opts.Recurrence)
+			nextDue, ok := scheduleNextOccurrence(baseTime, *opts.Recurrence)
 			if ok {
-				today := time.Now().UTC()
-				today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
-				nextDue = catchUpDueDate(nextDue, *opts.Recurrence, today)
-
 				statusOpen := "open"
 				opts.Status = &statusOpen
 				opts.DueDate = &nextDue
@@ -194,7 +190,7 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 
 	// Recurring task: schedule next occurrence from caught-up date.
 	if task.Recurrence.Valid && task.Recurrence.String != "" && task.DueDate.Valid {
-		nextDue, ok := calculateNextDueDate(taskDueDate, task.Recurrence.String)
+		nextDue, ok := scheduleNextOccurrence(taskDueDate, task.Recurrence.String)
 		if ok {
 			task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
 				ID:         id,
@@ -322,10 +318,34 @@ func calculateNextDueDate(current time.Time, recurrence string) (time.Time, bool
 
 func catchUpDueDate(from time.Time, recurrence string, today time.Time) time.Time {
 	taskDueDate := from
+	if recurrence == "daily" {
+		if taskDueDate.Before(today) || taskDueDate.Equal(today) {
+			daysDiff := int(today.Sub(taskDueDate).Hours() / 24)
+			return taskDueDate.AddDate(0, 0, daysDiff)
+		}
+	} else if recurrence == "weekly" {
+		if taskDueDate.Before(today) || taskDueDate.Equal(today) {
+			weeksDiff := int(today.Sub(taskDueDate).Hours() / (24 * 7))
+			return taskDueDate.AddDate(0, 0, weeksDiff*7)
+		}
+	}
+
 	nextDue, ok := calculateNextDueDate(taskDueDate, recurrence)
-	for ok && (nextDue.Before(today) || nextDue.Equal(today)) {
+	limit := 0
+	for ok && (nextDue.Before(today) || nextDue.Equal(today)) && limit < 1000 {
 		taskDueDate = nextDue
 		nextDue, ok = calculateNextDueDate(taskDueDate, recurrence)
+		limit++
 	}
 	return taskDueDate
+}
+
+func scheduleNextOccurrence(taskDueDate time.Time, recurrence string) (time.Time, bool) {
+	today := time.Now().UTC()
+	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+	nextDue, ok := calculateNextDueDate(taskDueDate, recurrence)
+	if !ok {
+		return time.Time{}, false
+	}
+	return catchUpDueDate(nextDue, recurrence, today), true
 }

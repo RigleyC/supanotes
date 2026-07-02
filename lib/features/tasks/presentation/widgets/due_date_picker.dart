@@ -20,30 +20,30 @@ class DueDatePicker extends StatefulWidget {
 class _DueDatePickerState extends State<DueDatePicker> {
   bool _isCalendarExpanded = false;
 
+  bool _isSelected(DateTime value) {
+    if (widget.initialDate == null) return false;
+    return value.isSameDayAs(widget.initialDate!);
+  }
+
+  bool _isCustomDate() {
+    if (widget.initialDate == null) return false;
+    return !widget.initialDate!.isQuickPick();
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = now.startOfDay;
-    final tomorrow = DateTime(now.year, now.month, now.day + 1);
-    final nextMonday = today.add(Duration(days: 8 - today.weekday));
-
-    bool isSelected(DateTime? value) {
-      if (value == null || widget.initialDate == null) return false;
-      return value.isSameDayAs(widget.initialDate!);
-    }
-
-    bool isCustomDate() {
-      if (widget.initialDate == null) return false;
-      return !_isQuickPick(widget.initialDate!, today, tomorrow, nextMonday);
-    }
+    final tomorrow = today.add(const Duration(days: 1));
+    final nextWeek = today.add(const Duration(days: 7));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppSelectionTile(
           label: 'Hoje',
-          icon: Icons.today_rounded,
-          isSelected: isSelected(today),
+          icon: Icons.calendar_month_rounded,
+          isSelected: _isSelected(today),
           onTap: () {
             setState(() => _isCalendarExpanded = false);
             widget.onChanged(today);
@@ -51,29 +51,28 @@ class _DueDatePickerState extends State<DueDatePicker> {
         ),
         AppSelectionTile(
           label: 'Amanhã',
-          icon: Icons.wb_sunny_outlined,
-          isSelected: isSelected(tomorrow),
+          icon: Icons.calendar_month_rounded,
+          isSelected: _isSelected(tomorrow),
           onTap: () {
             setState(() => _isCalendarExpanded = false);
             widget.onChanged(tomorrow);
           },
         ),
-        //Mudar pra proxima semana, no caso calcular o dia atual e seria proxima semana no dia atual.
         AppSelectionTile(
-          label: 'Próx. segunda',
-          icon: Icons.date_range_rounded,
-          isSelected: isSelected(nextMonday),
+          label: 'Próxima semana',
+          icon: Icons.calendar_month_rounded,
+          isSelected: _isSelected(nextWeek),
           onTap: () {
             setState(() => _isCalendarExpanded = false);
-            widget.onChanged(nextMonday);
+            widget.onChanged(nextWeek);
           },
         ),
         AppSelectionTile(
-          label: isCustomDate()
+          label: _isCustomDate()
               ? DateFormat('d MMM').format(widget.initialDate!)
               : 'Escolher data',
-          icon: Icons.calendar_month_outlined,
-          isSelected: isCustomDate(),
+          icon: Icons.calendar_month_rounded,
+          isSelected: _isCustomDate(),
           onTap: () {
             setState(() => _isCalendarExpanded = !_isCalendarExpanded);
           },
@@ -106,16 +105,5 @@ class _DueDatePickerState extends State<DueDatePicker> {
         ),
       ],
     );
-  }
-
-  bool _isQuickPick(
-    DateTime value,
-    DateTime today,
-    DateTime tomorrow,
-    DateTime nextMonday,
-  ) {
-    return value.isSameDayAs(today) ||
-        value.isSameDayAs(tomorrow) ||
-        value.isSameDayAs(nextMonday);
   }
 }

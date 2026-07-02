@@ -21,10 +21,7 @@ class TelegramUnlinkedView extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: AppSpacing.lg),
-            const Icon(
-              Icons.telegram_outlined,
-              size: 72,
-            ),
+            const Icon(Icons.telegram_outlined, size: 72),
             const SizedBox(height: AppSpacing.md),
             Text(
               'Conecte sua conta ao Telegram',
@@ -35,8 +32,8 @@ class TelegramUnlinkedView extends ConsumerWidget {
             Text(
               'Receba e envie notas diretamente pelo chat do Telegram.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -66,7 +63,9 @@ class TelegramUnlinkedView extends ConsumerWidget {
                 children: [
                   Text(
                     'Erro: $err',
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.md),

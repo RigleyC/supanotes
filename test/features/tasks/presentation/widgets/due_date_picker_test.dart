@@ -24,7 +24,7 @@ void main() {
 
       expect(find.text('Hoje'), findsOneWidget);
       expect(find.text('Amanhã'), findsOneWidget);
-      expect(find.text('Próx. segunda'), findsOneWidget);
+      expect(find.text('Próxima semana'), findsOneWidget);
       expect(find.text('Escolher data'), findsOneWidget);
       expect(find.text('Sem data'), findsOneWidget);
       expect(find.byType(AppSelectionTile), findsNWidgets(5));

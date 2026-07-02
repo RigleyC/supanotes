@@ -5,7 +5,7 @@ class Attachments extends Table {
   TextColumn get id => text()();
 
   TextColumn get noteId => text().customConstraint(
-    'NOT NULL REFERENCES notes(id) ON DELETE CASCADE'
+    'NOT NULL REFERENCES notes(id) ON DELETE CASCADE',
   )();
 
   TextColumn get localPath => text().nullable()();

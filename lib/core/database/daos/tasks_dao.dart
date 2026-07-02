@@ -22,13 +22,17 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     final today = DateTime(now.year, now.month, now.day);
 
     return (select(tasks)
-          ..where((t) => t.dueDate.isSmallerThanValue(today.add(const Duration(days: 1))))
+          ..where(
+            (t) => t.dueDate.isSmallerThanValue(
+              today.add(const Duration(days: 1)),
+            ),
+          )
           ..where((t) => t.deletedAt.isNull())
           ..orderBy([
             (t) => OrderingTerm(
-                  expression: t.status.equals('done'),
-                  mode: OrderingMode.asc,
-                ),
+              expression: t.status.equals('done'),
+              mode: OrderingMode.asc,
+            ),
             (t) => OrderingTerm(expression: t.dueDate, mode: OrderingMode.asc),
             (t) =>
                 OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
@@ -44,7 +48,10 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return (select(tasks)
           ..where((t) => t.status.equals('open'))
           ..where((t) => t.deletedAt.isNull())
-          ..where((t) => userId == null ? const Constant(true) : t.userId.equals(userId))
+          ..where(
+            (t) =>
+                userId == null ? const Constant(true) : t.userId.equals(userId),
+          )
           ..orderBy([
             (t) => OrderingTerm(expression: t.dueDate, mode: OrderingMode.asc),
             (t) =>
@@ -58,10 +65,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
           ..where((t) => t.noteId.equals(noteId))
           ..orderBy([
             (t) => OrderingTerm(
-                  expression: t.status.equals('done'),
-                  mode: OrderingMode.asc,
-                ),
-            (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
+              expression: t.status.equals('done'),
+              mode: OrderingMode.asc,
+            ),
+            (t) =>
+                OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
           ]))
         .watch();
   }
@@ -71,10 +79,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
           ..where((t) => t.noteId.equals(noteId))
           ..orderBy([
             (t) => OrderingTerm(
-                  expression: t.status.equals('done'),
-                  mode: OrderingMode.asc,
-                ),
-            (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
+              expression: t.status.equals('done'),
+              mode: OrderingMode.asc,
+            ),
+            (t) =>
+                OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
           ]))
         .get();
   }
@@ -92,9 +101,9 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       );
 
       if (companion.recurrence.present && companion.recurrence.value != null) {
-        final current = await (select(tasks)
-              ..where((t) => t.id.equals(companion.id.value)))
-            .getSingleOrNull();
+        final current = await (select(
+          tasks,
+        )..where((t) => t.id.equals(companion.id.value))).getSingleOrNull();
 
         if (current != null && current.status == 'done') {
           final recurrence = companion.recurrence.value!;
@@ -102,7 +111,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
           var nextDue = _nextDueDate(from: baseTime, recurrence: recurrence);
           if (nextDue != null) {
             final today = DateTime(now.year, now.month, now.day);
-            nextDue = _catchUpDueDate(from: nextDue, recurrence: recurrence, today: today);
+            nextDue = _catchUpDueDate(
+              from: nextDue,
+              recurrence: recurrence,
+              today: today,
+            );
             updatedCompanion = updatedCompanion.copyWith(
               status: const Value('open'),
               dueDate: Value(nextDue),
@@ -112,8 +125,9 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         }
       }
 
-      await (update(tasks)..where((t) => t.id.equals(companion.id.value)))
-          .write(updatedCompanion);
+      await (update(
+        tasks,
+      )..where((t) => t.id.equals(companion.id.value))).write(updatedCompanion);
     });
   }
 
@@ -176,8 +190,9 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   /// Returns the next due date for recurring tasks, or null for
   /// non-recurring tasks.
   Future<DateTime?> completeTask(String id) async {
-    final task = await (select(tasks)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final task = await (select(
+      tasks,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (task == null) return null;
 
     final now = DateTime.now();
@@ -188,7 +203,9 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       // 1. If recurring and overdue, catch up to the current active date.
       final recurrence = task.recurrence;
       var taskDueDate = task.dueDate;
-      if (recurrence != null && taskDueDate != null && taskDueDate.isBefore(today)) {
+      if (recurrence != null &&
+          taskDueDate != null &&
+          taskDueDate.isBefore(today)) {
         taskDueDate = _catchUpDueDate(
           from: taskDueDate,
           recurrence: recurrence,

@@ -140,5 +140,3 @@ class _HighlightedText extends StatelessWidget {
     return spans;
   }
 }
-
-

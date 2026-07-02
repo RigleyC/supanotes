@@ -43,30 +43,32 @@ class TagsDao extends DatabaseAccessor<AppDatabase> with _$TagsDaoMixin {
   /// Streams the tags attached to the given [noteId], in the same
   /// alphabetical order as [watchTags].
   Stream<List<TagData>> watchTagsForNote(String noteId) {
-    final query = select(tags).join([
-      innerJoin(localNoteTags, localNoteTags.tagId.equalsExp(tags.id)),
-    ])
-      ..where(localNoteTags.noteId.equals(noteId))
-      ..orderBy([
-        OrderingTerm(expression: tags.name, mode: OrderingMode.asc),
-      ]);
-    return query
-        .watch()
-        .map((rows) => rows.map((r) => r.readTable(tags)).toList());
+    final query =
+        select(tags).join([
+            innerJoin(localNoteTags, localNoteTags.tagId.equalsExp(tags.id)),
+          ])
+          ..where(localNoteTags.noteId.equals(noteId))
+          ..orderBy([
+            OrderingTerm(expression: tags.name, mode: OrderingMode.asc),
+          ]);
+    return query.watch().map(
+      (rows) => rows.map((r) => r.readTable(tags)).toList(),
+    );
   }
 
   /// Returns the tags attached to [noteId] (non-streaming).
   Future<List<TagData>> getTagsForNote(String noteId) {
-    final query = select(tags).join([
-      innerJoin(localNoteTags, localNoteTags.tagId.equalsExp(tags.id)),
-    ])
-      ..where(localNoteTags.noteId.equals(noteId))
-      ..orderBy([
-        OrderingTerm(expression: tags.name, mode: OrderingMode.asc),
-      ]);
-    return query
-        .get()
-        .then((rows) => rows.map((r) => r.readTable(tags)).toList());
+    final query =
+        select(tags).join([
+            innerJoin(localNoteTags, localNoteTags.tagId.equalsExp(tags.id)),
+          ])
+          ..where(localNoteTags.noteId.equals(noteId))
+          ..orderBy([
+            OrderingTerm(expression: tags.name, mode: OrderingMode.asc),
+          ]);
+    return query.get().then(
+      (rows) => rows.map((r) => r.readTable(tags)).toList(),
+    );
   }
 
   /// Inserts a brand-new tag owned by [userId] and returns the resulting
@@ -85,8 +87,7 @@ class TagsDao extends DatabaseAccessor<AppDatabase> with _$TagsDaoMixin {
       updatedAt: now,
     );
     await into(tags).insert(companion);
-    return (await (select(tags)..where((t) => t.id.equals(id)))
-        .getSingle());
+    return (await (select(tags)..where((t) => t.id.equals(id))).getSingle());
   }
 
   /// Hard-deletes a tag and any of its [LocalNoteTags] attachments.
@@ -104,10 +105,7 @@ class TagsDao extends DatabaseAccessor<AppDatabase> with _$TagsDaoMixin {
     required String tagId,
   }) async {
     await into(localNoteTags).insertOnConflictUpdate(
-      LocalNoteTagsCompanion.insert(
-        noteId: noteId,
-        tagId: tagId,
-      ),
+      LocalNoteTagsCompanion.insert(noteId: noteId, tagId: tagId),
     );
   }
 
@@ -116,9 +114,9 @@ class TagsDao extends DatabaseAccessor<AppDatabase> with _$TagsDaoMixin {
     required String noteId,
     required String tagId,
   }) async {
-    await (delete(localNoteTags)
-          ..where((t) => t.noteId.equals(noteId) & t.tagId.equals(tagId)))
-        .go();
+    await (delete(
+      localNoteTags,
+    )..where((t) => t.noteId.equals(noteId) & t.tagId.equals(tagId))).go();
   }
 
   /// Returns every tag that still needs to be pushed to the backend.

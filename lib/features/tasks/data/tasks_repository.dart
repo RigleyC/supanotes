@@ -22,10 +22,24 @@ abstract class ITasksRepository {
   Stream<List<TaskModel>> watchTodayDueTasks();
   Stream<List<TaskModel>> watchUndatedOpenTasks();
   Stream<List<TaskModel>> watchByNote(String noteId);
-  Future<TaskModel> createTask({required String noteId, required String title, DateTime? dueDate, TaskRecurrence? recurrence, int position = 0});
+  Future<TaskModel> createTask({
+    required String noteId,
+    required String title,
+    DateTime? dueDate,
+    TaskRecurrence? recurrence,
+    int position = 0,
+  });
   Future<DateTime?> completeTask(String id);
   Future<void> reopenTask(String id);
-  Future<void> updateTask(String id, {String? title, DateTime? dueDate, TaskRecurrence? recurrence, int? position, bool clearDueDate = false, bool clearRecurrence = false});
+  Future<void> updateTask(
+    String id, {
+    String? title,
+    DateTime? dueDate,
+    TaskRecurrence? recurrence,
+    int? position,
+    bool clearDueDate = false,
+    bool clearRecurrence = false,
+  });
   Future<void> deleteTask(String id);
   Future<void> reorderTasks(String noteId, List<String> orderedIds);
   Future<void> catchUpRecurringTasks();
@@ -172,9 +186,7 @@ class TasksRepository implements ITasksRepository {
           : (dueDate == null ? const Value.absent() : Value(dueDate)),
       recurrence: clearRecurrence
           ? const Value(null)
-          : (recurrence == null
-              ? const Value.absent()
-              : Value(recurrence)),
+          : (recurrence == null ? const Value.absent() : Value(recurrence)),
       position: position == null ? const Value.absent() : Value(position),
     );
     await _local.updateTask(companion);
@@ -234,18 +246,25 @@ final tasksRepositoryProvider = Provider.autoDispose<ITasksRepository>((ref) {
 
 /// Stream of every task visible on the "Hoje" surface (overdue + today +
 /// undated), used by the today screen for the global empty-state check.
-final todayTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
+final todayTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((
+  ref,
+) {
   return ref.watch(tasksRepositoryProvider).watchTodayTasks();
 });
 
-final overdueTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
+final overdueTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((
+  ref,
+) {
   return ref.watch(tasksRepositoryProvider).watchOverdueTasks();
 });
 
-final todayDueTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
-  return ref.watch(tasksRepositoryProvider).watchTodayDueTasks();
-});
+final todayDueTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>(
+  (ref) {
+    return ref.watch(tasksRepositoryProvider).watchTodayDueTasks();
+  },
+);
 
-final undatedOpenTasksStreamProvider = StreamProvider.autoDispose<List<TaskModel>>((ref) {
-  return ref.watch(tasksRepositoryProvider).watchUndatedOpenTasks();
-});
+final undatedOpenTasksStreamProvider =
+    StreamProvider.autoDispose<List<TaskModel>>((ref) {
+      return ref.watch(tasksRepositoryProvider).watchUndatedOpenTasks();
+    });

@@ -11,7 +11,10 @@ import '../domain/memory_model.dart';
 
 abstract class IMemoriesRepository {
   Future<List<MemoryModel>> getMemories();
-  Future<MemoryModel> createMemory({required String content, String? contextSlug});
+  Future<MemoryModel> createMemory({
+    required String content,
+    String? contextSlug,
+  });
   Future<MemoryModel> updateMemory(String id, {required String content});
   Future<void> deleteMemory(String id);
 }
@@ -91,6 +94,8 @@ class MemoriesRepository implements IMemoriesRepository {
   }
 }
 
-final memoriesRepositoryProvider = Provider.autoDispose<IMemoriesRepository>((ref) {
+final memoriesRepositoryProvider = Provider.autoDispose<IMemoriesRepository>((
+  ref,
+) {
   return MemoriesRepository(apiClient: ref.watch(apiClientProvider));
 });

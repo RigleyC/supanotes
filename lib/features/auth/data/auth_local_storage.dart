@@ -21,7 +21,7 @@ import 'package:supanotes/features/auth/domain/user.dart';
 
 class AuthLocalStorage {
   AuthLocalStorage({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
 
@@ -69,10 +69,7 @@ class AuthLocalStorage {
   /// Persists the raw session data (settings, soul, contexts, routines)
   /// as a JSON blob so controllers can hydrate from disk on cold start.
   Future<void> saveSessionData(Map<String, dynamic> data) async {
-    await _storage.write(
-      key: _kSessionData,
-      value: jsonEncode(data),
-    );
+    await _storage.write(key: _kSessionData, value: jsonEncode(data));
   }
 
   /// Returns the parsed session data or an empty map if missing.

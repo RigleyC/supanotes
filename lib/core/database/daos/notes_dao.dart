@@ -43,7 +43,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Returns a note with the user's preference flags, or `null` when the
   /// note does not exist.
   Future<NoteQueryResult?> getNoteWithPrefsById(
-      String id, String userId) async {
+    String id,
+    String userId,
+  ) async {
     return customSelect(
       'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
@@ -51,7 +53,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
       readsFrom: {notes, userNotePreferences},
-    ).get().then((rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first));
+    ).get().then(
+      (rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first),
+    );
   }
 
   /// Streams a single note by id with the user's preferences.
@@ -79,7 +83,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'WHERE n.user_id = ? AND n.is_inbox = 1 AND n.deleted_at IS NULL',
       variables: [Variable.withString(userId), Variable.withString(userId)],
       readsFrom: {notes, userNotePreferences},
-    ).get().then((rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first));
+    ).get().then(
+      (rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first),
+    );
   }
 
   /// Streams the single inbox note, re-emitting whenever a new one is
@@ -93,7 +99,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       variables: [Variable.withString(userId), Variable.withString(userId)],
       readsFrom: {notes, userNotePreferences},
     ).watchSingleOrNull().map(
-        (row) => row != null ? _queryResultFromRow(row) : null);
+      (row) => row != null ? _queryResultFromRow(row) : null,
+    );
   }
 
   /// Streams a note with its tasks in a single reactive emission via a
@@ -101,7 +108,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// or `user_note_preferences` tables change, so the combined stream
   /// stays in sync without manual stream merging.
   Stream<NoteWithTasksQueryResult?> watchNoteWithTasks(
-      String id, String userId) {
+    String id,
+    String userId,
+  ) {
     return customSelect(
       'SELECT n.*, '
       'COALESCE(unp.favorite, 0) AS favorite, '
@@ -131,7 +140,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Streams every active note attached to the given [contextId] with
   /// the user's preferences.
   Stream<List<NoteQueryResult>> watchNotesByContext(
-      String contextId, String userId) {
+    String contextId,
+    String userId,
+  ) {
     return _watchWithPref(
       'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
@@ -245,13 +256,15 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   Future<void> upsertNote(NotesCompanion note) {
     return into(notes).insert(
       note,
-      onConflict: DoUpdate.withExcluded((old, excluded) => NotesCompanion.custom(
-        content: excluded.content,
-        contextId: excluded.contextId,
-        excerpt: excluded.excerpt,
-        updatedAt: excluded.updatedAt,
-        isDirty: excluded.isDirty,
-      )),
+      onConflict: DoUpdate.withExcluded(
+        (old, excluded) => NotesCompanion.custom(
+          content: excluded.content,
+          contextId: excluded.contextId,
+          excerpt: excluded.excerpt,
+          updatedAt: excluded.updatedAt,
+          isDirty: excluded.isDirty,
+        ),
+      ),
     );
   }
 
@@ -276,9 +289,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// blank. Used to hide empty local-only notes from lists and to
   /// determine sync eligibility.
   Expression<bool> Function($NotesTable) get _nonEmptyNote =>
-      (t) => CustomExpression<bool>(
-            "trim(content) <> ''",
-          );
+      (t) => CustomExpression<bool>("trim(content) <> ''");
 
   /// Returns every note that has unsynced local changes and is eligible for
   /// sync (has a remote copy, is inbox, or has non-empty content).
@@ -288,7 +299,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return (select(notes)
           ..where((t) => t.isDirty.equals(true))
           ..where(
-            (t) => t.hasRemoteCopy.equals(true) |
+            (t) =>
+                t.hasRemoteCopy.equals(true) |
                 t.isInbox.equals(true) |
                 _nonEmptyNote(t),
           ))

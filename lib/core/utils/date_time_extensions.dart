@@ -8,4 +8,12 @@ extension DateTimeDateOnly on DateTime {
   DateTime get startOfDay {
     return DateTime(year, month, day);
   }
+
+  /// Returns true if this date is Today, Tomorrow, or 7 days from now.
+  bool isQuickPick() {
+    final today = DateTime.now().startOfDay;
+    final tomorrow = today.add(const Duration(days: 1));
+    final nextWeek = today.add(const Duration(days: 7));
+    return isSameDayAs(today) || isSameDayAs(tomorrow) || isSameDayAs(nextWeek);
+  }
 }

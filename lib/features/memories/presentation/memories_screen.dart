@@ -17,16 +17,18 @@ class MemoriesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncValue = ref.watch(memoriesControllerProvider);
 
-    ref.listen<AsyncValue<List<MemoryModel>>>(
-      memoriesControllerProvider,
-      (prev, next) {
-        next.whenOrNull(error: (err, _) {
+    ref.listen<AsyncValue<List<MemoryModel>>>(memoriesControllerProvider, (
+      prev,
+      next,
+    ) {
+      next.whenOrNull(
+        error: (err, _) {
           if (prev == null || prev.hasError == false) {
             AppMessenger.showError(err.toString());
           }
-        });
-      },
-    );
+        },
+      );
+    });
 
     return Scaffold(
       body: CustomScrollView(
@@ -36,9 +38,8 @@ class MemoriesScreen extends ConsumerWidget {
             loading: () => const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (e, _) => SliverFillRemaining(
-              child: Center(child: Text('$e')),
-            ),
+            error: (e, _) =>
+                SliverFillRemaining(child: Center(child: Text('$e'))),
             data: (memories) => memories.isEmpty
                 ? const SliverFillRemaining(
                     child: EmptyState(
@@ -48,24 +49,21 @@ class MemoriesScreen extends ConsumerWidget {
                     ),
                   )
                 : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final memory = memories[index];
-                        return ListTile(
-                          title: Text(memory.content),
-                          subtitle: memory.contextSlug != null
-                              ? Text(memory.contextSlug!)
-                              : null,
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () => ref
-                                .read(memoriesControllerProvider.notifier)
-                                .deleteMemory(memory.id),
-                          ),
-                        );
-                      },
-                      childCount: memories.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final memory = memories[index];
+                      return ListTile(
+                        title: Text(memory.content),
+                        subtitle: memory.contextSlug != null
+                            ? Text(memory.contextSlug!)
+                            : null,
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => ref
+                              .read(memoriesControllerProvider.notifier)
+                              .deleteMemory(memory.id),
+                        ),
+                      );
+                    }, childCount: memories.length),
                   ),
           ),
         ],

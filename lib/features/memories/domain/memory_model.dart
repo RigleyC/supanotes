@@ -20,9 +20,11 @@ class MemoryModel {
       id: (json['id'] ?? '') as String,
       content: (json['content'] ?? '') as String,
       contextSlug: json['context_slug'] as String?,
-      createdAt: DateTime.tryParse((json['created_at'] ?? '') as String) ??
+      createdAt:
+          DateTime.tryParse((json['created_at'] ?? '') as String) ??
           DateTime.now(),
-      updatedAt: DateTime.tryParse((json['updated_at'] ?? '') as String) ??
+      updatedAt:
+          DateTime.tryParse((json['updated_at'] ?? '') as String) ??
           DateTime.now(),
     );
   }

@@ -6,7 +6,10 @@ class CustomDividerComponentBuilder implements ComponentBuilder {
   const CustomDividerComponentBuilder();
 
   @override
-  SingleColumnLayoutComponentViewModel? createViewModel(Document document, DocumentNode node) {
+  SingleColumnLayoutComponentViewModel? createViewModel(
+    Document document,
+    DocumentNode node,
+  ) {
     if (node is! HorizontalRuleNode) return null;
 
     final dividerIndex = node.getMetadataValue('dividerIndex') as int?;
@@ -30,7 +33,9 @@ class CustomDividerComponentBuilder implements ComponentBuilder {
     return CustomDividerComponent(
       componentKey: componentContext.componentKey,
       dividerIndex: componentViewModel.dividerIndex,
-      selection: componentViewModel.selection?.nodeSelection as UpstreamDownstreamNodeSelection?,
+      selection:
+          componentViewModel.selection?.nodeSelection
+              as UpstreamDownstreamNodeSelection?,
       selectionColor: componentViewModel.selectionColor,
       showCaret: componentViewModel.caret != null,
       caretColor: componentViewModel.caretColor,
@@ -39,7 +44,9 @@ class CustomDividerComponentBuilder implements ComponentBuilder {
   }
 }
 
-class CustomDividerComponentViewModel extends SingleColumnLayoutComponentViewModel with SelectionAwareViewModelMixin {
+class CustomDividerComponentViewModel
+    extends SingleColumnLayoutComponentViewModel
+    with SelectionAwareViewModelMixin {
   CustomDividerComponentViewModel({
     required super.nodeId,
     this.dividerIndex,
@@ -117,10 +124,7 @@ class CustomDividerComponent extends StatelessWidget {
             child: SizedBox(
               height: 24,
               width: double.infinity,
-              child: SvgPicture.asset(
-                assetPath,
-                fit: BoxFit.fitWidth,
-              ),
+              child: SvgPicture.asset(assetPath, fit: BoxFit.fitWidth),
             ),
           ),
         ),

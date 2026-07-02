@@ -18,11 +18,11 @@ class ShareModel {
   });
 
   factory ShareModel.fromJson(Map<String, dynamic> json) => ShareModel(
-        id: json['id'] as String,
-        noteId: json['note_id'] as String,
-        userId: json['user_id'] as String,
-        email: json['email'] as String,
-        name: (json['name'] as String?) ?? '',
-        permission: SharePermission.fromJson(json['permission'] as String),
-      );
+    id: json['id'] as String,
+    noteId: json['note_id'] as String,
+    userId: json['user_id'] as String,
+    email: json['email'] as String,
+    name: (json['name'] as String?) ?? '',
+    permission: SharePermission.fromJson(json['permission'] as String),
+  );
 }

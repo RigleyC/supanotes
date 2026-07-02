@@ -12,10 +12,11 @@ class AgentActionTimelineCard extends StatefulWidget {
 
   final List<ChatToolAction> actions;
   final void Function(String confirmationId, {required bool approved})?
-      onResolveConfirmation;
+  onResolveConfirmation;
 
   @override
-  State<AgentActionTimelineCard> createState() => _AgentActionTimelineCardState();
+  State<AgentActionTimelineCard> createState() =>
+      _AgentActionTimelineCardState();
 }
 
 class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
@@ -24,20 +25,26 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
   @override
   void initState() {
     super.initState();
-    _expanded = widget.actions.any((a) =>
-        a.status == ChatToolActionStatus.running ||
-        a.status == ChatToolActionStatus.confirmationRequired);
+    _expanded = widget.actions.any(
+      (a) =>
+          a.status == ChatToolActionStatus.running ||
+          a.status == ChatToolActionStatus.confirmationRequired,
+    );
   }
 
   @override
   void didUpdateWidget(covariant AgentActionTimelineCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final hasActive = widget.actions.any((a) =>
-        a.status == ChatToolActionStatus.running ||
-        a.status == ChatToolActionStatus.confirmationRequired);
-    final hadActive = oldWidget.actions.any((a) =>
-        a.status == ChatToolActionStatus.running ||
-        a.status == ChatToolActionStatus.confirmationRequired);
+    final hasActive = widget.actions.any(
+      (a) =>
+          a.status == ChatToolActionStatus.running ||
+          a.status == ChatToolActionStatus.confirmationRequired,
+    );
+    final hadActive = oldWidget.actions.any(
+      (a) =>
+          a.status == ChatToolActionStatus.running ||
+          a.status == ChatToolActionStatus.confirmationRequired,
+    );
     if (hasActive && !hadActive) {
       _expanded = true;
     }
@@ -50,8 +57,12 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final isAnyRunning = widget.actions.any((a) => a.status == ChatToolActionStatus.running);
-    final isAnyConfirmation = widget.actions.any((a) => a.status == ChatToolActionStatus.confirmationRequired);
+    final isAnyRunning = widget.actions.any(
+      (a) => a.status == ChatToolActionStatus.running,
+    );
+    final isAnyConfirmation = widget.actions.any(
+      (a) => a.status == ChatToolActionStatus.confirmationRequired,
+    );
 
     String headerText = 'Etapas executadas';
     if (isAnyRunning) {
@@ -62,7 +73,9 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
 
     final iconColor = isAnyConfirmation
         ? theme.colorScheme.primary
-        : (isAnyRunning ? theme.colorScheme.secondary : theme.colorScheme.primary);
+        : (isAnyRunning
+              ? theme.colorScheme.secondary
+              : theme.colorScheme.primary);
 
     Widget headerIcon;
     if (isAnyRunning) {
@@ -80,7 +93,9 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
       headerIcon = Icon(Icons.check_circle_outline, size: 14, color: iconColor);
     }
 
-    final backgroundColor = isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7);
+    final backgroundColor = isDark
+        ? const Color(0xFF1C1C1E)
+        : const Color(0xFFF2F2F7);
 
     Widget headerContent = Row(
       mainAxisSize: MainAxisSize.min,
@@ -140,7 +155,9 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
                       children: [
                         const Divider(height: 1, thickness: 0.5),
                         const SizedBox(height: 8),
-                        ...widget.actions.map((action) => _buildActionRow(context, action)),
+                        ...widget.actions.map(
+                          (action) => _buildActionRow(context, action),
+                        ),
                       ],
                     ),
                   )
@@ -153,10 +170,10 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
 
   Widget _buildActionRow(BuildContext context, ChatToolAction action) {
     final theme = Theme.of(context);
-    
+
     Widget statusIcon;
     Color? textColor;
-    
+
     switch (action.status) {
       case ChatToolActionStatus.running:
         statusIcon = SizedBox(
@@ -199,10 +216,7 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
     Widget row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 3.0),
-          child: statusIcon,
-        ),
+        Padding(padding: const EdgeInsets.only(top: 3.0), child: statusIcon),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -218,11 +232,15 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
               Text(
                 'ferramenta: ${action.name}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                   fontStyle: FontStyle.italic,
                 ),
               ),
-              if (action.message != null && action.message!.isNotEmpty && action.status == ChatToolActionStatus.failed) ...[
+              if (action.message != null &&
+                  action.message!.isNotEmpty &&
+                  action.status == ChatToolActionStatus.failed) ...[
                 const SizedBox(height: 4),
                 Text(
                   action.message!,
@@ -231,7 +249,8 @@ class _AgentActionTimelineCardState extends State<AgentActionTimelineCard> {
                   ),
                 ),
               ],
-              if (action.status == ChatToolActionStatus.confirmationRequired && action.confirmationId != null) ...[
+              if (action.status == ChatToolActionStatus.confirmationRequired &&
+                  action.confirmationId != null) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [

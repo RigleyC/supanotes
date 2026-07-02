@@ -28,12 +28,14 @@ typedef AuthFailureHandler = Future<void> Function();
 
 /// Signature for the refresh HTTP call. Receives the plain refresh token
 /// and returns a new token pair, or null on failure.
-typedef RefreshHandler = Future<({String accessToken, String refreshToken})?> Function(
-  String refreshToken,
-);
+typedef RefreshHandler =
+    Future<({String accessToken, String refreshToken})?> Function(
+      String refreshToken,
+    );
 
 /// Signature for replaying a failed request after a successful refresh.
-typedef ReplayHandler = Future<Response<dynamic>> Function(RequestOptions options);
+typedef ReplayHandler =
+    Future<Response<dynamic>> Function(RequestOptions options);
 
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
@@ -42,22 +44,24 @@ class AuthInterceptor extends Interceptor {
     required Future<void> Function({
       required String accessToken,
       required String refreshToken,
-    }) saveTokens,
+    })
+    saveTokens,
     required this.onAuthFailure,
     required RefreshHandler onRefresh,
     required ReplayHandler replay,
-  })  : _getAccessToken = getAccessToken,
-        _getRefreshToken = getRefreshToken,
-        _saveTokens = saveTokens,
-        _onRefresh = onRefresh,
-        _replay = replay;
+  }) : _getAccessToken = getAccessToken,
+       _getRefreshToken = getRefreshToken,
+       _saveTokens = saveTokens,
+       _onRefresh = onRefresh,
+       _replay = replay;
 
   final Future<String?> Function() _getAccessToken;
   final Future<String?> Function() _getRefreshToken;
   final Future<void> Function({
     required String accessToken,
     required String refreshToken,
-  }) _saveTokens;
+  })
+  _saveTokens;
   final AuthFailureHandler onAuthFailure;
   final RefreshHandler _onRefresh;
   final ReplayHandler _replay;

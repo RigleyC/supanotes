@@ -34,9 +34,9 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     getRefreshToken: () => storage.getRefreshToken(),
     saveTokens: ({required String accessToken, required String refreshToken}) =>
         storage.saveTokens(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-    ),
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        ),
     onAuthFailure: () async {
       ref.read(authControllerProvider.notifier).onSessionExpired();
     },
@@ -64,8 +64,9 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
 ///
 /// State is [AsyncValue<User?>]: loading, data(user) → authenticated,
 /// data(null) → unauthenticated, error → unauthenticated with feedback.
-final authControllerProvider =
-    AsyncNotifierProvider<AuthController, User?>(AuthController.new);
+final authControllerProvider = AsyncNotifierProvider<AuthController, User?>(
+  AuthController.new,
+);
 
 final sessionResetProvider = StateProvider<int>((ref) => 0);
 
@@ -73,11 +74,14 @@ final sessionResetProvider = StateProvider<int>((ref) => 0);
 // Database DAOs
 // ---------------------------------------------------------------------------
 
-final tagsDaoProvider = Provider.autoDispose((ref) => ref.watch(appDatabaseProvider).tagsDao);
+final tagsDaoProvider = Provider.autoDispose(
+  (ref) => ref.watch(appDatabaseProvider).tagsDao,
+);
 
 // ---------------------------------------------------------------------------
 // Push notification service
 // ---------------------------------------------------------------------------
 
-final pushServiceProvider =
-    NotifierProvider<PushService, bool>(PushService.new);
+final pushServiceProvider = NotifierProvider<PushService, bool>(
+  PushService.new,
+);

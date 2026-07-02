@@ -26,10 +26,10 @@ class PushService extends Notifier<bool> {
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
-        await _api.post('/device-tokens', data: {
-          'token': token,
-          'platform': _getPlatformName(),
-        });
+        await _api.post(
+          '/device-tokens',
+          data: {'token': token, 'platform': _getPlatformName()},
+        );
         state = true;
       }
     } catch (e) {

@@ -14,10 +14,10 @@ class NodeSyncManager {
     required String noteId,
     required String userId,
     required MutableDocument document,
-  })  : _db = database,
-        _noteId = noteId,
-        _userId = userId,
-        _document = document {
+  }) : _db = database,
+       _noteId = noteId,
+       _userId = userId,
+       _document = document {
     _document.addListener(_onDocumentChanged);
   }
 
@@ -51,30 +51,31 @@ class NodeSyncManager {
           _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
         }
       } else if (change is NodeRemovedEvent) {
-        (_db.update(_db.noteNodes)..where((t) => t.id.equals(change.nodeId)))
-            .write(NoteNodesCompanion(
-              deletedAt: Value(now),
-              isDirty: const Value(true),
-            ));
+        (_db.update(
+          _db.noteNodes,
+        )..where((t) => t.id.equals(change.nodeId))).write(
+          NoteNodesCompanion(deletedAt: Value(now), isDirty: const Value(true)),
+        );
 
-        (_db.update(_db.tasks)..where((t) => t.id.equals(change.nodeId)))
-            .write(TasksCompanion(
-              deletedAt: Value(now),
-              isDirty: const Value(true),
-            ));
+        (_db.update(_db.tasks)..where((t) => t.id.equals(change.nodeId))).write(
+          TasksCompanion(deletedAt: Value(now), isDirty: const Value(true)),
+        );
       } else if (change is NodeMovedEvent) {
-        (_db.update(_db.noteNodes)
-              ..where((t) => t.id.equals(change.nodeId)))
-            .write(NoteNodesCompanion(
-              position: Value(change.to),
-              isDirty: const Value(true),
-            ));
+        (_db.update(
+          _db.noteNodes,
+        )..where((t) => t.id.equals(change.nodeId))).write(
+          NoteNodesCompanion(
+            position: Value(change.to),
+            isDirty: const Value(true),
+          ),
+        );
 
-        (_db.update(_db.tasks)..where((t) => t.id.equals(change.nodeId)))
-            .write(TasksCompanion(
-              position: Value(change.to),
-              isDirty: const Value(true),
-            ));
+        (_db.update(_db.tasks)..where((t) => t.id.equals(change.nodeId))).write(
+          TasksCompanion(
+            position: Value(change.to),
+            isDirty: const Value(true),
+          ),
+        );
       } else if (change is NodeChangeEvent) {
         final node = _document.getNodeById(change.nodeId);
         if (node == null) continue;
@@ -100,12 +101,14 @@ class NodeSyncManager {
       }
     }
 
-    final fullText = _document.map((n) {
-      if (n is TextNode) return n.text.toPlainText();
-      if (n is TaskNode) return n.text.toPlainText();
-      if (n is ListItemNode) return n.text.toPlainText();
-      return '';
-    }).join('\n');
+    final fullText = _document
+        .map((n) {
+          if (n is TextNode) return n.text.toPlainText();
+          if (n is TaskNode) return n.text.toPlainText();
+          if (n is ListItemNode) return n.text.toPlainText();
+          return '';
+        })
+        .join('\n');
 
     final excerpt = deriveNoteExcerpt(fullText);
 
@@ -144,11 +147,11 @@ class NodeSyncManager {
     if (node is HorizontalRuleNode) return 'divider';
     if (node is ParagraphNode) {
       final blockType = node.metadata['blockType'];
-      if (blockType == header1Attribution || 
-          blockType == header2Attribution || 
-          blockType == header3Attribution || 
-          blockType == header4Attribution || 
-          blockType == header5Attribution || 
+      if (blockType == header1Attribution ||
+          blockType == header2Attribution ||
+          blockType == header3Attribution ||
+          blockType == header4Attribution ||
+          blockType == header5Attribution ||
           blockType == header6Attribution) {
         return 'header';
       }
@@ -206,17 +209,15 @@ class NodeSyncManager {
 
         // Find the last opened span of this type that hasn't been closed
         for (int i = spansList.length - 1; i >= 0; i--) {
-          if (spansList[i]['attribution'] == attributionName && spansList[i]['end'] == -1) {
+          if (spansList[i]['attribution'] == attributionName &&
+              spansList[i]['end'] == -1) {
             spansList[i]['end'] = span.offset;
             break;
           }
         }
       }
     }
-    return {
-      'text': text.toPlainText(),
-      'spans': spansList,
-    };
+    return {'text': text.toPlainText(), 'spans': spansList};
   }
 
   String _nodeData(DocumentNode node) {
@@ -229,11 +230,11 @@ class NodeSyncManager {
     }
     if (node is ParagraphNode) {
       final blockType = node.metadata['blockType'];
-      if (blockType == header1Attribution || 
-          blockType == header2Attribution || 
-          blockType == header3Attribution || 
-          blockType == header4Attribution || 
-          blockType == header5Attribution || 
+      if (blockType == header1Attribution ||
+          blockType == header2Attribution ||
+          blockType == header3Attribution ||
+          blockType == header4Attribution ||
+          blockType == header5Attribution ||
           blockType == header6Attribution) {
         int level = 1;
         if (blockType == header2Attribution) level = 2;
@@ -247,13 +248,9 @@ class NodeSyncManager {
         });
       }
       if (blockType == blockquoteAttribution) {
-        return jsonEncode({
-          ..._serializeAttributedText(node.text),
-        });
+        return jsonEncode({..._serializeAttributedText(node.text)});
       }
-      return jsonEncode({
-        ..._serializeAttributedText(node.text),
-      });
+      return jsonEncode({..._serializeAttributedText(node.text)});
     }
     if (node is ListItemNode) {
       return jsonEncode({
@@ -263,15 +260,10 @@ class NodeSyncManager {
       });
     }
     if (node is TextNode) {
-      return jsonEncode({
-        ..._serializeAttributedText(node.text),
-      });
+      return jsonEncode({..._serializeAttributedText(node.text)});
     }
     if (node is ImageNode) {
-      return jsonEncode({
-        'url': node.imageUrl,
-        'alt': node.altText,
-      });
+      return jsonEncode({'url': node.imageUrl, 'alt': node.altText});
     }
     if (node is HorizontalRuleNode) {
       return '{}';
@@ -311,10 +303,7 @@ class NodeSyncManager {
     final data = jsonDecode(schema.data) as Map<String, dynamic>;
     final text = data['text'] as String? ?? '';
     final spans = data['spans'] as List? ?? [];
-    final attributedText = AttributedText(
-      text,
-      deserializeSpans(spans),
-    );
+    final attributedText = AttributedText(text, deserializeSpans(spans));
 
     if (type == 'task') {
       return TaskNode(
@@ -327,7 +316,9 @@ class NodeSyncManager {
     if (type == 'list_item') {
       return ListItemNode(
         id: schema.id,
-        itemType: (data['itemType'] as String?) == 'ordered' ? ListItemType.ordered : ListItemType.unordered,
+        itemType: (data['itemType'] as String?) == 'ordered'
+            ? ListItemType.ordered
+            : ListItemType.unordered,
         text: attributedText,
         indent: data['indent'] as int? ?? 0,
       );
@@ -384,11 +375,13 @@ class NodeSyncManager {
       final end = m['end'] as int;
       final parsed = parseSpan(m);
       list.add(parsed);
-      list.add(SpanMarker(
-        attribution: parsed.attribution,
-        offset: end,
-        markerType: SpanMarkerType.end,
-      ));
+      list.add(
+        SpanMarker(
+          attribution: parsed.attribution,
+          offset: end,
+          markerType: SpanMarkerType.end,
+        ),
+      );
     }
     return AttributedSpans(attributions: list);
   }
@@ -397,15 +390,16 @@ class NodeSyncManager {
     final text = data['text'] as String? ?? '';
     final spansData = data['spans'] as List<dynamic>? ?? [];
     final spans = AttributedSpans();
-    
+
     for (final s in spansData) {
       final spanMap = s as Map<String, dynamic>;
       final attributionName = spanMap['attribution'] as String?;
       final start = spanMap['start'] as int?;
       final end = spanMap['end'] as int?;
-      
-      if (attributionName == null || start == null || end == null || end == -1) continue;
-      
+
+      if (attributionName == null || start == null || end == null || end == -1)
+        continue;
+
       Attribution attribution;
       if (attributionName == 'bold') {
         attribution = boldAttribution;
@@ -421,15 +415,19 @@ class NodeSyncManager {
       } else {
         attribution = NamedAttribution(attributionName);
       }
-      
+
       // Ensure bounds are valid
       final safeStart = start.clamp(0, text.length);
       final safeEnd = end.clamp(safeStart, text.length);
       if (safeEnd > safeStart) {
-        spans.addAttribution(newAttribution: attribution, start: safeStart, end: safeEnd - 1);
+        spans.addAttribution(
+          newAttribution: attribution,
+          start: safeStart,
+          end: safeEnd - 1,
+        );
       }
     }
-    
+
     return AttributedText(text, spans);
   }
 
@@ -441,7 +439,9 @@ class NodeSyncManager {
           : <String, dynamic>{};
     } catch (_) {
       try {
-        data = jsonDecode(utf8.decode(base64Decode(node.data))) as Map<String, dynamic>;
+        data =
+            jsonDecode(utf8.decode(base64Decode(node.data)))
+                as Map<String, dynamic>;
       } catch (_) {
         data = <String, dynamic>{};
       }
@@ -471,7 +471,9 @@ class NodeSyncManager {
         final typeStr = data['type'] as String? ?? 'unordered';
         return ListItemNode(
           id: node.id,
-          itemType: typeStr == 'ordered' ? ListItemType.ordered : ListItemType.unordered,
+          itemType: typeStr == 'ordered'
+              ? ListItemType.ordered
+              : ListItemType.unordered,
           text: _deserializeAttributedText(data),
           indent: data['indent'] as int? ?? 0,
         );
@@ -517,7 +519,9 @@ class NodeSyncManager {
             : <String, dynamic>{};
       } catch (_) {
         try {
-          data = jsonDecode(utf8.decode(base64Decode(node.data))) as Map<String, dynamic>;
+          data =
+              jsonDecode(utf8.decode(base64Decode(node.data)))
+                  as Map<String, dynamic>;
         } catch (_) {
           data = <String, dynamic>{};
         }

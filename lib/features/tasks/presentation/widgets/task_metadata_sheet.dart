@@ -33,10 +33,7 @@ class TaskMetadataSheet extends ConsumerStatefulWidget {
   }) {
     return showAppBottomSheet(
       context: context,
-      builder: (_) => TaskMetadataSheet(
-        noteId: noteId,
-        task: task,
-      ),
+      builder: (_) => TaskMetadataSheet(noteId: noteId, task: task),
     );
   }
 

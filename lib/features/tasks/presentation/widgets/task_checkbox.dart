@@ -18,6 +18,7 @@ class TaskCheckbox extends StatelessWidget {
   final bool checked;
   final ValueChanged<bool> onChanged;
   final double size;
+
   /// When provided, overrides [ColorScheme.primary] as the active colour.
   final Color? accentColor;
 
@@ -51,11 +52,7 @@ class TaskCheckbox extends StatelessWidget {
               scale: checked ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOutBack,
-              child: Icon(
-                Icons.check,
-                size: size * 0.65,
-                color: Colors.white,
-              ),
+              child: Icon(Icons.check, size: size * 0.65, color: Colors.white),
             ),
           ),
         ),

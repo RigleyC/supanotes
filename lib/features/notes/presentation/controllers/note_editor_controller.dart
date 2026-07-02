@@ -36,10 +36,7 @@ class NoteEditorController {
   NodeSyncManager? _nodeSyncManager;
   String? _noteId;
 
-  void initFromNodes({
-    required List<NoteNode> nodes,
-    String? noteId,
-  }) {
+  void initFromNodes({required List<NoteNode> nodes, String? noteId}) {
     dev.log(
       '[NoteEditorController.initFromNodes] nodeCount=${nodes.length}',
       name: 'NoteEditor',
@@ -62,9 +59,7 @@ class NoteEditorController {
     editor!.reactionPipeline.add(
       const RandomDividerConversionReaction(dividerCount: _dividerCount),
     );
-    editor!.reactionPipeline.add(
-      const KeepFirstLineAsTitleReaction(),
-    );
+    editor!.reactionPipeline.add(const KeepFirstLineAsTitleReaction());
     // Reuse existing focus node if controller is re-initialized
     focusNode ??= FocusNode();
   }
@@ -89,7 +84,13 @@ class NoteEditorController {
   void attachFileFromPath({
     required String filePath,
     required String mimeType,
-    required Future<void> Function(String id, String noteId, String filePath, String mimeType) onUploadFile,
+    required Future<void> Function(
+      String id,
+      String noteId,
+      String filePath,
+      String mimeType,
+    )
+    onUploadFile,
     required void Function() onError,
   }) {
     final noteId = _noteId;
@@ -97,7 +98,9 @@ class NoteEditorController {
     if (noteId == null || editor == null) return;
 
     final id = Editor.createNodeId();
-    editor.execute([InsertNodeAtCaretRequest(node: DocumentAttachmentNode(id: id))]);
+    editor.execute([
+      InsertNodeAtCaretRequest(node: DocumentAttachmentNode(id: id)),
+    ]);
 
     onUploadFile(id, noteId, filePath, mimeType).catchError((_) {
       if (editor.document.getNodeById(id) != null) {
@@ -132,10 +135,7 @@ class NoteEditorController {
         final newNode = NodeSyncManager.createNodeFromSchema(incoming);
         if (_isNodeModified(existingNode, newNode)) {
           requests.add(
-            ReplaceNodeRequest(
-              existingNodeId: incoming.id,
-              newNode: newNode,
-            ),
+            ReplaceNodeRequest(existingNodeId: incoming.id, newNode: newNode),
           );
         }
       }
@@ -154,7 +154,8 @@ class NoteEditorController {
     }
 
     if (existing is ParagraphNode && incoming is ParagraphNode) {
-      if (existing.metadata['blockType'] != incoming.metadata['blockType']) return true;
+      if (existing.metadata['blockType'] != incoming.metadata['blockType'])
+        return true;
     }
 
     if (existing is TaskNode && incoming is TaskNode) {
@@ -203,10 +204,7 @@ class NoteEditorController {
 }
 
 Future<void> defaultEmptyNoteExit(INotesRepository repo, String noteId) async {
-  dev.log(
-    '[defaultEmptyNoteExit] noteId=$noteId',
-    name: 'NoteEditor',
-  );
+  dev.log('[defaultEmptyNoteExit] noteId=$noteId', name: 'NoteEditor');
   await repo.deleteIfEmptyOrTombstone(noteId);
   dev.log(
     '[defaultEmptyNoteExit] Completed noteId=$noteId',

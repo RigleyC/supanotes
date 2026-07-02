@@ -11,9 +11,7 @@ class NoteTagsDao extends DatabaseAccessor<AppDatabase>
   NoteTagsDao(super.db);
 
   Future<List<LocalNoteTagData>> getDirtyNoteTags() {
-    return (select(localNoteTags)
-          ..where((t) => t.isDirty.equals(true)))
-        .get();
+    return (select(localNoteTags)..where((t) => t.isDirty.equals(true))).get();
   }
 
   Future<void> clearDirtyFlag(String noteId, String tagId) async {

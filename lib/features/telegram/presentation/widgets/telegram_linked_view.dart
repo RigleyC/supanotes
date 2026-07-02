@@ -54,10 +54,7 @@ class TelegramLinkedView extends StatelessWidget {
                 child: ListTile(
                   leading: const Icon(Icons.tag),
                   title: const Text('Chat ID'),
-                  subtitle: Text(
-                    chatId.toString(),
-                    style: textTheme.bodyLarge,
-                  ),
+                  subtitle: Text(chatId.toString(), style: textTheme.bodyLarge),
                 ),
               ),
             ],

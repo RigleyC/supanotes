@@ -24,6 +24,7 @@ import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor
 import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
@@ -89,6 +90,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             ),
       onTaskComplete: widget.delegate.onTaskComplete,
       onTaskReopen: widget.delegate.onTaskReopen,
+      onError: (err) {
+        AppMessenger.showError('Erro ao alterar tarefa');
+      },
       requestRebuild: () {
         if (mounted) setState(() {});
       },
@@ -106,12 +110,14 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       editor: controller.editor!,
       document: controller.editor!.document,
       composer: controller.composer!,
-      documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+      documentLayoutResolver: () =>
+          _docLayoutKey.currentState as DocumentLayout,
     );
 
     _iosController = RichSuperEditorIosControlsController(
       editor: controller.editor!,
-      documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+      documentLayoutResolver: () =>
+          _docLayoutKey.currentState as DocumentLayout,
       operations: _richOps!,
       handleColor: editorControlsColor,
     );
@@ -139,9 +145,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         ? null
         : (taskId) => widget.delegate.onTaskLongPress?.call(
             widget.taskMetadata[taskId],
-             () async {},
+            () async {},
           );
-    
+
     if (widget.hideCompleted != oldWidget.hideCompleted ||
         widget.taskMetadata != oldWidget.taskMetadata) {
       setState(() {});
@@ -250,11 +256,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                           ? null
                           : [
                               (editContext) => NoteLinkTapHandler(
-                                    editContext.document,
-                                    editContext.composer,
-                                    onNoteTap: (targetId) =>
-                                        context.push(AppRoutes.note(targetId)),
-                                  ),
+                                editContext.document,
+                                editContext.composer,
+                                onNoteTap: (targetId) =>
+                                    context.push(AppRoutes.note(targetId)),
+                              ),
                               superEditorLaunchLinkTapHandlerFactory,
                             ],
                       keyboardActions: buildRichKeyboardActions(
@@ -297,5 +303,4 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       ),
     );
   }
-
 }

@@ -21,9 +21,19 @@ import '../domain/routine_model.dart';
 abstract class IRoutinesRepository {
   Future<List<RoutineModel>> getRoutines();
   Future<List<RoutineLogModel>> getLogs();
-  Future<RoutineModel> updateRoutine(String id, {String? cronExpr, bool? enabled});
-  Future<RoutineModel> updateDailyRoutine({required String cronExpr, bool? enabled});
-  Future<RoutineModel> updateWeeklyRoutine({required String cronExpr, bool? enabled});
+  Future<RoutineModel> updateRoutine(
+    String id, {
+    String? cronExpr,
+    bool? enabled,
+  });
+  Future<RoutineModel> updateDailyRoutine({
+    required String cronExpr,
+    bool? enabled,
+  });
+  Future<RoutineModel> updateWeeklyRoutine({
+    required String cronExpr,
+    bool? enabled,
+  });
   Future<String> testDaily();
   Future<String> testWeekly();
   Future<String> getLatestBrief(BriefType type);
@@ -107,8 +117,7 @@ class RoutinesRepository implements IRoutinesRepository {
   Future<RoutineModel> updateDailyRoutine({
     required String cronExpr,
     bool? enabled,
-  }) =>
-      _updateByType('daily', cronExpr: cronExpr, enabled: enabled);
+  }) => _updateByType('daily', cronExpr: cronExpr, enabled: enabled);
 
   /// `PATCH /routines/weekly` → update the weekly routine schedule.
   /// Returns the updated routine.
@@ -116,8 +125,7 @@ class RoutinesRepository implements IRoutinesRepository {
   Future<RoutineModel> updateWeeklyRoutine({
     required String cronExpr,
     bool? enabled,
-  }) =>
-      _updateByType('weekly', cronExpr: cronExpr, enabled: enabled);
+  }) => _updateByType('weekly', cronExpr: cronExpr, enabled: enabled);
 
   /// `POST /routines/daily/test` → dry-run, returns the brief body
   /// the LLM produced for the user's current context.
@@ -143,7 +151,11 @@ class RoutinesRepository implements IRoutinesRepository {
     }
   }
 
-  Future<RoutineModel> _updateByType(String type, {required String cronExpr, bool? enabled}) async {
+  Future<RoutineModel> _updateByType(
+    String type, {
+    required String cronExpr,
+    bool? enabled,
+  }) async {
     final body = <String, dynamic>{'cron_expr': cronExpr};
     if (enabled != null) body['enabled'] = enabled;
     try {
@@ -197,6 +209,8 @@ class RoutinesRepository implements IRoutinesRepository {
 /// Single shared [RoutinesRepository] wired to the app-wide
 /// [apiClientProvider]. Reading this provider is the entry point used
 /// by every routines widget.
-final routinesRepositoryProvider = Provider.autoDispose<IRoutinesRepository>((ref) {
+final routinesRepositoryProvider = Provider.autoDispose<IRoutinesRepository>((
+  ref,
+) {
   return RoutinesRepository(apiClient: ref.watch(apiClientProvider));
 });

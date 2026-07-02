@@ -14,9 +14,7 @@ class RichCommonEditorOperations extends CommonEditorOperations {
   void copy() {
     final selection = composer.selection;
     if (selection != null && !selection.isCollapsed) {
-      document.copyAsRichTextWithPlainTextFallback(
-        selection: selection,
-      );
+      document.copyAsRichTextWithPlainTextFallback(selection: selection);
     }
   }
 
@@ -24,9 +22,7 @@ class RichCommonEditorOperations extends CommonEditorOperations {
   void cut() {
     final selection = composer.selection;
     if (selection != null && !selection.isCollapsed) {
-      document.copyAsRichTextWithPlainTextFallback(
-        selection: selection,
-      );
+      document.copyAsRichTextWithPlainTextFallback(selection: selection);
       deleteSelection(TextAffinity.downstream);
     }
   }

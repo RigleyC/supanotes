@@ -26,17 +26,11 @@ class AppErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline_rounded,
-              size: 64,
-              color: scheme.error,
-            ),
+            Icon(Icons.error_outline_rounded, size: 64, color: scheme.error),
             const SizedBox(height: AppSpacing.md),
             Text(
               title,
-              style: textTheme.titleLarge?.copyWith(
-                color: scheme.onSurface,
-              ),
+              style: textTheme.titleLarge?.copyWith(color: scheme.onSurface),
               textAlign: TextAlign.center,
             ),
             if (subtitle != null) ...[

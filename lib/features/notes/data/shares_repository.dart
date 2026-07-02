@@ -26,10 +26,10 @@ class SharesRepository {
     required SharePermission permission,
   }) async {
     try {
-      await _api.post('/notes/$noteId/shares', data: {
-        'email': email,
-        'permission': permission.toJson(),
-      });
+      await _api.post(
+        '/notes/$noteId/shares',
+        data: {'email': email, 'permission': permission.toJson()},
+      );
     } on DioException catch (e) {
       throw fromDioError(e);
     }
@@ -39,13 +39,18 @@ class SharesRepository {
     try {
       final response = await _api.get('/notes/$noteId/shares');
       final data = response.data as List;
-      return data.map((j) => ShareModel.fromJson(j as Map<String, dynamic>)).toList();
+      return data
+          .map((j) => ShareModel.fromJson(j as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw fromDioError(e);
     }
   }
 
-  Future<void> deleteShare({required String noteId, required String userId}) async {
+  Future<void> deleteShare({
+    required String noteId,
+    required String userId,
+  }) async {
     try {
       await _api.delete('/notes/$noteId/shares/$userId');
     } on DioException catch (e) {

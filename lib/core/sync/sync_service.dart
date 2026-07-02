@@ -62,12 +62,12 @@ class SyncService {
     required ConnectivityMonitor connectivity,
     required SyncStateNotifier notifier,
     required String userId,
-  })  : _db = db,
-        _repo = repo,
-        _mapper = mapper,
-        _connectivity = connectivity,
-        _notifier = notifier,
-        _userId = userId;
+  }) : _db = db,
+       _repo = repo,
+       _mapper = mapper,
+       _connectivity = connectivity,
+       _notifier = notifier,
+       _userId = userId;
 
   final AppDatabase _db;
   final ISyncRepository _repo;
@@ -129,7 +129,9 @@ class SyncService {
 
   Future<void> push() async {
     final notes = await _db.notesDao.getDirtyNotes();
-    final noteNodes = await (_db.select(_db.noteNodes)..where((t) => t.isDirty.equals(true))).get();
+    final noteNodes = await (_db.select(
+      _db.noteNodes,
+    )..where((t) => t.isDirty.equals(true))).get();
     final tasks = await _db.tasksDao.getDirtyTasks();
     final contexts = await _db.contextsDao.getDirtyContexts();
     final tags = await _db.tagsDao.getDirtyTags();
@@ -156,12 +158,14 @@ class SyncService {
       'tasks': tasks.map(_mapper.taskToJson).toList(),
       'contexts': contexts.map(_mapper.contextToJson).toList(),
       'tags': tags.map(_mapper.tagToJson).toList(),
-      'task_completions':
-          completions.map(_mapper.taskCompletionToJson).toList(),
+      'task_completions': completions
+          .map(_mapper.taskCompletionToJson)
+          .toList(),
       'note_links': noteLinks.map(_mapper.noteLinkToJson).toList(),
       'note_tags': noteTags.map(_mapper.localNoteTagToJson).toList(),
-      'user_note_preferences':
-          prefs.map(_mapper.userNotePreferenceToJson).toList(),
+      'user_note_preferences': prefs
+          .map(_mapper.userNotePreferenceToJson)
+          .toList(),
     };
 
     await _repo.push(payload);
@@ -172,7 +176,8 @@ class SyncService {
         await _db.notesDao.clearDirtyFlag(n.id, n.updatedAt);
       }
       for (final nn in noteNodes) {
-        await (_db.update(_db.noteNodes)..where((t) => t.id.equals(nn.id))).write(const NoteNodesCompanion(isDirty: Value(false)));
+        await (_db.update(_db.noteNodes)..where((t) => t.id.equals(nn.id)))
+            .write(const NoteNodesCompanion(isDirty: Value(false)));
       }
       for (final tsk in tasks) {
         await _db.tasksDao.clearDirtyFlag(tsk.id, tsk.updatedAt);
@@ -209,9 +214,9 @@ class SyncService {
       lastSyncedAt: lastSyncedAt.toUtc().toIso8601String(),
     );
     final dirtyNoteIds = {
-      for (final note in await (_db.select(_db.notes)
-            ..where((t) => t.isDirty.equals(true)))
-          .get())
+      for (final note in await (_db.select(
+        _db.notes,
+      )..where((t) => t.isDirty.equals(true))).get())
         note.id,
     };
 
@@ -270,11 +275,7 @@ class SyncService {
         final link = _mapper
             .noteLinkFromJson(raw as Map<String, dynamic>)
             .copyWith(isDirty: false);
-        batch.insert(
-          _db.noteLinks,
-          link,
-          onConflict: DoUpdate((_) => link),
-        );
+        batch.insert(_db.noteLinks, link, onConflict: DoUpdate((_) => link));
       }
       for (final raw in (data['note_tags'] as List? ?? [])) {
         final noteTag = _mapper
@@ -288,7 +289,8 @@ class SyncService {
       }
       for (final raw in (data['user_note_preferences'] as List? ?? [])) {
         final pref = _mapper.userNotePreferenceFromJson(
-            raw as Map<String, dynamic>);
+          raw as Map<String, dynamic>,
+        );
         batch.insert(
           _db.userNotePreferences,
           pref,

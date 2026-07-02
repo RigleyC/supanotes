@@ -60,8 +60,11 @@ class _Body extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 80),
-              Icon(Icons.history_toggle_off,
-                  size: 56, color: Theme.of(context).colorScheme.outline),
+              Icon(
+                Icons.history_toggle_off,
+                size: 56,
+                color: Theme.of(context).colorScheme.outline,
+              ),
               const SizedBox(height: AppSpacing.md),
               const Text(
                 BriefHistoryScreen._emptyTitle,
@@ -80,17 +83,14 @@ class _Body extends StatelessWidget {
     }
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          return Column(
-            children: [
-              if (index > 0) const Divider(height: 1),
-              BriefLogTile(log: logs[index]),
-            ],
-          );
-        },
-        childCount: logs.length,
-      ),
+      delegate: SliverChildBuilderDelegate((context, index) {
+        return Column(
+          children: [
+            if (index > 0) const Divider(height: 1),
+            BriefLogTile(log: logs[index]),
+          ],
+        );
+      }, childCount: logs.length),
     );
   }
 }

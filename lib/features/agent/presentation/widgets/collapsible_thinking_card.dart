@@ -11,7 +11,8 @@ class CollapsibleThinkingCard extends StatefulWidget {
   final bool isFinished;
 
   @override
-  State<CollapsibleThinkingCard> createState() => _CollapsibleThinkingCardState();
+  State<CollapsibleThinkingCard> createState() =>
+      _CollapsibleThinkingCardState();
 }
 
 class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
@@ -40,8 +41,12 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final headerText = widget.isFinished ? 'Raciocínio concluído' : 'Pensando...';
-    final iconColor = widget.isFinished ? theme.colorScheme.primary : theme.colorScheme.secondary;
+    final headerText = widget.isFinished
+        ? 'Raciocínio concluído'
+        : 'Pensando...';
+    final iconColor = widget.isFinished
+        ? theme.colorScheme.primary
+        : theme.colorScheme.secondary;
 
     final Widget icon = widget.isFinished
         ? Icon(Icons.check_circle_outline, size: 16, color: iconColor)
@@ -54,7 +59,9 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
             ),
           );
 
-    final backgroundColor = isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7);
+    final backgroundColor = isDark
+        ? const Color(0xFF1C1C1E)
+        : const Color(0xFFF2F2F7);
 
     final headerContent = Row(
       mainAxisSize: MainAxisSize.min,
@@ -77,11 +84,13 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
       ],
     );
 
-    final textStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-      height: 1.5,
-      fontStyle: widget.isFinished ? FontStyle.normal : FontStyle.italic,
-    ) ?? const TextStyle();
+    final textStyle =
+        theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+          height: 1.5,
+          fontStyle: widget.isFinished ? FontStyle.normal : FontStyle.italic,
+        ) ??
+        const TextStyle();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -115,13 +124,11 @@ class _CollapsibleThinkingCardState extends State<CollapsibleThinkingCard> {
                         ? Text(
                             'Escrevendo raciocínio...',
                             style: textStyle.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.5),
                             ),
                           )
-                        : Text(
-                            widget.thinkingText,
-                            style: textStyle,
-                          ),
+                        : Text(widget.thinkingText, style: textStyle),
                   )
                 : const SizedBox.shrink(),
           ),

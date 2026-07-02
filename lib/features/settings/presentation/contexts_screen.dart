@@ -83,38 +83,35 @@ class _ContextsList extends ConsumerWidget {
     }
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final ctx = contexts[index];
-          return Column(
-            children: [
-              if (index > 0) const Divider(height: 1),
-              Dismissible(
-                key: ValueKey(ctx.id),
-                direction: DismissDirection.endToStart,
-                background: _DismissBackground(),
-                confirmDismiss: (_) => _confirmDelete(context),
-                onDismissed: (_) => _delete(context, ref, ctx.id),
-                child: ListTile(
-                  leading: const Icon(Icons.folder_outlined),
-                  title: Text(ctx.name),
-                  subtitle: Text(ctx.slug),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: 'Apagar',
-                    onPressed: () async {
-                      if (!await _confirmDelete(context)) return;
-                      if (!context.mounted) return;
-                      await _delete(context, ref, ctx.id);
-                    },
-                  ),
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final ctx = contexts[index];
+        return Column(
+          children: [
+            if (index > 0) const Divider(height: 1),
+            Dismissible(
+              key: ValueKey(ctx.id),
+              direction: DismissDirection.endToStart,
+              background: _DismissBackground(),
+              confirmDismiss: (_) => _confirmDelete(context),
+              onDismissed: (_) => _delete(context, ref, ctx.id),
+              child: ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(ctx.name),
+                subtitle: Text(ctx.slug),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Apagar',
+                  onPressed: () async {
+                    if (!await _confirmDelete(context)) return;
+                    if (!context.mounted) return;
+                    await _delete(context, ref, ctx.id);
+                  },
                 ),
               ),
-            ],
-          );
-        },
-        childCount: contexts.length,
-      ),
+            ),
+          ],
+        );
+      }, childCount: contexts.length),
     );
   }
 

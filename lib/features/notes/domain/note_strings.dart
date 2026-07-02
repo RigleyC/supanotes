@@ -26,6 +26,7 @@ class NoteStrings {
   static const String noShares = 'Nenhum compartilhamento';
   static const String revokeLabel = 'Remover';
   static const String revokeConfirmTitle = 'Remover compartilhamento?';
-  static const String revokeConfirmMessage = 'Esta pessoa não verá mais esta nota.';
+  static const String revokeConfirmMessage =
+      'Esta pessoa não verá mais esta nota.';
   static const String revokeSuccess = 'Compartilhamento removido';
 }

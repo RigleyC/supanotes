@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart' show MarkdownBody, MarkdownStyleSheet;
-import 'package:flutter_streaming_text_markdown/flutter_streaming_text_markdown.dart' show StreamingText;
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart'
+    show MarkdownBody, MarkdownStyleSheet;
+import 'package:flutter_streaming_text_markdown/flutter_streaming_text_markdown.dart'
+    show StreamingText;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:supanotes/features/agent/domain/agent_strings.dart';
@@ -11,7 +13,6 @@ import 'package:supanotes/features/agent/presentation/controllers/chat_controlle
 import 'package:supanotes/features/agent/presentation/widgets/agent_action_timeline_card.dart';
 import 'package:supanotes/features/agent/presentation/widgets/collapsible_thinking_card.dart';
 import 'package:supanotes/features/agent/presentation/widgets/shimmer_text.dart';
-
 
 class AgentChatView extends StatefulWidget {
   const AgentChatView({
@@ -34,7 +35,7 @@ class AgentChatView extends StatefulWidget {
   final ValueChanged<String> onSend;
   final VoidCallback? onCancel;
   final void Function(String confirmationId, {required bool approved})?
-      onResolveConfirmation;
+  onResolveConfirmation;
 
   @override
   State<AgentChatView> createState() => _AgentChatViewState();
@@ -97,7 +98,8 @@ class _AgentChatViewState extends State<AgentChatView> {
       final oldParts = oldSignature.split(':');
       final newParts = nextSignature.split(':');
       final msgCountChanged = oldParts.isEmpty || oldParts[0] != newParts[0];
-      final actionsCountChanged = oldParts.length < 2 || oldParts[1] != newParts[1];
+      final actionsCountChanged =
+          oldParts.length < 2 || oldParts[1] != newParts[1];
       final isStreaming = widget.streaming;
 
       if (msgCountChanged || actionsCountChanged || isStreaming) {
@@ -131,7 +133,9 @@ class _AgentChatViewState extends State<AgentChatView> {
 
     final bubbleStyle = BubbleStyle(
       enableShadow: false,
-      userBubbleColor: isDark ? const Color(0xFF2F2F2F) : const Color(0xFFF4F4F4),
+      userBubbleColor: isDark
+          ? const Color(0xFF2F2F2F)
+          : const Color(0xFFF4F4F4),
       aiBubbleColor: Colors.transparent,
       userBubbleMaxWidth: MediaQuery.of(context).size.width * 0.85,
       aiBubbleMaxWidth: MediaQuery.of(context).size.width,
@@ -146,8 +150,14 @@ class _AgentChatViewState extends State<AgentChatView> {
     final effectiveStyleSheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: theme.textTheme.bodyMedium?.copyWith(fontSize: 16),
       listBullet: theme.textTheme.bodyMedium?.copyWith(fontSize: 16),
-      strong: theme.textTheme.bodyMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
-      em: theme.textTheme.bodyMedium?.copyWith(fontSize: 16, fontStyle: FontStyle.italic),
+      strong: theme.textTheme.bodyMedium?.copyWith(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+      em: theme.textTheme.bodyMedium?.copyWith(
+        fontSize: 16,
+        fontStyle: FontStyle.italic,
+      ),
       code: theme.textTheme.bodyMedium?.copyWith(
         fontFamily: 'monospace',
         fontSize: 14,
@@ -158,9 +168,7 @@ class _AgentChatViewState extends State<AgentChatView> {
       codeblockDecoration: BoxDecoration(
         color: isDark ? const Color(0xFF15151F) : const Color(0xFFF4F4F8),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
     );
 
@@ -180,7 +188,9 @@ class _AgentChatViewState extends State<AgentChatView> {
       textStyle: theme.textTheme.bodyMedium?.copyWith(fontSize: 16),
       markdownStyleSheet: effectiveStyleSheet,
       markdownBuilder: (context, text, stylesheet, isUser) {
-        final thinkingRegex = RegExp(r'<(?:think|thinking)>([\s\S]*?)(?:</(?:think|thinking)>|$)');
+        final thinkingRegex = RegExp(
+          r'<(?:think|thinking)>([\s\S]*?)(?:</(?:think|thinking)>|$)',
+        );
         final match = thinkingRegex.firstMatch(text);
 
         Widget? thinkingWidget;
@@ -189,7 +199,8 @@ class _AgentChatViewState extends State<AgentChatView> {
         if (match != null) {
           final thinkingText = match.group(1)?.trim() ?? '';
           markdownText = text.replaceFirst(match.group(0)!, '').trim();
-          final isFinished = text.contains('</thinking>') || text.contains('</think>');
+          final isFinished =
+              text.contains('</thinking>') || text.contains('</think>');
 
           thinkingWidget = CollapsibleThinkingCard(
             thinkingText: thinkingText,
@@ -206,38 +217,37 @@ class _AgentChatViewState extends State<AgentChatView> {
           }
         }
 
-        final isStreamingMessage = widget.streaming && !isUser && 
+        final isStreamingMessage =
+            widget.streaming &&
+            !isUser &&
             widget.messages.isNotEmpty &&
             widget.messages.last.role == MessageRole.assistant &&
             widget.messages.last.content == text;
 
         final markdownBody = markdownText.isNotEmpty
             ? (isStreamingMessage
-                ? StreamingText(
-                    text: markdownText,
-                    style: stylesheet.p,
-                    typingSpeed: const Duration(milliseconds: 30),
-                    markdownEnabled: true,
-                    fadeInEnabled: true,
-                    fadeInDuration: const Duration(milliseconds: 150),
-                    wordByWord: true,
-                    showCursor: false,
-                  )
-                : MarkdownBody(
-                    data: markdownText,
-                    styleSheet: stylesheet,
-                    onTapLink: (text, href, title) => handleTapLink(href),
-                  ))
+                  ? StreamingText(
+                      text: markdownText,
+                      style: stylesheet.p,
+                      typingSpeed: const Duration(milliseconds: 30),
+                      markdownEnabled: true,
+                      fadeInEnabled: true,
+                      fadeInDuration: const Duration(milliseconds: 150),
+                      wordByWord: true,
+                      showCursor: false,
+                    )
+                  : MarkdownBody(
+                      data: markdownText,
+                      styleSheet: stylesheet,
+                      onTapLink: (text, href, title) => handleTapLink(href),
+                    ))
             : const SizedBox.shrink();
 
         if (thinkingWidget != null) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            children: [
-              thinkingWidget,
-              markdownBody,
-            ],
+            children: [thinkingWidget, markdownBody],
           );
         }
 
@@ -281,7 +291,10 @@ class _AgentChatViewState extends State<AgentChatView> {
     );
 
     final spacingConfig = ChatSpacingConfig(
-      messageListPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      messageListPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 8,
+      ),
       messageBubbleMargin: (isUser) {
         if (isUser) {
           return const EdgeInsets.only(
@@ -320,7 +333,10 @@ class _AgentChatViewState extends State<AgentChatView> {
             loadingConfig: LoadingConfig(
               isLoading: widget.streaming,
               loadingIndicator: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -330,7 +346,9 @@ class _AgentChatViewState extends State<AgentChatView> {
                       child: CircularProgressIndicator(
                         strokeWidth: 1.5,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                          theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                     ),
@@ -339,7 +357,9 @@ class _AgentChatViewState extends State<AgentChatView> {
                       child: Text(
                         widget.loadingLabel ?? 'Pensando...',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.7,
+                          ),
                           fontStyle: FontStyle.italic,
                         ),
                       ),
@@ -349,12 +369,15 @@ class _AgentChatViewState extends State<AgentChatView> {
               ),
             ),
             maxWidth: 768,
-            resultRenderers: {
-              'action_timeline': _buildActionTimelineCard,
-            },
+            resultRenderers: {'action_timeline': _buildActionTimelineCard},
             welcomeMessageConfig: WelcomeMessageConfig(
-              containerDecoration: const BoxDecoration(color: Colors.transparent),
-              containerPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              containerDecoration: const BoxDecoration(
+                color: Colors.transparent,
+              ),
+              containerPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
               builder: () => _buildEmptyStateList(context),
               centerVertically: true,
             ),
@@ -365,7 +388,10 @@ class _AgentChatViewState extends State<AgentChatView> {
     );
   }
 
-  Widget _buildActionTimelineCard(BuildContext context, Map<String, dynamic> data) {
+  Widget _buildActionTimelineCard(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) {
     final actions = data['actions'] as List<ChatToolAction>;
     return AgentActionTimelineCard(
       actions: actions,
@@ -378,22 +404,42 @@ class _AgentChatViewState extends State<AgentChatView> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildEmptyStateItem(context, Icons.edit_document, 'Resumir minhas notas', () {
-          widget.onSend('Resuma minhas notas');
-        }),
+        _buildEmptyStateItem(
+          context,
+          Icons.edit_document,
+          'Resumir minhas notas',
+          () {
+            widget.onSend('Resuma minhas notas');
+          },
+        ),
         const SizedBox(height: 12),
-        _buildEmptyStateItem(context, Icons.search, 'Procurar por ideias sobre...', () {
-          widget.onSend('Procurar por ideias sobre...');
-        }),
+        _buildEmptyStateItem(
+          context,
+          Icons.search,
+          'Procurar por ideias sobre...',
+          () {
+            widget.onSend('Procurar por ideias sobre...');
+          },
+        ),
         const SizedBox(height: 12),
-        _buildEmptyStateItem(context, Icons.add_task, 'Criar uma lista de tarefas', () {
-          widget.onSend('Crie uma lista de tarefas');
-        }),
+        _buildEmptyStateItem(
+          context,
+          Icons.add_task,
+          'Criar uma lista de tarefas',
+          () {
+            widget.onSend('Crie uma lista de tarefas');
+          },
+        ),
       ],
     );
   }
 
-  Widget _buildEmptyStateItem(BuildContext context, IconData icon, String text, VoidCallback onTap) {
+  Widget _buildEmptyStateItem(
+    BuildContext context,
+    IconData icon,
+    String text,
+    VoidCallback onTap,
+  ) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     return InkWell(
@@ -411,7 +457,7 @@ class _AgentChatViewState extends State<AgentChatView> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                text, 
+                text,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.w500,

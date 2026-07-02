@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
 class NoteLinkTapHandler extends ContentTapDelegate {
-  NoteLinkTapHandler(
-    this.document,
-    this.composer, {
-    required this.onNoteTap,
-  }) {
+  NoteLinkTapHandler(this.document, this.composer, {required this.onNoteTap}) {
     composer.isInInteractionMode.addListener(notifyListeners);
   }
 
@@ -28,7 +24,8 @@ class NoteLinkTapHandler extends ContentTapDelegate {
 
   @override
   TapHandlingInstruction onTap(DocumentTapDetails details) {
-    final tapPosition = details.documentLayout.getDocumentPositionNearestToOffset(details.layoutOffset);
+    final tapPosition = details.documentLayout
+        .getDocumentPositionNearestToOffset(details.layoutOffset);
     if (tapPosition == null) {
       return TapHandlingInstruction.continueHandling;
     }
@@ -53,7 +50,9 @@ class NoteLinkTapHandler extends ContentTapDelegate {
       return null;
     }
 
-    final tappedAttributions = textNode.text.getAllAttributionsAt(nodePosition.offset);
+    final tappedAttributions = textNode.text.getAllAttributionsAt(
+      nodePosition.offset,
+    );
     for (final tappedAttribution in tappedAttributions) {
       if (tappedAttribution is LinkAttribution) {
         final uri = tappedAttribution.launchableUri;

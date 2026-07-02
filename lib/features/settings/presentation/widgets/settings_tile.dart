@@ -28,10 +28,10 @@ class SettingsTile extends StatelessWidget {
     this.subtitle,
     this.onTap,
     this.enabled = true,
-  })  : _kind = _SettingsTileKind.navigation,
-        value = null,
-        onChanged = null,
-        trailing = null;
+  }) : _kind = _SettingsTileKind.navigation,
+       value = null,
+       onChanged = null,
+       trailing = null;
 
   const SettingsTile.toggle({
     super.key,
@@ -41,9 +41,9 @@ class SettingsTile extends StatelessWidget {
     required this.onChanged,
     this.subtitle,
     this.enabled = true,
-  })  : _kind = _SettingsTileKind.toggle,
-        onTap = null,
-        trailing = null;
+  }) : _kind = _SettingsTileKind.toggle,
+       onTap = null,
+       trailing = null;
 
   const SettingsTile.action({
     super.key,
@@ -53,9 +53,9 @@ class SettingsTile extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.enabled = true,
-  })  : _kind = _SettingsTileKind.action,
-        value = null,
-        onChanged = null;
+  }) : _kind = _SettingsTileKind.action,
+       value = null,
+       onChanged = null;
 
   final _SettingsTileKind _kind;
   final IconData icon;

@@ -16,13 +16,13 @@ class AttachmentsRepository {
   final AttachmentsLocalRepository _local;
   final ApiClient _api;
 
-  Stream<List<AttachmentModel>> watchByNote(String noteId) =>
-      _local.watchByNote(noteId).map(
-            (rows) => rows.map(AttachmentModel.fromData).toList(),
-          );
+  Stream<List<AttachmentModel>> watchByNote(String noteId) => _local
+      .watchByNote(noteId)
+      .map((rows) => rows.map(AttachmentModel.fromData).toList());
 
-  Stream<AttachmentModel?> watchById(String id) =>
-      _local.watchById(id).map((row) => row != null ? AttachmentModel.fromData(row) : null);
+  Stream<AttachmentModel?> watchById(String id) => _local
+      .watchById(id)
+      .map((row) => row != null ? AttachmentModel.fromData(row) : null);
 
   Future<void> upload({
     required String id,
@@ -34,17 +34,19 @@ class AttachmentsRepository {
     final fileSize = await file.length();
     final now = DateTime.now().toUtc();
 
-    await _local.insert(AttachmentsCompanion(
-      id: Value(id),
-      noteId: Value(noteId),
-      localPath: Value(file.path),
-      fileName: Value(fileName),
-      mimeType: Value(mimeType),
-      fileSize: Value(fileSize),
-      status: const Value('uploading'),
-      createdAt: Value(now),
-      updatedAt: Value(now),
-    ));
+    await _local.insert(
+      AttachmentsCompanion(
+        id: Value(id),
+        noteId: Value(noteId),
+        localPath: Value(file.path),
+        fileName: Value(fileName),
+        mimeType: Value(mimeType),
+        fileSize: Value(fileSize),
+        status: const Value('uploading'),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
 
     try {
       final formData = FormData.fromMap({
@@ -68,13 +70,13 @@ class AttachmentsRepository {
 
 final attachmentsRepositoryProvider =
     Provider.autoDispose<AttachmentsRepository>((ref) {
-  final local = ref.watch(attachmentsLocalRepositoryProvider);
-  final api = ref.watch(apiClientProvider);
-  return AttachmentsRepository(local, api);
-});
+      final local = ref.watch(attachmentsLocalRepositoryProvider);
+      final api = ref.watch(apiClientProvider);
+      return AttachmentsRepository(local, api);
+    });
 
-final attachmentByIdProvider =
-    StreamProvider.autoDispose.family<AttachmentModel?, String>((ref, id) {
-  final repo = ref.watch(attachmentsRepositoryProvider);
-  return repo.watchById(id);
-});
+final attachmentByIdProvider = StreamProvider.autoDispose
+    .family<AttachmentModel?, String>((ref, id) {
+      final repo = ref.watch(attachmentsRepositoryProvider);
+      return repo.watchById(id);
+    });

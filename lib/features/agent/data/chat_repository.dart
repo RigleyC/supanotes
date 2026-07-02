@@ -21,7 +21,10 @@ import '../domain/message_model.dart';
 import '../domain/tool_confirmation.dart';
 
 abstract class IChatRepository {
-  Future<String> sendMessage({required String sessionId, required String message});
+  Future<String> sendMessage({
+    required String sessionId,
+    required String message,
+  });
   Future<List<MessageModel>> getHistory(String sessionId);
   Future<void> clearHistory(String sessionId);
   Future<ToolConfirmationResolution> resolveToolConfirmation({
@@ -44,10 +47,7 @@ class ChatRepository implements IChatRepository {
     try {
       final response = await _api.post<Map<String, dynamic>>(
         '/agent/chat',
-        data: <String, dynamic>{
-          'session_id': sessionId,
-          'content': message,
-        },
+        data: <String, dynamic>{'session_id': sessionId, 'content': message},
       );
       final data = response.data;
       if (data == null || data['response'] is! String) {

@@ -5,14 +5,22 @@ import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_handler.dart';
 
-final noteSuggestionsProvider = Provider.family.autoDispose<List<NoteModel>, ({String query, String currentNoteId})>((ref, params) {
-  final notes = ref.watch(activeNotesProvider).asData?.value ?? [];
-  final lowercaseQuery = params.query.toLowerCase();
-  return notes
-      .where((n) => n.id != params.currentNoteId && n.title.toLowerCase().contains(lowercaseQuery))
-      .toList()
-    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-});
+final noteSuggestionsProvider = Provider.family
+    .autoDispose<List<NoteModel>, ({String query, String currentNoteId})>((
+      ref,
+      params,
+    ) {
+      final notes = ref.watch(activeNotesProvider).asData?.value ?? [];
+      final lowercaseQuery = params.query.toLowerCase();
+      return notes
+          .where(
+            (n) =>
+                n.id != params.currentNoteId &&
+                n.title.toLowerCase().contains(lowercaseQuery),
+          )
+          .toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    });
 
 class NoteSuggestionOverlay extends ConsumerStatefulWidget {
   final Editor editor;
@@ -29,7 +37,8 @@ class NoteSuggestionOverlay extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<NoteSuggestionOverlay> createState() => _NoteSuggestionOverlayState();
+  ConsumerState<NoteSuggestionOverlay> createState() =>
+      _NoteSuggestionOverlayState();
 }
 
 class _NoteMatch {
@@ -37,7 +46,12 @@ class _NoteMatch {
   final String nodeId;
   final int tagStart;
   final int tagEnd;
-  const _NoteMatch({required this.query, required this.nodeId, required this.tagStart, required this.tagEnd});
+  const _NoteMatch({
+    required this.query,
+    required this.nodeId,
+    required this.tagStart,
+    required this.tagEnd,
+  });
 }
 
 class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
@@ -97,7 +111,12 @@ class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
     }
 
     setState(() {
-      _match = _NoteMatch(query: match.group(1)!, nodeId: node.id, tagStart: match.start, tagEnd: caretOffset);
+      _match = _NoteMatch(
+        query: match.group(1)!,
+        nodeId: node.id,
+        tagStart: match.start,
+        tagEnd: caretOffset,
+      );
     });
   }
 
@@ -119,10 +138,12 @@ class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
     final match = _match;
     if (match == null) return const SizedBox.shrink();
 
-    final suggestions = ref.watch(noteSuggestionsProvider((
-      query: match.query,
-      currentNoteId: widget.currentNoteId,
-    )));
+    final suggestions = ref.watch(
+      noteSuggestionsProvider((
+        query: match.query,
+        currentNoteId: widget.currentNoteId,
+      )),
+    );
     if (suggestions.isEmpty) return const SizedBox.shrink();
 
     final chips = suggestions.take(10).map((note) {
@@ -138,7 +159,9 @@ class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Text(
                 note.title,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
           ),

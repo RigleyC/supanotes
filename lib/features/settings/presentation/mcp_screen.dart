@@ -10,7 +10,6 @@ import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
-
 String _sseUrl() => '${ApiConstants.baseUrl}/mcp';
 
 String _buildClaudeConfigJson({required String sseUrl, String? token}) {
@@ -47,7 +46,9 @@ class _McpScreenState extends ConsumerState<McpScreen> {
       _tokenAsync = const AsyncValue.loading();
     });
     try {
-      final token = await ref.read(settingsRepositoryProvider).generateMcpToken();
+      final token = await ref
+          .read(settingsRepositoryProvider)
+          .generateMcpToken();
       if (!mounted) return;
       setState(() {
         _tokenAsync = AsyncValue.data(token);
@@ -58,9 +59,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
       setState(() {
         _tokenAsync = AsyncValue.error(e, st);
       });
-      AppMessenger.showError(
-        e is ApiException ? e.message : e.toString(),
-      );
+      AppMessenger.showError(e is ApiException ? e.message : e.toString());
     }
   }
 
@@ -81,18 +80,11 @@ class _McpScreenState extends ConsumerState<McpScreen> {
             ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _TokenCard(
-                  tokenAsync: _tokenAsync,
-                  onGenerate: _generateToken,
-                ),
+                _TokenCard(tokenAsync: _tokenAsync, onGenerate: _generateToken),
                 const SizedBox(height: AppSpacing.md),
-                _ClaudeCard(
-                  token: token,
-                ),
+                _ClaudeCard(token: token),
                 const SizedBox(height: AppSpacing.md),
-                _CursorCard(
-                  token: token,
-                ),
+                _CursorCard(token: token),
               ]),
             ),
           ),
@@ -103,10 +95,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
 }
 
 class _TokenCard extends StatelessWidget {
-  const _TokenCard({
-    required this.tokenAsync,
-    required this.onGenerate,
-  });
+  const _TokenCard({required this.tokenAsync, required this.onGenerate});
 
   final AsyncValue<String?> tokenAsync;
   final VoidCallback onGenerate;
@@ -124,14 +113,20 @@ class _TokenCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.vpn_key_outlined, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.vpn_key_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Text('Token de Acesso', style: theme.textTheme.titleMedium),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
               if (token != null) ...[
-                Text('Seu token (mostrado apenas uma vez):', style: theme.textTheme.bodySmall),
+                Text(
+                  'Seu token (mostrado apenas uma vez):',
+                  style: theme.textTheme.bodySmall,
+                ),
                 const SizedBox(height: AppSpacing.sm),
                 Container(
                   width: double.infinity,
@@ -142,7 +137,9 @@ class _TokenCard extends StatelessWidget {
                   ),
                   child: SelectableText(
                     token,
-                    style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -164,22 +161,25 @@ class _TokenCard extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, size: AppSpacing.iconSm, color: theme.colorScheme.onErrorContainer),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: AppSpacing.iconSm,
+                        color: theme.colorScheme.onErrorContainer,
+                      ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
                           'Este token será exibido apenas uma vez. Copie-o agora e armazene em um local seguro.',
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onErrorContainer,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ] else ...[
-                AppButton(
-                  text: 'Gerar Token',
-                  onPressed: onGenerate,
-                ),
+                AppButton(text: 'Gerar Token', onPressed: onGenerate),
               ],
             ],
           ),
@@ -222,10 +222,7 @@ class _ClaudeCard extends StatelessWidget {
               children: [
                 Icon(Icons.terminal_outlined, color: theme.colorScheme.primary),
                 const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'Claude Desktop',
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text('Claude Desktop', style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -274,9 +271,7 @@ class _CursorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final sseUrl = _sseUrl();
-    final headerValue = token != null
-        ? 'Bearer $token'
-        : 'Bearer <seu_token>';
+    final headerValue = token != null ? 'Bearer $token' : 'Bearer <seu_token>';
 
     return Card(
       child: Padding(
@@ -288,10 +283,7 @@ class _CursorCard extends StatelessWidget {
               children: [
                 const Icon(Icons.terminal_outlined),
                 const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'Cursor',
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text('Cursor', style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -310,10 +302,7 @@ class _CursorCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'URL (SSE):',
-                    style: theme.textTheme.labelSmall,
-                  ),
+                  Text('URL (SSE):', style: theme.textTheme.labelSmall),
                   const SizedBox(height: AppSpacing.xs),
                   SelectableText(
                     sseUrl,
@@ -322,10 +311,7 @@ class _CursorCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Header:',
-                    style: theme.textTheme.labelSmall,
-                  ),
+                  Text('Header:', style: theme.textTheme.labelSmall),
                   const SizedBox(height: AppSpacing.xs),
                   Container(
                     width: double.infinity,
@@ -346,15 +332,16 @@ class _CursorCard extends StatelessWidget {
                         ),
                         if (token != null)
                           IconButton(
-                            icon: const Icon(Icons.copy, size: AppSpacing.iconSm),
+                            icon: const Icon(
+                              Icons.copy,
+                              size: AppSpacing.iconSm,
+                            ),
                             tooltip: 'Copiar Token',
                             onPressed: () {
                               Clipboard.setData(
                                 ClipboardData(text: 'Bearer $token'),
                               );
-                              AppMessenger.showSuccess(
-                                'Token copiado!',
-                              );
+                              AppMessenger.showSuccess('Token copiado!');
                             },
                           ),
                       ],

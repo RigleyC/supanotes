@@ -17,8 +17,8 @@ final isGridViewProvider = Provider.autoDispose<bool>((ref) {
 /// automatic rollback on server failure.
 final preferencesControllerProvider =
     NotifierProvider.autoDispose<PreferencesController, void>(
-  PreferencesController.new,
-);
+      PreferencesController.new,
+    );
 
 class PreferencesController extends Notifier<void> {
   @override
@@ -42,12 +42,14 @@ class PreferencesController extends Notifier<void> {
 
     final updatedSettings = Map<String, dynamic>.from(cache.settings);
     updatedSettings['preferences'] = currentPrefs;
-    await ref.read(sessionCacheProvider.notifier).updateSettings(updatedSettings);
+    await ref
+        .read(sessionCacheProvider.notifier)
+        .updateSettings(updatedSettings);
 
     try {
-      await ref.read(settingsRepositoryProvider).updateSettings(
-        preferences: currentPrefs,
-      );
+      await ref
+          .read(settingsRepositoryProvider)
+          .updateSettings(preferences: currentPrefs);
     } catch (e) {
       await ref.read(sessionCacheProvider.notifier).updateSettings(oldSettings);
       rethrow;

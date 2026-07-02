@@ -1,6 +1,7 @@
 library;
 
 import 'destination_type.dart';
+
 class OrganizationPlan {
   OrganizationPlan({required this.planId, required this.items});
 
@@ -19,9 +20,9 @@ class OrganizationPlan {
   }
 
   Map<String, dynamic> toJson() => {
-        'plan_id': planId,
-        'items': items.map((i) => i.toJson()).toList(),
-      };
+    'plan_id': planId,
+    'items': items.map((i) => i.toJson()).toList(),
+  };
 }
 
 /// One proposed move in an [OrganizationPlan].
@@ -60,13 +61,13 @@ class OrganizationPlanItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'item_id': itemId,
-        'original_snippet': originalSnippet,
-        'destination_type': destinationType.value,
-        'destination_note_id': destinationNoteId,
-        'destination_title': destinationTitle,
-        'accepted': accepted,
-      };
+    'item_id': itemId,
+    'original_snippet': originalSnippet,
+    'destination_type': destinationType.value,
+    'destination_note_id': destinationNoteId,
+    'destination_title': destinationTitle,
+    'accepted': accepted,
+  };
 
   factory OrganizationPlanItem.fromJson(Map<String, dynamic> json) {
     return OrganizationPlanItem(

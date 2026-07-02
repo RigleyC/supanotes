@@ -17,10 +17,10 @@ void main() {
     );
 
     expect(find.text('Nenhuma'), findsOneWidget);
-    expect(find.text('Diária'), findsOneWidget);
+    expect(find.text('Diariamente'), findsOneWidget);
     expect(find.text('Dias úteis'), findsOneWidget);
-    expect(find.text('Semanal'), findsOneWidget);
-    expect(find.text('Mensal'), findsOneWidget);
+    expect(find.text('Semanalmente'), findsOneWidget);
+    expect(find.text('Mensalmente'), findsOneWidget);
     expect(find.byType(AppSelectionTile), findsNWidgets(5));
   });
 }

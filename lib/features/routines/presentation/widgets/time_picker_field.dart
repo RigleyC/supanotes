@@ -19,10 +19,7 @@ class TimePickerField extends StatelessWidget {
   final ValueChanged<TimeOfDay> onChanged;
 
   Future<void> _open(BuildContext context) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: value,
-    );
+    final picked = await showTimePicker(context: context, initialTime: value);
     if (picked != null) onChanged(picked);
   }
 
@@ -47,11 +44,7 @@ class TimePickerField extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.access_time,
-                size: 18,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.access_time, size: 18, color: scheme.onSurfaceVariant),
               const SizedBox(width: AppSpacing.sm),
               Text(
                 _format(value),

@@ -58,10 +58,7 @@ class ServerException extends ApiException {
 /// No usable response was ever received: connection refused, DNS failure,
 /// TLS error, request or receive timeout, etc.
 class NetworkException extends ApiException {
-  const NetworkException({
-    required super.message,
-    super.statusCode,
-  });
+  const NetworkException({required super.message, super.statusCode});
 }
 
 /// Maps a [DioException] to the most specific [ApiException] subclass.

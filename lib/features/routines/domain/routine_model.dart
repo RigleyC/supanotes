@@ -143,11 +143,7 @@ RoutineSchedule? scheduleFromCronExpr(String cronExpr) {
 
   if (days.isEmpty) return null;
   final sorted = days.toList()..sort();
-  return RoutineSchedule(
-    daysOfWeek: sorted,
-    hour: hour,
-    minute: minute,
-  );
+  return RoutineSchedule(daysOfWeek: sorted, hour: hour, minute: minute);
 }
 
 int _cronDayToClientDay(int cronDay) {
@@ -189,10 +185,7 @@ class RoutineModel {
 
   /// Returns a copy of this routine with the fields in [patch]
   /// replaced. Only the user-mutable fields are exposed.
-  RoutineModel copyWith({
-    String? cronExpr,
-    bool? enabled,
-  }) {
+  RoutineModel copyWith({String? cronExpr, bool? enabled}) {
     return RoutineModel(
       id: id,
       briefType: briefType,

@@ -15,11 +15,7 @@ class AdaptiveSliverNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (title == null) {
-      return SliverAppBar(
-        actions: actions,
-        leading: leading,
-        pinned: true,
-      );
+      return SliverAppBar(actions: actions, leading: leading, pinned: true);
     }
 
     return SliverAppBar.medium(

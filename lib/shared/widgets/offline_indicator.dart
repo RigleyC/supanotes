@@ -33,7 +33,8 @@ class OfflineIndicator extends ConsumerWidget {
         return _Banner(
           color: colorScheme.error,
           textColor: colorScheme.onError,
-          label: 'Modo offline. As alterações serão sincronizadas quando reconectado.',
+          label:
+              'Modo offline. As alterações serão sincronizadas quando reconectado.',
           fontSize: labelSmall?.fontSize ?? 12,
           floating: floating,
         );
@@ -41,7 +42,8 @@ class OfflineIndicator extends ConsumerWidget {
         return _Banner(
           color: colorScheme.tertiary,
           textColor: colorScheme.onTertiary,
-          label: 'Erro de sincronização: ${state.errorMessage ?? "desconhecido"}',
+          label:
+              'Erro de sincronização: ${state.errorMessage ?? "desconhecido"}',
           fontSize: labelSmall?.fontSize ?? 12,
           floating: floating,
         );

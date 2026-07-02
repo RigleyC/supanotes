@@ -1,4 +1,3 @@
-
 /// HTTP and API constants.
 ///
 /// In production these values can be injected from build-time environment
@@ -18,8 +17,10 @@
 class ApiConstants {
   ApiConstants._();
 
-  static const String _envBaseUrl =
-      String.fromEnvironment('API_BASE_URL', defaultValue: '');
+  static const String _envBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
 
   static const String _prodBaseUrl =
       'https://backend-winter-waterfall-5807.fly.dev/api/v1';

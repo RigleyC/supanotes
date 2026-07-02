@@ -35,7 +35,9 @@ void applyNoteSuggestion({
       DocumentSelection.collapsed(
         position: DocumentPosition(
           nodeId: nodeId,
-          nodePosition: TextNodePosition(offset: tagStartOffset + note.title.length),
+          nodePosition: TextNodePosition(
+            offset: tagStartOffset + note.title.length,
+          ),
         ),
       ),
       SelectionChangeType.placeCaret,

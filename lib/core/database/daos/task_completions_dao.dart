@@ -50,23 +50,26 @@ class TaskCompletionsDao extends DatabaseAccessor<AppDatabase>
     return (select(localTaskCompletions)
           ..where((c) => c.taskId.equals(taskId))
           ..orderBy([
-            (c) =>
-                OrderingTerm(expression: c.completedAt, mode: OrderingMode.desc),
+            (c) => OrderingTerm(
+              expression: c.completedAt,
+              mode: OrderingMode.desc,
+            ),
           ]))
         .watch();
   }
 
   /// Returns every row still pending sync.
   Future<List<LocalTaskCompletionData>> getDirtyCompletions() {
-    return (select(localTaskCompletions)
-          ..where((c) => c.isDirty.equals(true)))
-        .get();
+    return (select(
+      localTaskCompletions,
+    )..where((c) => c.isDirty.equals(true))).get();
   }
 
   /// Flips the dirty flag off after a successful push.
   Future<void> clearDirtyFlag(String id) async {
-    await (update(localTaskCompletions)..where((c) => c.id.equals(id)))
-        .write(const LocalTaskCompletionsCompanion(isDirty: Value(false)));
+    await (update(localTaskCompletions)..where((c) => c.id.equals(id))).write(
+      const LocalTaskCompletionsCompanion(isDirty: Value(false)),
+    );
   }
 
   /// Stores a completion row that came back from the backend. Uses

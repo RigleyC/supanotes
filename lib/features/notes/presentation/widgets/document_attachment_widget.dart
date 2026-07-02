@@ -8,7 +8,8 @@ import '../../domain/attachment_model.dart';
 import 'attachment_renderers.dart';
 
 class DocumentAttachmentWidget extends ConsumerWidget {
-  const DocumentAttachmentWidget({super.key, 
+  const DocumentAttachmentWidget({
+    super.key,
     required this.componentKey,
     required this.nodeId,
     required this.onDelete,
@@ -77,10 +78,8 @@ class DocumentAttachmentWidget extends ConsumerWidget {
             );
         }
       },
-      loading: () => AttachmentUploadingCapsule(
-        fileName: '...',
-        onCancel: onDelete,
-      ),
+      loading: () =>
+          AttachmentUploadingCapsule(fileName: '...', onCancel: onDelete),
       error: (_, __) => const SizedBox.shrink(),
     );
 

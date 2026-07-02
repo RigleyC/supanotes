@@ -88,7 +88,9 @@ class _DayChip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final background = isSelected ? scheme.primary : scheme.surfaceContainerHighest;
+    final background = isSelected
+        ? scheme.primary
+        : scheme.surfaceContainerHighest;
     final foreground = isSelected ? scheme.onPrimary : scheme.onSurfaceVariant;
 
     return Material(

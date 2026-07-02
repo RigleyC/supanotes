@@ -17,7 +17,10 @@ String deriveNoteTitle(String content) {
   return NoteStrings.fallbackTitle;
 }
 
-String? deriveNoteExcerpt(String content, {int maxLength = AppConstants.noteExcerptMaxLength}) {
+String? deriveNoteExcerpt(
+  String content, {
+  int maxLength = AppConstants.noteExcerptMaxLength,
+}) {
   if (content.isEmpty) return null;
   final lines = content.split('\n');
   int firstNonEmptyIdx = -1;

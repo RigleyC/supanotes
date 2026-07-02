@@ -57,23 +57,22 @@ class NoteModel {
     String? permission,
     String? sharedByEmail,
     String? sharedByName,
-  }) =>
-      NoteModel(
-        id: id ?? this.id,
-        userId: userId ?? this.userId,
-        content: content ?? this.content,
-        isInbox: isInbox ?? this.isInbox,
-        favorite: favorite ?? this.favorite,
-        archived: archived ?? this.archived,
-        contextId: contextId ?? this.contextId,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-        hideCompleted: hideCompleted ?? this.hideCompleted,
-        collapseImages: collapseImages ?? this.collapseImages,
-        permission: permission ?? this.permission,
-        sharedByEmail: sharedByEmail ?? this.sharedByEmail,
-        sharedByName: sharedByName ?? this.sharedByName,
-      );
+  }) => NoteModel(
+    id: id ?? this.id,
+    userId: userId ?? this.userId,
+    content: content ?? this.content,
+    isInbox: isInbox ?? this.isInbox,
+    favorite: favorite ?? this.favorite,
+    archived: archived ?? this.archived,
+    contextId: contextId ?? this.contextId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    hideCompleted: hideCompleted ?? this.hideCompleted,
+    collapseImages: collapseImages ?? this.collapseImages,
+    permission: permission ?? this.permission,
+    sharedByEmail: sharedByEmail ?? this.sharedByEmail,
+    sharedByName: sharedByName ?? this.sharedByName,
+  );
 
   factory NoteModel.fromData(NoteData d, {bool hideCompleted = false}) {
     return NoteModel(
@@ -89,7 +88,9 @@ class NoteModel {
       hideCompleted: hideCompleted,
       collapseImages: d.collapseImages,
       permission: d.permission?.isNotEmpty == true ? d.permission : null,
-      sharedByEmail: d.sharedByEmail?.isNotEmpty == true ? d.sharedByEmail : null,
+      sharedByEmail: d.sharedByEmail?.isNotEmpty == true
+          ? d.sharedByEmail
+          : null,
       sharedByName: d.sharedByName?.isNotEmpty == true ? d.sharedByName : null,
     );
   }
@@ -107,9 +108,15 @@ class NoteModel {
       updatedAt: qr.note.updatedAt,
       hideCompleted: qr.hideCompleted,
       collapseImages: qr.note.collapseImages,
-      permission: qr.note.permission?.isNotEmpty == true ? qr.note.permission : null,
-      sharedByEmail: qr.note.sharedByEmail?.isNotEmpty == true ? qr.note.sharedByEmail : null,
-      sharedByName: qr.note.sharedByName?.isNotEmpty == true ? qr.note.sharedByName : null,
+      permission: qr.note.permission?.isNotEmpty == true
+          ? qr.note.permission
+          : null,
+      sharedByEmail: qr.note.sharedByEmail?.isNotEmpty == true
+          ? qr.note.sharedByEmail
+          : null,
+      sharedByName: qr.note.sharedByName?.isNotEmpty == true
+          ? qr.note.sharedByName
+          : null,
     );
   }
 }

@@ -12,7 +12,9 @@ class SplashScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
-              isDark ? 'assets/brand/splash_dark.png' : 'assets/brand/splash.png',
+              isDark
+                  ? 'assets/brand/splash_dark.png'
+                  : 'assets/brand/splash.png',
               width: 120,
               height: 120,
             ),

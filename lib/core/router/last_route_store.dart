@@ -15,7 +15,9 @@ class LastRouteStore {
     final route = _prefs.getString(_key);
     debugPrint('[LastRoute] initialLocation read: $route');
     if (route == null || !_isPersistable(route)) {
-      debugPrint('[LastRoute] initialLocation -> splash (null or not persistable)');
+      debugPrint(
+        '[LastRoute] initialLocation -> splash (null or not persistable)',
+      );
       return AppRoutes.splash;
     }
     debugPrint('[LastRoute] initialLocation -> $route');
@@ -23,7 +25,9 @@ class LastRouteStore {
   }
 
   Future<void> save(String location) async {
-    debugPrint('[LastRoute] save called with: $location persistable=${_isPersistable(location)}');
+    debugPrint(
+      '[LastRoute] save called with: $location persistable=${_isPersistable(location)}',
+    );
     if (!_isPersistable(location)) return;
     await _prefs.setString(_key, location);
     debugPrint('[LastRoute] save completed: $location');

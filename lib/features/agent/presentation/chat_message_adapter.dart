@@ -27,8 +27,7 @@ List<ChatMessage> toGenAiChatMessages(
 }) {
   final result = <ChatMessage>[
     for (final message in messages)
-      if (message.content.trim().isNotEmpty)
-        _toChatMessage(message),
+      if (message.content.trim().isNotEmpty) _toChatMessage(message),
   ];
 
   if (actions.isNotEmpty) {
@@ -36,9 +35,7 @@ List<ChatMessage> toGenAiChatMessages(
       ChatMessage.rich(
         user: agentChatSystemUser,
         resultKind: 'action_timeline',
-        data: {
-          'actions': actions,
-        },
+        data: {'actions': actions},
       ),
     );
   }

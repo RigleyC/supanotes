@@ -36,9 +36,7 @@ class TaskTile extends StatelessWidget {
     final taskColor = semantics?.task ?? AppColors.taskAccent;
     final isCompleted = task.isCompleted;
 
-    final titleColor = isCompleted
-        ? scheme.onSurfaceVariant
-        : scheme.onSurface;
+    final titleColor = isCompleted ? scheme.onSurfaceVariant : scheme.onSurface;
     final titleDecoration = isCompleted ? TextDecoration.lineThrough : null;
 
     return Dismissible(
@@ -101,8 +99,7 @@ class TaskTile extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (task.dueDate != null ||
-                          task.recurrence != null) ...[
+                      if (task.dueDate != null || task.recurrence != null) ...[
                         const SizedBox(height: AppSpacing.xs),
                         _MetaRow(task: task),
                       ],

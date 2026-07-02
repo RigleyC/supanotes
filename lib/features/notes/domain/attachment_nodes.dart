@@ -1,8 +1,7 @@
 import 'package:super_editor/super_editor.dart';
 
 abstract class AttachmentNode extends BlockNode {
-  AttachmentNode({Map<String, dynamic>? metadata})
-      : super(metadata: metadata);
+  AttachmentNode({Map<String, dynamic>? metadata}) : super(metadata: metadata);
 
   String get id;
 
@@ -20,29 +19,21 @@ abstract class AttachmentNode extends BlockNode {
 }
 
 class DocumentAttachmentNode extends AttachmentNode {
-  DocumentAttachmentNode({
-    required this.id,
-    super.metadata,
-  });
+  DocumentAttachmentNode({required this.id, super.metadata});
 
   @override
   final String id;
 
   @override
   DocumentNode copyWithAddedMetadata(Map<String, dynamic> newProperties) =>
-      DocumentAttachmentNode(
-        id: id,
-        metadata: {...metadata, ...newProperties},
-      );
+      DocumentAttachmentNode(id: id, metadata: {...metadata, ...newProperties});
 
   @override
   DocumentNode copyAndReplaceMetadata(Map<String, dynamic> newMetadata) =>
       DocumentAttachmentNode(id: id, metadata: newMetadata);
 
-  DocumentAttachmentNode copy() => DocumentAttachmentNode(
-        id: id,
-        metadata: Map.from(metadata),
-      );
+  DocumentAttachmentNode copy() =>
+      DocumentAttachmentNode(id: id, metadata: Map.from(metadata));
 }
 
 class RichLinkNode extends AttachmentNode {
@@ -67,21 +58,34 @@ class RichLinkNode extends AttachmentNode {
   @override
   DocumentNode copyWithAddedMetadata(Map<String, dynamic> newProperties) =>
       RichLinkNode(
-        id: id, url: url, title: title, description: description,
-        imageUrl: imageUrl, domain: domain,
+        id: id,
+        url: url,
+        title: title,
+        description: description,
+        imageUrl: imageUrl,
+        domain: domain,
         metadata: {...metadata, ...newProperties},
       );
 
   @override
   DocumentNode copyAndReplaceMetadata(Map<String, dynamic> newMetadata) =>
       RichLinkNode(
-        id: id, url: url, title: title, description: description,
-        imageUrl: imageUrl, domain: domain, metadata: newMetadata,
+        id: id,
+        url: url,
+        title: title,
+        description: description,
+        imageUrl: imageUrl,
+        domain: domain,
+        metadata: newMetadata,
       );
 
   RichLinkNode copy() => RichLinkNode(
-        id: id, url: url, title: title, description: description,
-        imageUrl: imageUrl, domain: domain,
-        metadata: Map.from(metadata),
-      );
+    id: id,
+    url: url,
+    title: title,
+    description: description,
+    imageUrl: imageUrl,
+    domain: domain,
+    metadata: Map.from(metadata),
+  );
 }

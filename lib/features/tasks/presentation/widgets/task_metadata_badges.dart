@@ -5,7 +5,6 @@ import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 import '../../domain/task_recurrence.dart';
-import 'recurrence_picker.dart';
 
 class TaskMetadataBadges extends StatelessWidget {
   const TaskMetadataBadges({
@@ -47,7 +46,7 @@ class TaskMetadataBadges extends StatelessWidget {
         if (_hasRecurrence)
           _MetadataPill(
             icon: Icons.refresh,
-            label: recurrenceLabel(recurrence),
+            label: recurrence!.label,
             color: scheme.onSurfaceVariant,
           ),
       ],
@@ -75,7 +74,7 @@ class TaskMetadataBadges extends StatelessWidget {
 
     final today = (now ?? DateTime.now()).startOfDay;
     final date = dueDate.startOfDay;
-    
+
     if (date.isBefore(today)) return Theme.of(context).colorScheme.error;
     if (date.isSameDayAs(today)) return AppColors.success;
     return Theme.of(context).colorScheme.onSurfaceVariant;

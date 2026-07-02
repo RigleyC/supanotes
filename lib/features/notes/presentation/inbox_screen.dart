@@ -20,8 +20,7 @@ import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart'
     show AdaptiveSliverNavBar;
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart'
     show TaskSnackBarHelper;
-import 'package:supanotes/shared/widgets/app_snackbar.dart'
-    show AppMessenger;
+import 'package:supanotes/shared/widgets/app_snackbar.dart' show AppMessenger;
 
 /// Route companion for the top-level Inbox tab.
 ///
@@ -61,11 +60,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     if (!mounted || result == null) return;
 
     final created = result.items
-        .where((i) => i.accepted && i.destinationType == DestinationType.newNote)
+        .where(
+          (i) => i.accepted && i.destinationType == DestinationType.newNote,
+        )
         .length;
     final moved = result.items
-        .where((i) =>
-            i.accepted && i.destinationType == DestinationType.existingNote)
+        .where(
+          (i) =>
+              i.accepted && i.destinationType == DestinationType.existingNote,
+        )
         .length;
     final kept = result.items
         .where((i) => i.accepted && i.destinationType == DestinationType.keep)
@@ -78,21 +81,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ref.watch(inboxProvider).when(
-      data: (inbox) {
-        if (inbox == null) {
-          return const Scaffold(
-            body: Center(child: Text('Inbox not found')),
-          );
-        }
-        return _buildEditor(inbox);
-      },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => Scaffold(
-        body: Center(child: Text('Error: $error')),
-      ),
-    );
+    return ref
+        .watch(inboxProvider)
+        .when(
+          data: (inbox) {
+            if (inbox == null) {
+              return const Scaffold(
+                body: Center(child: Text('Inbox not found')),
+              );
+            }
+            return _buildEditor(inbox);
+          },
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (error, _) =>
+              Scaffold(body: Center(child: Text('Error: $error'))),
+        );
   }
 
   Widget _buildEditor(NoteModel inbox) {
@@ -139,13 +143,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                             _openTaskActions(task, flushSnapshot),
                         onTaskComplete: (taskId) =>
                             TaskSnackBarHelper.completeTaskWithFeedback(
-                          onComplete: () =>
-                              ref.read(tasksRepositoryProvider).completeTask(taskId),
-                          onUndo: () =>
-                              ref.read(tasksRepositoryProvider).reopenTask(taskId),
-                        ),
-                        onTaskReopen: (taskId) =>
-                            ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                              onComplete: () => ref
+                                  .read(tasksRepositoryProvider)
+                                  .completeTask(taskId),
+                              onUndo: () => ref
+                                  .read(tasksRepositoryProvider)
+                                  .reopenTask(taskId),
+                            ),
+                        onTaskReopen: (taskId) => ref
+                            .read(tasksRepositoryProvider)
+                            .reopenTask(taskId),
                       ),
                     ),
                   ),
@@ -156,16 +163,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           },
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (error, _) => Scaffold(
-            body: Center(child: Text('Error: $error')),
-          ),
+          error: (error, _) =>
+              Scaffold(body: Center(child: Text('Error: $error'))),
         );
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => Scaffold(
-        body: Center(child: Text('Error: $error')),
-      ),
+      error: (error, _) => Scaffold(body: Center(child: Text('Error: $error'))),
     );
   }
 

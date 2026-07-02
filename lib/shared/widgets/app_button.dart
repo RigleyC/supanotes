@@ -76,10 +76,7 @@ class AppButton extends StatelessWidget {
       ),
     };
 
-    return SizedBox(
-      width: width ?? double.infinity,
-      child: button,
-    );
+    return SizedBox(width: width ?? double.infinity, child: button);
   }
 
   Color _foregroundColor(ColorScheme scheme) {

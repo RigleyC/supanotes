@@ -68,9 +68,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
-            tooltip: _isSearching
-                ? 'Fechar busca'
-                : 'Buscar notas',
+            tooltip: _isSearching ? 'Fechar busca' : 'Buscar notas',
             onPressed: _isSearching ? _closeSearch : _openSearch,
           ),
 
@@ -107,9 +105,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         ),
       ),
       const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
-      const SliverToBoxAdapter(
-        child: SectionTitle(title: 'Notas'),
-      ),
+      const SliverToBoxAdapter(child: SectionTitle(title: 'Notas')),
     ];
 
     return Scaffold(
@@ -120,7 +116,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 title: 'Erro ao carregar as notas',
                 subtitle: e.toString(),
               ),
-              data: (notes) => _buildNotesBody(notes, headerSlivers, isGridView),
+              data: (notes) =>
+                  _buildNotesBody(notes, headerSlivers, isGridView),
             )
           : searchAsync!.when(
               loading: () => SearchLoadingView(headerSlivers: headerSlivers),
@@ -172,14 +169,20 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
   Future<void> _toggleViewMode() async {
     try {
-      await ref.read(preferencesControllerProvider.notifier).toggleNotesViewMode();
+      await ref
+          .read(preferencesControllerProvider.notifier)
+          .toggleNotesViewMode();
     } catch (_) {
       if (!context.mounted) return;
       AppMessenger.showError('Erro ao salvar preferência de visualização');
     }
   }
 
-  Widget _buildNotesBody(List<NoteModel> notes, List<Widget> headerSlivers, bool isGridView) {
+  Widget _buildNotesBody(
+    List<NoteModel> notes,
+    List<Widget> headerSlivers,
+    bool isGridView,
+  ) {
     return Cue.onChange(
       value: isGridView,
       motion: .smooth(),

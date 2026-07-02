@@ -34,9 +34,7 @@ class InboxOrganizeRepository {
     }
   }
 
-  Future<void> applyOrganizationPlan(
-    OrganizationPlan plan,
-  ) async {
+  Future<void> applyOrganizationPlan(OrganizationPlan plan) async {
     try {
       final response = await _api.post<Map<String, dynamic>>(
         _applyPath,
@@ -55,6 +53,7 @@ class InboxOrganizeRepository {
   }
 }
 
-final inboxOrganizeRepositoryProvider = Provider.autoDispose<InboxOrganizeRepository>((ref) {
-  return InboxOrganizeRepository(apiClient: ref.watch(apiClientProvider));
-});
+final inboxOrganizeRepositoryProvider =
+    Provider.autoDispose<InboxOrganizeRepository>((ref) {
+      return InboxOrganizeRepository(apiClient: ref.watch(apiClientProvider));
+    });

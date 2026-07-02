@@ -69,24 +69,16 @@ class AuthController extends AsyncNotifier<User?> {
     }
   }
 
-  Future<AuthResult> login({
-    required String email,
-    required String password,
-  }) =>
+  Future<AuthResult> login({required String email, required String password}) =>
       _authenticate(() => _repository.login(email: email, password: password));
 
   Future<AuthResult> register({
     required String email,
     required String password,
     required String name,
-  }) =>
-      _authenticate(
-        () => _repository.register(
-          email: email,
-          password: password,
-          name: name,
-        ),
-      );
+  }) => _authenticate(
+    () => _repository.register(email: email, password: password, name: name),
+  );
 
   Future<void> _clearSession() async {
     await _storage.clear();

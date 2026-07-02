@@ -8,7 +8,9 @@ class UserNotePreferencesRepository {
   final AppDatabase _db;
 
   Stream<UserNotePreferenceData?> watchPreference(
-      String userId, String noteId) {
+    String userId,
+    String noteId,
+  ) {
     return _db.userNotePreferencesDao.watchPreference(userId, noteId);
   }
 
@@ -21,23 +23,29 @@ class UserNotePreferencesRepository {
   }
 
   Future<void> setHideCompleted(
-      String userId, String noteId, bool hideCompleted) {
-    return _db.userNotePreferencesDao
-        .setHideCompleted(userId, noteId, hideCompleted);
+    String userId,
+    String noteId,
+    bool hideCompleted,
+  ) {
+    return _db.userNotePreferencesDao.setHideCompleted(
+      userId,
+      noteId,
+      hideCompleted,
+    );
   }
 }
 
 final userNotePreferencesRepositoryProvider =
     Provider.autoDispose<UserNotePreferencesRepository>((ref) {
-  final db = ref.watch(appDatabaseProvider);
-  return UserNotePreferencesRepository(db);
-});
+      final db = ref.watch(appDatabaseProvider);
+      return UserNotePreferencesRepository(db);
+    });
 
 final userNotePreferenceStreamProvider = StreamProvider.autoDispose
     .family<UserNotePreferenceData?, String>((ref, noteId) {
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) return Stream.value(null);
-  return ref
-      .watch(userNotePreferencesRepositoryProvider)
-      .watchPreference(userId, noteId);
-});
+      final userId = ref.watch(currentUserIdProvider);
+      if (userId == null) return Stream.value(null);
+      return ref
+          .watch(userNotePreferencesRepositoryProvider)
+          .watchPreference(userId, noteId);
+    });

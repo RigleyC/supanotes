@@ -5,8 +5,10 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/memories/data/memories_repository.dart';
 import 'package:supanotes/features/memories/domain/memory_model.dart';
 
-final memoriesControllerProvider = AsyncNotifierProvider.autoDispose<
-  MemoriesController, List<MemoryModel>>(MemoriesController.new);
+final memoriesControllerProvider =
+    AsyncNotifierProvider.autoDispose<MemoriesController, List<MemoryModel>>(
+      MemoriesController.new,
+    );
 
 class MemoriesController extends AsyncNotifier<List<MemoryModel>> {
   @override
@@ -20,12 +22,14 @@ class MemoriesController extends AsyncNotifier<List<MemoryModel>> {
     return memories;
   }
 
-  Future<void> createMemory({required String content, String? contextSlug}) async {
+  Future<void> createMemory({
+    required String content,
+    String? contextSlug,
+  }) async {
     try {
-      await ref.read(memoriesRepositoryProvider).createMemory(
-            content: content,
-            contextSlug: contextSlug,
-          );
+      await ref
+          .read(memoriesRepositoryProvider)
+          .createMemory(content: content, contextSlug: contextSlug);
       state = AsyncValue.data(await _loadMemories());
     } on ApiException catch (e, st) {
       state = AsyncValue.error(e, st);

@@ -6,14 +6,18 @@ import '../../../../core/auth/current_user.dart';
 import '../../../../core/database/database.dart';
 import '../../../../core/database/daos/notes_dao.dart';
 
-final notesLocalRepositoryProvider = Provider.autoDispose<NotesLocalRepository>((ref) {
-  final db = ref.watch(appDatabaseProvider);
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) {
-    throw StateError('Cannot create NotesLocalRepository: user not authenticated');
-  }
-  return NotesLocalRepository(db.notesDao, userId);
-});
+final notesLocalRepositoryProvider = Provider.autoDispose<NotesLocalRepository>(
+  (ref) {
+    final db = ref.watch(appDatabaseProvider);
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null) {
+      throw StateError(
+        'Cannot create NotesLocalRepository: user not authenticated',
+      );
+    }
+    return NotesLocalRepository(db.notesDao, userId);
+  },
+);
 
 class NotesLocalRepository {
   NotesLocalRepository(this._dao, this._userId);
@@ -92,8 +96,10 @@ class NotesLocalRepository {
 
   /// Soft-delete the row with [id]. Marks `deletedAt` and flips
   /// `isDirty` so the tombstone reaches the backend on the next sync.
-  Future<NoteQueryResult> createNoteWithId(String id,
-      {String content = ''}) async {
+  Future<NoteQueryResult> createNoteWithId(
+    String id, {
+    String content = '',
+  }) async {
     final now = DateTime.now().toUtc();
     final companion = NotesCompanion.insert(
       id: id,
