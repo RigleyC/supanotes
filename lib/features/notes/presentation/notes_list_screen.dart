@@ -5,9 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/auth/data/session_cache.dart';
-import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
@@ -57,11 +56,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isGridView = ref.watch(
-      sessionCacheProvider.select(
-        (c) => (c.settings['preferences'] as Map<String, dynamic>?)?['notes_view_mode'] == 'grid',
-      ),
-    );
+    final isGridView = ref.watch(isGridViewProvider);
     final notesAsync = ref.watch(activeNotesProvider);
     final trimmedSearchQuery = _searchQuery.trim();
     final searchAsync = trimmedSearchQuery.isEmpty
@@ -176,23 +171,9 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   }
 
   Future<void> _toggleViewMode() async {
-    final sessionCache = ref.read(sessionCacheProvider);
-    final currentPrefs = Map<String, dynamic>.from(
-      (sessionCache.settings['preferences'] as Map<String, dynamic>?) ?? {},
-    );
-    final currentMode = currentPrefs['notes_view_mode'] as String? ?? 'list';
-    final newMode = currentMode == 'grid' ? 'list' : 'grid';
-    currentPrefs['notes_view_mode'] = newMode;
-
-    final updatedSettings = Map<String, dynamic>.from(sessionCache.settings);
-    updatedSettings['preferences'] = currentPrefs;
-    await ref.read(sessionCacheProvider.notifier).updateSettings(updatedSettings);
-
-    final repo = ref.read(settingsRepositoryProvider);
     try {
-      await repo.updateSettings(preferences: currentPrefs);
-    } catch (e) {
-      debugPrint('Failed to update view mode: $e');
+      await ref.read(preferencesControllerProvider.notifier).toggleNotesViewMode();
+    } catch (_) {
       if (!context.mounted) return;
       AppMessenger.showError('Erro ao salvar preferência de visualização');
     }
