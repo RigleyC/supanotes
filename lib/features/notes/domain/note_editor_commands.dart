@@ -254,9 +254,9 @@ class RandomDividerConversionReaction extends EditReaction {
     if (edit.change is! TextInsertionEvent) return;
 
     final textInsertionEvent = edit.change as TextInsertionEvent;
-    final paragraph =
-        document.getNodeById(textInsertionEvent.nodeId) as TextNode;
-    final match = _hrPattern.firstMatch(paragraph.text.toPlainText())?.group(0);
+    final node = document.getNodeById(textInsertionEvent.nodeId);
+    if (node is! TextNode) return;
+    final match = _hrPattern.firstMatch(node.text.toPlainText())?.group(0);
     if (match == null) return;
 
     final index = math.Random().nextInt(dividerCount) + 1;
@@ -265,17 +265,17 @@ class RandomDividerConversionReaction extends EditReaction {
       DeleteContentRequest(
         documentRange: DocumentRange(
           start: DocumentPosition(
-            nodeId: paragraph.id,
+            nodeId: node.id,
             nodePosition: const TextNodePosition(offset: 0),
           ),
           end: DocumentPosition(
-            nodeId: paragraph.id,
+            nodeId: node.id,
             nodePosition: TextNodePosition(offset: match.length),
           ),
         ),
       ),
       InsertNodeAtIndexRequest(
-        nodeIndex: document.getNodeIndexById(paragraph.id),
+        nodeIndex: document.getNodeIndexById(node.id),
         newNode: HorizontalRuleNode(
           id: Editor.createNodeId(),
           metadata: {'dividerIndex': index},
@@ -284,7 +284,7 @@ class RandomDividerConversionReaction extends EditReaction {
       ChangeSelectionRequest(
         DocumentSelection.collapsed(
           position: DocumentPosition(
-            nodeId: paragraph.id,
+            nodeId: node.id,
             nodePosition: const TextNodePosition(offset: 0),
           ),
         ),

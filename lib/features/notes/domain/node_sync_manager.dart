@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
@@ -26,8 +27,13 @@ class NodeSyncManager {
   final String _userId;
   final MutableDocument _document;
 
+  final Set<String> _dirtyNodeIds = {};
+  Timer? _debounceTimer;
+
   void _onDocumentChanged(DocumentChangeLog changeLog) {
     final now = DateTime.now().toUtc();
+    var hasTextChange = false;
+
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
         final node = _document.getNodeById(change.nodeId);
@@ -47,6 +53,7 @@ class NodeSyncManager {
             createdAt: now,
             updatedAt: now,
             isDirty: const Value(true),
+            deletedAt: const Value(null),
           );
           _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
         }
@@ -77,30 +84,56 @@ class NodeSyncManager {
           ),
         );
       } else if (change is NodeChangeEvent) {
-        final node = _document.getNodeById(change.nodeId);
-        if (node == null) continue;
-        final index = _document.getNodeIndexById(change.nodeId);
-        final companion = _nodeToCompanion(node, index);
-        if (companion == null) continue;
-        _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
-
-        if (node is TaskNode) {
-          final taskCompanion = TasksCompanion.insert(
-            id: node.id,
-            userId: _userId,
-            noteId: _noteId,
-            title: node.text.toPlainText(),
-            status: node.isComplete ? 'completed' : 'pending',
-            position: Value(index),
-            createdAt: now,
-            updatedAt: now,
-            isDirty: const Value(true),
-          );
-          _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
-        }
+        _dirtyNodeIds.add(change.nodeId);
+        hasTextChange = true;
       }
     }
 
+    if (hasTextChange) {
+      _debounceTimer?.cancel();
+      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+        _flushNodeChanges();
+      });
+    }
+  }
+
+  void _flushNodeChanges() {
+    final now = DateTime.now().toUtc();
+    final dirtyIds = Set<String>.from(_dirtyNodeIds);
+    _dirtyNodeIds.clear();
+    for (final nodeId in dirtyIds) {
+      final node = _document.getNodeById(nodeId);
+      if (node == null) continue;
+      final companion = _nodeToCompanion(
+        node,
+        _document.getNodeIndexById(nodeId),
+      );
+      if (companion == null) continue;
+      _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
+
+      if (node is TaskNode) {
+        final index = _document.getNodeIndexById(node.id);
+        final taskCompanion = TasksCompanion.insert(
+          id: node.id,
+          userId: _userId,
+          noteId: _noteId,
+          title: node.text.toPlainText(),
+          status: node.isComplete ? 'completed' : 'pending',
+          position: Value(index),
+          createdAt: now,
+          updatedAt: now,
+          isDirty: const Value(true),
+          deletedAt: const Value(null),
+        );
+        _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
+      }
+    }
+
+    _flushNoteExcerpt();
+  }
+
+  void _flushNoteExcerpt() {
+    final now = DateTime.now().toUtc();
     final fullText = _document
         .map((n) {
           if (n is TextNode) return n.text.toPlainText();
@@ -138,6 +171,7 @@ class NodeSyncManager {
       createdAt: now,
       updatedAt: now,
       isDirty: const Value(true),
+      deletedAt: const Value(null),
     );
   }
 
@@ -533,6 +567,8 @@ class NodeSyncManager {
   }
 
   void dispose() {
+    _debounceTimer?.cancel();
+    _flushNodeChanges();
     _document.removeListener(_onDocumentChanged);
   }
 }

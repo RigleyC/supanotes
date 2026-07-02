@@ -132,6 +132,7 @@ class NoteEditorController {
         final newNode = NodeSyncManager.createNodeFromSchema(incoming);
         requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
       } else {
+        if (_isNodeSelected(incoming.id)) continue;
         final newNode = NodeSyncManager.createNodeFromSchema(incoming);
         if (_isNodeModified(existingNode, newNode)) {
           requests.add(
@@ -171,6 +172,12 @@ class NoteEditorController {
     return false;
   }
 
+  bool _isNodeSelected(String nodeId) {
+    final sel = composer?.selection;
+    if (sel == null) return false;
+    return sel.start.nodeId == nodeId || sel.extent.nodeId == nodeId;
+  }
+
   bool _isDocEmpty(MutableDocument doc) {
     for (final node in doc) {
       if (node is TextNode && node.text.toPlainText().trim().isNotEmpty) {
@@ -197,6 +204,7 @@ class NoteEditorController {
   void dispose() {
     _flushAndSaveFinalState();
     _nodeSyncManager?.dispose();
+    editor?.dispose();
     document?.dispose();
     composer?.dispose();
     focusNode?.dispose();

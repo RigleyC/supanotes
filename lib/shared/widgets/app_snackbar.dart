@@ -186,6 +186,9 @@ class _SnackContent extends StatelessWidget {
             },
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.primary,
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: Text(action!.label),
           ),

@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
+
+import 'clipboard_preprocessor.dart';
 
 class RichCommonEditorOperations extends CommonEditorOperations {
   RichCommonEditorOperations({
@@ -29,6 +33,6 @@ class RichCommonEditorOperations extends CommonEditorOperations {
 
   @override
   void paste() {
-    pasteIntoEditorFromNativeClipboard(editor);
+    unawaited(pasteWithPreprocessing(editor));
   }
 }

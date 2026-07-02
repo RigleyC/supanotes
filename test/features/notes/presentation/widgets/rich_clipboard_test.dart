@@ -1,4 +1,5 @@
 // ignore_for_file: depend_on_referenced_packages
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
@@ -13,6 +14,7 @@ class MockDocumentLayout extends Mock implements DocumentLayout {}
 
 void main() {
   setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
     final mockContext = superNativeExtensionsContext as MockMessageChannelContext;
     mockContext.registerMockMethodCallHandler('DataProviderManager', (call) async {
       if (call.method == 'registerDataProvider') {
@@ -54,7 +56,7 @@ void main() {
       expect(richActions.length, equals(4));
       expect(richActions[0], equals(copyAsRichTextWhenCmdCOrCtrlCIsPressed));
       expect(richActions[1], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
-      expect(richActions[2], equals(pasteRichTextOnCmdCtrlV));
+      expect(richActions[2], equals(pastePreprocessedRichText));
       expect(richActions[3], equals(doNothingWhenThereIsNoSelection));
     });
   });

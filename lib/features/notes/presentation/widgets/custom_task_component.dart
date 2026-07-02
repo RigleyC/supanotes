@@ -143,7 +143,7 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! CustomTaskComponentViewModel) return false;
-    if (super == other) return false;
+    if (super != other) return false;
     return dueDate == other.dueDate && recurrence == other.recurrence;
   }
 
@@ -182,6 +182,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   late Animation<double> _fadeAnimation;
   late Animation<double> _sizeAnimation;
   late bool _isComplete;
+  double _cachedFirstLineHeight = 24.0;
 
   @override
   void initState() {
@@ -207,6 +208,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     if (widget.hideCompleted && _isComplete) {
       _exitController.forward();
     }
+
+    _cachedFirstLineHeight = _computeFirstLineHeight(context);
   }
 
   @override
@@ -270,7 +273,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
               widget.viewModel.setComplete?.call(val);
             },
             onLongPress: widget.onLongPress,
-            firstLineHeight: _firstLineHeight(context),
+            firstLineHeight: _cachedFirstLineHeight,
           ),
           Expanded(
             child: Column(
@@ -330,13 +333,15 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
         : style.copyWith(color: baseColor);
   }
 
-  double _firstLineHeight(BuildContext context) {
+  double _computeFirstLineHeight(BuildContext context) {
     final painter = TextPainter(
       text: TextSpan(text: ' ', style: _computeStyles({}, context)),
       textDirection: widget.viewModel.textDirection,
       textScaler: MediaQuery.textScalerOf(context),
     )..layout();
-    return painter.preferredLineHeight;
+    final height = painter.preferredLineHeight;
+    painter.dispose();
+    return height;
   }
 }
 

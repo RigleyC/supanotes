@@ -211,10 +211,10 @@ class NoteToolbar extends StatelessWidget {
         .whereType<TextNode>();
     for (final node in nodes) {
       final start = (selection.start.nodeId == node.id)
-          ? (selection.start.nodePosition as TextPosition).offset
+          ? (selection.start.nodePosition as TextNodePosition).offset
           : 0;
       final end = (selection.end.nodeId == node.id)
-          ? (selection.end.nodePosition as TextPosition).offset
+          ? (selection.end.nodePosition as TextNodePosition).offset
           : node.text.length;
       if (start >= end) continue;
       if (node.text

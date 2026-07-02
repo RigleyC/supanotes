@@ -151,6 +151,27 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (widget.hideCompleted != oldWidget.hideCompleted ||
         widget.taskMetadata != oldWidget.taskMetadata) {
       setState(() {});
+
+      if (widget.taskMetadata != oldWidget.taskMetadata &&
+          _controller?.editor != null &&
+          _controller?.document != null) {
+        final doc = _controller!.document!;
+        final requests = <EditRequest>[];
+        for (final node in doc) {
+          if (node is TaskNode) {
+            final isDbCompleted = widget.taskMetadata[node.id]?.isCompleted ?? false;
+            if (node.isComplete != isDbCompleted) {
+              requests.add(ChangeTaskCompletionRequest(
+                nodeId: node.id,
+                isComplete: isDbCompleted,
+              ));
+            }
+          }
+        }
+        if (requests.isNotEmpty) {
+          _controller!.editor!.execute(requests);
+        }
+      }
     }
 
     if (!listEquals(widget.nodes, oldWidget.nodes)) {
