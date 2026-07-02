@@ -248,8 +248,9 @@ type UserNotePreference struct {
 }
 
 type UserSetting struct {
-	UserID    pgtype.UUID        `json:"user_id"`
-	Timezone  string             `json:"timezone"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	Timezone    string             `json:"timezone"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	Preferences []byte             `json:"preferences"`
 }

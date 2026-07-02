@@ -1,0 +1,3 @@
+BEGIN;
+ALTER TABLE user_settings DROP COLUMN IF EXISTS preferences;
+COMMIT;

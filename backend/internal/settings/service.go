@@ -2,7 +2,9 @@ package settings
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -38,14 +40,27 @@ func (s *Service) Get(ctx context.Context, userID pgtype.UUID) (dto.SettingsResp
 	return mapper.SettingsFromSQLC(settings), nil
 }
 
-func (s *Service) Update(ctx context.Context, userID pgtype.UUID, timezone string) (dto.SettingsResponse, error) {
-	tz := strings.TrimSpace(timezone)
-	if _, err := time.LoadLocation(tz); err != nil {
-		return dto.SettingsResponse{}, ErrInvalidTimezone
+func (s *Service) Update(ctx context.Context, userID pgtype.UUID, req dto.UpdateSettingsRequest) (dto.SettingsResponse, error) {
+	tz := strings.TrimSpace(req.Timezone)
+	if tz != "" {
+		if _, err := time.LoadLocation(tz); err != nil {
+			return dto.SettingsResponse{}, ErrInvalidTimezone
+		}
 	}
+
+	var prefsBytes []byte
+	if req.Preferences != nil {
+		var err error
+		prefsBytes, err = json.Marshal(req.Preferences)
+		if err != nil {
+			return dto.SettingsResponse{}, fmt.Errorf("serialize preferences: %w", err)
+		}
+	}
+
 	settings, err := s.q.UpdateUserSettings(ctx, sqlcgen.UpdateUserSettingsParams{
-		UserID:   userID,
-		Timezone: tz,
+		UserID:      userID,
+		Timezone:    tz,
+		Preferences: prefsBytes,
 	})
 	if err != nil {
 		return dto.SettingsResponse{}, err

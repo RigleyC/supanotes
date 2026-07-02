@@ -40,7 +40,7 @@ class _SettingsRoutes {
 
 abstract class ISettingsRepository {
   Future<UserSettings> getSettings();
-  Future<UserSettings> updateSettings(String timezone);
+  Future<UserSettings> updateSettings({String? timezone, Map<String, dynamic>? preferences});
   Future<Soul> getSoul();
   Future<Soul> updateSoul(String personality);
   Future<List<UserContext>> getContexts();
@@ -78,13 +78,20 @@ class SettingsRepository implements ISettingsRepository {
     }
   }
 
-  /// `PUT /settings` with a new IANA [timezone] string.
+  /// `PUT /settings` with optional [timezone] and/or [preferences].
   @override
-  Future<UserSettings> updateSettings(String timezone) async {
+  Future<UserSettings> updateSettings({
+    String? timezone,
+    Map<String, dynamic>? preferences,
+  }) async {
     try {
+      final data = <String, dynamic>{};
+      if (timezone != null) data['timezone'] = timezone;
+      if (preferences != null) data['preferences'] = preferences;
+
       final response = await _api.put<Map<String, dynamic>>(
         _SettingsRoutes.settings,
-        data: {'timezone': timezone},
+        data: data,
       );
       final body = response.data;
       if (body == null) {

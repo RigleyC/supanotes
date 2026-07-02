@@ -6,12 +6,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/dto"
 	"github.com/RigleyC/supanotes/internal/web"
 )
-
-type UpdateSettingsRequest struct {
-	Timezone string `json:"timezone" validate:"required"`
-}
 
 type Handler struct {
 	svc *Service
@@ -45,15 +42,18 @@ func (h *Handler) Update(c echo.Context) error {
 		return err
 	}
 
-	var req UpdateSettingsRequest
+	var req dto.UpdateSettingsRequest
 	if err := web.BindAndValidate(c, &req); err != nil {
 		return err
 	}
 
-	settings, err := h.svc.Update(c.Request().Context(), userID, req.Timezone)
+	settings, err := h.svc.Update(c.Request().Context(), userID, req)
 	if err != nil {
 		if errors.Is(err, ErrInvalidTimezone) {
 			return web.JSONError(c, http.StatusBadRequest, "invalid timezone")
+		}
+		if errors.Is(err, ErrSettingsNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "settings not found")
 		}
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to update settings")

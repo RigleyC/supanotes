@@ -69,6 +69,17 @@ class SessionCacheNotifier extends Notifier<SessionCache> {
     await _storage.saveSessionData(data);
   }
 
+  Future<void> updateSettings(Map<String, dynamic> settings) async {
+    final data = {
+      'settings': settings,
+      'soul': state.soul,
+      'contexts': state.contexts,
+      'routines': state.routines,
+    };
+    state = SessionCache.fromJson(data);
+    await _storage.saveSessionData(data);
+  }
+
   Future<void> updateSoul(Map<String, dynamic> soul) async {
     final data = {
       'settings': state.settings,

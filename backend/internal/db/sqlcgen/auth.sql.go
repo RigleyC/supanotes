@@ -93,7 +93,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 const createUserSettings = `-- name: CreateUserSettings :one
 INSERT INTO user_settings (user_id, timezone)
 VALUES ($1, $2)
-RETURNING user_id, timezone, created_at, updated_at
+RETURNING user_id, timezone, created_at, updated_at, preferences
 `
 
 type CreateUserSettingsParams struct {
@@ -109,6 +109,7 @@ func (q *Queries) CreateUserSettings(ctx context.Context, arg CreateUserSettings
 		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Preferences,
 	)
 	return i, err
 }
@@ -203,7 +204,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 }
 
 const getUserSettings = `-- name: GetUserSettings :one
-SELECT user_id, timezone, created_at, updated_at FROM user_settings
+SELECT user_id, timezone, created_at, updated_at, preferences FROM user_settings
 WHERE user_id = $1
 `
 
@@ -215,6 +216,7 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID pgtype.UUID) (User
 		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Preferences,
 	)
 	return i, err
 }
@@ -275,25 +277,29 @@ func (q *Queries) RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error 
 
 const updateUserSettings = `-- name: UpdateUserSettings :one
 UPDATE user_settings
-SET timezone = $2,
+SET
+    timezone = COALESCE(NULLIF($1::text, ''), timezone),
+    preferences = COALESCE($2::jsonb, preferences),
     updated_at = NOW()
-WHERE user_id = $1
-RETURNING user_id, timezone, created_at, updated_at
+WHERE user_id = $3
+RETURNING user_id, timezone, created_at, updated_at, preferences
 `
 
 type UpdateUserSettingsParams struct {
-	UserID   pgtype.UUID `json:"user_id"`
-	Timezone string      `json:"timezone"`
+	Timezone    string      `json:"timezone"`
+	Preferences []byte      `json:"preferences"`
+	UserID      pgtype.UUID `json:"user_id"`
 }
 
 func (q *Queries) UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error) {
-	row := q.db.QueryRow(ctx, updateUserSettings, arg.UserID, arg.Timezone)
+	row := q.db.QueryRow(ctx, updateUserSettings, arg.Timezone, arg.Preferences, arg.UserID)
 	var i UserSetting
 	err := row.Scan(
 		&i.UserID,
 		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Preferences,
 	)
 	return i, err
 }

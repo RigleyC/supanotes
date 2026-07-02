@@ -22,9 +22,11 @@ WHERE user_id = $1;
 
 -- name: UpdateUserSettings :one
 UPDATE user_settings
-SET timezone = $2,
+SET
+    timezone = COALESCE(NULLIF(@timezone::text, ''), timezone),
+    preferences = COALESCE(sqlc.narg('preferences')::jsonb, preferences),
     updated_at = NOW()
-WHERE user_id = $1
+WHERE user_id = @user_id
 RETURNING *;
 
 -- name: CreateRefreshToken :one

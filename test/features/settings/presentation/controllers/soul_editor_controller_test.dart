@@ -29,7 +29,7 @@ class _FakeSettingsRepository implements ISettingsRepository {
   Future<UserSettings> getSettings() => throw UnimplementedError();
 
   @override
-  Future<UserSettings> updateSettings(String timezone) =>
+  Future<UserSettings> updateSettings({String? timezone, Map<String, dynamic>? preferences}) =>
       throw UnimplementedError();
 
   @override

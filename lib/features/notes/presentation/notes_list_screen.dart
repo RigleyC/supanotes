@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/features/auth/data/session_cache.dart';
+import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
@@ -27,8 +29,6 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/offline_indicator.dart';
 import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
 
-enum _NotesViewMode { list, grid }
-
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
 
@@ -37,7 +37,6 @@ class NotesListScreen extends ConsumerStatefulWidget {
 }
 
 class _NotesListScreenState extends ConsumerState<NotesListScreen> {
-  _NotesViewMode _viewMode = _NotesViewMode.list;
   bool _isSearching = false;
   String _searchQuery = '';
 
@@ -58,6 +57,11 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isGridView = ref.watch(
+      sessionCacheProvider.select(
+        (c) => (c.settings['preferences'] as Map<String, dynamic>?)?['notes_view_mode'] == 'grid',
+      ),
+    );
     final notesAsync = ref.watch(activeNotesProvider);
     final trimmedSearchQuery = _searchQuery.trim();
     final searchAsync = trimmedSearchQuery.isEmpty
@@ -76,7 +80,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ),
 
           NotesMoreMenu(
-            isListView: _viewMode == _NotesViewMode.list,
+            isListView: !isGridView,
             onToggleViewMode: _toggleViewMode,
             onOpenSettings: () => context.push(AppRoutes.settings),
             onLogout: () => ref.read(authControllerProvider.notifier).logout(),
@@ -121,7 +125,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 title: 'Erro ao carregar as notas',
                 subtitle: e.toString(),
               ),
-              data: (notes) => _buildNotesBody(notes, headerSlivers),
+              data: (notes) => _buildNotesBody(notes, headerSlivers, isGridView),
             )
           : searchAsync!.when(
               loading: () => SearchLoadingView(headerSlivers: headerSlivers),
@@ -171,20 +175,35 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     ref.read(notesRepositoryProvider).toggleFavorite(note.id);
   }
 
-  void _toggleViewMode() {
-    setState(() {
-      _viewMode = _viewMode == _NotesViewMode.grid
-          ? _NotesViewMode.list
-          : _NotesViewMode.grid;
-    });
+  Future<void> _toggleViewMode() async {
+    final sessionCache = ref.read(sessionCacheProvider);
+    final currentPrefs = Map<String, dynamic>.from(
+      (sessionCache.settings['preferences'] as Map<String, dynamic>?) ?? {},
+    );
+    final currentMode = currentPrefs['notes_view_mode'] as String? ?? 'list';
+    final newMode = currentMode == 'grid' ? 'list' : 'grid';
+    currentPrefs['notes_view_mode'] = newMode;
+
+    final updatedSettings = Map<String, dynamic>.from(sessionCache.settings);
+    updatedSettings['preferences'] = currentPrefs;
+    await ref.read(sessionCacheProvider.notifier).updateSettings(updatedSettings);
+
+    final repo = ref.read(settingsRepositoryProvider);
+    try {
+      await repo.updateSettings(preferences: currentPrefs);
+    } catch (e) {
+      debugPrint('Failed to update view mode: $e');
+      if (!context.mounted) return;
+      AppMessenger.showError('Erro ao salvar preferência de visualização');
+    }
   }
 
-  Widget _buildNotesBody(List<NoteModel> notes, List<Widget> headerSlivers) {
+  Widget _buildNotesBody(List<NoteModel> notes, List<Widget> headerSlivers, bool isGridView) {
     return Cue.onChange(
-      value: _viewMode,
+      value: isGridView,
       motion: .smooth(),
       acts: [.fadeIn()],
-      child: _viewMode == _NotesViewMode.grid
+      child: isGridView
           ? NotesGridView(
               key: const ValueKey('grid'),
               notes: notes.toList(),
