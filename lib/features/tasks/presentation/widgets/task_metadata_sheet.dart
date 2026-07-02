@@ -5,9 +5,9 @@ import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
-import '../../data/tasks_repository.dart';
 import '../../domain/task_model.dart';
 import '../../domain/task_recurrence.dart';
+import '../controllers/task_controller.dart';
 import 'due_date_picker.dart';
 import 'recurrence_picker.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
@@ -15,8 +15,7 @@ import 'package:supanotes/core/utils/date_time_extensions.dart';
 /// Bottom-sheet for editing a task's metadata (date and recurrence).
 ///
 /// Must be called with an existing [TaskModel].
-/// Pops the (possibly-updated) [TaskModel] back through `Navigator.pop`
-/// when the user taps **Salvar**.
+/// Pops when the user taps **Salvar**.
 class TaskMetadataSheet extends ConsumerStatefulWidget {
   const TaskMetadataSheet({
     super.key,
@@ -27,12 +26,12 @@ class TaskMetadataSheet extends ConsumerStatefulWidget {
   final String noteId;
   final TaskModel task;
 
-  static Future<TaskModel?> show(
+  static Future<void> show(
     BuildContext context, {
     required String noteId,
     required TaskModel task,
   }) {
-    return showAppBottomSheet<TaskModel>(
+    return showAppBottomSheet(
       context: context,
       builder: (_) => TaskMetadataSheet(
         noteId: noteId,
@@ -48,7 +47,6 @@ class TaskMetadataSheet extends ConsumerStatefulWidget {
 class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
   late DateTime? _dueDate;
   late TaskRecurrence? _recurrence;
-  bool _saving = false;
 
   @override
   void initState() {
@@ -59,40 +57,23 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
   }
 
   Future<void> _onSave() async {
-    setState(() => _saving = true);
-    final repo = ref.read(tasksRepositoryProvider);
-    final navigator = Navigator.of(context);
+    final controller = ref.read(taskControllerProvider.notifier);
 
-    try {
-      final original = widget.task;
-      await repo.updateTask(
-        original.id,
-        title: original.title,
-        dueDate: _dueDate,
-        recurrence: _recurrence,
-        clearDueDate: _dueDate == null,
-        clearRecurrence: _recurrence == null,
-      );
-      navigator.pop(
-        TaskModel(
-          id: original.id,
-          userId: original.userId,
-          noteId: original.noteId,
-          title: original.title,
-          status: original.status,
-          position: original.position,
-          dueDate: _dueDate,
-          completedAt: original.completedAt,
-          recurrence: _recurrence,
-          createdAt: original.createdAt,
-          updatedAt: DateTime.now().toUtc(),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      AppMessenger.showError('Erro ao salvar tarefa: $e');
-      setState(() => _saving = false);
+    await controller.updateTaskMetadata(
+      taskId: widget.task.id,
+      title: widget.task.title,
+      dueDate: _dueDate,
+      recurrence: _recurrence,
+      clearDueDate: _dueDate == null,
+      clearRecurrence: _recurrence == null,
+    );
+
+    if (ref.read(taskControllerProvider).hasError) {
+      if (mounted) AppMessenger.showError('Erro ao salvar tarefa');
+      return;
     }
+
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -132,7 +113,9 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
               Expanded(
                 child: AppButton(
                   text: 'Cancelar',
-                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  onPressed: ref.watch(taskControllerProvider).isLoading
+                      ? null
+                      : () => Navigator.of(context).pop(),
                   variant: AppButtonVariant.secondary,
                 ),
               ),
@@ -140,8 +123,10 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
               Expanded(
                 child: AppButton(
                   text: 'Salvar',
-                  onPressed: _saving ? null : _onSave,
-                  isLoading: _saving,
+                  onPressed: ref.watch(taskControllerProvider).isLoading
+                      ? null
+                      : _onSave,
+                  isLoading: ref.watch(taskControllerProvider).isLoading,
                 ),
               ),
             ],

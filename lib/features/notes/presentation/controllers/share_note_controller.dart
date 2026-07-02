@@ -26,4 +26,17 @@ class ShareNoteController extends AsyncNotifier<void> {
           ),
     );
   }
+
+  Future<void> revoke({
+    required String noteId,
+    required String userId,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(
+      () => ref.read(sharesRepositoryProvider).deleteShare(
+            noteId: noteId,
+            userId: userId,
+          ),
+    );
+  }
 }

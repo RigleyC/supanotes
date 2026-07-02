@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/api/api_exceptions.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
-import '../../data/shares_repository.dart';
-import '../../domain/note_strings.dart';
 import '../../domain/share_model.dart';
 import '../../domain/share_permission.dart';
 import '../controllers/share_list_controller.dart';
+import '../controllers/share_note_controller.dart';
 
 class ShareListSection extends ConsumerWidget {
   const ShareListSection({super.key, required this.noteId});
@@ -18,25 +16,25 @@ class ShareListSection extends ConsumerWidget {
   Future<void> _revoke(BuildContext context, WidgetRef ref, ShareModel share) async {
     final confirmed = await showConfirmDialog(
       context: context,
-      title: NoteStrings.revokeConfirmTitle,
-      message: NoteStrings.revokeConfirmMessage,
+      title: 'Remover compartilhamento?',
+      message: 'Esta pessoa não verá mais esta nota.',
     );
     if (confirmed != true) return;
 
-    try {
-      await ref.read(sharesRepositoryProvider).deleteShare(
-        noteId: noteId,
-        userId: share.userId,
-      );
-      ref.invalidate(shareListProvider(noteId));
-      if (context.mounted) AppMessenger.showSuccess(NoteStrings.revokeSuccess);
-    } catch (e) {
+    await ref.read(shareNoteControllerProvider.notifier).revoke(
+      noteId: noteId,
+      userId: share.userId,
+    );
+
+    if (ref.read(shareNoteControllerProvider).hasError) {
       if (context.mounted) {
-        AppMessenger.showError(
-          e is ApiException ? e.message : e.toString(),
-        );
+        AppMessenger.showError('Erro ao remover compartilhamento');
       }
+      return;
     }
+
+    ref.invalidate(shareListProvider(noteId));
+    if (context.mounted) AppMessenger.showSuccess('Compartilhamento removido');
   }
 
   @override
@@ -48,7 +46,7 @@ class ShareListSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          NoteStrings.sharesTitle,
+          'Compartilhamentos',
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
@@ -60,44 +58,46 @@ class ShareListSection extends ConsumerWidget {
             ),
           ),
           error: (error, _) => Text(
-            error is ApiException ? error.message : error.toString(),
+            error.toString(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.error,
                 ),
           ),
           data: (value) => value.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    NoteStrings.noShares,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    'Nenhum compartilhamento',
+                    style: TextStyle(),
                   ),
                 )
-              : Column(
-                  children: [
-                    for (var i = 0; i < value.length; i++) ...[
-                      if (i > 0) const Divider(height: 1),
-                      ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(value[i].email),
-                        subtitle: value[i].name.isNotEmpty ? Text(value[i].name) : null,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _PermissionBadge(permission: value[i].permission),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline),
-                              iconSize: 20,
-                              onPressed: () => _revoke(context, ref, value[i]),
-                              tooltip: NoteStrings.revokeLabel,
-                            ),
-                          ],
-                        ),
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: NeverScrollableScrollPhysics(),
+                  itemCount: value.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final share = value[i];
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(share.email),
+                      subtitle: share.name.isNotEmpty ? Text(share.name) : null,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _PermissionBadge(permission: share.permission),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            iconSize: 20,
+                            onPressed: () => _revoke(context, ref, share),
+                            tooltip: 'Remover',
+                          ),
+                        ],
                       ),
-                    ],
-                  ],
+                    );
+                  },
                 ),
         ),
       ],
@@ -122,7 +122,7 @@ class _PermissionBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        isEdit ? NoteStrings.permissionEdit : NoteStrings.permissionView,
+        isEdit ? 'Editar' : 'Visualizar',
         style: Theme.of(context).textTheme.labelSmall,
       ),
     );
