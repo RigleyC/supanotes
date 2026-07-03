@@ -115,6 +115,8 @@ class NoteEditorController {
     final ed = editor;
     if (doc == null || ed == null) return;
 
+    final dirtyIds = _nodeSyncManager?.locallyDirtyNodeIds ?? const {};
+
     final requests = <EditRequest>[];
     final incomingIds = incomingNodes.map((n) => n.id).toSet();
 
@@ -132,7 +134,8 @@ class NoteEditorController {
         final newNode = NodeSyncManager.createNodeFromSchema(incoming);
         requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
       } else {
-        if (_isNodeSelected(incoming.id) && incoming.isDirty) continue;
+        // Skip nodes with pending local changes — the DB data is stale.
+        if (dirtyIds.contains(incoming.id)) continue;
         final newNode = NodeSyncManager.createNodeFromSchema(incoming);
         if (_isNodeModified(existingNode, newNode)) {
           requests.add(
@@ -172,11 +175,6 @@ class NoteEditorController {
     return false;
   }
 
-  bool _isNodeSelected(String nodeId) {
-    final sel = composer?.selection;
-    if (sel == null) return false;
-    return sel.start.nodeId == nodeId || sel.extent.nodeId == nodeId;
-  }
 
   bool _isDocEmpty(MutableDocument doc) {
     if (doc.isEmpty) return true;

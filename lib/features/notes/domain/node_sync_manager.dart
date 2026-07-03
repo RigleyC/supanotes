@@ -57,6 +57,11 @@ class NodeSyncManager {
   final List<NodeOperation> _pendingOps = [];
   Timer? _debounceTimer;
 
+  /// IDs of nodes that have local changes not yet confirmed by the DB stream.
+  /// Used by the editor controller to skip reactive updates for these nodes,
+  /// preventing stale DB data from overwriting in-flight edits.
+  final Set<String> locallyDirtyNodeIds = {};
+
   Future<void> _writeLock = Future.value();
 
   void _enqueueDbWrite(FutureOr<void> Function() action) {
@@ -124,15 +129,19 @@ class NodeSyncManager {
         final node = _document.getNodeById(change.nodeId);
         if (node != null) {
           _pendingOps.add(InsertOp(change.nodeId, node, change.insertionIndex));
+          locallyDirtyNodeIds.add(change.nodeId);
         }
       } else if (change is NodeRemovedEvent) {
         _pendingOps.add(DeleteOp(change.nodeId));
+        locallyDirtyNodeIds.add(change.nodeId);
       } else if (change is NodeMovedEvent) {
         _pendingOps.add(MoveOp(change.nodeId, change.from, change.to));
+        locallyDirtyNodeIds.add(change.nodeId);
       } else if (change is NodeChangeEvent) {
         final node = _document.getNodeById(change.nodeId);
         if (node != null) {
           _pendingOps.add(UpdateOp(change.nodeId, node));
+          locallyDirtyNodeIds.add(change.nodeId);
         }
       }
     }
@@ -261,7 +270,20 @@ class NodeSyncManager {
 
       await _flushNoteExcerptFromSnapshot(snapshotText, now);
     });
+
+    // Clear dirty flags for flushed nodes only if no new ops arrived
+    // during the transaction. If new ops arrived, those IDs stay dirty.
+    final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
+    final stillPendingIds = _pendingOps.map(_opNodeId).whereType<String>().toSet();
+    locallyDirtyNodeIds.removeAll(flushedIds.difference(stillPendingIds));
   }
+
+  static String? _opNodeId(NodeOperation op) => switch (op) {
+    InsertOp(:final id) => id,
+    UpdateOp(:final id) => id,
+    MoveOp(:final id) => id,
+    DeleteOp(:final id) => id,
+  };
 
   NoteNodesCompanion? _nodeToCompanion(DocumentNode node, double position) {
     final type = _nodeType(node);
