@@ -377,10 +377,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		noteID := nn.NoteID
 		canEdit, exists := editableNotes[noteID]
 		if !exists {
-			note, err := r.GetNoteByID(ctx, sqlcgen.GetNoteByIDParams{
-				ID:     noteID,
-				UserID: userID,
-			})
+			ownerID, err := r.GetNoteOwnerID(ctx, noteID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
@@ -396,7 +393,14 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 					return err
 				}
 			} else {
-				canEdit = note.UserID == userID
+				canEdit = ownerID == userID
+				if !canEdit {
+					share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+						NoteID: noteID,
+						UserID: userID,
+					})
+					canEdit = shareErr == nil && share.Permission == "edit"
+				}
 			}
 			editableNotes[noteID] = canEdit
 		}

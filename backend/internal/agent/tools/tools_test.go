@@ -16,6 +16,7 @@ import (
 
 // stubQuerier panics on any method call.
 type stubQuerier struct {
+	sqlcgen.Querier
 	searchByEmbedding  func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error)
 	createNoteLink     func(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error
 	getNoteByID        func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error)

@@ -170,7 +170,9 @@ func (s *stubLoopTasksRepo) GetRecentlyCompletedTasks(ctx context.Context, arg s
 	return nil, nil
 }
 
-type stubLoopQuerier struct{}
+type stubLoopQuerier struct{
+	sqlcgen.Querier
+}
 
 func (s *stubLoopQuerier) GetSoul(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error) {
 	return sqlcgen.Soul{Personality: "test"}, nil

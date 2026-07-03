@@ -10,6 +10,7 @@ import (
 )
 
 type stubWMQuerier struct {
+	sqlcgen.Querier
 	vals map[string]string // keyed by "userID:sessionID:key"
 }
 

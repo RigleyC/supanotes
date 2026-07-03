@@ -66,6 +66,7 @@ func (s *stubTasksRepo) CountCompletedTasks(ctx context.Context, userID pgtype.U
 
 // Minimal stubQuerier for context tests (subset of sqlcgen.Querier).
 type stubQuerier struct {
+	sqlcgen.Querier
 	searchByEmbedding func(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error)
 	getSoul           func(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error)
 	getMessages       func(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error)

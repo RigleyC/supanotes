@@ -302,7 +302,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
             (t) =>
                 t.hasRemoteCopy.equals(true) |
                 t.isInbox.equals(true) |
-                _nonEmptyNote(t),
+                t.deletedAt.isNull(),
           ))
         .get();
   }

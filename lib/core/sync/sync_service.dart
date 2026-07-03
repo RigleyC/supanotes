@@ -129,41 +129,69 @@ class SyncService {
 
   Future<void> push() async {
     final notes = await _db.notesDao.getDirtyNotes();
+    final pushingNoteIds = notes.map((n) => n.id).toSet();
+    final remoteNotes = await (_db.select(_db.notes)..where((t) => t.hasRemoteCopy.equals(true))).get();
+    final remoteNoteIds = remoteNotes.map((n) => n.id).toSet();
+    final allowedNoteIds = {...pushingNoteIds, ...remoteNoteIds};
+
     final noteNodes = await (_db.select(
       _db.noteNodes,
     )..where((t) => t.isDirty.equals(true))).get();
+    final filteredNoteNodes = noteNodes.where((nn) => allowedNoteIds.contains(nn.noteId)).toList();
+
     final tasks = await _db.tasksDao.getDirtyTasks();
+    final filteredTasks = tasks.where((t) => allowedNoteIds.contains(t.noteId)).toList();
+
+    final completions = await _db.taskCompletionsDao.getDirtyCompletions();
+    final List<LocalTaskCompletionData> filteredCompletions;
+    if (completions.isEmpty) {
+      filteredCompletions = [];
+    } else {
+      final dirtyTaskIds = completions.map((c) => c.taskId).toSet();
+      final tasksForCompletions = await (_db.select(_db.tasks)..where((t) => t.id.isIn(dirtyTaskIds))).get();
+      final taskIdToNoteId = {for (final t in tasksForCompletions) t.id: t.noteId};
+      filteredCompletions = completions.where((c) {
+        final noteId = taskIdToNoteId[c.taskId];
+        return noteId != null && allowedNoteIds.contains(noteId);
+      }).toList();
+    }
+
+    final noteLinks = await _db.noteLinksDao.getDirtyLinks();
+    final filteredLinks = noteLinks.where((l) => allowedNoteIds.contains(l.sourceId) && allowedNoteIds.contains(l.targetId)).toList();
+
+    final noteTags = await _db.noteTagsDao.getDirtyNoteTags();
+    final filteredNoteTags = noteTags.where((nt) => allowedNoteIds.contains(nt.noteId)).toList();
+
+    final prefs = await _db.userNotePreferencesDao.getDirtyPreferences();
+    final filteredPrefs = prefs.where((p) => allowedNoteIds.contains(p.noteId)).toList();
+
     final contexts = await _db.contextsDao.getDirtyContexts();
     final tags = await _db.tagsDao.getDirtyTags();
-    final completions = await _db.taskCompletionsDao.getDirtyCompletions();
-    final noteLinks = await _db.noteLinksDao.getDirtyLinks();
-    final noteTags = await _db.noteTagsDao.getDirtyNoteTags();
-    final prefs = await _db.userNotePreferencesDao.getDirtyPreferences();
 
     if (notes.isEmpty &&
-        noteNodes.isEmpty &&
-        tasks.isEmpty &&
+        filteredNoteNodes.isEmpty &&
+        filteredTasks.isEmpty &&
         contexts.isEmpty &&
         tags.isEmpty &&
-        completions.isEmpty &&
-        noteLinks.isEmpty &&
-        noteTags.isEmpty &&
-        prefs.isEmpty) {
+        filteredCompletions.isEmpty &&
+        filteredLinks.isEmpty &&
+        filteredNoteTags.isEmpty &&
+        filteredPrefs.isEmpty) {
       return;
     }
 
     final payload = <String, dynamic>{
       'notes': notes.map(_mapper.noteToJson).toList(),
-      'note_nodes': noteNodes.map(_mapper.noteNodeToJson).toList(),
-      'tasks': tasks.map(_mapper.taskToJson).toList(),
+      'note_nodes': filteredNoteNodes.map(_mapper.noteNodeToJson).toList(),
+      'tasks': filteredTasks.map(_mapper.taskToJson).toList(),
       'contexts': contexts.map(_mapper.contextToJson).toList(),
       'tags': tags.map(_mapper.tagToJson).toList(),
-      'task_completions': completions
+      'task_completions': filteredCompletions
           .map(_mapper.taskCompletionToJson)
           .toList(),
-      'note_links': noteLinks.map(_mapper.noteLinkToJson).toList(),
-      'note_tags': noteTags.map(_mapper.localNoteTagToJson).toList(),
-      'user_note_preferences': prefs
+      'note_links': filteredLinks.map(_mapper.noteLinkToJson).toList(),
+      'note_tags': filteredNoteTags.map(_mapper.localNoteTagToJson).toList(),
+      'user_note_preferences': filteredPrefs
           .map(_mapper.userNotePreferenceToJson)
           .toList(),
     };
@@ -175,11 +203,11 @@ class SyncService {
         await _db.notesDao.markHasRemoteCopy(n.id);
         await _db.notesDao.clearDirtyFlag(n.id, n.updatedAt);
       }
-      for (final nn in noteNodes) {
+      for (final nn in filteredNoteNodes) {
         await (_db.update(_db.noteNodes)..where((t) => t.id.equals(nn.id)))
             .write(const NoteNodesCompanion(isDirty: Value(false)));
       }
-      for (final tsk in tasks) {
+      for (final tsk in filteredTasks) {
         await _db.tasksDao.clearDirtyFlag(tsk.id, tsk.updatedAt);
       }
       for (final c in contexts) {
@@ -188,16 +216,16 @@ class SyncService {
       for (final tg in tags) {
         await _db.tagsDao.clearDirtyFlag(tg.id, tg.updatedAt);
       }
-      for (final cmp in completions) {
+      for (final cmp in filteredCompletions) {
         await _db.taskCompletionsDao.clearDirtyFlag(cmp.id);
       }
-      for (final nl in noteLinks) {
+      for (final nl in filteredLinks) {
         await _db.noteLinksDao.clearDirtyFlag(nl.id, nl.updatedAt);
       }
-      for (final nt in noteTags) {
+      for (final nt in filteredNoteTags) {
         await _db.noteTagsDao.clearDirtyFlag(nt.noteId, nt.tagId);
       }
-      for (final p in prefs) {
+      for (final p in filteredPrefs) {
         await _db.userNotePreferencesDao.clearDirtyFlag(p.userId, p.noteId);
       }
     });
