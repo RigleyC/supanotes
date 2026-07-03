@@ -102,7 +102,7 @@ type NoteNode struct {
 	ID        pgtype.UUID        `json:"id"`
 	NoteID    pgtype.UUID        `json:"note_id"`
 	ParentID  pgtype.UUID        `json:"parent_id"`
-	Position  int32              `json:"position"`
+	Position  float64            `json:"position"`
 	Type      string             `json:"type"`
 	Data      []byte             `json:"data"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -194,7 +194,7 @@ type Task struct {
 	Status      string             `json:"status"`
 	DueDate     pgtype.Date        `json:"due_date"`
 	Recurrence  pgtype.Text        `json:"recurrence"`
-	Position    int32              `json:"position"`
+	Position    float64            `json:"position"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`

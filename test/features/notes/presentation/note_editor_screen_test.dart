@@ -71,7 +71,7 @@ class _FakeNotesRepository implements INotesRepository {
         nodes.add(NoteNode(
           id: id,
           noteId: noteId,
-          position: i,
+          position: i.toDouble(),
           type: type,
           data: isTask
               ? '{"text":"$title","completed":$isComplete}'

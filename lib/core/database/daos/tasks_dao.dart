@@ -316,7 +316,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       for (var i = 0; i < orderedIds.length; i++) {
         b.update(
           tasks,
-          TasksCompanion(position: Value(i)),
+          TasksCompanion(position: Value(i.toDouble())),
           where: (t) => t.id.equals(orderedIds[i]),
         );
       }

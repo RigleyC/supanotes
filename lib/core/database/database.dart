@@ -66,7 +66,7 @@ class AppDatabase extends _$AppDatabase {
   /// Latest schema version. Bumped to 13 — v13 adds note_nodes table and
   /// node_id column to tasks.
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -135,12 +135,56 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(noteNodes);
         await m.addColumn(tasks, tasks.nodeId);
       }
+      if (from < 14) {
+        await customStatement('PRAGMA foreign_keys=OFF;');
+        
+        // Recreate note_nodes with REAL position
+        await customStatement('''
+          CREATE TABLE note_nodes_migration (
+            id TEXT NOT NULL PRIMARY KEY,
+            note_id TEXT NOT NULL REFERENCES notes (id),
+            parent_id TEXT REFERENCES note_nodes (id),
+            position REAL NOT NULL,
+            type TEXT NOT NULL,
+            data TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            deleted_at INTEGER,
+            is_dirty INTEGER NOT NULL DEFAULT 1
+          );
+        ''');
+        await customStatement('INSERT INTO note_nodes_migration SELECT id, note_id, parent_id, CAST(position AS REAL), type, data, created_at, updated_at, deleted_at, is_dirty FROM note_nodes;');
+        await customStatement('DROP TABLE note_nodes;');
+        await customStatement('ALTER TABLE note_nodes_migration RENAME TO note_nodes;');
+
+        // Recreate tasks with REAL position
+        await customStatement('''
+          CREATE TABLE tasks_migration (
+            id TEXT NOT NULL PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            note_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            status TEXT NOT NULL,
+            position REAL NOT NULL DEFAULT 0.0,
+            recurrence TEXT,
+            due_date INTEGER,
+            completed_at INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            deleted_at INTEGER,
+            node_id TEXT REFERENCES note_nodes (id),
+            is_dirty INTEGER NOT NULL DEFAULT 1
+          );
+        ''');
+        await customStatement('INSERT INTO tasks_migration SELECT id, user_id, note_id, title, status, CAST(position AS REAL), recurrence, due_date, completed_at, created_at, updated_at, deleted_at, node_id, is_dirty FROM tasks;');
+        await customStatement('DROP TABLE tasks;');
+        await customStatement('ALTER TABLE tasks_migration RENAME TO tasks;');
+        
+        await customStatement('PRAGMA foreign_keys=ON;');
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
-      await customStatement(
-        "UPDATE notes SET content = '(Recuperado)' WHERE trim(content) = '' AND deleted_at IS NULL;"
-      );
     },
   );
 }

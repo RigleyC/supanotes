@@ -9,6 +9,33 @@ import 'attachment_nodes.dart';
 import 'note_display_text.dart';
 import 'task_entry.dart';
 
+sealed class NodeOperation {}
+
+class InsertOp extends NodeOperation {
+  final String id;
+  final DocumentNode node;
+  final int index;
+  InsertOp(this.id, this.node, this.index);
+}
+
+class UpdateOp extends NodeOperation {
+  final String id;
+  final DocumentNode node;
+  UpdateOp(this.id, this.node);
+}
+
+class MoveOp extends NodeOperation {
+  final String id;
+  final int from;
+  final int to;
+  MoveOp(this.id, this.from, this.to);
+}
+
+class DeleteOp extends NodeOperation {
+  final String id;
+  DeleteOp(this.id);
+}
+
 class NodeSyncManager {
   NodeSyncManager({
     required AppDatabase database,
@@ -27,8 +54,7 @@ class NodeSyncManager {
   final String _userId;
   final MutableDocument _document;
 
-  final Set<String> _dirtyNodeIds = {};
-  final List<DocumentChangeLog> _pendingChangeLogs = [];
+  final List<NodeOperation> _pendingOps = [];
   Timer? _debounceTimer;
 
   Future<void> _writeLock = Future.value();
@@ -43,191 +69,82 @@ class NodeSyncManager {
     });
   }
 
-  Future<void> _shiftPositionsAfter(int fromIndex, {int offset = 1}) async {
-    await _db.customUpdate(
-      'UPDATE note_nodes SET position = position + ? WHERE note_id = ? AND position >= ? AND deleted_at IS NULL',
-      variables: [Variable(offset), Variable(_noteId), Variable(fromIndex)],
-    );
-  }
+  Future<double> _calculatePositionForInsert(String nodeId, int insertionIndex) async {
+    final dbNodes = await (_db.select(_db.noteNodes)
+      ..where((t) => t.noteId.equals(_noteId))
+      ..where((t) => t.deletedAt.isNull())
+      ..orderBy([(t) => OrderingTerm(expression: t.position, mode: OrderingMode.asc)])
+    ).get();
 
-  Future<void> _shiftTaskPositionsAfter(int fromIndex, {int offset = 1}) async {
-    await _db.customUpdate(
-      'UPDATE tasks SET position = position + ? WHERE note_id = ? AND position >= ? AND deleted_at IS NULL',
-      variables: [Variable(offset), Variable(_noteId), Variable(fromIndex)],
-    );
-  }
-
-  Future<void> _shiftPositionsOnMove(int from, int to) async {
-    if (from < to) {
-      await _db.customUpdate(
-        'UPDATE note_nodes SET position = position - 1 WHERE note_id = ? AND position > ? AND position <= ? AND deleted_at IS NULL',
-        variables: [Variable(_noteId), Variable(from), Variable(to)],
-      );
-    } else if (from > to) {
-      await _db.customUpdate(
-        'UPDATE note_nodes SET position = position + 1 WHERE note_id = ? AND position >= ? AND position < ? AND deleted_at IS NULL',
-        variables: [Variable(_noteId), Variable(to), Variable(from)],
-      );
+    if (dbNodes.isEmpty) {
+      return 1.0;
     }
+
+    if (insertionIndex == 0) {
+      return dbNodes.first.position / 2.0;
+    }
+
+    if (insertionIndex >= dbNodes.length) {
+      return dbNodes.last.position + 1.0;
+    }
+
+    final prevPos = dbNodes[insertionIndex - 1].position;
+    final nextPos = dbNodes[insertionIndex].position;
+    return (prevPos + nextPos) / 2.0;
   }
 
-  Future<void> _shiftTaskPositionsOnMove(int from, int to) async {
-    if (from < to) {
-      await _db.customUpdate(
-        'UPDATE tasks SET position = position - 1 WHERE note_id = ? AND position > ? AND position <= ? AND deleted_at IS NULL',
-        variables: [Variable(_noteId), Variable(from), Variable(to)],
-      );
-    } else if (from > to) {
-      await _db.customUpdate(
-        'UPDATE tasks SET position = position + 1 WHERE note_id = ? AND position >= ? AND position < ? AND deleted_at IS NULL',
-        variables: [Variable(_noteId), Variable(to), Variable(from)],
-      );
+  Future<double> _calculatePositionForMove(String nodeId, int toIndex) async {
+    final dbNodes = await (_db.select(_db.noteNodes)
+      ..where((t) => t.noteId.equals(_noteId))
+      ..where((t) => t.deletedAt.isNull())
+      ..where((t) => t.id.equals(nodeId).not())
+      ..orderBy([(t) => OrderingTerm(expression: t.position, mode: OrderingMode.asc)])
+    ).get();
+
+    if (dbNodes.isEmpty) {
+      return 1.0;
     }
+
+    if (toIndex == 0) {
+      return dbNodes.first.position / 2.0;
+    }
+
+    if (toIndex >= dbNodes.length) {
+      return dbNodes.last.position + 1.0;
+    }
+
+    final prevPos = dbNodes[toIndex - 1].position;
+    final nextPos = dbNodes[toIndex].position;
+    return (prevPos + nextPos) / 2.0;
   }
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
-    final now = DateTime.now().toUtc();
-    var hasTextChange = false;
-    var hasStructuralChange = false;
-
-    _pendingChangeLogs.add(changeLog);
-
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
-        hasStructuralChange = true;
+        final node = _document.getNodeById(change.nodeId);
+        if (node != null) {
+          _pendingOps.add(InsertOp(change.nodeId, node, change.insertionIndex));
+        }
       } else if (change is NodeRemovedEvent) {
-        hasStructuralChange = true;
+        _pendingOps.add(DeleteOp(change.nodeId));
       } else if (change is NodeMovedEvent) {
-        hasStructuralChange = true;
+        _pendingOps.add(MoveOp(change.nodeId, change.from, change.to));
       } else if (change is NodeChangeEvent) {
-        _dirtyNodeIds.add(change.nodeId);
-        hasTextChange = true;
-      }
-    }
-
-    if (!hasStructuralChange && !hasTextChange) return;
-
-    _debounceTimer?.cancel();
-    if (hasStructuralChange) {
-      _debounceTimer = null;
-    } else {
-      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-        _enqueueDbWrite(() => _flushPendingChanges(now));
-      });
-      return;
-    }
-
-    _enqueueDbWrite(() => _flushPendingChanges(now));
-  }
-
-  Future<void> _flushPendingChanges(DateTime now) async {
-    final logsToProcess = List<DocumentChangeLog>.from(_pendingChangeLogs);
-    _pendingChangeLogs.clear();
-
-    if (logsToProcess.isEmpty && _dirtyNodeIds.isEmpty) return;
-
-    await _db.transaction(() async {
-      for (final log in logsToProcess) {
-        for (final change in log.changes) {
-          if (change is NodeInsertedEvent) {
-            final node = _document.getNodeById(change.nodeId);
-            if (node == null) continue;
-            final companion = _nodeToCompanion(node, change.insertionIndex);
-            if (companion == null) continue;
-            await _shiftPositionsAfter(change.insertionIndex);
-            await _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
-
-            if (node is TaskNode) {
-              final taskCompanion = TasksCompanion.insert(
-                id: node.id,
-                userId: _userId,
-                noteId: _noteId,
-                title: node.text.toPlainText(),
-                status: node.isComplete ? 'done' : 'open',
-                position: Value(change.insertionIndex),
-                createdAt: now,
-                updatedAt: now,
-                isDirty: const Value(true),
-                deletedAt: const Value(null),
-              );
-              await _shiftTaskPositionsAfter(change.insertionIndex);
-              await _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
-            }
-          } else if (change is NodeRemovedEvent) {
-            await (_db.update(
-              _db.noteNodes,
-            )..where((t) => t.id.equals(change.nodeId))).write(
-              NoteNodesCompanion(deletedAt: Value(now), isDirty: const Value(true)),
-            );
-
-            await (_db.update(_db.tasks)..where((t) => t.id.equals(change.nodeId))).write(
-              TasksCompanion(deletedAt: Value(now), isDirty: const Value(true)),
-            );
-          } else if (change is NodeMovedEvent) {
-            await _shiftPositionsOnMove(change.from, change.to);
-            await (_db.update(
-              _db.noteNodes,
-            )..where((t) => t.id.equals(change.nodeId))).write(
-              NoteNodesCompanion(
-                position: Value(change.to),
-                isDirty: const Value(true),
-              ),
-            );
-
-            await _shiftTaskPositionsOnMove(change.from, change.to);
-            await (_db.update(_db.tasks)..where((t) => t.id.equals(change.nodeId))).write(
-              TasksCompanion(
-                position: Value(change.to),
-                isDirty: const Value(true),
-              ),
-            );
-          }
+        final node = _document.getNodeById(change.nodeId);
+        if (node != null) {
+          _pendingOps.add(UpdateOp(change.nodeId, node));
         }
       }
+    }
 
-      if (_dirtyNodeIds.isNotEmpty) {
-        await _flushNodeChanges();
-      }
-      await _flushNoteExcerpt();
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _enqueueDbWrite(_drainQueue);
     });
   }
 
-  Future<void> _flushNodeChanges() async {
-    final now = DateTime.now().toUtc();
-    final dirtyIds = Set<String>.from(_dirtyNodeIds);
-    _dirtyNodeIds.clear();
-    for (final nodeId in dirtyIds) {
-      final node = _document.getNodeById(nodeId);
-      if (node == null) continue;
-      final companion = _nodeToCompanion(
-        node,
-        _document.getNodeIndexById(nodeId),
-      );
-      if (companion == null) continue;
-      await _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
-
-      if (node is TaskNode) {
-        final index = _document.getNodeIndexById(node.id);
-        final taskCompanion = TasksCompanion.insert(
-          id: node.id,
-          userId: _userId,
-          noteId: _noteId,
-          title: node.text.toPlainText(),
-          status: node.isComplete ? 'done' : 'open',
-          position: Value(index),
-          createdAt: now,
-          updatedAt: now,
-          isDirty: const Value(true),
-          deletedAt: const Value(null),
-        );
-        await _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
-      }
-    }
-  }
-
-  Future<void> _flushNoteExcerpt() async {
-    final now = DateTime.now().toUtc();
-    final fullText = _document
+  String _buildContentSnapshot() {
+    return _document
         .where((n) => n is TextNode || n is TaskNode)
         .map((n) {
           if (n is TaskNode) {
@@ -236,7 +153,9 @@ class NodeSyncManager {
           return (n as TextNode).text.toPlainText();
         })
         .join('\n');
+  }
 
+  Future<void> _flushNoteExcerptFromSnapshot(String fullText, DateTime now) async {
     final excerpt = deriveNoteExcerpt(fullText);
 
     await (_db.update(_db.notes)..where((t) => t.id.equals(_noteId))).write(
@@ -249,7 +168,102 @@ class NodeSyncManager {
     );
   }
 
-  NoteNodesCompanion? _nodeToCompanion(DocumentNode node, int position) {
+  Future<void> _drainQueue() async {
+    if (_pendingOps.isEmpty) return;
+
+    final opsToProcess = List<NodeOperation>.from(_pendingOps);
+    _pendingOps.clear();
+
+    final now = DateTime.now().toUtc();
+    final snapshotText = _buildContentSnapshot();
+
+    await _db.transaction(() async {
+      for (final op in opsToProcess) {
+        switch (op) {
+          case InsertOp():
+            final position = await _calculatePositionForInsert(op.id, op.index);
+            final companion = _nodeToCompanion(op.node, position);
+            if (companion != null) {
+              await _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
+            }
+            if (op.node is TaskNode) {
+              final taskNode = op.node as TaskNode;
+              final taskCompanion = TasksCompanion.insert(
+                id: op.id,
+                userId: _userId,
+                noteId: _noteId,
+                title: taskNode.text.toPlainText(),
+                status: taskNode.isComplete ? 'done' : 'open',
+                position: Value(position),
+                createdAt: now,
+                updatedAt: now,
+                isDirty: const Value(true),
+                deletedAt: const Value(null),
+              );
+              await _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
+            }
+            break;
+
+          case UpdateOp():
+            final existingNode = await (_db.select(_db.noteNodes)
+              ..where((t) => t.id.equals(op.id))).getSingleOrNull();
+            final position = existingNode?.position ?? 0.0;
+
+            final companion = _nodeToCompanion(op.node, position);
+            if (companion != null) {
+              await _db.into(_db.noteNodes).insertOnConflictUpdate(companion);
+            }
+            if (op.node is TaskNode) {
+              final taskNode = op.node as TaskNode;
+              final taskCompanion = TasksCompanion.insert(
+                id: op.id,
+                userId: _userId,
+                noteId: _noteId,
+                title: taskNode.text.toPlainText(),
+                status: taskNode.isComplete ? 'done' : 'open',
+                position: Value(position),
+                createdAt: now,
+                updatedAt: now,
+                isDirty: const Value(true),
+                deletedAt: const Value(null),
+              );
+              await _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
+            }
+            break;
+
+          case MoveOp():
+            final position = await _calculatePositionForMove(op.id, op.to);
+
+            await (_db.update(_db.noteNodes)..where((t) => t.id.equals(op.id))).write(
+              NoteNodesCompanion(
+                position: Value(position),
+                isDirty: const Value(true),
+              ),
+            );
+            await (_db.update(_db.tasks)..where((t) => t.id.equals(op.id))).write(
+              TasksCompanion(
+                position: Value(position),
+                isDirty: const Value(true),
+              ),
+            );
+            break;
+
+          case DeleteOp():
+            await (_db.update(_db.noteNodes)..where((t) => t.id.equals(op.id))).write(
+              NoteNodesCompanion(deletedAt: Value(now), isDirty: const Value(true)),
+            );
+            await (_db.update(_db.tasks)..where((t) => t.id.equals(op.id))).write(
+              TasksCompanion(deletedAt: Value(now), isDirty: const Value(true)),
+            );
+            break;
+        }
+      }
+
+      await _flushNoteExcerptFromSnapshot(snapshotText, now);
+    });
+  }
+
+  NoteNodesCompanion? _nodeToCompanion(DocumentNode node, double position) {
     final type = _nodeType(node);
     if (type == null) return null;
 
@@ -662,10 +676,7 @@ class NodeSyncManager {
 
   void dispose() {
     _debounceTimer?.cancel();
-    _enqueueDbWrite(() async {
-      await _flushNodeChanges();
-      await _flushNoteExcerpt();
-    });
+    _drainQueue();
     _document.removeListener(_onDocumentChanged);
   }
 }

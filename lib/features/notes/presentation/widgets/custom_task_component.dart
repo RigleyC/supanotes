@@ -65,6 +65,17 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
         try {
           if (isComplete) {
             await onTaskComplete?.call(node.id);
+            final taskMeta = taskMetadataById[node.id];
+            if (taskMeta?.recurrence != null) {
+              Future.delayed(const Duration(milliseconds: 400), () {
+                final exists = document.getNodeById(node.id) != null;
+                if (exists) {
+                  _editor.execute([
+                    ChangeTaskCompletionRequest(nodeId: node.id, isComplete: false),
+                  ]);
+                }
+              });
+            }
           } else {
             await onTaskReopen?.call(node.id);
           }

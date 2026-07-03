@@ -63,7 +63,7 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
     required String noteId,
     required String title,
     String status = 'pending',
-    int position = 0,
+    double position = 0.0,
     TaskRecurrence? recurrence,
     DateTime? dueDate,
   }) async {}

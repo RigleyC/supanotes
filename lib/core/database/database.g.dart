@@ -983,11 +983,11 @@ class $NoteNodesTable extends NoteNodes
     'position',
   );
   @override
-  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+  late final GeneratedColumn<double> position = GeneratedColumn<double>(
     'position',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
@@ -1174,7 +1174,7 @@ class $NoteNodesTable extends NoteNodes
         data['${effectivePrefix}parent_id'],
       ),
       position: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}position'],
       )!,
       type: attachedDatabase.typeMapping.read(
@@ -1214,7 +1214,7 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
   final String id;
   final String noteId;
   final String? parentId;
-  final int position;
+  final double position;
   final String type;
   final String data;
   final DateTime createdAt;
@@ -1241,7 +1241,7 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
     if (!nullToAbsent || parentId != null) {
       map['parent_id'] = Variable<String>(parentId);
     }
-    map['position'] = Variable<int>(position);
+    map['position'] = Variable<double>(position);
     map['type'] = Variable<String>(type);
     map['data'] = Variable<String>(data);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -1281,7 +1281,7 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
       id: serializer.fromJson<String>(json['id']),
       noteId: serializer.fromJson<String>(json['noteId']),
       parentId: serializer.fromJson<String?>(json['parentId']),
-      position: serializer.fromJson<int>(json['position']),
+      position: serializer.fromJson<double>(json['position']),
       type: serializer.fromJson<String>(json['type']),
       data: serializer.fromJson<String>(json['data']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -1297,7 +1297,7 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
       'id': serializer.toJson<String>(id),
       'noteId': serializer.toJson<String>(noteId),
       'parentId': serializer.toJson<String?>(parentId),
-      'position': serializer.toJson<int>(position),
+      'position': serializer.toJson<double>(position),
       'type': serializer.toJson<String>(type),
       'data': serializer.toJson<String>(data),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -1311,7 +1311,7 @@ class NoteNode extends DataClass implements Insertable<NoteNode> {
     String? id,
     String? noteId,
     Value<String?> parentId = const Value.absent(),
-    int? position,
+    double? position,
     String? type,
     String? data,
     DateTime? createdAt,
@@ -1395,7 +1395,7 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
   final Value<String> id;
   final Value<String> noteId;
   final Value<String?> parentId;
-  final Value<int> position;
+  final Value<double> position;
   final Value<String> type;
   final Value<String> data;
   final Value<DateTime> createdAt;
@@ -1420,7 +1420,7 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
     required String id,
     required String noteId,
     this.parentId = const Value.absent(),
-    required int position,
+    required double position,
     required String type,
     required String data,
     required DateTime createdAt,
@@ -1439,7 +1439,7 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
     Expression<String>? id,
     Expression<String>? noteId,
     Expression<String>? parentId,
-    Expression<int>? position,
+    Expression<double>? position,
     Expression<String>? type,
     Expression<String>? data,
     Expression<DateTime>? createdAt,
@@ -1467,7 +1467,7 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
     Value<String>? id,
     Value<String>? noteId,
     Value<String?>? parentId,
-    Value<int>? position,
+    Value<double>? position,
     Value<String>? type,
     Value<String>? data,
     Value<DateTime>? createdAt,
@@ -1504,7 +1504,7 @@ class NoteNodesCompanion extends UpdateCompanion<NoteNode> {
       map['parent_id'] = Variable<String>(parentId.value);
     }
     if (position.present) {
-      map['position'] = Variable<int>(position.value);
+      map['position'] = Variable<double>(position.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -1603,13 +1603,13 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     'position',
   );
   @override
-  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+  late final GeneratedColumn<double> position = GeneratedColumn<double>(
     'position',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.double,
     requiredDuringInsert: false,
-    defaultValue: const Constant(0),
+    defaultValue: const Constant(0.0),
   );
   @override
   late final GeneratedColumnWithTypeConverter<TaskRecurrence?, String>
@@ -1853,7 +1853,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         data['${effectivePrefix}status'],
       )!,
       position: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}position'],
       )!,
       recurrence: $TasksTable.$converterrecurrencen.fromSql(
@@ -1910,7 +1910,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final String noteId;
   final String title;
   final String status;
-  final int position;
+  final double position;
   final TaskRecurrence? recurrence;
   final DateTime? dueDate;
   final DateTime? completedAt;
@@ -1943,7 +1943,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     map['note_id'] = Variable<String>(noteId);
     map['title'] = Variable<String>(title);
     map['status'] = Variable<String>(status);
-    map['position'] = Variable<int>(position);
+    map['position'] = Variable<double>(position);
     if (!nullToAbsent || recurrence != null) {
       map['recurrence'] = Variable<String>(
         $TasksTable.$converterrecurrencen.toSql(recurrence),
@@ -2007,7 +2007,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       noteId: serializer.fromJson<String>(json['noteId']),
       title: serializer.fromJson<String>(json['title']),
       status: serializer.fromJson<String>(json['status']),
-      position: serializer.fromJson<int>(json['position']),
+      position: serializer.fromJson<double>(json['position']),
       recurrence: $TasksTable.$converterrecurrencen.fromJson(
         serializer.fromJson<String?>(json['recurrence']),
       ),
@@ -2029,7 +2029,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'noteId': serializer.toJson<String>(noteId),
       'title': serializer.toJson<String>(title),
       'status': serializer.toJson<String>(status),
-      'position': serializer.toJson<int>(position),
+      'position': serializer.toJson<double>(position),
       'recurrence': serializer.toJson<String?>(
         $TasksTable.$converterrecurrencen.toJson(recurrence),
       ),
@@ -2049,7 +2049,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     String? noteId,
     String? title,
     String? status,
-    int? position,
+    double? position,
     Value<TaskRecurrence?> recurrence = const Value.absent(),
     Value<DateTime?> dueDate = const Value.absent(),
     Value<DateTime?> completedAt = const Value.absent(),
@@ -2161,7 +2161,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<String> noteId;
   final Value<String> title;
   final Value<String> status;
-  final Value<int> position;
+  final Value<double> position;
   final Value<TaskRecurrence?> recurrence;
   final Value<DateTime?> dueDate;
   final Value<DateTime?> completedAt;
@@ -2217,7 +2217,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<String>? noteId,
     Expression<String>? title,
     Expression<String>? status,
-    Expression<int>? position,
+    Expression<double>? position,
     Expression<String>? recurrence,
     Expression<DateTime>? dueDate,
     Expression<DateTime>? completedAt,
@@ -2253,7 +2253,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Value<String>? noteId,
     Value<String>? title,
     Value<String>? status,
-    Value<int>? position,
+    Value<double>? position,
     Value<TaskRecurrence?>? recurrence,
     Value<DateTime?>? dueDate,
     Value<DateTime?>? completedAt,
@@ -2302,7 +2302,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       map['status'] = Variable<String>(status.value);
     }
     if (position.present) {
-      map['position'] = Variable<int>(position.value);
+      map['position'] = Variable<double>(position.value);
     }
     if (recurrence.present) {
       map['recurrence'] = Variable<String>(
@@ -6160,7 +6160,7 @@ typedef $$NoteNodesTableCreateCompanionBuilder =
       required String id,
       required String noteId,
       Value<String?> parentId,
-      required int position,
+      required double position,
       required String type,
       required String data,
       required DateTime createdAt,
@@ -6174,7 +6174,7 @@ typedef $$NoteNodesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> noteId,
       Value<String?> parentId,
-      Value<int> position,
+      Value<double> position,
       Value<String> type,
       Value<String> data,
       Value<DateTime> createdAt,
@@ -6256,7 +6256,7 @@ class $$NoteNodesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get position => $composableBuilder(
+  ColumnFilters<double> get position => $composableBuilder(
     column: $table.position,
     builder: (column) => ColumnFilters(column),
   );
@@ -6377,7 +6377,7 @@ class $$NoteNodesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get position => $composableBuilder(
+  ColumnOrderings<double> get position => $composableBuilder(
     column: $table.position,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6471,7 +6471,7 @@ class $$NoteNodesTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<int> get position =>
+  GeneratedColumn<double> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
@@ -6595,7 +6595,7 @@ class $$NoteNodesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> noteId = const Value.absent(),
                 Value<String?> parentId = const Value.absent(),
-                Value<int> position = const Value.absent(),
+                Value<double> position = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> data = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -6621,7 +6621,7 @@ class $$NoteNodesTableTableManager
                 required String id,
                 required String noteId,
                 Value<String?> parentId = const Value.absent(),
-                required int position,
+                required double position,
                 required String type,
                 required String data,
                 required DateTime createdAt,
@@ -6752,7 +6752,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       required String noteId,
       required String title,
       required String status,
-      Value<int> position,
+      Value<double> position,
       Value<TaskRecurrence?> recurrence,
       Value<DateTime?> dueDate,
       Value<DateTime?> completedAt,
@@ -6770,7 +6770,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<String> noteId,
       Value<String> title,
       Value<String> status,
-      Value<int> position,
+      Value<double> position,
       Value<TaskRecurrence?> recurrence,
       Value<DateTime?> dueDate,
       Value<DateTime?> completedAt,
@@ -6837,7 +6837,7 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get position => $composableBuilder(
+  ColumnFilters<double> get position => $composableBuilder(
     column: $table.position,
     builder: (column) => ColumnFilters(column),
   );
@@ -6936,7 +6936,7 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get position => $composableBuilder(
+  ColumnOrderings<double> get position => $composableBuilder(
     column: $table.position,
     builder: (column) => ColumnOrderings(column),
   );
@@ -7024,7 +7024,7 @@ class $$TasksTableAnnotationComposer
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
-  GeneratedColumn<int> get position =>
+  GeneratedColumn<double> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<TaskRecurrence?, String> get recurrence =>
@@ -7110,7 +7110,7 @@ class $$TasksTableTableManager
                 Value<String> noteId = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String> status = const Value.absent(),
-                Value<int> position = const Value.absent(),
+                Value<double> position = const Value.absent(),
                 Value<TaskRecurrence?> recurrence = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
@@ -7144,7 +7144,7 @@ class $$TasksTableTableManager
                 required String noteId,
                 required String title,
                 required String status,
-                Value<int> position = const Value.absent(),
+                Value<double> position = const Value.absent(),
                 Value<TaskRecurrence?> recurrence = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),

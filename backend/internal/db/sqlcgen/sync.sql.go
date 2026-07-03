@@ -619,7 +619,7 @@ type UpsertNoteNodeParams struct {
 	ID        pgtype.UUID        `json:"id"`
 	NoteID    pgtype.UUID        `json:"note_id"`
 	ParentID  pgtype.UUID        `json:"parent_id"`
-	Position  int32              `json:"position"`
+	Position  float64            `json:"position"`
 	Type      string             `json:"type"`
 	Data      []byte             `json:"data"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -732,7 +732,7 @@ type UpsertTaskParams struct {
 	NoteID     pgtype.UUID        `json:"note_id"`
 	Title      string             `json:"title"`
 	Status     string             `json:"status"`
-	Position   int32              `json:"position"`
+	Position   float64            `json:"position"`
 	Recurrence pgtype.Text        `json:"recurrence"`
 	DueDate    pgtype.Date        `json:"due_date"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`

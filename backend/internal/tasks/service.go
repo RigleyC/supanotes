@@ -27,7 +27,7 @@ type UpdateTaskOpts struct {
 	ClearDueDate    bool
 	Recurrence      *string
 	ClearRecurrence bool
-	Position        *int
+	Position        *float64
 }
 
 // Validate catches conflicting "set" + "clear" inputs early so callers
@@ -50,12 +50,12 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, title string, dueDate *time.Time, recurrence *string, position int) (sqlcgen.Task, error) {
+func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, title string, dueDate *time.Time, recurrence *string, position float64) (sqlcgen.Task, error) {
 	arg := sqlcgen.CreateTaskParams{
 		NoteID:   noteID,
 		UserID:   userID,
 		Title:    title,
-		Position: int32(position),
+		Position: position,
 	}
 	if dueDate != nil {
 		arg.DueDate = pgtype.Date{Time: *dueDate, Valid: true}
@@ -133,7 +133,7 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 	}
 	if opts.Position != nil {
 		arg.SetPosition = pgtype.Bool{Bool: true, Valid: true}
-		arg.Position = pgtype.Int4{Int32: int32(*opts.Position), Valid: true}
+		arg.Position = pgtype.Float8{Float64: *opts.Position, Valid: true}
 	}
 
 	// Clear completed_at when re-opening

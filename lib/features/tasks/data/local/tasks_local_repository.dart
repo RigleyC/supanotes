@@ -47,7 +47,7 @@ class TasksLocalRepository {
     required String noteId,
     required String title,
     String status = 'open',
-    int position = 0,
+    double position = 0.0,
     TaskRecurrence? recurrence,
     DateTime? dueDate,
   }) async {

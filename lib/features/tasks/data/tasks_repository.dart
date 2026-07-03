@@ -27,7 +27,7 @@ abstract class ITasksRepository {
     required String title,
     DateTime? dueDate,
     TaskRecurrence? recurrence,
-    int position = 0,
+    double position = 0.0,
   });
   Future<DateTime?> completeTask(String id);
   Future<void> reopenTask(String id);
@@ -36,7 +36,7 @@ abstract class ITasksRepository {
     String? title,
     DateTime? dueDate,
     TaskRecurrence? recurrence,
-    int? position,
+    double? position,
     bool clearDueDate = false,
     bool clearRecurrence = false,
   });
@@ -128,7 +128,7 @@ class TasksRepository implements ITasksRepository {
     required String title,
     DateTime? dueDate,
     TaskRecurrence? recurrence,
-    int position = 0,
+    double position = 0.0,
   }) async {
     final id = _uuid.v4();
     await _local.createTask(
@@ -174,7 +174,7 @@ class TasksRepository implements ITasksRepository {
     String? title,
     DateTime? dueDate,
     TaskRecurrence? recurrence,
-    int? position,
+    double? position,
     bool clearDueDate = false,
     bool clearRecurrence = false,
   }) async {

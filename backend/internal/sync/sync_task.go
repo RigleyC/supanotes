@@ -18,7 +18,7 @@ type SyncTask struct {
 	UserID      pgtype.UUID `json:"user_id"`
 	Title       string      `json:"title"`
 	Status      string      `json:"status"`
-	Position    int32       `json:"position"`
+	Position    float64     `json:"position"`
 	Recurrence  *string     `json:"recurrence"`
 	DueDate     *string     `json:"due_date"`
 	CompletedAt *time.Time  `json:"completed_at"`

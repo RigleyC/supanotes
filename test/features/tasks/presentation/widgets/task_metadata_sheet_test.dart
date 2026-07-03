@@ -30,6 +30,7 @@ void main() {
   }
   testWidgets('renders metadata pickers for existing task', (tester) async {
     await tester.pumpWidget(wrap(TaskMetadataSheet(noteId: 'note-1', task: task())));
+    await tester.pumpAndSettle();
 
     expect(find.text('Data de vencimento'), findsOneWidget);
     expect(find.text('Repetição'), findsOneWidget);

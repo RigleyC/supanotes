@@ -19,7 +19,7 @@ type CreateTaskRequest struct {
 	Title      string  `json:"title" validate:"required"`
 	DueDate    *string `json:"due_date"`
 	Recurrence *string `json:"recurrence"`
-	Position   int     `json:"position"`
+	Position   float64 `json:"position"`
 }
 
 // UpdateTaskRequest expresses a partial update. For each nullable field
@@ -29,13 +29,13 @@ type CreateTaskRequest struct {
 // pointer for that field must be nil. Sending both DueDate != nil and
 // ClearDueDate = true is rejected by UpdateTaskOpts.Validate().
 type UpdateTaskRequest struct {
-	Title           *string `json:"title"`
-	Status          *string `json:"status"`
-	DueDate         *string `json:"due_date"`
-	ClearDueDate    bool    `json:"clear_due_date"`
-	Recurrence      *string `json:"recurrence"`
-	ClearRecurrence bool    `json:"clear_recurrence"`
-	Position        *int    `json:"position"`
+	Title           *string  `json:"title"`
+	Status          *string  `json:"status"`
+	DueDate         *string  `json:"due_date"`
+	ClearDueDate    bool     `json:"clear_due_date"`
+	Recurrence      *string  `json:"recurrence"`
+	ClearRecurrence bool     `json:"clear_recurrence"`
+	Position        *float64 `json:"position"`
 }
 
 type TaskResponse struct {
@@ -45,7 +45,7 @@ type TaskResponse struct {
 	Status     string  `json:"status"`
 	DueDate    *string `json:"due_date,omitempty"`
 	Recurrence *string `json:"recurrence,omitempty"`
-	Position   int     `json:"position"`
+	Position   float64 `json:"position"`
 	CreatedAt  string  `json:"created_at"`
 	UpdatedAt  string  `json:"updated_at"`
 }
@@ -299,7 +299,7 @@ func mapToTaskResponse(t sqlcgen.Task) TaskResponse {
 		Status:     t.Status,
 		DueDate:    FormatDate(t.DueDate),
 		Recurrence: FormatText(t.Recurrence),
-		Position:   int(t.Position),
+		Position:   t.Position,
 		CreatedAt:  t.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:  t.UpdatedAt.Time.Format(time.RFC3339),
 	}

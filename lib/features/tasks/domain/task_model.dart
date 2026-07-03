@@ -32,7 +32,7 @@ class TaskModel {
   final String noteId;
   final String title;
   final String status;
-  final int position;
+  final double position;
   final DateTime? dueDate;
   final DateTime? completedAt;
   final TaskRecurrence? recurrence;

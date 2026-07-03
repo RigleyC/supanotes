@@ -144,7 +144,7 @@ class SyncMapper {
     noteId: json['note_id'] as String,
     title: json['title'] as String,
     status: json['status'] as String,
-    position: (json['position'] as int?) ?? 0,
+    position: (json['position'] as num?)?.toDouble() ?? 0.0,
     recurrence: TaskRecurrence.parse(json['recurrence'] as String?),
     dueDate: _parseDueDate(json['due_date'] as String?),
     completedAt: json['completed_at'] != null
@@ -217,7 +217,7 @@ class SyncMapper {
     id: json['id'] as String,
     noteId: json['note_id'] as String,
     parentId: json['parent_id'] as String?,
-    position: json['position'] as int,
+    position: (json['position'] as num).toDouble(),
     type: json['type'] as String,
     data: utf8.decode(base64Decode(json['data'] as String)),
     createdAt: DateTime.parse(json['created_at'] as String).toLocal(),

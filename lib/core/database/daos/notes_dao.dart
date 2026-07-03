@@ -28,7 +28,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND n.is_inbox = 0 AND trim(n.content) <> \'\' '
+      'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND n.is_inbox = 0 '
       'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC',
       userId,
     );
@@ -147,7 +147,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE n.context_id = ? AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND trim(n.content) <> \'\' '
+      'WHERE n.context_id = ? AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
       'ORDER BY n.updated_at DESC',
       userId,
       extraVariables: [Variable.withString(contextId)],
@@ -160,7 +160,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND trim(n.content) <> \'\' '
+      'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
       'ORDER BY n.updated_at DESC',
       userId,
     );
@@ -215,7 +215,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       noteId: row.read<String>('task_note_id'),
       title: row.read<String>('task_title'),
       status: row.read<String>('task_status'),
-      position: row.read<int>('task_position'),
+      position: row.read<double>('task_position'),
       dueDate: row.read<DateTime?>('task_due_date'),
       recurrence: recurrenceRaw != null
           ? TaskRecurrence.values.byName(recurrenceRaw)
@@ -285,11 +285,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
   }
 
-  /// Shared filter: a note is non-empty when its trimmed content is not
-  /// blank. Used to hide empty local-only notes from lists and to
-  /// determine sync eligibility.
-  Expression<bool> Function($NotesTable) get _nonEmptyNote =>
-      (t) => CustomExpression<bool>("trim(content) <> ''");
+
 
   /// Returns every note that has unsynced local changes and is eligible for
   /// sync (has a remote copy, is inbox, or has non-empty content).

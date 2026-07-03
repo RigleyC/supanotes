@@ -56,7 +56,7 @@ type CreateTaskParams struct {
 	Title      string      `json:"title"`
 	DueDate    pgtype.Date `json:"due_date"`
 	Recurrence pgtype.Text `json:"recurrence"`
-	Position   int32       `json:"position"`
+	Position   float64     `json:"position"`
 	NodeID     pgtype.UUID `json:"node_id"`
 }
 
@@ -504,7 +504,7 @@ type UpdateTaskParams struct {
 	SetRecurrence  pgtype.Bool        `json:"set_recurrence"`
 	Recurrence     pgtype.Text        `json:"recurrence"`
 	SetPosition    pgtype.Bool        `json:"set_position"`
-	Position       pgtype.Int4        `json:"position"`
+	Position       pgtype.Float8      `json:"position"`
 	SetCompletedAt pgtype.Bool        `json:"set_completed_at"`
 	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
 }

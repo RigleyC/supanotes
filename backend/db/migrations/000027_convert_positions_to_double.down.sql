@@ -1,0 +1,2 @@
+ALTER TABLE note_nodes ALTER COLUMN position TYPE INT;
+ALTER TABLE tasks ALTER COLUMN position TYPE INT;

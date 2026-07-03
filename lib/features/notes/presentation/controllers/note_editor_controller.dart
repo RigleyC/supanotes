@@ -179,12 +179,14 @@ class NoteEditorController {
   }
 
   bool _isDocEmpty(MutableDocument doc) {
-    for (final node in doc) {
-      if (node is TextNode && node.text.toPlainText().trim().isNotEmpty) {
-        return false;
+    if (doc.isEmpty) return true;
+    if (doc.nodeCount == 1) {
+      final firstNode = doc.first;
+      if (firstNode is ParagraphNode && firstNode.text.toPlainText().trim().isEmpty) {
+        return true;
       }
     }
-    return true;
+    return false;
   }
 
   void _flushAndSaveFinalState() {
