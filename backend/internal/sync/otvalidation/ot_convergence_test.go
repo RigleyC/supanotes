@@ -10,13 +10,52 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func deepCopyDelta(d *delta.Delta) *delta.Delta {
+	if d == nil {
+		return nil
+	}
+	ops := make([]delta.Op, len(d.Ops))
+	for i, op := range d.Ops {
+		ops[i] = op
+		if op.Insert != nil {
+			ops[i].Insert = append([]rune(nil), op.Insert...)
+		}
+		if op.Retain != nil {
+			val := *op.Retain
+			ops[i].Retain = &val
+		}
+		if op.Delete != nil {
+			val := *op.Delete
+			ops[i].Delete = &val
+		}
+		if op.Attributes != nil {
+			attrs := make(map[string]interface{})
+			for k, v := range op.Attributes {
+				attrs[k] = v
+			}
+			ops[i].Attributes = attrs
+		}
+	}
+	return delta.New(ops)
+}
+
 // Invariant: Base.Compose(A).Compose(B.Transform(A, false)) == Base.Compose(B).Compose(A.Transform(B, true))
 func assertConvergence(t *testing.T, base, a, b *delta.Delta) {
-	aPrime := b.Transform(*a, true)
-	bPrime := a.Transform(*b, false)
+	// Deep copy inputs to prevent slice sharing side-effects
+	aCopy := deepCopyDelta(a)
+	bCopy := deepCopyDelta(b)
+	baseCopy1 := deepCopyDelta(base)
+	baseCopy2 := deepCopyDelta(base)
 
-	docA := base.Compose(*a).Compose(*bPrime)
-	docB := base.Compose(*b).Compose(*aPrime)
+	aPrime := bCopy.Transform(*aCopy, true)
+	bPrime := aCopy.Transform(*bCopy, false)
+
+	// Clone primes since they might contain slice references from transforms
+	aPrimeCopy := deepCopyDelta(aPrime)
+	bPrimeCopy := deepCopyDelta(bPrime)
+
+	docA := baseCopy1.Compose(*aCopy).Compose(*bPrimeCopy)
+	docB := baseCopy2.Compose(*bCopy).Compose(*aPrimeCopy)
 
 	jsonA, errA := json.Marshal(docA.Ops)
 	jsonB, errB := json.Marshal(docB.Ops)
