@@ -136,6 +136,12 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(tasks, tasks.nodeId);
       }
     },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+      await customStatement(
+        "UPDATE notes SET content = '(Recuperado)' WHERE trim(content) = '' AND deleted_at IS NULL;"
+      );
+    },
   );
 }
 

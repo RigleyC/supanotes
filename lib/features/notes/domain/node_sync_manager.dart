@@ -228,12 +228,12 @@ class NodeSyncManager {
   Future<void> _flushNoteExcerpt() async {
     final now = DateTime.now().toUtc();
     final fullText = _document
-        .whereType<TextNode>()
+        .where((n) => n is TextNode || n is TaskNode)
         .map((n) {
           if (n is TaskNode) {
             return '- [${n.isComplete ? 'x' : ' '}] ${n.text.toPlainText()}';
           }
-          return n.text.toPlainText();
+          return (n as TextNode).text.toPlainText();
         })
         .join('\n');
 
