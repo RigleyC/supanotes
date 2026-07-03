@@ -132,7 +132,7 @@ class NoteEditorController {
         final newNode = NodeSyncManager.createNodeFromSchema(incoming);
         requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
       } else {
-        if (_isNodeSelected(incoming.id)) continue;
+        if (_isNodeSelected(incoming.id) && incoming.isDirty) continue;
         final newNode = NodeSyncManager.createNodeFromSchema(incoming);
         if (_isNodeModified(existingNode, newNode)) {
           requests.add(

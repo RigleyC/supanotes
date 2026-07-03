@@ -94,6 +94,9 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-cache")
 	c.Response().Header().Set(echo.HeaderConnection, "keep-alive")
 
+	ctx, cancel := context.WithCancel(c.Request().Context())
+	defer cancel()
+
 	events := make(chan StreamEvent, 10)
 	go func() {
 		defer func() {
@@ -102,10 +105,10 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 			}
 			close(events)
 		}()
-		if err := h.loop.ChatStream(c.Request().Context(), userID, req.SessionID, req.Content, events); err != nil {
+		if err := h.loop.ChatStream(ctx, userID, req.SessionID, req.Content, events); err != nil {
 			slog.Error("agent chat stream failed", "session_id", req.SessionID, "error", err)
 			writer := NewStreamEventWriter(req.SessionID, "")
-			sendStreamEvent(c.Request().Context(), events, writer.Event(EventError, ErrorPayload{Message: err.Error()}))
+			sendStreamEvent(ctx, events, writer.Event(EventError, ErrorPayload{Message: err.Error()}))
 		}
 	}()
 
@@ -123,6 +126,7 @@ func (h *Handler) ChatSSE(c echo.Context) error {
 		_, err = fmt.Fprintf(c.Response().Writer, "data: %s\n\n", data)
 		if err != nil {
 			slog.Error("agent chat stream write failed", "session_id", req.SessionID, "error", err)
+			cancel()
 			break
 		}
 		flusher.Flush()

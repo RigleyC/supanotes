@@ -297,6 +297,11 @@ func (l *Loop) executeLoop(ctx context.Context, turn *agentTurn) error {
 	turn.completionReason = "completed"
 
 	for !budget.IsExhausted() {
+		if ctx.Err() != nil {
+			slog.Info("agent loop cancelled", "session_id", turn.sessionIDStr, "error", ctx.Err())
+			turn.completionReason = "cancelled"
+			return nil
+		}
 		done, err := l.executeSingleIteration(ctx, turn, budget)
 		if err != nil {
 			return err

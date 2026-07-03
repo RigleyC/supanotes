@@ -203,10 +203,15 @@ class SyncService {
         await _db.notesDao.markHasRemoteCopy(n.id);
         await _db.notesDao.clearDirtyFlag(n.id, n.updatedAt);
       }
-      for (final nn in filteredNoteNodes) {
-        await (_db.update(_db.noteNodes)..where((t) => t.id.equals(nn.id)))
-            .write(const NoteNodesCompanion(isDirty: Value(false)));
-      }
+      await _db.batch((batch) {
+        for (final nn in filteredNoteNodes) {
+          batch.update(
+            _db.noteNodes,
+            const NoteNodesCompanion(isDirty: Value(false)),
+            where: (t) => t.id.equals(nn.id) & t.updatedAt.equals(nn.updatedAt),
+          );
+        }
+      });
       for (final tsk in filteredTasks) {
         await _db.tasksDao.clearDirtyFlag(tsk.id, tsk.updatedAt);
       }
