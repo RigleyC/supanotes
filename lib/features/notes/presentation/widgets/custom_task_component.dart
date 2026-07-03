@@ -208,7 +208,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     if (widget.hideCompleted && _isComplete) {
       _exitController.forward();
     }
+  }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _cachedFirstLineHeight = _computeFirstLineHeight(context);
   }
 

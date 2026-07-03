@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 
@@ -20,19 +22,89 @@ String preprocessClipboardText(String text) {
   return result;
 }
 
-/// Reads the native clipboard, preprocesses bullet characters, writes the
-/// cleaned text back, then triggers super_editor's rich-text paste.
-///
-/// NOTE: This mutates the system clipboard as a side effect. If the user
-/// pastes and immediately switches apps, their clipboard will contain the
-/// preprocessed text rather than the original. This is a pragmatic tradeoff
-/// because super_editor's paste API does not support injecting content
-/// directly without going through the native clipboard.
 Future<void> pasteWithPreprocessing(Editor editor) async {
-  final data = await Clipboard.getData(Clipboard.kTextPlain);
-  if (data?.text != null) {
-    final preprocessed = preprocessClipboardText(data!.text!);
-    await Clipboard.setData(ClipboardData(text: preprocessed));
-  }
-  pasteIntoEditorFromNativeClipboard(editor);
+  await pasteIntoEditorFromNativeClipboard(
+    editor,
+    customInserter: (editor, reader) async {
+      // 1. Try html
+      if (reader.canProvide(Formats.htmlText)) {
+        final html = await reader.readValue(Formats.htmlText);
+        if (html != null) {
+          final preprocessedHtml = preprocessClipboardText(html);
+          editor.pasteHtml(editor, preprocessedHtml);
+          return true;
+        }
+      }
+
+      // 2. Try markdown
+      if (reader.canProvide(Formats.md)) {
+        final completer = Completer<bool>();
+        final progress = reader.getFile(
+          Formats.md,
+          (file) async {
+            final data = await file.readAll();
+            final markdown = utf8.decode(data);
+            if (markdown.isNotEmpty) {
+              final preprocessedMarkdown = preprocessClipboardText(markdown);
+              editor.pasteMarkdown(editor, preprocessedMarkdown);
+              completer.complete(true);
+            } else {
+              completer.complete(false);
+            }
+          },
+          onError: (_) {
+            completer.complete(false);
+          },
+        );
+        if (progress != null) {
+          final success = await completer.future;
+          if (success) return true;
+        }
+      }
+
+      // 3. Try plain text
+      if (reader.canProvide(Formats.plainText)) {
+        final text = await reader.readValue(Formats.plainText);
+        if (text != null) {
+          final preprocessedText = preprocessClipboardText(text);
+          final selection = editor.composer.selection;
+          if (selection != null) {
+            DocumentPosition? pastePosition = selection.extent;
+
+            if (!selection.isCollapsed) {
+              pastePosition = CommonEditorOperations.getDocumentPositionAfterExpandedDeletion(
+                document: editor.document,
+                selection: editor.composer.selection!,
+              );
+
+              if (pastePosition == null) {
+                return false;
+              }
+
+              // Delete the selected content.
+              editor.execute([
+                DeleteContentRequest(documentRange: editor.composer.selection!),
+                ChangeSelectionRequest(
+                  DocumentSelection.collapsed(position: pastePosition),
+                  SelectionChangeType.deleteContent,
+                  SelectionReason.userInteraction,
+                ),
+              ]);
+            }
+
+            // Paste clipboard text.
+            editor.execute([
+              PasteEditorRequest(
+                content: preprocessedText,
+                pastePosition: pastePosition,
+              ),
+            ]);
+            return true;
+          }
+        }
+      }
+
+      return false;
+    },
+  );
 }

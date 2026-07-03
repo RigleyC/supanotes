@@ -33,9 +33,11 @@ class NodeSyncManager {
   void _onDocumentChanged(DocumentChangeLog changeLog) {
     final now = DateTime.now().toUtc();
     var hasTextChange = false;
+    var hasStructuralChange = false;
 
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
+        hasStructuralChange = true;
         final node = _document.getNodeById(change.nodeId);
         if (node == null) continue;
         final companion = _nodeToCompanion(node, change.insertionIndex);
@@ -58,6 +60,7 @@ class NodeSyncManager {
           _db.into(_db.tasks).insertOnConflictUpdate(taskCompanion);
         }
       } else if (change is NodeRemovedEvent) {
+        hasStructuralChange = true;
         (_db.update(
           _db.noteNodes,
         )..where((t) => t.id.equals(change.nodeId))).write(
@@ -68,6 +71,7 @@ class NodeSyncManager {
           TasksCompanion(deletedAt: Value(now), isDirty: const Value(true)),
         );
       } else if (change is NodeMovedEvent) {
+        hasStructuralChange = true;
         (_db.update(
           _db.noteNodes,
         )..where((t) => t.id.equals(change.nodeId))).write(
@@ -89,7 +93,12 @@ class NodeSyncManager {
       }
     }
 
-    if (hasTextChange) {
+    if (hasStructuralChange) {
+      _debounceTimer?.cancel();
+      _debounceTimer = null;
+      _flushNodeChanges();
+      _flushNoteExcerpt();
+    } else if (hasTextChange) {
       _debounceTimer?.cancel();
       _debounceTimer = Timer(const Duration(milliseconds: 500), () {
         _flushNodeChanges();
