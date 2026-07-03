@@ -11,7 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RigleyC/supanotes/internal/sync/ot"
+	prodsync "github.com/RigleyC/supanotes/internal/sync"
+	"github.com/fmpwizard/go-quilljs-delta/delta"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,19 +20,19 @@ import (
 type NoteRoom struct {
 	mu           sync.Mutex
 	Version      int
-	History      []ot.Delta
-	State        ot.Delta
+	History      []delta.Delta
+	State        *delta.Delta
 	clients      map[string]*websocket.Conn // client_id -> connection
 	ProcessedMsg int
 	Cond         *sync.Cond
 }
 
 type WSMessage struct {
-	Type        string   `json:"type"`
-	SenderID    string   `json:"sender_id"`
-	BaseVersion int      `json:"base_version,omitempty"`
-	Version     int      `json:"version,omitempty"`
-	Delta       ot.Delta `json:"delta,omitempty"`
+	Type        string      `json:"type"`
+	SenderID    string      `json:"sender_id"`
+	BaseVersion int         `json:"base_version,omitempty"`
+	Version     int         `json:"version,omitempty"`
+	Delta       delta.Delta `json:"delta,omitempty"`
 }
 
 var upgrader = websocket.Upgrader{
@@ -82,11 +83,13 @@ func startTestWSServer(t *testing.T, room *NoteRoom) *httptest.Server {
 
 				if baseVer < room.Version {
 					for _, histDelta := range room.History[baseVer:] {
-						clientDelta = histDelta.Transform(clientDelta, false)
+						// Safe transform to prevent memory corruption/aliasing
+						clientDelta = *prodsync.SafeTransform(&clientDelta, &histDelta, false)
 					}
 				}
 
-				room.State = room.State.Compose(clientDelta)
+				// Safe compose to prevent memory corruption/aliasing
+				room.State = prodsync.SafeCompose(room.State, &clientDelta)
 				room.History = append(room.History, clientDelta)
 				room.Version++
 				currentVersion := room.Version
@@ -115,8 +118,8 @@ func TestWS_SequencingAndConvergence(t *testing.T) {
 	baseText := "Hello"
 	room := &NoteRoom{
 		Version: 0,
-		History: make([]ot.Delta, 0),
-		State:   ot.New(nil).Insert(baseText, nil),
+		History: make([]delta.Delta, 0),
+		State:   delta.New(nil).Insert(baseText, nil),
 		clients: make(map[string]*websocket.Conn),
 	}
 	room.Cond = sync.NewCond(&room.mu)
@@ -134,11 +137,11 @@ func TestWS_SequencingAndConvergence(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numClients)
 
-	clientStates := make([]ot.Delta, numClients)
+	clientStates := make([]*delta.Delta, numClients)
 	clientVersions := make([]int, numClients)
 	clientMus := make([]sync.Mutex, numClients)
 	clientAckConds := make([]*sync.Cond, numClients)
-	clientOutstanding := make([]ot.Delta, numClients)
+	clientOutstanding := make([]*delta.Delta, numClients)
 	clientConns := make([]*websocket.Conn, numClients)
 
 	defer func() {
@@ -150,10 +153,10 @@ func TestWS_SequencingAndConvergence(t *testing.T) {
 	}()
 
 	for i := 0; i < numClients; i++ {
-		clientStates[i] = ot.New(nil).Insert(baseText, nil)
+		clientStates[i] = delta.New(nil).Insert(baseText, nil)
 		clientVersions[i] = 0
 		clientAckConds[i] = sync.NewCond(&clientMus[i])
-		clientOutstanding[i] = ot.Delta{} // uninitialized / nil representation
+		clientOutstanding[i] = nil
 	}
 
 	for i := 0; i < numClients; i++ {
@@ -186,22 +189,22 @@ func TestWS_SequencingAndConvergence(t *testing.T) {
 						clientMus[clientId].Lock()
 						if msg.SenderID == clientIDStr {
 							// Ack of our own edit
-							clientOutstanding[clientId] = ot.Delta{}
+							clientOutstanding[clientId] = nil
 							clientVersions[clientId] = msg.Version
 							clientAckConds[clientId].Broadcast()
 						} else {
 							// Edit from another client.
-							if !clientOutstanding[clientId].IsNil() {
+							if clientOutstanding[clientId] != nil {
 								// Transform incoming delta against our outstanding delta
 								// The server-side edit has priority (priority = true)
 								serverEdit := msg.Delta
-								serverEditPrime := clientOutstanding[clientId].Transform(serverEdit, true)
-								clientStates[clientId] = clientStates[clientId].Compose(serverEditPrime)
+								serverEditPrime := prodsync.SafeTransform(&serverEdit, clientOutstanding[clientId], true)
+								clientStates[clientId] = prodsync.SafeCompose(clientStates[clientId], serverEditPrime)
 
 								// Update our outstanding delta for future messages (priority = false)
-								clientOutstanding[clientId] = serverEdit.Transform(clientOutstanding[clientId], false)
+								clientOutstanding[clientId] = prodsync.SafeTransform(clientOutstanding[clientId], &serverEdit, false)
 							} else {
-								clientStates[clientId] = clientStates[clientId].Compose(msg.Delta)
+								clientStates[clientId] = prodsync.SafeCompose(clientStates[clientId], &msg.Delta)
 							}
 							clientVersions[clientId] = msg.Version
 						}
@@ -217,23 +220,23 @@ func TestWS_SequencingAndConvergence(t *testing.T) {
 
 				clientMus[clientId].Lock()
 				// Wait for previous edit to be acknowledged
-				for !clientOutstanding[clientId].IsNil() {
+				for clientOutstanding[clientId] != nil {
 					clientAckConds[clientId].Wait()
 				}
 
 				baseVersion := clientVersions[clientId]
 				editString := string(rune('A' + clientId)) + strings.Repeat(string(rune('a'+clientId)), rng.Intn(2))
-				editDelta := ot.New(nil).Retain(rng.Intn(5), nil).Insert(editString, nil)
+				editDelta := delta.New(nil).Retain(rng.Intn(5), nil).Insert(editString, nil)
 
 				// Apply locally first (instant UI feedback)
-				clientStates[clientId] = clientStates[clientId].Compose(editDelta)
+				clientStates[clientId] = prodsync.SafeCompose(clientStates[clientId], editDelta)
 				clientOutstanding[clientId] = editDelta
 
 				msg := WSMessage{
 					Type:        "edit",
 					SenderID:    clientIDStr,
 					BaseVersion: baseVersion,
-					Delta:       editDelta,
+					Delta:       *editDelta,
 				}
 				msgBytes, _ := json.Marshal(msg)
 				_ = c.WriteMessage(websocket.TextMessage, msgBytes)
@@ -250,7 +253,7 @@ func TestWS_SequencingAndConvergence(t *testing.T) {
 	for room.ProcessedMsg < expectedTotalProcessed {
 		room.Cond.Wait()
 	}
-	serverJSON, _ := json.Marshal(room.State.Ops())
+	serverJSON, _ := json.Marshal(room.State.Ops)
 	room.mu.Unlock()
 
 	// Small padding to let client socket listener loops process the final broadcast
@@ -259,7 +262,7 @@ func TestWS_SequencingAndConvergence(t *testing.T) {
 	// Validate convergence
 	for i := 0; i < numClients; i++ {
 		clientMus[i].Lock()
-		clientJSON, _ := json.Marshal(clientStates[i].Ops())
+		clientJSON, _ := json.Marshal(clientStates[i].Ops)
 		clientMus[i].Unlock()
 
 		assert.JSONEq(t, string(serverJSON), string(clientJSON), "Client %d state did not converge with server state", i)
