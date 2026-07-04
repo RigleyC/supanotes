@@ -696,6 +696,14 @@ class NodeSyncManager {
     return tasks;
   }
 
+  void suspendSync() {
+    _document.removeListener(_onDocumentChanged);
+  }
+
+  void resumeSync() {
+    _document.addListener(_onDocumentChanged);
+  }
+
   void dispose() {
     _debounceTimer?.cancel();
     _drainQueue();

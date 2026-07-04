@@ -110,43 +110,83 @@ class NoteEditorController {
     });
   }
 
+  void suspendSync() {
+    _nodeSyncManager?.suspendSync();
+  }
+
+  void resumeSync() {
+    _nodeSyncManager?.resumeSync();
+  }
+
+  void syncTaskStates(Map<String, bool> taskCompletionMap) {
+    final doc = document;
+    final ed = editor;
+    if (doc == null || ed == null) return;
+
+    suspendSync();
+    try {
+      final requests = <EditRequest>[];
+      for (final node in doc) {
+        if (node is TaskNode) {
+          final isDbCompleted = taskCompletionMap[node.id] ?? false;
+          if (node.isComplete != isDbCompleted) {
+            requests.add(ChangeTaskCompletionRequest(
+              nodeId: node.id,
+              isComplete: isDbCompleted,
+            ));
+          }
+        }
+      }
+      if (requests.isNotEmpty) {
+        ed.execute(requests);
+      }
+    } finally {
+      resumeSync();
+    }
+  }
+
   void updateNodesIncrementally(List<NoteNode> incomingNodes) {
     final doc = document;
     final ed = editor;
     if (doc == null || ed == null) return;
 
-    final dirtyIds = _nodeSyncManager?.locallyDirtyNodeIds ?? const {};
+    _nodeSyncManager?.suspendSync();
+    try {
+      final dirtyIds = _nodeSyncManager?.locallyDirtyNodeIds ?? const {};
 
-    final requests = <EditRequest>[];
-    final incomingIds = incomingNodes.map((n) => n.id).toSet();
+      final requests = <EditRequest>[];
+      final incomingIds = incomingNodes.map((n) => n.id).toSet();
 
-    for (final node in doc) {
-      if (!incomingIds.contains(node.id)) {
-        requests.add(DeleteNodeRequest(nodeId: node.id));
-      }
-    }
-
-    for (int i = 0; i < incomingNodes.length; i++) {
-      final incoming = incomingNodes[i];
-      final existingNode = doc.getNodeById(incoming.id);
-
-      if (existingNode == null) {
-        final newNode = NodeSyncManager.createNodeFromSchema(incoming);
-        requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
-      } else {
-        // Skip nodes with pending local changes — the DB data is stale.
-        if (dirtyIds.contains(incoming.id)) continue;
-        final newNode = NodeSyncManager.createNodeFromSchema(incoming);
-        if (_isNodeModified(existingNode, newNode)) {
-          requests.add(
-            ReplaceNodeRequest(existingNodeId: incoming.id, newNode: newNode),
-          );
+      for (final node in doc) {
+        if (!incomingIds.contains(node.id)) {
+          requests.add(DeleteNodeRequest(nodeId: node.id));
         }
       }
-    }
 
-    if (requests.isNotEmpty) {
-      ed.execute(requests);
+      for (int i = 0; i < incomingNodes.length; i++) {
+        final incoming = incomingNodes[i];
+        final existingNode = doc.getNodeById(incoming.id);
+
+        if (existingNode == null) {
+          final newNode = NodeSyncManager.createNodeFromSchema(incoming);
+          requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
+        } else {
+          // Skip nodes with pending local changes — the DB data is stale.
+          if (dirtyIds.contains(incoming.id)) continue;
+          final newNode = NodeSyncManager.createNodeFromSchema(incoming);
+          if (_isNodeModified(existingNode, newNode)) {
+            requests.add(
+              ReplaceNodeRequest(existingNodeId: incoming.id, newNode: newNode),
+            );
+          }
+        }
+      }
+
+      if (requests.isNotEmpty) {
+        ed.execute(requests);
+      }
+    } finally {
+      _nodeSyncManager?.resumeSync();
     }
   }
 

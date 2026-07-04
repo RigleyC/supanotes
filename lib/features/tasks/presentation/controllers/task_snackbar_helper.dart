@@ -9,7 +9,7 @@ class TaskSnackBarHelper {
   }) async {
     final nextDue = await onComplete();
 
-    final title = 'Tarefa concluída!';
+    final title = 'Concluída!';
     final subtitle = nextDue != null
         ? 'Próx. em: ${DateFormat.MMMMd('pt_BR').format(nextDue)}'
         : null;

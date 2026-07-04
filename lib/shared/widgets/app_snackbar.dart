@@ -102,7 +102,7 @@ class AppMessenger {
   }
 }
 
-class _SnackContent extends StatelessWidget {
+class _SnackContent extends StatefulWidget {
   const _SnackContent({
     required this.title,
     this.subtitle,
@@ -115,8 +115,15 @@ class _SnackContent extends StatelessWidget {
   final _SnackType type;
   final SnackBarAction? action;
 
+  @override
+  State<_SnackContent> createState() => _SnackContentState();
+}
+
+class _SnackContentState extends State<_SnackContent> {
+  bool _actionPressed = false;
+
   Color _dotColor(BuildContext context) {
-    return switch (type) {
+    return switch (widget.type) {
       _SnackType.success => Colors.green,
       _SnackType.error => Colors.red,
       _SnackType.info ||
@@ -155,17 +162,17 @@ class _SnackContent extends StatelessWidget {
             TextSpan(
               children: [
                 TextSpan(
-                  text: title,
+                  text: widget.title,
                   style: TextStyle(
                     color: scheme.onSurface,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
-                if (subtitle != null) ...[
+                if (widget.subtitle != null) ...[
                   const TextSpan(text: '  '),
                   TextSpan(
-                    text: subtitle,
+                    text: widget.subtitle!,
                     style: TextStyle(
                       color: scheme.onSurfaceVariant,
                       fontSize: 13,
@@ -178,19 +185,22 @@ class _SnackContent extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (action != null)
+        if (widget.action != null)
           TextButton(
-            onPressed: () {
-              action!.onPressed();
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            },
+            onPressed: _actionPressed
+                ? null
+                : () {
+                    setState(() => _actionPressed = true);
+                    widget.action!.onPressed();
+                    AppMessenger.key.currentState?.hideCurrentSnackBar();
+                  },
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.primary,
               minimumSize: Size.zero,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: Text(action!.label),
+            child: Text(widget.action!.label),
           ),
       ],
     );

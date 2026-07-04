@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
@@ -177,7 +177,7 @@ void main() {
           editor: editor,
           componentBuilders: [
             ...defaultComponentBuilders,
-            CustomTaskComponentBuilder(editor),
+            CustomTaskComponentBuilder(),
           ],
         ),
       ),
@@ -249,7 +249,6 @@ void main() {
           componentBuilders: [
             ...defaultComponentBuilders,
             CustomTaskComponentBuilder(
-              editor,
               taskMetadataById: {
                 'task-1': TaskModel(
                   id: 'task-1',
@@ -265,9 +264,10 @@ void main() {
                   updatedAt: now,
                 ),
               },
-              onTaskComplete: (id) async => capturedCompleteId = id,
+              onTaskComplete: (id) async { capturedCompleteId = id; return null; },
               onTaskReopen: (id) async => capturedReopenId = id,
             ),
+
           ],
         ),
       ),
@@ -278,7 +278,6 @@ void main() {
 
     expect(capturedCompleteId, equals('task-1'));
     expect(capturedReopenId, isNull);
-
     // Drain the pending reset timer
     await tester.pump(const Duration(milliseconds: 400));
   });
@@ -309,8 +308,7 @@ void main() {
           componentBuilders: [
             ...defaultComponentBuilders,
             CustomTaskComponentBuilder(
-              editor,
-              onTaskComplete: (id) async => capturedCompleteId = id,
+              onTaskComplete: (id) async { capturedCompleteId = id; return null; },
               onTaskReopen: (id) async => capturedReopenId = id,
             ),
           ],
@@ -451,7 +449,6 @@ void main() {
         composer: composer,
       );
       final builder = CustomTaskComponentBuilder(
-        editor,
         hideCompleted: true,
       );
 
@@ -531,6 +528,7 @@ void main() {
       composer: composer,
     );
 
+    String? capturedCompleteId;
     final now = DateTime.now();
 
     await tester.pumpWidget(
@@ -540,7 +538,6 @@ void main() {
           componentBuilders: [
             ...defaultComponentBuilders,
             CustomTaskComponentBuilder(
-              editor,
               taskMetadataById: {
                 'task-1': TaskModel(
                   id: 'task-1',
@@ -556,6 +553,11 @@ void main() {
                   updatedAt: now,
                 ),
               },
+              onTaskComplete: (id) async {
+                capturedCompleteId = id;
+                return now.add(const Duration(days: 1));
+              },
+              onTaskReopen: (id) async {},
             ),
           ],
         ),
@@ -566,20 +568,13 @@ void main() {
     expect(taskNode().isComplete, isFalse);
 
     await tester.tap(find.byType(AnimatedTaskCheckbox));
-    // First pump: process the tap event, setComplete runs synchronously
-    // up to the await, _editor.execute updates the document.
     await tester.pump();
 
-    expect(taskNode().isComplete, isTrue);
-
-    // Second pump: process the microtask that continues setComplete,
-    // which creates the Future.delayed(400ms) timer.
-    await tester.pump();
-
-    // Third pump: advance clock by 400ms so the timer fires and
-    // the document is reset.
-    await tester.pump(const Duration(milliseconds: 400));
-
+    // New behavior: no optimistic editor commands, document unchanged.
     expect(taskNode().isComplete, isFalse);
+    expect(capturedCompleteId, equals('task-1'));
+
+    // Drain the 1s recurring delay timer so no pending timers remain.
+    await tester.pump(const Duration(seconds: 1));
   });
 }

@@ -14,28 +14,25 @@ const Duration _exitAnimationDelay = Duration(milliseconds: 300);
 const Duration _exitAnimationDuration = Duration(milliseconds: 350);
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
-  CustomTaskComponentBuilder(
-    this._editor, {
+  CustomTaskComponentBuilder({
     this.composer,
     this.taskMetadataById = const {},
     this.hideCompleted = false,
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
-    this.onError,
     this.requestRebuild,
   });
 
-  final Editor _editor;
   final MutableDocumentComposer? composer;
   Map<String, TaskModel> taskMetadataById;
   bool hideCompleted;
   ValueChanged<String>? onTaskLongPress;
-  final Future<void> Function(String taskId)? onTaskComplete;
+  final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
-  final void Function(Object error)? onError;
   final VoidCallback? requestRebuild;
   final Set<String> _animatingNodeIds = {};
+  final Set<String> _completingTaskIds = {};
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -51,42 +48,36 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt],
       padding: EdgeInsets.zero,
       indent: node.indent,
-      isComplete: node.isComplete,
+      isComplete: _completingTaskIds.contains(node.id) || node.isComplete,
       setComplete: (bool isComplete) async {
-        if (isComplete && hideCompleted) {
-          _animatingNodeIds.add(node.id);
-          FocusManager.instance.primaryFocus?.unfocus();
-          composer?.clearSelection();
-        }
-        _editor.execute([
-          ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),
-        ]);
+        if (isComplete) {
+          final isRecurring = taskMetadataById[node.id]?.recurrence != null;
 
-        try {
-          if (isComplete) {
-            await onTaskComplete?.call(node.id);
-            final taskMeta = taskMetadataById[node.id];
-            if (taskMeta?.recurrence != null) {
-              Future.delayed(const Duration(milliseconds: 400), () {
-                final exists = document.getNodeById(node.id) != null;
-                if (exists) {
-                  _editor.execute([
-                    ChangeTaskCompletionRequest(nodeId: node.id, isComplete: false),
-                  ]);
-                }
-              });
-            }
-          } else {
-            await onTaskReopen?.call(node.id);
+          if (isRecurring) {
+            _completingTaskIds.add(node.id);
+            requestRebuild?.call();
           }
-        } catch (e) {
-          _editor.execute([
-            ChangeTaskCompletionRequest(
-              nodeId: node.id,
-              isComplete: !isComplete,
-            ),
-          ]);
-          onError?.call(e);
+
+          if (hideCompleted) {
+            _animatingNodeIds.add(node.id);
+            FocusManager.instance.primaryFocus?.unfocus();
+            composer?.clearSelection();
+          }
+
+          try {
+            final nextDue = await onTaskComplete?.call(node.id);
+
+            if (nextDue != null && isRecurring) {
+              await Future.delayed(const Duration(seconds: 1));
+            }
+          } finally {
+            if (isRecurring) {
+              _completingTaskIds.remove(node.id);
+              requestRebuild?.call();
+            }
+          }
+        } else {
+          await onTaskReopen?.call(node.id);
         }
       },
       text: node.text,
@@ -192,13 +183,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   late AnimationController _exitController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _sizeAnimation;
-  late bool _isComplete;
   double _cachedFirstLineHeight = 24.0;
 
   @override
   void initState() {
     super.initState();
-    _isComplete = widget.viewModel.isComplete;
     _exitController = AnimationController(
       vsync: this,
       duration: _exitAnimationDuration,
@@ -216,7 +205,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       }
     });
 
-    if (widget.hideCompleted && _isComplete) {
+    if (widget.hideCompleted && widget.viewModel.isComplete) {
       _exitController.forward();
     }
   }
@@ -243,10 +232,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   @override
   void didUpdateWidget(CustomTaskComponent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
-      _isComplete = widget.viewModel.isComplete;
-    }
-
     if (widget.hideCompleted) {
       if (widget.viewModel.isComplete && !oldWidget.viewModel.isComplete) {
         Future.delayed(_exitAnimationDelay, () {
@@ -279,12 +264,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
             ),
           ),
           _TaskCheckboxHitTarget(
-            value: _isComplete,
+            value: widget.viewModel.isComplete,
             activeColor: taskColor,
             inactiveColor: colorScheme.outline,
             checkmarkColor: Colors.white,
             onChanged: (val) {
-              setState(() => _isComplete = val);
               widget.viewModel.setComplete?.call(val);
             },
             onLongPress: widget.onLongPress,

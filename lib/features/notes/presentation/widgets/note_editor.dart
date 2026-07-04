@@ -24,7 +24,6 @@ import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor
 import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
@@ -78,7 +77,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _notifyContentChanged();
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
-      _controller!.editor!,
       composer: _controller!.composer,
       taskMetadataById: widget.taskMetadata,
       hideCompleted: widget.hideCompleted,
@@ -90,9 +88,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             ),
       onTaskComplete: widget.delegate.onTaskComplete,
       onTaskReopen: widget.delegate.onTaskReopen,
-      onError: (err) {
-        AppMessenger.showError('Erro ao alterar tarefa');
-      },
       requestRebuild: () {
         if (mounted) setState(() {});
       },
@@ -148,30 +143,14 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             () async {},
           );
 
-    if (widget.hideCompleted != oldWidget.hideCompleted ||
-        widget.taskMetadata != oldWidget.taskMetadata) {
+    if (widget.hideCompleted != oldWidget.hideCompleted) {
       setState(() {});
+    }
 
-      if (widget.taskMetadata != oldWidget.taskMetadata &&
-          _controller?.editor != null &&
-          _controller?.document != null) {
-        final doc = _controller!.document!;
-        final requests = <EditRequest>[];
-        for (final node in doc) {
-          if (node is TaskNode) {
-            final isDbCompleted = widget.taskMetadata[node.id]?.isCompleted ?? false;
-            if (node.isComplete != isDbCompleted) {
-              requests.add(ChangeTaskCompletionRequest(
-                nodeId: node.id,
-                isComplete: isDbCompleted,
-              ));
-            }
-          }
-        }
-        if (requests.isNotEmpty) {
-          _controller!.editor!.execute(requests);
-        }
-      }
+    if (widget.taskMetadata != oldWidget.taskMetadata) {
+      _controller?.syncTaskStates(
+        widget.taskMetadata.map((k, v) => MapEntry(k, v.isCompleted)),
+      );
     }
 
     if (!listEquals(widget.nodes, oldWidget.nodes)) {

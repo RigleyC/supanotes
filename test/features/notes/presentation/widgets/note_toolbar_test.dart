@@ -59,7 +59,7 @@ Widget buildConversionHarness({
               editor: editor,
               componentBuilders: [
                 ...defaultComponentBuilders,
-                CustomTaskComponentBuilder(editor),
+                CustomTaskComponentBuilder(),
               ],
             ),
           ),
@@ -151,7 +151,7 @@ void main() {
                     editor: editor,
                     componentBuilders: [
                       ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(editor),
+                      CustomTaskComponentBuilder(),
                     ],
                   ),
                 ),
@@ -202,7 +202,7 @@ void main() {
                     editor: editor,
                     componentBuilders: [
                       ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(editor),
+                      CustomTaskComponentBuilder(),
                     ],
                   ),
                 ),
@@ -265,7 +265,7 @@ void main() {
                     editor: editor,
                     componentBuilders: [
                       ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(editor),
+                      CustomTaskComponentBuilder(),
                     ],
                   ),
                 ),
@@ -327,7 +327,7 @@ void main() {
                     editor: editor,
                     componentBuilders: [
                       ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(editor),
+                      CustomTaskComponentBuilder(),
                     ],
                   ),
                 ),
@@ -381,7 +381,7 @@ void main() {
                     editor: editor,
                     componentBuilders: [
                       ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(editor),
+                      CustomTaskComponentBuilder(),
                     ],
                   ),
                 ),
@@ -435,7 +435,7 @@ void main() {
                     editor: editor,
                     componentBuilders: [
                       ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(editor),
+                      CustomTaskComponentBuilder(),
                     ],
                   ),
                 ),
@@ -541,7 +541,7 @@ void main() {
                     editor: editor,
                     componentBuilders: [
                       ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(editor),
+                      CustomTaskComponentBuilder(),
                     ],
                   ),
                 ),
@@ -595,7 +595,7 @@ void main() {
                     editor: editor,
                     componentBuilders: [
                       ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(editor),
+                      CustomTaskComponentBuilder(),
                     ],
                   ),
                 ),
