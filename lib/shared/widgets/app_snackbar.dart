@@ -91,8 +91,8 @@ class AppMessenger {
             title: title,
             subtitle: subtitle,
             type: type,
-            action: action,
           ),
+          action: action,
           backgroundColor: bgColor,
           behavior: SnackBarBehavior.floating,
           shape: const StadiumBorder(),
@@ -102,28 +102,19 @@ class AppMessenger {
   }
 }
 
-class _SnackContent extends StatefulWidget {
+class _SnackContent extends StatelessWidget {
   const _SnackContent({
     required this.title,
     this.subtitle,
     required this.type,
-    this.action,
   });
 
   final String title;
   final String? subtitle;
   final _SnackType type;
-  final SnackBarAction? action;
-
-  @override
-  State<_SnackContent> createState() => _SnackContentState();
-}
-
-class _SnackContentState extends State<_SnackContent> {
-  bool _actionPressed = false;
 
   Color _dotColor(BuildContext context) {
-    return switch (widget.type) {
+    return switch (type) {
       _SnackType.success => Colors.green,
       _SnackType.error => Colors.red,
       _SnackType.info ||
@@ -162,17 +153,17 @@ class _SnackContentState extends State<_SnackContent> {
             TextSpan(
               children: [
                 TextSpan(
-                  text: widget.title,
+                  text: title,
                   style: TextStyle(
                     color: scheme.onSurface,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
-                if (widget.subtitle != null) ...[
+                if (subtitle != null) ...[
                   const TextSpan(text: '  '),
                   TextSpan(
-                    text: widget.subtitle!,
+                    text: subtitle,
                     style: TextStyle(
                       color: scheme.onSurfaceVariant,
                       fontSize: 13,
@@ -185,23 +176,6 @@ class _SnackContentState extends State<_SnackContent> {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (widget.action != null)
-          TextButton(
-            onPressed: _actionPressed
-                ? null
-                : () {
-                    setState(() => _actionPressed = true);
-                    widget.action!.onPressed();
-                    AppMessenger.key.currentState?.hideCurrentSnackBar();
-                  },
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.primary,
-              minimumSize: Size.zero,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(widget.action!.label),
-          ),
       ],
     );
   }
