@@ -27,6 +27,7 @@ type inMemoryDB struct {
 	notes      map[pgtype.UUID]sqlcgen.Note
 	noteNodes  map[pgtype.UUID]sqlcgen.NoteNode
 	noteShares map[pgtype.UUID][]sqlcgen.NoteShare
+	tasks      map[pgtype.UUID]sqlcgen.Task // Add tasks map
 }
 
 type testValidator struct {
@@ -107,11 +108,50 @@ func (m *mockCollabRepository) GetInboxNote(ctx context.Context, userID pgtype.U
 }
 
 func (m *mockCollabRepository) GetSyncTasks(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Task, error) {
-	return nil, nil
+	accessibleNotes := make(map[pgtype.UUID]bool)
+	for _, n := range m.db.notes {
+		isOwner := n.UserID == userID
+		isShared := false
+		if !isOwner {
+			sharesList := m.db.noteShares[n.ID]
+			for _, s := range sharesList {
+				if s.UserID == userID {
+					isShared = true
+					break
+				}
+			}
+		}
+		if isOwner || isShared {
+			accessibleNotes[n.ID] = true
+		}
+	}
+
+	var tasks []sqlcgen.Task
+	for _, t := range m.db.tasks {
+		if accessibleNotes[t.NoteID] {
+			tasks = append(tasks, t)
+		}
+	}
+	return tasks, nil
 }
 
 func (m *mockCollabRepository) UpsertTask(ctx context.Context, arg sqlcgen.UpsertTaskParams) (sqlcgen.Task, error) {
-	return sqlcgen.Task{}, nil
+
+	t := sqlcgen.Task{
+		ID:         arg.ID,
+		UserID:     arg.UserID,
+		NoteID:     arg.NoteID,
+		Title:      arg.Title,
+		Status:     arg.Status,
+		Position:   arg.Position,
+		Recurrence: arg.Recurrence,
+		DueDate:    arg.DueDate,
+		CreatedAt:  arg.CreatedAt,
+		UpdatedAt:  pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		DeletedAt:  arg.DeletedAt,
+	}
+	m.db.tasks[arg.ID] = t
+	return t, nil
 }
 
 func (m *mockCollabRepository) GetSyncContexts(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Context, error) {
@@ -313,6 +353,7 @@ func TestNoteSharingAndCollaborationIntegration(t *testing.T) {
 		notes:      make(map[pgtype.UUID]sqlcgen.Note),
 		noteNodes:  make(map[pgtype.UUID]sqlcgen.NoteNode),
 		noteShares: make(map[pgtype.UUID][]sqlcgen.NoteShare),
+		tasks:      make(map[pgtype.UUID]sqlcgen.Task),
 	}
 
 	repo := &mockCollabRepository{db: db}
@@ -450,4 +491,58 @@ func TestNoteSharingAndCollaborationIntegration(t *testing.T) {
 	assert.NotEmpty(t, pullPayloadResultA.NoteNodes, "User A should have received note nodes on sync pull")
 	assert.Equal(t, nodeID, pullPayloadResultA.NoteNodes[0].ID)
 	assert.Equal(t, `{"text":"Hello from User B"}`, string(pullPayloadResultA.NoteNodes[0].Data), "User A should see User B's edits")
+
+	// User A creates a task on note-1
+	taskID := pgtype.UUID{Bytes: [16]byte{5}, Valid: true}
+	pushPayloadTask := sync.SyncPayload{
+		Tasks: []sync.SyncTask{
+			{
+				ID:     taskID,
+				UserID: userA.ID,
+				NoteID: noteID,
+				Title:  "Buy milk",
+				Status: "open",
+			},
+		},
+	}
+	pushBodyTask, _ := json.Marshal(pushPayloadTask)
+	reqPushTask := httptest.NewRequest(http.MethodPost, "/api/v1/sync/push", bytes.NewReader(pushBodyTask))
+	reqPushTask.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	recPushTask := httptest.NewRecorder()
+	e.ServeHTTP(recPushTask, reqPushTask)
+	assert.Equal(t, http.StatusOK, recPushTask.Code)
+
+	// User B pulls and receives the task
+	currentMockUserID = userB.ID
+	reqPullBTask := httptest.NewRequest(http.MethodPost, "/api/v1/sync/pull", bytes.NewReader(pullBody))
+	reqPullBTask.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	recPullBTask := httptest.NewRecorder()
+	e.ServeHTTP(recPullBTask, reqPullBTask)
+	assert.Equal(t, http.StatusOK, recPullBTask.Code)
+
+	var pullPayloadResultBTask sync.SyncPayload
+	json.Unmarshal(recPullBTask.Body.Bytes(), &pullPayloadResultBTask)
+	assert.NotEmpty(t, pullPayloadResultBTask.Tasks)
+
+	// User B (collaborator) edits User A's task (marks as done)
+	// The client sends the task with User B's user ID.
+	pushPayloadBTask := sync.SyncPayload{
+		Tasks: []sync.SyncTask{
+			{
+				ID:     taskID,
+				UserID: userB.ID, // Collaborator's ID
+				NoteID: noteID,
+				Title:  "Buy milk",
+				Status: "done",
+			},
+		},
+	}
+	pushBodyBTask, _ := json.Marshal(pushPayloadBTask)
+	reqPushBTask := httptest.NewRequest(http.MethodPost, "/api/v1/sync/push", bytes.NewReader(pushBodyBTask))
+	reqPushBTask.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	recPushBTask := httptest.NewRecorder()
+	e.ServeHTTP(recPushBTask, reqPushBTask)
+	
+	// We assert that the status code is 200 OK. Under the bug, this returns 409 Conflict.
+	assert.Equal(t, http.StatusOK, recPushBTask.Code)
 }

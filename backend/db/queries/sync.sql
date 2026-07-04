@@ -65,7 +65,6 @@ SET note_id = EXCLUDED.note_id,
     due_date = EXCLUDED.due_date,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
-WHERE tasks.user_id = EXCLUDED.user_id
 RETURNING *;
 
 -- name: GetSyncContexts :many

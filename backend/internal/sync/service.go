@@ -278,6 +278,39 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 
 		status := sanitizeTaskStatus(t.Status)
 
+		// Authorize task push by checking parent note edit permission
+		noteID := t.NoteID
+		canEdit, exists := editableNotes[noteID]
+		if !exists {
+			ownerID, err := r.GetNoteOwnerID(ctx, noteID)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+						NoteID: noteID,
+						UserID: userID,
+					})
+					canEdit = shareErr == nil && share.Permission == "edit"
+				} else {
+					return err
+				}
+			} else {
+				canEdit = ownerID == userID
+				if !canEdit {
+					share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+						NoteID: noteID,
+						UserID: userID,
+					})
+					canEdit = shareErr == nil && share.Permission == "edit"
+				}
+			}
+			editableNotes[noteID] = canEdit
+		}
+
+		if !canEdit {
+			log.Error().Interface("task_id", t.ID).Interface("note_id", noteID).Interface("user_id", userID).Msg("sync push conflict: user unauthorized to write task")
+			return ErrSyncConflict
+		}
+
 		upsertUserID := userID
 		if t.UserID != userID {
 			upsertUserID = t.UserID
