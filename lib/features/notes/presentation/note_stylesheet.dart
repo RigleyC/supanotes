@@ -109,7 +109,7 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
           Styles.padding:
               hideCompleted && docNode is TaskNode && docNode.isComplete
               ? const CascadingPadding.all(0)
-              : const CascadingPadding.only(top: 8),
+              : const CascadingPadding.only(top: 14),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: 18,
@@ -123,7 +123,7 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
           Styles.padding:
               hideCompleted && docNode is TaskNode && docNode.isComplete
               ? const CascadingPadding.all(0)
-              : const CascadingPadding.only(bottom: 12),
+              : const CascadingPadding.only(bottom: 14),
         },
       ),
     ],

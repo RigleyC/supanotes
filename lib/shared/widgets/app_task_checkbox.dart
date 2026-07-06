@@ -25,6 +25,7 @@ class AppTaskCheckbox extends StatefulWidget {
 class _AppTaskCheckboxState extends State<AppTaskCheckbox>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  late final Animation<double> _scaleAnim;
   late final Animation<double> _checkAnim;
 
   @override
@@ -33,6 +34,10 @@ class _AppTaskCheckboxState extends State<AppTaskCheckbox>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
+    );
+    _scaleAnim = CurvedAnimation(
+      parent: _controller,
+      curve: const ElasticOutCurve(0.8),
     );
     _checkAnim = CurvedAnimation(
       parent: _controller,
@@ -74,25 +79,29 @@ class _AppTaskCheckboxState extends State<AppTaskCheckbox>
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
+            final scale = 1.0 - (0.15 * (1.0 - _scaleAnim.value));
             final t = _controller.value;
             final fill = Color.lerp(Colors.transparent, accent, t)!;
             final border = Color.lerp(inactive, accent, t)!;
-            return Container(
-              width: widget.size,
-              height: widget.size,
-              decoration: BoxDecoration(
-                color: fill,
-                shape: widget.shape == AppTaskCheckboxShape.circle
-                    ? BoxShape.circle
-                    : BoxShape.rectangle,
-                borderRadius: widget.shape == AppTaskCheckboxShape.rounded
-                    ? BorderRadius.circular(8)
-                    : null,
-                border: Border.all(color: border, width: 2),
-              ),
-              child: _CheckmarkPainter(
-                progress: _checkAnim.value,
-                color: Colors.white,
+            return Transform.scale(
+              scale: scale,
+              child: Container(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  color: fill,
+                  shape: widget.shape == AppTaskCheckboxShape.circle
+                      ? BoxShape.circle
+                      : BoxShape.rectangle,
+                  borderRadius: widget.shape == AppTaskCheckboxShape.rounded
+                      ? BorderRadius.circular(8)
+                      : null,
+                  border: Border.all(color: border, width: 2),
+                ),
+                child: _CheckmarkPainter(
+                  progress: _checkAnim.value,
+                  color: Colors.white,
+                ),
               ),
             );
           },
