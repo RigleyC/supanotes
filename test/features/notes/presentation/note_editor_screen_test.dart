@@ -18,7 +18,7 @@ import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
-import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
+import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 class _FakeNotesRepository implements INotesRepository {
@@ -273,7 +273,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('tarefa concluida'), findsNothing);
-    expect(find.byType(AnimatedTaskCheckbox), findsNothing);
+    expect(find.byType(AppTaskCheckbox), findsNothing);
     expect(find.byType(Placeholder), findsNothing);
     expect(
       find.byWidgetPredicate(
@@ -344,12 +344,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(AnimatedTaskCheckbox), findsOneWidget);
+    expect(find.byType(AppTaskCheckbox), findsOneWidget);
 
     await tester.tap(find.text('toggle hide'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AnimatedTaskCheckbox), findsNothing);
+    expect(find.byType(AppTaskCheckbox), findsNothing);
     expect(find.byType(Placeholder), findsNothing);
     expect(
       find.byWidgetPredicate(
@@ -500,7 +500,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final checkbox = find.byType(AnimatedTaskCheckbox);
+    final checkbox = find.byType(AppTaskCheckbox);
     expect(checkbox, findsOneWidget);
     await tester.tap(checkbox);
     await tester.pumpAndSettle();
@@ -569,7 +569,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final checkbox = find.byType(AnimatedTaskCheckbox);
+        final checkbox = find.byType(AppTaskCheckbox);
         expect(checkbox, findsOneWidget);
         await tester.tap(checkbox);
         await tester.pumpAndSettle();

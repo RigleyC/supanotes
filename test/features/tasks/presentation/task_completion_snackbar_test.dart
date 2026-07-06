@@ -15,7 +15,7 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_de
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
+import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -97,10 +97,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify task checkbox is rendered
-    expect(find.byType(AnimatedTaskCheckbox), findsOneWidget);
+    expect(find.byType(AppTaskCheckbox), findsOneWidget);
 
     // Click to complete the task
-    final checkbox = find.byType(AnimatedTaskCheckbox).first;
+    final checkbox = find.byType(AppTaskCheckbox).first;
     
     final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await gesture.addPointer(location: tester.getCenter(checkbox));

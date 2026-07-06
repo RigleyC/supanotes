@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
+import 'package:supanotes/features/notes/presentation/widgets/task_text_style_resolver.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
-import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
+import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
-const double _taskCheckboxSize = 22;
-const double _taskCheckboxPadding = 9;
-const double _taskCheckboxGap = 9;
-
-const Duration _exitAnimationDelay = Duration(milliseconds: 300);
-const Duration _exitAnimationDuration = Duration(milliseconds: 350);
+const double _taskCheckboxGap = 9.0;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
@@ -66,7 +63,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
           try {
             final nextDue = await onTaskComplete?.call(node.id);
-
             if (nextDue != null && isRecurring) {
               await Future.delayed(const Duration(seconds: 1));
             }
@@ -176,51 +172,8 @@ class CustomTaskComponent extends StatefulWidget {
 class _CustomTaskComponentState extends State<CustomTaskComponent>
     with
         ProxyDocumentComponent<CustomTaskComponent>,
-        ProxyTextComposable,
-        TickerProviderStateMixin {
+        ProxyTextComposable {
   final _textKey = GlobalKey();
-
-  late AnimationController _exitController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _sizeAnimation;
-  double _cachedFirstLineHeight = 24.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _exitController = AnimationController(
-      vsync: this,
-      duration: _exitAnimationDuration,
-    );
-    _fadeAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(parent: _exitController, curve: Curves.easeOut));
-    _sizeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _exitController, curve: Curves.easeInOutCubic),
-    );
-    _exitController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        widget.onAnimationComplete?.call();
-      }
-    });
-
-    if (widget.hideCompleted && widget.viewModel.isComplete) {
-      _exitController.forward();
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _cachedFirstLineHeight = _computeFirstLineHeight(context);
-  }
-
-  @override
-  void dispose() {
-    _exitController.dispose();
-    super.dispose();
-  }
 
   @override
   GlobalKey<State<StatefulWidget>> get childDocumentComponentKey => _textKey;
@@ -230,23 +183,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       childDocumentComponentKey.currentState as TextComposable;
 
   @override
-  void didUpdateWidget(CustomTaskComponent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.hideCompleted) {
-      if (widget.viewModel.isComplete && !oldWidget.viewModel.isComplete) {
-        Future.delayed(_exitAnimationDelay, () {
-          if (mounted && widget.viewModel.isComplete) {
-            _exitController.forward();
-          }
-        });
-      } else if (!widget.viewModel.isComplete &&
-          oldWidget.viewModel.isComplete) {
-        _exitController.reverse();
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final semantics = Theme.of(context).extension<AppSemanticColors>();
@@ -254,141 +190,75 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
     final content = Directionality(
       textDirection: widget.viewModel.textDirection,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: defaultTaskIndentCalculator(
-              widget.viewModel.textStyleBuilder({}),
-              widget.viewModel.indent,
-            ),
-          ),
-          _TaskCheckboxHitTarget(
-            value: widget.viewModel.isComplete,
-            activeColor: taskColor,
-            inactiveColor: colorScheme.outline,
-            checkmarkColor: Colors.white,
-            onChanged: (val) {
-              widget.viewModel.setComplete?.call(val);
-            },
-            onLongPress: widget.onLongPress,
-            firstLineHeight: _cachedFirstLineHeight,
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextComponent(
-                  key: _textKey,
-                  text: widget.viewModel.text,
-                  textDirection: widget.viewModel.textDirection,
-                  textAlign: widget.viewModel.textAlignment,
-                  maxLines: widget.viewModel.maxLines,
-                  overflow: widget.viewModel.overflow,
-                  textStyleBuilder: (attributions) =>
-                      _computeStyles(attributions, context),
-                  inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
-                  textSelection: widget.viewModel.selection,
-                  selectionColor: widget.viewModel.selectionColor,
-                  highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                  underlines: widget.viewModel.createUnderlines(),
-                ),
-                if (widget.taskMetadata?.dueDate != null ||
-                    widget.taskMetadata?.recurrence != null) ...[
-                  const SizedBox(height: 4),
-                  TaskMetadataBadges(
-                    dueDate: widget.taskMetadata?.dueDate,
-                    recurrence: widget.taskMetadata?.recurrence,
-                    isCompleted: widget.viewModel.isComplete,
-                  ),
-                  const SizedBox(height: 4),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return SizeTransition(
-      sizeFactor: _sizeAnimation,
-      alignment: Alignment.topCenter,
-      child: FadeTransition(opacity: _fadeAnimation, child: content),
-    );
-  }
-
-  TextStyle _computeStyles(
-    Set<Attribution> attributions,
-    BuildContext context,
-  ) {
-    final style = widget.viewModel.textStyleBuilder(attributions);
-    final baseColor = style.color ?? Theme.of(context).colorScheme.onSurface;
-    final muted = baseColor.withValues(
-      alpha: widget.viewModel.isComplete ? 0.5 : 1.0,
-    );
-    return widget.viewModel.isComplete
-        ? style.copyWith(decoration: TextDecoration.lineThrough, color: muted)
-        : style.copyWith(color: baseColor);
-  }
-
-  double _computeFirstLineHeight(BuildContext context) {
-    final painter = TextPainter(
-      text: TextSpan(text: ' ', style: _computeStyles({}, context)),
-      textDirection: widget.viewModel.textDirection,
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout();
-    final height = painter.preferredLineHeight;
-    painter.dispose();
-    return height;
-  }
-}
-
-class _TaskCheckboxHitTarget extends StatelessWidget {
-  const _TaskCheckboxHitTarget({
-    required this.value,
-    required this.activeColor,
-    required this.inactiveColor,
-    required this.checkmarkColor,
-    required this.onChanged,
-    required this.onLongPress,
-    required this.firstLineHeight,
-  });
-
-  final bool value;
-  final Color activeColor;
-  final Color inactiveColor;
-  final Color checkmarkColor;
-  final ValueChanged<bool>? onChanged;
-  final VoidCallback? onLongPress;
-  final double firstLineHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: onChanged == null ? null : () => onChanged!(!value),
-      onLongPress: onLongPress,
-      child: SizedBox(
-        width: _taskCheckboxPadding + _taskCheckboxSize + _taskCheckboxGap,
-        height: (_taskCheckboxPadding * 2) + _taskCheckboxSize,
-        child: Stack(
-          clipBehavior: Clip.none,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: widget.viewModel.setComplete == null
+            ? null
+            : () => widget.viewModel.setComplete!(!widget.viewModel.isComplete),
+        onLongPress: widget.onLongPress,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Positioned(
-              left: _taskCheckboxPadding,
-              top: (firstLineHeight - _taskCheckboxSize) / 2,
-              child: AnimatedTaskCheckbox(
-                size: _taskCheckboxSize,
-                value: value,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-                checkmarkColor: checkmarkColor,
+            SizedBox(
+              width: defaultTaskIndentCalculator(
+                widget.viewModel.textStyleBuilder({}),
+                widget.viewModel.indent,
+              ),
+            ),
+            AppTaskCheckbox(
+              value: widget.viewModel.isComplete,
+              accentColor: taskColor,
+              inactiveColor: colorScheme.outline,
+              shape: AppTaskCheckboxShape.rounded,
+            ),
+            const SizedBox(width: _taskCheckboxGap),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextComponent(
+                    key: _textKey,
+                    text: widget.viewModel.text,
+                    textDirection: widget.viewModel.textDirection,
+                    textAlign: widget.viewModel.textAlignment,
+                    maxLines: widget.viewModel.maxLines,
+                    overflow: widget.viewModel.overflow,
+                    textStyleBuilder: (attributions) =>
+                        resolveTaskTextStyle(
+                      widget.viewModel.textStyleBuilder(attributions),
+                      Theme.of(context).colorScheme.onSurface,
+                      widget.viewModel.isComplete,
+                    ),
+                    inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
+                    textSelection: widget.viewModel.selection,
+                    selectionColor: widget.viewModel.selectionColor,
+                    highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                    underlines: widget.viewModel.createUnderlines(),
+                  ),
+                  if (widget.taskMetadata?.dueDate != null ||
+                      widget.taskMetadata?.recurrence != null) ...[
+                    const SizedBox(height: 4),
+                    TaskMetadataBadges(
+                      dueDate: widget.taskMetadata?.dueDate,
+                      recurrence: widget.taskMetadata?.recurrence,
+                      isCompleted: widget.viewModel.isComplete,
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+
+    return TaskExitAnimator(
+      hideCompleted: widget.hideCompleted,
+      isComplete: widget.viewModel.isComplete,
+      onAnimationComplete: widget.onAnimationComplete,
+      child: content,
     );
   }
 }

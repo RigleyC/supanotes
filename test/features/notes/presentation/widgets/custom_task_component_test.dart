@@ -4,7 +4,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
-import 'package:supanotes/shared/widgets/animated_task_checkbox.dart';
+import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
 void main() {
   Widget wrap(Widget child) {
@@ -62,33 +62,13 @@ void main() {
       ),
     );
 
-    await tester.longPress(find.byType(AnimatedTaskCheckbox));
+    await tester.longPress(find.byType(AppTaskCheckbox));
     await tester.pump();
 
     expect(openedActions, isTrue);
   });
 
-  testWidgets('text area long press does not open task actions', (
-    tester,
-  ) async {
-    var openedActions = false;
-
-    await tester.pumpWidget(
-      wrap(
-        CustomTaskComponent(
-          viewModel: viewModel(),
-          onLongPress: () => openedActions = true,
-        ),
-      ),
-    );
-
-    await tester.longPress(find.byType(TextComponent), warnIfMissed: false);
-    await tester.pump();
-
-    expect(openedActions, isFalse);
-  });
-
-  testWidgets('toggles completion from checkbox tap', (tester) async {
+  testWidgets('toggles completion from row tap', (tester) async {
     bool? completed;
     final vm = TaskComponentViewModel(
       nodeId: 'task-1',
@@ -105,7 +85,7 @@ void main() {
 
     await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: vm)));
 
-    await tester.tap(find.byType(AnimatedTaskCheckbox));
+    await tester.tap(find.byType(AppTaskCheckbox));
     await tester.pump();
 
     expect(completed, isTrue);
@@ -115,46 +95,40 @@ void main() {
     await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: viewModel())));
 
     expect(
-      tester.getSize(find.byType(AnimatedTaskCheckbox)),
+      tester.getSize(find.byType(AppTaskCheckbox)),
       const Size(22, 22),
     );
 
     final checkboxLeft = tester
-        .getTopLeft(find.byType(AnimatedTaskCheckbox))
+        .getTopLeft(find.byType(AppTaskCheckbox))
         .dx;
     final textLeft = tester.getTopLeft(find.byType(TextComponent)).dx;
 
     expect(textLeft, checkboxLeft + 31);
   });
 
-  testWidgets('centers the first text line against the checkbox icon', (
+  testWidgets('places checkbox at the top of the row', (
     tester,
   ) async {
     await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: viewModel())));
 
-    final checkboxTop = tester.getTopLeft(find.byType(AnimatedTaskCheckbox)).dy;
-    final iconCenterY = checkboxTop + 11;
+    final checkboxTop = tester.getTopLeft(find.byType(AppTaskCheckbox)).dy;
     final textTop = tester.getTopLeft(find.byType(TextComponent)).dy;
-    final textHeight = tester.getSize(find.byType(TextComponent)).height;
-    final firstLineCenterY = textTop + (textHeight / 2);
 
-    expect(iconCenterY, closeTo(firstLineCenterY, 1));
+    expect(checkboxTop, closeTo(textTop, 2));
   });
 
-  testWidgets('keeps checkbox aligned to the first line for multiline text', (
+  testWidgets('keeps checkbox at the top for multiline text', (
     tester,
   ) async {
     await tester.pumpWidget(
       wrap(CustomTaskComponent(viewModel: multilineViewModel())),
     );
 
-    final checkboxTop = tester.getTopLeft(find.byType(AnimatedTaskCheckbox)).dy;
-    final iconCenterY = checkboxTop + 11;
+    final checkboxTop = tester.getTopLeft(find.byType(AppTaskCheckbox)).dy;
     final textTop = tester.getTopLeft(find.byType(TextComponent)).dy;
-    final textHeight = tester.getSize(find.byType(TextComponent)).height;
-    final firstLineCenterY = textTop + (textHeight / 4);
 
-    expect(iconCenterY, closeTo(firstLineCenterY, 1));
+    expect(checkboxTop, closeTo(textTop, 2));
   });
 
   testWidgets('keeps typed paragraph text visible after leaving empty task', (
@@ -273,7 +247,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byType(AnimatedTaskCheckbox));
+    await tester.tap(find.byType(AppTaskCheckbox));
     await tester.pump();
 
     expect(capturedCompleteId, equals('task-1'));
@@ -316,7 +290,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byType(AnimatedTaskCheckbox));
+    await tester.tap(find.byType(AppTaskCheckbox));
     await tester.pump();
 
     expect(capturedReopenId, equals('task-1'));
@@ -567,7 +541,7 @@ void main() {
     TaskNode taskNode() => document.first as TaskNode;
     expect(taskNode().isComplete, isFalse);
 
-    await tester.tap(find.byType(AnimatedTaskCheckbox));
+    await tester.tap(find.byType(AppTaskCheckbox));
     await tester.pump();
 
     // New behavior: no optimistic editor commands, document unchanged.

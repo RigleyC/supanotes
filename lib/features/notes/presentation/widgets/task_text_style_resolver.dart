@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
 TextStyle resolveTaskTextStyle(
-  Set<Object> attributions,
-  TextStyle Function(Set<Object>) baseBuilder,
-  TextStyle baseColor,
+  TextStyle baseStyle,
+  Color defaultColor,
   bool isComplete,
 ) {
-  final style = baseBuilder(attributions);
-  final color = style.color ?? baseColor;
-  if (!isComplete) return style.copyWith(color: color);
-  return style.copyWith(
+  final color = baseStyle.color ?? defaultColor;
+  if (!isComplete) return baseStyle.copyWith(color: color);
+  return baseStyle.copyWith(
     color: color.withValues(alpha: 0.5),
     decoration: TextDecoration.lineThrough,
   );
