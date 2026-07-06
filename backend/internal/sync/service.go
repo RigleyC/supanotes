@@ -180,7 +180,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	editableNotes := make(map[pgtype.UUID]bool)
 	affectedNotes := make(map[pgtype.UUID]bool)
 
-	for i, n := range payload.Notes {
+	for _, n := range payload.Notes {
 		if isEmptyIncomingRegularNote(n) {
 			return ErrEmptyNote
 		}
@@ -211,36 +211,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		}
 		noteID := n.ID
 
-		if n.IsInbox {
-			existing, err := r.GetInboxNote(ctx, userID)
-			if err == nil && existing.ID != n.ID {
-				noteID = existing.ID
-				payload.Notes[i].ID = existing.ID
-				for j, t := range payload.Tasks {
-					if t.NoteID == n.ID {
-						payload.Tasks[j].NoteID = existing.ID
-					}
-				}
-				for j, nl := range payload.NoteLinks {
-					if nl.SourceID == n.ID {
-						payload.NoteLinks[j].SourceID = existing.ID
-					}
-					if nl.TargetID == n.ID {
-						payload.NoteLinks[j].TargetID = existing.ID
-					}
-				}
-				for j, nt := range payload.NoteTags {
-					if nt.NoteID == n.ID {
-						payload.NoteTags[j].NoteID = existing.ID
-					}
-				}
-				for j, up := range payload.UserNotePreferences {
-					if up.NoteID == n.ID {
-						payload.UserNotePreferences[j].NoteID = existing.ID
-					}
-				}
-			}
-		}
 		editableNotes[noteID] = canEdit
 
 		// Preserve the original owner ID for UpsertNote so the
@@ -255,7 +225,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			UserID:          upsertUserID,
 			ContextID:       n.ContextID,
 			Content:         "", // Derived automatically by trigger from note_nodes
-			IsInbox:         n.IsInbox,
 			EmbeddingStatus: embStatus,
 			CollapseImages:  n.CollapseImages,
 			CreatedAt:       n.CreatedAt,

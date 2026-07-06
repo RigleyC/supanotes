@@ -144,9 +144,6 @@ func (s *stubQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen
 func (s *stubQuerier) AddTagToNote(context.Context, sqlcgen.AddTagToNoteParams) error {
 	panic("unimplemented")
 }
-func (s *stubQuerier) AppendToInbox(context.Context, sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
-	panic("unimplemented")
-}
 func (s *stubQuerier) AppendToNoteContent(context.Context, sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
@@ -229,9 +226,6 @@ func (s *stubQuerier) GetContexts(context.Context, pgtype.UUID) ([]sqlcgen.Conte
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetEnabledRoutines(context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
-	panic("unimplemented")
-}
-func (s *stubQuerier) GetInboxNote(context.Context, pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetLatestBriefByType(context.Context, sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
@@ -326,9 +320,6 @@ func (s *stubQuerier) SearchNotesHybrid(context.Context, sqlcgen.SearchNotesHybr
 	panic("unimplemented")
 }
 func (s *stubQuerier) SearchNotesSemantic(context.Context, sqlcgen.SearchNotesSemanticParams) ([]sqlcgen.SearchNotesSemanticRow, error) {
-	panic("unimplemented")
-}
-func (s *stubQuerier) SetInboxContent(context.Context, sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpdateMemory(context.Context, sqlcgen.UpdateMemoryParams) (sqlcgen.Memory, error) {

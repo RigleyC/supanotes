@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -39,58 +38,6 @@ func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 		return "", err
 	}
 	return fmt.Sprintf("Note created with ID: %s", formatID(note.ID)), nil
-}
-
-type GetInboxNoteTool struct {
-	notesSvc *notes.Service
-}
-
-func (t *GetInboxNoteTool) Name() string { return "get_inbox_note" }
-func (t *GetInboxNoteTool) Description() string {
-	return "Get the content of the user's Inbox note. The Inbox is a special note where the user quickly dumps ideas, reminders, and random thoughts. Read this when the user asks about quick notes or unorganized items."
-}
-func (t *GetInboxNoteTool) Label() string { return "Lendo notas" }
-func (t *GetInboxNoteTool) Summary(string) string { return "[GetInboxNoteTool executed successfully]" }
-
-func (t *GetInboxNoteTool) SchemaJSON() string {
-	return `{"type":"object","properties":{}}`
-}
-func (t *GetInboxNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
-	note, err := t.notesSvc.GetInboxNote(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-	markdown, err := t.notesSvc.GetNoteMarkdownByID(ctx, note.ID, userID)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("Inbox:\n%s", markdown), nil
-}
-
-type AppendToInboxTool struct {
-	notesSvc *notes.Service
-}
-
-func (t *AppendToInboxTool) Name() string        { return "append_to_inbox" }
-func (t *AppendToInboxTool) Description() string { return "Append text to the user's Inbox note" }
-func (t *AppendToInboxTool) Label() string { return "Atualizando notas" }
-func (t *AppendToInboxTool) Summary(string) string { return "[AppendToInboxTool executed successfully]" }
-
-func (t *AppendToInboxTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"content":{"type":"string"}},"required":["content"]}`
-}
-func (t *AppendToInboxTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
-	args, err := parseArgs[struct {
-		Content string `json:"content"`
-	}](argsJSON)
-	if err != nil {
-		return "", err
-	}
-	_, err = t.notesSvc.AppendToInbox(ctx, userID, args.Content)
-	if err != nil {
-		return "", err
-	}
-	return "Content appended to Inbox", nil
 }
 
 type SearchNotesTool struct {
@@ -337,56 +284,4 @@ func (t *GetVaultContextTool) Execute(ctx context.Context, userID pgtype.UUID, s
 - Tags: %d`, noteCount, openTaskCount, completedTaskCount, len(contexts), len(tags)), nil
 }
 
-type PlanInboxOrganizationTool struct {
-	notesSvc  *notes.Service
-	llmClient llm.Client
-}
 
-func (t *PlanInboxOrganizationTool) Name() string { return "plan_inbox_organization" }
-func (t *PlanInboxOrganizationTool) Description() string {
-	return "Analyze the inbox content and propose how to organize snippets into notes, without editing anything"
-}
-func (t *PlanInboxOrganizationTool) Label() string { return "Analisando notas" }
-func (t *PlanInboxOrganizationTool) Summary(string) string { return "[PlanInboxOrganizationTool executed successfully]" }
-
-func (t *PlanInboxOrganizationTool) SchemaJSON() string {
-	return `{"type":"object","properties":{}}`
-}
-func (t *PlanInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
-	items, err := t.notesSvc.PlanInboxOrganization(ctx, userID, t.llmClient)
-	if err != nil {
-		return "", err
-	}
-	bytes, err := json.Marshal(items)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
-}
-
-type ApplyInboxOrganizationTool struct {
-	notesSvc *notes.Service
-}
-
-func (t *ApplyInboxOrganizationTool) Name() string { return "apply_inbox_organization" }
-func (t *ApplyInboxOrganizationTool) Description() string {
-	return "Apply a confirmed inbox organization plan and remove organized items from the inbox"
-}
-func (t *ApplyInboxOrganizationTool) Label() string { return "Atualizando notas" }
-func (t *ApplyInboxOrganizationTool) Summary(string) string { return "[ApplyInboxOrganizationTool executed successfully]" }
-
-func (t *ApplyInboxOrganizationTool) SchemaJSON() string {
-	return `{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"item_id":{"type":"string"},"destination_type":{"type":"string"},"destination_note_id":{"type":"string"},"destination_title":{"type":"string"},"accepted":{"type":"boolean"}},"required":["item_id","destination_type","accepted"]}}},"required":["items"]}`
-}
-func (t *ApplyInboxOrganizationTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error) {
-	var args struct {
-		Items []notes.PlanOrganizationItem `json:"items"`
-	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return "", fmt.Errorf("parse args: %w", err)
-	}
-	if err := t.notesSvc.ApplyOrganization(ctx, userID, args.Items); err != nil {
-		return "", err
-	}
-	return "Inbox organization plan applied successfully", nil
-}

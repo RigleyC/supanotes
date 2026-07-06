@@ -55,16 +55,6 @@ func buildIntelligenceBriefing(todayTasks []sqlcgen.Task, completedTasks []sqlcg
 		b.WriteString(fmt.Sprintf("- Overdue: %d open tasks\n", overdueCount))
 	}
 
-	inboxCount := 0
-	for _, n := range recentNotes {
-		if n.IsInbox {
-			inboxCount++
-		}
-	}
-	if inboxCount > 0 {
-		b.WriteString("- Inbox: Note has recent activity\n")
-	}
-
 	return b.String()
 }
 
@@ -245,7 +235,6 @@ func (cb *ContextBuilder) fetchContextData(ctx context.Context, userID, sessionI
 					ContextID:       r.ContextID,
 					Content:         r.Content,
 					Excerpt:         r.Excerpt,
-					IsInbox:         r.IsInbox,
 					SearchVector:    r.SearchVector,
 					CreatedAt:       r.CreatedAt,
 					UpdatedAt:       r.UpdatedAt,
@@ -501,7 +490,6 @@ func (cb *ContextBuilder) BuildForRoutine(ctx context.Context, userID pgtype.UUI
 				ContextID:       r.ContextID,
 				Content:         r.Content,
 				Excerpt:         r.Excerpt,
-				IsInbox:         r.IsInbox,
 				SearchVector:    r.SearchVector,
 				CreatedAt:       r.CreatedAt,
 				UpdatedAt:       r.UpdatedAt,

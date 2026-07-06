@@ -188,9 +188,6 @@ func (s *stubLoopQuerier) SearchNotesByEmbedding(ctx context.Context, arg sqlcge
 func (s *stubLoopQuerier) AddTagToNote(ctx context.Context, arg sqlcgen.AddTagToNoteParams) error {
 	panic("unimplemented")
 }
-func (s *stubLoopQuerier) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
-	panic("unimplemented")
-}
 func (s *stubLoopQuerier) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
@@ -286,9 +283,6 @@ func (s *stubLoopQuerier) GetContexts(ctx context.Context, userID pgtype.UUID) (
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) GetEnabledRoutines(ctx context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
-	panic("unimplemented")
-}
-func (s *stubLoopQuerier) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
@@ -390,9 +384,6 @@ func (s *stubLoopQuerier) SearchNotesHybrid(ctx context.Context, arg sqlcgen.Sea
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) SearchNotesSemantic(ctx context.Context, arg sqlcgen.SearchNotesSemanticParams) ([]sqlcgen.SearchNotesSemanticRow, error) {
-	panic("unimplemented")
-}
-func (s *stubLoopQuerier) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
 func (s *stubLoopQuerier) UpdateMemory(ctx context.Context, arg sqlcgen.UpdateMemoryParams) (sqlcgen.Memory, error) {

@@ -61,8 +61,6 @@ func NewToolRegistry(
 		&CompleteTaskTool{tasksSvc: tasksSvc},
 		&QueryTasksTool{tasksSvc: tasksSvc, q: q},
 		&ListMemoriesTool{memoriesSvc: memoriesSvc},
-		&GetInboxNoteTool{notesSvc: notesSvc},
-		&AppendToInboxTool{notesSvc: notesSvc},
 		&SearchNotesTool{q: q, embedCL: embedCL},
 		&GetSoulTool{q: q},
 		&ListRoutinesTool{routinesSvc: routinesSvc},
@@ -78,8 +76,6 @@ func NewToolRegistry(
 		&UpdateSoulTool{soulSvc: soulSvc},
 		&UpdateTaskTool{tasksSvc: tasksSvc},
 		&GetVaultContextTool{q: q},
-		&PlanInboxOrganizationTool{notesSvc: notesSvc, llmClient: llmFact.For(llm.TaskTypeInboxOrganize)},
-		&ApplyInboxOrganizationTool{notesSvc: notesSvc},
 		&GetWorkingMemoryTool{wm: wm},
 		&SetWorkingMemoryTool{wm: wm},
 		&UpdateUserProfileTool{q: q},
@@ -102,11 +98,11 @@ const (
 
 func (tr *ToolRegistry) Risk(toolName string) ToolRisk {
 	switch toolName {
-	case "search_notes", "get_note", "get_notes", "query_tasks", "list_memories", "get_soul", "list_routines", "get_vault_context", "get_inbox_note", "plan_inbox_organization", "test_daily_brief", "test_weekly_brief", "get_working_memory":
+	case "search_notes", "get_note", "get_notes", "query_tasks", "list_memories", "get_soul", "list_routines", "get_vault_context", "test_daily_brief", "test_weekly_brief", "get_working_memory":
 		return ToolRiskRead
-	case "add_note", "add_task", "save_memory", "append_to_inbox", "update_soul", "update_user_profile", "link_notes", "set_working_memory", "append_to_note":
+	case "add_note", "add_task", "save_memory", "update_soul", "update_user_profile", "link_notes", "set_working_memory", "append_to_note":
 		return ToolRiskLowWrite
-	case "delete_memory", "apply_inbox_organization", "set_daily_brief_schedule", "set_weekly_brief_schedule", "update_task", "complete_task":
+	case "delete_memory", "set_daily_brief_schedule", "set_weekly_brief_schedule", "update_task", "complete_task":
 		return ToolRiskSensitiveWrite
 	default:
 		return ToolRiskSensitiveWrite

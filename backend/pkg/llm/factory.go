@@ -5,13 +5,9 @@ import "github.com/RigleyC/supanotes/pkg/config"
 type TaskType string
 
 const (
-	TaskTypeAgentic  TaskType = "agentic"
-	TaskTypeGenerate TaskType = "generate"
-	// TaskTypeInboxOrganize routes to the OpenAI-compatible client
-	// (provider chosen at deploy time via env). Kept separate from
-	// TaskTypeGenerate so we can swap provider/model per feature
-	// without affecting other generate-path consumers.
-	TaskTypeInboxOrganize TaskType = "inbox_organize"
+	TaskTypeAgentic   TaskType = "agentic"
+	TaskTypeGenerate  TaskType = "generate"
+	TaskTypeAgentHelper TaskType = "agent_helper"
 )
 
 type Factory interface {
@@ -19,9 +15,9 @@ type Factory interface {
 }
 
 type factory struct {
-	agent         Client
-	generate      Client
-	inboxOrganize Client
+	agent        Client
+	generate     Client
+	agentHelper  Client
 }
 
 func NewFactory(cfg *config.Config) Factory {
@@ -46,17 +42,17 @@ func NewFactory(cfg *config.Config) Factory {
 	)
 	briefWithRetry := WithRetry(briefBase, 3)
 
-	organizeBase := NewOpenAICompatClient(
+	helperBase := NewOpenAICompatClient(
 		cfg.OpenAIAPIKey,
 		defaultIfEmpty(cfg.OrganizeBaseURL, "https://api.openai.com/v1/chat/completions"),
 		defaultIfEmpty(cfg.OrganizeModel, "gpt-4o-mini"),
 	)
-	organizeWithRetry := WithRetry(organizeBase, 3)
+	helperWithRetry := WithRetry(helperBase, 3)
 
 	return &factory{
-		agent:         agentClient,
-		generate:      briefWithRetry,
-		inboxOrganize: organizeWithRetry,
+		agent:       agentClient,
+		generate:    briefWithRetry,
+		agentHelper: helperWithRetry,
 	}
 }
 
@@ -64,8 +60,8 @@ func (f *factory) For(task TaskType) Client {
 	switch task {
 	case TaskTypeAgentic:
 		return f.agent
-	case TaskTypeInboxOrganize:
-		return f.inboxOrganize
+	case TaskTypeAgentHelper:
+		return f.agentHelper
 	default:
 		return f.generate
 	}

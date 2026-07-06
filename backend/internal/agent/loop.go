@@ -43,9 +43,9 @@ func NewLoop(repo Repository, llmFact llm.Factory, ctxBldr *ContextBuilder, tool
 
 	if llmFact != nil && !isTestStub {
 		// Use lightweight/inbox-organize client (DeepSeek/GPT-4o-mini) for classification, planning, and response building.
-		classifierClient := llmFact.For(llm.TaskTypeInboxOrganize)
-		plannerClient := llmFact.For(llm.TaskTypeInboxOrganize)
-		respBldrClient := llmFact.For(llm.TaskTypeInboxOrganize)
+		classifierClient := llmFact.For(llm.TaskTypeAgentHelper)
+		plannerClient := llmFact.For(llm.TaskTypeAgentHelper)
+		respBldrClient := llmFact.For(llm.TaskTypeAgentHelper)
 		classifier = NewIntentClassifier(classifierClient)
 		planner = NewPlanner(plannerClient)
 		respBldr = NewResponseBuilder(respBldrClient)
