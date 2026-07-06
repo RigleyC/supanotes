@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../../../features/tasks/domain/task_recurrence.dart';
+import '../../../features/notes/domain/note_strings.dart';
 import '../database.dart';
 import '../tables/notes.dart';
 import '../tables/user_note_preferences.dart';
@@ -8,10 +9,21 @@ part 'notes_dao.g.dart';
 
 typedef NoteQueryResult = ({
   NoteData note,
+  String title,
   bool favorite,
   bool archived,
   bool hideCompleted,
 });
+
+/// SQL subselect that returns the plain text of the first non-deleted
+/// note_nodes row with non-empty text, ordered by position. Used as the
+/// note title everywhere notes are listed. Returns NULL when the note has
+/// no text-bearing node; the Dart row reader applies the fallback.
+const _titleFromNodesSubselect =
+    "(SELECT nn.data->>'text' FROM note_nodes nn "
+    "WHERE nn.note_id = n.id AND nn.deleted_at IS NULL "
+    "AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' "
+    "ORDER BY nn.position ASC LIMIT 1) AS title";
 
 typedef NoteWithTasksQueryResult = ({
   NoteQueryResult note,
@@ -25,7 +37,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Streams all active notes with the user's preferences.
   Stream<List<NoteQueryResult>> watchAllActiveNotes(String userId) {
     return _watchWithPref(
-      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      '$_titleFromNodesSubselect '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND n.is_inbox = 0 '
@@ -47,12 +60,13 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     String userId,
   ) async {
     return customSelect(
-      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      '$_titleFromNodesSubselect '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
-      readsFrom: {notes, userNotePreferences},
+      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
     ).get().then(
       (rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first),
     );
@@ -61,12 +75,13 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Streams a single note by id with the user's preferences.
   Stream<NoteQueryResult?> watchNoteById(String id, String userId) {
     return customSelect(
-      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      '$_titleFromNodesSubselect '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
-      readsFrom: {notes, userNotePreferences},
+      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
     ).watch().map((rows) {
       if (rows.isEmpty) return null;
       return _queryResultFromRow(rows.first);
@@ -77,12 +92,13 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// `null` if none has been created yet.
   Future<NoteQueryResult?> getInboxNote(String userId) {
     return customSelect(
-      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      '$_titleFromNodesSubselect '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.user_id = ? AND n.is_inbox = 1 AND n.deleted_at IS NULL',
       variables: [Variable.withString(userId), Variable.withString(userId)],
-      readsFrom: {notes, userNotePreferences},
+      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
     ).get().then(
       (rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first),
     );
@@ -92,12 +108,13 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// created.
   Stream<NoteQueryResult?> watchInboxNote(String userId) {
     return customSelect(
-      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      '$_titleFromNodesSubselect '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.user_id = ? AND n.is_inbox = 1 AND n.deleted_at IS NULL',
       variables: [Variable.withString(userId), Variable.withString(userId)],
-      readsFrom: {notes, userNotePreferences},
+      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
     ).watchSingleOrNull().map(
       (row) => row != null ? _queryResultFromRow(row) : null,
     );
@@ -116,6 +133,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'COALESCE(unp.favorite, 0) AS favorite, '
       'COALESCE(unp.archived, 0) AS archived, '
       'COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      '$_titleFromNodesSubselect, '
       't.id AS task_id, t.user_id AS task_user_id, t.note_id AS task_note_id, '
       't.title AS task_title, t.status AS task_status, '
       't.position AS task_position, '
@@ -130,7 +148,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       '  ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
-      readsFrom: {notes, attachedDatabase.tasks, userNotePreferences},
+      readsFrom: {notes, attachedDatabase.tasks, userNotePreferences, attachedDatabase.noteNodes},
     ).watch().map((rows) {
       if (rows.isEmpty) return null;
       return _noteWithTasksFromRows(rows);
@@ -144,7 +162,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     String userId,
   ) {
     return _watchWithPref(
-      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      '$_titleFromNodesSubselect '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.context_id = ? AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
@@ -157,7 +176,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Streams every favorite note with the user's preferences.
   Stream<List<NoteQueryResult>> watchFavorites(String userId) {
     return _watchWithPref(
-      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed '
+      'SELECT n.*, COALESCE(unp.favorite, 0) AS favorite, COALESCE(unp.archived, 0) AS archived, COALESCE(unp.hide_completed, 0) AS hide_completed, '
+      '$_titleFromNodesSubselect '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
@@ -189,6 +209,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
     return (
       note: note,
+      title: row.read<String?>('title') ?? NoteStrings.fallbackTitle,
       favorite: row.read<bool>('favorite'),
       archived: row.read<bool>('archived'),
       hideCompleted: row.read<bool>('hide_completed'),
@@ -236,7 +257,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return customSelect(
       sql,
       variables: [Variable.withString(userId), ...extraVariables],
-      readsFrom: {notes, userNotePreferences},
+      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
     ).watch().map((rows) {
       final result = <NoteQueryResult>[];
       for (final row in rows) {
