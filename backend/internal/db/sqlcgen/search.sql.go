@@ -21,7 +21,6 @@ FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2
 WHERE n.user_id = $2
   AND n.deleted_at IS NULL 
-  AND NOT n.is_inbox
   AND COALESCE(unp.archived, FALSE) = false
   AND n.search_vector @@ plainto_tsquery('simple', $1::text)
 ORDER BY score DESC
@@ -86,7 +85,6 @@ WITH fts AS (
   LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $3
   WHERE n.user_id = $3
     AND n.deleted_at IS NULL 
-    AND NOT n.is_inbox
     AND COALESCE(unp.archived, FALSE) = false
     AND n.search_vector @@ to_tsquery('simple', $2::text)
   LIMIT $4::int
@@ -101,7 +99,6 @@ semantic AS (
   LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $3
   WHERE n.user_id = $3
     AND n.deleted_at IS NULL 
-    AND NOT n.is_inbox
     AND COALESCE(unp.archived, FALSE) = false
   LIMIT $6::int
 )
@@ -189,7 +186,6 @@ JOIN note_embeddings ne ON n.id = ne.note_id
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2
 WHERE n.user_id = $2
   AND n.deleted_at IS NULL 
-  AND NOT n.is_inbox
   AND COALESCE(unp.archived, FALSE) = false
 ORDER BY ne.embedding <=> $1::vector
 LIMIT $3

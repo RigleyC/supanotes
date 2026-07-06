@@ -72,7 +72,6 @@ type Note struct {
 	ContextID       pgtype.UUID        `json:"context_id"`
 	Content         string             `json:"content"`
 	Excerpt         pgtype.Text        `json:"excerpt"`
-	IsInbox         bool               `json:"is_inbox"`
 	SearchVector    pgtype.Text        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`

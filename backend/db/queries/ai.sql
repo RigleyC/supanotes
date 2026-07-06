@@ -4,7 +4,6 @@ FROM notes n
 WHERE (n.embedding_status = 'pending'
    OR (n.embedding_status = 'failed' AND n.updated_at < NOW() - INTERVAL '5 minutes'))
   AND n.deleted_at IS NULL
-  AND NOT n.is_inbox
 LIMIT $1;
 
 -- name: UpdateNoteEmbeddingStatus :exec
@@ -55,7 +54,7 @@ WHERE id = $1 AND user_id = $2;
 SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.updated_at, (1 - (ne.embedding <=> $2::vector))::real AS similarity
 FROM notes n
 JOIN note_embeddings ne ON n.id = ne.note_id
-WHERE n.user_id = $1 AND n.deleted_at IS NULL AND NOT n.is_inbox
+WHERE n.user_id = $1 AND n.deleted_at IS NULL
 ORDER BY ne.embedding <=> $2::vector
 LIMIT $3;
 

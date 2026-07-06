@@ -13,8 +13,8 @@ DELETE FROM contexts
 WHERE id = $1 AND user_id = $2;
 
 -- name: CreateNote :one
-INSERT INTO notes (user_id, context_id, content, is_inbox, embedding_status, collapse_images)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO notes (user_id, context_id, content, embedding_status, collapse_images)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetNoteByID :one
@@ -49,29 +49,13 @@ SELECT n.*,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
-WHERE n.is_inbox = false
-  AND n.deleted_at IS NULL
+WHERE n.deleted_at IS NULL
   AND (n.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = n.id AND note_shares.user_id = $1))
   AND (sqlc.narg('context_id')::uuid IS NULL OR n.context_id = sqlc.narg('context_id'))
   AND (sqlc.narg('favorite')::boolean IS NULL OR COALESCE(unp.favorite, FALSE) = sqlc.narg('favorite'))
   AND (sqlc.narg('cursor_updated_at')::timestamptz IS NULL OR n.updated_at < sqlc.narg('cursor_updated_at') OR (n.updated_at = sqlc.narg('cursor_updated_at') AND n.id < sqlc.narg('cursor_id')))
 ORDER BY n.updated_at DESC, n.id DESC
 LIMIT sqlc.arg('limit');
-
--- name: GetInboxNote :one
-SELECT n.*,
-  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
-  COALESCE(unp.archived, FALSE)::boolean AS archived
-FROM notes n
-LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
-WHERE n.user_id = $1 AND n.is_inbox = true AND n.deleted_at IS NULL;
-
--- name: AppendToInbox :one
-UPDATE notes
-SET content = content || E'\n\n' || $3,
-    updated_at = NOW()
-WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
-RETURNING *;
 
 -- name: DeleteTag :exec
 DELETE FROM tags
@@ -109,7 +93,6 @@ SELECT n.*,
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
 WHERE n.user_id = $1
-  AND n.is_inbox = false
   AND n.deleted_at IS NULL
   AND n.updated_at >= NOW() - INTERVAL '48 hours'
 ORDER BY n.updated_at DESC
@@ -122,19 +105,12 @@ WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.id != ALL($1::uuid[])
   AND n.user_id = $2
   AND n.deleted_at IS NULL
-  AND n.is_inbox = false
 LIMIT 5;
-
--- name: SetInboxContent :one
-UPDATE notes
-SET content = $3, updated_at = NOW()
-WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
-RETURNING *;
 
 -- name: AppendToNoteContent :one
 UPDATE notes
 SET content = content || E'\n\n' || $3, updated_at = NOW()
-WHERE notes.id = $1 AND notes.deleted_at IS NULL AND notes.is_inbox = false
+WHERE notes.id = $1 AND notes.deleted_at IS NULL
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
 RETURNING *;
 
@@ -150,7 +126,7 @@ UPDATE notes SET search_vector = $2 WHERE id = $1;
 SELECT id, content FROM notes WHERE content IS NOT NULL AND content != '';
 
 -- name: CountNotes :one
-SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL AND NOT is_inbox;
+SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL;
 
 -- name: UpdateNotesContentFromNodes :exec
 UPDATE notes n

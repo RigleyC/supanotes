@@ -27,46 +27,12 @@ func (q *Queries) AddTagToNote(ctx context.Context, arg AddTagToNoteParams) erro
 	return err
 }
 
-const appendToInbox = `-- name: AppendToInbox :one
-UPDATE notes
-SET content = content || E'\n\n' || $3,
-    updated_at = NOW()
-WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
-`
-
-type AppendToInboxParams struct {
-	ID      pgtype.UUID `json:"id"`
-	UserID  pgtype.UUID `json:"user_id"`
-	Content string      `json:"content"`
-}
-
-func (q *Queries) AppendToInbox(ctx context.Context, arg AppendToInboxParams) (Note, error) {
-	row := q.db.QueryRow(ctx, appendToInbox, arg.ID, arg.UserID, arg.Content)
-	var i Note
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ContextID,
-		&i.Content,
-		&i.Excerpt,
-		&i.IsInbox,
-		&i.SearchVector,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.EmbeddingStatus,
-		&i.CollapseImages,
-	)
-	return i, err
-}
-
 const appendToNoteContent = `-- name: AppendToNoteContent :one
 UPDATE notes
 SET content = content || E'\n\n' || $3, updated_at = NOW()
-WHERE notes.id = $1 AND notes.deleted_at IS NULL AND notes.is_inbox = false
+WHERE notes.id = $1 AND notes.deleted_at IS NULL
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
+RETURNING id, user_id, context_id, content, excerpt, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
 `
 
 type AppendToNoteContentParams struct {
@@ -84,7 +50,6 @@ func (q *Queries) AppendToNoteContent(ctx context.Context, arg AppendToNoteConte
 		&i.ContextID,
 		&i.Content,
 		&i.Excerpt,
-		&i.IsInbox,
 		&i.SearchVector,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -96,7 +61,7 @@ func (q *Queries) AppendToNoteContent(ctx context.Context, arg AppendToNoteConte
 }
 
 const countNotes = `-- name: CountNotes :one
-SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL AND NOT is_inbox
+SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
@@ -134,16 +99,15 @@ func (q *Queries) CreateContext(ctx context.Context, arg CreateContextParams) (C
 }
 
 const createNote = `-- name: CreateNote :one
-INSERT INTO notes (user_id, context_id, content, is_inbox, embedding_status, collapse_images)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
+INSERT INTO notes (user_id, context_id, content, embedding_status, collapse_images)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, user_id, context_id, content, excerpt, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
 `
 
 type CreateNoteParams struct {
 	UserID          pgtype.UUID `json:"user_id"`
 	ContextID       pgtype.UUID `json:"context_id"`
 	Content         string      `json:"content"`
-	IsInbox         bool        `json:"is_inbox"`
 	EmbeddingStatus string      `json:"embedding_status"`
 	CollapseImages  bool        `json:"collapse_images"`
 }
@@ -153,7 +117,6 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		arg.UserID,
 		arg.ContextID,
 		arg.Content,
-		arg.IsInbox,
 		arg.EmbeddingStatus,
 		arg.CollapseImages,
 	)
@@ -164,7 +127,6 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		&i.ContextID,
 		&i.Content,
 		&i.Excerpt,
-		&i.IsInbox,
 		&i.SearchVector,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -323,62 +285,13 @@ func (q *Queries) GetContexts(ctx context.Context, userID pgtype.UUID) ([]Contex
 	return items, nil
 }
 
-const getInboxNote = `-- name: GetInboxNote :one
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
-  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
-  COALESCE(unp.archived, FALSE)::boolean AS archived
-FROM notes n
-LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
-WHERE n.user_id = $1 AND n.is_inbox = true AND n.deleted_at IS NULL
-`
-
-type GetInboxNoteRow struct {
-	ID              pgtype.UUID        `json:"id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	ContextID       pgtype.UUID        `json:"context_id"`
-	Content         string             `json:"content"`
-	Excerpt         pgtype.Text        `json:"excerpt"`
-	IsInbox         bool               `json:"is_inbox"`
-	SearchVector    pgtype.Text        `json:"search_vector"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
-	EmbeddingStatus string             `json:"embedding_status"`
-	CollapseImages  bool               `json:"collapse_images"`
-	Favorite        bool               `json:"favorite"`
-	Archived        bool               `json:"archived"`
-}
-
-func (q *Queries) GetInboxNote(ctx context.Context, userID pgtype.UUID) (GetInboxNoteRow, error) {
-	row := q.db.QueryRow(ctx, getInboxNote, userID)
-	var i GetInboxNoteRow
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ContextID,
-		&i.Content,
-		&i.Excerpt,
-		&i.IsInbox,
-		&i.SearchVector,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.EmbeddingStatus,
-		&i.CollapseImages,
-		&i.Favorite,
-		&i.Archived,
-	)
-	return i, err
-}
-
 const getLinkedNotes = `-- name: GetLinkedNotes :many
-SELECT DISTINCT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images FROM notes n
+SELECT DISTINCT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images FROM notes n
 JOIN note_links nl ON (n.id = nl.source_id OR n.id = nl.target_id)
 WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.id != ALL($1::uuid[])
   AND n.user_id = $2
   AND n.deleted_at IS NULL
-  AND n.is_inbox = false
 LIMIT 5
 `
 
@@ -402,7 +315,6 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 			&i.ContextID,
 			&i.Content,
 			&i.Excerpt,
-			&i.IsInbox,
 			&i.SearchVector,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -421,7 +333,7 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 }
 
 const getNoteByID = `-- name: GetNoteByID :one
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -441,7 +353,6 @@ type GetNoteByIDRow struct {
 	ContextID       pgtype.UUID        `json:"context_id"`
 	Content         string             `json:"content"`
 	Excerpt         pgtype.Text        `json:"excerpt"`
-	IsInbox         bool               `json:"is_inbox"`
 	SearchVector    pgtype.Text        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
@@ -461,7 +372,6 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 		&i.ContextID,
 		&i.Content,
 		&i.Excerpt,
-		&i.IsInbox,
 		&i.SearchVector,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -475,14 +385,13 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 }
 
 const getNotes = `-- name: GetNotes :many
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
   COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
-WHERE n.is_inbox = false
-  AND n.deleted_at IS NULL
+WHERE n.deleted_at IS NULL
   AND (n.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = n.id AND note_shares.user_id = $1))
   AND ($2::uuid IS NULL OR n.context_id = $2)
   AND ($3::boolean IS NULL OR COALESCE(unp.favorite, FALSE) = $3)
@@ -506,7 +415,6 @@ type GetNotesRow struct {
 	ContextID       pgtype.UUID        `json:"context_id"`
 	Content         string             `json:"content"`
 	Excerpt         pgtype.Text        `json:"excerpt"`
-	IsInbox         bool               `json:"is_inbox"`
 	SearchVector    pgtype.Text        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
@@ -540,7 +448,6 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 			&i.ContextID,
 			&i.Content,
 			&i.Excerpt,
-			&i.IsInbox,
 			&i.SearchVector,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -562,14 +469,13 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 }
 
 const getRecentNotes = `-- name: GetRecentNotes :many
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.is_inbox, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
   COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
 WHERE n.user_id = $1
-  AND n.is_inbox = false
   AND n.deleted_at IS NULL
   AND n.updated_at >= NOW() - INTERVAL '48 hours'
 ORDER BY n.updated_at DESC
@@ -582,7 +488,6 @@ type GetRecentNotesRow struct {
 	ContextID       pgtype.UUID        `json:"context_id"`
 	Content         string             `json:"content"`
 	Excerpt         pgtype.Text        `json:"excerpt"`
-	IsInbox         bool               `json:"is_inbox"`
 	SearchVector    pgtype.Text        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
@@ -609,7 +514,6 @@ func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Get
 			&i.ContextID,
 			&i.Content,
 			&i.Excerpt,
-			&i.IsInbox,
 			&i.SearchVector,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -707,39 +611,6 @@ func (q *Queries) RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNotePa
 	return err
 }
 
-const setInboxContent = `-- name: SetInboxContent :one
-UPDATE notes
-SET content = $3, updated_at = NOW()
-WHERE id = $1 AND user_id = $2 AND is_inbox = true AND deleted_at IS NULL
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
-`
-
-type SetInboxContentParams struct {
-	ID      pgtype.UUID `json:"id"`
-	UserID  pgtype.UUID `json:"user_id"`
-	Content string      `json:"content"`
-}
-
-func (q *Queries) SetInboxContent(ctx context.Context, arg SetInboxContentParams) (Note, error) {
-	row := q.db.QueryRow(ctx, setInboxContent, arg.ID, arg.UserID, arg.Content)
-	var i Note
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ContextID,
-		&i.Content,
-		&i.Excerpt,
-		&i.IsInbox,
-		&i.SearchVector,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.EmbeddingStatus,
-		&i.CollapseImages,
-	)
-	return i, err
-}
-
 const updateNote = `-- name: UpdateNote :one
 UPDATE notes
 SET content = COALESCE($3, content),
@@ -749,7 +620,7 @@ SET content = COALESCE($3, content),
     updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
-RETURNING id, user_id, context_id, content, excerpt, is_inbox, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
+RETURNING id, user_id, context_id, content, excerpt, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
 `
 
 type UpdateNoteParams struct {
@@ -777,7 +648,6 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		&i.ContextID,
 		&i.Content,
 		&i.Excerpt,
-		&i.IsInbox,
 		&i.SearchVector,
 		&i.CreatedAt,
 		&i.UpdatedAt,

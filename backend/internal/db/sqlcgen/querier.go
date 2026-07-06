@@ -12,7 +12,6 @@ import (
 
 type Querier interface {
 	AddTagToNote(ctx context.Context, arg AddTagToNoteParams) error
-	AppendToInbox(ctx context.Context, arg AppendToInboxParams) (Note, error)
 	AppendToNoteContent(ctx context.Context, arg AppendToNoteContentParams) (Note, error)
 	CleanupOldMessages(ctx context.Context) error
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
@@ -53,7 +52,6 @@ type Querier interface {
 	GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesForMigrationRow, error)
 	GetContexts(ctx context.Context, userID pgtype.UUID) ([]Context, error)
 	GetEnabledRoutines(ctx context.Context) ([]GetEnabledRoutinesRow, error)
-	GetInboxNote(ctx context.Context, userID pgtype.UUID) (GetInboxNoteRow, error)
 	GetLatestBriefByType(ctx context.Context, arg GetLatestBriefByTypeParams) (RoutineLog, error)
 	GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) ([]Note, error)
 	GetMemories(ctx context.Context, arg GetMemoriesParams) ([]Memory, error)
@@ -111,7 +109,6 @@ type Querier interface {
 	SearchNotesHybrid(ctx context.Context, arg SearchNotesHybridParams) ([]SearchNotesHybridRow, error)
 	SearchNotesSemantic(ctx context.Context, arg SearchNotesSemanticParams) ([]SearchNotesSemanticRow, error)
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Task, error)
-	SetInboxContent(ctx context.Context, arg SetInboxContentParams) (Note, error)
 	SetWorkingMemoryValue(ctx context.Context, arg SetWorkingMemoryValueParams) (AgentWorkingMemory, error)
 	UpdateMemory(ctx context.Context, arg UpdateMemoryParams) (Memory, error)
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (NoteNode, error)
