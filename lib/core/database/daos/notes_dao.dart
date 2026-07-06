@@ -46,7 +46,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       '$_noteSelectColumns '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL AND n.is_inbox = 0 '
+      'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
       'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC',
       userId,
     );
@@ -89,36 +89,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       if (rows.isEmpty) return null;
       return _queryResultFromRow(rows.first);
     });
-  }
-
-  /// Returns the first inbox note (the spec says there is exactly one) or
-  /// `null` if none has been created yet.
-  Future<NoteQueryResult?> getInboxNote(String userId) {
-    return customSelect(
-      '$_noteSelectColumns '
-      'FROM notes n '
-      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE n.user_id = ? AND n.is_inbox = 1 AND n.deleted_at IS NULL',
-      variables: [Variable.withString(userId), Variable.withString(userId)],
-      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
-    ).get().then(
-      (rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first),
-    );
-  }
-
-  /// Streams the single inbox note, re-emitting whenever a new one is
-  /// created.
-  Stream<NoteQueryResult?> watchInboxNote(String userId) {
-    return customSelect(
-      '$_noteSelectColumns '
-      'FROM notes n '
-      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE n.user_id = ? AND n.is_inbox = 1 AND n.deleted_at IS NULL',
-      variables: [Variable.withString(userId), Variable.withString(userId)],
-      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
-    ).watchSingleOrNull().map(
-      (row) => row != null ? _queryResultFromRow(row) : null,
-    );
   }
 
   /// Streams a note with its tasks in a single reactive emission via a
@@ -190,7 +160,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       contextId: row.read<String?>('context_id'),
       content: row.read<String>('content'),
       excerpt: row.read<String?>('excerpt'),
-      isInbox: row.read<bool>('is_inbox'),
       embeddingStatus: row.read<String?>('embedding_status'),
       createdAt: row.read<DateTime>('created_at'),
       updatedAt: row.read<DateTime>('updated_at'),
@@ -313,7 +282,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           ..where(
             (t) =>
                 t.hasRemoteCopy.equals(true) |
-                t.isInbox.equals(true) |
                 t.deletedAt.isNull(),
           ))
         .get();

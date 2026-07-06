@@ -63,10 +63,8 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
     : super(executor ?? NativeDatabase.memory());
 
-  /// Latest schema version. Bumped to 13 — v13 adds note_nodes table and
-  /// node_id column to tasks.
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -181,6 +179,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement('ALTER TABLE tasks_migration RENAME TO tasks;');
         
         await customStatement('PRAGMA foreign_keys=ON;');
+      }
+      if (from < 15) {
+        await customStatement('DELETE FROM notes WHERE is_inbox = 1;');
+        await customStatement('ALTER TABLE notes DROP COLUMN is_inbox;');
       }
     },
     beforeOpen: (details) async {

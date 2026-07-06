@@ -59,21 +59,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _isInboxMeta = const VerificationMeta(
-    'isInbox',
-  );
-  @override
-  late final GeneratedColumn<bool> isInbox = GeneratedColumn<bool>(
-    'is_inbox',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_inbox" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
   static const VerificationMeta _embeddingStatusMeta = const VerificationMeta(
     'embeddingStatus',
   );
@@ -203,7 +188,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     contextId,
     content,
     excerpt,
-    isInbox,
     embeddingStatus,
     createdAt,
     updatedAt,
@@ -258,12 +242,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
       context.handle(
         _excerptMeta,
         excerpt.isAcceptableOrUnknown(data['excerpt']!, _excerptMeta),
-      );
-    }
-    if (data.containsKey('is_inbox')) {
-      context.handle(
-        _isInboxMeta,
-        isInbox.isAcceptableOrUnknown(data['is_inbox']!, _isInboxMeta),
       );
     }
     if (data.containsKey('embedding_status')) {
@@ -374,10 +352,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         DriftSqlType.string,
         data['${effectivePrefix}excerpt'],
       ),
-      isInbox: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_inbox'],
-      )!,
       embeddingStatus: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}embedding_status'],
@@ -433,7 +407,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
   final String? contextId;
   final String content;
   final String? excerpt;
-  final bool isInbox;
   final String? embeddingStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -450,7 +423,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     this.contextId,
     required this.content,
     this.excerpt,
-    required this.isInbox,
     this.embeddingStatus,
     required this.createdAt,
     required this.updatedAt,
@@ -474,7 +446,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     if (!nullToAbsent || excerpt != null) {
       map['excerpt'] = Variable<String>(excerpt);
     }
-    map['is_inbox'] = Variable<bool>(isInbox);
     if (!nullToAbsent || embeddingStatus != null) {
       map['embedding_status'] = Variable<String>(embeddingStatus);
     }
@@ -509,7 +480,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       excerpt: excerpt == null && nullToAbsent
           ? const Value.absent()
           : Value(excerpt),
-      isInbox: Value(isInbox),
       embeddingStatus: embeddingStatus == null && nullToAbsent
           ? const Value.absent()
           : Value(embeddingStatus),
@@ -544,7 +514,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       contextId: serializer.fromJson<String?>(json['contextId']),
       content: serializer.fromJson<String>(json['content']),
       excerpt: serializer.fromJson<String?>(json['excerpt']),
-      isInbox: serializer.fromJson<bool>(json['isInbox']),
       embeddingStatus: serializer.fromJson<String?>(json['embeddingStatus']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -566,7 +535,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       'contextId': serializer.toJson<String?>(contextId),
       'content': serializer.toJson<String>(content),
       'excerpt': serializer.toJson<String?>(excerpt),
-      'isInbox': serializer.toJson<bool>(isInbox),
       'embeddingStatus': serializer.toJson<String?>(embeddingStatus),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -586,7 +554,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     Value<String?> contextId = const Value.absent(),
     String? content,
     Value<String?> excerpt = const Value.absent(),
-    bool? isInbox,
     Value<String?> embeddingStatus = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -603,7 +570,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     contextId: contextId.present ? contextId.value : this.contextId,
     content: content ?? this.content,
     excerpt: excerpt.present ? excerpt.value : this.excerpt,
-    isInbox: isInbox ?? this.isInbox,
     embeddingStatus: embeddingStatus.present
         ? embeddingStatus.value
         : this.embeddingStatus,
@@ -626,7 +592,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       contextId: data.contextId.present ? data.contextId.value : this.contextId,
       content: data.content.present ? data.content.value : this.content,
       excerpt: data.excerpt.present ? data.excerpt.value : this.excerpt,
-      isInbox: data.isInbox.present ? data.isInbox.value : this.isInbox,
       embeddingStatus: data.embeddingStatus.present
           ? data.embeddingStatus.value
           : this.embeddingStatus,
@@ -660,7 +625,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ..write('contextId: $contextId, ')
           ..write('content: $content, ')
           ..write('excerpt: $excerpt, ')
-          ..write('isInbox: $isInbox, ')
           ..write('embeddingStatus: $embeddingStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -682,7 +646,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     contextId,
     content,
     excerpt,
-    isInbox,
     embeddingStatus,
     createdAt,
     updatedAt,
@@ -703,7 +666,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           other.contextId == this.contextId &&
           other.content == this.content &&
           other.excerpt == this.excerpt &&
-          other.isInbox == this.isInbox &&
           other.embeddingStatus == this.embeddingStatus &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -722,7 +684,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   final Value<String?> contextId;
   final Value<String> content;
   final Value<String?> excerpt;
-  final Value<bool> isInbox;
   final Value<String?> embeddingStatus;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -740,7 +701,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.contextId = const Value.absent(),
     this.content = const Value.absent(),
     this.excerpt = const Value.absent(),
-    this.isInbox = const Value.absent(),
     this.embeddingStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -759,7 +719,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.contextId = const Value.absent(),
     required String content,
     this.excerpt = const Value.absent(),
-    this.isInbox = const Value.absent(),
     this.embeddingStatus = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -782,7 +741,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Expression<String>? contextId,
     Expression<String>? content,
     Expression<String>? excerpt,
-    Expression<bool>? isInbox,
     Expression<String>? embeddingStatus,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -801,7 +759,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       if (contextId != null) 'context_id': contextId,
       if (content != null) 'content': content,
       if (excerpt != null) 'excerpt': excerpt,
-      if (isInbox != null) 'is_inbox': isInbox,
       if (embeddingStatus != null) 'embedding_status': embeddingStatus,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -822,7 +779,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Value<String?>? contextId,
     Value<String>? content,
     Value<String?>? excerpt,
-    Value<bool>? isInbox,
     Value<String?>? embeddingStatus,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -841,7 +797,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       contextId: contextId ?? this.contextId,
       content: content ?? this.content,
       excerpt: excerpt ?? this.excerpt,
-      isInbox: isInbox ?? this.isInbox,
       embeddingStatus: embeddingStatus ?? this.embeddingStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -873,9 +828,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     }
     if (excerpt.present) {
       map['excerpt'] = Variable<String>(excerpt.value);
-    }
-    if (isInbox.present) {
-      map['is_inbox'] = Variable<bool>(isInbox.value);
     }
     if (embeddingStatus.present) {
       map['embedding_status'] = Variable<String>(embeddingStatus.value);
@@ -921,7 +873,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
           ..write('contextId: $contextId, ')
           ..write('content: $content, ')
           ..write('excerpt: $excerpt, ')
-          ..write('isInbox: $isInbox, ')
           ..write('embeddingStatus: $embeddingStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -5548,7 +5499,6 @@ typedef $$NotesTableCreateCompanionBuilder =
       Value<String?> contextId,
       required String content,
       Value<String?> excerpt,
-      Value<bool> isInbox,
       Value<String?> embeddingStatus,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -5568,7 +5518,6 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<String?> contextId,
       Value<String> content,
       Value<String?> excerpt,
-      Value<bool> isInbox,
       Value<String?> embeddingStatus,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -5653,11 +5602,6 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<String> get excerpt => $composableBuilder(
     column: $table.excerpt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get isInbox => $composableBuilder(
-    column: $table.isInbox,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5796,11 +5740,6 @@ class $$NotesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isInbox => $composableBuilder(
-    column: $table.isInbox,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get embeddingStatus => $composableBuilder(
     column: $table.embeddingStatus,
     builder: (column) => ColumnOrderings(column),
@@ -5875,9 +5814,6 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<String> get excerpt =>
       $composableBuilder(column: $table.excerpt, builder: (column) => column);
-
-  GeneratedColumn<bool> get isInbox =>
-      $composableBuilder(column: $table.isInbox, builder: (column) => column);
 
   GeneratedColumn<String> get embeddingStatus => $composableBuilder(
     column: $table.embeddingStatus,
@@ -6005,7 +5941,6 @@ class $$NotesTableTableManager
                 Value<String?> contextId = const Value.absent(),
                 Value<String> content = const Value.absent(),
                 Value<String?> excerpt = const Value.absent(),
-                Value<bool> isInbox = const Value.absent(),
                 Value<String?> embeddingStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -6023,7 +5958,6 @@ class $$NotesTableTableManager
                 contextId: contextId,
                 content: content,
                 excerpt: excerpt,
-                isInbox: isInbox,
                 embeddingStatus: embeddingStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -6043,7 +5977,6 @@ class $$NotesTableTableManager
                 Value<String?> contextId = const Value.absent(),
                 required String content,
                 Value<String?> excerpt = const Value.absent(),
-                Value<bool> isInbox = const Value.absent(),
                 Value<String?> embeddingStatus = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -6061,7 +5994,6 @@ class $$NotesTableTableManager
                 contextId: contextId,
                 content: content,
                 excerpt: excerpt,
-                isInbox: isInbox,
                 embeddingStatus: embeddingStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

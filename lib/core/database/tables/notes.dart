@@ -7,7 +7,6 @@ class Notes extends Table {
   TextColumn get contextId => text().nullable()();
   TextColumn get content => text()();
   TextColumn get excerpt => text().nullable()();
-  BoolColumn get isInbox => boolean().withDefault(const Constant(false))();
   TextColumn get embeddingStatus => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
