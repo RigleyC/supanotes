@@ -180,7 +180,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         final note = noteWithTasks.note;
         if (note == null) {
           return AdaptiveScaffold(
-            body: Center(child: Text(NoteStrings.errorNotFound)),
+            body: SafeArea(child: Center(child: Text(NoteStrings.errorNotFound))),
           );
         }
 
@@ -204,6 +204,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               if (!isReadOnly)
                 AdaptiveAppBarAction(
                   icon: Icons.check,
+                  iosSymbol: 'checkmark',
                   onPressed: () {
                     FocusManager.instance.primaryFocus?.unfocus();
                     SystemChannels.textInput.invokeMethod(
@@ -252,9 +253,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         );
       },
       loading: () =>
-          const AdaptiveScaffold(body: Center(child: CircularProgressIndicator())),
+          const AdaptiveScaffold(body: SafeArea(child: Center(child: CircularProgressIndicator()))),
       error: (error, _) =>
-          AdaptiveScaffold(body: Center(child: Text('Error: $error'))),
+          AdaptiveScaffold(body: SafeArea(child: Center(child: Text('Error: $error')))),
     );
   }
 }

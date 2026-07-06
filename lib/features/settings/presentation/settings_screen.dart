@@ -1,5 +1,6 @@
 library;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -113,6 +114,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final message = lastSynced == null
         ? 'Nenhuma sincronização registrada.'
         : 'Última sync: ${timeago.format(lastSynced, locale: 'pt_BR')}';
+
+    final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
+
+    if (isIOS) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('Sincronização'),
+          content: Text(message),
+          actions: [
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Fechar'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     await showDialog<void>(
       context: context,

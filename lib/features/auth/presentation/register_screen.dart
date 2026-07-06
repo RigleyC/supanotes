@@ -5,6 +5,7 @@
 /// to match the typical backend constraint.
 library;
 
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -63,8 +64,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final scheme = Theme.of(context).colorScheme;
     final isLoading = ref.watch(authControllerProvider).isLoading;
 
-    return Scaffold(
+    return AdaptiveScaffold(
+      appBar: const AdaptiveAppBar(title: 'Criar conta'),
       body: SafeArea(
+        bottom: false,
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.lg),

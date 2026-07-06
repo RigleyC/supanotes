@@ -24,6 +24,7 @@ import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor
 import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
@@ -196,9 +197,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       onUploadFile: uploader,
       onError: () {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Falha ao enviar anexo')),
-          );
+          AppMessenger.showError('Falha ao enviar anexo');
         }
       },
     );

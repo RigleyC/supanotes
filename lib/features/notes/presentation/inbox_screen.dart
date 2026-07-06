@@ -86,15 +86,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           data: (inbox) {
             if (inbox == null) {
               return const AdaptiveScaffold(
-                body: Center(child: Text('Inbox not found')),
+                body: SafeArea(child: Center(child: Text('Inbox not found'))),
               );
             }
             return _buildEditor(inbox);
           },
           loading: () =>
-              const AdaptiveScaffold(body: Center(child: CircularProgressIndicator())),
+              const AdaptiveScaffold(body: SafeArea(child: Center(child: CircularProgressIndicator()))),
           error: (error, _) =>
-              AdaptiveScaffold(body: Center(child: Text('Error: $error'))),
+              AdaptiveScaffold(body: SafeArea(child: Center(child: Text('Error: $error')))),
         );
   }
 
@@ -115,6 +115,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 actions: [
                   AdaptiveAppBarAction(
                     icon: Icons.check,
+                    iosSymbol: 'checkmark',
                     onPressed: () =>
                         FocusManager.instance.primaryFocus?.unfocus(),
                   ),
@@ -154,14 +155,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             );
           },
           loading: () =>
-              const AdaptiveScaffold(body: Center(child: CircularProgressIndicator())),
+              const AdaptiveScaffold(body: SafeArea(child: Center(child: CircularProgressIndicator()))),
           error: (error, _) =>
-              AdaptiveScaffold(body: Center(child: Text('Error: $error'))),
+              AdaptiveScaffold(body: SafeArea(child: Center(child: Text('Error: $error')))),
         );
       },
       loading: () =>
-          const AdaptiveScaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => AdaptiveScaffold(body: Center(child: Text('Error: $error'))),
+          const AdaptiveScaffold(body: SafeArea(child: Center(child: CircularProgressIndicator()))),
+      error: (error, _) => AdaptiveScaffold(body: SafeArea(child: Center(child: Text('Error: $error')))),
     );
   }
 

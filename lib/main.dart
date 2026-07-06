@@ -1,8 +1,11 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:cue/cue.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
@@ -94,11 +97,30 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
       debugShowCheckedModeBanner: false,
       routerConfig: router,
       scaffoldMessengerKey: AppMessenger.key,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('pt', 'BR'),
+        Locale('en', 'US'),
+      ],
       builder: (context, child) {
+        Widget result = child!;
         if (kDebugMode) {
-          return CueDebugTools(child: child!);
+          result = CueDebugTools(child: result);
         }
-        return child!;
+        if (PlatformInfo.isIOS) {
+          final brightness = MediaQuery.platformBrightnessOf(context);
+          result = CupertinoTheme(
+            data: brightness == Brightness.dark
+                ? AppTheme.cupertinoDarkTheme
+                : AppTheme.cupertinoLightTheme,
+            child: result,
+          );
+        }
+        return result;
       },
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
@@ -33,6 +34,30 @@ class AppTheme {
 
   /// Cached dark theme.
   static final ThemeData darkTheme = buildTheme(Brightness.dark);
+
+  /// Cached light Cupertino theme derived from the Material color scheme.
+  static final CupertinoThemeData cupertinoLightTheme = _buildCupertinoTheme(Brightness.light);
+
+  /// Cached dark Cupertino theme derived from the Material color scheme.
+  static final CupertinoThemeData cupertinoDarkTheme = _buildCupertinoTheme(Brightness.dark);
+
+  static CupertinoThemeData _buildCupertinoTheme(Brightness brightness) {
+    final colorScheme = brightness == Brightness.light
+        ? AppColors.lightColorScheme
+        : AppColors.darkColorScheme;
+    return CupertinoThemeData(
+      brightness: brightness,
+      primaryColor: colorScheme.primary,
+      scaffoldBackgroundColor: colorScheme.surface,
+      textTheme: CupertinoTextThemeData(
+        primaryColor: colorScheme.onSurface,
+        textStyle: AppTypography.textTheme.bodyMedium?.copyWith(
+          color: colorScheme.onSurface,
+        ) ??
+            const TextStyle(),
+      ),
+    );
+  }
 
   /// Builds a [ThemeData] for the given [brightness] using the design
   /// system as the single source of truth.

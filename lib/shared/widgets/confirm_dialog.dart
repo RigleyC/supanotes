@@ -7,6 +7,7 @@
 /// the action cannot be silently undone.
 library;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -34,6 +35,30 @@ Future<bool> showConfirmDialog({
   String cancelLabel = ConfirmDialogStrings.cancel,
   bool destructive = false,
 }) async {
+  final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
+
+  if (isIOS) {
+    final result = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(cancelLabel),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: destructive,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   final result = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => ConfirmDialog(

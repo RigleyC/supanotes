@@ -17,7 +17,6 @@ class ChatScreen extends ConsumerWidget {
   const ChatScreen({super.key});
 
   Future<void> _handleNewSession(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showConfirmDialog(
       context: context,
       title: 'Nova conversa',
@@ -32,11 +31,7 @@ class ChatScreen extends ConsumerWidget {
       await ref.read(chatRepositoryProvider).clearHistory(oldSessionId);
     } catch (e) {
       debugPrint('new session error: $e');
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível limpar o histórico no servidor.'),
-        ),
-      );
+      AppMessenger.showError('Não foi possível limpar o histórico no servidor.');
     }
     ref.read(sessionManagerProvider.notifier).newSession();
   }
