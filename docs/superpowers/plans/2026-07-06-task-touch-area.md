@@ -10,6 +10,52 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-06-task-touch-area-design.md`
 
+> **FIRST**: read the spec at `docs/superpowers/specs/2026-07-06-task-touch-area-design.md` in full before starting. It contains the design rationale and decisions this plan assumes.
+
+**Planned at:** commit `65fbd4b`, 2026-07-06.
+
+> **Drift check (run first)**: `git diff --stat 65fbd4b..HEAD -- lib/features/tasks/presentation/widgets/task_tile.dart lib/features/tasks/presentation/widgets/task_checkbox.dart lib/features/notes/presentation/widgets/custom_task_component.dart lib/shared/widgets/animated_task_checkbox.dart lib/features/tasks/presentation/widgets/task_metadata_badges.dart lib/features/tasks/domain/task_model.dart lib/features/tasks/domain/task_recurrence.dart`
+> If any in-scope file changed since this plan was written, compare the code blocks in this plan against the live code; on a mismatch, treat as a STOP condition.
+
+---
+
+## Scope
+
+**In scope** (files you may modify):
+- `lib/shared/widgets/app_task_checkbox.dart` (create)
+- `lib/features/tasks/presentation/widgets/task_tile.dart` (modify)
+- `lib/features/notes/presentation/widgets/task_exit_animator.dart` (create)
+- `lib/features/notes/presentation/widgets/task_text_style_resolver.dart` (create)
+- `lib/features/notes/presentation/widgets/custom_task_component.dart` (modify)
+- Their corresponding test files under `test/...`
+- `lib/features/tasks/presentation/widgets/task_checkbox.dart` (delete — Task 5)
+- `lib/shared/widgets/animated_task_checkbox.dart` (delete — Task 5)
+
+**Out of scope** (do NOT touch, even though they look related):
+- `lib/features/tasks/presentation/widgets/task_metadata_badges.dart` — its API is read-only here.
+- `lib/features/tasks/domain/task_model.dart` / `task_recurrence.dart` — verbatim consumers.
+- Any `CustomTaskComponentBuilder` **caller** in production screens — this plan preserves the builder's public surface (`composer`, `taskMetadataById`, `hideCompleted`, `onTaskLongPress`, `onTaskComplete`, `onTaskReopen`, `requestRebuild`).
+- Any route, screen, or screen-level state — `TaskTile` is currently referenced only in test code (verified: `git grep -n "TaskTile\("` returns matches only in `lib/features/tasks/presentation/widgets/task_tile.dart` (the class) and `test/...`). No production screen hosts it.
+
+## Done criteria
+
+ALL must hold at the end of Task 5:
+
+- [ ] `flutter analyze` exits 0 with no NEW warnings vs `git stash && flutter analyze; git stash pop` baseline (run both if uncertain).
+- [ ] `flutter test` exits 0.
+- [ ] `git grep -n "\bTaskCheckbox\b\|AnimatedTaskCheckbox\b"` returns matches only inside `lib/shared/widgets/app_task_checkbox.dart` and its test (the class `AppTaskCheckbox` contains the substring `TaskCheckbox`).
+- [ ] No files outside the "In scope" list are modified (`git diff --name-only` matches).
+- [ ] `lib/features/tasks/presentation/widgets/task_checkbox.dart` and `lib/shared/widgets/animated_task_checkbox.dart` are deleted.
+
+## STOP conditions
+
+Stop and report back (do not improvise) if:
+- The code at the locations cited does not match the excerpts below (the codebase has drifted since `65fbd4b`).
+- A step's verification fails twice after a reasonable fix attempt.
+- A fix appears to require touching an out-of-scope file.
+- `TaskModel.isCompleted` no longer equals `status == 'done'` (the Step 2.1 test relies on this — verified at `lib/features/tasks/domain/task_model.dart:60`).
+- The `CustomTaskComponentBuilder` public API (`composer`, `taskMetadataById`, `hideCompleted`, `onTaskLongPress`, `onTaskComplete`, `onTaskReopen`, `requestRebuild`) does not match the `createViewModel`/`createComponent` surface used by production — preserving the public contract is load-bearing.
+
 ---
 
 ## File Structure
@@ -23,7 +69,7 @@
 | `lib/features/notes/presentation/widgets/task_exit_animator.dart` | **Create** | `StatefulWidget` wrapping `SizeTransition`+`FadeTransition` driven by `AnimationController`; exposes `forward()/reverse()` via `didUpdateWidget`. |
 | `lib/features/notes/presentation/widgets/task_text_style_resolver.dart` | **Create** | Pure function `resolveTaskTextStyle(Set<Attribution>, TextStyle base, bool isComplete)` → mutates colour/lineThrough. |
 | `test/features/notes/presentation/widgets/task_exit_animator_test.dart` | **Create** | Verifies forward/reverse + `onAnimationComplete` callback. |
-| `lib/features/notes/presentation/widgets/custom_task_component.dart` | **Modify** | Slim to ~100 lines: replace `_TaskCheckboxHitTarget`+`AnimatedTaskCheckbox` with `AppTaskCheckbox`; wrap row in `GestureDetector(behavior: translucent, onTap, onLongPress)`; delegate exit animation to `TaskExitAnimator`; delegate styles to `resolveTaskTextStyle`. |
+| `lib/features/notes/presentation/widgets/custom_task_component.dart` | **Modify** | Slim: replace `_TaskCheckboxHitTarget`+`AnimatedTaskCheckbox` with `AppTaskCheckbox`; wrap row in `GestureDetector(behavior: translucent, onTap, onLongPress)`; delegate exit animation to `TaskExitAnimator`; delegate styles to `resolveTaskTextStyle`. The component class `CustomTaskComponent` drops from ~220 lines to ~75; builder + view model remain (~150), file overall drops ~394→~250. |
 | `test/features/notes/presentation/widgets/custom_task_component_test.dart` | **Modify** | Update `find.byType(AnimatedTaskCheckbox)` → `find.byType(AppTaskCheckbox)`. Verify tap on checkbox location toggles completion. Verify long-press on checkbox location fires callback. Text area tap remains editable. |
 | `test/features/tasks/presentation/task_completion_snackbar_test.dart` | **Modify** | Same `AnimatedTaskCheckbox`→`AppTaskCheckbox` rename. |
 | `test/features/notes/presentation/note_editor_screen_test.dart` | **Modify** | Same rename. |
@@ -58,7 +104,12 @@ void main() {
         ),
       );
 
-      final container = tester.widget<Container>(find.byType(Container).first);
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppTaskCheckbox),
+          matching: find.byType(Container),
+        ),
+      );
       final decoration = container.decoration as BoxDecoration;
       expect(decoration.shape, BoxShape.circle);
       expect(decoration.color, Colors.transparent);
@@ -79,7 +130,12 @@ void main() {
       // Wait for the didUpdateWidget-driven animation to settle at 1.0.
       await tester.pumpAndSettle();
 
-      final container = tester.widget<Container>(find.byType(Container).first);
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppTaskCheckbox),
+          matching: find.byType(Container),
+        ),
+      );
       final decoration = container.decoration as BoxDecoration;
       expect(decoration.shape, BoxShape.circle);
       expect(decoration.color, const Color(0xFF000000));
@@ -99,7 +155,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final container = tester.widget<Container>(find.byType(Container).first);
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(AppTaskCheckbox),
+          matching: find.byType(Container),
+        ),
+      );
       final decoration = container.decoration as BoxDecoration;
       expect(decoration.borderRadius, BorderRadius.circular(8));
     });
@@ -418,7 +479,7 @@ void main() {
   testWidgets('tap on row toggles completion to false when completed',
       (tester) async {
     bool? toggled;
-    final task = buildTask(status: 'completed');
+    final task = buildTask(status: 'done');
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -851,6 +912,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/notes/presentation/widgets/task_text_style_resolver.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
@@ -1127,10 +1189,14 @@ Run:
 git rm lib/features/tasks/presentation/widgets/task_checkbox.dart lib/shared/widgets/animated_task_checkbox.dart
 ```
 
-- [ ] **Step 5.2: Verify no stale references**
+- [ ] **Step 5.2: Verify no stale imports**
 
-Run: `git grep -n "TaskCheckbox\|AnimatedTaskCheckbox"`
-Expected: only output should be matches inside `app_task_checkbox_test.dart` referencing `AppTaskCheckbox` (which contains the substring `TaskCheckbox`). If any lib file or test still imports `task_checkbox.dart` / `animated_task_checkbox.dart`, fix before continuing.
+Run: `git grep -lE "import .*(task_checkbox|animated_task_checkbox)\.dart"`
+Expected: empty output (command exits 1). Any path printed is a stale import — fix or remove before continuing.
+
+Then sanity-check class references:
+Run: `git grep -nE "\bTaskCheckbox\b|\bAnimatedTaskCheckbox\b"`
+Expected: every match belongs to `lib/shared/widgets/app_task_checkbox.dart` or `test/shared/widgets/app_task_checkbox_test.dart` (i.e. `AppTaskCheckbox` substring). Any other match means a stale reference.
 
 - [ ] **Step 5.3: Run full test suite + analyze**
 
@@ -1161,7 +1227,8 @@ Run: `flutter run` (or the project's run script).
 3. Tap the row of a completed task → it reopens.
 4. Long-press a task row → the metadata sheet opens.
 5. Tap directly on the task text → caret enters the text (editable).
-6. Open the tasks list screen if it exists (`/tasks` or analogous) — confirm same tap/long-press behaviour on `TaskTile`.
+
+> **Note**: `TaskTile` is currently referenced only by test code (no production screen hosts it — verified via `git grep -n "TaskTile\("`). Its visual smoke is exercised indirectly through `TaskTile`'s unit tests; skip a dedicated screen-level smoke for it in this cycle.
 
 > No code change from this step; record any regression in a follow-up.
 
