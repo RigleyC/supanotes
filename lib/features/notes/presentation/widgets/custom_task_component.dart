@@ -170,9 +170,7 @@ class CustomTaskComponent extends StatefulWidget {
 }
 
 class _CustomTaskComponentState extends State<CustomTaskComponent>
-    with
-        ProxyDocumentComponent<CustomTaskComponent>,
-        ProxyTextComposable {
+    with ProxyDocumentComponent<CustomTaskComponent>, ProxyTextComposable {
   final _textKey = GlobalKey();
 
   @override
@@ -192,64 +190,77 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       textDirection: widget.viewModel.textDirection,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTap: widget.viewModel.setComplete == null
-            ? null
-            : () => widget.viewModel.setComplete!(!widget.viewModel.isComplete),
         onLongPress: widget.onLongPress,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: defaultTaskIndentCalculator(
-                widget.viewModel.textStyleBuilder({}),
-                widget.viewModel.indent,
-              ),
-            ),
-            AppTaskCheckbox(
-              value: widget.viewModel.isComplete,
-              accentColor: taskColor,
-              inactiveColor: colorScheme.outline,
-              shape: AppTaskCheckboxShape.rounded,
-            ),
-            const SizedBox(width: _taskCheckboxGap),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextComponent(
-                    key: _textKey,
-                    text: widget.viewModel.text,
-                    textDirection: widget.viewModel.textDirection,
-                    textAlign: widget.viewModel.textAlignment,
-                    maxLines: widget.viewModel.maxLines,
-                    overflow: widget.viewModel.overflow,
-                    textStyleBuilder: (attributions) =>
-                        resolveTaskTextStyle(
-                      widget.viewModel.textStyleBuilder(attributions),
-                      Theme.of(context).colorScheme.onSurface,
-                      widget.viewModel.isComplete,
+        child: SizedBox(
+          height: widget.viewModel.textStyleBuilder({}).fontSize! * 1.5,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: widget.viewModel.setComplete == null
+                    ? null
+                    : () => widget.viewModel.setComplete!(
+                        !widget.viewModel.isComplete,
+                      ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: defaultTaskIndentCalculator(
+                        widget.viewModel.textStyleBuilder({}),
+                        widget.viewModel.indent,
+                      ),
                     ),
-                    inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
-                    textSelection: widget.viewModel.selection,
-                    selectionColor: widget.viewModel.selectionColor,
-                    highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                    underlines: widget.viewModel.createUnderlines(),
-                  ),
-                  if (widget.taskMetadata?.dueDate != null ||
-                      widget.taskMetadata?.recurrence != null) ...[
-                    const SizedBox(height: 4),
-                    TaskMetadataBadges(
-                      dueDate: widget.taskMetadata?.dueDate,
-                      recurrence: widget.taskMetadata?.recurrence,
-                      isCompleted: widget.viewModel.isComplete,
+                    AppTaskCheckbox(
+                      value: widget.viewModel.isComplete,
+                      accentColor: taskColor,
+                      inactiveColor: colorScheme.outline,
+                      shape: AppTaskCheckboxShape.rounded,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(width: _taskCheckboxGap),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextComponent(
+                      key: _textKey,
+                      text: widget.viewModel.text,
+                      textDirection: widget.viewModel.textDirection,
+                      textAlign: widget.viewModel.textAlignment,
+                      maxLines: widget.viewModel.maxLines,
+                      overflow: widget.viewModel.overflow,
+                      textStyleBuilder: (attributions) => resolveTaskTextStyle(
+                        widget.viewModel.textStyleBuilder(attributions),
+                        Theme.of(context).colorScheme.onSurface,
+                        widget.viewModel.isComplete,
+                      ),
+                      inlineWidgetBuilders:
+                          widget.viewModel.inlineWidgetBuilders,
+                      textSelection: widget.viewModel.selection,
+                      selectionColor: widget.viewModel.selectionColor,
+                      highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                      underlines: widget.viewModel.createUnderlines(),
+                    ),
+                    if (widget.taskMetadata?.dueDate != null ||
+                        widget.taskMetadata?.recurrence != null) ...[
+                      const SizedBox(height: 4),
+                      TaskMetadataBadges(
+                        dueDate: widget.taskMetadata?.dueDate,
+                        recurrence: widget.taskMetadata?.recurrence,
+                        isCompleted: widget.viewModel.isComplete,
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -91,6 +91,47 @@ void main() {
     expect(completed, isTrue);
   });
 
+  testWidgets('tap on text does not toggle completion', (tester) async {
+    bool? completed;
+    final vm = TaskComponentViewModel(
+      nodeId: 'task-1',
+      padding: EdgeInsets.zero,
+      indent: 0,
+      isComplete: false,
+      setComplete: (value) => completed = value,
+      text: AttributedText('Enviar relatorio'),
+      textDirection: TextDirection.ltr,
+      textAlignment: TextAlign.left,
+      textStyleBuilder: (_) => const TextStyle(fontSize: 16),
+      selectionColor: Colors.transparent,
+    );
+
+    await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: vm)));
+
+    await tester.tap(find.byType(TextComponent), warnIfMissed: false);
+    await tester.pump();
+
+    expect(completed, isNull);
+  });
+
+  testWidgets('long-press on text opens task actions', (tester) async {
+    var openedActions = false;
+
+    await tester.pumpWidget(
+      wrap(
+        CustomTaskComponent(
+          viewModel: viewModel(),
+          onLongPress: () => openedActions = true,
+        ),
+      ),
+    );
+
+    await tester.longPress(find.byType(TextComponent), warnIfMissed: false);
+    await tester.pump();
+
+    expect(openedActions, isTrue);
+  });
+
   testWidgets('keeps text spaced from the checkbox icon', (tester) async {
     await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: viewModel())));
 
