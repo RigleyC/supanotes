@@ -80,9 +80,8 @@ class _AppTaskCheckboxState extends State<AppTaskCheckbox>
           animation: _controller,
           builder: (context, _) {
             final scale = 1.0 - (0.15 * (1.0 - _scaleAnim.value));
-            final t = _controller.value;
-            final fill = Color.lerp(Colors.transparent, accent, t)!;
-            final border = Color.lerp(inactive, accent, t)!;
+            final fill = widget.value ? accent : Colors.transparent;
+            final border = widget.value ? accent : inactive;
             return Transform.scale(
               scale: scale,
               child: Container(
