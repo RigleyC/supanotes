@@ -31,7 +31,7 @@
 
 **Local:** `lib/shared/widgets/app_task_checkbox.dart`
 **Tipo:** `StatefulWidget` (precisa de `AnimationController`).
-**Linhas esperadas:** ~150 (incluindo `_CheckmarkPainter`).
+**Linhas esperadas:** ~120 (incluindo `_CheckmarkPainter`, sem lógica de gesture).
 
 #### API
 
@@ -42,28 +42,23 @@ class AppTaskCheckbox extends StatefulWidget {
   const AppTaskCheckbox({
     super.key,
     required this.value,
-    required this.onChanged,
     this.accentColor,
     this.inactiveColor,
-    this.size = 22.0,                        // tamanho visível do checkbox
-    this.hitSize = 48.0,                      // área de toque (Material mínimo)
+    this.size = 22.0,
     this.shape = AppTaskCheckboxShape.circle,
-    this.onLongPress,
   });
 
   final bool value;
-  final ValueChanged<bool>? onChanged;
-  final Color? accentColor;                  // default: ColorScheme.primary
-  final Color? inactiveColor;                // default: ColorScheme.outline @ 0.6
+  final Color? accentColor;            // default: ColorScheme.primary
+  final Color? inactiveColor;         // default: ColorScheme.outline @ 0.6
   final double size;
-  final double hitSize;
   final AppTaskCheckboxShape shape;
-  final VoidCallback? onLongPress;
 }
 ```
 
 #### Comportamento
 
+- **Puramente visual** — não tem `GestureDetector`, `onChanged` ou `onLongPress`. Todos os gestures são responsabilidade do `TaskTile`/`CustomTaskComponent` (parent).
 - `AnimationController` duration **300ms**, `SingleTickerProviderStateMixin`.
   - `forward()` ao marcar (`didUpdateWidget` detecta `value: false → true`).
   - `reverse()` ao desmarcar.
@@ -73,10 +68,6 @@ class AppTaskCheckbox extends StatefulWidget {
 - `shape`:
   - `circle` → `BoxShape.circle` (lista).
   - `rounded` → `BorderRadius.circular(8)` (editor).
-- `GestureDetector` `behavior: HitTestBehavior.opaque` envolvendo `SizedBox(hitSize, hitSize)` com o checkbox centrado via `Center`.
-  - `onTap: onChanged == null ? null : () => onChanged!(!value)` — **chave**: quando `onChanged` é null, `onTap` é null e o `GestureDetector` não consome toque (Flutter trata `onTap: null` como não‑hit‑testable). Isso permite usar o checkbox como **puramente visual** dentro da `TaskTile`/`CustomTaskComponent` (gestures centralizados no parent) sem precisar de `IgnorePointer`.
-  - `onLongPress` similarmente null quando `widget.onLongPress == null`.
-  - **Bug do `TaskCheckbox` atual evitado:** não registrar `onTap` incondicionalmente.
 - `Semantics(checked: value, label: 'Tarefa ${value ? 'concluída' : 'pendente'}')` mantido do `TaskCheckbox` atual.
 
 #### `_CheckmarkPainter`
@@ -131,7 +122,6 @@ Material(
         children: [
           AppTaskCheckbox(
             value: task.isCompleted,
-            onChanged: null,              // só visual — gesture é do parent
             accentColor: taskColor,
             shape: circle,
           ),
@@ -184,11 +174,9 @@ Widget build(BuildContext context) {
           SizedBox(width: indent),
           AppTaskCheckbox(
             value: viewModel.isComplete,
-            onChanged: null,                        // só visual
             accentColor: taskColor,
             inactiveColor: colorScheme.outline,
             shape: rounded,
-            hitSize: 40,                            // editor pede menos que lista
           ),
           SizedBox(width: _taskCheckboxGap),
           Expanded(Column[
@@ -224,7 +212,7 @@ Widget build(BuildContext context) {
 
 | Arquivo | Estado | Cobertura |
 |---|---|---|
-| `test/shared/widgets/app_task_checkbox_test.dart` | **Novo** | Tap → `onChanged(!value)`; long‑press → `onLongPress`; `onChanged: null` → tap não consome. Hit area via `tester.getSize` ≥ 48px (size default 22 com hitSize 48). |
+| `test/shared/widgets/app_task_checkbox_test.dart` | **Novo** | Renderiza conforme `value` (filled/outline). `didUpdateWidget` dispara `forward()`/`reverse()` no controller. `shape: circle` vs `rounded` produzem `BoxShape.circle`/`BorderRadius.circular(8)`. Sem gesture — não consome tap (validar com `tester.tap` não propagar erro). |
 | `test/features/tasks/presentation/widgets/task_tile_test.dart` | **Atualizar** | Tap no título (fora do checkbox) → `onToggleComplete(true)`. Tap quando já concluída → `onToggleComplete(false)`. Long‑press → `onOpenMetadata`. Remover testes de swipe. |
 | `test/features/tasks/presentation/widgets/task_metadata_badges_test.dart` | Mantido | — |
 | `test/features/notes/.../custom_task_component_test.dart` | **Novo ou estendido** | Tap fora do texto → `setComplete(!isComplete)`. Long‑press → callback. Texto editável preservado (pump, focar, digitar). |
@@ -246,7 +234,7 @@ Widget build(BuildContext context) {
 - **Swipe removido** da `TaskTile`. Exclusão via long‑press → modal (já existe `TaskMetadataSheet` com delete).
 - **`onTap` antigo da `TaskTile`** (abrir detalhes) some; vira `onToggleComplete`. Detalhes agora só via long‑press.
 - **Animação "sendo desenhada" do check**: preservada (Mover `_CheckmarkPainter` p/ o novo widget).
-- **Hit area editor = 40px** (não 48) pra evitar overlapping com o topo da linha de texto; `hitSize` parametrizado caso queira ajustar depois.
+- **Hit area editor**: definida pelo `Row` inteiro (parent `GestureDetector` translucidam), não pelo checkbox — que é puramente visual.
 - **Sem codegen** (AGENTS.md §Riverpod — código manual).
 - **Sem `_FooStrings`**: labels vão inline (`const Text('Concluir')` etc.) — não há neste design.
 
