@@ -178,7 +178,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   Future<NoteQueryResult?> getNoteById(String id) async {
     final data = _store[id];
     if (data == null) return null;
-    return (note: data, favorite: false, archived: false, hideCompleted: false);
+    return (note: data, title: 'Sem título', favorite: false, archived: false, hideCompleted: false);
   }
 
   @override
@@ -201,7 +201,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       collapseImages: false,
     );
     _store[id] = data;
-    return (note: data, favorite: false, archived: false, hideCompleted: false);
+    return (note: data, title: 'Sem título', favorite: false, archived: false, hideCompleted: false);
   }
 
   @override
@@ -296,10 +296,10 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
   }
 
   @override
-  Future<DateTime?> completeTask(String id) async => null;
+  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id) async => (nextDue: null, previousDue: null);
 
   @override
-  Future<void> reopenTask(String id) async {}
+  Future<void> reopenTask(String id, {DateTime? originalDueDate}) async {}
 
   @override
   Future<void> softDeleteTask(String id) async {}

@@ -91,8 +91,6 @@ class _FakeNotesRepository implements INotesRepository {
   @override
   Future<void> markHasRemoteCopy(String id) async {}
 
-  @override
-  Future<void> migrateMarkdownToNodes(String noteId, String content) async {}
 
   @override
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId) =>
@@ -108,6 +106,7 @@ class _FakeNotesRepository implements INotesRepository {
       id: id,
       userId: 'user-1',
       content: content,
+      title: 'Test Note',
       isInbox: isInbox,
       favorite: false,
       archived: false,
@@ -205,11 +204,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Buscar notas'));
+    await tester.tap(find.byIcon(Icons.search));
     await tester.pump();
 
     expect(find.byKey(const ValueKey('notes-inline-search-field')), findsOneWidget);
-    expect(find.byTooltip('Fechar busca'), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsOneWidget);
   });
 
   testWidgets('inline search renders hybrid backend results', (tester) async {
@@ -238,7 +237,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Buscar notas'));
+    await tester.tap(find.byIcon(Icons.search));
     await tester.pump();
     await tester.enterText(find.byType(TextField), 'comida');
     await tester.pump(const Duration(milliseconds: 350));

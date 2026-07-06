@@ -98,8 +98,8 @@ class _MockTasksRepository extends Mock implements ITasksRepository {}
 _MockTasksRepository _defaultMockTasksRepo() {
   final mock = _MockTasksRepository();
   when(() => mock.watchByNote(any())).thenAnswer((_) => Stream.value([]));
-  when(() => mock.completeTask(any())).thenAnswer((_) async => null);
-  when(() => mock.reopenTask(any())).thenAnswer((_) async {});
+  when(() => mock.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null));
+  when(() => mock.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
   return mock;
 }
 
@@ -128,6 +128,7 @@ void main() {
           id: 'note-1',
           userId: 'u-1',
           content: '# Persisted note',
+          title: 'Persisted note',
           favorite: false,
           archived: false,
           isInbox: false,
@@ -147,6 +148,7 @@ void main() {
           id: 'note-1',
           userId: 'u-1',
           content: '# Persisted note',
+          title: 'Persisted note',
           favorite: false,
           archived: false,
           isInbox: false,
@@ -193,6 +195,7 @@ void main() {
         id: 'note-1',
         userId: 'u-1',
         content: 'Dark content',
+        title: 'Dark content',
         favorite: false,
         archived: false,
         isInbox: false,
@@ -416,6 +419,7 @@ void main() {
         id: 'note-1',
         userId: 'u-1',
         content: 'Plain content',
+        title: 'Plain content',
         favorite: false,
         archived: false,
         isInbox: false,
@@ -460,8 +464,8 @@ void main() {
         ),
       ]),
     );
-    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => null);
-    when(() => mockTasksRepo.reopenTask(any())).thenAnswer((_) async {});
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null));
+    when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
 
     const noteContent = '# Test note\n\n- [ ] buy milk <!-- task:task-1 -->\n';
 
@@ -484,6 +488,7 @@ void main() {
         id: 'note-1',
         userId: 'u-1',
         content: noteContent,
+        title: 'Test note',
         favorite: false,
         archived: false,
         isInbox: false,
@@ -527,8 +532,8 @@ void main() {
           ),
         ]),
       );
-      when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => null);
-      when(() => mockTasksRepo.reopenTask(any())).thenAnswer((_) async {});
+      when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null));
+      when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
 
       const noteContent =
           '# Test note\n\n- [x] buy milk <!-- task:task-1 -->\n';
@@ -547,28 +552,29 @@ void main() {
         ),
       );
 
-      streamController.add(
-        NoteModel(
-          id: 'note-1',
-          userId: 'u-1',
-          content: noteContent,
-          favorite: false,
-          archived: false,
-          isInbox: false,
-          contextId: null,
-          createdAt: DateTime(2026, 6, 11),
-          updatedAt: DateTime(2026, 6, 11),
-          hideCompleted: false,
-        ),
-      );
-      await tester.pumpAndSettle();
+        streamController.add(
+          NoteModel(
+            id: 'note-1',
+            userId: 'u-1',
+            content: noteContent,
+            title: 'Test note',
+            favorite: false,
+            archived: false,
+            isInbox: false,
+            contextId: null,
+            createdAt: DateTime(2026, 6, 11),
+            updatedAt: DateTime(2026, 6, 11),
+            hideCompleted: false,
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      final checkbox = find.byType(AnimatedTaskCheckbox);
-      expect(checkbox, findsOneWidget);
-      await tester.tap(checkbox);
-      await tester.pumpAndSettle();
+        final checkbox = find.byType(AnimatedTaskCheckbox);
+        expect(checkbox, findsOneWidget);
+        await tester.tap(checkbox);
+        await tester.pumpAndSettle();
 
-      verify(() => mockTasksRepo.reopenTask('task-1')).called(1);
+        verify(() => mockTasksRepo.reopenTask('task-1')).called(1);
     },
   );
 }

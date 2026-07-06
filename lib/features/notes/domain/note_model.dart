@@ -1,5 +1,3 @@
-import 'package:supanotes/features/notes/domain/note_display_text.dart';
-import '../../../core/database/database.dart';
 import '../../../core/database/daos/notes_dao.dart';
 
 class NoteModel {
@@ -7,6 +5,8 @@ class NoteModel {
     required this.id,
     required this.userId,
     required this.content,
+    required this.title,
+    this.excerpt,
     required this.isInbox,
     required this.favorite,
     required this.archived,
@@ -23,6 +23,8 @@ class NoteModel {
   final String id;
   final String userId;
   final String content;
+  final String title;
+  final String? excerpt;
   final bool isInbox;
   final bool favorite;
   final bool archived;
@@ -35,9 +37,6 @@ class NoteModel {
   final String? sharedByEmail;
   final String? sharedByName;
 
-  String get title => deriveNoteTitle(content);
-  String? get excerpt => deriveNoteExcerpt(content);
-
   bool get isOwner => permission == null;
   bool get isReadOnly => permission == 'view';
   bool get isShared => sharedByEmail != null;
@@ -46,6 +45,8 @@ class NoteModel {
     String? id,
     String? userId,
     String? content,
+    String? title,
+    String? excerpt,
     bool? isInbox,
     bool? favorite,
     bool? archived,
@@ -61,6 +62,8 @@ class NoteModel {
     id: id ?? this.id,
     userId: userId ?? this.userId,
     content: content ?? this.content,
+    title: title ?? this.title,
+    excerpt: excerpt ?? this.excerpt,
     isInbox: isInbox ?? this.isInbox,
     favorite: favorite ?? this.favorite,
     archived: archived ?? this.archived,
@@ -74,32 +77,13 @@ class NoteModel {
     sharedByName: sharedByName ?? this.sharedByName,
   );
 
-  factory NoteModel.fromData(NoteData d, {bool hideCompleted = false}) {
-    return NoteModel(
-      id: d.id,
-      userId: d.userId,
-      content: d.content,
-      isInbox: d.isInbox,
-      favorite: false,
-      archived: false,
-      contextId: d.contextId,
-      createdAt: d.createdAt,
-      updatedAt: d.updatedAt,
-      hideCompleted: hideCompleted,
-      collapseImages: d.collapseImages,
-      permission: d.permission?.isNotEmpty == true ? d.permission : null,
-      sharedByEmail: d.sharedByEmail?.isNotEmpty == true
-          ? d.sharedByEmail
-          : null,
-      sharedByName: d.sharedByName?.isNotEmpty == true ? d.sharedByName : null,
-    );
-  }
-
   factory NoteModel.fromQueryResult(NoteQueryResult qr) {
     return NoteModel(
       id: qr.note.id,
       userId: qr.note.userId,
       content: qr.note.content,
+      title: qr.title,
+      excerpt: qr.note.excerpt,
       isInbox: qr.note.isInbox,
       favorite: qr.favorite,
       archived: qr.archived,

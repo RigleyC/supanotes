@@ -13,6 +13,7 @@ void main() {
         id: 'note-1',
         userId: 'user-1',
         content: 'Dark note\nReadable excerpt',
+        title: 'Dark note',
         isInbox: false,
         favorite: false,
         archived: false,
