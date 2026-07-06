@@ -5,13 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
-	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -27,16 +25,11 @@ type UpdateNoteRequest struct {
 	CollapseImages *bool   `json:"collapse_images"`
 }
 
-type AppendToInboxRequest struct {
-	Content string `json:"content" validate:"required"`
-}
-
 type NoteResponse struct {
 	ID             string  `json:"id"`
 	ContextID      *string `json:"context_id,omitempty"`
 	Content        string  `json:"content"`
 	Excerpt        *string `json:"excerpt,omitempty"`
-	IsInbox        bool    `json:"is_inbox"`
 	Favorite       bool    `json:"favorite"`
 	Archived       bool    `json:"archived"`
 	CollapseImages bool    `json:"collapse_images"`
@@ -45,12 +38,11 @@ type NoteResponse struct {
 }
 
 type Handler struct {
-	svc       *Service
-	llmClient llm.Client
+	svc *Service
 }
 
-func NewHandler(svc *Service, llmClient llm.Client) *Handler {
-	return &Handler{svc: svc, llmClient: llmClient}
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) Create(c echo.Context) error {
@@ -121,7 +113,7 @@ func (h *Handler) List(c echo.Context) error {
 	for _, n := range notes {
 		res = append(res, mapToNoteResponse(NoteResponseFields{
 			ID: n.ID, ContextID: n.ContextID, Content: n.Content, Excerpt: n.Excerpt,
-			IsInbox: n.IsInbox, Favorite: n.Favorite, Archived: n.Archived,
+			Favorite: n.Favorite, Archived: n.Archived,
 			CollapseImages: n.CollapseImages, CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
 		}))
 	}
@@ -151,7 +143,7 @@ func (h *Handler) Get(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, mapToNoteResponse(NoteResponseFields{
 		ID: note.ID, ContextID: note.ContextID, Content: note.Content,
-		Excerpt: note.Excerpt, IsInbox: note.IsInbox, Favorite: note.Favorite,
+		Excerpt: note.Excerpt, Favorite: note.Favorite,
 		Archived: note.Archived, CollapseImages: note.CollapseImages,
 		CreatedAt: note.CreatedAt, UpdatedAt: note.UpdatedAt,
 	}))
@@ -186,9 +178,6 @@ func (h *Handler) Update(c echo.Context) error {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
 		}
-		if errors.Is(err, ErrInboxRule) {
-			return web.JSONError(c, http.StatusForbidden, "cannot modify inbox note properties")
-		}
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to update note")
 	}
@@ -212,111 +201,11 @@ func (h *Handler) Delete(c echo.Context) error {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
 		}
-		if errors.Is(err, ErrInboxRule) {
-			return web.JSONError(c, http.StatusForbidden, "cannot delete inbox note")
-		}
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to delete note")
 	}
 
 	return c.NoContent(http.StatusNoContent)
-}
-
-func (h *Handler) GetInbox(c echo.Context) error {
-	userID, err := web.UserID(c)
-	if err != nil {
-		return err
-	}
-
-	note, err := h.svc.GetInboxNote(c.Request().Context(), userID)
-	if err != nil {
-		if errors.Is(err, ErrNoteNotFound) {
-			return web.JSONError(c, http.StatusNotFound, "inbox note not found")
-		}
-		c.Logger().Error(err)
-		return web.JSONError(c, http.StatusInternalServerError, "failed to get inbox note")
-	}
-
-	return c.JSON(http.StatusOK, mapToNoteResponse(NoteResponseFields{
-		ID: note.ID, ContextID: note.ContextID, Content: note.Content,
-		Excerpt: note.Excerpt, IsInbox: note.IsInbox, Favorite: note.Favorite,
-		Archived: note.Archived, CollapseImages: note.CollapseImages,
-		CreatedAt: note.CreatedAt, UpdatedAt: note.UpdatedAt,
-	}))
-}
-
-func (h *Handler) AppendToInbox(c echo.Context) error {
-	userID, err := web.UserID(c)
-	if err != nil {
-		return err
-	}
-
-	var req AppendToInboxRequest
-	if err := web.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
-	note, err := h.svc.AppendToInbox(c.Request().Context(), userID, req.Content)
-	if err != nil {
-		c.Logger().Error(err)
-		return web.JSONError(c, http.StatusInternalServerError, "failed to append to inbox note")
-	}
-
-	return c.JSON(http.StatusOK, mapToNoteResponse(noteToResponseFields(note)))
-}
-
-type PlanOrganizationResponse struct {
-	PlanID string                 `json:"plan_id"`
-	Items  []PlanOrganizationItem `json:"items"`
-}
-
-type ApplyOrganizationRequest struct {
-	PlanID string                 `json:"plan_id"`
-	Items  []PlanOrganizationItem `json:"items" validate:"required"`
-}
-
-type ApplyOrganizationResponse struct {
-	Status string `json:"status"`
-}
-
-func (h *Handler) PlanOrganization(c echo.Context) error {
-	userID, err := web.UserID(c)
-	if err != nil {
-		return err
-	}
-
-	items, err := h.svc.PlanInboxOrganization(c.Request().Context(), userID, h.llmClient)
-	if err != nil {
-		if errors.Is(err, ErrNoteNotFound) {
-			return web.JSONError(c, http.StatusNotFound, "inbox note not found")
-		}
-		c.Logger().Error(err)
-		return web.JSONError(c, http.StatusInternalServerError, "failed to plan inbox organization")
-	}
-
-	planID := uuid.New().String()
-	return c.JSON(http.StatusOK, PlanOrganizationResponse{
-		PlanID: planID,
-		Items:  items,
-	})
-}
-
-func (h *Handler) ApplyOrganization(c echo.Context) error {
-	userID, err := web.UserID(c)
-	if err != nil {
-		return err
-	}
-
-	var req ApplyOrganizationRequest
-	if err := web.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
-	if err := h.svc.ApplyOrganization(c.Request().Context(), userID, req.Items); err != nil {
-		return web.JSONError(c, http.StatusInternalServerError, err.Error())
-	}
-
-	return c.JSON(http.StatusOK, ApplyOrganizationResponse{Status: "applied"})
 }
 
 func ptr(s string) *string { return &s }
@@ -330,7 +219,6 @@ type NoteResponseFields struct {
 	ContextID      pgtype.UUID
 	Content        string
 	Excerpt        pgtype.Text
-	IsInbox        bool
 	Favorite       bool
 	Archived       bool
 	CollapseImages bool
@@ -354,7 +242,6 @@ func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 		ContextID:      ctxID,
 		Content:        f.Content,
 		Excerpt:        exc,
-		IsInbox:        f.IsInbox,
 		Favorite:       f.Favorite,
 		Archived:       f.Archived,
 		CollapseImages: f.CollapseImages,
@@ -369,7 +256,6 @@ func noteToResponseFields(n sqlcgen.Note) NoteResponseFields {
 		ContextID:      n.ContextID,
 		Content:        n.Content,
 		Excerpt:        n.Excerpt,
-		IsInbox:        n.IsInbox,
 		CollapseImages: n.CollapseImages,
 		CreatedAt:      n.CreatedAt,
 		UpdatedAt:      n.UpdatedAt,

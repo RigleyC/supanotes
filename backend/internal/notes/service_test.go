@@ -36,15 +36,6 @@ func (m *mockRepo) DeleteNote(ctx context.Context, id pgtype.UUID, userID pgtype
 func (m *mockRepo) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	return nil, nil
 }
-func (m *mockRepo) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
-	return sqlcgen.GetInboxNoteRow{}, nil
-}
-func (m *mockRepo) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
-}
-func (m *mockRepo) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
-}
 func (m *mockRepo) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }

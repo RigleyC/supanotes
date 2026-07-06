@@ -192,7 +192,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
 	tasksSvc := tasks.NewService(tasksRepo)
-	tasksH := tasks.NewHandler(tasksSvc, notesSvc)
+	tasksH := tasks.NewHandler(tasksSvc)
 	protected.POST("/tasks", tasksH.Create)
 	protected.GET("/tasks", tasksH.List)
 	protected.PATCH("/tasks/:id", tasksH.Update)
@@ -223,7 +223,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	// Memories
 	memoriesRepo := memories.NewRepository(queries)
-	memoriesSvc := memories.NewService(memoriesRepo, embeddingClient, llmFactory.For(llm.TaskTypeInboxOrganize))
+	memoriesSvc := memories.NewService(memoriesRepo, embeddingClient, llmFactory.For(llm.TaskTypeAgentHelper))
 	memoriesH := memories.NewHandler(memoriesSvc)
 	protected.GET("/memories", memoriesH.List)
 	protected.POST("/memories", memoriesH.Create)
@@ -234,18 +234,13 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	searchH := search.NewHandler(searchSvc)
 	search.RegisterRoutes(protected, searchH)
 
-	// Notes (needs llmFactory for inbox organization)
-	notesH := notes.NewHandler(notesSvc, llmFactory.For(llm.TaskTypeInboxOrganize))
+	// Notes
+	notesH := notes.NewHandler(notesSvc)
 	protected.POST("/notes", notesH.Create)
 	protected.GET("/notes", notesH.List)
 	protected.GET("/notes/:id", notesH.Get)
 	protected.PATCH("/notes/:id", notesH.Update)
 	protected.DELETE("/notes/:id", notesH.Delete)
-
-	protected.GET("/notes/inbox", notesH.GetInbox)
-	protected.POST("/notes/inbox/append", notesH.AppendToInbox)
-	protected.POST("/notes/inbox/organize/plan", notesH.PlanOrganization)
-	protected.POST("/notes/inbox/organize/apply", notesH.ApplyOrganization)
 
 	// Shares
 	sharesRepo := shares.NewRepository(queries)

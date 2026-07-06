@@ -14,9 +14,6 @@ type Repository interface {
 	UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error)
 	DeleteNote(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) error
 	GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error)
-	GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error)
-	AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error)
-	SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error)
 	AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
 	GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error)
@@ -48,10 +45,6 @@ func (r *repository) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgt
 	return r.q.GetNoteByID(ctx, sqlcgen.GetNoteByIDParams{ID: id, UserID: userID})
 }
 
-func (r *repository) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
-	return r.q.GetInboxNote(ctx, userID)
-}
-
 func (r *repository) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
 	return r.q.UpdateNote(ctx, arg)
 }
@@ -62,14 +55,6 @@ func (r *repository) DeleteNote(ctx context.Context, id pgtype.UUID, userID pgty
 
 func (r *repository) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	return r.q.GetNotes(ctx, arg)
-}
-
-func (r *repository) AppendToInbox(ctx context.Context, arg sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
-	return r.q.AppendToInbox(ctx, arg)
-}
-
-func (r *repository) SetInboxContent(ctx context.Context, arg sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
-	return r.q.SetInboxContent(ctx, arg)
 }
 
 func (r *repository) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
