@@ -74,9 +74,9 @@ class AppTaskCheckbox extends StatefulWidget {
   - `circle` → `BoxShape.circle` (lista).
   - `rounded` → `BorderRadius.circular(8)` (editor).
 - `GestureDetector` `behavior: HitTestBehavior.opaque` envolvendo `SizedBox(hitSize, hitSize)` com o checkbox centrado via `Center`.
-  - `onTap` → `onChanged?.call(!value)`.
-  - `onLongPress` → `widget.onLongPress?.call()`.
-  - Se `onChanged == null` → desabilita `onTap` (não consome touch). Importante pra usar o checkbox como **puramente visual** dentro da `TaskTile` (gesturescentralizados no parent).
+  - `onTap: onChanged == null ? null : () => onChanged!(!value)` — **chave**: quando `onChanged` é null, `onTap` é null e o `GestureDetector` não consome toque (Flutter trata `onTap: null` como não‑hit‑testable). Isso permite usar o checkbox como **puramente visual** dentro da `TaskTile`/`CustomTaskComponent` (gestures centralizados no parent) sem precisar de `IgnorePointer`.
+  - `onLongPress` similarmente null quando `widget.onLongPress == null`.
+  - **Bug do `TaskCheckbox` atual evitado:** não registrar `onTap` incondicionalmente.
 - `Semantics(checked: value, label: 'Tarefa ${value ? 'concluída' : 'pendente'}')` mantido do `TaskCheckbox` atual.
 
 #### `_CheckmarkPainter`
@@ -129,13 +129,11 @@ Material(
       // padding simétrico (igual hoje)
       child: Row(
         children: [
-          IgnorePointer(
-            child: AppTaskCheckbox(
-              value: task.isCompleted,
-              onChanged: null,              // só visual — gesture é do parent
-              accentColor: taskColor,
-              shape: circle,
-            ),
+          AppTaskCheckbox(
+            value: task.isCompleted,
+            onChanged: null,              // só visual — gesture é do parent
+            accentColor: taskColor,
+            shape: circle,
           ),
           SizedBox(width: md),
           Expanded(Column[
@@ -149,7 +147,7 @@ Material(
 )
 ```
 
-> **Decisão de implementação:** checkbox visual é `IgnorePointer(child: AppTaskCheckbox(onChanged: null))` — garante que nunca captura toque, sobrando pro `GestureDetector` externo tratar tudo.
+> **Decisão de implementação:** checkbox visual é `AppTaskCheckbox(onChanged: null)`. Como `onTap` é null quando `onChanged` é null, o checkbox não consome toque — dispensa `IgnorePointer`.
 
 - **Removido:** `Dismissible`, `_SwipeBackground`, `_MetaRow`.
 - **Tap area:** toda a linha (height ≈ 56–72px dependendo de `dense` e badges). Acima dos 48px mínimos.
