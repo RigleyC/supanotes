@@ -14,7 +14,6 @@ import 'package:supanotes/features/notes/presentation/controllers/notes_provider
 import 'package:supanotes/features/notes/presentation/widgets/brain_dump_tile.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_grid_view.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_list_view.dart';
-import 'package:supanotes/features/notes/presentation/widgets/notes_more_menu.dart';
 import 'package:supanotes/features/notes/presentation/widgets/section_title.dart';
 import 'package:supanotes/features/search/presentation/controllers/search_controller.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_bar.dart';
@@ -22,11 +21,12 @@ import 'package:supanotes/features/search/presentation/widgets/search_error_view
 import 'package:supanotes/features/search/presentation/widgets/search_loading_view.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_results_view.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/offline_indicator.dart';
 import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart' show CupertinoActionSheet, CupertinoActionSheetAction, showCupertinoModalPopup;
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
@@ -64,22 +64,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         : ref.watch(searchResultsProvider(trimmedSearchQuery));
 
     final headerSlivers = [
-      AdaptiveSliverNavBar(
-        actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
-            tooltip: _isSearching ? 'Fechar busca' : 'Buscar notas',
-            onPressed: _isSearching ? _closeSearch : _openSearch,
-          ),
-
-          NotesMoreMenu(
-            isListView: !isGridView,
-            onToggleViewMode: _toggleViewMode,
-            onOpenSettings: () => context.push(AppRoutes.settings),
-            onLogout: () => ref.read(authControllerProvider.notifier).logout(),
-          ),
-        ],
-      ),
       const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
       if (_isSearching)
         SliverToBoxAdapter(
@@ -108,31 +92,55 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       const SliverToBoxAdapter(child: SectionTitle(title: 'Notas')),
     ];
 
-    return Scaffold(
-      body: trimmedSearchQuery.isEmpty
-          ? notesAsync.when(
-              loading: () => _NotesLoadingView(headerSlivers: headerSlivers),
-              error: (e, _) => AppErrorView(
-                title: 'Erro ao carregar as notas',
-                subtitle: e.toString(),
-              ),
-              data: (notes) =>
-                  _buildNotesBody(notes, headerSlivers, isGridView),
-            )
-          : searchAsync!.when(
-              loading: () => SearchLoadingView(headerSlivers: headerSlivers),
-              error: (e, _) => SearchErrorView(
-                headerSlivers: headerSlivers,
-                error: e.toString(),
-              ),
-              data: (results) => SearchResultsView(
-                headerSlivers: headerSlivers,
-                query: trimmedSearchQuery,
-                results: results,
-                onTap: (result) => context.push(AppRoutes.note(result.id)),
-              ),
-            ),
-      bottomSheet: const _OfflineStatusBottomSheet(),
+    return AdaptiveScaffold(
+      appBar: AdaptiveAppBar(
+        title: _isSearching ? null : 'Notas',
+        actions: [
+          AdaptiveAppBarAction(
+            icon: _isSearching ? Icons.close : Icons.search,
+            iosSymbol: _isSearching ? 'xmark' : 'magnifyingglass',
+            onPressed: _isSearching ? _closeSearch : _openSearch,
+          ),
+          AdaptiveAppBarAction(
+            icon: Icons.more_vert,
+            iosSymbol: 'ellipsis',
+            onPressed: () => _showMoreMenu(context),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          trimmedSearchQuery.isEmpty
+              ? notesAsync.when(
+                  loading: () => _NotesLoadingView(headerSlivers: headerSlivers),
+                  error: (e, _) => AppErrorView(
+                    title: 'Erro ao carregar as notas',
+                    subtitle: e.toString(),
+                  ),
+                  data: (notes) =>
+                      _buildNotesBody(notes, headerSlivers, isGridView),
+                )
+              : searchAsync!.when(
+                  loading: () => SearchLoadingView(headerSlivers: headerSlivers),
+                  error: (e, _) => SearchErrorView(
+                    headerSlivers: headerSlivers,
+                    error: e.toString(),
+                  ),
+                  data: (results) => SearchResultsView(
+                    headerSlivers: headerSlivers,
+                    query: trimmedSearchQuery,
+                    results: results,
+                    onTap: (result) => context.push(AppRoutes.note(result.id)),
+                  ),
+                ),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _OfflineStatusBottomSheet(),
+          ),
+        ],
+      ),
       floatingActionButton: QuickActionFabs(
         smallFabKey: const ValueKey('home-chat-fab'),
         smallHeroTag: 'home-chat-fab',
@@ -175,6 +183,96 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     } catch (_) {
       if (!context.mounted) return;
       AppMessenger.showError('Erro ao salvar preferência de visualização');
+    }
+  }
+
+  Future<void> _showMoreMenu(BuildContext context) async {
+    final isGridView = ref.read(isGridViewProvider);
+    final items = [
+      AdaptivePopupMenuItem<String>(
+        label: isGridView ? 'Ver como lista' : 'Ver como galeria',
+        icon: isGridView ? Icons.list_rounded : Icons.grid_view_rounded,
+        value: 'toggleView',
+      ),
+      AdaptivePopupMenuItem<String>(
+        label: 'Configurações',
+        icon: Icons.settings_outlined,
+        value: 'settings',
+      ),
+      AdaptivePopupMenuItem<String>(
+        label: 'Sair',
+        icon: Icons.logout,
+        value: 'logout',
+      ),
+    ];
+
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      final selected = await showCupertinoModalPopup<int>(
+        context: context,
+        builder: (ctx) => CupertinoActionSheet(
+          actions: [
+            for (var i = 0; i < items.length; i++)
+              CupertinoActionSheetAction(
+                onPressed: () => Navigator.of(ctx).pop(i),
+                child: Text(items[i].label),
+              ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            isDefaultAction: true,
+            child: const Text('Cancelar'),
+          ),
+        ),
+      );
+      if (selected != null && context.mounted) {
+        final val = items[selected].value;
+        if (val != null) {
+          _handleMenuValue(val);
+        }
+      }
+    } else {
+      final renderBox = context.findRenderObject() as RenderBox?;
+      final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+      final size = renderBox?.size ?? Size.zero;
+
+      final selectedValue = await showMenu<String>(
+        context: context,
+        position: RelativeRect.fromLTRB(
+          offset.dx + size.width,
+          offset.dy + 56,
+          offset.dx + size.width,
+          offset.dy,
+        ),
+        items: [
+          for (final item in items)
+            PopupMenuItem<String>(
+              value: item.value,
+              child: Row(
+                children: [
+                  Icon(item.icon as IconData?),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(item.label),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+      if (selectedValue != null && context.mounted) {
+        _handleMenuValue(selectedValue);
+      }
+    }
+  }
+
+  void _handleMenuValue(String value) {
+    switch (value) {
+      case 'toggleView':
+        _toggleViewMode();
+      case 'settings':
+        context.push(AppRoutes.settings);
+      case 'logout':
+        ref.read(authControllerProvider.notifier).logout();
     }
   }
 

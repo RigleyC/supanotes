@@ -31,7 +31,7 @@ class NoteEditorController {
   MutableDocument? document;
   Editor? editor;
   MutableDocumentComposer? composer;
-  FocusNode? focusNode;
+  final FocusNode focusNode = FocusNode();
 
   NodeSyncManager? _nodeSyncManager;
   String? _noteId;
@@ -60,8 +60,6 @@ class NoteEditorController {
       const RandomDividerConversionReaction(dividerCount: _dividerCount),
     );
     editor!.reactionPipeline.add(const KeepFirstLineAsTitleReaction());
-    // Reuse existing focus node if controller is re-initialized
-    focusNode ??= FocusNode();
   }
 
   void _setupNodeSyncManager() {
@@ -247,7 +245,7 @@ class NoteEditorController {
     editor?.dispose();
     document?.dispose();
     composer?.dispose();
-    focusNode?.dispose();
+    focusNode.dispose();
   }
 }
 

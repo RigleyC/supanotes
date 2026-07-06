@@ -9,10 +9,10 @@ import 'package:supanotes/features/settings/presentation/controllers/soul_editor
 import 'package:supanotes/features/settings/presentation/widgets/soul_footer.dart';
 import 'package:supanotes/features/settings/presentation/widgets/soul_form.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 class SoulEditorScreen extends ConsumerStatefulWidget {
   const SoulEditorScreen({super.key});
@@ -77,32 +77,27 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     final soulAsync = ref.watch(soulProvider);
     final isSaving = soulAsync.value?.isSaving ?? false;
 
-    return Scaffold(
-      bottomNavigationBar: SoulFooter(
-        isSaving: isSaving,
-        onSave: _save,
-        onRestore: _restoreDefault,
-      ),
-      body: CustomScrollView(
-        slivers: [
-          const AdaptiveSliverNavBar(title: Text(SettingsStrings.title)),
-          soulAsync.when(
-            loading: () => const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (err, _) => SliverFillRemaining(
-              child: AppErrorView(
+    return AdaptiveScaffold(
+      appBar: const AdaptiveAppBar(title: SettingsStrings.title),
+      body: Column(
+        children: [
+          Expanded(
+            child: soulAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => AppErrorView(
                 title: err is ApiException ? err.message : err.toString(),
                 onRetry: () => ref.invalidate(soulProvider),
               ),
-            ),
-            data: (state) => SliverPadding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              sliver: SliverFillRemaining(
-                hasScrollBody: true,
+              data: (state) => Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: SoulForm(controller: _controller),
               ),
             ),
+          ),
+          SoulFooter(
+            isSaving: isSaving,
+            onSave: _save,
+            onRestore: _restoreDefault,
           ),
         ],
       ),

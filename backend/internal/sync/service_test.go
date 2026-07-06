@@ -50,6 +50,7 @@ type mockRepository struct {
 	upsertNoteErr       error
 	lastUpsertNoteArg   sqlcgen.UpsertNoteParams
 	getNoteShareForUser func(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error)
+	getNoteOwnerID      func(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error)
 }
 
 func (m *mockRepository) GetSyncNotes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.GetSyncNotesRow, error) {
@@ -129,6 +130,9 @@ func (m *mockRepository) UpsertUserNotePreference(ctx context.Context, arg sqlcg
 }
 
 func (m *mockRepository) GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
+	if m.getNoteOwnerID != nil {
+		return m.getNoteOwnerID(ctx, noteID)
+	}
 	return pgtype.UUID{}, nil
 }
 
@@ -195,11 +199,19 @@ func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
 }
 
 func TestSyncServicePushAllowsTaskSyncWithoutParentNoteInPayload(t *testing.T) {
-	repo := &mockRepository{}
-	svc := NewService(repo, nil)
-
 	userID := testUserID()
 	noteID := pgtype.UUID{Bytes: [16]byte{2}, Valid: true}
+
+	repo := &mockRepository{
+		getNoteOwnerID: func(ctx context.Context, nId pgtype.UUID) (pgtype.UUID, error) {
+			if nId == noteID {
+				return userID, nil
+			}
+			return pgtype.UUID{}, nil
+		},
+	}
+	svc := NewService(repo, nil)
+
 
 	payload := &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{},

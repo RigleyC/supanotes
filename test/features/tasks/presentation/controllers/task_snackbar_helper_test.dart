@@ -23,9 +23,9 @@ void main() {
     await TaskSnackBarHelper.completeTaskWithFeedback(
       onComplete: () async {
         completed = true;
-        return null;
+        return (nextDue: null, previousDue: null);
       },
-      onUndo: () {
+      onUndo: (previousDue) {
         undone = true;
       },
     );
@@ -33,7 +33,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(completed, isTrue);
-    expect(find.text('Tarefa concluída!'), findsOneWidget);
+    expect(find.text('Concluída!'), findsOneWidget);
     expect(find.text('Desfazer'), findsOneWidget);
 
     await tester.tap(find.text('Desfazer'));
@@ -51,13 +51,13 @@ void main() {
     final nextDue = DateTime(2030, 3, 15);
 
     await TaskSnackBarHelper.completeTaskWithFeedback(
-      onComplete: () async => nextDue,
-      onUndo: () {},
+      onComplete: () async => (nextDue: nextDue, previousDue: null),
+      onUndo: (_) {},
     );
 
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Tarefa concluída!  Próx. em:'), findsOneWidget);
+    expect(find.textContaining('Concluída!  Próx. em:'), findsOneWidget);
     expect(find.text('Desfazer'), findsOneWidget);
   });
 }

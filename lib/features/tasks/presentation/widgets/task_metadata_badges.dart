@@ -46,7 +46,7 @@ class TaskMetadataBadges extends StatelessWidget {
         if (_hasRecurrence)
           _MetadataPill(
             icon: Icons.refresh,
-            label: recurrence!.label,
+            label: recurrence!.getLocalizedLabel(dueDate),
             color: scheme.onSurfaceVariant,
           ),
       ],

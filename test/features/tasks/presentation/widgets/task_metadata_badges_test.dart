@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 
 void main() {
+  setUpAll(() async {
+    await initializeDateFormatting('pt_BR', null);
+  });
+
   Widget wrap(Widget child) {
     return MaterialApp(home: Scaffold(body: child));
   }
@@ -47,5 +52,33 @@ void main() {
 
     expect(find.byIcon(Icons.event_outlined), findsOneWidget);
     expect(find.textContaining('Atrasada'), findsNothing);
+  });
+
+  testWidgets('shows dynamic weekly label when dueDate is set', (tester) async {
+    final thursday = DateTime.utc(2026, 6, 11);
+
+    await tester.pumpWidget(
+      wrap(TaskMetadataBadges(
+        dueDate: thursday,
+        recurrence: TaskRecurrence.weekly,
+      )),
+    );
+
+    expect(find.byIcon(Icons.refresh), findsOneWidget);
+    expect(find.text('Semanalmente (quinta-feira)'), findsOneWidget);
+  });
+
+  testWidgets('shows dynamic monthly label when dueDate is set', (tester) async {
+    final fifteenth = DateTime.utc(2026, 7, 15);
+
+    await tester.pumpWidget(
+      wrap(TaskMetadataBadges(
+        dueDate: fifteenth,
+        recurrence: TaskRecurrence.monthly,
+      )),
+    );
+
+    expect(find.byIcon(Icons.refresh), findsOneWidget);
+    expect(find.text('Mensalmente (dia 15)'), findsOneWidget);
   });
 }

@@ -8,10 +8,10 @@ import 'package:supanotes/features/telegram/data/telegram_repository.dart';
 import 'package:supanotes/features/telegram/presentation/controllers/telegram_link_controller.dart';
 import 'package:supanotes/features/telegram/presentation/widgets/telegram_linked_view.dart';
 import 'package:supanotes/features/telegram/presentation/widgets/telegram_unlinked_view.dart';
-import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 class TelegramLinkScreen extends ConsumerStatefulWidget {
   const TelegramLinkScreen({super.key});
@@ -39,31 +39,21 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
 
     final statusAsync = ref.watch(telegramStatusProvider);
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          const AdaptiveSliverNavBar(title: Text('Telegram')),
-          statusAsync.when(
-            loading: () => const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (err, _) => SliverFillRemaining(
-              child: AppErrorView(
-                title: err is ApiException ? err.message : err.toString(),
-                onRetry: () => ref.invalidate(telegramStatusProvider),
-              ),
-            ),
-            data: (status) => SliverFillRemaining(
-              child: status.linked
-                  ? TelegramLinkedView(
-                      username: status.username,
-                      chatId: status.chatId,
-                      onDelete: _onDelete,
-                    )
-                  : TelegramUnlinkedView(onGenerate: _onGenerate),
-            ),
-          ),
-        ],
+    return AdaptiveScaffold(
+      appBar: const AdaptiveAppBar(title: 'Telegram'),
+      body: statusAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => AppErrorView(
+          title: err is ApiException ? err.message : err.toString(),
+          onRetry: () => ref.invalidate(telegramStatusProvider),
+        ),
+        data: (status) => status.linked
+            ? TelegramLinkedView(
+                username: status.username,
+                chatId: status.chatId,
+                onDelete: _onDelete,
+              )
+            : TelegramUnlinkedView(onGenerate: _onGenerate),
       ),
     );
   }

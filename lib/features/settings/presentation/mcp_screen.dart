@@ -6,9 +6,9 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 String _sseUrl() => '${ApiConstants.baseUrl}/mcp';
 
@@ -67,27 +67,21 @@ class _McpScreenState extends ConsumerState<McpScreen> {
   Widget build(BuildContext context) {
     final token = _tokenAsync.asData?.value;
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          const AdaptiveSliverNavBar(title: Text('MCP')),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.lg,
-            ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _TokenCard(tokenAsync: _tokenAsync, onGenerate: _generateToken),
-                const SizedBox(height: AppSpacing.md),
-                _ClaudeCard(token: token),
-                const SizedBox(height: AppSpacing.md),
-                _CursorCard(token: token),
-              ]),
-            ),
-          ),
+    return AdaptiveScaffold(
+      appBar: const AdaptiveAppBar(title: 'MCP'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.lg,
+        ),
+        children: [
+          _TokenCard(tokenAsync: _tokenAsync, onGenerate: _generateToken),
+          const SizedBox(height: AppSpacing.md),
+          _ClaudeCard(token: token),
+          const SizedBox(height: AppSpacing.md),
+          _CursorCard(token: token),
         ],
       ),
     );
@@ -331,12 +325,10 @@ class _CursorCard extends StatelessWidget {
                           ),
                         ),
                         if (token != null)
-                          IconButton(
-                            icon: const Icon(
-                              Icons.copy,
-                              size: AppSpacing.iconSm,
-                            ),
-                            tooltip: 'Copiar Token',
+                          AdaptiveButton.icon(
+                            style: AdaptiveButtonStyle.plain,
+                            padding: EdgeInsets.zero,
+                            icon: Icons.copy,
                             onPressed: () {
                               Clipboard.setData(
                                 ClipboardData(text: 'Bearer $token'),

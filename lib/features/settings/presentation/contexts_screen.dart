@@ -7,7 +7,7 @@ import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/controllers/contexts_controller.dart';
 import 'package:supanotes/features/settings/presentation/widgets/new_context_sheet.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -21,31 +21,23 @@ class ContextsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(contextsProvider);
 
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(contextsProvider),
-        child: CustomScrollView(
-          slivers: [
-            const AdaptiveSliverNavBar(title: Text('Contextos')),
-            async.when(
-              data: (contexts) => _ContextsList(contexts: contexts),
-              loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (err, _) => SliverFillRemaining(
-                child: AppErrorView(
-                  title: err is ApiException ? err.message : err.toString(),
-                  onRetry: () => ref.invalidate(contextsProvider),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AdaptiveScaffold(
+      appBar: const AdaptiveAppBar(title: 'Contextos'),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Novo contexto',
         onPressed: () => _showCreateSheet(context, ref),
         child: const Icon(Icons.add),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async => ref.invalidate(contextsProvider),
+        child: async.when(
+          data: (contexts) => _ContextsList(contexts: contexts),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, _) => AppErrorView(
+            title: err is ApiException ? err.message : err.toString(),
+            onRetry: () => ref.invalidate(contextsProvider),
+          ),
+        ),
       ),
     );
   }
@@ -69,8 +61,8 @@ class _ContextsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (contexts.isEmpty) {
-      return const SliverFillRemaining(
-        hasScrollBody: false,
+      return const SingleChildScrollView(
+        physics: AlwaysScrollableScrollPhysics(),
         child: Padding(
           padding: EdgeInsets.only(top: 120),
           child: EmptyState(
@@ -82,8 +74,10 @@ class _ContextsList extends ConsumerWidget {
       );
     }
 
-    return SliverList(
-      delegate: SliverChildBuilderDelegate((context, index) {
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: contexts.length,
+      itemBuilder: (context, index) {
         final ctx = contexts[index];
         return Column(
           children: [
@@ -98,9 +92,10 @@ class _ContextsList extends ConsumerWidget {
                 leading: const Icon(Icons.folder_outlined),
                 title: Text(ctx.name),
                 subtitle: Text(ctx.slug),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Apagar',
+                trailing: AdaptiveButton.icon(
+                  style: AdaptiveButtonStyle.plain,
+                  padding: EdgeInsets.zero,
+                  icon: Icons.delete_outline,
                   onPressed: () async {
                     if (!await _confirmDelete(context)) return;
                     if (!context.mounted) return;
@@ -111,7 +106,7 @@ class _ContextsList extends ConsumerWidget {
             ),
           ],
         );
-      }, childCount: contexts.length),
+      },
     );
   }
 

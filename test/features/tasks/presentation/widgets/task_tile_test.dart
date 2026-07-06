@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_tile.dart';
 
 void main() {
+  setUpAll(() async {
+    await initializeDateFormatting('pt_BR', null);
+  });
+
   TaskModel buildTask({
     String id = '1',
     String title = 'Buy coffee',

@@ -97,6 +97,7 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
           const SizedBox(height: AppSpacing.md),
           RecurrencePicker(
             initialRecurrence: _recurrence,
+            dueDate: _dueDate,
             onChanged: (r) => setState(() {
               _recurrence = r;
               if (r != null && _dueDate == null) {

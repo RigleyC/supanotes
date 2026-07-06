@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 enum TaskRecurrence {
   daily,
@@ -26,6 +27,21 @@ extension TaskRecurrenceUI on TaskRecurrence {
         return 'Semanalmente';
       case TaskRecurrence.monthly:
         return 'Mensalmente';
+    }
+  }
+
+  String getLocalizedLabel(DateTime? dueDate) {
+    if (dueDate == null) return label;
+    switch (this) {
+      case TaskRecurrence.daily:
+      case TaskRecurrence.weekdays:
+        return label;
+      case TaskRecurrence.weekly:
+        final weekday = DateFormat.EEEE('pt_BR').format(dueDate);
+        return 'Semanalmente ($weekday)';
+      case TaskRecurrence.monthly:
+        final day = DateFormat('d').format(dueDate);
+        return 'Mensalmente (dia $day)';
     }
   }
 

@@ -74,12 +74,12 @@ class TasksLocalRepository {
     await _dao.updateTask(companion);
   }
 
-  Future<DateTime?> completeTask(String id) async {
+  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id) async {
     return await _dao.completeTask(id);
   }
 
-  Future<void> reopenTask(String id) async {
-    await _dao.reopenTask(id);
+  Future<void> reopenTask(String id, {DateTime? originalDueDate}) async {
+    await _dao.reopenTask(id, originalDueDate: originalDueDate);
   }
 
   Future<void> softDeleteTask(String id) async {

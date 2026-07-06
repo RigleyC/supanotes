@@ -122,7 +122,7 @@ class CustomDividerComponent extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
             child: SizedBox(
-              height: 24,
+              height: 16,
               width: double.infinity,
               child: SvgPicture.asset(assetPath, fit: BoxFit.fitWidth),
             ),

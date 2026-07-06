@@ -9,6 +9,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -235,10 +236,19 @@ func (s *Service) loadSessionData(ctx context.Context, session *SessionData) err
 	if err != nil {
 		return fmt.Errorf("load settings: %w", err)
 	}
+	var prefs map[string]any
+	if len(settings.Preferences) > 0 {
+		_ = json.Unmarshal(settings.Preferences, &prefs)
+	}
+	if prefs == nil {
+		prefs = make(map[string]any)
+	}
+
 	session.Settings = dto.SettingsResponse{
-		Timezone:  settings.Timezone,
-		CreatedAt: settings.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt: settings.UpdatedAt.Time.Format(time.RFC3339),
+		Timezone:    settings.Timezone,
+		Preferences: prefs,
+		CreatedAt:   settings.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   settings.UpdatedAt.Time.Format(time.RFC3339),
 	}
 
 	// Soul

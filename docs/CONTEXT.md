@@ -2,7 +2,7 @@
 
 ## Note
 
-A note has no separate user-authored title. The first non-empty line of `content` is the display title. Persisted `notes.title` is removed in this breaking migration. The first line is still part of `content`.
+A note has no separate user-authored title. The title is derived from the first non-deleted `note_nodes` row (by position) whose `data->>'text'` is non-empty. The first line is still part of `content`, but the display title now comes from the node, not from regex on the content string. `KeepFirstLineAsTitleReaction` enforces H1 styling of the first line in the editor (Apple Notes-style first-line-as-title UX).
 
 ## Empty Note
 

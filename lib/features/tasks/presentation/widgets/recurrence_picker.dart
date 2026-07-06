@@ -7,10 +7,12 @@ class RecurrencePicker extends StatelessWidget {
     super.key,
     required this.initialRecurrence,
     required this.onChanged,
+    this.dueDate,
   });
 
   final TaskRecurrence? initialRecurrence;
   final ValueChanged<TaskRecurrence?> onChanged;
+  final DateTime? dueDate;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +32,7 @@ class RecurrencePicker extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: AppSelectionTile(
-              label: option.label,
+              label: option.getLocalizedLabel(dueDate),
               icon: option.icon,
               isSelected: option == initialRecurrence,
               onTap: () => onChanged(option),

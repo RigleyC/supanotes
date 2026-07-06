@@ -77,10 +77,10 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
   }
 
   @override
-  Future<DateTime?> completeTask(String id) async => null;
+  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id) async => (nextDue: null, previousDue: null);
 
   @override
-  Future<void> reopenTask(String id) async {}
+  Future<void> reopenTask(String id, {DateTime? originalDueDate}) async {}
 
   @override
   Future<void> softDeleteTask(String id) async {}

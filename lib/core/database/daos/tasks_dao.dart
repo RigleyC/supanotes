@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../features/tasks/domain/task_recurrence.dart';
 import '../../utils/date_time_extensions.dart';
@@ -189,14 +190,15 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   ///
   /// Returns the next due date for recurring tasks, or null for
   /// non-recurring tasks.
-  Future<DateTime?> completeTask(String id) async {
+  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id) async {
     final task = await (select(
       tasks,
     )..where((t) => t.id.equals(id))).getSingleOrNull();
-    if (task == null) return null;
+    if (task == null) return (nextDue: null, previousDue: null);
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final previousDue = task.dueDate;
     DateTime? nextDue;
 
     await transaction(() async {
@@ -253,7 +255,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       );
     });
 
-    return nextDue;
+    return (nextDue: nextDue, previousDue: previousDue);
   }
 
   /// Hard-deletes a task (used when the user removes a task from the
@@ -277,15 +279,26 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
   /// Reverses a completion: clears `completedAt`, sets `status` back to
   /// `pending`, and marks the row dirty so the change propagates.
-  Future<void> reopenTask(String id) async {
-    await (update(tasks)..where((t) => t.id.equals(id))).write(
-      TasksCompanion(
-        status: const Value('open'),
-        completedAt: const Value(null),
-        updatedAt: Value(DateTime.now()),
-        isDirty: const Value(true),
-      ),
-    );
+  Future<void> reopenTask(String id, {DateTime? originalDueDate}) async {
+    debugPrint('[TasksDao] reopenTask called: id=$id, originalDueDate=$originalDueDate');
+    await transaction(() async {
+      await (update(tasks)..where((t) => t.id.equals(id))).write(
+        TasksCompanion(
+          status: const Value('open'),
+          completedAt: const Value(null),
+          dueDate: originalDueDate != null ? Value(originalDueDate) : const Value.absent(),
+          updatedAt: Value(DateTime.now()),
+          isDirty: const Value(true),
+        ),
+      );
+      debugPrint('[TasksDao] reopenTask: task row updated');
+
+      if (completionsDao != null) {
+        await completionsDao!.undoLastCompletion(id);
+        debugPrint('[TasksDao] reopenTask: last completion deleted');
+      }
+    });
+    debugPrint('[TasksDao] reopenTask: transaction committed');
   }
 
   /// Returns every task that has unsynced local changes.

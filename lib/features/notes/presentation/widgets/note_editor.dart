@@ -33,7 +33,6 @@ class NoteEditor extends ConsumerStatefulWidget {
   final bool collapseImages;
   final bool isReadOnly;
   final NoteEditorDelegate delegate;
-  final Widget? appBar;
 
   const NoteEditor({
     super.key,
@@ -44,7 +43,6 @@ class NoteEditor extends ConsumerStatefulWidget {
     this.collapseImages = false,
     this.isReadOnly = false,
     required this.delegate,
-    this.appBar,
   });
 
   @override
@@ -70,7 +68,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       _controller!.document?.addListener(_onDocumentChanged);
       if (widget.nodes.isEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _controller?.focusNode?.requestFocus();
+          if (mounted) _controller!.focusNode.requestFocus();
         });
       }
     }
@@ -228,7 +226,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           Expanded(
             child: CustomScrollView(
               slivers: [
-                if (widget.appBar != null) widget.appBar!,
                 SuperEditorAndroidControlsScope(
                   controller: _androidController!,
                   child: SuperEditorIosControlsScope(

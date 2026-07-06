@@ -29,8 +29,8 @@ abstract class ITasksRepository {
     TaskRecurrence? recurrence,
     double position = 0.0,
   });
-  Future<DateTime?> completeTask(String id);
-  Future<void> reopenTask(String id);
+  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id);
+  Future<void> reopenTask(String id, {DateTime? originalDueDate});
   Future<void> updateTask(
     String id, {
     String? title,
@@ -158,11 +158,11 @@ class TasksRepository implements ITasksRepository {
   /// task is recurring, schedules the next occurrence in the same
   /// transaction.
   @override
-  Future<DateTime?> completeTask(String id) => _local.completeTask(id);
+  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id) => _local.completeTask(id);
 
   /// Reverses a completion: clears `completedAt` and re-opens the task.
   @override
-  Future<void> reopenTask(String id) => _local.reopenTask(id);
+  Future<void> reopenTask(String id, {DateTime? originalDueDate}) => _local.reopenTask(id, originalDueDate: originalDueDate);
 
   /// Partial update of the task with [id]. Pass `null` for any field
   /// that should not change. An explicit `Value(null)` (via the

@@ -51,8 +51,8 @@ void main() {
       updatedAt: now,
     );
 
-    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => now.add(const Duration(days: 1)));
-    when(() => mockTasksRepo.reopenTask(any())).thenAnswer((_) async {});
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: now.add(const Duration(days: 1)), previousDue: now));
+    when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
 
     await tester.pumpWidget(
       ProviderScope(
@@ -84,7 +84,7 @@ void main() {
               delegate: NoteEditorDelegate(
                 onTaskComplete: (taskId) => TaskSnackBarHelper.completeTaskWithFeedback(
                   onComplete: () => mockTasksRepo.completeTask(taskId),
-                  onUndo: () => mockTasksRepo.reopenTask(taskId),
+                  onUndo: (previousDue) => mockTasksRepo.reopenTask(taskId, originalDueDate: previousDue),
                 ),
                 onTaskReopen: (taskId) => mockTasksRepo.reopenTask(taskId),
               ),
@@ -118,14 +118,21 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     // Verify snackbar appears
-    expect(find.textContaining('Tarefa concluída!'), findsOneWidget);
+    expect(find.textContaining('Concluída!'), findsOneWidget);
+    final snackBarFinder = find.byType(SnackBar);
+    if (snackBarFinder.evaluate().isNotEmpty) {
+      final RenderBox box = tester.renderObject(snackBarFinder);
+      final position = box.localToGlobal(Offset.zero);
+      final size = box.size;
+      print('DEBUG: SnackBar position = $position, size = $size');
+    }
     
     // Advance time to allow the snackbar to disappear
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 100; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
     // Verify snackbar disappears
-    expect(find.textContaining('Tarefa concluída!'), findsNothing);
+    expect(find.textContaining('Concluída!'), findsNothing);
   });
 }

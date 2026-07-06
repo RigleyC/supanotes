@@ -311,11 +311,13 @@ void main() {
       isDirty: true,
     ));
 
-    final nextDue = await db.tasksDao.completeTask('complete-catchup-1');
+    final result = await db.tasksDao.completeTask('complete-catchup-1');
+    final nextDue = result.nextDue;
 
     // Should advance to tomorrow (today + 1)
     final tomorrowStart = todayStart.add(const Duration(days: 1));
     expect(nextDue, tomorrowStart);
+    expect(result.previousDue, threeDaysAgo);
 
     // Task row: open, due tomorrow
     final tasks = await db.select(db.tasks).get();

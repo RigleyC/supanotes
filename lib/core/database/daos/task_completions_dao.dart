@@ -58,6 +58,26 @@ class TaskCompletionsDao extends DatabaseAccessor<AppDatabase>
         .watch();
   }
 
+  /// Deletes the most recent completion record for [taskId].
+  Future<void> undoLastCompletion(String taskId) async {
+    final lastCompletion = await (select(localTaskCompletions)
+          ..where((c) => c.taskId.equals(taskId))
+          ..orderBy([
+            (c) => OrderingTerm(
+              expression: c.completedAt,
+              mode: OrderingMode.desc,
+            ),
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+
+    if (lastCompletion != null) {
+      await (delete(localTaskCompletions)
+            ..where((c) => c.id.equals(lastCompletion.id)))
+          .go();
+    }
+  }
+
   /// Returns every row still pending sync.
   Future<List<LocalTaskCompletionData>> getDirtyCompletions() {
     return (select(

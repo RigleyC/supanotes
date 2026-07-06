@@ -16,8 +16,7 @@ import 'package:supanotes/features/tasks/data/tasks_repository.dart'
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart'
     show TaskMetadataSheet;
-import 'package:supanotes/shared/widgets/adaptive_sliver_nav_bar.dart'
-    show AdaptiveSliverNavBar;
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart'
     show TaskSnackBarHelper;
 import 'package:supanotes/shared/widgets/app_snackbar.dart' show AppMessenger;
@@ -86,16 +85,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         .when(
           data: (inbox) {
             if (inbox == null) {
-              return const Scaffold(
+              return const AdaptiveScaffold(
                 body: Center(child: Text('Inbox not found')),
               );
             }
             return _buildEditor(inbox);
           },
           loading: () =>
-              const Scaffold(body: Center(child: CircularProgressIndicator())),
+              const AdaptiveScaffold(body: Center(child: CircularProgressIndicator())),
           error: (error, _) =>
-              Scaffold(body: Center(child: Text('Error: $error'))),
+              AdaptiveScaffold(body: Center(child: Text('Error: $error'))),
         );
   }
 
@@ -109,67 +108,60 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           data: (noteWithTasks) {
             final tasksMap = noteWithTasks.taskById;
 
-            return Scaffold(
+            return AdaptiveScaffold(
               resizeToAvoidBottomInset: false,
-              body: CustomScrollView(
-                slivers: [
-                  AdaptiveSliverNavBar(
-                    title: Text(inbox.title),
-                    actions: [
-                      IconButton(
-                        icon: const Icon(Icons.check),
-                        onPressed: () =>
-                            FocusManager.instance.primaryFocus?.unfocus(),
-                      ),
-                    ],
-                  ),
-                  SliverFillRemaining(
-                    hasScrollBody: true,
-                    child: NoteEditor(
-                      noteId: inbox.id,
-                      nodes: nodes,
-                      taskMetadata: tasksMap,
-                      delegate: NoteEditorDelegate(
-                        onHasContentChanged: (hasContent) {
-                          if (mounted) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted) {
-                                setState(() => _hasContent = hasContent);
-                              }
-                            });
-                          }
-                        },
-                        onTaskLongPress: (task, flushSnapshot) =>
-                            _openTaskActions(task, flushSnapshot),
-                        onTaskComplete: (taskId) =>
-                            TaskSnackBarHelper.completeTaskWithFeedback(
-                              onComplete: () => ref
-                                  .read(tasksRepositoryProvider)
-                                  .completeTask(taskId),
-                              onUndo: () => ref
-                                  .read(tasksRepositoryProvider)
-                                  .reopenTask(taskId),
-                            ),
-                        onTaskReopen: (taskId) => ref
-                            .read(tasksRepositoryProvider)
-                            .reopenTask(taskId),
-                      ),
-                    ),
+              appBar: AdaptiveAppBar(
+                title: inbox.title,
+                actions: [
+                  AdaptiveAppBarAction(
+                    icon: Icons.check,
+                    onPressed: () =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
                   ),
                 ],
+              ),
+              body: NoteEditor(
+                noteId: inbox.id,
+                nodes: nodes,
+                taskMetadata: tasksMap,
+                delegate: NoteEditorDelegate(
+                  onHasContentChanged: (hasContent) {
+                    if (mounted) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          setState(() => _hasContent = hasContent);
+                        }
+                      });
+                    }
+                  },
+                  onTaskLongPress: (task, flushSnapshot) =>
+                      _openTaskActions(task, flushSnapshot),
+                  onTaskComplete: (taskId) =>
+                      TaskSnackBarHelper.completeTaskWithFeedback(
+                        onComplete: () => ref
+                            .read(tasksRepositoryProvider)
+                            .completeTask(taskId),
+                        onUndo: (previousDue) => ref
+                            .read(tasksRepositoryProvider)
+                            .reopenTask(taskId, originalDueDate: previousDue),
+                      ),
+                  onTaskReopen: (taskId) => ref
+                      .read(tasksRepositoryProvider)
+                      .reopenTask(taskId),
+                ),
               ),
               floatingActionButton: _hasContent ? _buildOrganizeFab : null,
             );
           },
           loading: () =>
-              const Scaffold(body: Center(child: CircularProgressIndicator())),
+              const AdaptiveScaffold(body: Center(child: CircularProgressIndicator())),
           error: (error, _) =>
-              Scaffold(body: Center(child: Text('Error: $error'))),
+              AdaptiveScaffold(body: Center(child: Text('Error: $error'))),
         );
       },
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => Scaffold(body: Center(child: Text('Error: $error'))),
+          const AdaptiveScaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, _) => AdaptiveScaffold(body: Center(child: Text('Error: $error'))),
     );
   }
 
