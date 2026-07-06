@@ -35,6 +35,9 @@ class InboxScreen extends ConsumerStatefulWidget {
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   bool _hasContent = false;
 
+  Widget _fallbackScaffold(Widget child) =>
+      AdaptiveScaffold(body: SafeArea(child: Center(child: child)));
+
   @override
   void initState() {
     super.initState();
@@ -85,16 +88,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         .when(
           data: (inbox) {
             if (inbox == null) {
-              return const AdaptiveScaffold(
-                body: SafeArea(child: Center(child: Text('Inbox not found'))),
-              );
+              return _fallbackScaffold(const Text('Inbox not found'));
             }
             return _buildEditor(inbox);
           },
           loading: () =>
-              const AdaptiveScaffold(body: SafeArea(child: Center(child: CircularProgressIndicator()))),
+              _fallbackScaffold(const CircularProgressIndicator()),
           error: (error, _) =>
-              AdaptiveScaffold(body: SafeArea(child: Center(child: Text('Error: $error')))),
+              _fallbackScaffold(Text('Error: $error')),
         );
   }
 
@@ -155,14 +156,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             );
           },
           loading: () =>
-              const AdaptiveScaffold(body: SafeArea(child: Center(child: CircularProgressIndicator()))),
+              _fallbackScaffold(const CircularProgressIndicator()),
           error: (error, _) =>
-              AdaptiveScaffold(body: SafeArea(child: Center(child: Text('Error: $error')))),
+              _fallbackScaffold(Text('Error: $error')),
         );
       },
       loading: () =>
-          const AdaptiveScaffold(body: SafeArea(child: Center(child: CircularProgressIndicator()))),
-      error: (error, _) => AdaptiveScaffold(body: SafeArea(child: Center(child: Text('Error: $error')))),
+          _fallbackScaffold(const CircularProgressIndicator()),
+      error: (error, _) => _fallbackScaffold(Text('Error: $error')),
     );
   }
 

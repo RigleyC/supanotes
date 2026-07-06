@@ -26,7 +26,11 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/offline_indicator.dart';
 import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart' show CupertinoActionSheet, CupertinoActionSheetAction, showCupertinoModalPopup;
+import 'package:flutter/cupertino.dart'
+    show
+        CupertinoActionSheet,
+        CupertinoActionSheetAction,
+        showCupertinoModalPopup;
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
@@ -88,8 +92,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           onTap: () => context.push(AppRoutes.inbox),
         ),
       ),
-      const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
-      const SliverToBoxAdapter(child: SectionTitle(title: 'Notas')),
     ];
 
     return AdaptiveScaffold(
@@ -112,7 +114,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         children: [
           trimmedSearchQuery.isEmpty
               ? notesAsync.when(
-                  loading: () => _NotesLoadingView(headerSlivers: headerSlivers),
+                  loading: () =>
+                      _NotesLoadingView(headerSlivers: headerSlivers),
                   error: (e, _) => AppErrorView(
                     title: 'Erro ao carregar as notas',
                     subtitle: e.toString(),
@@ -121,7 +124,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                       _buildNotesBody(notes, headerSlivers, isGridView),
                 )
               : searchAsync!.when(
-                  loading: () => SearchLoadingView(headerSlivers: headerSlivers),
+                  loading: () =>
+                      SearchLoadingView(headerSlivers: headerSlivers),
                   error: (e, _) => SearchErrorView(
                     headerSlivers: headerSlivers,
                     error: e.toString(),
@@ -251,9 +255,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 children: [
                   Icon(item.icon as IconData?),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(item.label),
-                  ),
+                  Expanded(child: Text(item.label)),
                 ],
               ),
             ),

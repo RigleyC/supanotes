@@ -37,6 +37,9 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
+  Widget _fallbackScaffold(Widget child) =>
+      AdaptiveScaffold(body: SafeArea(child: Center(child: child)));
+
   Future<void> _openTaskActions(
     TaskModel? task,
     Future<void> Function() flushSnapshot,
@@ -179,9 +182,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         final (nodes, noteWithTasks) = data;
         final note = noteWithTasks.note;
         if (note == null) {
-          return AdaptiveScaffold(
-            body: SafeArea(child: Center(child: Text(NoteStrings.errorNotFound))),
-          );
+          return _fallbackScaffold(Text(NoteStrings.errorNotFound));
         }
 
         final tasksMap = noteWithTasks.taskById;
@@ -253,9 +254,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         );
       },
       loading: () =>
-          const AdaptiveScaffold(body: SafeArea(child: Center(child: CircularProgressIndicator()))),
+          _fallbackScaffold(const CircularProgressIndicator()),
       error: (error, _) =>
-          AdaptiveScaffold(body: SafeArea(child: Center(child: Text('Error: $error')))),
+          _fallbackScaffold(Text('Error: $error')),
     );
   }
 }

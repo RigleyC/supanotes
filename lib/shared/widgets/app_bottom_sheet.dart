@@ -18,9 +18,9 @@ Future<T?> showAppBottomSheet<T>({
     showDragHandle: true,
     backgroundColor: isIOS ? CupertinoColors.systemBackground : null,
     shape: isIOS
-        ? const RoundedRectangleBorder(
+        ? RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(
-              top: Radius.circular(20),
+              top: Radius.circular(AppSpacing.radiusXl),
             ),
           )
         : null,

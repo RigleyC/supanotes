@@ -46,9 +46,8 @@ class NotesListView extends StatelessWidget {
             AppSpacing.sm,
             80 + AppSpacing.sm,
           ),
-          sliver: SliverList.separated(
+          sliver: SliverList.builder(
             itemCount: notes.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 6),
             itemBuilder: (context, index) {
               final note = notes[index];
               return Cue.onMount(

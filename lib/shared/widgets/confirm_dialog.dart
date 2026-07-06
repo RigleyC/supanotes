@@ -7,7 +7,7 @@
 /// the action cannot be silently undone.
 library;
 
-import 'package:flutter/cupertino.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -35,89 +35,23 @@ Future<bool> showConfirmDialog({
   String cancelLabel = ConfirmDialogStrings.cancel,
   bool destructive = false,
 }) async {
-  final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
-
-  if (isIOS) {
-    final result = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(cancelLabel),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: destructive,
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
-
-  final result = await showDialog<bool>(
+  bool? confirmed;
+  await AdaptiveAlertDialog.show(
     context: context,
-    builder: (dialogContext) => ConfirmDialog(
-      title: title,
-      message: message,
-      confirmLabel: confirmLabel,
-      cancelLabel: cancelLabel,
-      destructive: destructive,
-    ),
-  );
-  return result ?? false;
-}
-
-class ConfirmDialog extends StatelessWidget {
-  const ConfirmDialog({
-    super.key,
-    required this.title,
-    required this.message,
-    this.confirmLabel = ConfirmDialogStrings.confirm,
-    this.cancelLabel = ConfirmDialogStrings.cancel,
-    this.destructive = false,
-  });
-
-  final String title;
-  final String message;
-  final String confirmLabel;
-  final String cancelLabel;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final confirmStyle = destructive
-        ? FilledButton.styleFrom(
-            backgroundColor: scheme.error,
-            foregroundColor: scheme.onError,
-          )
-        : null;
-
-    return AlertDialog(
-      title: Text(title),
-      content: Text(message),
-      contentPadding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-        AppSpacing.sm,
+    title: title,
+    message: message,
+    actions: [
+      AlertAction(
+        title: cancelLabel,
+        style: AlertActionStyle.cancel,
+        onPressed: () => confirmed = false,
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(cancelLabel),
-        ),
-        FilledButton(
-          style: confirmStyle,
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(confirmLabel),
-        ),
-      ],
-    );
-  }
+      AlertAction(
+        title: confirmLabel,
+        style: destructive ? AlertActionStyle.destructive : AlertActionStyle.primary,
+        onPressed: () => confirmed = true,
+      ),
+    ],
+  );
+  return confirmed ?? false;
 }
