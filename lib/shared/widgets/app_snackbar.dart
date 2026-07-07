@@ -59,6 +59,7 @@ class AppMessenger {
     required SnackBarAction action,
     Duration? duration,
   }) {
+    debugPrint('[AppMessenger] showTaskCompletion duration=${duration ?? const Duration(seconds: 3)}');
     _show(
       title: title,
       subtitle: subtitle,

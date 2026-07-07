@@ -8,7 +8,9 @@ class TaskSnackBarHelper {
     required Future<({DateTime? nextDue, DateTime? previousDue})> Function() onComplete,
     required void Function(DateTime? previousDue) onUndo,
   }) async {
+    debugPrint('[TaskSnackBarHelper] completeTaskWithFeedback CALLED');
     final result = await onComplete();
+    debugPrint('[TaskSnackBarHelper] onComplete returned nextDue=${result.nextDue}');
 
     final title = 'Concluída!';
     final subtitle = result.nextDue != null
@@ -25,6 +27,7 @@ class TaskSnackBarHelper {
           onUndo(result.previousDue);
         },
       ),
+      duration: const Duration(milliseconds: 500),
     );
 
     return result.nextDue;

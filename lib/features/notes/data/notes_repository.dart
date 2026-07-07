@@ -23,7 +23,6 @@ abstract class INotesRepository {
     String? contextId,
     bool favoritesOnly = false,
   });
-  Stream<NoteModel?> watchInbox();
   Stream<NoteModel?> watchNoteById(String id);
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId);
   Stream<List<NoteNode>> watchNodes(String noteId);
@@ -41,8 +40,6 @@ abstract class INotesRepository {
   });
   Future<void> toggleFavorite(String noteId);
   Future<void> softDelete(String id);
-  Future<NoteModel> ensureInbox();
-  Future<void> appendToInbox(String text);
   Future<NoteModel> createLocalNote({required String id});
   Future<void> saveNoteSnapshot({required String id, required String content});
   Future<void> deleteIfEmptyOrTombstone(String id);
@@ -84,15 +81,6 @@ class NotesRepository implements INotesRepository {
     }
     return source.map(
       (rows) => rows.map((qr) => NoteModel.fromQueryResult(qr)).toList(),
-    );
-  }
-
-  /// Streams the single inbox note, if any. The inbox is a singleton
-  /// per user — there is at most one row with `isInbox = true`.
-  @override
-  Stream<NoteModel?> watchInbox() {
-    return _local.watchInbox().map(
-      (qr) => qr == null ? null : NoteModel.fromQueryResult(qr),
     );
   }
 
@@ -200,23 +188,6 @@ class NotesRepository implements INotesRepository {
   @override
   Future<void> softDelete(String id) async {
     await _local.softDeleteNote(id);
-  }
-
-  @override
-  Future<NoteModel> ensureInbox() async {
-    final inbox = await _local.getOrCreateInboxNote();
-    return NoteModel.fromQueryResult(inbox);
-  }
-
-  /// Appends [text] to the user's inbox note, creating the inbox row
-  /// on first use. The new block is separated from the existing content
-  /// by a blank line so distinct captures stay visually distinct.
-  @override
-  Future<void> appendToInbox(String text) async {
-    final existing = await _local.getOrCreateInboxNote();
-    final separator = existing.note.content.isEmpty ? '' : '\n\n';
-    final newContent = '${existing.note.content}$separator$text';
-    await _local.updateNoteContent(existing.note.id, newContent);
   }
 
   @override

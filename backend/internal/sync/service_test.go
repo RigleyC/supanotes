@@ -18,7 +18,6 @@ func testNote(overrides ...func(*sqlcgen.GetSyncNotesRow)) sqlcgen.GetSyncNotesR
 		ID:        pgtype.UUID{Valid: true},
 		UserID:    pgtype.UUID{Valid: true},
 		Content:   "",
-		IsInbox:   false,
 		DeletedAt: pgtype.Timestamptz{Valid: false},
 	}
 	for _, o := range overrides {
@@ -60,10 +59,6 @@ func (m *mockRepository) GetSyncNotes(ctx context.Context, userID pgtype.UUID, l
 func (m *mockRepository) UpsertNote(ctx context.Context, arg sqlcgen.UpsertNoteParams) (sqlcgen.Note, error) {
 	m.lastUpsertNoteArg = arg
 	return sqlcgen.Note{}, m.upsertNoteErr
-}
-
-func (m *mockRepository) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
-	return sqlcgen.GetInboxNoteRow{}, pgx.ErrNoRows
 }
 
 func (m *mockRepository) GetSyncTasks(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Task, error) {

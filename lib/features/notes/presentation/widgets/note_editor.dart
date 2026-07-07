@@ -57,8 +57,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
   late CustomTaskComponentBuilder _taskComponentBuilder;
-  final _animatingNodeIds = ValueNotifier<Set<String>>(const {});
-  final _completingTaskIds = ValueNotifier<Set<String>>(const {});
+  Set<String> _animatingNodeIds = const {};
+  Set<String> _completingTaskIds = const {};
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
   bool? _cachedHideCompleted;
@@ -95,10 +95,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       onTaskReopen: widget.delegate.onTaskReopen,
       animatingNodeIds: _animatingNodeIds,
       completingTaskIds: _completingTaskIds,
+      onAnimationStart: _onAnimationStart,
+      onAnimationEnd: _onAnimationEnd,
+      onCompletingStart: _onCompletingStart,
+      onCompletingEnd: _onCompletingEnd,
     );
-
-    _animatingNodeIds.addListener(_onTaskAnimationsChanged);
-    _completingTaskIds.addListener(_onTaskAnimationsChanged);
   }
 
   void _setupControls(BuildContext context) {
@@ -172,10 +173,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     }
     _iosController?.dispose();
     _androidController?.dispose();
-    _animatingNodeIds.removeListener(_onTaskAnimationsChanged);
-    _completingTaskIds.removeListener(_onTaskAnimationsChanged);
-    _animatingNodeIds.dispose();
-    _completingTaskIds.dispose();
     super.dispose();
   }
 
@@ -188,8 +185,28 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     widget.delegate.onHasContentChanged?.call(doc != null && doc.isNotEmpty);
   }
 
-  void _onTaskAnimationsChanged() {
-    if (mounted) setState(() {});
+  void _onAnimationStart(String nodeId) {
+    setState(() {
+      _animatingNodeIds = {..._animatingNodeIds, nodeId};
+    });
+  }
+
+  void _onAnimationEnd(String nodeId) {
+    setState(() {
+      _animatingNodeIds = _animatingNodeIds.where((id) => id != nodeId).toSet();
+    });
+  }
+
+  void _onCompletingStart(String nodeId) {
+    setState(() {
+      _completingTaskIds = {..._completingTaskIds, nodeId};
+    });
+  }
+
+  void _onCompletingEnd(String nodeId) {
+    setState(() {
+      _completingTaskIds = _completingTaskIds.where((id) => id != nodeId).toSet();
+    });
   }
 
   Future<void> _onAttach({bool imageOnly = false}) async {

@@ -19,8 +19,12 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
-    this.animatingNodeIds,
-    this.completingTaskIds,
+    this.animatingNodeIds = const {},
+    this.completingTaskIds = const {},
+    this.onAnimationStart,
+    this.onAnimationEnd,
+    this.onCompletingStart,
+    this.onCompletingEnd,
   });
 
   /// The editor used to issue local [ChangeTaskCompletionRequest]s whenever
@@ -43,32 +47,12 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ValueChanged<String>? onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
-  final ValueNotifier<Set<String>>? animatingNodeIds;
-  final ValueNotifier<Set<String>>? completingTaskIds;
-
-  void _markAnimating(String nodeId) {
-    final current = Set<String>.from(animatingNodeIds?.value ?? const {});
-    current.add(nodeId);
-    animatingNodeIds?.value = current;
-  }
-
-  void _unmarkAnimating(String nodeId) {
-    final current = Set<String>.from(animatingNodeIds?.value ?? const {});
-    current.remove(nodeId);
-    animatingNodeIds?.value = current;
-  }
-
-  void _markCompleting(String nodeId) {
-    final current = Set<String>.from(completingTaskIds?.value ?? const {});
-    current.add(nodeId);
-    completingTaskIds?.value = current;
-  }
-
-  void _unmarkCompleting(String nodeId) {
-    final current = Set<String>.from(completingTaskIds?.value ?? const {});
-    current.remove(nodeId);
-    completingTaskIds?.value = current;
-  }
+  final Set<String> animatingNodeIds;
+  final Set<String> completingTaskIds;
+  final ValueChanged<String>? onAnimationStart;
+  final ValueChanged<String>? onAnimationEnd;
+  final ValueChanged<String>? onCompletingStart;
+  final ValueChanged<String>? onCompletingEnd;
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -84,7 +68,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt],
       padding: EdgeInsets.zero,
       indent: node.indent,
-      isComplete: (completingTaskIds?.value.contains(node.id) ?? false) || node.isComplete,
+      isComplete: completingTaskIds.contains(node.id) || node.isComplete,
       setComplete: (bool isComplete) async {
         final isRecurring = taskMetadataById[node.id]?.recurrence != null;
 
@@ -101,11 +85,11 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
         if (isComplete) {
           if (isRecurring) {
-            _markCompleting(node.id);
+            onCompletingStart?.call(node.id);
           }
 
           if (hideCompleted) {
-            _markAnimating(node.id);
+            onAnimationStart?.call(node.id);
             FocusManager.instance.primaryFocus?.unfocus();
             composer?.clearSelection();
           }
@@ -117,7 +101,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
             }
           } finally {
             if (isRecurring) {
-              _unmarkCompleting(node.id);
+              onCompletingEnd?.call(node.id);
             }
           }
         } else {
@@ -145,7 +129,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     if (hideCompleted &&
         componentViewModel.isComplete &&
-        !(animatingNodeIds?.value.contains(nodeId) ?? false)) {
+        !animatingNodeIds.contains(nodeId)) {
       return SizedBox(key: componentContext.componentKey, height: 0);
     }
 
@@ -158,7 +142,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
           ? null
           : () => onTaskLongPress!(nodeId),
       onAnimationComplete: () {
-        _unmarkAnimating(componentViewModel.nodeId);
+        onAnimationEnd?.call(componentViewModel.nodeId);
       },
     );
   }

@@ -8,7 +8,7 @@ void main() {
       userId: 'u',
       content: 'some content that is NOT the title',
       title: 'From Node',
-      isInbox: false,
+      
       favorite: false,
       archived: false,
       contextId: null,
@@ -25,7 +25,7 @@ void main() {
       userId: 'u',
       content: 'body',
       title: 'Kept Title',
-      isInbox: false,
+      
       favorite: false,
       archived: false,
       contextId: null,

@@ -7,7 +7,6 @@ class NoteModel {
     required this.content,
     required this.title,
     this.excerpt,
-    required this.isInbox,
     required this.favorite,
     required this.archived,
     required this.contextId,
@@ -25,7 +24,6 @@ class NoteModel {
   final String content;
   final String title;
   final String? excerpt;
-  final bool isInbox;
   final bool favorite;
   final bool archived;
   final String? contextId;
@@ -47,7 +45,6 @@ class NoteModel {
     String? content,
     String? title,
     String? excerpt,
-    bool? isInbox,
     bool? favorite,
     bool? archived,
     String? contextId,
@@ -64,7 +61,6 @@ class NoteModel {
     content: content ?? this.content,
     title: title ?? this.title,
     excerpt: excerpt ?? this.excerpt,
-    isInbox: isInbox ?? this.isInbox,
     favorite: favorite ?? this.favorite,
     archived: archived ?? this.archived,
     contextId: contextId ?? this.contextId,
@@ -84,7 +80,6 @@ class NoteModel {
       content: qr.note.content,
       title: qr.title,
       excerpt: qr.note.excerpt,
-      isInbox: qr.note.isInbox,
       favorite: qr.favorite,
       archived: qr.archived,
       contextId: qr.note.contextId,

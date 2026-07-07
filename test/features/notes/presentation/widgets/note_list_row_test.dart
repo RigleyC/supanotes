@@ -13,7 +13,7 @@ void main() {
         userId: 'user1',
         content: 'My Note',
         title: 'My Note',
-        isInbox: false,
+        
         favorite: false,
         archived: false,
         contextId: null,
@@ -45,7 +45,7 @@ void main() {
         userId: 'user2',
         content: 'Shared Note',
         title: 'Shared Note',
-        isInbox: false,
+        
         favorite: false,
         archived: false,
         contextId: null,
@@ -80,7 +80,7 @@ void main() {
         userId: 'user1',
         content: 'Favorite Note',
         title: 'Favorite Note',
-        isInbox: false,
+        
         favorite: true,
         archived: false,
         contextId: null,
@@ -114,7 +114,7 @@ void main() {
         userId: 'user1',
         content: 'Non-favorite Note',
         title: 'Non-favorite Note',
-        isInbox: false,
+        
         favorite: false,
         archived: false,
         contextId: null,

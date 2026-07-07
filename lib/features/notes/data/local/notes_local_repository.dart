@@ -43,10 +43,6 @@ class NotesLocalRepository {
     return _dao.watchFavorites(_userId);
   }
 
-  Stream<NoteQueryResult?> watchInbox() {
-    return _dao.watchInboxNote(_userId);
-  }
-
   Stream<NoteQueryResult?> watchNoteById(String id) {
     return _dao.watchNoteById(id, _userId);
   }
@@ -139,22 +135,4 @@ class NotesLocalRepository {
     await _dao.updateNote(companion);
   }
 
-  Future<NoteQueryResult> getOrCreateInboxNote() async {
-    final existing = await _dao.getInboxNote(_userId);
-    if (existing != null) return existing;
-
-    final now = DateTime.now().toUtc();
-    final id = _uuid.v4();
-    final companion = NotesCompanion.insert(
-      id: id,
-      userId: _userId,
-      content: '',
-      isInbox: const Value(true),
-      createdAt: now,
-      updatedAt: now,
-      isDirty: const Value(true),
-    );
-    await _dao.createNote(companion);
-    return (await _dao.getNoteWithPrefsById(id, _userId))!;
-  }
 }

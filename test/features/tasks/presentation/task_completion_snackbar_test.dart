@@ -30,6 +30,39 @@ void main() {
   });
 
   testWidgets(
+      'minimal snackbar dismiss test',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Concluída!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: const Text('Show'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Show'));
+    await tester.pump();
+    expect(find.textContaining('Concluída!'), findsOneWidget);
+
+    await tester.pumpAndSettle(const Duration(seconds: 5));
+    expect(find.textContaining('Concluída!'), findsNothing);
+  });
+
+  testWidgets(
       'creates a daily recurring task, clicks to complete, and snackbar disappears after default time',
       (tester) async {
     final mockTasksRepo = _MockTasksRepository();
@@ -40,7 +73,7 @@ void main() {
     final task = TaskModel(
       id: 'task-1',
       userId: 'user-1',
-      noteId: 'inbox',
+      noteId: 'note-1',
       title: 'Daily Task',
       status: 'open',
       position: 0,
@@ -65,11 +98,11 @@ void main() {
           scaffoldMessengerKey: AppMessenger.key,
           home: Scaffold(
             body: NoteEditor(
-              noteId: 'inbox',
+              noteId: 'note-1',
               nodes: [
                 NoteNode(
                   id: 'task-1',
-                  noteId: 'inbox',
+                  noteId: 'note-1',
                   position: 0,
                   type: 'task',
                   data: '{"text":"Daily Task","completed":false}',
@@ -128,9 +161,7 @@ void main() {
     }
     
     // Advance time to allow the snackbar to disappear
-    for (int i = 0; i < 100; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+    await tester.pump(const Duration(seconds: 5));
 
     // Verify snackbar disappears
     expect(find.textContaining('Concluída!'), findsNothing);

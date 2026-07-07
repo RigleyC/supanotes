@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 
-import 'package:flutter/cupertino.dart' show CupertinoActionSheet, CupertinoActionSheetAction, showCupertinoModalPopup;
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
+import 'package:supanotes/shared/widgets/app_popup_menu.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
@@ -58,84 +58,32 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     INotesRepository repo,
   ) async {
     final isOwner = note.isOwner;
-    final items = [
-      if (isOwner)
-        AdaptivePopupMenuItem<String>(
-          label: NoteStrings.shareLabel,
-          icon: Icons.share_outlined,
-          value: 'share',
-        ),
-      AdaptivePopupMenuItem<String>(
-        label: hideCompleted
-            ? NoteStrings.showCompleted
-            : NoteStrings.hideCompleted,
-        icon: hideCompleted ? Icons.visibility : Icons.visibility_off,
-        value: 'hide_completed',
-      ),
-      if (isOwner)
-        AdaptivePopupMenuItem<String>(
-          label: note.collapseImages ? 'Expandir imagens' : 'Colapsar imagens',
-          icon: note.collapseImages ? Icons.image : Icons.image_outlined,
-          value: 'collapse_images',
-        ),
-    ];
-
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      final selected = await showCupertinoModalPopup<int>(
-        context: context,
-        builder: (ctx) => CupertinoActionSheet(
-          actions: [
-            for (var i = 0; i < items.length; i++)
-              CupertinoActionSheetAction(
-                onPressed: () => Navigator.of(ctx).pop(i),
-                child: Text(items[i].label),
-              ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            isDefaultAction: true,
-            child: const Text('Cancelar'),
+    final val = await showAdaptivePopupMenu<String>(
+      context: context,
+      items: [
+        if (isOwner)
+          AdaptivePopupMenuItem<String>(
+            label: NoteStrings.shareLabel,
+            icon: Icons.share_outlined,
+            value: 'share',
           ),
+        AdaptivePopupMenuItem<String>(
+          label: hideCompleted
+              ? NoteStrings.showCompleted
+              : NoteStrings.hideCompleted,
+          icon: hideCompleted ? Icons.visibility : Icons.visibility_off,
+          value: 'hide_completed',
         ),
-      );
-      if (selected != null && context.mounted) {
-        final val = items[selected].value;
-        if (val != null) {
-          _handleMenuValue(context, ref, val, note, hideCompleted, repo);
-        }
-      }
-    } else {
-      final renderBox = context.findRenderObject() as RenderBox?;
-      final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
-      final size = renderBox?.size ?? Size.zero;
-
-      final selectedValue = await showMenu<String>(
-        context: context,
-        position: RelativeRect.fromLTRB(
-          offset.dx + size.width,
-          offset.dy + 56,
-          offset.dx + size.width,
-          offset.dy,
-        ),
-        items: [
-          for (final item in items)
-            PopupMenuItem<String>(
-              value: item.value,
-              child: Row(
-                children: [
-                  Icon(item.icon as IconData?),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(item.label),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      );
-      if (selectedValue != null && context.mounted) {
-        _handleMenuValue(context, ref, selectedValue, note, hideCompleted, repo);
-      }
+        if (isOwner)
+          AdaptivePopupMenuItem<String>(
+            label: note.collapseImages ? 'Expandir imagens' : 'Colapsar imagens',
+            icon: note.collapseImages ? Icons.image : Icons.image_outlined,
+            value: 'collapse_images',
+          ),
+      ],
+    );
+    if (val != null && context.mounted) {
+      _handleMenuValue(context, ref, val, note, hideCompleted, repo);
     }
   }
 

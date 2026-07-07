@@ -27,7 +27,7 @@
 ## Key decisions
 - No `valueOrNull` — Riverpod 3.x doesn't expose it; use `is AsyncData` pattern.
 - Router listener guard: `authState is! AsyncData<User?>` because `valueOrNull` is not available.
-- `LastRouteStore` is validated (only `/home`, `/inbox`, `/settings`, `/soul`, `/contexts`, `/routines`, `/routinesLogs`, `/telegram`, `/chat`, `/search`, `/memories`, `/notes/*`).
+- `LastRouteStore` is validated (only `/home`, `/settings`, `/soul`, `/contexts`, `/routines`, `/routinesLogs`, `/telegram`, `/chat`, `/search`, `/memories`, `/notes/*`).
 - Public auth routes (`/login`, `/register`) are never persisted.
-- `_NotesLoadingView` keeps the full sliver header (Brain Dump, view mode toggle, SectionTitle) visible during loading.
+- `_NotesLoadingView` keeps the full sliver header (view mode toggle, SectionTitle) visible during loading.
 - Editor init is guarded by `controller.document == null`; subsequent note stream values don't re-init the document.

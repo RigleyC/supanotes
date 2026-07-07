@@ -10,7 +10,6 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
 import 'package:supanotes/features/notes/domain/note_sync_coordinator.dart';
-import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
 
@@ -42,10 +41,10 @@ class NoteEditorController {
       '[NoteEditorController.initFromNodes] nodeCount=${nodes.length}',
       name: 'NoteEditor',
     );
-    document = NodeSyncManager.documentFromNodes(nodes);
+    document = NoteSyncCoordinator.documentFromNodes(nodes);
     _noteId = noteId;
     _setupEditor();
-    _setupNodeSyncManager();
+    _setupCoordinator();
   }
 
   void _setupEditor() {
@@ -63,7 +62,7 @@ class NoteEditorController {
     editor!.reactionPipeline.add(const KeepFirstLineAsTitleReaction());
   }
 
-  void _setupNodeSyncManager() {
+  void _setupCoordinator() {
     final db = _database;
     final noteId = _noteId;
     final doc = document;

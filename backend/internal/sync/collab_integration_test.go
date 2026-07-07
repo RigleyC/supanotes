@@ -71,7 +71,6 @@ func (m *mockCollabRepository) GetSyncNotes(ctx context.Context, userID pgtype.U
 				UserID:           n.UserID,
 				ContextID:        n.ContextID,
 				Content:          n.Content,
-				IsInbox:          n.IsInbox,
 				CreatedAt:        n.CreatedAt,
 				UpdatedAt:        n.UpdatedAt,
 				DeletedAt:        n.DeletedAt,
@@ -92,7 +91,6 @@ func (m *mockCollabRepository) UpsertNote(ctx context.Context, arg sqlcgen.Upser
 		UserID:          arg.UserID,
 		ContextID:       arg.ContextID,
 		Content:         arg.Content,
-		IsInbox:         arg.IsInbox,
 		EmbeddingStatus: arg.EmbeddingStatus,
 		CollapseImages:  arg.CollapseImages,
 		CreatedAt:       arg.CreatedAt,
@@ -101,10 +99,6 @@ func (m *mockCollabRepository) UpsertNote(ctx context.Context, arg sqlcgen.Upser
 	}
 	m.db.notes[arg.ID] = n
 	return n, nil
-}
-
-func (m *mockCollabRepository) GetInboxNote(ctx context.Context, userID pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
-	return sqlcgen.GetInboxNoteRow{}, pgx.ErrNoRows
 }
 
 func (m *mockCollabRepository) GetSyncTasks(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Task, error) {
@@ -275,7 +269,6 @@ func (m *mockCollabRepository) GetNoteByID(ctx context.Context, arg sqlcgen.GetN
 				UserID:          n.UserID,
 				ContextID:       n.ContextID,
 				Content:         n.Content,
-				IsInbox:         n.IsInbox,
 				CreatedAt:       n.CreatedAt,
 				UpdatedAt:       n.UpdatedAt,
 				DeletedAt:       n.DeletedAt,

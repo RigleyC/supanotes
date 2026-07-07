@@ -166,9 +166,6 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   Stream<List<NoteQueryResult>> watchFavorites() => const Stream.empty();
 
   @override
-  Stream<NoteQueryResult?> watchInbox() => const Stream.empty();
-
-  @override
   Stream<NoteQueryResult?> watchNoteById(String id) => const Stream.empty();
 
   @override
@@ -193,7 +190,6 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       id: id,
       userId: userId,
       content: content,
-      isInbox: false,
       createdAt: now,
       updatedAt: now,
       isDirty: false,
@@ -250,9 +246,6 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
     }
   }
 
-  @override
-  Future<NoteQueryResult> getOrCreateInboxNote() async =>
-      throw UnimplementedError('not used in these tests');
 }
 
 class FakeTasksLocalRepository implements TasksLocalRepository {

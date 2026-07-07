@@ -39,9 +39,6 @@ func (m *mockQuerier) DeleteContext(ctx context.Context, arg sqlcgen.DeleteConte
 	return nil
 }
 func (m *mockQuerier) AddTagToNote(_ context.Context, _ sqlcgen.AddTagToNoteParams) error { return nil }
-func (m *mockQuerier) AppendToInbox(_ context.Context, _ sqlcgen.AppendToInboxParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
-}
 func (m *mockQuerier) AppendToNoteContent(_ context.Context, _ sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
@@ -112,9 +109,6 @@ func (m *mockQuerier) DeleteTag(_ context.Context, _ sqlcgen.DeleteTagParams) er
 func (m *mockQuerier) DeleteTask(_ context.Context, _ sqlcgen.DeleteTaskParams) error { return nil }
 func (m *mockQuerier) GetEnabledRoutines(_ context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
 	return nil, nil
-}
-func (m *mockQuerier) GetInboxNote(_ context.Context, _ pgtype.UUID) (sqlcgen.GetInboxNoteRow, error) {
-	return sqlcgen.GetInboxNoteRow{}, nil
 }
 func (m *mockQuerier) GetLatestBriefByType(_ context.Context, _ sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
 	return sqlcgen.RoutineLog{}, nil
@@ -219,9 +213,6 @@ func (m *mockQuerier) SearchNotesHybrid(_ context.Context, _ sqlcgen.SearchNotes
 }
 func (m *mockQuerier) SearchNotesSemantic(_ context.Context, _ sqlcgen.SearchNotesSemanticParams) ([]sqlcgen.SearchNotesSemanticRow, error) {
 	return nil, nil
-}
-func (m *mockQuerier) SetInboxContent(_ context.Context, _ sqlcgen.SetInboxContentParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
 }
 func (m *mockQuerier) UpdateNote(_ context.Context, _ sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil

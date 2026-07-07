@@ -25,9 +25,6 @@ class _FakeNotesRepository implements INotesRepository {
   }
 
   @override
-  Stream<NoteModel?> watchInbox() => Stream<NoteModel?>.value(null);
-
-  @override
   Stream<NoteModel?> watchNoteById(String id) => Stream<NoteModel?>.value(null);
 
   @override
@@ -73,12 +70,6 @@ class _FakeNotesRepository implements INotesRepository {
   Future<void> softDelete(String id) async {}
 
   @override
-  Future<NoteModel> ensureInbox() async => _note(id: 'inbox', isInbox: true);
-
-  @override
-  Future<void> appendToInbox(String text) async {}
-
-  @override
   Future<NoteModel> createLocalNote({required String id}) async {
     final note = _note(id: id);
     createdNotes.add(note);
@@ -99,7 +90,6 @@ class _FakeNotesRepository implements INotesRepository {
   NoteModel _note({
     required String id,
     String content = '',
-    bool isInbox = false,
   }) {
     final now = DateTime.utc(2026, 6, 12);
     return NoteModel(
@@ -107,7 +97,6 @@ class _FakeNotesRepository implements INotesRepository {
       userId: 'user-1',
       content: content,
       title: 'Test Note',
-      isInbox: isInbox,
       favorite: false,
       archived: false,
       contextId: null,
@@ -175,8 +164,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Brain Dump'), findsOneWidget);
-    expect(find.text('NOTAS'), findsOneWidget);
+    expect(find.text('Notas'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 

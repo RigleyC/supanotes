@@ -131,7 +131,7 @@ void main() {
           title: 'Persisted note',
           favorite: false,
           archived: false,
-          isInbox: false,
+          
           contextId: null,
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 11),
@@ -151,7 +151,7 @@ void main() {
           title: 'Persisted note',
           favorite: false,
           archived: false,
-          isInbox: false,
+          
           contextId: null,
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 12),
@@ -198,7 +198,7 @@ void main() {
         title: 'Dark content',
         favorite: false,
         archived: false,
-        isInbox: false,
+        
         contextId: null,
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
@@ -422,7 +422,7 @@ void main() {
         title: 'Plain content',
         favorite: false,
         archived: false,
-        isInbox: false,
+        
         contextId: null,
         createdAt: DateTime(2026, 6, 17),
         updatedAt: DateTime(2026, 6, 17),
@@ -491,7 +491,7 @@ void main() {
         title: 'Test note',
         favorite: false,
         archived: false,
-        isInbox: false,
+        
         contextId: null,
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
@@ -560,7 +560,7 @@ void main() {
             title: 'Test note',
             favorite: false,
             archived: false,
-            isInbox: false,
+            
             contextId: null,
             createdAt: DateTime(2026, 6, 11),
             updatedAt: DateTime(2026, 6, 11),

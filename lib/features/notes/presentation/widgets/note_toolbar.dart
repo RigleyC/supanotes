@@ -241,9 +241,12 @@ class NoteToolbar extends StatelessWidget {
     return null;
   }
 
-  void _maybeMarkTitleDismissal(String? activeNodeId, Attribution? newBlockType) {
+  void _updateTitleDismissal(String? activeNodeId, {bool wasPromotedToH1 = false}) {
     if (activeNodeId == null) return;
-    if (newBlockType == header1Attribution) return;
+    if (wasPromotedToH1) {
+      clearTitlePromotionDismissed(activeNodeId);
+      return;
+    }
     final document = editor.context.document;
     if (document.isEmpty) return;
     if (document.first.id != activeNodeId) return;
@@ -254,39 +257,28 @@ class NoteToolbar extends StatelessWidget {
     markTitlePromotionDismissed(firstNode.id);
   }
 
-  void _maybeClearTitleDismissal(String? activeNodeId) {
-    if (activeNodeId == null) return;
-    final document = editor.context.document;
-    if (document.isEmpty) return;
-    if (document.first.id != activeNodeId) return;
-    final firstNode = document.first;
-    if (firstNode is! ParagraphNode) return;
-    clearTitlePromotionDismissed(firstNode.id);
-  }
-
   void _toggleInline(Attribution attribution) =>
       NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
 
   void _setBlockType(Attribution? blockType) {
     final activeNodeId = _activeNodeId(composer.selection);
     NoteEditorCommands.setBlockType(editor, composer, blockType);
-    if (blockType == header1Attribution) {
-      _maybeClearTitleDismissal(activeNodeId);
-    } else {
-      _maybeMarkTitleDismissal(activeNodeId, blockType);
-    }
+    _updateTitleDismissal(
+      activeNodeId,
+      wasPromotedToH1: blockType == header1Attribution,
+    );
   }
 
   void _convertToListItem(ListItemType type) {
     final activeNodeId = _activeNodeId(composer.selection);
     NoteEditorCommands.convertToListItem(editor, composer, type);
-    _maybeMarkTitleDismissal(activeNodeId, listItemAttribution);
+    _updateTitleDismissal(activeNodeId);
   }
 
   void _convertToTask() {
     final activeNodeId = _activeNodeId(composer.selection);
     NoteEditorCommands.convertToTask(editor, composer);
-    _maybeMarkTitleDismissal(activeNodeId, listItemAttribution);
+    _updateTitleDismissal(activeNodeId);
   }
 
   void _indentListItem() =>

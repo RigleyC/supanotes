@@ -10,7 +10,6 @@ library;
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 
-import 'package:supanotes/shared/theme/app_spacing.dart';
 
 /// Strings displayed inside the confirm dialog.
 ///

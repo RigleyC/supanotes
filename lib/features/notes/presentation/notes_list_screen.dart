@@ -11,10 +11,8 @@ import 'package:supanotes/core/sync/sync_state.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
-import 'package:supanotes/features/notes/presentation/widgets/brain_dump_tile.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_grid_view.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_list_view.dart';
-import 'package:supanotes/features/notes/presentation/widgets/section_title.dart';
 import 'package:supanotes/features/search/presentation/controllers/search_controller.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_bar.dart';
 import 'package:supanotes/features/search/presentation/widgets/search_error_view.dart';
@@ -24,13 +22,9 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/offline_indicator.dart';
+import 'package:supanotes/shared/widgets/app_popup_menu.dart';
 import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart'
-    show
-        CupertinoActionSheet,
-        CupertinoActionSheetAction,
-        showCupertinoModalPopup;
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
@@ -86,17 +80,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
             ),
           ),
         ),
-      SliverToBoxAdapter(
-        child: BrainDumpTile(
-          title: 'Brain Dump',
-          onTap: () => context.push(AppRoutes.inbox),
-        ),
-      ),
     ];
 
     return AdaptiveScaffold(
       appBar: AdaptiveAppBar(
-        title: _isSearching ? null : 'Notas',
         actions: [
           AdaptiveAppBarAction(
             icon: _isSearching ? Icons.close : Icons.search,
@@ -192,78 +179,28 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
   Future<void> _showMoreMenu(BuildContext context) async {
     final isGridView = ref.read(isGridViewProvider);
-    final items = [
-      AdaptivePopupMenuItem<String>(
-        label: isGridView ? 'Ver como lista' : 'Ver como galeria',
-        icon: isGridView ? Icons.list_rounded : Icons.grid_view_rounded,
-        value: 'toggleView',
-      ),
-      AdaptivePopupMenuItem<String>(
-        label: 'Configurações',
-        icon: Icons.settings_outlined,
-        value: 'settings',
-      ),
-      AdaptivePopupMenuItem<String>(
-        label: 'Sair',
-        icon: Icons.logout,
-        value: 'logout',
-      ),
-    ];
-
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      final selected = await showCupertinoModalPopup<int>(
-        context: context,
-        builder: (ctx) => CupertinoActionSheet(
-          actions: [
-            for (var i = 0; i < items.length; i++)
-              CupertinoActionSheetAction(
-                onPressed: () => Navigator.of(ctx).pop(i),
-                child: Text(items[i].label),
-              ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            isDefaultAction: true,
-            child: const Text('Cancelar'),
-          ),
+    final val = await showAdaptivePopupMenu<String>(
+      context: context,
+      items: [
+        AdaptivePopupMenuItem<String>(
+          label: isGridView ? 'Ver como lista' : 'Ver como galeria',
+          icon: isGridView ? Icons.list_rounded : Icons.grid_view_rounded,
+          value: 'toggleView',
         ),
-      );
-      if (selected != null && context.mounted) {
-        final val = items[selected].value;
-        if (val != null) {
-          _handleMenuValue(val);
-        }
-      }
-    } else {
-      final renderBox = context.findRenderObject() as RenderBox?;
-      final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
-      final size = renderBox?.size ?? Size.zero;
-
-      final selectedValue = await showMenu<String>(
-        context: context,
-        position: RelativeRect.fromLTRB(
-          offset.dx + size.width,
-          offset.dy + 56,
-          offset.dx + size.width,
-          offset.dy,
+        AdaptivePopupMenuItem<String>(
+          label: 'Configurações',
+          icon: Icons.settings_outlined,
+          value: 'settings',
         ),
-        items: [
-          for (final item in items)
-            PopupMenuItem<String>(
-              value: item.value,
-              child: Row(
-                children: [
-                  Icon(item.icon as IconData?),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(item.label)),
-                ],
-              ),
-            ),
-        ],
-      );
-      if (selectedValue != null && context.mounted) {
-        _handleMenuValue(selectedValue);
-      }
+        AdaptivePopupMenuItem<String>(
+          label: 'Sair',
+          icon: Icons.logout,
+          value: 'logout',
+        ),
+      ],
+    );
+    if (val != null && context.mounted) {
+      _handleMenuValue(val);
     }
   }
 
