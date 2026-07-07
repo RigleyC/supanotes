@@ -1,0 +1,8 @@
+name: yjs_compatibility_runner
+description: Yjs compatibility test suite runner.
+version: 1.0.0
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dependencies:
+  yjs_dart: ^1.1.15
+  args: ^2.4.2
