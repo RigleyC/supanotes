@@ -19,7 +19,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
-    this.requestRebuild,
+    this.animatingNodeIds,
+    this.completingTaskIds,
   });
 
   /// The editor used to issue local [ChangeTaskCompletionRequest]s whenever
@@ -32,7 +33,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   /// Recurring tasks are exempt: their `completeTask` repo call re-opens
   /// the row with a new `dueDate` (`status='open'`), so emitting a local
   /// completion here would have `NodeSyncManager` overwrite that with
-  /// `status='done'`. For those, we rely on the `_completingTaskIds`
+  /// `status='done'`. For those, we rely on the `completingTaskIds`
   /// transient flag instead.
   final Editor? editor;
 
@@ -42,9 +43,32 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ValueChanged<String>? onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
-  final VoidCallback? requestRebuild;
-  final Set<String> _animatingNodeIds = {};
-  final Set<String> _completingTaskIds = {};
+  final ValueNotifier<Set<String>>? animatingNodeIds;
+  final ValueNotifier<Set<String>>? completingTaskIds;
+
+  void _markAnimating(String nodeId) {
+    final current = Set<String>.from(animatingNodeIds?.value ?? const {});
+    current.add(nodeId);
+    animatingNodeIds?.value = current;
+  }
+
+  void _unmarkAnimating(String nodeId) {
+    final current = Set<String>.from(animatingNodeIds?.value ?? const {});
+    current.remove(nodeId);
+    animatingNodeIds?.value = current;
+  }
+
+  void _markCompleting(String nodeId) {
+    final current = Set<String>.from(completingTaskIds?.value ?? const {});
+    current.add(nodeId);
+    completingTaskIds?.value = current;
+  }
+
+  void _unmarkCompleting(String nodeId) {
+    final current = Set<String>.from(completingTaskIds?.value ?? const {});
+    current.remove(nodeId);
+    completingTaskIds?.value = current;
+  }
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -60,7 +84,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt],
       padding: EdgeInsets.zero,
       indent: node.indent,
-      isComplete: _completingTaskIds.contains(node.id) || node.isComplete,
+      isComplete: (completingTaskIds?.value.contains(node.id) ?? false) || node.isComplete,
       setComplete: (bool isComplete) async {
         final isRecurring = taskMetadataById[node.id]?.recurrence != null;
 
@@ -77,12 +101,11 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
         if (isComplete) {
           if (isRecurring) {
-            _completingTaskIds.add(node.id);
-            requestRebuild?.call();
+            _markCompleting(node.id);
           }
 
           if (hideCompleted) {
-            _animatingNodeIds.add(node.id);
+            _markAnimating(node.id);
             FocusManager.instance.primaryFocus?.unfocus();
             composer?.clearSelection();
           }
@@ -94,8 +117,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
             }
           } finally {
             if (isRecurring) {
-              _completingTaskIds.remove(node.id);
-              requestRebuild?.call();
+              _unmarkCompleting(node.id);
             }
           }
         } else {
@@ -123,7 +145,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     if (hideCompleted &&
         componentViewModel.isComplete &&
-        !_animatingNodeIds.contains(nodeId)) {
+        !(animatingNodeIds?.value.contains(nodeId) ?? false)) {
       return SizedBox(key: componentContext.componentKey, height: 0);
     }
 
@@ -136,8 +158,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
           ? null
           : () => onTaskLongPress!(nodeId),
       onAnimationComplete: () {
-        _animatingNodeIds.remove(componentViewModel.nodeId);
-        requestRebuild?.call();
+        _unmarkAnimating(componentViewModel.nodeId);
       },
     );
   }

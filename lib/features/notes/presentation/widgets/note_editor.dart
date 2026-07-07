@@ -57,6 +57,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
   late CustomTaskComponentBuilder _taskComponentBuilder;
+  final _animatingNodeIds = ValueNotifier<Set<String>>(const {});
+  final _completingTaskIds = ValueNotifier<Set<String>>(const {});
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
   bool? _cachedHideCompleted;
@@ -91,10 +93,12 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             ),
       onTaskComplete: widget.delegate.onTaskComplete,
       onTaskReopen: widget.delegate.onTaskReopen,
-      requestRebuild: () {
-        if (mounted) setState(() {});
-      },
+      animatingNodeIds: _animatingNodeIds,
+      completingTaskIds: _completingTaskIds,
     );
+
+    _animatingNodeIds.addListener(_onTaskAnimationsChanged);
+    _completingTaskIds.addListener(_onTaskAnimationsChanged);
   }
 
   void _setupControls(BuildContext context) {
@@ -168,6 +172,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     }
     _iosController?.dispose();
     _androidController?.dispose();
+    _animatingNodeIds.removeListener(_onTaskAnimationsChanged);
+    _completingTaskIds.removeListener(_onTaskAnimationsChanged);
+    _animatingNodeIds.dispose();
+    _completingTaskIds.dispose();
     super.dispose();
   }
 
@@ -178,6 +186,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   void _notifyContentChanged() {
     final doc = _controller?.document;
     widget.delegate.onHasContentChanged?.call(doc != null && doc.isNotEmpty);
+  }
+
+  void _onTaskAnimationsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _onAttach({bool imageOnly = false}) async {
