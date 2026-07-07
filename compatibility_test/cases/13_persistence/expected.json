@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "Saved State - Loaded"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "Saved State - Loaded"
+      }
+    }
+  },
+  "text_any_of": null
+}

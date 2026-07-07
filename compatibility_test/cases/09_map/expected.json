@@ -1,0 +1,27 @@
+{
+  "states": {
+    "A": {
+      "map": {
+        "meta": {
+          "tags": [
+            "flutter",
+            "sync"
+          ],
+          "title": "Nota"
+        }
+      }
+    },
+    "B": {
+      "map": {
+        "meta": {
+          "tags": [
+            "flutter",
+            "sync"
+          ],
+          "title": "Nota"
+        }
+      }
+    }
+  },
+  "text_any_of": null
+}

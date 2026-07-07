@@ -1,0 +1,59 @@
+{
+  "name": "Array compatibility (push and insert)",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "array_insert",
+      "name": "list",
+      "index": 0,
+      "value": "item1"
+    },
+    {
+      "client": "A",
+      "action": "array_insert",
+      "name": "list",
+      "index": 1,
+      "value": "item2"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "array_insert",
+      "name": "list",
+      "index": 0,
+      "value": "item0"
+    },
+    {
+      "client": "B",
+      "action": "export_update",
+      "id": "u2"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "u2"
+    }
+  ],
+  "expected": {
+    "array": {
+      "list": [
+        "item0",
+        "item1",
+        "item2"
+      ]
+    }
+  }
+}

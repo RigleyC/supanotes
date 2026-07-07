@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "EdxitB EditA"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "EdxitB EditA"
+      }
+    }
+  },
+  "text_any_of": null
+}

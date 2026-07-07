@@ -1,0 +1,48 @@
+{
+  "name": "Go -> Dart sync",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "Hello"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "text_insert",
+      "name": "note",
+      "index": 5,
+      "value": " World"
+    },
+    {
+      "client": "B",
+      "action": "export_update",
+      "id": "u2"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "u2"
+    }
+  ],
+  "expected": {
+    "text": {
+      "note": "Hello World"
+    }
+  }
+}

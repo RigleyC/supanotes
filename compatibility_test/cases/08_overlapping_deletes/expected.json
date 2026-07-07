@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "The mps over the lazy dog"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "The mps over the lazy dog"
+      }
+    }
+  },
+  "text_any_of": null
+}

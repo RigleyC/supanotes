@@ -1,0 +1,84 @@
+{
+  "name": "Anti-interleaving (concurrent inserts)",
+  "clients": [
+    "A",
+    "B",
+    "C"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "Hello"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "C",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "text_insert",
+      "name": "note",
+      "index": 5,
+      "value": " Ola"
+    },
+    {
+      "client": "B",
+      "action": "export_update",
+      "id": "u2"
+    },
+    {
+      "client": "C",
+      "action": "text_insert",
+      "name": "note",
+      "index": 5,
+      "value": " World"
+    },
+    {
+      "client": "C",
+      "action": "export_update",
+      "id": "u3"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u3"
+    },
+    {
+      "client": "C",
+      "action": "import_update",
+      "id": "u2"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "u2"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "u3"
+    }
+  ],
+  "expected": {
+    "text_any_of": {
+      "note": [
+        "Hello Ola World",
+        "Hello World Ola"
+      ]
+    }
+  }
+}

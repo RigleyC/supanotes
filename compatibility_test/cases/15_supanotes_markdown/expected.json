@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "# Projeto SupaNotes\n\n- [x] Comprar VPS\n\n## Backend\n\nLorem ipsum..."
+      }
+    },
+    "B": {
+      "text": {
+        "note": "# Projeto SupaNotes\n\n- [x] Comprar VPS\n\n## Backend\n\nLorem ipsum..."
+      }
+    }
+  },
+  "text_any_of": null
+}

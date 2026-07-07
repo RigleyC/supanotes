@@ -1,0 +1,65 @@
+{
+  "name": "Out of Order updates",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "Hello"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 5,
+      "value": " World"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u2"
+    },
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 11,
+      "value": "!!!"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u3"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u3"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u2"
+    }
+  ],
+  "expected": {
+    "text": {
+      "note": "Hello World!!!"
+    }
+  }
+}
