@@ -109,4 +109,86 @@ void main() {
       }
     }
   });
+
+  group('crdt_lf - Deterministic Edge Cases', () {
+    test('Anti-interleaving (Fugue Core)', () {
+      final docA = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000001'))..registerDefaultFactories();
+      final docB = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000002'))..registerDefaultFactories();
+
+      final textA = CRDTFugueTextHandler(docA, 'text-anti');
+      textA.insert(0, "Hello");
+
+      // Sync base
+      docB.importChanges(docA.exportChanges());
+      final textB = docB.registeredHandlers['text-anti']! as CRDTFugueTextHandler;
+
+      // Concurrent insertions at index 5
+      textA.insert(5, " Ola");
+      textB.insert(5, " World");
+
+      // Merge changes
+      final changesA = docA.exportChanges();
+      final changesB = docB.exportChanges();
+
+      docA.importChanges(changesB);
+      docB.importChanges(changesA);
+
+      expect(textA.value, textB.value);
+      final finalVal = textA.value;
+      // Should not be interleaved, words must remain contiguous
+      expect(
+        finalVal == "Hello Ola World" || finalVal == "Hello World Ola",
+        true,
+        reason: 'Interleaved result detected: $finalVal',
+      );
+    });
+
+    test('Concurrent Overlapping Deletes', () {
+      final docA = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000001'))..registerDefaultFactories();
+      final docB = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000002'))..registerDefaultFactories();
+
+      final textA = CRDTFugueTextHandler(docA, 'text-delete');
+      textA.insert(0, "The quick brown fox jumps over the lazy dog");
+
+      // Sync base
+      docB.importChanges(docA.exportChanges());
+      final textB = docB.registeredHandlers['text-delete']! as CRDTFugueTextHandler;
+
+      // Client A deletes indices 4 to 16 ("quick brown ")
+      textA.delete(4, 12);
+
+      // Client B deletes indices 10 to 20 ("brown fox ju")
+      textB.delete(10, 12);
+
+      // Merge changes
+      final changesA = docA.exportChanges();
+      final changesB = docB.exportChanges();
+
+      docA.importChanges(changesB);
+      docB.importChanges(changesA);
+
+      expect(textA.value, textB.value);
+      expect(textA.value, "The mps over the lazy dog");
+    });
+
+    test('Idempotency / Double Application', () {
+      final docA = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000001'))..registerDefaultFactories();
+      final docB = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000002'))..registerDefaultFactories();
+
+      final textA = CRDTFugueTextHandler(docA, 'text-idem');
+      textA.insert(0, "Base");
+
+      docB.importChanges(docA.exportChanges());
+      final textB = docB.registeredHandlers['text-idem']! as CRDTFugueTextHandler;
+
+      textA.insert(4, " Edit");
+      final changes = docA.exportChanges();
+
+      // Apply changes twice to B
+      docB.importChanges(changes);
+      docB.importChanges(changes);
+
+      expect(textB.value, "Base Edit");
+    });
+  });
 }
