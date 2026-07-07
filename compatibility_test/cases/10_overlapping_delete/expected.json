@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "The  jumps"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "The  jumps"
+      }
+    }
+  },
+  "text_any_of": null
+}

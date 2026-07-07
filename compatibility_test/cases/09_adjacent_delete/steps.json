@@ -1,0 +1,77 @@
+{
+  "name": "Concurrent adjacent deletes",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "The quick brown fox"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "A",
+      "action": "text_delete",
+      "name": "note",
+      "index": 4,
+      "length": 6
+    },
+    {
+      "client": "B",
+      "action": "text_delete",
+      "name": "note",
+      "index": 10,
+      "length": 6
+    },
+    {
+      "client": "A",
+      "action": "export_state_vector",
+      "id": "svA"
+    },
+    {
+      "client": "B",
+      "action": "import_state_vector_and_export_diff",
+      "state_vector_id": "svA",
+      "diff_id": "diffB"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "diffB"
+    },
+    {
+      "client": "B",
+      "action": "export_state_vector",
+      "id": "svB"
+    },
+    {
+      "client": "A",
+      "action": "import_state_vector_and_export_diff",
+      "state_vector_id": "svB",
+      "diff_id": "diffA"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "diffA"
+    }
+  ],
+  "expected": {
+    "text": {
+      "note": "The fox"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "Snapshot restore roundtrip",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "First Version"
+    },
+    {
+      "client": "A",
+      "action": "take_snapshot",
+      "id": "snap1"
+    },
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 13,
+      "value": " and Second Version"
+    },
+    {
+      "client": "B",
+      "action": "restore_snapshot",
+      "source_client": "A",
+      "snapshot_id": "snap1"
+    }
+  ],
+  "expected": {
+    "text": {
+      "note": "First Version"
+    }
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "name": "Convergence Shuffle (4 clients, concurrent edits)",
+  "clients": [
+    "A",
+    "B",
+    "C",
+    "D"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "Start "
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "uInit"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "uInit"
+    },
+    {
+      "client": "C",
+      "action": "import_update",
+      "id": "uInit"
+    },
+    {
+      "client": "D",
+      "action": "import_update",
+      "id": "uInit"
+    },
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 6,
+      "value": "A"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "uA"
+    },
+    {
+      "client": "B",
+      "action": "text_insert",
+      "name": "note",
+      "index": 6,
+      "value": "B"
+    },
+    {
+      "client": "B",
+      "action": "export_update",
+      "id": "uB"
+    },
+    {
+      "client": "C",
+      "action": "text_insert",
+      "name": "note",
+      "index": 6,
+      "value": "C"
+    },
+    {
+      "client": "C",
+      "action": "export_update",
+      "id": "uC"
+    },
+    {
+      "client": "D",
+      "action": "text_insert",
+      "name": "note",
+      "index": 6,
+      "value": "D"
+    },
+    {
+      "client": "D",
+      "action": "export_update",
+      "id": "uD"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "uB"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "uC"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "uD"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "uC"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "uD"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "uA"
+    },
+    {
+      "client": "C",
+      "action": "import_update",
+      "id": "uD"
+    },
+    {
+      "client": "C",
+      "action": "import_update",
+      "id": "uA"
+    },
+    {
+      "client": "C",
+      "action": "import_update",
+      "id": "uB"
+    },
+    {
+      "client": "D",
+      "action": "import_update",
+      "id": "uA"
+    },
+    {
+      "client": "D",
+      "action": "import_update",
+      "id": "uB"
+    },
+    {
+      "client": "D",
+      "action": "import_update",
+      "id": "uC"
+    }
+  ],
+  "expected": {
+    "text": {
+      "note": "Start DCBA"
+    }
+  }
+}

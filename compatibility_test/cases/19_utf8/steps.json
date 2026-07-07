@@ -1,0 +1,31 @@
+{
+  "name": "UTF-8 multi-language and emoji validation",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "Emojis: 👨‍👩‍👧‍👦, Accents: café, Chinese: 你好, Arabic: مرحبا"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    }
+  ],
+  "expected": {
+    "text": {
+      "note": "Emojis: 👨‍👩‍👧‍👦, Accents: café, Chinese: 你好, Arabic: مرحبا"
+    }
+  }
+}

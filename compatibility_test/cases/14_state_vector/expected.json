@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "Start A B C D"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "Start A B C D"
+      }
+    }
+  },
+  "text_any_of": null
+}

@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "Offline State Saved - Reopened"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "Offline State Saved - Reopened"
+      }
+    }
+  },
+  "text_any_of": null
+}

@@ -4,7 +4,7 @@ echo Running Yjs Compatibility Test Suite
 echo =======================================
 
 echo.
-echo [1/4] Running Dart Generator...
+echo [1/5] Running Dart Generator...
 cd dart_runner
 call dart run bin/runner.dart --mode=generate
 if %errorlevel% neq 0 (
@@ -13,7 +13,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/4] Running Go Verification...
+echo [2/5] Running Go Verification...
 cd ../go_runner
 call go run main.go --mode=verify
 if %errorlevel% neq 0 (
@@ -22,7 +22,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [3/4] Running Go Generator...
+echo [3/5] Running Go Generator...
 call go run main.go --mode=generate
 if %errorlevel% neq 0 (
     echo ❌ Go Generator failed!
@@ -30,11 +30,19 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [4/4] Running Dart Verification...
+echo [4/5] Running Dart Verification...
 cd ../dart_runner
 call dart run bin/runner.dart --mode=verify
 if %errorlevel% neq 0 (
     echo ❌ Dart Verification failed!
+    exit /b %errorlevel%
+)
+
+echo.
+echo [5/5] Running 10,000 Iterations Fuzzing Stress-Test...
+call dart run bin/fuzzer.dart
+if %errorlevel% neq 0 (
+    echo ❌ Fuzzing Stress-Test failed!
     exit /b %errorlevel%
 )
 

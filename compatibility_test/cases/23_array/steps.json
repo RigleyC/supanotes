@@ -1,0 +1,69 @@
+{
+  "name": "Array concurrent insertions and merges",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "array_insert",
+      "name": "list",
+      "index": 0,
+      "value": "item1"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "A",
+      "action": "array_insert",
+      "name": "list",
+      "index": 0,
+      "value": "itemA"
+    },
+    {
+      "client": "B",
+      "action": "array_insert",
+      "name": "list",
+      "index": 1,
+      "value": "itemB"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u2"
+    },
+    {
+      "client": "B",
+      "action": "export_update",
+      "id": "u3"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "u3"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u2"
+    }
+  ],
+  "expected": {
+    "array": {
+      "list": [
+        "itemA",
+        "item1",
+        "itemB"
+      ]
+    }
+  }
+}

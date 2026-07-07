@@ -1,0 +1,107 @@
+{
+  "name": "Periodic State Vector exchange fuzzing scenario",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "Initial"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 7,
+      "value": " A"
+    },
+    {
+      "client": "B",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "B "
+    },
+    {
+      "client": "B",
+      "action": "export_state_vector",
+      "id": "svB1"
+    },
+    {
+      "client": "A",
+      "action": "import_state_vector_and_export_diff",
+      "state_vector_id": "svB1",
+      "diff_id": "diffA1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "diffA1"
+    },
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 9,
+      "value": " C"
+    },
+    {
+      "client": "B",
+      "action": "text_insert",
+      "name": "note",
+      "index": 1,
+      "value": "D"
+    },
+    {
+      "client": "A",
+      "action": "export_state_vector",
+      "id": "svA1"
+    },
+    {
+      "client": "B",
+      "action": "import_state_vector_and_export_diff",
+      "state_vector_id": "svA1",
+      "diff_id": "diffB1"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "diffB1"
+    },
+    {
+      "client": "B",
+      "action": "export_state_vector",
+      "id": "svB2"
+    },
+    {
+      "client": "A",
+      "action": "import_state_vector_and_export_diff",
+      "state_vector_id": "svB2",
+      "diff_id": "diffA2"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "diffA2"
+    }
+  ],
+  "expected": {
+    "text": {
+      "note": "BD  Initial A C"
+    }
+  }
+}

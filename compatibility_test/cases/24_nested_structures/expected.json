@@ -1,0 +1,31 @@
+{
+  "states": {
+    "A": {
+      "map": {
+        "meta": {
+          "info": {
+            "tags": [
+              "crdt",
+              "yjs"
+            ]
+          },
+          "version": 1
+        }
+      }
+    },
+    "B": {
+      "map": {
+        "meta": {
+          "info": {
+            "tags": [
+              "crdt",
+              "yjs"
+            ]
+          },
+          "version": 1
+        }
+      }
+    }
+  },
+  "text_any_of": null
+}

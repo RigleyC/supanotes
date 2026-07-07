@@ -1,0 +1,92 @@
+{
+  "name": "Random network delay, shuffle, and duplicate simulation",
+  "clients": [
+    "A",
+    "B"
+  ],
+  "steps": [
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 0,
+      "value": "Initial"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u1"
+    },
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 7,
+      "value": " A"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u2"
+    },
+    {
+      "client": "A",
+      "action": "text_insert",
+      "name": "note",
+      "index": 9,
+      "value": " B"
+    },
+    {
+      "client": "A",
+      "action": "export_update",
+      "id": "u3"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u2"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u3"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u2"
+    },
+    {
+      "client": "B",
+      "action": "import_update",
+      "id": "u1"
+    },
+    {
+      "client": "B",
+      "action": "text_insert",
+      "name": "note",
+      "index": 11,
+      "value": " C"
+    },
+    {
+      "client": "B",
+      "action": "export_update",
+      "id": "u4"
+    },
+    {
+      "client": "A",
+      "action": "import_update",
+      "id": "u4"
+    }
+  ],
+  "expected": {
+    "text": {
+      "note": "Initial A B C"
+    }
+  }
+}

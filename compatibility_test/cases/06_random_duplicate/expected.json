@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "EditB - Initial - EditA"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "EditB - Initial - EditA"
+      }
+    }
+  },
+  "text_any_of": null
+}

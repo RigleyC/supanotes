@@ -1,0 +1,15 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "First Version and Second Version"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "First Version"
+      }
+    }
+  },
+  "text_any_of": null
+}

@@ -138,6 +138,7 @@ func runCase(caseName, mode string) error {
 	updates := make(map[string][]byte)
 	stateVectors := make(map[string][]byte)
 	snapshots := make(map[string]*crdt.Snapshot)
+	undoManagers := make(map[string]map[string]*crdt.UndoManager)
 
 	ensureFixturesDir := func() {
 		os.MkdirAll(filepath.Join("../cases", caseName, "fixtures"), 0755)
@@ -262,6 +263,52 @@ func runCase(caseName, mode string) error {
 				return fmt.Errorf("step %d: failed to create doc from snapshot: %w", i, err)
 			}
 			docs[step.Client] = restoredDoc
+
+		case "undo":
+			doc := docs[step.Client]
+			clientManagers, ok := undoManagers[step.Client]
+			if !ok {
+				clientManagers = make(map[string]*crdt.UndoManager)
+				undoManagers[step.Client] = clientManagers
+			}
+			um, ok := clientManagers[step.Name]
+			if !ok {
+				var sharedType crdt.SharedType
+				typeKind := typeSchemas[step.Name]
+				if typeKind == "text" {
+					sharedType = doc.GetText(step.Name)
+				} else if typeKind == "map" {
+					sharedType = doc.GetMap(step.Name)
+				} else if typeKind == "array" {
+					sharedType = doc.GetArray(step.Name)
+				}
+				um = crdt.NewUndoManager(doc, []crdt.SharedType{sharedType})
+				clientManagers[step.Name] = um
+			}
+			um.Undo()
+
+		case "redo":
+			doc := docs[step.Client]
+			clientManagers, ok := undoManagers[step.Client]
+			if !ok {
+				clientManagers = make(map[string]*crdt.UndoManager)
+				undoManagers[step.Client] = clientManagers
+			}
+			um, ok := clientManagers[step.Name]
+			if !ok {
+				var sharedType crdt.SharedType
+				typeKind := typeSchemas[step.Name]
+				if typeKind == "text" {
+					sharedType = doc.GetText(step.Name)
+				} else if typeKind == "map" {
+					sharedType = doc.GetMap(step.Name)
+				} else if typeKind == "array" {
+					sharedType = doc.GetArray(step.Name)
+				}
+				um = crdt.NewUndoManager(doc, []crdt.SharedType{sharedType})
+				clientManagers[step.Name] = um
+			}
+			um.Redo()
 
 		default:
 			return fmt.Errorf("step %d: unknown action %q", i, step.Action)

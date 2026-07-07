@@ -1,0 +1,25 @@
+{
+  "states": {
+    "A": {
+      "text": {
+        "note": "Start ABCD"
+      }
+    },
+    "B": {
+      "text": {
+        "note": "Start ABCD"
+      }
+    },
+    "C": {
+      "text": {
+        "note": "Start ABCD"
+      }
+    },
+    "D": {
+      "text": {
+        "note": "Start ABCD"
+      }
+    }
+  },
+  "text_any_of": null
+}

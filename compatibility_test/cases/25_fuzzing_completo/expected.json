@@ -1,0 +1,50 @@
+{
+  "states": {
+    "A": {
+      "array": {
+        "list": [
+          42
+        ]
+      },
+      "map": {
+        "meta": {
+          "sync": true
+        }
+      },
+      "text": {
+        "note": "Initial state plus A"
+      }
+    },
+    "B": {
+      "array": {
+        "list": [
+          42
+        ]
+      },
+      "map": {
+        "meta": {
+          "sync": true
+        }
+      },
+      "text": {
+        "note": "Initial state plus A"
+      }
+    },
+    "C": {
+      "array": {
+        "list": [
+          42
+        ]
+      },
+      "map": {
+        "meta": {
+          "sync": true
+        }
+      },
+      "text": {
+        "note": "Initial state plus A"
+      }
+    }
+  },
+  "text_any_of": null
+}

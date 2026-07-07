@@ -1,0 +1,23 @@
+{
+  "states": {
+    "A": {
+      "map": {
+        "meta": {
+          "author": "B",
+          "desc": "B description",
+          "title": "DocA"
+        }
+      }
+    },
+    "B": {
+      "map": {
+        "meta": {
+          "author": "B",
+          "desc": "B description",
+          "title": "DocA"
+        }
+      }
+    }
+  },
+  "text_any_of": null
+}

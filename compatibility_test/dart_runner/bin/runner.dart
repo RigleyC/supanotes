@@ -146,6 +146,7 @@ Future<void> runCase(String caseName, String mode) async {
   final updates = <String, Uint8List>{};
   final stateVectors = <String, Uint8List>{};
   final snapshots = <String, Snapshot>{};
+  final undoManagers = <String, Map<String, UndoManager>>{};
 
   // Helper to ensure parent directory for fixtures exists
   void ensureFixturesDir() {
@@ -272,6 +273,28 @@ Future<void> runCase(String caseName, String mode) async {
         }
         final targetDoc = docs[client!]!;
         customCreateDocFromSnapshot(sourceDoc, snap, targetDoc);
+        break;
+
+      case 'undo':
+        final doc = docs[client]!;
+        final name = step['name'] as String;
+        final clientManagers = undoManagers.putIfAbsent(client!, () => {});
+        final um = clientManagers.putIfAbsent(name, () {
+          final type = doc.share[name]!;
+          return UndoManager(type);
+        });
+        um.undo();
+        break;
+
+      case 'redo':
+        final doc = docs[client]!;
+        final name = step['name'] as String;
+        final clientManagers = undoManagers.putIfAbsent(client!, () => {});
+        final um = clientManagers.putIfAbsent(name, () {
+          final type = doc.share[name]!;
+          return UndoManager(type);
+        });
+        um.redo();
         break;
 
       default:
