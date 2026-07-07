@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
@@ -69,7 +70,7 @@ class NodeSyncManager {
       try {
         await action();
       } catch (e, stackTrace) {
-        print('[NodeSyncManager] SQLite Write Error: $e\n$stackTrace');
+        dev.log('SQLite write error: $e', name: 'NodeSyncManager', error: e, stackTrace: stackTrace, level: 1000);
       }
     });
   }
