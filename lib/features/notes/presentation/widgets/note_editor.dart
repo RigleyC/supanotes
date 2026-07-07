@@ -57,6 +57,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
   late CustomTaskComponentBuilder _taskComponentBuilder;
+  Stylesheet? _cachedStylesheet;
+  ColorScheme? _cachedColorScheme;
+  bool? _cachedHideCompleted;
 
   @override
   void initState() {
@@ -217,6 +220,18 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
     _setupControls(context);
 
+    final theme = Theme.of(context);
+    if (_cachedStylesheet == null ||
+        _cachedHideCompleted != widget.hideCompleted ||
+        !identical(_cachedColorScheme, theme.colorScheme)) {
+      _cachedHideCompleted = widget.hideCompleted;
+      _cachedColorScheme = theme.colorScheme;
+      _cachedStylesheet = noteStylesheet(
+        context,
+        hideCompleted: widget.hideCompleted,
+      );
+    }
+
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -236,10 +251,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                           ? null
                           : controller.focusNode,
                       documentLayoutKey: _docLayoutKey,
-                      stylesheet: noteStylesheet(
-                        context,
-                        hideCompleted: widget.hideCompleted,
-                      ),
+                      stylesheet: _cachedStylesheet!,
                       selectionStyle: SelectionStyles(
                         selectionColor:
                             Theme.of(
