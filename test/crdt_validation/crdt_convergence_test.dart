@@ -5,7 +5,7 @@ import 'package:crdt_lf/crdt_lf.dart';
 void main() {
   test('crdt_lf fuzzing convergence under shuffled and duplicated delivery', () {
     const seedEnv = String.fromEnvironment('FUZZ_SEED');
-    final seed = seedEnv.isNotEmpty ? int.parse(seedEnv) : DateTime.now().millisecondsSinceEpoch;
+    final seed = int.tryParse(seedEnv) ?? DateTime.now().millisecondsSinceEpoch;
     final rand = Random(seed);
     print('[Fuzz] Running with seed: $seed');
 
@@ -137,8 +137,8 @@ void main() {
       final finalVal = textA.value;
       // Should not be interleaved, words must remain contiguous
       expect(
-        finalVal == "Hello Ola World" || finalVal == "Hello World Ola",
-        true,
+        finalVal,
+        anyOf('Hello Ola World', 'Hello World Ola'),
         reason: 'Interleaved result detected: $finalVal',
       );
     });
@@ -189,6 +189,97 @@ void main() {
       docB.importChanges(changes);
 
       expect(textB.value, "Base Edit");
+      expect(textB.value, textA.value);
+    });
+
+    test('Out-of-order causal delivery', () {
+      final docA = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000001'))..registerDefaultFactories();
+      final docB = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000002'))..registerDefaultFactories();
+
+      final textA = CRDTFugueTextHandler(docA, 'text-ooo');
+      
+      // Step 1: Insert "A" (parent)
+      textA.insert(0, "A");
+      final changes1 = docA.exportChanges();
+      final vvAfterA = docA.getVersionVector();
+
+      // Step 2: Insert "B" (child, causally depends on the state with "A")
+      textA.insert(1, "B");
+      final changes2 = docA.exportChanges(fromVersionVector: vvAfterA);
+
+      // Verify that changes2 actually contains the child operation
+      expect(changes2.length, 1);
+
+      // Deliver changes2 (child) BEFORE changes1 (parent) to Doc B.
+      // Option A: applyChange throws CausallyNotReadyException when dependencies are missing.
+      expect(
+        () => docB.applyChange(changes2.first),
+        throwsA(isA<CausallyNotReadyException>()),
+      );
+
+      // Option B: importChanges skips the changes and returns 0 applied changes.
+      final importedBefore = docB.importChanges(changes2);
+      expect(importedBefore, 0);
+
+      // Deliver parent (changes1)
+      final importedParent = docB.importChanges(changes1);
+      expect(importedParent, 1);
+
+      // Now apply the child operation (changes2) again, which should succeed now that parent is present
+      final importedChild = docB.importChanges(changes2);
+      expect(importedChild, 1);
+
+      final textB = docB.registeredHandlers['text-ooo']! as CRDTFugueTextHandler;
+      expect(textB.value, "AB");
+      expect(textB.value, textA.value);
+    });
+
+    test('Snapshot continuity', () {
+      final docA = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000001'))..registerDefaultFactories();
+      final docB = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000002'))..registerDefaultFactories();
+      final docC = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000003'))..registerDefaultFactories();
+
+      final textA = CRDTFugueTextHandler(docA, 'text-snap');
+      textA.insert(0, "Hello");
+
+      // Sync all to version V
+      final initialChanges = docA.exportChanges();
+      docB.importChanges(initialChanges);
+      docC.importChanges(initialChanges);
+
+      // Client C goes offline.
+      // A and B perform edits up to V+50
+      final textB = docB.registeredHandlers['text-snap']! as CRDTFugueTextHandler;
+      for (var i = 0; i < 50; i++) {
+        final currentLen = textA.value.length;
+        textA.insert(currentLen, ".");
+        final changes = docA.exportChanges();
+        docB.importChanges(changes);
+      }
+
+      // Compact B history into snapshot
+      final snapshotB = docB.takeSnapshot(pruneHistory: true);
+
+      // Compact A history into snapshot
+      final snapshotA = docA.takeSnapshot(pruneHistory: true);
+
+      // C wakes up and makes edits based on version V (offline)
+      final textC = docC.registeredHandlers['text-snap']! as CRDTFugueTextHandler;
+      textC.insert(5, " C");
+
+      // C reconnects and sends its edits to the compacted B
+      final changesC = docC.exportChanges();
+      docB.importChanges(changesC);
+
+      // Compacted B sends its snapshot to C.
+      docC.importSnapshot(snapshotB);
+      docC.reconstruct();
+
+      // Sync A with the edits from C as well
+      docA.importChanges(changesC);
+
+      expect(textB.value, textA.value);
+      expect(textC.value, textA.value);
     });
   });
 }
