@@ -9,6 +9,7 @@ import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
+import 'package:supanotes/features/notes/domain/note_sync_coordinator.dart';
 import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
@@ -33,7 +34,7 @@ class NoteEditorController {
   MutableDocumentComposer? composer;
   final FocusNode focusNode = FocusNode();
 
-  NodeSyncManager? _nodeSyncManager;
+  NoteSyncCoordinator? _coordinator;
   String? _noteId;
 
   void initFromNodes({required List<NoteNode> nodes, String? noteId}) {
@@ -66,12 +67,14 @@ class NoteEditorController {
     final db = _database;
     final noteId = _noteId;
     final doc = document;
-    if (db == null || noteId == null || doc == null) return;
-    _nodeSyncManager = NodeSyncManager(
+    final ed = editor;
+    if (db == null || noteId == null || doc == null || ed == null) return;
+    _coordinator = NoteSyncCoordinator(
       database: db,
       noteId: noteId,
       userId: userId,
       document: doc,
+      editor: ed,
     );
   }
 
@@ -109,115 +112,20 @@ class NoteEditorController {
   }
 
   void suspendSync() {
-    _nodeSyncManager?.suspendSync();
+    _coordinator?.suspendSync();
   }
 
   void resumeSync() {
-    _nodeSyncManager?.resumeSync();
+    _coordinator?.resumeSync();
   }
 
   void syncTaskStates(Map<String, bool> taskCompletionMap) {
-    final doc = document;
-    final ed = editor;
-    if (doc == null || ed == null) return;
-
-    suspendSync();
-    try {
-      final requests = <EditRequest>[];
-      for (final node in doc) {
-        if (node is TaskNode) {
-          final isDbCompleted = taskCompletionMap[node.id] ?? false;
-          if (node.isComplete != isDbCompleted) {
-            requests.add(ChangeTaskCompletionRequest(
-              nodeId: node.id,
-              isComplete: isDbCompleted,
-            ));
-          }
-        }
-      }
-      if (requests.isNotEmpty) {
-        ed.execute(requests);
-      }
-    } finally {
-      resumeSync();
-    }
+    _coordinator?.syncTaskStates(taskCompletionMap);
   }
 
   void updateNodesIncrementally(List<NoteNode> incomingNodes) {
-    final doc = document;
-    final ed = editor;
-    if (doc == null || ed == null) return;
-
-    _nodeSyncManager?.suspendSync();
-    try {
-      final dirtyIds = _nodeSyncManager?.locallyDirtyNodeIds ?? const {};
-
-      final requests = <EditRequest>[];
-      final incomingIds = incomingNodes.map((n) => n.id).toSet();
-
-      for (final node in doc) {
-        if (!incomingIds.contains(node.id)) {
-          if (dirtyIds.contains(node.id)) continue;
-          requests.add(DeleteNodeRequest(nodeId: node.id));
-        }
-      }
-
-      for (int i = 0; i < incomingNodes.length; i++) {
-        final incoming = incomingNodes[i];
-        final existingNode = doc.getNodeById(incoming.id);
-
-        if (existingNode == null) {
-          final newNode = NodeSyncManager.createNodeFromSchema(incoming);
-          requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
-        } else {
-          // Skip nodes with pending local changes — the DB data is stale.
-          if (dirtyIds.contains(incoming.id)) continue;
-          final newNode = NodeSyncManager.createNodeFromSchema(incoming);
-          if (_isNodeModified(existingNode, newNode)) {
-            requests.add(
-              ReplaceNodeRequest(existingNodeId: incoming.id, newNode: newNode),
-            );
-          }
-        }
-      }
-
-      if (requests.isNotEmpty) {
-        ed.execute(requests);
-      }
-    } finally {
-      _nodeSyncManager?.resumeSync();
-    }
+    _coordinator?.updateNodesIncrementally(incomingNodes);
   }
-
-  bool _isNodeModified(DocumentNode existing, DocumentNode incoming) {
-    if (existing.runtimeType != incoming.runtimeType) return true;
-
-    if (existing is TextNode && incoming is TextNode) {
-      if (existing.text != incoming.text) return true;
-    }
-
-    if (existing is ParagraphNode && incoming is ParagraphNode) {
-      if (existing.metadata['blockType'] != incoming.metadata['blockType'])
-        return true;
-    }
-
-    if (existing is TaskNode && incoming is TaskNode) {
-      if (existing.isComplete != incoming.isComplete) return true;
-      if (existing.indent != incoming.indent) return true;
-    }
-
-    if (existing is ListItemNode && incoming is ListItemNode) {
-      if (existing.indent != incoming.indent) return true;
-      if (existing.type != incoming.type) return true;
-    }
-
-    final existingData = NodeSyncManager.nodeData(existing);
-    final incomingData = NodeSyncManager.nodeData(incoming);
-    if (existingData == incomingData) return false;
-
-    return true;
-  }
-
 
   bool _isDocEmpty(MutableDocument doc) {
     if (doc.isEmpty) return true;
@@ -246,7 +154,7 @@ class NoteEditorController {
 
   void dispose() {
     _flushAndSaveFinalState();
-    _nodeSyncManager?.dispose();
+    _coordinator?.dispose();
     editor?.dispose();
     document?.dispose();
     composer?.dispose();
