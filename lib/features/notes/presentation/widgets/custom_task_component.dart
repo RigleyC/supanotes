@@ -12,6 +12,7 @@ const double _taskCheckboxGap = 9.0;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
+    this.editor,
     this.composer,
     this.taskMetadataById = const {},
     this.hideCompleted = false,
@@ -20,6 +21,20 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskReopen,
     this.requestRebuild,
   });
+
+  /// The editor used to issue local [ChangeTaskCompletionRequest]s whenever
+  /// the user toggles the checkbox. This is required so the local
+  /// [TaskNode] reflects the user's intent immediately, which lets the
+  /// [NodeSyncManager] serialize the change to `noteNodes.data` (the
+  /// `completed` field) and mark the node as locally dirty so subsequent
+  /// streamed (and possibly stale) snapshots don't overwrite it.
+  ///
+  /// Recurring tasks are exempt: their `completeTask` repo call re-opens
+  /// the row with a new `dueDate` (`status='open'`), so emitting a local
+  /// completion here would have `NodeSyncManager` overwrite that with
+  /// `status='done'`. For those, we rely on the `_completingTaskIds`
+  /// transient flag instead.
+  final Editor? editor;
 
   final MutableDocumentComposer? composer;
   Map<String, TaskModel> taskMetadataById;
@@ -47,9 +62,20 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       indent: node.indent,
       isComplete: _completingTaskIds.contains(node.id) || node.isComplete,
       setComplete: (bool isComplete) async {
-        if (isComplete) {
-          final isRecurring = taskMetadataById[node.id]?.recurrence != null;
+        final isRecurring = taskMetadataById[node.id]?.recurrence != null;
 
+        final shouldUpdateDoc =
+            !isComplete || !isRecurring;
+        if (shouldUpdateDoc) {
+          editor?.execute([
+            ChangeTaskCompletionRequest(
+              nodeId: node.id,
+              isComplete: isComplete,
+            ),
+          ]);
+        }
+
+        if (isComplete) {
           if (isRecurring) {
             _completingTaskIds.add(node.id);
             requestRebuild?.call();
@@ -191,76 +217,72 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onLongPress: widget.onLongPress,
-        child: SizedBox(
-          height: widget.viewModel.textStyleBuilder({}).fontSize! * 1.5,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: widget.viewModel.setComplete == null
-                    ? null
-                    : () => widget.viewModel.setComplete!(
-                        !widget.viewModel.isComplete,
-                      ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: defaultTaskIndentCalculator(
-                        widget.viewModel.textStyleBuilder({}),
-                        widget.viewModel.indent,
-                      ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: widget.viewModel.setComplete == null
+                  ? null
+                  : () => widget.viewModel.setComplete!(
+                      !widget.viewModel.isComplete,
                     ),
-                    AppTaskCheckbox(
-                      value: widget.viewModel.isComplete,
-                      accentColor: taskColor,
-                      inactiveColor: colorScheme.outline,
-                      shape: AppTaskCheckboxShape.rounded,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: defaultTaskIndentCalculator(
+                      widget.viewModel.textStyleBuilder({}),
+                      widget.viewModel.indent,
                     ),
-                    const SizedBox(width: _taskCheckboxGap),
-                  ],
-                ),
+                  ),
+                  AppTaskCheckbox(
+                    value: widget.viewModel.isComplete,
+                    accentColor: taskColor,
+                    inactiveColor: colorScheme.outline,
+                    shape: AppTaskCheckboxShape.rounded,
+                  ),
+                  const SizedBox(width: _taskCheckboxGap),
+                ],
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextComponent(
-                      key: _textKey,
-                      text: widget.viewModel.text,
-                      textDirection: widget.viewModel.textDirection,
-                      textAlign: widget.viewModel.textAlignment,
-                      maxLines: widget.viewModel.maxLines,
-                      overflow: widget.viewModel.overflow,
-                      textStyleBuilder: (attributions) => resolveTaskTextStyle(
-                        widget.viewModel.textStyleBuilder(attributions),
-                        Theme.of(context).colorScheme.onSurface,
-                        widget.viewModel.isComplete,
-                      ),
-                      inlineWidgetBuilders:
-                          widget.viewModel.inlineWidgetBuilders,
-                      textSelection: widget.viewModel.selection,
-                      selectionColor: widget.viewModel.selectionColor,
-                      highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                      underlines: widget.viewModel.createUnderlines(),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextComponent(
+                    key: _textKey,
+                    text: widget.viewModel.text,
+                    textDirection: widget.viewModel.textDirection,
+                    textAlign: widget.viewModel.textAlignment,
+                    maxLines: widget.viewModel.maxLines,
+                    overflow: widget.viewModel.overflow,
+                    textStyleBuilder: (attributions) => resolveTaskTextStyle(
+                      widget.viewModel.textStyleBuilder(attributions),
+                      Theme.of(context).colorScheme.onSurface,
+                      widget.viewModel.isComplete,
                     ),
-                    if (widget.taskMetadata?.dueDate != null ||
-                        widget.taskMetadata?.recurrence != null) ...[
-                      const SizedBox(height: 4),
-                      TaskMetadataBadges(
-                        dueDate: widget.taskMetadata?.dueDate,
-                        recurrence: widget.taskMetadata?.recurrence,
-                        isCompleted: widget.viewModel.isComplete,
-                      ),
-                      const SizedBox(height: 4),
-                    ],
+                    inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
+                    textSelection: widget.viewModel.selection,
+                    selectionColor: widget.viewModel.selectionColor,
+                    highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                    underlines: widget.viewModel.createUnderlines(),
+                  ),
+                  if (widget.taskMetadata?.dueDate != null ||
+                      widget.taskMetadata?.recurrence != null) ...[
+                    const SizedBox(height: 4),
+                    TaskMetadataBadges(
+                      dueDate: widget.taskMetadata?.dueDate,
+                      recurrence: widget.taskMetadata?.recurrence,
+                      isCompleted: widget.viewModel.isComplete,
+                    ),
+                    const SizedBox(height: 4),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

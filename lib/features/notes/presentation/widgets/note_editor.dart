@@ -76,6 +76,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _notifyContentChanged();
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
+      editor: _controller!.editor,
       composer: _controller!.composer,
       taskMetadataById: widget.taskMetadata,
       hideCompleted: widget.hideCompleted,
