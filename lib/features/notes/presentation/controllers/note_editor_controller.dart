@@ -211,7 +211,11 @@ class NoteEditorController {
       if (existing.type != incoming.type) return true;
     }
 
-    return false;
+    final existingData = NodeSyncManager.nodeData(existing);
+    final incomingData = NodeSyncManager.nodeData(incoming);
+    if (existingData == incomingData) return false;
+
+    return true;
   }
 
 

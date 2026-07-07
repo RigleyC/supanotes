@@ -223,7 +223,7 @@ void main() {
     });
 
     test(
-        'BUG 049: createNodeFromSchema does not handle image type, converting ImageNode to ParagraphNode',
+        'plan 049: remote image updates are applied correctly via serialization fallback',
         () async {
       final db = _createDb();
       final controller = NoteEditorController(
@@ -240,11 +240,42 @@ void main() {
         _imageNode(id: 'i1', url: 'newurl'),
       ]);
 
-      final docNode = controller.document!.getNodeById('i1')!;
-      expect(docNode is ParagraphNode, isTrue,
-          reason:
-              'BUG 049: createNodeFromSchema returns ParagraphNode for image type, '
-              'converting ImageNode to ParagraphNode on remote update');
+      final docNode = controller.document!.getNodeById('i1');
+      expect(docNode, isNotNull);
+      expect(docNode, isA<ImageNode>());
+      expect((docNode as ImageNode).imageUrl, 'newurl');
+    });
+
+    test('plan 049: dirty image node preserves local changes', () async {
+      final db = _createDb();
+      final controller = NoteEditorController(
+        userId: 'test-user',
+        database: db,
+      );
+      controller.bind('test-note');
+      controller.initFromNodes(
+        nodes: [_imageNode(id: 'i1', url: 'oldurl')],
+        noteId: 'test-note',
+      );
+
+      controller.editor!.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 'i1',
+          newNode: ImageNode(
+            id: 'i1',
+            imageUrl: 'localurl',
+          ),
+        ),
+      ]);
+
+      controller.updateNodesIncrementally([
+        _imageNode(id: 'i1', url: 'newurl'),
+      ]);
+
+      final docNode = controller.document!.getNodeById('i1');
+      expect(docNode, isNotNull);
+      expect(docNode, isA<ImageNode>());
+      expect((docNode as ImageNode).imageUrl, 'localurl');
     });
   });
 }

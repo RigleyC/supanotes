@@ -316,7 +316,7 @@ class NodeSyncManager {
     final type = _nodeType(node);
     if (type == null) return null;
 
-    final data = _nodeData(node);
+    final data = nodeData(node);
     final now = DateTime.now();
 
     return NoteNodesCompanion.insert(
@@ -356,7 +356,7 @@ class NodeSyncManager {
     return null;
   }
 
-  Map<String, dynamic> _serializeAttributedText(AttributedText text) {
+  static Map<String, dynamic> _serializeAttributedText(AttributedText text) {
     final spansList = <Map<String, dynamic>>[];
     for (final span in text.spans.markers) {
       if (span.isStart) {
@@ -411,7 +411,7 @@ class NodeSyncManager {
     return {'text': text.toPlainText(), 'spans': spansList};
   }
 
-  String _nodeData(DocumentNode node) {
+  static String nodeData(DocumentNode node) {
     if (node is TaskNode) {
       return jsonEncode({
         ..._serializeAttributedText(node.text),
@@ -531,6 +531,13 @@ class NodeSyncManager {
         id: schema.id,
         text: attributedText,
         metadata: {'blockType': blockType},
+      );
+    }
+    if (type == 'image') {
+      return ImageNode(
+        id: schema.id,
+        imageUrl: data['url'] as String? ?? '',
+        altText: data['alt'] as String? ?? '',
       );
     }
     return ParagraphNode(id: schema.id, text: attributedText);
