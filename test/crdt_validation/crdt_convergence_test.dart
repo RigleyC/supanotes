@@ -23,8 +23,6 @@ void main() {
       final docs = List.generate(4, (i) {
         final peerId = PeerId.parse('00000000-0000-4000-8000-00000000000${i}');
         final doc = CRDTDocument(peerId: peerId)..registerDefaultFactories();
-        // Initialize a Fugue text handler on each doc
-        final handler = CRDTFugueTextHandler(doc, 'text-fuzz');
         doc.importChanges(initChanges);
         return doc;
       });
@@ -114,26 +112,41 @@ void main() {
     test('Anti-interleaving (Fugue Core)', () {
       final docA = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000001'))..registerDefaultFactories();
       final docB = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000002'))..registerDefaultFactories();
+      final docC = CRDTDocument(peerId: PeerId.parse('00000000-0000-4000-8000-000000000003'))..registerDefaultFactories();
 
       final textA = CRDTFugueTextHandler(docA, 'text-anti');
       textA.insert(0, "Hello");
 
       // Sync base
-      docB.importChanges(docA.exportChanges());
+      final baseChanges = docA.exportChanges();
+      docB.importChanges(baseChanges);
       final textB = docB.registeredHandlers['text-anti']! as CRDTFugueTextHandler;
+
+      CRDTFugueTextHandler(docC, 'text-anti');
+      docC.importChanges(baseChanges);
+      final textC = docC.registeredHandlers['text-anti']! as CRDTFugueTextHandler;
+
+      // Capture version vectors before concurrent edits
+      final vvA = docA.getVersionVector();
+      final vvB = docB.getVersionVector();
 
       // Concurrent insertions at index 5
       textA.insert(5, " Ola");
       textB.insert(5, " World");
 
       // Merge changes
-      final changesA = docA.exportChanges();
-      final changesB = docB.exportChanges();
+      final newChangesA = docA.exportChanges(fromVersionVector: vvA);
+      final newChangesB = docB.exportChanges(fromVersionVector: vvB);
 
-      docA.importChanges(changesB);
-      docB.importChanges(changesA);
+      docA.importChanges(newChangesB);
+      docB.importChanges(newChangesA);
+
+      // docC imports the same concurrent changes in a shuffled/shuffled order
+      docC.importChanges(newChangesA);
+      docC.importChanges(newChangesB);
 
       expect(textA.value, textB.value);
+      expect(textC.value, textA.value); // Confirm all replicas converge to the exact same string
       final finalVal = textA.value;
       // Should not be interleaved, words must remain contiguous
       expect(
@@ -157,7 +170,7 @@ void main() {
       // Client A deletes indices 4 to 16 ("quick brown ")
       textA.delete(4, 12);
 
-      // Client B deletes indices 10 to 20 ("brown fox ju")
+      // Client B deletes indices 10 to 22 ("brown fox ju")
       textB.delete(10, 12);
 
       // Merge changes
@@ -261,7 +274,7 @@ void main() {
       final snapshotB = docB.takeSnapshot(pruneHistory: true);
 
       // Compact A history into snapshot
-      final snapshotA = docA.takeSnapshot(pruneHistory: true);
+      docA.takeSnapshot(pruneHistory: true);
 
       // C wakes up and makes edits based on version V (offline)
       final textC = docC.registeredHandlers['text-snap']! as CRDTFugueTextHandler;
