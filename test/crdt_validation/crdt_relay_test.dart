@@ -9,12 +9,19 @@ void main() {
   test('Dumb Go Relay sync and convergence verification', () async {
     final exeExtension = Platform.isWindows ? '.exe' : '';
     final binaryName = 'crdt_relay$exeExtension';
-    final binaryPath = Platform.isWindows ? binaryName : './$binaryName';
+    
+    // Ensure build directory exists
+    final buildDir = Directory('build');
+    if (!buildDir.existsSync()) {
+      buildDir.createSync(recursive: true);
+    }
+    
+    final binaryPath = 'build/$binaryName';
 
     // 1. Compile Go server
     final compileResult = await Process.run(
       'go',
-      ['build', '-o', binaryName, './backend/cmd/crdt_relay/main.go'],
+      ['build', '-o', binaryPath, './backend/cmd/crdt_relay/main.go'],
     );
     if (compileResult.exitCode != 0) {
       fail('Failed to compile Go relay: ${compileResult.stderr}');
@@ -23,12 +30,12 @@ void main() {
     // Spawn the compiled Go server process
     final process = await Process.start(binaryPath, []);
 
-    // Register server cleanups
+    // Register server cleanups using robust addTearDown
     addTearDown(() async {
       process.kill();
       await process.exitCode;
       try {
-        final file = File(binaryName);
+        final file = File(binaryPath);
         if (file.existsSync()) {
           file.deleteSync();
         }
@@ -36,6 +43,16 @@ void main() {
     });
 
     final serverStarted = Completer<void>();
+
+    // Fail early if the Go process exits before print
+    process.exitCode.then((code) {
+      if (!serverStarted.isCompleted) {
+        serverStarted.completeError(
+          ProcessException(binaryPath, [], 'Go server exited early with code $code'),
+        );
+      }
+    });
+
     process.stdout
         .transform(utf8.decoder)
         .transform(const LineSplitter())
@@ -55,6 +72,7 @@ void main() {
       print('GO STDERR: $line');
     });
 
+    // Wait dynamically for server to startup
     await serverStarted.future.timeout(
       const Duration(seconds: 10),
       onTimeout: () => throw TimeoutException('Go server did not start in time'),
@@ -75,20 +93,27 @@ void main() {
       // Auto-instantiate the Fugue text handler
       CRDTFugueTextHandler(doc, 'text-relay');
 
-      ws.listen((data) {
-        if (data is List<int>) {
-          doc.binaryImportChanges(Uint8List.fromList(data));
-        }
-      });
+      ws.listen(
+        (data) {
+          if (data is List<int>) {
+            doc.binaryImportChanges(Uint8List.fromList(data));
+          }
+        },
+        onError: (err) => fail('WebSocket error on client $name: $err'),
+      );
 
       return doc;
     }
 
-    // Helper for polling
-    Future<void> waitFor(bool Function() condition, {String message = 'Condition timed out'}) async {
-      final timeout = DateTime.now().add(const Duration(seconds: 5));
+    // Helper for polling using Stopwatch
+    Future<void> waitFor(
+      bool Function() condition, {
+      String message = 'Condition timed out',
+      Duration timeout = const Duration(seconds: 10),
+    }) async {
+      final stopwatch = Stopwatch()..start();
       while (!condition()) {
-        if (DateTime.now().isAfter(timeout)) {
+        if (stopwatch.elapsed > timeout) {
           throw TimeoutException(message);
         }
         await Future.delayed(const Duration(milliseconds: 20));
@@ -122,7 +147,7 @@ void main() {
     // Wait for sync propagation and convergence dynamically
     await waitFor(() => textA.value == textB.value, message: "Documents A and B did not converge");
 
-    // Assert that both documents have converged to the exact same text and it matches one of the valid outcomes
+    // Assert that both documents have converged to the exact same text
     expect(textA.value, textB.value);
     expect(textA.value, anyOf('Hello Ola World', 'Hello World Ola'));
   });
