@@ -225,6 +225,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.15.1"
+  crdt_lf:
+    dependency: "direct dev"
+    description:
+      name: crdt_lf
+      sha256: "75f73b56074ae165df3477c6a39ecb7f6b14d5a4ec7d63d7bd51eb242b2796ae"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.1"
   cross_file:
     dependency: transitive
     description:
@@ -653,6 +661,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
+  hlc_dart:
+    dependency: transitive
+    description:
+      name: hlc_dart
+      sha256: "16b10c0ad8869d67519a12b8a15460464b47dd7e459fc16f4d101435c324fe85"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
   hooks:
     dependency: transitive
     description:
