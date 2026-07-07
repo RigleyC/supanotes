@@ -1,7 +1,7 @@
 library;
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -156,7 +156,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       );
     }
 
-    if (!listEquals(widget.nodes, oldWidget.nodes)) {
+    if (!identical(widget.nodes, oldWidget.nodes)) {
       _controller?.updateNodesIncrementally(widget.nodes);
     }
   }
