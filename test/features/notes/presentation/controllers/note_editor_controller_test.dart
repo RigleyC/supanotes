@@ -153,7 +153,7 @@ void main() {
     });
 
     test(
-        'BUG 047: locally-dirty paragraph is deleted by stale stream emission',
+        'plan 047: locally-dirty paragraph is preserved on stale stream emission',
         () async {
       final db = _createDb();
       final controller = NoteEditorController(
@@ -175,9 +175,9 @@ void main() {
 
       controller.updateNodesIncrementally([]);
 
-      expect(controller.document!.getNodeById('p1'), isNull,
+      expect(controller.document!.getNodeById('p1'), isA<ParagraphNode>(),
           reason:
-              'BUG 047: locally-dirty paragraph should survive empty incoming');
+              'Plan 047: locally-dirty paragraph is preserved against stale stream');
     });
 
     test(

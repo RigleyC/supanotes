@@ -157,6 +157,7 @@ class NoteEditorController {
 
       for (final node in doc) {
         if (!incomingIds.contains(node.id)) {
+          if (dirtyIds.contains(node.id)) continue;
           requests.add(DeleteNodeRequest(nodeId: node.id));
         }
       }
