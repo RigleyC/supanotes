@@ -178,15 +178,11 @@ class NodeSyncManager {
     );
   }
 
-  Future<void> _drainQueue() async {
-    if (_pendingOps.isEmpty) return;
-
-    final opsToProcess = List<NodeOperation>.from(_pendingOps);
-    _pendingOps.clear();
-
-    final now = DateTime.now().toUtc();
-    final snapshotText = _buildContentSnapshot();
-
+  Future<void> _applyOpsTransaction(
+    List<NodeOperation> opsToProcess,
+    DateTime now,
+    String snapshotText,
+  ) async {
     await _db.transaction(() async {
       for (final op in opsToProcess) {
         switch (op) {
@@ -271,12 +267,42 @@ class NodeSyncManager {
 
       await _flushNoteExcerptFromSnapshot(snapshotText, now);
     });
+  }
+
+  Future<void> _drainQueue() async {
+    if (_pendingOps.isEmpty) return;
+
+    final opsToProcess = List<NodeOperation>.from(_pendingOps);
+    _pendingOps.clear();
+
+    final now = DateTime.now().toUtc();
+    final snapshotText = _buildContentSnapshot();
+
+    await _applyOpsTransaction(opsToProcess, now, snapshotText);
 
     // Clear dirty flags for flushed nodes only if no new ops arrived
     // during the transaction. If new ops arrived, those IDs stay dirty.
     final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
     final stillPendingIds = _pendingOps.map(_opNodeId).whereType<String>().toSet();
     locallyDirtyNodeIds.removeAll(flushedIds.difference(stillPendingIds));
+  }
+
+  void flushNow() {
+    _debounceTimer?.cancel();
+    if (_pendingOps.isEmpty) return;
+
+    final opsToProcess = List<NodeOperation>.from(_pendingOps);
+    _pendingOps.clear();
+
+    final now = DateTime.now().toUtc();
+    final snapshotText = _buildContentSnapshot();
+
+    _enqueueDbWrite(() async {
+      await _applyOpsTransaction(opsToProcess, now, snapshotText);
+      final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
+      final stillPendingIds = _pendingOps.map(_opNodeId).whereType<String>().toSet();
+      locallyDirtyNodeIds.removeAll(flushedIds.difference(stillPendingIds));
+    });
   }
 
   static String? _opNodeId(NodeOperation op) => switch (op) {
@@ -706,8 +732,8 @@ class NodeSyncManager {
   }
 
   void dispose() {
+    flushNow();
     _debounceTimer?.cancel();
-    _drainQueue();
     _document.removeListener(_onDocumentChanged);
   }
 }

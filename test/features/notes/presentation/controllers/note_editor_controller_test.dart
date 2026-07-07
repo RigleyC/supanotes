@@ -181,7 +181,7 @@ void main() {
     });
 
     test(
-        'BUG 048: dispose starts _drainQueue but does not await it',
+        '048: dispose flushes pending ops via flushNow',
         () async {
       final db = _createDb();
       await db.into(db.notes).insert(NotesCompanion.insert(
@@ -214,9 +214,12 @@ void main() {
 
       final rows = await db.select(db.noteNodes).get();
       expect(rows.any((r) => r.id == 'p1'), isTrue,
-          reason:
-              'BUG 048: dispose starts _drainQueue async but does not await it; '
-              'the flush happens to complete in time for in-memory DB');
+          reason: '048: dispose calls flushNow which syncs ops before disposal');
+
+      final note = await (db.select(db.notes)
+            ..where((t) => t.id.equals('test-note')))
+          .getSingle();
+      expect(note.content, contains('Hello'));
     });
 
     test(
