@@ -3,7 +3,7 @@ import 'snack.dart';
 import 'snack_view.dart';
 
 class SnackOverlay extends StatefulWidget {
-  const SnackOverlay({super.key, required this.child});
+  SnackOverlay({required this.child}) : super(key: _key);
 
   final Widget child;
 
