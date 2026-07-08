@@ -49,6 +49,22 @@ func makeNodeUpdate(t *testing.T, nodes map[string]string) []byte {
 	return crdt.EncodeStateAsUpdateV1(doc, nil)
 }
 
+func projectUpdateHelper(ctx context.Context, pool *pgxpool.Pool, noteID string, update []byte) error {
+	doc := crdt.New(crdt.WithGC(false))
+	if err := crdt.ApplyUpdateV1(doc, update, nil); err != nil {
+		return err
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := ProjectToDBTxFromDoc(ctx, tx, doc, noteID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func TestProjectToDB_InsertsNodes(t *testing.T) {
 	ctx := context.Background()
 	pool := setupTestDB(t)
@@ -58,7 +74,7 @@ func TestProjectToDB_InsertsNodes(t *testing.T) {
 	nodeJSON := fmt.Sprintf(`{"id":"%s","parentId":"","position":0,"type":"text","data":{"text":"hello"}}`, nodeID)
 	update := makeNodeUpdate(t, map[string]string{nodeID: nodeJSON})
 
-	err := ProjectToDB(ctx, pool, testNoteID, update)
+	err := projectUpdateHelper(ctx, pool, testNoteID, update)
 	require.NoError(t, err)
 	assert.Equal(t, "text", getNodeType(t, pool, nodeID))
 }
@@ -78,7 +94,7 @@ func TestProjectToDB_InsertsTasks(t *testing.T) {
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 
-	err := ProjectToDB(ctx, pool, testNoteID, update)
+	err := projectUpdateHelper(ctx, pool, testNoteID, update)
 	require.NoError(t, err)
 
 	var title, status string
@@ -112,7 +128,7 @@ func TestProjectToDB_UpdatesExistingNode(t *testing.T) {
 	updatedJSON := fmt.Sprintf(`{"id":"%s","parentId":"","position":1,"type":"heading","data":{"text":"updated"}}`, nodeID)
 	update := makeNodeUpdate(t, map[string]string{nodeID: updatedJSON})
 
-	err := ProjectToDB(ctx, pool, testNoteID, update)
+	err := projectUpdateHelper(ctx, pool, testNoteID, update)
 	require.NoError(t, err)
 	assert.Equal(t, "heading", getNodeType(t, pool, nodeID))
 }
@@ -193,7 +209,7 @@ func TestProjectToDB_HandlesEmptyUpdate(t *testing.T) {
 	doc := crdt.New(crdt.WithGC(false))
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 
-	err := ProjectToDB(ctx, pool, testNoteID, update)
+	err := projectUpdateHelper(ctx, pool, testNoteID, update)
 	require.NoError(t, err)
 }
 
@@ -247,7 +263,7 @@ func TestProjectToDBTx_RoundTripsFullDoc(t *testing.T) {
 	nodeID := "00000000-0000-0000-0000-000000000070"
 	nodeJSON := fmt.Sprintf(`{"id":"%s","parentId":"","position":0,"type":"text","data":{"text":"hello"}}`, nodeID)
 	seed := makeNodeUpdate(t, map[string]string{nodeID: nodeJSON})
-	require.NoError(t, ProjectToDB(ctx, pool, testNoteID, seed))
+	require.NoError(t, projectUpdateHelper(ctx, pool, testNoteID, seed))
 
 	docPartial := crdt.New(crdt.WithGC(false))
 	docPartial.Transact(func(txn *crdt.Transaction) {

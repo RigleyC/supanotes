@@ -12,8 +12,33 @@ import (
 	"github.com/reearth/ygo/crdt"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
-	"github.com/RigleyC/supanotes/internal/tasks"
 )
+
+const dueDateLayout = "2006-01-02"
+
+func parseDueDate(s string) (time.Time, error) {
+	t, err := time.Parse(dueDateLayout, s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid due_date %q: expected YYYY-MM-DD", s)
+	}
+	return t, nil
+}
+
+func formatDate(d pgtype.Date) *string {
+	if !d.Valid {
+		return nil
+	}
+	s := d.Time.Format(dueDateLayout)
+	return &s
+}
+
+func formatText(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	s := t.String
+	return &s
+}
 
 // SyncTask is the wire shape of a task in the sync payload.
 // Differs from sqlcgen.Task in that due_date is formatted as YYYY-MM-DD
@@ -44,10 +69,10 @@ func toSyncTask(t sqlcgen.Task) SyncTask {
 		CreatedAt: t.CreatedAt.Time,
 		UpdatedAt: t.UpdatedAt.Time,
 	}
-	if rec := tasks.FormatText(t.Recurrence); rec != nil {
+	if rec := formatText(t.Recurrence); rec != nil {
 		st.Recurrence = rec
 	}
-	if due := tasks.FormatDate(t.DueDate); due != nil {
+	if due := formatDate(t.DueDate); due != nil {
 		st.DueDate = due
 	}
 	if t.CompletedAt.Valid {
@@ -115,7 +140,7 @@ func fromSyncTask(t SyncTask) (sqlcgen.Task, error) {
 		out.Recurrence = pgtype.Text{String: *t.Recurrence, Valid: true}
 	}
 	if t.DueDate != nil {
-		d, err := tasks.ParseDueDate(*t.DueDate)
+		d, err := parseDueDate(*t.DueDate)
 		if err != nil {
 			return sqlcgen.Task{}, err
 		}
@@ -157,6 +182,10 @@ func ProduceUpdateFromRows(
 	doc.Transact(func(txn *crdt.Transaction) {
 		for _, n := range nodes {
 			nID := uuid.UUID(n.ID.Bytes).String()
+			if n.DeletedAt.Valid {
+				nodesMap.Delete(txn, nID)
+				continue
+			}
 			nd := noteNodeJSON{
 				ID:        nID,
 				ParentID:  uuidToStr(n.ParentID),
@@ -170,6 +199,10 @@ func ProduceUpdateFromRows(
 		}
 		for _, t := range tasks {
 			tID := uuid.UUID(t.ID.Bytes).String()
+			if t.DeletedAt != nil {
+				tasksMap.Delete(txn, tID)
+				continue
+			}
 			td := taskJSON{
 				ID:        tID,
 				NoteID:    noteID,

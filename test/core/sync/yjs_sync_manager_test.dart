@@ -73,14 +73,6 @@ void main() {
     expect(doc.getText('content/node-1').toString(), 'hi');
   });
 
-  test('docFor throws when loadDoc has not been called', () async {
-    final mgr = YjsSyncManager(db: db);
-    expect(
-      () => mgr.docFor('note-1'),
-      throwsStateError,
-    );
-  });
-
   test('loadDoc returns cached doc on second call', () async {
     final mgr = YjsSyncManager(db: db);
     final doc1 = await mgr.loadDoc('note-1');

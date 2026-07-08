@@ -181,7 +181,9 @@ func (r *Room) HandleIncomingUpdate(framedMsg []byte, sender *wsConn) {
 
 	switch msgType {
 	case ygsync.MsgSyncStep1:
+		r.mu.Lock()
 		reply, err := ygsync.EncodeSyncStep2(doc, framedMsg)
+		r.mu.Unlock()
 		if err != nil {
 			return
 		}
@@ -192,13 +194,15 @@ func (r *Room) HandleIncomingUpdate(framedMsg []byte, sender *wsConn) {
 		return
 	}
 
+	r.mu.Lock()
 	_, err = ygsync.ApplySyncMessage(doc, framedMsg, "remote")
+	if err == nil {
+		_ = r.ydocSvc.ApplyNodeMutation(context.Background(), r.NoteID, payload)
+	}
+	r.mu.Unlock()
 	if err != nil {
 		return
 	}
-
-	// Forward the underlying payload (unwrapped) to other clients.
-	_ = r.ydocSvc.ApplyNodeMutation(context.Background(), r.NoteID, payload)
 
 	r.mu.Lock()
 	recipients := make([]*wsConn, 0, len(r.clients))
@@ -221,7 +225,9 @@ func (r *Room) HandleHandshake(c *wsConn) error {
 		return err
 	}
 	// Send server Step1
+	r.mu.Lock()
 	step1Server := ygsync.EncodeSyncStep1(doc)
+	r.mu.Unlock()
 	if err := c.writeBinary(step1Server); err != nil {
 		return err
 	}
@@ -238,7 +244,9 @@ func (r *Room) HandleHandshake(c *wsConn) error {
 		return fmt.Errorf("expected SyncStep1 from client, got type %d", mt)
 	}
 	// Reply with Step2 diff
+	r.mu.Lock()
 	step2, err := ygsync.EncodeSyncStep2(doc, raw)
+	r.mu.Unlock()
 	if err != nil {
 		return err
 	}

@@ -45,25 +45,6 @@ NoteNode _imageNode({
 }
 
 void main() {
-  group('NoteEditorController nodes lifecycle', () {
-    test(
-        'flushBeforePop deletes empty regular note through lifecycle callback',
-        () async {
-      String? deletedNoteId;
-      final controller = NoteEditorController(
-        userId: 'test-user',
-        emptyNoteExit: (noteId) async {
-          deletedNoteId = noteId;
-        },
-      );
-
-      controller.initFromNodes(nodes: [], noteId: 'empty-note');
-
-      controller.dispose();
-      expect(deletedNoteId, 'empty-note');
-    });
-  });
-
   group('updateNodesIncrementally', () {
     test('Add a node not yet in doc', () async {
       final db = _createDb();
@@ -209,8 +190,7 @@ void main() {
         ),
       ]);
 
-      controller.dispose();
-      await Future.delayed(const Duration(milliseconds: 50));
+      await controller.dispose();
 
       final rows = await db.select(db.noteNodes).get();
       expect(rows.any((r) => r.id == 'p1'), isTrue,

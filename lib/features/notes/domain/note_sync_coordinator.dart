@@ -62,7 +62,7 @@ class NoteSyncCoordinator {
 
   void resumeSync() => _nodeSyncManager.resumeSync();
 
-  void dispose() => _nodeSyncManager.dispose();
+  Future<void> dispose() => _nodeSyncManager.dispose();
 
   // ---------------------------------------------------------------------------
   // Remote-change application

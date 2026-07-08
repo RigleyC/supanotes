@@ -64,6 +64,9 @@ class NodeSyncManager {
   /// preventing stale DB data from overwriting in-flight edits.
   final Set<String> locallyDirtyNodeIds = {};
 
+  int _opSequence = 0;
+  final Map<String, int> _dirtyNodeSequences = {};
+
   Future<void> _writeLock = Future.value();
 
   void _enqueueDbWrite(FutureOr<void> Function() action) {
@@ -126,24 +129,29 @@ class NodeSyncManager {
   }
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
+    _opSequence++;
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
         final node = _document.getNodeById(change.nodeId);
         if (node != null) {
           _pendingOps.add(InsertOp(change.nodeId, node, change.insertionIndex));
           locallyDirtyNodeIds.add(change.nodeId);
+          _dirtyNodeSequences[change.nodeId] = _opSequence;
         }
       } else if (change is NodeRemovedEvent) {
         _pendingOps.add(DeleteOp(change.nodeId));
         locallyDirtyNodeIds.add(change.nodeId);
+        _dirtyNodeSequences[change.nodeId] = _opSequence;
       } else if (change is NodeMovedEvent) {
         _pendingOps.add(MoveOp(change.nodeId, change.from, change.to));
         locallyDirtyNodeIds.add(change.nodeId);
+        _dirtyNodeSequences[change.nodeId] = _opSequence;
       } else if (change is NodeChangeEvent) {
         final node = _document.getNodeById(change.nodeId);
         if (node != null) {
           _pendingOps.add(UpdateOp(change.nodeId, node));
           locallyDirtyNodeIds.add(change.nodeId);
+          _dirtyNodeSequences[change.nodeId] = _opSequence;
         }
       }
     }
@@ -275,6 +283,7 @@ class NodeSyncManager {
 
     final opsToProcess = List<NodeOperation>.from(_pendingOps);
     _pendingOps.clear();
+    final snapshotSeq = _opSequence;
 
     final now = DateTime.now().toUtc();
     final snapshotText = _buildContentSnapshot();
@@ -284,20 +293,26 @@ class NodeSyncManager {
     // Clear dirty flags for flushed nodes only if no new ops arrived
     // during the transaction. If new ops arrived, those IDs stay dirty.
     final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
-    final stillPendingIds = _pendingOps.map(_opNodeId).whereType<String>().toSet();
-    locallyDirtyNodeIds.removeAll(flushedIds.difference(stillPendingIds));
+    for (final id in flushedIds) {
+      final seq = _dirtyNodeSequences[id];
+      if (seq != null && seq <= snapshotSeq) {
+        locallyDirtyNodeIds.remove(id);
+        _dirtyNodeSequences.remove(id);
+      }
+    }
 
     if (opsToProcess.isNotEmpty) {
       onFlush?.call(opsToProcess);
     }
   }
 
-  void flushNow() {
+  Future<void> flushNow() {
     _debounceTimer?.cancel();
-    if (_pendingOps.isEmpty) return;
+    if (_pendingOps.isEmpty) return _writeLock;
 
     final opsToProcess = List<NodeOperation>.from(_pendingOps);
     _pendingOps.clear();
+    final snapshotSeq = _opSequence;
 
     final now = DateTime.now().toUtc();
     final snapshotText = _buildContentSnapshot();
@@ -305,9 +320,16 @@ class NodeSyncManager {
     _enqueueDbWrite(() async {
       await _applyOpsTransaction(opsToProcess, now, snapshotText);
       final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
-      final stillPendingIds = _pendingOps.map(_opNodeId).whereType<String>().toSet();
-      locallyDirtyNodeIds.removeAll(flushedIds.difference(stillPendingIds));
+      for (final id in flushedIds) {
+        final seq = _dirtyNodeSequences[id];
+        if (seq != null && seq <= snapshotSeq) {
+          locallyDirtyNodeIds.remove(id);
+          _dirtyNodeSequences.remove(id);
+        }
+      }
     });
+
+    return _writeLock;
   }
 
   static String? _opNodeId(NodeOperation op) => switch (op) {
@@ -719,8 +741,8 @@ class NodeSyncManager {
     _document.addListener(_onDocumentChanged);
   }
 
-  void dispose() {
-    flushNow();
+  Future<void> dispose() async {
+    await flushNow();
     _debounceTimer?.cancel();
     _document.removeListener(_onDocumentChanged);
   }

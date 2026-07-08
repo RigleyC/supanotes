@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/reearth/ygo/crdt"
+	ygsync "github.com/reearth/ygo/sync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,11 +24,17 @@ func TestMergeYjsUpdates(t *testing.T) {
 	require.NotEmpty(t, update1)
 
 	doc2 := crdt.New()
+	err := crdt.ApplyUpdateV1(doc2, update1, nil)
+	require.NoError(t, err)
 	text2 := doc2.GetText("content")
 	doc2.Transact(func(txn *crdt.Transaction) {
 		text2.Insert(txn, 5, " world", nil)
 	})
-	update2 := crdt.EncodeStateAsUpdateV1(doc2, nil)
+	step1 := ygsync.EncodeSyncStep1(doc1)
+	step2, err := ygsync.EncodeSyncStep2(doc2, step1)
+	require.NoError(t, err)
+	_, update2, err := ygsync.ReadSyncMessage(step2)
+	require.NoError(t, err)
 	require.NotEmpty(t, update2)
 
 	merged, err := mergeYjsUpdates([][]byte{update1, update2})
@@ -57,8 +64,9 @@ func TestMergeYjsUpdates_Empty(t *testing.T) {
 
 func TestMergeYjsUpdates_Single(t *testing.T) {
 	doc := crdt.New()
+	text := doc.GetText("content")
 	doc.Transact(func(txn *crdt.Transaction) {
-		doc.GetText("content").Insert(txn, 0, "single", nil)
+		text.Insert(txn, 0, "single", nil)
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 

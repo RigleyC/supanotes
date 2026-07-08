@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/sync"
 )
 
 var (
@@ -43,16 +44,12 @@ func (o UpdateTaskOpts) Validate() error {
 	return nil
 }
 
-type NoteStateSyncer interface {
-	SyncNoteToYjs(ctx context.Context, noteID pgtype.UUID) error
-}
-
 type Service struct {
 	repo       Repository
-	noteSyncer NoteStateSyncer
+	noteSyncer sync.NoteStateSyncer
 }
 
-func NewService(repo Repository, noteSyncer NoteStateSyncer) *Service {
+func NewService(repo Repository, noteSyncer sync.NoteStateSyncer) *Service {
 	return &Service{repo: repo, noteSyncer: noteSyncer}
 }
 

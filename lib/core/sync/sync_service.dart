@@ -109,26 +109,40 @@ class SyncService {
     if (noteId == _activeNoteId && _yjsWsClient != null) return;
     await disconnectNote();
     final accessToken = await _authStorage.getAccessToken();
-    if (accessToken == null) return;
-    _activeNoteId = noteId;
-    final doc = await _yjsMgr.loadDoc(noteId);
-    final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/sync/ws/$noteId');
-    final channel = IOWebSocketChannel.connect(
-      uri,
-      headers: {'Authorization': 'Bearer $accessToken'},
-    );
-    final stream = channel.stream
-        .where((m) => m is List<int>)
-        .map((m) => Uint8List.fromList(m as List<int>));
-    _yjsWsClient = YjsWebSocketClient(
-      stream: stream,
-      sink: channel.sink,
-      doc: doc,
-      notifier: _notifier,
-    );
-    await _yjsWsClient!.connect(noteId);
-    _yjsUpdateSub = _yjsWsClient!.onUpdate.listen(_handleIncomingUpdate);
-    onReady?.call(doc, (update) => _yjsWsClient?.sendUpdate(update));
+    if (accessToken == null) {
+      if (kDebugMode) {
+        debugPrint('[SyncService] Access token missing for connectNote');
+      }
+      _notifier.markError('Access token is missing');
+      return;
+    }
+    try {
+      _activeNoteId = noteId;
+      final doc = await _yjsMgr.loadDoc(noteId);
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/sync/ws/$noteId');
+      final channel = IOWebSocketChannel.connect(
+        uri,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+      final stream = channel.stream
+          .where((m) => m is List<int>)
+          .map((m) => Uint8List.fromList(m as List<int>));
+      _yjsWsClient = YjsWebSocketClient(
+        stream: stream,
+        sink: channel.sink,
+        doc: doc,
+        notifier: _notifier,
+      );
+      await _yjsWsClient!.connect(noteId);
+      _yjsUpdateSub = _yjsWsClient!.onUpdate.listen(_handleIncomingUpdate);
+      onReady?.call(doc, (update) => _yjsWsClient?.sendUpdate(update));
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('[SyncService] Failed to connect note: $e\n$stackTrace');
+      }
+      _notifier.markError(e.toString());
+      rethrow;
+    }
   }
 
   void _handleIncomingUpdate(Uint8List _) {
@@ -211,7 +225,7 @@ class SyncService {
 
     final noteNodes = await (_db.select(
       _db.noteNodes,
-    )..where((t) => t.isDirty.equals(true))).get();
+    )..where((t) => t.isDirty.equals(true) & t.deletedAt.isNull())).get();
     final filteredNoteNodes = noteNodes.where((nn) => allowedNoteIds.contains(nn.noteId)).toList();
 
     final tasks = await _db.tasksDao.getDirtyTasks();

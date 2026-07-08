@@ -75,10 +75,11 @@ class YjsDocEditorBridge {
     final existingRaw = nodesMap.get(id);
     final createdAt = _readCreatedAt(existingRaw) ??
         DateTime.now().millisecondsSinceEpoch.toDouble();
+    final parentId = _readParentId(existingRaw) ?? '';
 
     final meta = <String, dynamic>{
       'id': id,
-      'parentId': '',
+      'parentId': parentId,
       'position': position,
       'type': _attributionFor(node),
       'data': data,
@@ -104,6 +105,16 @@ class YjsDocEditorBridge {
       final meta = jsonDecode(raw) as Map<String, dynamic>;
       final ca = meta['createdAt'] as num?;
       return ca?.toDouble();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _readParentId(dynamic raw) {
+    if (raw is! String) return null;
+    try {
+      final meta = jsonDecode(raw) as Map<String, dynamic>;
+      return meta['parentId'] as String?;
     } catch (_) {
       return null;
     }

@@ -97,6 +97,8 @@ class YjsSyncManager {
     return doc;
   }
 
+  Future<void> _persistLock = Future.value();
+
   /// Persist the current in-memory Doc state for [noteId] to the database
   /// and project it to [note_nodes]. Unlike [applyUpdate], this does NOT call
   /// [applyUpdate] — it is safe to call when the Doc is already up-to-date
@@ -105,14 +107,21 @@ class YjsSyncManager {
     final doc = _docs[noteId];
     if (doc == null) return;
     final state = encodeStateAsUpdate(doc);
-    await _db.into(_db.localYjsStates).insertOnConflictUpdate(
-          LocalYjsStatesCompanion(
-            noteId: Value(noteId),
-            state: Value(state),
-          ),
-        );
-    await _projectToNodes(noteId, doc);
-    dev.log('[YjsSyncManager] Persisted state for note=$noteId', name: 'YjsSync');
+    _persistLock = _persistLock.then((_) async {
+      try {
+        await _db.into(_db.localYjsStates).insertOnConflictUpdate(
+              LocalYjsStatesCompanion(
+                noteId: Value(noteId),
+                state: Value(state),
+              ),
+            );
+        await _projectToNodes(noteId, doc);
+        dev.log('[YjsSyncManager] Persisted state for note=$noteId', name: 'YjsSync');
+      } catch (e, stackTrace) {
+        dev.log('YjsSyncManager persist error: $e', name: 'YjsSync', error: e, stackTrace: stackTrace, level: 1000);
+      }
+    });
+    await _persistLock;
   }
 
   /// Project the in-memory [Doc] state into [note_nodes] so it survives
@@ -141,20 +150,9 @@ class YjsSyncManager {
     await _db.batch((b) {
       for (final node in nodes) {
         b.insert(_db.noteNodes, node,
-            onConflict: DoUpdate((_) => node));
+            onConflict: DoUpdate((old) => node.copyWith(updatedAt: old.updatedAt)));
       }
     });
-  }
-
-  /// Retrieve the in-memory [Doc] for [noteId].
-  ///
-  /// Throws a [StateError] if [loadDoc] has not been called first.
-  Doc docFor(String noteId) {
-    final d = _docs[noteId];
-    if (d == null) {
-      throw StateError('loadDoc($noteId) must be awaited before docFor');
-    }
-    return d;
   }
 
   /// Dispose all in-memory Ydocs.

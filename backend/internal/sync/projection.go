@@ -76,36 +76,6 @@ func ProjectToDBTxFromDoc(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID 
 	return projectDocToDB(ctx, tx, doc, noteID)
 }
 
-// ProjectToDBTx projects the Yjs update onto relational tables using
-// an existing transaction. The caller is responsible for acquiring the
-// advisory lock (if needed) and for committing/rolling back the transaction.
-func ProjectToDBTx(ctx context.Context, tx pgx.Tx, noteID string, update []byte) error {
-	doc := crdt.New(crdt.WithGC(false))
-	if err := crdt.ApplyUpdateV1(doc, update, nil); err != nil {
-		return fmt.Errorf("apply update: %w", err)
-	}
-	return ProjectToDBTxFromDoc(ctx, tx, doc, noteID)
-}
-
-// ProjectToDB creates its own transaction, acquires the advisory lock,
-// and projects the Yjs update onto relational tables.
-func ProjectToDB(ctx context.Context, pool *pgxpool.Pool, noteID string, update []byte) error {
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext('nodes'))", noteID); err != nil {
-		return fmt.Errorf("advisory lock: %w", err)
-	}
-
-	if err := ProjectToDBTx(ctx, tx, noteID, update); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
-}
-
 // projectDocToDB projects the given Doc's state onto relational tables
 // using the provided transaction.
 func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string) error {
@@ -175,6 +145,28 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 			}
 			if _, err := q.UpsertNoteNode(ctx, params); err != nil {
 				return fmt.Errorf("upsert node %s: %w", key, err)
+			}
+
+			if nd.Type == "task" {
+				var dataMap map[string]interface{}
+				if err := json.Unmarshal(dataBytes, &dataMap); err == nil {
+					if completedVal, ok := dataMap["completed"]; ok {
+						completed, _ := completedVal.(bool)
+						status := "todo"
+						if completed {
+							status = "done"
+						}
+						// Update the corresponding tasks table status and completed_at using the transaction
+						if completed {
+							_, err = tx.Exec(ctx, "UPDATE tasks SET status = $1, completed_at = NOW(), updated_at = NOW() WHERE node_id = $2 AND deleted_at IS NULL", status, pgNodeID)
+						} else {
+							_, err = tx.Exec(ctx, "UPDATE tasks SET status = $1, completed_at = NULL, updated_at = NOW() WHERE node_id = $2 AND deleted_at IS NULL", status, pgNodeID)
+						}
+						if err != nil {
+							return fmt.Errorf("update task status for node %s: %w", nd.ID, err)
+						}
+					}
+				}
 			}
 		}
 
@@ -358,15 +350,36 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 	nodesMap := doc.GetMap("nodes")
 	tasksMap := doc.GetMap("tasks")
 
+	// Build a taskStatusMap from the queried tasks
+	taskStatusMap := make(map[string]string)
+	for _, t := range tasks {
+		if t.NodeID.Valid {
+			taskStatusMap[uuidToStr(t.NodeID)] = t.Status
+		}
+	}
+
 	doc.Transact(func(txn *crdt.Transaction) {
 		for _, node := range nodes {
 			nodeID := uuidToStr(node.ID)
+			nodeData := node.Data
+			if node.Type == "task" {
+				if status, ok := taskStatusMap[nodeID]; ok {
+					var dataMap map[string]interface{}
+					if err := json.Unmarshal(node.Data, &dataMap); err == nil {
+						dataMap["completed"] = (status == "done")
+						if updatedBytes, err := json.Marshal(dataMap); err == nil {
+							nodeData = updatedBytes
+						}
+					}
+				}
+			}
+
 			nd := noteNodeJSON{
 				ID:        nodeID,
 				ParentID:  uuidToStr(node.ParentID),
 				Position:  node.Position,
 				Type:      node.Type,
-				Data:      node.Data,
+				Data:      nodeData,
 				CreatedAt: timestamptzToMS(node.CreatedAt),
 				UpdatedAt: timestamptzToMS(node.UpdatedAt),
 			}
@@ -379,9 +392,9 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 			// Create YText for the node's text content so that
 			// concurrent edits on the same paragraph get proper
 			// character-level CRDT merge.
-			if len(node.Data) > 0 {
+			if len(nodeData) > 0 {
 				var dataMap map[string]interface{}
-				if err := json.Unmarshal(node.Data, &dataMap); err == nil {
+				if err := json.Unmarshal(nodeData, &dataMap); err == nil {
 					if text, ok := dataMap["text"].(string); ok && text != "" {
 						textType := doc.GetText("content/" + nodeID)
 						textType.Insert(txn, 0, text, nil)
@@ -431,11 +444,11 @@ func validateNoteID(noteID string) error {
 // falling back to ReconstructYDocFromNodes when no snapshot exists yet.
 // Returns nil, nil if pool is nil (used in tests).
 func LoadYDocState(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]byte, error) {
-	if err := validateNoteID(noteID); err != nil {
-		return nil, err
-	}
 	if pool == nil {
 		return nil, nil
+	}
+	if err := validateNoteID(noteID); err != nil {
+		return nil, err
 	}
 
 	noteUUID, err := parseUUIDStr(noteID)

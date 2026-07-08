@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/reearth/ygo/crdt"
@@ -300,7 +301,7 @@ func TestRoomHandleIncomingUpdateBroadcasts(t *testing.T) {
 	case msg := <-recipientCh:
 		assert.GreaterOrEqual(t, len(msg), 1, "message should have type byte prefix")
 		assert.Equal(t, byte(ygsync.MsgUpdate), msg[0], "broadcast should use Update framing")
-	default:
+	case <-time.After(200 * time.Millisecond):
 		t.Fatal("expected recipient to receive a broadcast message")
 	}
 }
@@ -370,13 +371,14 @@ func TestRoomHandleIncomingUpdateSkipsSender(t *testing.T) {
 	select {
 	case <-senderCh:
 		t.Fatal("sender should NOT receive its own update")
-	default:
+	case <-time.After(50 * time.Millisecond):
+		// Expected - sender got nothing
 	}
 
 	select {
 	case <-recipientCh:
 		// expected — recipient got the broadcast
-	default:
+	case <-time.After(200 * time.Millisecond):
 		t.Fatal("expected recipient to receive a broadcast message")
 	}
 }

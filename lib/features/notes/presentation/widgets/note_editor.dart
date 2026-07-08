@@ -69,6 +69,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _controller = ref.read(noteEditorControllerProvider(widget.noteId));
     if (_controller!.document == null) {
       _controller!.initFromNodes(nodes: widget.nodes, noteId: widget.noteId);
+      _controller!.syncTaskStates(
+        widget.taskMetadata.map((k, v) => MapEntry(k, v.isCompleted)),
+      );
     }
     if (!widget.isReadOnly) {
       _controller!.document?.addListener(_onDocumentChanged);

@@ -153,10 +153,10 @@ class NoteEditorController {
     _coordinator?.updateNodesIncrementally(incomingNodes);
   }
 
-  void dispose() {
+  Future<void> dispose() async {
     _bridge?.dispose();
     _bridge = null;
-    _coordinator?.dispose();
+    await _coordinator?.dispose();
     editor?.dispose();
     document?.dispose();
     composer?.dispose();
