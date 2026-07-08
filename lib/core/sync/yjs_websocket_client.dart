@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'sync_state.dart';
@@ -40,6 +41,8 @@ class YjsWebSocketClient {
   bool get isConnected => _isConnected;
 
   Future<void> connect(String noteId) async {
+    final sw = Stopwatch()..start();
+    debugPrint('[YjsWS] connect START noteId=$noteId');
     await disconnect();
     _reconnectAttempts = 0;
     _connectedNoteId = noteId;
@@ -47,27 +50,33 @@ class YjsWebSocketClient {
     _notifier?.markSyncing();
     _sub = _stream.listen(_handleMessage);
     _isConnected = true;
+    debugPrint('[YjsWS] connect: sending Step1 elapsed=${sw.elapsedMilliseconds}ms');
     _sendStep1(_doc);
     _resetIdleTimer();
+    debugPrint('[YjsWS] connect DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
 
   void _handleMessage(Uint8List data) {
     if (data.isEmpty) return;
+    final sw = Stopwatch()..start();
     final decoder = createDecoder(data);
     final encoder = createEncoder();
     final msgType = readSyncMessage(decoder, encoder, _doc, 'remote');
+    debugPrint('[YjsWS] _handleMessage msgType=$msgType dataLen=${data.length} elapsed=${sw.elapsedMilliseconds}ms');
     switch (msgType) {
       case messageSyncStep1:
         final step2 = toUint8Array(encoder);
         _sendRaw(step2);
         if (!_handshakeDone) {
           _handshakeDone = true;
+          debugPrint('[YjsWS] HANDSHAKE DONE (via Step1) elapsed=${sw.elapsedMilliseconds}ms');
           _notifier?.markSynced(DateTime.now());
           _flushPending();
         }
       case messageSyncStep2:
         if (!_handshakeDone) {
           _handshakeDone = true;
+          debugPrint('[YjsWS] HANDSHAKE DONE (via Step2) elapsed=${sw.elapsedMilliseconds}ms');
           _notifier?.markSynced(DateTime.now());
           _flushPending();
         }
@@ -102,13 +111,15 @@ class YjsWebSocketClient {
     final framed = toUint8Array(enc);
     if (!_isConnected) {
       if (_pendingUpdates.length >= _kMaxPendingUpdates) {
-        dev.log('[YjsWS] pendingUpdates full, dropping oldest', name: 'YjsWS');
+        debugPrint('[YjsWS] sendUpdate: pendingUpdates full, dropping oldest (was ${_pendingUpdates.length})');
         _pendingUpdates.removeAt(0);
       }
       _pendingUpdates.add(framed);
+      debugPrint('[YjsWS] sendUpdate: queued (pending=${_pendingUpdates.length}, connected=false) updateLen=${update.length}');
       _scheduleReconnect();
       return;
     }
+    debugPrint('[YjsWS] sendUpdate: sending directly updateLen=${update.length}');
     _sendRaw(framed);
   }
 
@@ -119,11 +130,14 @@ class YjsWebSocketClient {
     final delay = Duration(
       milliseconds: (500 * (1 << (_reconnectAttempts - 1))).clamp(500, 30000),
     );
+    debugPrint('[YjsWS] _scheduleReconnect attempt=$_reconnectAttempts delay=${delay.inMilliseconds}ms noteId=$_connectedNoteId');
     _reconnectTimer = Timer(delay, () async {
       _reconnectTimer = null;
       try {
+        debugPrint('[YjsWS] _scheduleReconnect: reconnecting...');
         await connect(_connectedNoteId!);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('[YjsWS] _scheduleReconnect: failed, retrying: $e');
         _scheduleReconnect();
       }
     });
@@ -135,6 +149,7 @@ class YjsWebSocketClient {
   }
 
   Future<void> disconnect() async {
+    debugPrint('[YjsWS] disconnect START pending=${_pendingUpdates.length} connected=$_isConnected');
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _reconnectAttempts = 0;
@@ -144,11 +159,10 @@ class YjsWebSocketClient {
     _sub = null;
     _isConnected = false;
     _handshakeDone = false;
+    debugPrint('[YjsWS] disconnect DONE');
   }
 
   Future<void> dispose() async {
     _reconnectTimer?.cancel();
     await disconnect();
-    await _onUpdateController.close();
-  }
-}
+   

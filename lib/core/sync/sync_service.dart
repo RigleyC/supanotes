@@ -106,19 +106,25 @@ class SyncService {
     String noteId, {
     void Function(Doc doc, void Function(Uint8List) sendUpdate)? onReady,
   }) async {
-    if (noteId == _activeNoteId && _yjsWsClient != null) return;
+    final sw = Stopwatch()..start();
+    debugPrint('[SyncService] connectNote START noteId=$noteId currentActive=$_activeNoteId');
+    if (noteId == _activeNoteId && _yjsWsClient != null) {
+      debugPrint('[SyncService] connectNote SKIP (already active) elapsed=${sw.elapsedMilliseconds}ms');
+      return;
+    }
     await disconnectNote();
+    debugPrint('[SyncService] connectNote disconnected previous elapsed=${sw.elapsedMilliseconds}ms');
     final accessToken = await _authStorage.getAccessToken();
     if (accessToken == null) {
-      if (kDebugMode) {
-        debugPrint('[SyncService] Access token missing for connectNote');
-      }
+      debugPrint('[SyncService] connectNote FAIL: no access token elapsed=${sw.elapsedMilliseconds}ms');
       _notifier.markError('Access token is missing');
       return;
     }
     try {
       _activeNoteId = noteId;
+      debugPrint('[SyncService] connectNote loading doc elapsed=${sw.elapsedMilliseconds}ms');
       final doc = await _yjsMgr.loadDoc(noteId);
+      debugPrint('[SyncService] connectNote doc loaded elapsed=${sw.elapsedMilliseconds}ms');
       String wsUrl = ApiConstants.baseUrl
           .replaceFirst('https://', 'wss://')
           .replaceFirst('http://', 'ws://');
@@ -128,6 +134,7 @@ class SyncService {
         wsUrl = '$wsUrl/api/v1/sync/ws/$noteId';
       }
       final uri = Uri.parse(wsUrl);
+      debugPrint('[SyncService] connectNote connecting WS url=$wsUrl elapsed=${sw.elapsedMilliseconds}ms');
       final channel = IOWebSocketChannel.connect(
         uri,
         headers: {'Authorization': 'Bearer $accessToken'},
@@ -141,13 +148,14 @@ class SyncService {
         doc: doc,
         notifier: _notifier,
       );
+      debugPrint('[SyncService] connectNote calling WS connect elapsed=${sw.elapsedMilliseconds}ms');
       await _yjsWsClient!.connect(noteId);
+      debugPrint('[SyncService] connectNote WS connected elapsed=${sw.elapsedMilliseconds}ms');
       _yjsUpdateSub = _yjsWsClient!.onUpdate.listen(_handleIncomingUpdate);
       onReady?.call(doc, (update) => _yjsWsClient?.sendUpdate(update));
+      debugPrint('[SyncService] connectNote DONE elapsed=${sw.elapsedMilliseconds}ms');
     } catch (e, stackTrace) {
-      if (kDebugMode) {
-        debugPrint('[SyncService] Failed to connect note: $e\n$stackTrace');
-      }
+      debugPrint('[SyncService] connectNote FAIL: $e\n$stackTrace');
       _notifier.markError(e.toString());
       rethrow;
     }
@@ -161,9 +169,8 @@ class SyncService {
 
   /// Disconnect real-time sync for the active note.
   Future<void> disconnectNote() async {
-    if (_activeNoteId != null && kDebugMode) {
-      debugPrint('[SyncService] Disconnecting note=$_activeNoteId');
-    }
+    final sw = Stopwatch()..start();
+    debugPrint('[SyncService] disconnectNote START noteId=$_activeNoteId');
     await _yjsUpdateSub?.cancel();
     _yjsUpdateSub = null;
     _activeNoteId = null;
@@ -172,6 +179,7 @@ class SyncService {
       await _yjsWsClient!.dispose();
       _yjsWsClient = null;
     }
+    debugPrint('[SyncService] disconnectNote DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
 
   void start() {
@@ -197,16 +205,25 @@ class SyncService {
   }
 
   Future<void> sync() async {
-    if (_isSyncing) return;
+    if (_isSyncing) {
+      debugPrint('[SyncService] sync SKIP (already syncing)');
+      return;
+    }
+    final sw = Stopwatch()..start();
     _isSyncing = true;
+    debugPrint('[SyncService] sync START');
     try {
       if (!_connectivity.isConnected) {
+        debugPrint('[SyncService] sync: offline, skipping');
         _notifier.markOffline();
         return;
       }
       _notifier.markSyncing();
+      debugPrint('[SyncService] sync: push START');
       await push();
+      debugPrint('[SyncService] sync: push DONE, pull START elapsed=${sw.elapsedMilliseconds}ms');
       await pull();
+      debugPrint('[SyncService] sync: pull DONE elapsed=${sw.elapsedMilliseconds}ms');
       final syncedAt = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
@@ -214,10 +231,9 @@ class SyncService {
         syncedAt.toUtc().toIso8601String(),
       );
       _notifier.markSynced(syncedAt);
+      debugPrint('[SyncService] sync DONE elapsed=${sw.elapsedMilliseconds}ms');
     } catch (e, stackTrace) {
-      if (kDebugMode) {
-        debugPrint('[SyncService] Error: $e\n$stackTrace');
-      }
+      debugPrint('[SyncService] sync FAIL: $e\n$stackTrace');
       _notifier.markError(e.toString());
     } finally {
       _isSyncing = false;
@@ -225,6 +241,8 @@ class SyncService {
   }
 
   Future<void> push() async {
+    final sw = Stopwatch()..start();
+    debugPrint('[SyncService] push START');
     final notes = await _db.notesDao.getDirtyNotes();
     final pushingNoteIds = notes.map((n) => n.id).toSet();
     final remoteNotes = await (_db.select(_db.notes)..where((t) => t.hasRemoteCopy.equals(true))).get();
@@ -265,6 +283,8 @@ class SyncService {
     final contexts = await _db.contextsDao.getDirtyContexts();
     final tags = await _db.tagsDao.getDirtyTags();
 
+    debugPrint('[SyncService] push: dirty data collected elapsed=${sw.elapsedMilliseconds}ms notes=${notes.length} nodes=${filteredNoteNodes.length} tasks=${filteredTasks.length} completions=${filteredCompletions.length} links=${filteredLinks.length}');
+
     if (notes.isEmpty &&
         filteredNoteNodes.isEmpty &&
         filteredTasks.isEmpty &&
@@ -274,6 +294,7 @@ class SyncService {
         filteredLinks.isEmpty &&
         filteredNoteTags.isEmpty &&
         filteredPrefs.isEmpty) {
+      debugPrint('[SyncService] push: nothing dirty, SKIP elapsed=${sw.elapsedMilliseconds}ms');
       return;
     }
 
@@ -293,8 +314,11 @@ class SyncService {
           .toList(),
     };
 
+    debugPrint('[SyncService] push: sending HTTP POST elapsed=${sw.elapsedMilliseconds}ms');
     await _repo.push(payload);
+    debugPrint('[SyncService] push: HTTP POST done elapsed=${sw.elapsedMilliseconds}ms');
 
+    debugPrint('[SyncService] push: clearing dirty flags elapsed=${sw.elapsedMilliseconds}ms');
     await _db.transaction(() async {
       for (final n in notes) {
         await _db.notesDao.markHasRemoteCopy(n.id);
@@ -331,18 +355,23 @@ class SyncService {
         await _db.userNotePreferencesDao.clearDirtyFlag(p.userId, p.noteId);
       }
     });
+    debugPrint('[SyncService] push DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
 
   Future<void> pull() async {
+    final sw = Stopwatch()..start();
+    debugPrint('[SyncService] pull START');
     final prefs = await SharedPreferences.getInstance();
     final lastSyncedStr = prefs.getString(_kLastSyncedAtPref);
     final lastSyncedAt = lastSyncedStr != null
         ? DateTime.parse(lastSyncedStr)
         : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 
+    debugPrint('[SyncService] pull: HTTP GET lastSyncedAt=$lastSyncedStr');
     final data = await _repo.pull(
       lastSyncedAt: lastSyncedAt.toUtc().toIso8601String(),
     );
+    debugPrint('[SyncService] pull: HTTP GET done elapsed=${sw.elapsedMilliseconds}ms');
     final dirtyNoteIds = {
       for (final note in await (_db.select(
         _db.notes,
@@ -350,6 +379,7 @@ class SyncService {
         note.id,
     };
 
+    debugPrint('[SyncService] pull: applying batch elapsed=${sw.elapsedMilliseconds}ms notes=${(data['notes'] as List?)?.length ?? 0} nodes=${(data['note_nodes'] as List?)?.length ?? 0}');
     await _db.batch((batch) {
       for (final raw in (data['notes'] as List? ?? [])) {
         final note = _mapper
@@ -433,5 +463,6 @@ class SyncService {
       _kLastSyncedAtPref,
       DateTime.now().toUtc().toIso8601String(),
     );
+    debugPrint('[SyncService] pull DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
 }

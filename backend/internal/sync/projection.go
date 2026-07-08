@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -311,6 +312,7 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 }
 
 func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]byte, error) {
+	startTotal := time.Now()
 	noteUUID, err := parseUUIDStr(noteID)
 	if err != nil {
 		return nil, fmt.Errorf("parse note id: %w", err)
@@ -318,16 +320,22 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 
 	q := sqlcgen.New(pool)
 
+	startNodes := time.Now()
 	nodes, err := q.GetNodesByNoteId(ctx, noteUUID)
 	if err != nil {
+		slog.Error("ReconstructYDocFromNodes: query nodes failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startNodes).Milliseconds())
 		return nil, fmt.Errorf("query nodes: %w", err)
 	}
+	slog.Info("ReconstructYDocFromNodes: nodes loaded", "note_id", noteID, "count", len(nodes), "elapsed_ms", time.Since(startNodes).Milliseconds())
 
+	startTasks := time.Now()
 	rows, err := pool.Query(ctx, `SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, node_id FROM tasks WHERE note_id = $1 AND deleted_at IS NULL ORDER BY position ASC, created_at ASC`, noteUUID)
 	if err != nil {
+		slog.Error("ReconstructYDocFromNodes: query tasks failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startTasks).Milliseconds())
 		return nil, fmt.Errorf("query tasks: %w", err)
 	}
 	defer rows.Close()
+	slog.Info("ReconstructYDocFromNodes: tasks queried", "note_id", noteID, "elapsed_ms", time.Since(startTasks).Milliseconds())
 
 	var tasks []sqlcgen.Task
 	for rows.Next() {
@@ -428,7 +436,9 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 		}
 	})
 
-	return crdt.EncodeStateAsUpdateV1(doc, nil), nil
+	result := crdt.EncodeStateAsUpdateV1(doc, nil)
+	slog.Info("ReconstructYDocFromNodes: done", "note_id", noteID, "result_bytes", len(result), "total_ms", time.Since(startTotal).Milliseconds())
+	return result, nil
 }
 
 func validateNoteID(noteID string) error {
@@ -447,23 +457,31 @@ func LoadYDocState(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]by
 	if pool == nil {
 		return nil, nil
 	}
+	startTotal := time.Now()
 	if err := validateNoteID(noteID); err != nil {
 		return nil, err
 	}
 
 	noteUUID, err := parseUUIDStr(noteID)
 
+	startQuery := time.Now()
 	var state []byte
 	err = pool.QueryRow(ctx, "SELECT state FROM note_yjs_states WHERE note_id = $1", noteUUID).Scan(&state)
+	queryElapsed := time.Since(startQuery)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			slog.Info("LoadYDocState: no snapshot, reconstructing", "note_id", noteID, "query_ms", queryElapsed.Milliseconds())
 			return ReconstructYDocFromNodes(ctx, pool, noteID)
 		}
+		slog.Error("LoadYDocState: query state failed", "note_id", noteID, "error", err, "elapsed_ms", queryElapsed.Milliseconds())
 		return nil, fmt.Errorf("load state: %w", err)
 	}
+	slog.Info("LoadYDocState: state loaded", "note_id", noteID, "state_bytes", len(state), "query_ms", queryElapsed.Milliseconds())
 
+	startPending := time.Now()
 	rows, err := pool.Query(ctx, "SELECT update_data FROM note_yjs_updates WHERE note_id = $1 ORDER BY created_at ASC", noteUUID)
 	if err != nil {
+		slog.Error("LoadYDocState: query updates failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startPending).Milliseconds())
 		return nil, fmt.Errorf("query pending updates: %w", err)
 	}
 	defer rows.Close()
@@ -472,22 +490,29 @@ func LoadYDocState(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]by
 	for rows.Next() {
 		var u []byte
 		if err := rows.Scan(&u); err != nil {
+			slog.Error("LoadYDocState: scan update failed", "note_id", noteID, "error", err)
 			return nil, fmt.Errorf("scan pending update: %w", err)
 		}
 		pending = append(pending, u)
 	}
 	if err := rows.Err(); err != nil {
+		slog.Error("LoadYDocState: rows iter failed", "note_id", noteID, "error", err)
 		return nil, fmt.Errorf("rows iter: %w", err)
 	}
+	slog.Info("LoadYDocState: pending updates loaded", "note_id", noteID, "pending_count", len(pending), "elapsed_ms", time.Since(startPending).Milliseconds())
 
 	if len(pending) == 0 {
+		slog.Info("LoadYDocState: done (no merge needed)", "note_id", noteID, "total_ms", time.Since(startTotal).Milliseconds())
 		return state, nil
 	}
 
+	startMerge := time.Now()
 	all := append([][]byte{state}, pending...)
 	merged, err := crdt.MergeUpdatesV1(all...)
 	if err != nil {
+		slog.Error("LoadYDocState: merge failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startMerge).Milliseconds())
 		return nil, fmt.Errorf("merge pending updates: %w", err)
 	}
+	slog.Info("LoadYDocState: done (merged)", "note_id", noteID, "merged_bytes", len(merged), "merge_ms", time.Since(startMerge).Milliseconds(), "total_ms", time.Since(startTotal).Milliseconds())
 	return merged, nil
 }

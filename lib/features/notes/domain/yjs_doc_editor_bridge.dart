@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'dart:typed_data';
 
 import 'package:super_editor/super_editor.dart';
@@ -31,13 +32,18 @@ class YjsDocEditorBridge {
   late final void Function(dynamic, Transaction) _nodesSub;
 
   void _onNodesChanged(dynamic event, Transaction tr) {
+    final sw = Stopwatch()..start();
     final nodes = noteNodesFromDoc(_doc);
+    dev.log('[YjsBridge] _onNodesChanged: ${nodes.length} nodes from YDoc, elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
     _coordinator.updateNodesIncrementally(nodes);
+    dev.log('[YjsBridge] _onNodesChanged: updateNodesIncrementally done, elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
   }
 
   /// Called by [NoteSyncCoordinator] when local edits are flushed to SQLite.
   void onLocalFlush(List<NodeOperation> ops) {
     if (ops.isEmpty) return;
+    final sw = Stopwatch()..start();
+    dev.log('[YjsBridge] onLocalFlush START ops=${ops.length}', name: 'YjsBridge');
 
     final nodesMap = _doc.getMap('nodes')!;
 
@@ -55,7 +61,9 @@ class YjsDocEditorBridge {
     }
 
     final update = encodeStateAsUpdate(_doc);
+    dev.log('[YjsBridge] onLocalFlush: sending update updateLen=${update.length} elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
     _sendUpdate(update);
+    dev.log('[YjsBridge] onLocalFlush DONE elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
   }
 
   void _serializeNode(
@@ -97,6 +105,7 @@ class YjsDocEditorBridge {
     if (text != null && text.isNotEmpty) {
       ytext.insert(0, text);
     }
+    dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
   }
 
   double? _readCreatedAt(dynamic raw) {

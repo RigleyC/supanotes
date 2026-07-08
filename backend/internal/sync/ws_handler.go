@@ -161,6 +161,7 @@ func NewWSHandler(shutdownCtx context.Context, roomMgr *RoomManager, pool *pgxpo
 }
 
 func (h *WSHandler) HandleConnect(c echo.Context) error {
+	startTotal := time.Now()
 	noteID := c.Param("note_id")
 	userIDStr, ok := web.UserIDFromContext(c)
 	if !ok {
@@ -171,8 +172,10 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "invalid user id")
 	}
 
+	slog.Info("WS HandleConnect: starting", "note_id", noteID, "user_id", userIDStr)
 	ctx := c.Request().Context()
 
+	startPerm := time.Now()
 	var hasAccess bool
 	err = h.pool.QueryRow(ctx, `
 		SELECT EXISTS (
@@ -182,38 +185,52 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 		)
 	`, noteID, userID).Scan(&hasAccess)
 	if err != nil {
+		slog.Error("WS HandleConnect: permission check failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startPerm).Milliseconds())
 		return web.JSONError(c, http.StatusInternalServerError, "permission check failed")
 	}
 	if !hasAccess {
+		slog.Error("WS HandleConnect: access denied", "note_id", noteID, "user_id", userIDStr, "elapsed_ms", time.Since(startPerm).Milliseconds())
 		return web.JSONError(c, http.StatusForbidden, "access denied")
 	}
+	slog.Info("WS HandleConnect: permission OK", "note_id", noteID, "elapsed_ms", time.Since(startPerm).Milliseconds())
 
 	// Pre-upgrade fly-replay redirect: read lease without acquiring.
+	startLease := time.Now()
 	var leaseMachine string
 	err = h.pool.QueryRow(ctx, "SELECT machine_id FROM note_ws_leases WHERE note_id = $1 AND expires_at > NOW()", noteID).Scan(&leaseMachine)
 	if err == nil && leaseMachine != "" && leaseMachine != h.machineID {
+		slog.Info("WS HandleConnect: fly-replay redirect", "note_id", noteID, "target_machine", leaseMachine, "elapsed_ms", time.Since(startLease).Milliseconds())
 		c.Response().Header().Set("fly-replay", leaseMachine)
 		return c.NoContent(http.StatusServiceUnavailable)
 	}
+	slog.Info("WS HandleConnect: lease check done", "note_id", noteID, "elapsed_ms", time.Since(startLease).Milliseconds())
 
+	startUpgrade := time.Now()
 	conn, err := h.upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
+		slog.Error("WS HandleConnect: upgrade failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startUpgrade).Milliseconds())
 		return fmt.Errorf("websocket upgrade: %w", err)
 	}
+	slog.Info("WS HandleConnect: upgraded", "note_id", noteID, "elapsed_ms", time.Since(startUpgrade).Milliseconds())
 	wsC := &wsConn{conn: conn}
 
+	startRoom := time.Now()
 	room, err := h.roomMgr.GetOrCreateRoom(ctx, noteID, h.machineID)
 	if err != nil {
+		slog.Error("WS HandleConnect: GetOrCreateRoom failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startRoom).Milliseconds())
 		conn.Close()
 		return fmt.Errorf("get or create room: %w", err)
 	}
+	slog.Info("WS HandleConnect: room ready", "note_id", noteID, "elapsed_ms", time.Since(startRoom).Milliseconds())
+
+	startHandshake := time.Now()
 	if err := room.HandleHandshake(wsC); err != nil {
+		slog.Error("WS HandleConnect: handshake failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startHandshake).Milliseconds())
 		conn.Close()
-		// Rollback: handshake failure must NOT leak the room/lease when this
-		// was the first (and only) connection.
 		room.RemoveClient(wsC)
 		return fmt.Errorf("handshake: %w", err)
 	}
+	slog.Info("WS HandleConnect: handshake done", "note_id", noteID, "elapsed_ms", time.Since(startHandshake).Milliseconds())
 	room.AddClient(wsC)
 
 	canEdit := true
@@ -228,6 +245,8 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 		canEdit = false
 	}
 
+	slog.Info("WS HandleConnect: connected", "note_id", noteID, "can_edit", canEdit, "total_ms", time.Since(startTotal).Milliseconds())
+
 	var closeOnce sync.Once
 	unregister := h.perm.Register(noteID, userIDStr, func() {
 		h.log.Info("revoking WS connection due to permission change", "note_id", noteID, "user_id", userIDStr)
@@ -238,6 +257,7 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 	for {
 		_, msg, rerr := conn.ReadMessage()
 		if rerr != nil {
+			slog.Info("WS HandleConnect: connection closed", "note_id", noteID, "error", rerr)
 			break
 		}
 		if !rl.Allow() {
@@ -250,5 +270,6 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 	}
 	unregister()
 	room.RemoveClient(wsC)
+	slog.Info("WS HandleConnect: disconnected", "note_id", noteID)
 	return nil
 }

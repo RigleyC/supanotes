@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -149,16 +150,22 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 }
 
 func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPayload) error {
+	startTotal := time.Now()
+	log.Info().Interface("user_id", userID).Int("notes", len(payload.Notes)).Int("nodes", len(payload.NoteNodes)).Int("tasks", len(payload.Tasks)).Msg("PUSH START")
+
 	r := s.repo
 	var tx pgx.Tx
 
 	if s.pool != nil {
+		startTx := time.Now()
 		var err error
 		tx, err = s.pool.Begin(ctx)
 		if err != nil {
+			log.Error().Dur("elapsed", time.Since(startTotal)).Err(err).Msg("PUSH FAIL: pool.Begin")
 			return err
 		}
 		defer tx.Rollback(ctx)
+		log.Info().Dur("elapsed", time.Since(startTx)).Msg("PUSH TX BEGIN")
 		r = s.repo.WithQuerier(sqlcgen.New(tx))
 	}
 
@@ -233,6 +240,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		nodesByNote[noteID] = append(nodesByNote[noteID], nn)
 		affectedNotes[noteID] = true
 	}
+	log.Info().Int("nodes_grouped", len(payload.NoteNodes)).Int("unique_notes", len(nodesByNote)).Msg("PUSH: nodes grouped by note")
 
 	tasksByNote := make(map[pgtype.UUID][]SyncTask)
 	for _, st := range payload.Tasks {
@@ -253,6 +261,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		tasksByNote[noteID] = append(tasksByNote[noteID], st)
 		affectedNotes[noteID] = true
 	}
+	log.Info().Int("tasks_grouped", len(payload.Tasks)).Int("unique_notes", len(tasksByNote)).Msg("PUSH: tasks grouped by note")
 
 	for _, c := range payload.Contexts {
 		_, err := r.UpsertContext(ctx, sqlcgen.UpsertContextParams{
@@ -356,38 +365,59 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	}
 
 	if len(affectedNotes) > 0 {
+		startContent := time.Now()
 		noteIDs := make([]pgtype.UUID, 0, len(affectedNotes))
 		for id := range affectedNotes {
 			noteIDs = append(noteIDs, id)
 		}
 		if err := r.UpdateNotesContentFromNodes(ctx, noteIDs); err != nil {
+			log.Error().Dur("elapsed", time.Since(startContent)).Err(err).Msg("PUSH FAIL: UpdateNotesContentFromNodes")
 			return err
 		}
+		log.Info().Dur("elapsed", time.Since(startContent)).Int("notes", len(noteIDs)).Msg("PUSH: UpdateNotesContentFromNodes done")
 	}
 
 	if tx != nil {
+		startCommit := time.Now()
 		if err := tx.Commit(ctx); err != nil {
+			log.Error().Dur("elapsed", time.Since(startCommit)).Err(err).Msg("PUSH FAIL: tx.Commit")
 			return err
 		}
+		log.Info().Dur("elapsed", time.Since(startCommit)).Msg("PUSH TX COMMIT")
 	}
 
 	if s.ydoc != nil {
+		startYjs := time.Now()
+		log.Info().Int("affected_notes", len(nodesByNote)).Msg("PUSH YJS: starting ingestion")
 		for noteIDUUID, nodes := range nodesByNote {
 			tasks := tasksByNote[noteIDUUID]
 			noteIDStr := uuid.UUID(noteIDUUID.Bytes).String()
+			startNote := time.Now()
 			update, err := ProduceUpdateFromRows(ctx, s.pool, noteIDStr, nodes, tasks)
 			if err != nil {
+				log.Error().Str("note_id", noteIDStr).Dur("elapsed", time.Since(startNote)).Err(err).Msg("PUSH FAIL: ProduceUpdateFromRows")
 				return fmt.Errorf("produce update for note %s: %w", noteIDStr, err)
 			}
+			log.Info().Str("note_id", noteIDStr).Dur("produce_elapsed", time.Since(startNote)).Int("update_bytes", len(update)).Msg("PUSH YJS: update produced")
+
+			startApply := time.Now()
 			if err := s.ydoc.ApplyNodeMutation(ctx, noteIDStr, update); err != nil {
+				log.Error().Str("note_id", noteIDStr).Dur("elapsed", time.Since(startApply)).Err(err).Msg("PUSH FAIL: ApplyNodeMutation")
 				return fmt.Errorf("ingest update for note %s: %w", noteIDStr, err)
 			}
+			log.Info().Str("note_id", noteIDStr).Dur("apply_elapsed", time.Since(startApply)).Msg("PUSH YJS: mutation applied")
+
 			if s.roomMgr != nil {
+				startBroadcast := time.Now()
 				s.roomMgr.BroadcastIfActive(noteIDStr, update)
+				log.Info().Str("note_id", noteIDStr).Dur("elapsed", time.Since(startBroadcast)).Msg("PUSH YJS: broadcast done")
 			}
+			log.Info().Str("note_id", noteIDStr).Dur("note_total", time.Since(startNote)).Msg("PUSH YJS: note done")
 		}
+		log.Info().Dur("yjs_total", time.Since(startYjs)).Msg("PUSH YJS: all notes done")
 	}
 
+	log.Info().Dur("total", time.Since(startTotal)).Msg("PUSH DONE")
 	return nil
 }
 
