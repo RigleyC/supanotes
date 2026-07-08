@@ -59,7 +59,7 @@ class AppMessenger {
       message: subtitle != null ? '$title\n$subtitle' : title,
       icon: Icons.task_alt,
       action: action,
-      duration: duration ?? const Duration(seconds: 3),
+      duration: duration ?? const Duration(seconds: 4),
     );
   }
 }

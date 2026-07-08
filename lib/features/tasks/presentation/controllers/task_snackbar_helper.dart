@@ -27,7 +27,6 @@ class TaskSnackBarHelper {
           onUndo(result.previousDue);
         },
       ),
-      duration: const Duration(milliseconds: 500),
     );
 
     return result.nextDue;
