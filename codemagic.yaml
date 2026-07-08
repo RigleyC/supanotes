@@ -34,7 +34,7 @@ workflows:
           cd ios && pod install && cd ..
       - name: Flutter build config-only
         script: |
-          flutter build ios --config-only --dart-define=API_BASE_URL="$API_BASE_URL"
+          flutter build ios --config-only --no-codesign --dart-define=API_BASE_URL="$API_BASE_URL"
       - name: Clean Swift Package Manager artifacts
         script: |
           rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
