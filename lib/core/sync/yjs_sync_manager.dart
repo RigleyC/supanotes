@@ -124,16 +124,17 @@ class YjsSyncManager {
     final staleNodes = await (_db.select(_db.noteNodes)
           ..where((t) => t.noteId.equals(noteId) & t.deletedAt.isNull()))
         .get();
-    for (final stale in staleNodes) {
-      if (!activeIds.contains(stale.id)) {
-        await (_db.update(_db.noteNodes)
-              ..where((t) => t.id.equals(stale.id)))
-            .write(NoteNodesCompanion(
-              deletedAt: Value(DateTime.now().toUtc()),
-              updatedAt: Value(DateTime.now().toUtc()),
-            ));
+    final now = DateTime.now().toUtc();
+    await _db.batch((b) {
+      for (final stale in staleNodes) {
+        if (!activeIds.contains(stale.id)) {
+          b.update(_db.noteNodes, NoteNodesCompanion(
+            deletedAt: Value(now),
+            updatedAt: Value(now),
+          ), where: (t) => t.id.equals(stale.id));
+        }
       }
-    }
+    });
 
     if (nodes.isEmpty) return;
 

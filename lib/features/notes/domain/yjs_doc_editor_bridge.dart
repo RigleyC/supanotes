@@ -72,20 +72,40 @@ class YjsDocEditorBridge {
       position = existing ?? 0.0;
     }
 
+    final existingRaw = nodesMap.get(id);
+    final createdAt = _readCreatedAt(existingRaw) ??
+        DateTime.now().millisecondsSinceEpoch.toDouble();
+
     final meta = <String, dynamic>{
       'id': id,
       'parentId': '',
       'position': position,
       'type': _attributionFor(node),
       'data': data,
-      'createdAt': DateTime.now().millisecondsSinceEpoch.toDouble(),
+      'createdAt': createdAt,
     };
 
     nodesMap.set(id, jsonEncode(meta));
 
     final text = data['text'] as String?;
+    final ytext = _doc.getText('content/$id')!;
+    final currentLen = ytext.toString().length;
+    if (currentLen > 0) {
+      ytext.delete(0, currentLen);
+    }
     if (text != null && text.isNotEmpty) {
-      _doc.getText('content/$id')!.insert(0, text);
+      ytext.insert(0, text);
+    }
+  }
+
+  double? _readCreatedAt(dynamic raw) {
+    if (raw is! String) return null;
+    try {
+      final meta = jsonDecode(raw) as Map<String, dynamic>;
+      final ca = meta['createdAt'] as num?;
+      return ca?.toDouble();
+    } catch (_) {
+      return null;
     }
   }
 
@@ -127,5 +147,6 @@ class YjsDocEditorBridge {
 
   void dispose() {
     _doc.getMap('nodes')?.unobserve(_nodesSub);
+    _coordinator.onNodeFlush = null;
   }
 }
