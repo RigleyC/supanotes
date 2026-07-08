@@ -1,6 +1,7 @@
 library;
 
 import 'dart:developer' as dev;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
@@ -11,6 +12,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
 import 'package:supanotes/features/notes/domain/note_sync_coordinator.dart';
+import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
 
@@ -35,11 +37,8 @@ class NoteEditorController {
   final FocusNode focusNode = FocusNode();
 
   NoteSyncCoordinator? _coordinator;
+  YjsDocEditorBridge? _bridge;
   String? _noteId;
-
-  /// Yjs UndoManager configured to track only local transactions.
-  /// Remote transactions (origin != 'local') are excluded from undo/redo.
-  UndoManager? _undoManager;
 
   void initFromNodes({required List<NoteNode> nodes, String? noteId}) {
     dev.log(
@@ -65,17 +64,6 @@ class NoteEditorController {
       const RandomDividerConversionReaction(dividerCount: _dividerCount),
     );
     editor!.reactionPipeline.add(const KeepFirstLineAsTitleReaction());
-
-    _setupUndoManager();
-  }
-
-  void _setupUndoManager() {
-    final doc = Doc();
-    final nodesMap = doc.share['nodes'] as YMap;
-    _undoManager = UndoManager(
-      nodesMap,
-      UndoManagerOpts(trackedOrigins: {'local'}),
-    );
   }
 
   void _setupCoordinator() {
@@ -95,6 +83,19 @@ class NoteEditorController {
 
   void bind(String noteId) {
     _noteId = noteId;
+  }
+
+  void attachYjsBridge({
+    required Doc doc,
+    required void Function(Uint8List update) sendUpdate,
+  }) {
+    final coordinator = _coordinator;
+    if (coordinator == null) return;
+    _bridge = YjsDocEditorBridge(
+      doc: doc,
+      coordinator: coordinator,
+      sendUpdate: sendUpdate,
+    );
   }
 
   void attachFileFromPath({
@@ -169,13 +170,13 @@ class NoteEditorController {
 
   void dispose() {
     _flushAndSaveFinalState();
+    _bridge?.dispose();
+    _bridge = null;
     _coordinator?.dispose();
     editor?.dispose();
     document?.dispose();
     composer?.dispose();
     focusNode.dispose();
-    _undoManager?.destroy();
-    _undoManager = null;
   }
 }
 

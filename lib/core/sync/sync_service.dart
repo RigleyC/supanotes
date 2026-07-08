@@ -17,14 +17,19 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
-import '../auth/current_user.dart';
-import '../database/database.dart';
-import '../di/providers.dart';
+import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/constants/api_constants.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/features/auth/data/auth_local_storage.dart';
+
 import 'connectivity_monitor.dart';
 import 'sync_mapper.dart';
 import 'sync_repository.dart';
 import 'sync_state.dart';
+import 'yjs_sync_manager.dart';
 import 'yjs_websocket_client.dart';
 
 /// SharedPreferences key under which the last successful sync
@@ -36,11 +41,12 @@ final syncServiceProvider = Provider<SyncService?>((ref) {
   if (userId == null) return null;
 
   final db = ref.watch(appDatabaseProvider);
-  final apiClient = ref.watch(apiClientProvider);
   final connectivity = ref.watch(connectivityMonitorProvider);
   final notifier = ref.watch(syncStateProvider.notifier);
+  final yjsMgr = ref.watch(yjsSyncManagerProvider);
+  final authStorage = ref.watch(authLocalStorageProvider);
 
-  final repo = SyncRepository(apiClient: apiClient);
+  final repo = SyncRepository(apiClient: ref.watch(apiClientProvider));
   final mapper = SyncMapper();
 
   final service = SyncService(
@@ -50,6 +56,8 @@ final syncServiceProvider = Provider<SyncService?>((ref) {
     connectivity: connectivity,
     notifier: notifier,
     userId: userId,
+    yjsMgr: yjsMgr,
+    authStorage: authStorage,
   );
   ref.onDispose(service.dispose);
   return service;
@@ -63,12 +71,16 @@ class SyncService {
     required ConnectivityMonitor connectivity,
     required SyncStateNotifier notifier,
     required String userId,
+    required YjsSyncManager yjsMgr,
+    required AuthLocalStorage authStorage,
   }) : _db = db,
        _repo = repo,
        _mapper = mapper,
        _connectivity = connectivity,
        _notifier = notifier,
-       _userId = userId;
+       _userId = userId,
+       _yjsMgr = yjsMgr,
+       _authStorage = authStorage;
 
   final AppDatabase _db;
   final ISyncRepository _repo;
@@ -76,24 +88,45 @@ class SyncService {
   final ConnectivityMonitor _connectivity;
   final SyncStateNotifier _notifier;
   final String _userId;
+  final YjsSyncManager _yjsMgr;
+  final AuthLocalStorage _authStorage;
 
   YjsWebSocketClient? _yjsWsClient;
   String? _activeNoteId;
+  StreamSubscription<Uint8List>? _yjsUpdateSub;
 
   bool _isSyncing = false;
 
   StreamSubscription<bool>? _connectivitySub;
   Timer? _syncTimer;
 
-  /// Register the WebSocket client for real-time Yjs sync.
-  void setWebSocketClient(YjsWebSocketClient client) {
-    _yjsWsClient = client;
+  /// Connect real-time Yjs sync for [noteId] when it becomes active.
+  Future<void> connectNote(
+    String noteId, {
+    void Function(Doc doc, void Function(Uint8List) sendUpdate)? onReady,
+  }) async {
+    if (noteId == _activeNoteId && _yjsWsClient != null) return;
+    await disconnectNote();
+    final accessToken = await _authStorage.getAccessToken();
+    if (accessToken == null) return;
+    _activeNoteId = noteId;
+    final doc = await _yjsMgr.loadDoc(noteId);
+    _yjsWsClient = YjsWebSocketClient(
+      baseUrl: ApiConstants.baseUrl,
+      authToken: accessToken,
+      doc: doc,
+      notifier: _notifier,
+    );
+    await _yjsWsClient!.connect(noteId);
+    _yjsUpdateSub = _yjsWsClient!.onUpdate.listen(_handleIncomingUpdate);
+    onReady?.call(doc, (update) => _yjsWsClient?.sendUpdate(update));
   }
 
-  /// Connect real-time sync for [noteId] when it becomes active.
-  Future<void> connectNote(String noteId) async {
-    _activeNoteId = noteId;
-    await _yjsWsClient?.connect(noteId);
+  void _handleIncomingUpdate(Uint8List framed) {
+    final noteId = _activeNoteId;
+    if (noteId == null) return;
+    final doc = _yjsMgr.docFor(noteId);
+    _yjsMgr.saveState(noteId, encodeStateAsUpdate(doc));
   }
 
   /// Disconnect real-time sync for the active note.
@@ -101,8 +134,14 @@ class SyncService {
     if (_activeNoteId != null && kDebugMode) {
       debugPrint('[SyncService] Disconnecting note=$_activeNoteId');
     }
+    await _yjsUpdateSub?.cancel();
+    _yjsUpdateSub = null;
     _activeNoteId = null;
-    await _yjsWsClient?.disconnect();
+    if (_yjsWsClient != null) {
+      await _yjsWsClient!.disconnect();
+      await _yjsWsClient!.dispose();
+      _yjsWsClient = null;
+    }
   }
 
   void start() {
@@ -121,6 +160,8 @@ class SyncService {
     _syncTimer = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
+    _yjsUpdateSub?.cancel();
+    _yjsUpdateSub = null;
     _yjsWsClient?.dispose();
     _yjsWsClient = null;
   }
