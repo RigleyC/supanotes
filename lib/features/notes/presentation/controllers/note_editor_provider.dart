@@ -7,13 +7,14 @@ import 'note_editor_controller.dart';
 final noteEditorControllerProvider = Provider.autoDispose
     .family<NoteEditorController, String>((ref, noteId) {
       final userId = ref.watch(currentUserIdProvider)!;
+      final syncService = ref.read(syncServiceProvider);
       final controller = NoteEditorController(
         userId: userId,
         database: ref.watch(appDatabaseProvider),
       );
       controller.bind(noteId);
 
-      ref.read(syncServiceProvider)?.connectNote(
+      syncService?.connectNote(
         noteId,
         onReady: (doc, sendUpdate) {
           controller.attachYjsBridge(
@@ -24,7 +25,7 @@ final noteEditorControllerProvider = Provider.autoDispose
       );
 
       ref.onDispose(() {
-        ref.read(syncServiceProvider)?.disconnectNote();
+        syncService?.disconnectNote();
         controller.dispose();
       });
       return controller;
