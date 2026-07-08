@@ -32,13 +32,35 @@ workflows:
       - name: Install pods
         script: |
           cd ios && pod install && cd ..
-      - name: Build unsigned iOS
+      - name: Flutter build config-only
         script: |
-          flutter build ios --no-codesign --dart-define=API_BASE_URL="$API_BASE_URL"
+          flutter build ios --config-only --dart-define=API_BASE_URL="$API_BASE_URL"
+      - name: Clean Swift Package Manager artifacts
+        script: |
+          rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
+      - name: Build iOS project with xcodebuild
+        script: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ../DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS="--dart-define=API_BASE_URL=$API_BASE_URL" \
+            clean build
       - name: Package Unsigned IPA
         script: |
+          APP_PATH=$(find DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Could not find .app"
+            exit 1
+          fi
           mkdir -p build/Payload
-          cp -R build/ios/iphoneos/Runner.app build/Payload/
+          cp -R "$APP_PATH" build/Payload/
           cd build
           zip -rq supanotes-unsigned.ipa Payload
           rm -rf Payload
