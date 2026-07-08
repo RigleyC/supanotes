@@ -86,11 +86,7 @@ dependencies:
   super_clipboard: ^0.9.1
 
   # Motion
-  motor:
-    git:
-      url: https://github.com/kamranbekirovyz/bunpod.git
-      ref: main
-      path: packages/motor
+  motor: ^1.1.0
 
   # Shapes
   material_shapes:

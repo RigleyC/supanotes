@@ -17,6 +17,7 @@ import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -96,6 +97,7 @@ void main() {
         ],
         child: MaterialApp(
           scaffoldMessengerKey: AppMessenger.key,
+          builder: (context, child) => SnackOverlay(child: child!),
           home: Scaffold(
             body: NoteEditor(
               noteId: 'note-1',
@@ -152,12 +154,12 @@ void main() {
 
     // Verify snackbar appears
     expect(find.textContaining('Concluída!'), findsOneWidget);
-    final snackBarFinder = find.byType(SnackBar);
+    final snackBarFinder = find.byType(SnackView);
     if (snackBarFinder.evaluate().isNotEmpty) {
       final RenderBox box = tester.renderObject(snackBarFinder);
       final position = box.localToGlobal(Offset.zero);
       final size = box.size;
-      print('DEBUG: SnackBar position = $position, size = $size');
+      print('DEBUG: SnackView position = $position, size = $size');
     }
     
     // Advance time to allow the snackbar to disappear
