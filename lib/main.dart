@@ -17,6 +17,7 @@ import 'firebase_options.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
 import 'shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
 import 'core/notifications/fcm_message_listeners.dart';
 import 'core/router/app_router.dart';
 import 'core/sync/sync_service.dart';
@@ -107,7 +108,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
         Locale('en', 'US'),
       ],
       builder: (context, child) {
-        Widget result = child!;
+        Widget result = SnackOverlay(child: child!);
         if (kDebugMode) {
           result = CueDebugTools(child: result);
         }
