@@ -191,10 +191,10 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 		machineID = "default"
 	}
 	leaseMgr := syncpkg.NewLeaseManager(pool)
-	ydocSvc := syncpkg.NewYDocService(pool, nil)
+	compactor := syncpkg.NewCompactor(pool)
+	ydocSvc := syncpkg.NewYDocService(pool, compactor)
 	roomMgr := syncpkg.NewRoomManager(leaseMgr, ydocSvc, pool)
 	ydocSvc.StartFlusher(cronCtx, 500*time.Millisecond)
-	compactor := syncpkg.NewCompactor(pool)
 	compactor.StartScheduler(cronCtx, 5*time.Minute)
 	noteSyncer := syncpkg.NewNoteStateSyncer(pool, roomMgr)
 
