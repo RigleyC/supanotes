@@ -2,10 +2,12 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/reearth/ygo/crdt"
 )
@@ -29,31 +31,51 @@ func (c *Compactor) CompactNote(ctx context.Context, noteID string) error {
 		return fmt.Errorf("advisory lock: %w", err)
 	}
 
+	var existingState []byte
+	if err := tx.QueryRow(ctx, "SELECT state FROM note_yjs_states WHERE note_id = $1", noteID).Scan(&existingState); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("query existing state: %w", err)
+	}
+
 	rows, err := tx.Query(ctx, "SELECT update_data FROM note_yjs_updates WHERE note_id = $1 ORDER BY created_at ASC", noteID)
 	if err != nil {
 		return fmt.Errorf("query updates: %w", err)
 	}
-	defer rows.Close()
-
 	var allUpdates [][]byte
 	for rows.Next() {
-		var update []byte
-		if err := rows.Scan(&update); err != nil {
+		var u []byte
+		if err := rows.Scan(&u); err != nil {
+			rows.Close()
 			return fmt.Errorf("scan update: %w", err)
 		}
-		allUpdates = append(allUpdates, update)
+		allUpdates = append(allUpdates, u)
 	}
+	rows.Close()
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("rows iter: %w", err)
 	}
 
-	if len(allUpdates) == 0 {
+	if len(allUpdates) == 0 && existingState == nil {
 		return nil
 	}
 
-	merged, err := crdt.MergeUpdatesV1(allUpdates...)
+	parts := make([][]byte, 0, len(allUpdates)+1)
+	if existingState != nil {
+		parts = append(parts, existingState)
+	}
+	parts = append(parts, allUpdates...)
+	merged, err := crdt.MergeUpdatesV1(parts...)
 	if err != nil {
 		return fmt.Errorf("merge updates: %w", err)
+	}
+
+	// PROJECT FROM THE FULL DOC STATE — not from the partial update.
+	doc := crdt.New(crdt.WithGC(false))
+	if err := crdt.ApplyUpdateV1(doc, merged, nil); err != nil {
+		return fmt.Errorf("apply merged state for projection: %w", err)
+	}
+	if err := projectDocToDB(ctx, tx, doc, noteID); err != nil {
+		// Abort; do NOT persist snapshot or delete updates.
+		return fmt.Errorf("project during compaction: %w", err)
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -66,11 +88,12 @@ func (c *Compactor) CompactNote(ctx context.Context, noteID string) error {
 	}
 
 	if _, err := tx.Exec(ctx, "DELETE FROM note_yjs_updates WHERE note_id = $1", noteID); err != nil {
-		return fmt.Errorf("delete updates: %w", err)
+		return fmt.Errorf("delete compacted updates: %w", err)
 	}
 
+	// 30-day retention safety: prune any stragglers from orphaned failures.
 	if _, err := tx.Exec(ctx, "DELETE FROM note_yjs_updates WHERE note_id = $1 AND created_at < NOW() - INTERVAL '30 days'", noteID); err != nil {
-		return fmt.Errorf("delete old updates: %w", err)
+		return fmt.Errorf("prune old updates: %w", err)
 	}
 
 	return tx.Commit(ctx)
