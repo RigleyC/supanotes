@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"syscall"
 	"time"
 	_ "time/tzdata"
@@ -149,6 +150,12 @@ func connectDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 }
 
 func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCtx context.Context) {
+	e.GET("/debug/goroutine", func(c echo.Context) error {
+		c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
+		c.Response().WriteHeader(http.StatusOK)
+		return pprof.Lookup("goroutine").WriteTo(c.Response().Writer, 2)
+	})
+
 	api := e.Group("/api/v1")
 	api.GET("/health", handler.Health)
 
