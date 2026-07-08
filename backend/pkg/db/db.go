@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	maxConns        = 10
-	minConns        = 2
+	maxConns        = 30
+	minConns        = 5
 	maxConnLifetime = time.Hour
 )
 

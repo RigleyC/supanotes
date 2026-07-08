@@ -117,10 +117,6 @@ func (m *RoomManager) BroadcastIfActive(noteID string, update []byte) bool {
 	if !ok {
 		return false
 	}
-	// Ensure YDoc cache warm (room was active)
-	if _, err := m.ydocSvc.DocFor(context.Background(), noteID); err != nil {
-		return false
-	}
 	framed := ygsync.EncodeUpdate(update)
 	room.mu.Lock()
 	clients := make([]*wsConn, 0, len(room.clients))
