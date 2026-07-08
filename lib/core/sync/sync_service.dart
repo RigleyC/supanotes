@@ -119,7 +119,15 @@ class SyncService {
     try {
       _activeNoteId = noteId;
       final doc = await _yjsMgr.loadDoc(noteId);
-      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/sync/ws/$noteId');
+      String wsUrl = ApiConstants.baseUrl
+          .replaceFirst('https://', 'wss://')
+          .replaceFirst('http://', 'ws://');
+      if (wsUrl.endsWith('/api/v1')) {
+        wsUrl = '$wsUrl/sync/ws/$noteId';
+      } else {
+        wsUrl = '$wsUrl/api/v1/sync/ws/$noteId';
+      }
+      final uri = Uri.parse(wsUrl);
       final channel = IOWebSocketChannel.connect(
         uri,
         headers: {'Authorization': 'Bearer $accessToken'},

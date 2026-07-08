@@ -36,8 +36,9 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
-  Widget _fallbackScaffold(Widget child) =>
-      AdaptiveScaffold(body: SafeArea(child: Center(child: child)));
+  Widget _fallbackScaffold(Widget child) => AdaptiveScaffold(
+    body: SafeArea(child: Center(child: child)),
+  );
 
   Future<void> _openTaskActions(
     TaskModel? task,
@@ -75,7 +76,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         ),
         if (isOwner)
           AdaptivePopupMenuItem<String>(
-            label: note.collapseImages ? 'Expandir imagens' : 'Colapsar imagens',
+            label: note.collapseImages
+                ? 'Expandir imagens'
+                : 'Colapsar imagens',
             icon: note.collapseImages ? Icons.image : Icons.image_outlined,
             value: 'collapse_images',
           ),
@@ -105,11 +108,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         if (userId != null) {
           await ref
               .read(userNotePreferencesRepositoryProvider)
-              .setHideCompleted(
-                userId,
-                widget.noteId,
-                !hideCompleted,
-              );
+              .setHideCompleted(userId, widget.noteId, !hideCompleted);
         }
       case 'collapse_images':
         await repo.updateNote(
@@ -122,7 +121,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(notesRepositoryProvider);
-    final combinedAsync = ref.watch(combinedNoteEditorStateProvider(widget.noteId));
+    final combinedAsync = ref.watch(
+      combinedNoteEditorStateProvider(widget.noteId),
+    );
 
     return combinedAsync.when(
       data: (data) {
@@ -137,9 +138,28 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         final isReadOnly = note.isReadOnly;
         final hideCompleted = note.hideCompleted;
 
-        return AdaptiveScaffold(
+        return Scaffold(
           resizeToAvoidBottomInset: false,
-          appBar: AdaptiveAppBar(
+          appBar: AppBar(
+            actions: [
+              IconButton(
+                onPressed: () {
+                  _showMoreMenu(context, ref, note, hideCompleted, repo);
+                },
+                icon: Icon(Icons.more_vert),
+              ),
+              if (!isReadOnly)
+                IconButton(
+                  icon: Icon(Icons.check),
+                  onPressed: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    SystemChannels.textInput.invokeMethod('TextInput.hide');
+                  },
+                ),
+            ],
+          ),
+
+          /* AdaptiveAppBar(
             title: isReadOnly
                 ? '${NoteStrings.sharedByPrefix} ${note.sharedByEmail}'
                 : null,
@@ -161,7 +181,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   },
                 ),
             ],
-          ),
+          ), */
           body: NoteEditor(
             noteId: widget.noteId,
             nodes: nodes,
@@ -176,9 +196,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         _openTaskActions(task, flushSnapshot),
               onTaskComplete: (taskId) =>
                   TaskSnackBarHelper.completeTaskWithFeedback(
-                    onComplete: () => ref
-                        .read(tasksRepositoryProvider)
-                        .completeTask(taskId),
+                    onComplete: () =>
+                        ref.read(tasksRepositoryProvider).completeTask(taskId),
                     onUndo: (previousDue) => ref
                         .read(tasksRepositoryProvider)
                         .reopenTask(taskId, originalDueDate: previousDue),
@@ -199,10 +218,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           ),
         );
       },
-      loading: () =>
-          _fallbackScaffold(const CircularProgressIndicator()),
-      error: (error, _) =>
-          _fallbackScaffold(Text('Error: $error')),
+      loading: () => _fallbackScaffold(const CircularProgressIndicator()),
+      error: (error, _) => _fallbackScaffold(Text('Error: $error')),
     );
   }
 }

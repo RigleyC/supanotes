@@ -1,15 +1,22 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:material_shapes/material_shapes.dart';
 import 'package:motor/motor.dart';
+
 import 'snack.dart';
 import 'snack_overlay.dart';
 
+/// One pill: entry and exit springs, its place in the card stack, drag and
+/// tap to dismiss, and the duplicate message shake.
 class SnackView extends StatefulWidget {
   const SnackView({super.key, required this.snack, required this.depth});
 
   final Snack snack;
+
+  /// Steps behind the front pill: raised and shrunk this many notches.
   final int depth;
 
   @override
@@ -17,18 +24,32 @@ class SnackView extends StatefulWidget {
 }
 
 class SnackViewState extends State<SnackView> with TickerProviderStateMixin {
+  // Distance the pill travels from its offscreen resting point, in px.
   static const double _travel = 160;
+  // Past this offset, or any real downward fling, a released drag closes
+  // the pill. Kept forgiving on purpose: a short quick swipe is enough.
   static const double _dismissOffset = 24;
   static const double _dismissVelocity = 300;
+  // How far each depth step peeks above the pill in front, and how much
+  // smaller it renders. The usual card stack recipe.
   static const double _peek = 12;
   static const double _shrink = 0.05;
+  // How much of the theme's shadow color each depth step lays over a pill.
+  // The pills share one surface color, so without this the stacked ones
+  // melt into each other.
   static const double _shade = 0.15;
+  // Sideways impulse for the duplicate message shake, in px/s. Swings the
+  // pill about 15px on the first swing.
   static const double _shakeVelocity = 600;
 
+  // Finger-driven vertical offset; springs back to 0 on a released drag
+  // that didn't pass the dismiss threshold.
   late final AnimationController _drag = AnimationController.unbounded(
     vsync: this,
   )..value = 0;
 
+  // Horizontal shake offset; rests at 0 and only moves when [shake] kicks
+  // it with an impulse.
   late final AnimationController _shake = AnimationController.unbounded(
     vsync: this,
   )..value = 0;
@@ -37,6 +58,7 @@ class SnackViewState extends State<SnackView> with TickerProviderStateMixin {
   bool _removing = false;
   Timer? _timer;
 
+  /// Whether the exit animation is already running.
   bool get isDismissing => _removing;
 
   @override
@@ -63,169 +85,214 @@ class SnackViewState extends State<SnackView> with TickerProviderStateMixin {
     _drag.stop();
     if (mounted) setState(() => _visible = false);
     SnackOverlay.refresh();
+    // Leave the list once the exit spring has settled.
     Timer(const Duration(milliseconds: 450), () {
       SnackOverlay.remove(widget.snack);
     });
   }
 
+  /// The duplicate message cue: a sideways velocity impulse into a spring
+  /// resting at 0, so the pill wobbles and settles on real physics instead
+  /// of a keyframed shake. Also restarts the countdown, since the message
+  /// just proved it is still relevant.
   void shake() {
     if (_removing) return;
+
     _timer?.cancel();
     _timer = Timer(widget.snack.duration, dismiss);
+
     const spring = SpringDescription(mass: 1, stiffness: 400, damping: 10);
     _shake.animateWith(
       SpringSimulation(spring, _shake.value, 0, _shakeVelocity),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final styles = theme.textTheme;
+  void _onDragStart(DragStartDetails details) {
+    // Holding the pill pauses the auto-dismiss countdown.
+    _timer?.cancel();
+    _drag.stop();
+  }
 
-    final background = colors.inverseSurface;
-    final foreground = colors.onInverseSurface;
-    final hasIcon = widget.snack.icon != null;
+  void _onDragUpdate(DragUpdateDetails details) {
+    _drag.value = (_drag.value + details.delta.dy).clamp(0.0, _travel * 2);
+  }
 
-    final pill = Material(
-      color: background,
-      shape: const StadiumBorder(),
-      elevation: 6,
-      clipBehavior: Clip.antiAlias,
-      child: IntrinsicHeight(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (hasIcon)
-              Padding(
-                padding: const EdgeInsets.all(6),
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Material(
-                    color: colors.primary,
-                    shape: const MaterialShapeBorder(
-                      shape: MaterialShape(
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(99),
-                          topRight: Radius.circular(99),
-                        ),
-                      ),
-                    ),
-                    child: Icon(
-                      widget.snack.icon,
-                      color: colors.onPrimary,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ),
-            Flexible(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  hasIcon ? 6 : 24,
-                  14,
-                  widget.snack.action != null ? 8 : 24,
-                  14,
-                ),
-                child: Text(
-                  widget.snack.message,
-                  style: styles.bodyMedium?.copyWith(color: foreground),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-            if (widget.snack.action != null) ...[
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: TextButton(
-                  onPressed: () {
-                    widget.snack.action!.onPressed();
-                    dismiss();
-                  },
-                  child: Text(
-                    widget.snack.action!.label,
-                    style: TextStyle(color: colors.primary),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+  void _onDragEnd(DragEndDetails details) {
+    final double velocity = details.velocity.pixelsPerSecond.dy;
+    if (_drag.value > _dismissOffset || velocity > _dismissVelocity) {
+      dismiss();
+      return;
+    }
+    _settleBack(velocity);
+  }
+
+  void _settleBack(double velocity) {
+    if (_removing) return;
+    _drag.animateWith(
+      SpringSimulation(
+        const MaterialSpringMotion.standardSpatialFast().description,
+        _drag.value,
+        0,
+        velocity,
       ),
     );
+    _timer = Timer(widget.snack.duration, dismiss);
+  }
 
-    final depth = widget.depth;
-    final scale = 1.0 - (depth * _shrink);
-    final translate = depth * _peek;
+  @override
+  Widget build(BuildContext context) {
+    final Color shadow = Theme.of(context).colorScheme.shadow;
 
-    const entrySpring = SpringDescription(mass: 1, stiffness: 300, damping: 18);
-    const exitSpring = SpringDescription(mass: 1, stiffness: 450, damping: 30);
-
-    return Focus(
-      child: Center(
-        child: IgnorePointer(
-          ignoring: depth > 0,
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_drag, _shake]),
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(_shake.value, _drag.value - translate),
-                child: Transform.scale(
-                  scale: scale,
-                  alignment: Alignment.bottomCenter,
-                  child: child,
-                ),
-              );
-            },
-            child: AnimatedColorAsphalt(
-              color: Colors.black.withValues(alpha: depth * _shade),
-              child: AnimatedOpacitySpring(
-                visible: _visible,
-                entrySpring: entrySpring,
-                exitSpring: exitSpring,
-                child: AnimatedTranslationSpring(
-                  visible: _visible,
-                  entrySpring: entrySpring,
-                  exitSpring: exitSpring,
-                  offset: const Offset(0, _travel),
-                  child: GestureDetector(
-                    onTap: dismiss,
-                    onVerticalDragUpdate: (details) {
-                      _drag.value += details.primaryDelta!;
-                    },
-                    onVerticalDragEnd: (details) {
-                      final offset = _drag.value;
-                      final velocity = details.primaryVelocity!;
-
-                      if (offset > _dismissOffset || velocity > _dismissVelocity) {
-                        dismiss();
-                        _drag.animateWith(
-                          ScrollSpringSimulation(
-                            const SpringDescription(
-                              mass: 1,
-                              stiffness: 450,
-                              damping: 30,
-                            ),
-                            offset,
-                            _travel,
-                            velocity,
-                          ),
-                        );
-                      } else {
-                        const spring = SpringDescription(mass: 1, stiffness: 400, damping: 20);
-                        _drag.animateWith(
-                          SpringSimulation(spring, offset, 0, velocity),
-                        );
-                      }
-                    },
-                    child: pill,
+    // The outer spring chases the dealt depth (moving back or forward in
+    // the stack). The inner spring drives entry and exit. Both use the
+    // pill's fast bounce.
+    return SingleMotionBuilder(
+      motion: const MaterialSpringMotion.expressiveSpatialFast(),
+      value: widget.depth.toDouble(),
+      builder: (context, depth, child) => SingleMotionBuilder(
+        // Fast springs: the spec maps the fast speed class to small
+        // components, and this pill is one (sheets keep default).
+        motion: _visible
+            ? const MaterialSpringMotion.expressiveSpatialFast()
+            : const MaterialSpringMotion.standardSpatialFast(),
+        value: _visible ? 0.0 : 1.0,
+        builder: (context, t, child) => AnimatedBuilder(
+          animation: Listenable.merge([_drag, _shake]),
+          builder: (context, child) => Transform.translate(
+            offset: Offset(
+              _shake.value,
+              t * _travel + _drag.value - depth * _peek,
+            ),
+            child: Transform.scale(
+              scale: (1 - depth * _shrink).clamp(0.0, 1.0),
+              alignment: Alignment.bottomCenter,
+              // The fade hides a leaving pill crossing the ones behind it.
+              // Clamped so it does not wiggle with the spring's overshoot.
+              child: Opacity(
+                opacity: _removing ? 1 - t.clamp(0.0, 1.0) : 1,
+                // The shade rides the depth spring: a pill darkens as it
+                // recedes and clears as it comes forward.
+                child: DecoratedBox(
+                  position: DecorationPosition.foreground,
+                  decoration: ShapeDecoration(
+                    shape: const StadiumBorder(),
+                    color: shadow.withValues(
+                      alpha: (depth * _shade).clamp(0.0, 0.5),
+                    ),
                   ),
+                  child: child,
                 ),
               ),
             ),
+          ),
+          child: child,
+        ),
+        child: child,
+      ),
+      child: GestureDetector(
+        onVerticalDragStart: _onDragStart,
+        onVerticalDragUpdate: _onDragUpdate,
+        onVerticalDragEnd: _onDragEnd,
+        onVerticalDragCancel: () => _settleBack(0),
+        child: _Pill(snack: widget.snack, onTap: dismiss),
+      ),
+    );
+  }
+}
+
+/// The pill itself: an inverse surface stadium with an optional arch
+/// shaped icon chip and the message text.
+class _Pill extends StatelessWidget {
+  const _Pill({required this.snack, required this.onTap});
+
+  final Snack snack;
+  final VoidCallback onTap;
+
+  /// [MaterialShapes.arch] turned so its dome points to the text start
+  /// side, matching the stadium curve of the pill's end. One per text
+  /// direction: the chip sits on the left in LTR and on the right in RTL.
+  static final RoundedPolygon _archLtr = _arch(-math.pi / 2);
+  static final RoundedPolygon _archRtl = _arch(math.pi / 2);
+
+  static RoundedPolygon _arch(double rotation) {
+    return MaterialShapes.arch
+        .transformed(
+          (Matrix4.identity()..rotateZ(rotation)).asPointTransformer(),
+        )
+        .normalized();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final TextTheme tt = Theme.of(context).textTheme;
+    final IconData? icon = snack.icon;
+    final bool ltr = Directionality.of(context) == TextDirection.ltr;
+
+    return Material(
+      color: cs.inverseSurface,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      elevation: 6,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          // Both paddings land on the spec's 48dp single line container
+          // height: 8dp around the 32dp chip, or 14dp around the 20dp
+          // body medium line when there is no chip.
+          padding: icon != null
+              ? const EdgeInsetsDirectional.fromSTEB(8, 8, 20, 8)
+              : const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: ShapeDecoration(
+                    color: cs.inversePrimary,
+                    shape: MaterialShapeBorder(
+                      shape: ltr ? _archLtr : _archRtl,
+                    ),
+                  ),
+                  child: Icon(icon, size: 18, color: cs.inverseSurface),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Flexible(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    snack.message,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: tt.bodyMedium?.copyWith(
+                      color: cs.onInverseSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+              if (snack.action != null) ...[
+                const SizedBox(width: 12),
+                TextButton(
+                  onPressed: () {
+                    snack.action!.onPressed();
+                    onTap();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    snack.action!.label,
+                    style: TextStyle(color: cs.inversePrimary),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
