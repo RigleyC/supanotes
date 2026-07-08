@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/reearth/ygo/crdt"
+	ygsync "github.com/reearth/ygo/sync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,17 +25,17 @@ func newMockLeaseManager() *mockLeaseManager {
 	return &mockLeaseManager{leases: make(map[string]string)}
 }
 
-func (m *mockLeaseManager) AcquireLease(_ context.Context, noteID, machineID string) (bool, error) {
+func (m *mockLeaseManager) AcquireLease(_ context.Context, noteID, machineID string) (string, bool, error) {
 	if m.acquireErr != nil {
-		return false, m.acquireErr
+		return "", false, m.acquireErr
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.leases[noteID]; ok {
-		return false, nil
+		return m.leases[noteID], false, nil
 	}
 	m.leases[noteID] = machineID
-	return true, nil
+	return machineID, true, nil
 }
 
 func (m *mockLeaseManager) ReleaseLease(_ context.Context, noteID, _ string) error {
@@ -170,8 +171,7 @@ func TestRoomManagerGetOrCreateRoomDifferentNotes(t *testing.T) {
 func TestRoomAddRemoveClient(t *testing.T) {
 	room := &Room{
 		NoteID:    "note-1",
-		Doc:       crdt.New(crdt.WithGC(false)),
-		clients:   make(map[*websocket.Conn]bool),
+		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
 		manager:   NewRoomManager(newMockLeaseManager(), NewYDocService(nil, nil), nil),
@@ -180,29 +180,33 @@ func TestRoomAddRemoveClient(t *testing.T) {
 
 	conn1 := newTestWSConn(t)
 	conn2 := newTestWSConn(t)
+	wsA := &wsConn{conn: conn1}
+	wsB := &wsConn{conn: conn2}
 
-	room.AddClient(conn1)
+	room.AddClient(wsA)
 	room.mu.Lock()
 	assert.Equal(t, 1, len(room.clients), "should have 1 client after first AddClient")
-	assert.True(t, room.clients[conn1], "conn1 should be in clients")
+	_, ok := room.clients[wsA]
+	assert.True(t, ok, "wsA should be in clients")
 	room.mu.Unlock()
 
-	room.AddClient(conn2)
+	room.AddClient(wsB)
 	room.mu.Lock()
 	assert.Equal(t, 2, len(room.clients), "should have 2 clients after second AddClient")
-	assert.True(t, room.clients[conn2], "conn2 should be in clients")
+	_, ok = room.clients[wsB]
+	assert.True(t, ok, "wsB should be in clients")
 	room.mu.Unlock()
 
-	room.RemoveClient(conn1)
+	room.RemoveClient(wsA)
 	room.mu.Lock()
-	assert.Equal(t, 1, len(room.clients), "should have 1 client after removing conn1")
-	_, ok := room.clients[conn1]
-	assert.False(t, ok, "conn1 should be removed")
+	assert.Equal(t, 1, len(room.clients), "should have 1 client after removing wsA")
+	_, ok = room.clients[wsA]
+	assert.False(t, ok, "wsA should be removed")
 	room.mu.Unlock()
 
-	room.RemoveClient(conn2)
+	room.RemoveClient(wsB)
 	room.mu.Lock()
-	assert.Equal(t, 0, len(room.clients), "should have 0 clients after removing conn2")
+	assert.Equal(t, 0, len(room.clients), "should have 0 clients after removing wsB")
 	room.mu.Unlock()
 }
 
@@ -221,16 +225,18 @@ func TestRoomRemoveClientLastReleasesLease(t *testing.T) {
 
 	conn1 := newTestWSConn(t)
 	conn2 := newTestWSConn(t)
-	room.AddClient(conn1)
-	room.AddClient(conn2)
+	wsA := &wsConn{conn: conn1}
+	wsB := &wsConn{conn: conn2}
+	room.AddClient(wsA)
+	room.AddClient(wsB)
 
-	room.RemoveClient(conn1)
+	room.RemoveClient(wsA)
 	// Lease should still be held (one client remains)
 	machine, err = leaseMgr.GetLeaseMachine(context.Background(), "note-lease")
 	require.NoError(t, err)
 	assert.Equal(t, "machine-a", machine)
 
-	room.RemoveClient(conn2)
+	room.RemoveClient(wsB)
 	// Lease should be released (no clients remain)
 	_, err = leaseMgr.GetLeaseMachine(context.Background(), "note-lease")
 	assert.Error(t, err, "lease should be released after last client disconnects")
@@ -271,26 +277,27 @@ func TestRoomHandleIncomingUpdateBroadcasts(t *testing.T) {
 
 	room := &Room{
 		NoteID:    "note-broadcast",
-		Doc:       crdt.New(crdt.WithGC(false)),
-		clients:   make(map[*websocket.Conn]bool),
+		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
 		ydocSvc:   NewYDocService(nil, nil),
 	}
 
-	room.AddClient(sender)
-	room.AddClient(recipient)
+	wsSender := &wsConn{conn: sender}
+	wsRecipient := &wsConn{conn: recipient}
+	room.AddClient(wsSender)
+	room.AddClient(wsRecipient)
 
 	update := makeTestUpdate(t)
 	require.NotEmpty(t, update)
 
-	room.HandleIncomingUpdate(update, sender)
+	framed := ygsync.EncodeUpdate(update)
+	room.HandleIncomingUpdate(framed, wsSender)
 
 	select {
 	case msg := <-recipientCh:
 		assert.GreaterOrEqual(t, len(msg), 1, "message should have type byte prefix")
-		assert.Equal(t, byte(0), msg[0], "broadcast message should start with type byte 0")
-		assert.Equal(t, update, msg[1:], "broadcast message body should match the update")
+		assert.Equal(t, byte(ygsync.MsgUpdate), msg[0], "broadcast should use Update framing")
 	default:
 		t.Fatal("expected recipient to receive a broadcast message")
 	}
@@ -341,20 +348,22 @@ func TestRoomHandleIncomingUpdateSkipsSender(t *testing.T) {
 
 	room := &Room{
 		NoteID:    "note-skip-sender",
-		Doc:       crdt.New(crdt.WithGC(false)),
-		clients:   make(map[*websocket.Conn]bool),
+		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
 		ydocSvc:   NewYDocService(nil, nil),
 	}
 
-	room.AddClient(sender)
-	room.AddClient(recipient)
-	room.AddClient(sender)
+	wsSender := &wsConn{conn: sender}
+	wsRecipient := &wsConn{conn: recipient}
+	room.AddClient(wsSender)
+	room.AddClient(wsRecipient)
+	room.AddClient(wsSender)
 
 	update := makeTestUpdate(t)
 
-	room.HandleIncomingUpdate(update, sender)
+	framed := ygsync.EncodeUpdate(update)
+	room.HandleIncomingUpdate(framed, wsSender)
 
 	select {
 	case <-senderCh:
@@ -378,7 +387,7 @@ func TestRoomHandleHandshake(t *testing.T) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		require.NoError(t, err)
 
-		// Read the SV from the room
+		// Read the Step1 from the room
 		_, raw, err := conn.ReadMessage()
 		if err != nil {
 			return
@@ -388,12 +397,12 @@ func TestRoomHandleHandshake(t *testing.T) {
 		default:
 		}
 
-		// Send back the room's own encoded SV as the "client SV"
+		// Send back a Step1 message with an empty doc (as the "client")
 		roomDoc := crdt.New(crdt.WithGC(false))
-		clientSV := crdt.EncodeStateVectorV1(roomDoc)
-		_ = conn.WriteMessage(websocket.BinaryMessage, append([]byte{0}, clientSV...))
+		clientStep1 := ygsync.EncodeSyncStep1(roomDoc)
+		_ = conn.WriteMessage(websocket.BinaryMessage, clientStep1)
 
-		// Read the diff response
+		// Read the Step2 response
 		_, diffRaw, err := conn.ReadMessage()
 		if err != nil {
 			return
@@ -414,20 +423,19 @@ func TestRoomHandleHandshake(t *testing.T) {
 
 	room := &Room{
 		NoteID:    "note-handshake",
-		Doc:       crdt.New(crdt.WithGC(false)),
-		clients:   make(map[*websocket.Conn]bool),
+		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		ydocSvc:   NewYDocService(nil, nil),
 	}
 
-	err = room.HandleHandshake(conn)
+	err = room.HandleHandshake(&wsConn{conn: conn})
 	require.NoError(t, err)
 
 	svMsg := <-serverCh
 	assert.GreaterOrEqual(t, len(svMsg), 1)
-	assert.Equal(t, byte(0), svMsg[0], "SV message should start with type byte 0")
+	assert.Equal(t, byte(ygsync.MsgSyncStep1), svMsg[0], "first message should be SyncStep1")
 
 	diffMsg := <-serverCh
 	assert.GreaterOrEqual(t, len(diffMsg), 1)
-	assert.Equal(t, byte(0), diffMsg[0], "diff message should start with type byte 0")
+	assert.Equal(t, byte(ygsync.MsgSyncStep2), diffMsg[0], "second message should be SyncStep2")
 }

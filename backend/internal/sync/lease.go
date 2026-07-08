@@ -10,7 +10,7 @@ import (
 )
 
 type LeaseManager interface {
-	AcquireLease(ctx context.Context, noteID string, machineID string) (bool, error)
+	AcquireLease(ctx context.Context, noteID string, machineID string) (winnerMachineID string, acquired bool, err error)
 	RenewLease(ctx context.Context, noteID string, machineID string) error
 	ReleaseLease(ctx context.Context, noteID string, machineID string) error
 	GetLeaseMachine(ctx context.Context, noteID string) (string, error)
@@ -26,25 +26,25 @@ func NewLeaseManager(pool *pgxpool.Pool) LeaseManager {
 
 const leaseDuration = 60 * time.Second
 
-func (m *leaseManager) AcquireLease(ctx context.Context, noteID string, machineID string) (bool, error) {
+func (m *leaseManager) AcquireLease(ctx context.Context, noteID string, machineID string) (string, bool, error) {
 	query := `
 		INSERT INTO note_ws_leases (note_id, machine_id, expires_at)
 		VALUES ($1, $2, NOW() + $3::interval)
 		ON CONFLICT (note_id) DO UPDATE
 		SET machine_id = EXCLUDED.machine_id, expires_at = NOW() + $3::interval
 		WHERE note_ws_leases.expires_at < NOW() OR note_ws_leases.machine_id = EXCLUDED.machine_id
-		RETURNING true;
+		RETURNING machine_id;
 	`
 	interval := leaseDuration.String()
-	var acquired bool
-	err := m.pool.QueryRow(ctx, query, noteID, machineID, interval).Scan(&acquired)
+	var winner string
+	err := m.pool.QueryRow(ctx, query, noteID, machineID, interval).Scan(&winner)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return false, nil
+			return "", false, nil
 		}
-		return false, err
+		return "", false, err
 	}
-	return acquired, nil
+	return winner, winner == machineID, nil
 }
 
 func (m *leaseManager) RenewLease(ctx context.Context, noteID string, machineID string) error {

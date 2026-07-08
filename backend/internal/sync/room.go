@@ -69,7 +69,7 @@ func (m *RoomManager) GetOrCreateRoom(ctx context.Context, noteID string, machin
 		m.mu.Unlock()
 
 		// Acquire lease BEFORE loading doc (rollback if lease fails)
-		acquired, err := m.leaseMgr.AcquireLease(ctx, noteID, machineID)
+		_, acquired, err := m.leaseMgr.AcquireLease(ctx, noteID, machineID)
 		if err != nil {
 			return nil, err
 		}

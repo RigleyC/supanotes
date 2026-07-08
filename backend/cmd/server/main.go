@@ -185,13 +185,26 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/notes/:id/tags", tagsH.AddTag)
 	protected.DELETE("/notes/:id/tags/:tagId", tagsH.RemoveTag)
 
+	// Yjs Sync Engine (built before Notes/Tasks so the syncer can be injected)
+	machineID, _ := os.Hostname()
+	if machineID == "" {
+		machineID = "default"
+	}
+	leaseMgr := syncpkg.NewLeaseManager(pool)
+	ydocSvc := syncpkg.NewYDocService(pool, nil)
+	roomMgr := syncpkg.NewRoomManager(leaseMgr, ydocSvc, pool)
+	ydocSvc.StartFlusher(cronCtx, 500*time.Millisecond)
+	compactor := syncpkg.NewCompactor(pool)
+	compactor.StartScheduler(cronCtx, 5*time.Minute)
+	noteSyncer := syncpkg.NewNoteStateSyncer(pool, roomMgr)
+
 	// Notes
 	notesRepo := notes.NewRepository(queries)
-	notesSvc := notes.NewService(notesRepo, pool)
+	notesSvc := notes.NewService(notesRepo, pool, noteSyncer)
 
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
-	tasksSvc := tasks.NewService(tasksRepo)
+	tasksSvc := tasks.NewService(tasksRepo, noteSyncer)
 	tasksH := tasks.NewHandler(tasksSvc)
 	protected.POST("/tasks", tasksH.Create)
 	protected.GET("/tasks", tasksH.List)
@@ -277,11 +290,15 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	routinesH := routines.NewHandler(routinesSvc)
 	routines.RegisterRoutes(protected, routinesH)
 
+	// WebSocket sync handler
+	wsH := syncpkg.NewWSHandler(roomMgr, pool, machineID)
+	protected.GET("/sync/ws/:note_id", wsH.HandleConnect)
+
 	// Agent Loop (built before the runner so the runner and the
 	// gateway can both depend on it).
 	agentRepo := agent.NewRepository(queries)
 	workingMemSvc := agent.NewWorkingMemoryService(queries)
-	yjsMutSvc := agent.NewYjsMutationService(pool)
+	yjsMutSvc := agent.NewYjsMutationService(pool, roomMgr)
 	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient, llmFactory, workingMemSvc, yjsMutSvc)
 	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools, workingMemSvc)
 	agentH := agent.NewHandler(agentLoop, agentRepo)
@@ -342,27 +359,4 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	syncH := syncpkg.NewHandler(syncSvc)
 	protected.POST("/sync/push", syncH.Push)
 	protected.POST("/sync/pull", syncH.Pull)
-
-	// Yjs Sync Engine
-	machineID, _ := os.Hostname()
-	if machineID == "" {
-		machineID = "default"
-	}
-
-	leaseMgr := syncpkg.NewLeaseManager(pool)
-	ydocSvc := syncpkg.NewYDocService(pool)
-	roomMgr := syncpkg.NewRoomManager(leaseMgr, ydocSvc, func(ctx context.Context, noteID string) ([]byte, error) {
-		return syncpkg.ReconstructYDocFromNodes(ctx, pool, noteID)
-	})
-
-	// YDoc flush scheduler (every 500ms)
-	ydocSvc.StartFlusher(cronCtx, 500*time.Millisecond)
-
-	// Compaction scheduler (every 5 minutes)
-	compactor := syncpkg.NewCompactor(pool)
-	compactor.StartScheduler(cronCtx, 5*time.Minute)
-
-	// WebSocket sync handler
-	wsH := syncpkg.NewWSHandler(roomMgr, pool, machineID)
-	protected.GET("/sync/ws/:note_id", wsH.HandleConnect)
 }

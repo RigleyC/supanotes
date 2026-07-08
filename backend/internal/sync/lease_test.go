@@ -25,7 +25,7 @@ func TestLeaseAcquireAndGet(t *testing.T) {
 	noteID := "00000000-0000-0000-0000-000000000001"
 	machineID := "machine-a"
 
-	acquired, err := mgr.AcquireLease(ctx, noteID, machineID)
+	_, acquired, err := mgr.AcquireLease(ctx, noteID, machineID)
 	require.NoError(t, err)
 	assert.True(t, acquired)
 
@@ -47,17 +47,37 @@ func TestLeaseConflict(t *testing.T) {
 	machineA := "machine-a"
 	machineB := "machine-b"
 
-	acquired, err := mgr.AcquireLease(ctx, noteID, machineA)
+	_, acquired, err := mgr.AcquireLease(ctx, noteID, machineA)
 	require.NoError(t, err)
 	assert.True(t, acquired)
 
-	acquired, err = mgr.AcquireLease(ctx, noteID, machineB)
+	_, acquired, err = mgr.AcquireLease(ctx, noteID, machineB)
 	require.NoError(t, err)
 	assert.False(t, acquired)
 
 	t.Cleanup(func() {
-		mgr.ReleaseLease(ctx, noteID, machineA)
+		mgr.ReleaseLease(ctx, noteID, machineID)
 	})
+}
+
+func TestLeaseAcquireReturnsWinnerMachineID(t *testing.T) {
+	pool := setupTestDB(t)
+	mgr := NewLeaseManager(pool)
+	ctx := context.Background()
+	noteID := "00000000-0000-0000-0000-000000000100"
+	machineID := "machine-a"
+
+	winner, acquired, err := mgr.AcquireLease(ctx, noteID, machineID)
+	require.NoError(t, err)
+	assert.True(t, acquired)
+	assert.Equal(t, machineID, winner)
+
+	// A second machine contesting the lease must NOT get its own id.
+	_, acquiredB, errB := mgr.AcquireLease(ctx, noteID, "machine-b")
+	require.NoError(t, errB)
+	assert.False(t, acquiredB)
+
+	t.Cleanup(func() { mgr.ReleaseLease(ctx, noteID, machineID) })
 }
 
 func TestLeaseRelease(t *testing.T) {
@@ -68,7 +88,7 @@ func TestLeaseRelease(t *testing.T) {
 	noteID := "00000000-0000-0000-0000-000000000003"
 	machineID := "machine-a"
 
-	_, err := mgr.AcquireLease(ctx, noteID, machineID)
+	_, _, err := mgr.AcquireLease(ctx, noteID, machineID)
 	require.NoError(t, err)
 
 	err = mgr.ReleaseLease(ctx, noteID, machineID)
@@ -87,7 +107,7 @@ func TestLeaseRenew(t *testing.T) {
 	noteID := "00000000-0000-0000-0000-000000000004"
 	machineID := "machine-a"
 
-	_, err := mgr.AcquireLease(ctx, noteID, machineID)
+	_, _, err := mgr.AcquireLease(ctx, noteID, machineID)
 	require.NoError(t, err)
 
 	err = mgr.RenewLease(ctx, noteID, machineID)
@@ -109,7 +129,7 @@ func TestLeaseExpiry(t *testing.T) {
 	noteID := "00000000-0000-0000-0000-000000000005"
 	machineID := "machine-a"
 
-	_, err := mgr.AcquireLease(ctx, noteID, machineID)
+	_, _, err := mgr.AcquireLease(ctx, noteID, machineID)
 	require.NoError(t, err)
 
 	// Shorten the lease to force expiry — we use raw SQL to set a past expires_at
