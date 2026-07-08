@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
@@ -253,5 +252,3 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 	room.RemoveClient(wsC)
 	return nil
 }
-
-var _ = pgx.ErrNoRows

@@ -43,28 +43,26 @@ void main() {
     expect(ytext.toString(), 'hi');
   });
 
-  test('saveState persists and merged data survives reload', () async {
+  test('persist saves mutated doc and data survives fresh load', () async {
     final mgr = YjsSyncManager(db: db);
     final doc = await mgr.loadDoc('note-1');
 
-    // Mutate the canonical doc directly (avoids yjs_dart v1.1.15
-    // applyUpdate corruption when merging from a separate doc).
+    // Mutate the canonical doc directly.
     doc.transact((t) {
       doc.getMap('nodes')!.set(
           'node-2',
           '{"id":"node-2","position":1,"type":"paragraph","data":{"text":"new"}}');
       doc.getText('content/node-2')!.insert(0, 'new');
     });
-    await mgr.saveState('note-1', encodeStateAsUpdate(doc));
+    await mgr.persist('note-1');
 
-    // Reload — verify YMap keys and text content
-    mgr.unloadDoc('note-1');
-    final doc2 = await mgr.loadDoc('note-1');
+    // New manager to bypass cache, then reload.
+    final mgr2 = YjsSyncManager(db: db);
+    final doc2 = await mgr2.loadDoc('note-1');
     expect(doc2.getMap('nodes')!.keys, containsAll(['node-1', 'node-2']));
     expect(doc2.getText('content/node-2').toString(), 'new');
     expect(doc2.getText('content/node-1').toString(), 'hi');
 
-    // Verify state is persisted (non-empty)
     final state = encodeStateAsUpdate(doc2);
     expect(state.length, greaterThan(0));
   });

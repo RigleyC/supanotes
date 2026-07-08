@@ -1,12 +1,12 @@
 library;
 
 import 'dart:developer' as dev;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
-import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
@@ -17,17 +17,13 @@ import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
 
 const int _dividerCount = 35;
 
-typedef EmptyNoteExit = Future<void> Function(String noteId);
-
 class NoteEditorController {
   NoteEditorController({
     required this.userId,
-    this.emptyNoteExit,
     AppDatabase? database,
   }) : _database = database;
 
   final String userId;
-  final EmptyNoteExit? emptyNoteExit;
   final AppDatabase? _database;
 
   MutableDocument? document;
@@ -39,6 +35,7 @@ class NoteEditorController {
   YjsDocEditorBridge? _bridge;
   String? _noteId;
   Doc? _pendingBridgeDoc;
+  void Function(Uint8List update)? _pendingBridgeSendUpdate;
 
   void initFromNodes({required List<NoteNode> nodes, String? noteId}) {
     dev.log(
@@ -81,8 +78,12 @@ class NoteEditorController {
     );
 
     if (_pendingBridgeDoc != null) {
-      attachYjsBridge(doc: _pendingBridgeDoc!);
+      attachYjsBridge(
+        doc: _pendingBridgeDoc!,
+        sendUpdate: _pendingBridgeSendUpdate ?? (update) {},
+      );
       _pendingBridgeDoc = null;
+      _pendingBridgeSendUpdate = null;
     }
   }
 
@@ -92,15 +93,18 @@ class NoteEditorController {
 
   void attachYjsBridge({
     required Doc doc,
+    required void Function(Uint8List update) sendUpdate,
   }) {
     final coordinator = _coordinator;
     if (coordinator == null) {
       _pendingBridgeDoc = doc;
+      _pendingBridgeSendUpdate = sendUpdate;
       return;
     }
     _bridge = YjsDocEditorBridge(
       doc: doc,
       coordinator: coordinator,
+      sendUpdate: sendUpdate,
     );
   }
 
@@ -149,33 +153,7 @@ class NoteEditorController {
     _coordinator?.updateNodesIncrementally(incomingNodes);
   }
 
-  bool _isDocEmpty(MutableDocument doc) {
-    if (doc.isEmpty) return true;
-    if (doc.nodeCount == 1) {
-      final firstNode = doc.first;
-      if (firstNode is ParagraphNode && firstNode.text.toPlainText().trim().isEmpty) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  void _flushAndSaveFinalState() {
-    final noteId = _noteId;
-    final doc = document;
-    if (noteId == null || doc == null) return;
-
-    if (_isDocEmpty(doc)) {
-      dev.log(
-        '[NoteEditorController] Deleting note (empty)',
-        name: 'NoteEditor',
-      );
-      emptyNoteExit?.call(noteId);
-    }
-  }
-
   void dispose() {
-    _flushAndSaveFinalState();
     _bridge?.dispose();
     _bridge = null;
     _coordinator?.dispose();
@@ -186,11 +164,3 @@ class NoteEditorController {
   }
 }
 
-Future<void> defaultEmptyNoteExit(INotesRepository repo, String noteId) async {
-  dev.log('[defaultEmptyNoteExit] noteId=$noteId', name: 'NoteEditor');
-  await repo.deleteIfEmptyOrTombstone(noteId);
-  dev.log(
-    '[defaultEmptyNoteExit] Completed noteId=$noteId',
-    name: 'NoteEditor',
-  );
-}

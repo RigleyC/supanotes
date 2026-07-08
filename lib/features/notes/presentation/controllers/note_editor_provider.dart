@@ -14,14 +14,23 @@ final noteEditorControllerProvider = Provider.autoDispose
       );
       controller.bind(noteId);
 
+      var disposed = false;
+
       syncService?.connectNote(
         noteId,
-        onReady: (doc, _) {
-          controller.attachYjsBridge(doc: doc);
+        onReady: (doc, sendUpdate) {
+          if (disposed) return;
+          controller.attachYjsBridge(
+            doc: doc,
+            sendUpdate: sendUpdate,
+          );
         },
-      );
+      ).catchError((_) {
+        // connectNote errored (e.g., WS failure) — ignore if disposed.
+      });
 
       ref.onDispose(() {
+        disposed = true;
         syncService?.disconnectNote();
         controller.dispose();
       });

@@ -19,7 +19,6 @@ import 'package:supanotes/features/notes/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
@@ -171,7 +170,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             collapseImages: note.collapseImages,
             isReadOnly: isReadOnly,
             delegate: NoteEditorDelegate(
-              emptyNoteExit: (noteId) => defaultEmptyNoteExit(repo, noteId),
               onTaskLongPress: isReadOnly
                   ? null
                   : (task, flushSnapshot) =>

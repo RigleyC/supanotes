@@ -8,7 +8,6 @@ import 'package:super_editor/super_editor.dart';
 import '../../../core/database/database.dart';
 import 'attachment_nodes.dart';
 import 'note_display_text.dart';
-import 'task_entry.dart';
 
 sealed class NodeOperation {}
 
@@ -43,10 +42,12 @@ class NodeSyncManager {
     required String noteId,
     required String userId,
     required MutableDocument document,
+    void Function(List<NodeOperation> ops)? onFlush,
   }) : _db = database,
        _noteId = noteId,
        _userId = userId,
-       _document = document {
+       _document = document,
+       _onFlush = onFlush {
     _document.addListener(_onDocumentChanged);
   }
 
@@ -54,9 +55,15 @@ class NodeSyncManager {
   final String _noteId;
   final String _userId;
   final MutableDocument _document;
+  void Function(List<NodeOperation> ops)? _onFlush;
 
   final List<NodeOperation> _pendingOps = [];
   Timer? _debounceTimer;
+
+  void Function(List<NodeOperation> ops)? get onFlush => _onFlush;
+  set onFlush(void Function(List<NodeOperation> ops)? cb) {
+    _onFlush = cb;
+  }
 
   /// IDs of nodes that have local changes not yet confirmed by the DB stream.
   /// Used by the editor controller to skip reactive updates for these nodes,
@@ -285,6 +292,10 @@ class NodeSyncManager {
     final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
     final stillPendingIds = _pendingOps.map(_opNodeId).whereType<String>().toSet();
     locallyDirtyNodeIds.removeAll(flushedIds.difference(stillPendingIds));
+
+    if (opsToProcess.isNotEmpty) {
+      _onFlush?.call(opsToProcess);
+    }
   }
 
   void flushNow() {
@@ -704,30 +715,6 @@ class NodeSyncManager {
           text: _deserializeAttributedText(data),
         );
     }
-  }
-
-  static List<TaskEntry> extractTasks(List<NoteNode> nodes) {
-    final tasks = <TaskEntry>[];
-    for (final node in nodes) {
-      if (node.type != 'task') continue;
-      Map<String, dynamic> data;
-      try {
-        data = node.data.isNotEmpty
-            ? jsonDecode(node.data) as Map<String, dynamic>
-            : <String, dynamic>{};
-      } catch (_) {
-        try {
-          data =
-              jsonDecode(utf8.decode(base64Decode(node.data)))
-                  as Map<String, dynamic>;
-        } catch (_) {
-          data = <String, dynamic>{};
-        }
-      }
-      final text = data['text'] as String? ?? '';
-      tasks.add(TaskEntry(id: node.id, text: text, isComplete: false));
-    }
-    return tasks;
   }
 
   void suspendSync() {

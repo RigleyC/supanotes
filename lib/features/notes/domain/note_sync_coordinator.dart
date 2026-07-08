@@ -35,6 +35,12 @@ class NoteSyncCoordinator {
     );
   }
 
+  void Function(List<NodeOperation> ops)? get onNodeFlush =>
+      _nodeSyncManager.onFlush;
+  set onNodeFlush(void Function(List<NodeOperation> ops)? cb) {
+    _nodeSyncManager.onFlush = cb;
+  }
+
   final MutableDocument _document;
   final Editor _editor;
 

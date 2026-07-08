@@ -1,25 +1,128 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
+import 'attachment_nodes.dart';
+import 'node_sync_manager.dart';
 import 'note_sync_coordinator.dart';
 import 'yjs_node_codec.dart';
 
 /// Wires a [Doc] to a [MutableDocument] via [NoteSyncCoordinator].
+///
+/// Handles both remote→local (via YMap observation) and local→remote
+/// (via [NodeSyncManager] flush callbacks and [sendUpdate]).
 class YjsDocEditorBridge {
   YjsDocEditorBridge({
     required Doc doc,
     required NoteSyncCoordinator coordinator,
+    required void Function(Uint8List update) sendUpdate,
   })  : _doc = doc,
-        _coordinator = coordinator {
+        _coordinator = coordinator,
+        _sendUpdate = sendUpdate {
     _nodesSub = _doc.getMap('nodes')!.observe(_onNodesChanged);
+    coordinator.onNodeFlush = onLocalFlush;
   }
 
   final Doc _doc;
   final NoteSyncCoordinator _coordinator;
+  final void Function(Uint8List update) _sendUpdate;
   late final void Function(dynamic, Transaction) _nodesSub;
 
   void _onNodesChanged(dynamic event, Transaction tr) {
     final nodes = noteNodesFromDoc(_doc);
     _coordinator.updateNodesIncrementally(nodes);
+  }
+
+  /// Called by [NoteSyncCoordinator] when local edits are flushed to SQLite.
+  void onLocalFlush(List<NodeOperation> ops) {
+    if (ops.isEmpty) return;
+
+    final nodesMap = _doc.getMap('nodes')!;
+
+    for (final op in ops) {
+      switch (op) {
+        case InsertOp(:final id, :final node, :final index):
+          _serializeNode(node, index.toDouble(), id, nodesMap);
+        case DeleteOp(:final id):
+          nodesMap.delete(id);
+        case UpdateOp(:final id, :final node):
+          _serializeNode(node, null, id, nodesMap);
+        case MoveOp(:final id, :final to):
+          _repositionNode(id, to.toDouble(), nodesMap);
+      }
+    }
+
+    final update = encodeStateAsUpdate(_doc);
+    _sendUpdate(update);
+  }
+
+  void _serializeNode(
+    DocumentNode node,
+    double? position,
+    String id,
+    YMap nodesMap,
+  ) {
+    final dataStr = NodeSyncManager.nodeData(node);
+    final data = jsonDecode(dataStr) as Map<String, dynamic>;
+
+    if (position == null) {
+      final existing = _readPosition(id, nodesMap);
+      position = existing ?? 0.0;
+    }
+
+    final meta = <String, dynamic>{
+      'id': id,
+      'parentId': '',
+      'position': position,
+      'type': _attributionFor(node),
+      'data': data,
+      'createdAt': DateTime.now().millisecondsSinceEpoch.toDouble(),
+    };
+
+    nodesMap.set(id, jsonEncode(meta));
+
+    final text = data['text'] as String?;
+    if (text != null && text.isNotEmpty) {
+      _doc.getText('content/$id')!.insert(0, text);
+    }
+  }
+
+  void _repositionNode(String id, double position, YMap nodesMap) {
+    final raw = nodesMap.get(id);
+    if (raw == null) return;
+    try {
+      final meta = jsonDecode(raw as String) as Map<String, dynamic>;
+      meta['position'] = position;
+      nodesMap.set(id, jsonEncode(meta));
+    } catch (_) {}
+  }
+
+  double? _readPosition(String id, YMap nodesMap) {
+    final raw = nodesMap.get(id);
+    if (raw == null) return null;
+    try {
+      final meta = jsonDecode(raw as String) as Map<String, dynamic>;
+      return (meta['position'] as num?)?.toDouble();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _attributionFor(DocumentNode node) {
+    if (node is ParagraphNode) {
+      final blockType = node.getMetadataValue('blockType') as Attribution?;
+      if (blockType == null) return 'paragraph';
+      if (blockType == blockquoteAttribution) return 'blockquote';
+      return 'header';
+    }
+    if (node is TaskNode) return 'task';
+    if (node is ListItemNode) return 'list_item';
+    if (node is HorizontalRuleNode) return 'divider';
+    if (node is ImageNode) return 'image';
+    if (node is DocumentAttachmentNode) return 'attachment';
+    return 'paragraph';
   }
 
   void dispose() {

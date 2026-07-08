@@ -20,15 +20,12 @@ class YjsSyncManager {
   /// In-memory per-note Yjs documents.
   final Map<String, Doc> _docs = {};
 
-  /// Per-note set of known node IDs for O(1) phantom-node checks.
-  final Map<String, Set<String>> _nodeExistence = {};
-
   /// Load (or reconstruct) the canonical [Doc] for [noteId].
   ///
   /// Always reconstructs from [note_nodes] rather than calling [applyUpdate]
   /// on the persisted snapshot because `yjs_dart` v1.1.15 has a confirmed bug:
   /// [encodeStateAsUpdate] + [applyUpdate] deserialises YText types as YMap
-  /// in the share map. The snapshot is still written by [saveState] and used
+  /// in the share map. The snapshot is still written by [persist] and used
   /// for server-side sync, but not for local Doc reconstruction.
   Future<Doc> loadDoc(String noteId) async {
     final cached = _docs[noteId];
@@ -36,7 +33,6 @@ class YjsSyncManager {
 
     final doc = await _reconstructFromLocal(noteId);
     _docs[noteId] = doc;
-    _updateNodeExistence(noteId, doc);
     return doc;
   }
 
@@ -101,40 +97,8 @@ class YjsSyncManager {
     return doc;
   }
 
-  /// Refresh [_nodeExistence] for [noteId] from the in-memory [Doc].
-  void _updateNodeExistence(String noteId, Doc doc) {
-    final nodes = doc.getMap('nodes');
-    final ids = <String>{};
-    if (nodes != null) {
-      ids.addAll(nodes.keys);
-    }
-    _nodeExistence[noteId] = ids;
-  }
-
-  /// Apply [update] to the canonical [Doc] for [noteId] and persist the
-  /// resulting binary state. The [update] payload MUST be a raw Yjs update
-  /// (no transport prefix).
-  ///
-  /// Also projects the Doc state back into [note_nodes] so that
-  /// [loadDoc] can reconstruct from the relational tables (bypassing
-  /// `yjs_dart` v1.1.15's `applyUpdate` YText-corruption bug).
-  Future<void> saveState(String noteId, Uint8List update) async {
-    final doc = _docs[noteId] ?? await loadDoc(noteId);
-    applyUpdate(doc, update);
-    final state = encodeStateAsUpdate(doc);
-    await _db.into(_db.localYjsStates).insertOnConflictUpdate(
-          LocalYjsStatesCompanion(
-            noteId: Value(noteId),
-            state: Value(state),
-          ),
-        );
-    await _projectToNodes(noteId, doc);
-    _updateNodeExistence(noteId, doc);
-    dev.log('[YjsSyncManager] Saved state for note=$noteId', name: 'YjsSync');
-  }
-
   /// Persist the current in-memory Doc state for [noteId] to the database
-  /// and project it to [note_nodes]. Unlike [saveState], this does NOT call
+  /// and project it to [note_nodes]. Unlike [applyUpdate], this does NOT call
   /// [applyUpdate] — it is safe to call when the Doc is already up-to-date
   /// (e.g. after the WS client applied a remote update).
   Future<void> persist(String noteId) async {
@@ -148,7 +112,6 @@ class YjsSyncManager {
           ),
         );
     await _projectToNodes(noteId, doc);
-    _updateNodeExistence(noteId, doc);
     dev.log('[YjsSyncManager] Persisted state for note=$noteId', name: 'YjsSync');
   }
 
@@ -156,7 +119,24 @@ class YjsSyncManager {
   /// reconstruction without calling [applyUpdate].
   Future<void> _projectToNodes(String noteId, Doc doc) async {
     final nodes = noteNodesFromDoc(doc, noteIdOverride: noteId);
+
+    final activeIds = nodes.map((n) => n.id).toSet();
+    final staleNodes = await (_db.select(_db.noteNodes)
+          ..where((t) => t.noteId.equals(noteId) & t.deletedAt.isNull()))
+        .get();
+    for (final stale in staleNodes) {
+      if (!activeIds.contains(stale.id)) {
+        await (_db.update(_db.noteNodes)
+              ..where((t) => t.id.equals(stale.id)))
+            .write(NoteNodesCompanion(
+              deletedAt: Value(DateTime.now().toUtc()),
+              updatedAt: Value(DateTime.now().toUtc()),
+            ));
+      }
+    }
+
     if (nodes.isEmpty) return;
+
     await _db.batch((b) {
       for (final node in nodes) {
         b.insert(_db.noteNodes, node,
@@ -176,27 +156,8 @@ class YjsSyncManager {
     return d;
   }
 
-  /// Check whether [nodeId] exists inside the `nodes` YMap of the
-  /// in-memory [Doc] for [noteId].
-  ///
-  /// This protects against phantom-node mutations where a remote peer
-  /// has already deleted the node locally. Uses an in-memory set for
-  /// O(1) lookup instead of decoding the binary state on every call.
-  bool nodeExists(String noteId, String nodeId) {
-    final ids = _nodeExistence[noteId];
-    if (ids == null) return false;
-    return ids.contains(nodeId);
-  }
-
-  /// Remove the in-memory doc for [noteId] to free resources.
-  void unloadDoc(String noteId) {
-    _docs.remove(noteId);
-    _nodeExistence.remove(noteId);
-  }
-
   /// Dispose all in-memory Ydocs.
   void dispose() {
     _docs.clear();
-    _nodeExistence.clear();
   }
 }

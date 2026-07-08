@@ -1,7 +1,6 @@
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 
 class NoteEditorDelegate {
-  final Future<void> Function(String noteId)? emptyNoteExit;
   final void Function(bool hasContent)? onHasContentChanged;
   final void Function(TaskModel? task, Future<void> Function() flushSnapshot)?
   onTaskLongPress;
@@ -16,7 +15,6 @@ class NoteEditorDelegate {
   onUploadFile;
 
   const NoteEditorDelegate({
-    this.emptyNoteExit,
     this.onHasContentChanged,
     this.onTaskLongPress,
     this.onTaskComplete,

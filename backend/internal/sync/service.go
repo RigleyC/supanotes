@@ -148,24 +148,6 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 	}, nil
 }
 
-func sanitizeTaskStatus(status string) string {
-	switch status {
-	case "open", "done":
-		return status
-	case "completed":
-		return "done"
-	default:
-		return "open"
-	}
-}
-
-func isEmptyIncomingRegularNote(n sqlcgen.GetSyncNotesRow) bool {
-	// In the new architecture, notes.content can legitimately be empty
-	// because the content is stored in note_nodes. We no longer reject
-	// notes based on the legacy content field.
-	return false
-}
-
 func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPayload) error {
 	r := s.repo
 	var tx pgx.Tx
@@ -185,10 +167,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	affectedNotes := make(map[pgtype.UUID]bool)
 
 	for _, n := range payload.Notes {
-		if isEmptyIncomingRegularNote(n) {
-			return ErrEmptyNote
-		}
-
 		canEdit, err := s.canEditNote(ctx, n.ID, userID, editableNotes)
 		if err != nil {
 			log.Error().Interface("note_id", n.ID).Interface("user_id", userID).Interface("note_owner_id", n.UserID).Err(err).Msg("sync push conflict: note permission check failed")
