@@ -167,7 +167,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	affectedNotes := make(map[pgtype.UUID]bool)
 
 	for _, n := range payload.Notes {
-		canEdit, err := s.canEditNote(ctx, n.ID, userID, editableNotes)
+		canEdit, err := s.canEditNote(ctx, r, n.ID, userID, editableNotes)
 		if err != nil {
 			log.Error().Interface("note_id", n.ID).Interface("user_id", userID).Interface("note_owner_id", n.UserID).Err(err).Msg("sync push conflict: note permission check failed")
 			return ErrSyncConflict
@@ -221,7 +221,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	nodesByNote := make(map[pgtype.UUID][]sqlcgen.NoteNode)
 	for _, nn := range payload.NoteNodes {
 		noteID := nn.NoteID
-		canEdit, err := s.canEditNote(ctx, noteID, userID, editableNotes)
+		canEdit, err := s.canEditNote(ctx, r, noteID, userID, editableNotes)
 		if err != nil {
 			log.Error().Interface("node_id", nn.ID).Interface("note_id", noteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: note node permission check failed")
 			return ErrSyncConflict
@@ -241,7 +241,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			return err
 		}
 		noteID := t.NoteID
-		canEdit, err := s.canEditNote(ctx, noteID, userID, editableNotes)
+		canEdit, err := s.canEditNote(ctx, r, noteID, userID, editableNotes)
 		if err != nil {
 			log.Error().Interface("task_id", t.ID).Interface("note_id", noteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: task permission check failed")
 			return ErrSyncConflict
@@ -324,22 +324,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		}
 	}
 
-	if s.ydoc != nil {
-		for noteIDUUID, nodes := range nodesByNote {
-			tasks := tasksByNote[noteIDUUID]
-			noteIDStr := uuid.UUID(noteIDUUID.Bytes).String()
-			update, err := ProduceUpdateFromRows(ctx, s.pool, noteIDStr, nodes, tasks)
-			if err != nil {
-				return fmt.Errorf("produce update for note %s: %w", noteIDStr, err)
-			}
-			if err := s.ydoc.ApplyNodeMutation(ctx, noteIDStr, update); err != nil {
-				return fmt.Errorf("ingest update for note %s: %w", noteIDStr, err)
-			}
-			if s.roomMgr != nil {
-				s.roomMgr.BroadcastIfActive(noteIDStr, update)
-			}
-		}
-	}
+
 
 	for _, p := range payload.UserNotePreferences {
 		ownerID, err := r.GetNoteOwnerID(ctx, p.NoteID)
@@ -381,19 +366,39 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	}
 
 	if tx != nil {
-		return tx.Commit(ctx)
+		if err := tx.Commit(ctx); err != nil {
+			return err
+		}
 	}
+
+	if s.ydoc != nil {
+		for noteIDUUID, nodes := range nodesByNote {
+			tasks := tasksByNote[noteIDUUID]
+			noteIDStr := uuid.UUID(noteIDUUID.Bytes).String()
+			update, err := ProduceUpdateFromRows(ctx, s.pool, noteIDStr, nodes, tasks)
+			if err != nil {
+				return fmt.Errorf("produce update for note %s: %w", noteIDStr, err)
+			}
+			if err := s.ydoc.ApplyNodeMutation(ctx, noteIDStr, update); err != nil {
+				return fmt.Errorf("ingest update for note %s: %w", noteIDStr, err)
+			}
+			if s.roomMgr != nil {
+				s.roomMgr.BroadcastIfActive(noteIDStr, update)
+			}
+		}
+	}
+
 	return nil
 }
 
-func (s *service) canEditNote(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID, editableNotes map[pgtype.UUID]bool) (bool, error) {
+func (s *service) canEditNote(ctx context.Context, r Repository, noteID pgtype.UUID, userID pgtype.UUID, editableNotes map[pgtype.UUID]bool) (bool, error) {
 	if canEdit, exists := editableNotes[noteID]; exists {
 		return canEdit, nil
 	}
-	ownerID, err := s.repo.GetNoteOwnerID(ctx, noteID)
+	ownerID, err := r.GetNoteOwnerID(ctx, noteID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			share, shareErr := s.repo.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+			share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
 				NoteID: noteID, UserID: userID,
 			})
 			if shareErr != nil || share.Permission != "edit" {
@@ -407,7 +412,7 @@ func (s *service) canEditNote(ctx context.Context, noteID pgtype.UUID, userID pg
 	}
 	canEdit := ownerID == userID
 	if !canEdit {
-		share, shareErr := s.repo.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+		share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
 			NoteID: noteID, UserID: userID,
 		})
 		canEdit = shareErr == nil && share.Permission == "edit"

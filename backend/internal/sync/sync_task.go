@@ -165,19 +165,11 @@ func ProduceUpdateFromRows(
 	nodes []sqlcgen.NoteNode,
 	tasks []SyncTask,
 ) ([]byte, error) {
-	noteUUID, err := uuid.Parse(noteID)
-	if err != nil {
-		return nil, fmt.Errorf("parse note id: %w", err)
-	}
 
 	doc := crdt.New(crdt.WithGC(false))
 	nodesMap := doc.GetMap("nodes")
 	tasksMap := doc.GetMap("tasks")
 
-	var defaultUserID pgtype.UUID
-	if pool != nil {
-		_ = pool.QueryRow(ctx, "SELECT user_id FROM notes WHERE id = $1", noteUUID).Scan(&defaultUserID)
-	}
 
 	doc.Transact(func(txn *crdt.Transaction) {
 		for _, n := range nodes {
