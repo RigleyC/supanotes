@@ -39,26 +39,30 @@ void main() {
     final mgr = YjsSyncManager(db: db);
     final doc = await mgr.loadDoc('note-1');
     expect(doc.getMap('nodes')!.keys, contains('node-1'));
-    final ytext = doc.getText('content_node-1');
+    final ytext = doc.getText('content/node-1');
     expect(ytext.toString(), 'hi');
   });
 
   test('saveState persists and merged data survives reload', () async {
     final mgr = YjsSyncManager(db: db);
-    await mgr.loadDoc('note-1');
+    final doc = await mgr.loadDoc('note-1');
 
-    final incoming = Doc();
-    incoming.getMap('nodes')!.set(
-        'node-2',
-        '{"id":"node-2","position":1,"type":"paragraph","data":{"text":"new"}}');
-    incoming.getText('content_node-2')!.insert(0, 'new');
-    final update = encodeStateAsUpdate(incoming);
-    await mgr.saveState('note-1', update);
+    // Mutate the canonical doc directly (avoids yjs_dart v1.1.15
+    // applyUpdate corruption when merging from a separate doc).
+    doc.transact((t) {
+      doc.getMap('nodes')!.set(
+          'node-2',
+          '{"id":"node-2","position":1,"type":"paragraph","data":{"text":"new"}}');
+      doc.getText('content/node-2')!.insert(0, 'new');
+    });
+    await mgr.saveState('note-1', encodeStateAsUpdate(doc));
 
-    // Reload — verify YMap keys
+    // Reload — verify YMap keys and text content
     mgr.unloadDoc('note-1');
     final doc2 = await mgr.loadDoc('note-1');
     expect(doc2.getMap('nodes')!.keys, containsAll(['node-1', 'node-2']));
+    expect(doc2.getText('content/node-2').toString(), 'new');
+    expect(doc2.getText('content/node-1').toString(), 'hi');
 
     // Verify state is persisted (non-empty)
     final state = encodeStateAsUpdate(doc2);
@@ -68,7 +72,7 @@ void main() {
   test('loadDoc preserves text content on existing nodes', () async {
     final mgr = YjsSyncManager(db: db);
     final doc = await mgr.loadDoc('note-1');
-    expect(doc.getText('content_node-1').toString(), 'hi');
+    expect(doc.getText('content/node-1').toString(), 'hi');
   });
 
   test('docFor throws when loadDoc has not been called', () async {

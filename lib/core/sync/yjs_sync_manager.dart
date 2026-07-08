@@ -23,22 +23,17 @@ class YjsSyncManager {
   final Map<String, Set<String>> _nodeExistence = {};
 
   /// Load (or reconstruct) the canonical [Doc] for [noteId].
+  ///
+  /// Always reconstructs from [note_nodes] rather than calling [applyUpdate]
+  /// on the persisted snapshot because `yjs_dart` v1.1.15 has a confirmed bug:
+  /// [encodeStateAsUpdate] + [applyUpdate] deserialises YText types as YMap
+  /// in the share map. The snapshot is still written by [saveState] and used
+  /// for server-side sync, but not for local Doc reconstruction.
   Future<Doc> loadDoc(String noteId) async {
     final cached = _docs[noteId];
     if (cached != null) return cached;
 
-    final row = await (_db.select(_db.localYjsStates)
-          ..where((t) => t.noteId.equals(noteId)))
-        .getSingleOrNull();
-
-    Doc doc;
-    if (row != null) {
-      doc = Doc();
-      applyUpdate(doc, row.state);
-      dev.log('[YjsSyncManager] Loaded state for note=$noteId', name: 'YjsSync');
-    } else {
-      doc = await _reconstructFromLocal(noteId);
-    }
+    final doc = await _reconstructFromLocal(noteId);
     _docs[noteId] = doc;
     _updateNodeExistence(noteId, doc);
     return doc;
@@ -63,7 +58,7 @@ class YjsSyncManager {
 
       final meta = <String, dynamic>{
         'id': nodeId,
-        'parentId': node.parentId ?? '',
+        'parentId': node.parentId,
         'position': node.position,
         'type': node.type,
         'data': dataMap,
@@ -72,7 +67,7 @@ class YjsSyncManager {
 
       doc.getMap('nodes')!.set(nodeId, jsonEncode(meta));
       if (textContent.isNotEmpty) {
-        doc.getText('content_$nodeId')!.insert(0, textContent);
+        doc.getText('content/$nodeId')!.insert(0, textContent);
       }
     }
 
@@ -118,6 +113,10 @@ class YjsSyncManager {
   /// Apply [update] to the canonical [Doc] for [noteId] and persist the
   /// resulting binary state. The [update] payload MUST be a raw Yjs update
   /// (no transport prefix).
+  ///
+  /// Also projects the Doc state back into [note_nodes] so that
+  /// [loadDoc] can reconstruct from the relational tables (bypassing
+  /// `yjs_dart` v1.1.15's `applyUpdate` YText-corruption bug).
   Future<void> saveState(String noteId, Uint8List update) async {
     final doc = _docs[noteId] ?? await loadDoc(noteId);
     applyUpdate(doc, update);
@@ -128,8 +127,54 @@ class YjsSyncManager {
             state: Value(state),
           ),
         );
+    await _projectToNodes(noteId, doc);
     _updateNodeExistence(noteId, doc);
     dev.log('[YjsSyncManager] Saved state for note=$noteId', name: 'YjsSync');
+  }
+
+  /// Project the in-memory [Doc] state into [note_nodes] so it survives
+  /// reconstruction without calling [applyUpdate].
+  Future<void> _projectToNodes(String noteId, Doc doc) async {
+    final nodesMap = doc.getMap('nodes');
+    if (nodesMap == null) return;
+    final nodeIds = nodesMap.keys.toList();
+    if (nodeIds.isEmpty) return;
+
+    final now = DateTime.now().toUtc();
+    await _db.batch((b) {
+      for (final nodeId in nodeIds) {
+        final raw = nodesMap.get(nodeId);
+        if (raw is! String) continue;
+        try {
+          final meta = jsonDecode(raw) as Map<String, dynamic>;
+          final ytext = doc.getText('content/$nodeId');
+          final textContent = ytext?.toString() ?? '';
+          final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
+          if (textContent.isNotEmpty) {
+            data['text'] = textContent;
+          }
+          final rawParentId = meta['parentId'] as String?;
+          final resolvedParentId =
+              (rawParentId == null || rawParentId.isEmpty) ? null : rawParentId;
+          final node = NoteNode(
+            id: nodeId,
+            noteId: noteId,
+            parentId: resolvedParentId,
+            position: (meta['position'] as num?)?.toDouble() ?? 0.0,
+            type: meta['type'] as String? ?? 'paragraph',
+            data: jsonEncode(data),
+            createdAt: DateTime.fromMillisecondsSinceEpoch(
+              (meta['createdAt'] as num?)?.toInt() ??
+                  now.millisecondsSinceEpoch,
+            ),
+            updatedAt: now,
+            isDirty: false,
+          );
+          b.insert(_db.noteNodes, node,
+              onConflict: DoUpdate((_) => node));
+        } catch (_) {}
+      }
+    });
   }
 
   /// Retrieve the in-memory [Doc] for [noteId].

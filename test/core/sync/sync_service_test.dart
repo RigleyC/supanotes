@@ -10,6 +10,8 @@ import 'package:supanotes/core/sync/sync_mapper.dart';
 import 'package:supanotes/core/sync/sync_repository.dart';
 import 'package:supanotes/core/sync/sync_service.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
+import 'package:supanotes/core/sync/yjs_sync_manager.dart';
+import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 class FakeSyncRepository implements ISyncRepository {
@@ -202,6 +204,8 @@ void main() {
           connectivity: connectivity,
           notifier: notifier,
           userId: 'test-user',
+          yjsMgr: YjsSyncManager(db: db),
+          authStorage: AuthLocalStorage(),
         );
 
         await service.push();
@@ -268,6 +272,8 @@ void main() {
           connectivity: FakeConnectivityMonitor(),
           notifier: SyncStateNotifier(),
           userId: 'test-user',
+          yjsMgr: YjsSyncManager(db: db),
+          authStorage: AuthLocalStorage(),
         );
 
         await service.pull();
@@ -311,6 +317,8 @@ void main() {
         connectivity: FakeConnectivityMonitor(),
         notifier: SyncStateNotifier(),
         userId: 'test-user',
+        yjsMgr: YjsSyncManager(db: db),
+        authStorage: AuthLocalStorage(),
       );
 
       await service.pull();
