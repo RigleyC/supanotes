@@ -68,6 +68,27 @@ func timestamptzToMS(t pgtype.Timestamptz) float64 {
 	return float64(t.Time.UnixMilli())
 }
 
+// ProjectToDBTxFromDoc projects the full Yjs Doc state onto relational
+// tables using an existing transaction. The caller is responsible for
+// acquiring the advisory lock (if needed) and for committing/rolling
+// back the transaction.
+func ProjectToDBTxFromDoc(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string) error {
+	return projectDocToDB(ctx, tx, doc, noteID)
+}
+
+// ProjectToDBTx projects the Yjs update onto relational tables using
+// an existing transaction. The caller is responsible for acquiring the
+// advisory lock (if needed) and for committing/rolling back the transaction.
+func ProjectToDBTx(ctx context.Context, tx pgx.Tx, noteID string, update []byte) error {
+	doc := crdt.New(crdt.WithGC(false))
+	if err := crdt.ApplyUpdateV1(doc, update, nil); err != nil {
+		return fmt.Errorf("apply update: %w", err)
+	}
+	return ProjectToDBTxFromDoc(ctx, tx, doc, noteID)
+}
+
+// ProjectToDB creates its own transaction, acquires the advisory lock,
+// and projects the Yjs update onto relational tables.
 func ProjectToDB(ctx context.Context, pool *pgxpool.Pool, noteID string, update []byte) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -79,11 +100,15 @@ func ProjectToDB(ctx context.Context, pool *pgxpool.Pool, noteID string, update 
 		return fmt.Errorf("advisory lock: %w", err)
 	}
 
-	doc := crdt.New(crdt.WithGC(false))
-	if err := crdt.ApplyUpdateV1(doc, update, nil); err != nil {
-		return fmt.Errorf("apply update: %w", err)
+	if err := ProjectToDBTx(ctx, tx, noteID, update); err != nil {
+		return err
 	}
+	return tx.Commit(ctx)
+}
 
+// projectDocToDB projects the given Doc's state onto relational tables
+// using the provided transaction.
+func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string) error {
 	noteUUID, err := parseUUIDStr(noteID)
 	if err != nil {
 		return fmt.Errorf("parse note id: %w", err)
@@ -103,6 +128,25 @@ func ProjectToDB(ctx context.Context, pool *pgxpool.Pool, noteID string, update 
 			var nd noteNodeJSON
 			if err := json.Unmarshal([]byte(nodeStr), &nd); err != nil {
 				continue
+			}
+
+			// Override text content from YText (CRDT source of truth).
+			// If a YText exists for this node's content, its value
+			// takes precedence over whatever is in the YMap JSON.
+			if textType := doc.GetText("content/" + nd.ID); textType != nil {
+				textContent := textType.ToString()
+				if textContent != "" {
+					var dataMap map[string]interface{}
+					if len(nd.Data) > 0 {
+						json.Unmarshal(nd.Data, &dataMap)
+					}
+					if dataMap == nil {
+						dataMap = make(map[string]interface{})
+					}
+					dataMap["text"] = textContent
+					updatedData, _ := json.Marshal(dataMap)
+					nd.Data = updatedData
+				}
 			}
 
 			pgNodeID, err := parseUUIDStr(nd.ID)
@@ -200,7 +244,7 @@ func ProjectToDB(ctx context.Context, pool *pgxpool.Pool, noteID string, update 
 		}
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
 func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]byte, error) {
@@ -245,8 +289,9 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 
 	doc.Transact(func(txn *crdt.Transaction) {
 		for _, node := range nodes {
+			nodeID := uuidToStr(node.ID)
 			nd := noteNodeJSON{
-				ID:        uuidToStr(node.ID),
+				ID:        nodeID,
 				ParentID:  uuidToStr(node.ParentID),
 				Position:  node.Position,
 				Type:      node.Type,
@@ -258,7 +303,20 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 			if err != nil {
 				continue
 			}
-			nodesMap.Set(txn, uuidToStr(node.ID), string(b))
+			nodesMap.Set(txn, nodeID, string(b))
+
+			// Create YText for the node's text content so that
+			// concurrent edits on the same paragraph get proper
+			// character-level CRDT merge.
+			if len(node.Data) > 0 {
+				var dataMap map[string]interface{}
+				if err := json.Unmarshal(node.Data, &dataMap); err == nil {
+					if text, ok := dataMap["text"].(string); ok && text != "" {
+						textType := doc.GetText("content/" + nodeID)
+						textType.Insert(txn, 0, text, nil)
+					}
+				}
+			}
 		}
 
 		for _, t := range tasks {
@@ -287,4 +345,57 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 	})
 
 	return crdt.EncodeStateAsUpdateV1(doc, nil), nil
+}
+
+// LoadYDocState loads the Yjs document state for a note from the database.
+// It prefers the compacted snapshot from note_yjs_states + pending updates,
+// falling back to ReconstructYDocFromNodes when no snapshot exists yet.
+// Returns nil, nil if pool is nil (used in tests).
+func LoadYDocState(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]byte, error) {
+	if pool == nil {
+		return nil, nil
+	}
+
+	noteUUID, err := parseUUIDStr(noteID)
+	if err != nil {
+		return nil, fmt.Errorf("parse note id: %w", err)
+	}
+
+	var state []byte
+	err = pool.QueryRow(ctx, "SELECT state FROM note_yjs_states WHERE note_id = $1", noteUUID).Scan(&state)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ReconstructYDocFromNodes(ctx, pool, noteID)
+		}
+		return nil, fmt.Errorf("load state: %w", err)
+	}
+
+	rows, err := pool.Query(ctx, "SELECT update_data FROM note_yjs_updates WHERE note_id = $1 ORDER BY created_at ASC", noteUUID)
+	if err != nil {
+		return nil, fmt.Errorf("query pending updates: %w", err)
+	}
+	defer rows.Close()
+
+	var pending [][]byte
+	for rows.Next() {
+		var u []byte
+		if err := rows.Scan(&u); err != nil {
+			return nil, fmt.Errorf("scan pending update: %w", err)
+		}
+		pending = append(pending, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iter: %w", err)
+	}
+
+	if len(pending) == 0 {
+		return state, nil
+	}
+
+	all := append([][]byte{state}, pending...)
+	merged, err := crdt.MergeUpdatesV1(all...)
+	if err != nil {
+		return nil, fmt.Errorf("merge pending updates: %w", err)
+	}
+	return merged, nil
 }

@@ -178,6 +178,11 @@ func TestReconstructYDocFromNodes_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Buy milk", rehydratedTask.Title)
 	assert.Equal(t, "open", rehydratedTask.Status)
+
+	// Verify YText was created for the node's text content
+	textType := doc.GetText("content/" + nodeID)
+	require.NotNil(t, textType)
+	assert.Equal(t, "hello", textType.ToString())
 }
 
 func TestProjectToDB_HandlesEmptyUpdate(t *testing.T) {
@@ -190,6 +195,86 @@ func TestProjectToDB_HandlesEmptyUpdate(t *testing.T) {
 
 	err := ProjectToDB(ctx, pool, testNoteID, update)
 	require.NoError(t, err)
+}
+
+func TestReconstructYDocFromNodes_IncludesYText(t *testing.T) {
+	ctx := context.Background()
+	pool := setupTestDB(t)
+	insertNote(t, pool)
+
+	pgNoteID := pgtype.UUID{Bytes: uuid.MustParse(testNoteID), Valid: true}
+	q := sqlcgen.New(pool)
+
+	nodeID := "00000000-0000-0000-0000-000000000060"
+	nodeUUID := pgtype.UUID{Bytes: uuid.MustParse(nodeID), Valid: true}
+	q.UpsertNoteNode(ctx, sqlcgen.UpsertNoteNodeParams{
+		ID:        nodeUUID,
+		NoteID:    pgNoteID,
+		Type:      "text",
+		Data:      []byte(`{"text":"hello world","level":2}`),
+		CreatedAt: pgtype.Timestamptz{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
+		DeletedAt: pgtype.Timestamptz{Valid: false},
+	})
+
+	update, err := ReconstructYDocFromNodes(ctx, pool, testNoteID)
+	require.NoError(t, err)
+	require.NotEmpty(t, update)
+
+	doc := crdt.New(crdt.WithGC(false))
+	err = crdt.ApplyUpdateV1(doc, update, nil)
+	require.NoError(t, err)
+
+	// Verify YText exists for this node
+	textType := doc.GetText("content/" + nodeID)
+	require.NotNil(t, textType)
+	assert.Equal(t, "hello world", textType.ToString())
+
+	// Verify YMap still has the full metadata
+	nodesMap := doc.GetMap("nodes")
+	raw, ok := nodesMap.Get(nodeID)
+	require.True(t, ok)
+	var rehydrated noteNodeJSON
+	err = json.Unmarshal([]byte(raw.(string)), &rehydrated)
+	require.NoError(t, err)
+	assert.Equal(t, "text", rehydrated.Type)
+}
+
+func TestProjectToDBTx_RoundTripsFullDoc(t *testing.T) {
+	ctx := context.Background()
+	pool := setupTestDB(t)
+	insertNote(t, pool)
+
+	nodeID := "00000000-0000-0000-0000-000000000070"
+	nodeJSON := fmt.Sprintf(`{"id":"%s","parentId":"","position":0,"type":"text","data":{"text":"hello"}}`, nodeID)
+	seed := makeNodeUpdate(t, map[string]string{nodeID: nodeJSON})
+	require.NoError(t, ProjectToDB(ctx, pool, testNoteID, seed))
+
+	docPartial := crdt.New(crdt.WithGC(false))
+	docPartial.Transact(func(txn *crdt.Transaction) {
+		docPartial.GetText("content/"+nodeID).Insert(txn, 0, " CHANGED", nil)
+	})
+	partial := crdt.EncodeStateAsUpdateV1(docPartial, nil)
+
+	doc := crdt.New(crdt.WithGC(false))
+	require.NoError(t, crdt.ApplyUpdateV1(doc, seed, nil))
+	require.NoError(t, crdt.ApplyUpdateV1(doc, partial, nil))
+
+	tx, err := pool.Begin(ctx)
+	require.NoError(t, err)
+	require.NoError(t, ProjectToDBTxFromDoc(ctx, tx, doc, testNoteID))
+	require.NoError(t, tx.Commit(ctx))
+
+	var dataJSON []byte
+	require.NoError(t, pool.QueryRow(ctx, "SELECT data FROM note_nodes WHERE id = $1", nodeID).Scan(&dataJSON))
+	assert.Contains(t, string(dataJSON), "hello CHANGED")
+}
+
+func TestLoadYDocState_RejectsMalformedUUID(t *testing.T) {
+	ctx := context.Background()
+	pool := setupTestDB(t)
+	_, err := LoadYDocState(ctx, pool, "not-a-uuid")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse note id")
 }
 
 func TestReconstructYDocFromNodes_EmptyNote(t *testing.T) {
