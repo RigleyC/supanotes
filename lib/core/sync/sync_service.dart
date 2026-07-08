@@ -25,6 +25,7 @@ import 'connectivity_monitor.dart';
 import 'sync_mapper.dart';
 import 'sync_repository.dart';
 import 'sync_state.dart';
+import 'yjs_websocket_client.dart';
 
 /// SharedPreferences key under which the last successful sync
 /// timestamp is persisted across app launches.
@@ -76,10 +77,33 @@ class SyncService {
   final SyncStateNotifier _notifier;
   final String _userId;
 
+  YjsWebSocketClient? _yjsWsClient;
+  String? _activeNoteId;
+
   bool _isSyncing = false;
 
   StreamSubscription<bool>? _connectivitySub;
   Timer? _syncTimer;
+
+  /// Register the WebSocket client for real-time Yjs sync.
+  void setWebSocketClient(YjsWebSocketClient client) {
+    _yjsWsClient = client;
+  }
+
+  /// Connect real-time sync for [noteId] when it becomes active.
+  Future<void> connectNote(String noteId) async {
+    _activeNoteId = noteId;
+    await _yjsWsClient?.connect(noteId);
+  }
+
+  /// Disconnect real-time sync for the active note.
+  Future<void> disconnectNote() async {
+    if (_activeNoteId != null && kDebugMode) {
+      debugPrint('[SyncService] Disconnecting note=$_activeNoteId');
+    }
+    _activeNoteId = null;
+    await _yjsWsClient?.disconnect();
+  }
 
   void start() {
     _connectivitySub ??= _connectivity.onConnected.listen((_) {
@@ -97,6 +121,8 @@ class SyncService {
     _syncTimer = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
+    _yjsWsClient?.dispose();
+    _yjsWsClient = null;
   }
 
   Future<void> sync() async {

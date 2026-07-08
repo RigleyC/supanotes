@@ -4,6 +4,7 @@ import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/core/database/database.dart';
@@ -36,6 +37,10 @@ class NoteEditorController {
   NoteSyncCoordinator? _coordinator;
   String? _noteId;
 
+  /// Yjs UndoManager configured to track only local transactions.
+  /// Remote transactions (origin != 'local') are excluded from undo/redo.
+  UndoManager? _undoManager;
+
   void initFromNodes({required List<NoteNode> nodes, String? noteId}) {
     dev.log(
       '[NoteEditorController.initFromNodes] nodeCount=${nodes.length}',
@@ -60,6 +65,17 @@ class NoteEditorController {
       const RandomDividerConversionReaction(dividerCount: _dividerCount),
     );
     editor!.reactionPipeline.add(const KeepFirstLineAsTitleReaction());
+
+    _setupUndoManager();
+  }
+
+  void _setupUndoManager() {
+    final doc = Doc();
+    final nodesMap = doc.share['nodes'] as YMap;
+    _undoManager = UndoManager(
+      nodesMap,
+      UndoManagerOpts(trackedOrigins: {'local'}),
+    );
   }
 
   void _setupCoordinator() {
@@ -158,6 +174,8 @@ class NoteEditorController {
     document?.dispose();
     composer?.dispose();
     focusNode.dispose();
+    _undoManager?.destroy();
+    _undoManager = null;
   }
 }
 
