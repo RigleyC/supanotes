@@ -47,13 +47,14 @@ var (
 )
 
 type service struct {
-	repo Repository
-	pool *pgxpool.Pool
-	ydoc *YDocService
+	repo    Repository
+	pool    *pgxpool.Pool
+	ydoc    *YDocService
+	roomMgr *RoomManager
 }
 
-func NewService(repo Repository, pool *pgxpool.Pool, ydoc *YDocService) Service {
-	return &service{repo: repo, pool: pool, ydoc: ydoc}
+func NewService(repo Repository, pool *pgxpool.Pool, ydoc *YDocService, roomMgr *RoomManager) Service {
+	return &service{repo: repo, pool: pool, ydoc: ydoc, roomMgr: roomMgr}
 }
 
 func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) (*SyncPayload, error) {
@@ -355,6 +356,9 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			}
 			if err := s.ydoc.ApplyNodeMutation(ctx, noteIDStr, update); err != nil {
 				return fmt.Errorf("ingest update for note %s: %w", noteIDStr, err)
+			}
+			if s.roomMgr != nil {
+				s.roomMgr.BroadcastIfActive(noteIDStr, update)
 			}
 		}
 	}

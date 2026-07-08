@@ -705,8 +705,8 @@ func (q *Queries) UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, erro
 }
 
 const upsertTask = `-- name: UpsertTask :one
-INSERT INTO tasks (id, user_id, note_id, title, status, position, recurrence, due_date, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
+INSERT INTO tasks (id, user_id, note_id, title, status, position, recurrence, due_date, completed_at, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
 ON CONFLICT (id) DO UPDATE
 SET note_id = EXCLUDED.note_id,
     title = EXCLUDED.title,
@@ -714,22 +714,24 @@ SET note_id = EXCLUDED.note_id,
     position = EXCLUDED.position,
     recurrence = EXCLUDED.recurrence,
     due_date = EXCLUDED.due_date,
+    completed_at = EXCLUDED.completed_at,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, node_id
 `
 
 type UpsertTaskParams struct {
-	ID         pgtype.UUID        `json:"id"`
-	UserID     pgtype.UUID        `json:"user_id"`
-	NoteID     pgtype.UUID        `json:"note_id"`
-	Title      string             `json:"title"`
-	Status     string             `json:"status"`
-	Position   float64            `json:"position"`
-	Recurrence pgtype.Text        `json:"recurrence"`
-	DueDate    pgtype.Date        `json:"due_date"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+	ID          pgtype.UUID        `json:"id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	NoteID      pgtype.UUID        `json:"note_id"`
+	Title       string             `json:"title"`
+	Status      string             `json:"status"`
+	Position    float64            `json:"position"`
+	Recurrence  pgtype.Text        `json:"recurrence"`
+	DueDate     pgtype.Date        `json:"due_date"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }
 
 func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, error) {
@@ -742,6 +744,7 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, e
 		arg.Position,
 		arg.Recurrence,
 		arg.DueDate,
+		arg.CompletedAt,
 		arg.CreatedAt,
 		arg.DeletedAt,
 	)

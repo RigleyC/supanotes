@@ -177,6 +177,34 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 				return fmt.Errorf("upsert node %s: %w", key, err)
 			}
 		}
+
+		// Soft-delete nodes removed from the YMap.
+		orphanRows, err := tx.Query(ctx, "SELECT id FROM note_nodes WHERE note_id = $1 AND deleted_at IS NULL", noteUUID)
+		if err != nil {
+			return fmt.Errorf("query active node ids: %w", err)
+		}
+		var existingIDs []string
+		for orphanRows.Next() {
+			var id pgtype.UUID
+			if err := orphanRows.Scan(&id); err != nil {
+				orphanRows.Close()
+				return fmt.Errorf("scan orphan id: %w", err)
+			}
+			existingIDs = append(existingIDs, uuid.UUID(id.Bytes).String())
+		}
+		orphanRows.Close()
+
+		activeIDs := make(map[string]bool, len(nodesMap.Keys()))
+		for _, key := range nodesMap.Keys() {
+			activeIDs[key] = true
+		}
+		for _, id := range existingIDs {
+			if !activeIDs[id] {
+				if _, err := tx.Exec(ctx, "UPDATE note_nodes SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL", id); err != nil {
+					return fmt.Errorf("soft-delete orphan node %s: %w", id, err)
+				}
+			}
+		}
 	}
 
 	if tasksMap := doc.GetMap("tasks"); tasksMap != nil {
@@ -227,19 +255,48 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 			}
 
 			params := sqlcgen.UpsertTaskParams{
-				ID:         pgTaskID,
-				UserID:     userID,
-				NoteID:     noteUUID,
-				Title:      td.Title,
-				Status:     td.Status,
-				Position:   td.Position,
-				Recurrence: recurrence,
-				DueDate:    dueDate,
-				CreatedAt:  msToTimestamptz(td.CreatedAt),
-				DeletedAt:  pgtype.Timestamptz{Valid: false},
+				ID:          pgTaskID,
+				UserID:      userID,
+				NoteID:      noteUUID,
+				Title:       td.Title,
+				Status:      td.Status,
+				Position:    td.Position,
+				Recurrence:  recurrence,
+				DueDate:     dueDate,
+				CompletedAt: msToTimestamptz(td.CompletedAt),
+				CreatedAt:   msToTimestamptz(td.CreatedAt),
+				DeletedAt:   pgtype.Timestamptz{Valid: false},
 			}
 			if _, err := q.UpsertTask(ctx, params); err != nil {
 				return fmt.Errorf("upsert task %s: %w", key, err)
+			}
+		}
+
+		// Soft-delete tasks removed from the YMap.
+		orphanTaskRows, err := tx.Query(ctx, "SELECT id FROM tasks WHERE note_id = $1 AND deleted_at IS NULL", noteUUID)
+		if err != nil {
+			return fmt.Errorf("query active task ids: %w", err)
+		}
+		var existingTaskIDs []string
+		for orphanTaskRows.Next() {
+			var id pgtype.UUID
+			if err := orphanTaskRows.Scan(&id); err != nil {
+				orphanTaskRows.Close()
+				return fmt.Errorf("scan orphan task id: %w", err)
+			}
+			existingTaskIDs = append(existingTaskIDs, uuid.UUID(id.Bytes).String())
+		}
+		orphanTaskRows.Close()
+
+		activeTaskIDs := make(map[string]bool, len(tasksMap.Keys()))
+		for _, key := range tasksMap.Keys() {
+			activeTaskIDs[key] = true
+		}
+		for _, id := range existingTaskIDs {
+			if !activeTaskIDs[id] {
+				if _, err := tx.Exec(ctx, "UPDATE tasks SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL", id); err != nil {
+					return fmt.Errorf("soft-delete orphan task %s: %w", id, err)
+				}
 			}
 		}
 	}

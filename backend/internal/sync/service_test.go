@@ -158,7 +158,7 @@ func (m *mockRepository) UpdateNotesContentFromNodes(ctx context.Context, noteID
 
 func TestSyncServicePushRejectsSharedNoteWithoutEditPermission(t *testing.T) {
 	repo := &mockRepository{}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 
 	payload := &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
@@ -181,7 +181,7 @@ func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
 			return sqlcgen.NoteShare{Permission: "edit"}, nil
 		},
 	}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 
 	payload := &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
@@ -210,7 +210,7 @@ func TestSyncServicePushAllowsTaskSyncWithoutParentNoteInPayload(t *testing.T) {
 			return pgtype.UUID{}, nil
 		},
 	}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 
 
 	payload := &SyncPayload{
@@ -269,7 +269,7 @@ func TestProduceUpdateFromRows_GeneratesYjsUpdate(t *testing.T) {
 
 func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
 	repo := &mockRepository{upsertNoteErr: pgx.ErrNoRows}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 
 	userID := testUserID()
 

@@ -53,8 +53,8 @@ ORDER BY t.updated_at ASC
 LIMIT sqlc.arg('limit');
 
 -- name: UpsertTask :one
-INSERT INTO tasks (id, user_id, note_id, title, status, position, recurrence, due_date, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
+INSERT INTO tasks (id, user_id, note_id, title, status, position, recurrence, due_date, completed_at, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
 ON CONFLICT (id) DO UPDATE
 SET note_id = EXCLUDED.note_id,
     title = EXCLUDED.title,
@@ -62,6 +62,7 @@ SET note_id = EXCLUDED.note_id,
     position = EXCLUDED.position,
     recurrence = EXCLUDED.recurrence,
     due_date = EXCLUDED.due_date,
+    completed_at = EXCLUDED.completed_at,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 RETURNING *;
