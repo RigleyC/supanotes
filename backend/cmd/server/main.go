@@ -196,7 +196,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	roomMgr := syncpkg.NewRoomManager(leaseMgr, ydocSvc, pool)
 	ydocSvc.StartFlusher(cronCtx, 500*time.Millisecond)
 	compactor.StartScheduler(cronCtx, 5*time.Minute)
-	noteSyncer := syncpkg.NewNoteStateSyncer(pool, roomMgr)
+	noteSyncer := syncpkg.NewNoteStateSyncer(pool, ydocSvc)
 
 	// Notes
 	notesRepo := notes.NewRepository(queries)
@@ -355,7 +355,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	// Sync (push/pull)
 	syncRepo := syncpkg.NewRepository(queries)
-	syncSvc := syncpkg.NewService(syncRepo, pool)
+	syncSvc := syncpkg.NewService(syncRepo, pool, ydocSvc)
 	syncH := syncpkg.NewHandler(syncSvc)
 	protected.POST("/sync/push", syncH.Push)
 	protected.POST("/sync/pull", syncH.Pull)
