@@ -136,10 +136,8 @@ func makeTestUpdate(t *testing.T) []byte {
 func TestRoomManagerGetOrCreateRoom(t *testing.T) {
 	mgr := NewRoomManager(
 		newMockLeaseManager(),
-		NewYDocService(nil),
-		func(_ context.Context, _ string) ([]byte, error) {
-			return nil, nil
-		},
+		NewYDocService(nil, nil),
+		nil,
 	)
 
 	room1, err := mgr.GetOrCreateRoom(context.Background(), "note-1", "machine-a")
@@ -156,10 +154,8 @@ func TestRoomManagerGetOrCreateRoom(t *testing.T) {
 func TestRoomManagerGetOrCreateRoomDifferentNotes(t *testing.T) {
 	mgr := NewRoomManager(
 		newMockLeaseManager(),
-		NewYDocService(nil),
-		func(_ context.Context, _ string) ([]byte, error) {
-			return nil, nil
-		},
+		NewYDocService(nil, nil),
+		nil,
 	)
 
 	room1, err := mgr.GetOrCreateRoom(context.Background(), "note-1", "machine-a")
@@ -178,8 +174,8 @@ func TestRoomAddRemoveClient(t *testing.T) {
 		clients:   make(map[*websocket.Conn]bool),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		manager:   NewRoomManager(newMockLeaseManager(), NewYDocService(nil), nil),
-		ydocSvc:   NewYDocService(nil),
+		manager:   NewRoomManager(newMockLeaseManager(), NewYDocService(nil, nil), nil),
+		ydocSvc:   NewYDocService(nil, nil),
 	}
 
 	conn1 := newTestWSConn(t)
@@ -212,9 +208,7 @@ func TestRoomAddRemoveClient(t *testing.T) {
 
 func TestRoomRemoveClientLastReleasesLease(t *testing.T) {
 	leaseMgr := newMockLeaseManager()
-	rm := NewRoomManager(leaseMgr, NewYDocService(nil), func(_ context.Context, _ string) ([]byte, error) {
-		return nil, nil
-	})
+	rm := NewRoomManager(leaseMgr, NewYDocService(nil, nil), nil)
 
 	room, err := rm.GetOrCreateRoom(context.Background(), "note-lease", "machine-a")
 	require.NoError(t, err)
@@ -281,7 +275,7 @@ func TestRoomHandleIncomingUpdateBroadcasts(t *testing.T) {
 		clients:   make(map[*websocket.Conn]bool),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil),
+		ydocSvc:   NewYDocService(nil, nil),
 	}
 
 	room.AddClient(sender)
@@ -351,7 +345,7 @@ func TestRoomHandleIncomingUpdateSkipsSender(t *testing.T) {
 		clients:   make(map[*websocket.Conn]bool),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil),
+		ydocSvc:   NewYDocService(nil, nil),
 	}
 
 	room.AddClient(sender)
@@ -423,7 +417,7 @@ func TestRoomHandleHandshake(t *testing.T) {
 		Doc:       crdt.New(crdt.WithGC(false)),
 		clients:   make(map[*websocket.Conn]bool),
 		stopHeart: make(chan struct{}),
-		ydocSvc:   NewYDocService(nil),
+		ydocSvc:   NewYDocService(nil, nil),
 	}
 
 	err = room.HandleHandshake(conn)

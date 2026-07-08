@@ -9,6 +9,29 @@ import (
 	"github.com/reearth/ygo/crdt"
 )
 
+type projectionRunner interface {
+	RunDebouncedProjection(ctx context.Context, noteID string)
+}
+
+type YDocService struct {
+	pool        *pgxpool.Pool
+	projection  projectionRunner
+	mu          sync.Mutex
+	docs        map[string]*crdt.Doc
+	buffers     map[string][][]byte
+	lastFlushAt map[string]time.Time
+}
+
+func NewYDocService(pool *pgxpool.Pool, projection projectionRunner) *YDocService {
+	return &YDocService{
+		pool:        pool,
+		projection:  projection,
+		docs:        make(map[string]*crdt.Doc),
+		buffers:     make(map[string][][]byte),
+		lastFlushAt: make(map[string]time.Time),
+	}
+}
+
 func mergeYjsUpdates(updates [][]byte) ([]byte, error) {
 	if len(updates) == 0 {
 		return nil, nil
@@ -19,23 +42,46 @@ func mergeYjsUpdates(updates [][]byte) ([]byte, error) {
 	return crdt.MergeUpdatesV1(updates...)
 }
 
-type YDocService struct {
-	pool    *pgxpool.Pool
-	mu      sync.Mutex
-	buffers map[string][][]byte
-}
-
-func NewYDocService(pool *pgxpool.Pool) *YDocService {
-	return &YDocService{
-		pool:    pool,
-		buffers: make(map[string][][]byte),
-	}
-}
-
-func (s *YDocService) ApplyNodeMutation(_ context.Context, noteID string, update []byte) error {
+func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	if doc, ok := s.docs[noteID]; ok {
+		s.mu.Unlock()
+		return doc, nil
+	}
+	s.mu.Unlock()
+
+	state, err := LoadYDocState(ctx, s.pool, noteID)
+	if err != nil {
+		return nil, err
+	}
+	doc := crdt.New(crdt.WithGC(false))
+	if len(state) > 0 {
+		if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
+			return nil, err
+		}
+	}
+	s.mu.Lock()
+	s.docs[noteID] = doc
+	s.mu.Unlock()
+	return doc, nil
+}
+
+func (s *YDocService) ApplyNodeMutation(ctx context.Context, noteID string, update []byte) error {
+	doc, err := s.DocFor(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if err := crdt.ApplyUpdateV1(doc, update, "local"); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
 	s.buffers[noteID] = append(s.buffers[noteID], update)
+	s.mu.Unlock()
+
+	if s.projection != nil {
+		s.projection.RunDebouncedProjection(ctx, noteID)
+	}
 	return nil
 }
 
@@ -44,7 +90,6 @@ func (s *YDocService) flushNoteToDB(ctx context.Context, noteID string, updates 
 	if err != nil {
 		return err
 	}
-
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -54,11 +99,9 @@ func (s *YDocService) flushNoteToDB(ctx context.Context, noteID string, updates 
 	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext('nodes'))", noteID); err != nil {
 		return err
 	}
-
 	if _, err := tx.Exec(ctx, "INSERT INTO note_yjs_updates (note_id, update_data) VALUES ($1, $2)", noteID, merged); err != nil {
 		return err
 	}
-
 	return tx.Commit(ctx)
 }
 
@@ -71,7 +114,6 @@ func (s *YDocService) FlushUpdates(ctx context.Context, noteID string) error {
 	if len(updates) == 0 {
 		return nil
 	}
-
 	if err := s.flushNoteToDB(ctx, noteID, updates); err != nil {
 		s.mu.Lock()
 		s.buffers[noteID] = append(updates, s.buffers[noteID]...)
@@ -104,7 +146,14 @@ func (s *YDocService) flushAll(ctx context.Context) {
 	}
 	s.mu.Unlock()
 
+	var wg sync.WaitGroup
 	for _, id := range noteIDs {
-		_ = s.FlushUpdates(ctx, id)
+		wg.Add(1)
+		id := id
+		go func() {
+			defer wg.Done()
+			_ = s.FlushUpdates(ctx, id)
+		}()
 	}
+	wg.Wait()
 }

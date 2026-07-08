@@ -67,7 +67,7 @@ func TestMergeYjsUpdates_Single(t *testing.T) {
 
 func TestYDocServiceFlush(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool)
+	svc := NewYDocService(pool, nil)
 	ctx := context.Background()
 
 	noteID := uuid.New().String()
@@ -115,7 +115,7 @@ func TestYDocServiceFlush(t *testing.T) {
 
 func TestYDocServiceFlush_EmptyBuffer(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool)
+	svc := NewYDocService(pool, nil)
 	ctx := context.Background()
 
 	err := svc.FlushUpdates(ctx, "nonexistent-note")
@@ -124,7 +124,7 @@ func TestYDocServiceFlush_EmptyBuffer(t *testing.T) {
 
 func TestYDocServiceFlusher(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool)
+	svc := NewYDocService(pool, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -155,4 +155,31 @@ func TestYDocServiceFlusher(t *testing.T) {
 		}
 		return count == 1
 	}, 2*time.Second, 50*time.Millisecond, "expected flusher to persist update within 2s")
+}
+
+func TestYDocServiceRetainsCanonicalDoc(t *testing.T) {
+	pool := setupTestDB(t)
+	svc := NewYDocService(pool, nil)
+	ctx := context.Background()
+
+	noteID := uuid.New().String()
+	_, err := pool.Exec(ctx, "INSERT INTO notes (id, user_id, content, created_at) VALUES ($1, '00000000-0000-0000-0000-000000000000', '', NOW())", noteID)
+	require.NoError(t, err)
+	t.Cleanup(func() { pool.Exec(ctx, "DELETE FROM notes WHERE id = $1", noteID) })
+
+	doc1 := crdt.New()
+	doc1.Transact(func(txn *crdt.Transaction) {
+		doc1.GetText("content/x").Insert(txn, 0, "hello", nil)
+	})
+	update1 := crdt.EncodeStateAsUpdateV1(doc1, nil)
+
+	require.NoError(t, svc.ApplyNodeMutation(ctx, noteID, update1))
+
+	canonical, err := svc.DocFor(ctx, noteID)
+	require.NoError(t, err)
+	require.NotNil(t, canonical)
+	// The canonical doc must already reflect the applied update without flushing.
+	got := canonical.GetText("content/x").ToString()
+	require.NotEmpty(t, got)
+	require.Contains(t, got, "hello")
 }
