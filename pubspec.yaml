@@ -85,6 +85,16 @@ dependencies:
   flutter_markdown_plus: ^1.0.7
   super_clipboard: ^0.9.1
 
+  # Motion
+  motor: ^1.1.0
+
+  # Shapes
+  material_shapes:
+    git:
+      url: https://github.com/kamranbekirovyz/bunpod.git
+      ref: main
+      path: packages/material_shapes
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
