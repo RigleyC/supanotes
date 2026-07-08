@@ -5445,6 +5445,273 @@ class UserNotePreferencesCompanion
   }
 }
 
+class $LocalYjsStatesTable extends LocalYjsStates
+    with TableInfo<$LocalYjsStatesTable, LocalYjsState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalYjsStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES notes (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _stateMeta = const VerificationMeta('state');
+  @override
+  late final GeneratedColumn<Uint8List> state = GeneratedColumn<Uint8List>(
+    'state',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [noteId, state, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_yjs_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalYjsState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('state')) {
+      context.handle(
+        _stateMeta,
+        state.isAcceptableOrUnknown(data['state']!, _stateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stateMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {noteId};
+  @override
+  LocalYjsState map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalYjsState(
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      state: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}state'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalYjsStatesTable createAlias(String alias) {
+    return $LocalYjsStatesTable(attachedDatabase, alias);
+  }
+}
+
+class LocalYjsState extends DataClass implements Insertable<LocalYjsState> {
+  final String noteId;
+  final Uint8List state;
+  final DateTime updatedAt;
+  const LocalYjsState({
+    required this.noteId,
+    required this.state,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['note_id'] = Variable<String>(noteId);
+    map['state'] = Variable<Uint8List>(state);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LocalYjsStatesCompanion toCompanion(bool nullToAbsent) {
+    return LocalYjsStatesCompanion(
+      noteId: Value(noteId),
+      state: Value(state),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LocalYjsState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalYjsState(
+      noteId: serializer.fromJson<String>(json['noteId']),
+      state: serializer.fromJson<Uint8List>(json['state']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'noteId': serializer.toJson<String>(noteId),
+      'state': serializer.toJson<Uint8List>(state),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LocalYjsState copyWith({
+    String? noteId,
+    Uint8List? state,
+    DateTime? updatedAt,
+  }) => LocalYjsState(
+    noteId: noteId ?? this.noteId,
+    state: state ?? this.state,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LocalYjsState copyWithCompanion(LocalYjsStatesCompanion data) {
+    return LocalYjsState(
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      state: data.state.present ? data.state.value : this.state,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalYjsState(')
+          ..write('noteId: $noteId, ')
+          ..write('state: $state, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(noteId, $driftBlobEquality.hash(state), updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalYjsState &&
+          other.noteId == this.noteId &&
+          $driftBlobEquality.equals(other.state, this.state) &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalYjsStatesCompanion extends UpdateCompanion<LocalYjsState> {
+  final Value<String> noteId;
+  final Value<Uint8List> state;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LocalYjsStatesCompanion({
+    this.noteId = const Value.absent(),
+    this.state = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalYjsStatesCompanion.insert({
+    required String noteId,
+    required Uint8List state,
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : noteId = Value(noteId),
+       state = Value(state);
+  static Insertable<LocalYjsState> custom({
+    Expression<String>? noteId,
+    Expression<Uint8List>? state,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (noteId != null) 'note_id': noteId,
+      if (state != null) 'state': state,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalYjsStatesCompanion copyWith({
+    Value<String>? noteId,
+    Value<Uint8List>? state,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalYjsStatesCompanion(
+      noteId: noteId ?? this.noteId,
+      state: state ?? this.state,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (state.present) {
+      map['state'] = Variable<Uint8List>(state.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalYjsStatesCompanion(')
+          ..write('noteId: $noteId, ')
+          ..write('state: $state, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5460,6 +5727,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AttachmentsTable attachments = $AttachmentsTable(this);
   late final $UserNotePreferencesTable userNotePreferences =
       $UserNotePreferencesTable(this);
+  late final $LocalYjsStatesTable localYjsStates = $LocalYjsStatesTable(this);
   late final NotesDao notesDao = NotesDao(this as AppDatabase);
   late final ContextsDao contextsDao = ContextsDao(this as AppDatabase);
   late final TasksDao tasksDao = TasksDao(this as AppDatabase);
@@ -5489,7 +5757,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     noteLinks,
     attachments,
     userNotePreferences,
+    localYjsStates,
   ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'notes',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('local_yjs_states', kind: UpdateKind.delete)],
+    ),
+  ]);
 }
 
 typedef $$NotesTableCreateCompanionBuilder =
@@ -5566,6 +5845,24 @@ final class $$NotesTableReferences
     ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_localNoteTagsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$LocalYjsStatesTable, List<LocalYjsState>>
+  _localYjsStatesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.localYjsStates,
+    aliasName: 'notes__id__local_yjs_states__note_id',
+  );
+
+  $$LocalYjsStatesTableProcessedTableManager get localYjsStatesRefs {
+    final manager = $$LocalYjsStatesTableTableManager(
+      $_db,
+      $_db.localYjsStates,
+    ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_localYjsStatesRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -5696,6 +5993,31 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
           }) => $$LocalNoteTagsTableFilterComposer(
             $db: $db,
             $table: $db.localNoteTags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> localYjsStatesRefs(
+    Expression<bool> Function($$LocalYjsStatesTableFilterComposer f) f,
+  ) {
+    final $$LocalYjsStatesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.localYjsStates,
+      getReferencedColumn: (t) => t.noteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LocalYjsStatesTableFilterComposer(
+            $db: $db,
+            $table: $db.localYjsStates,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5906,6 +6228,31 @@ class $$NotesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> localYjsStatesRefs<T extends Object>(
+    Expression<T> Function($$LocalYjsStatesTableAnnotationComposer a) f,
+  ) {
+    final $$LocalYjsStatesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.localYjsStates,
+      getReferencedColumn: (t) => t.noteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LocalYjsStatesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.localYjsStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$NotesTableTableManager
@@ -5921,7 +6268,11 @@ class $$NotesTableTableManager
           $$NotesTableUpdateCompanionBuilder,
           (NoteData, $$NotesTableReferences),
           NoteData,
-          PrefetchHooks Function({bool noteNodesRefs, bool localNoteTagsRefs})
+          PrefetchHooks Function({
+            bool noteNodesRefs,
+            bool localNoteTagsRefs,
+            bool localYjsStatesRefs,
+          })
         > {
   $$NotesTableTableManager(_$AppDatabase db, $NotesTable table)
     : super(
@@ -6013,12 +6364,17 @@ class $$NotesTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({noteNodesRefs = false, localNoteTagsRefs = false}) {
+              ({
+                noteNodesRefs = false,
+                localNoteTagsRefs = false,
+                localYjsStatesRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (noteNodesRefs) db.noteNodes,
                     if (localNoteTagsRefs) db.localNoteTags,
+                    if (localYjsStatesRefs) db.localYjsStates,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -6065,6 +6421,27 @@ class $$NotesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (localYjsStatesRefs)
+                        await $_getPrefetchedData<
+                          NoteData,
+                          $NotesTable,
+                          LocalYjsState
+                        >(
+                          currentTable: table,
+                          referencedTable: $$NotesTableReferences
+                              ._localYjsStatesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$NotesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).localYjsStatesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.noteId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -6085,7 +6462,11 @@ typedef $$NotesTableProcessedTableManager =
       $$NotesTableUpdateCompanionBuilder,
       (NoteData, $$NotesTableReferences),
       NoteData,
-      PrefetchHooks Function({bool noteNodesRefs, bool localNoteTagsRefs})
+      PrefetchHooks Function({
+        bool noteNodesRefs,
+        bool localNoteTagsRefs,
+        bool localYjsStatesRefs,
+      })
     >;
 typedef $$NoteNodesTableCreateCompanionBuilder =
     NoteNodesCompanion Function({
@@ -9338,6 +9719,292 @@ typedef $$UserNotePreferencesTableProcessedTableManager =
       UserNotePreferenceData,
       PrefetchHooks Function()
     >;
+typedef $$LocalYjsStatesTableCreateCompanionBuilder =
+    LocalYjsStatesCompanion Function({
+      required String noteId,
+      required Uint8List state,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalYjsStatesTableUpdateCompanionBuilder =
+    LocalYjsStatesCompanion Function({
+      Value<String> noteId,
+      Value<Uint8List> state,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$LocalYjsStatesTableReferences
+    extends BaseReferences<_$AppDatabase, $LocalYjsStatesTable, LocalYjsState> {
+  $$LocalYjsStatesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $NotesTable _noteIdTable(_$AppDatabase db) =>
+      db.notes.createAlias('local_yjs_states__note_id__notes__id');
+
+  $$NotesTableProcessedTableManager get noteId {
+    final $_column = $_itemColumn<String>('note_id')!;
+
+    final manager = $$NotesTableTableManager(
+      $_db,
+      $_db.notes,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_noteIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$LocalYjsStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalYjsStatesTable> {
+  $$LocalYjsStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<Uint8List> get state => $composableBuilder(
+    column: $table.state,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$NotesTableFilterComposer get noteId {
+    final $$NotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableFilterComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LocalYjsStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalYjsStatesTable> {
+  $$LocalYjsStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<Uint8List> get state => $composableBuilder(
+    column: $table.state,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$NotesTableOrderingComposer get noteId {
+    final $$NotesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableOrderingComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LocalYjsStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalYjsStatesTable> {
+  $$LocalYjsStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<Uint8List> get state =>
+      $composableBuilder(column: $table.state, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$NotesTableAnnotationComposer get noteId {
+    final $$NotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LocalYjsStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalYjsStatesTable,
+          LocalYjsState,
+          $$LocalYjsStatesTableFilterComposer,
+          $$LocalYjsStatesTableOrderingComposer,
+          $$LocalYjsStatesTableAnnotationComposer,
+          $$LocalYjsStatesTableCreateCompanionBuilder,
+          $$LocalYjsStatesTableUpdateCompanionBuilder,
+          (LocalYjsState, $$LocalYjsStatesTableReferences),
+          LocalYjsState,
+          PrefetchHooks Function({bool noteId})
+        > {
+  $$LocalYjsStatesTableTableManager(
+    _$AppDatabase db,
+    $LocalYjsStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalYjsStatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalYjsStatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalYjsStatesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> noteId = const Value.absent(),
+                Value<Uint8List> state = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalYjsStatesCompanion(
+                noteId: noteId,
+                state: state,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String noteId,
+                required Uint8List state,
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalYjsStatesCompanion.insert(
+                noteId: noteId,
+                state: state,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$LocalYjsStatesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({noteId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (noteId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.noteId,
+                                referencedTable: $$LocalYjsStatesTableReferences
+                                    ._noteIdTable(db),
+                                referencedColumn:
+                                    $$LocalYjsStatesTableReferences
+                                        ._noteIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$LocalYjsStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalYjsStatesTable,
+      LocalYjsState,
+      $$LocalYjsStatesTableFilterComposer,
+      $$LocalYjsStatesTableOrderingComposer,
+      $$LocalYjsStatesTableAnnotationComposer,
+      $$LocalYjsStatesTableCreateCompanionBuilder,
+      $$LocalYjsStatesTableUpdateCompanionBuilder,
+      (LocalYjsState, $$LocalYjsStatesTableReferences),
+      LocalYjsState,
+      PrefetchHooks Function({bool noteId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9361,4 +10028,6 @@ class $AppDatabaseManager {
       $$AttachmentsTableTableManager(_db, _db.attachments);
   $$UserNotePreferencesTableTableManager get userNotePreferences =>
       $$UserNotePreferencesTableTableManager(_db, _db.userNotePreferences);
+  $$LocalYjsStatesTableTableManager get localYjsStates =>
+      $$LocalYjsStatesTableTableManager(_db, _db.localYjsStates);
 }

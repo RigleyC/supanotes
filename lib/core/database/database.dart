@@ -19,6 +19,7 @@ import 'daos/tasks_dao.dart';
 import 'daos/user_note_preferences_dao.dart';
 import 'tables/attachments.dart';
 import 'tables/contexts.dart';
+import 'tables/local_yjs_states.dart';
 import 'tables/note_links.dart';
 import 'tables/note_nodes.dart';
 import 'tables/note_tags.dart';
@@ -44,6 +45,7 @@ part 'database.g.dart';
     Attachments,
     UserNotePreferences,
     NoteNodes,
+    LocalYjsStates,
   ],
   daos: [
     NotesDao,
@@ -64,7 +66,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -183,6 +185,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 15) {
         await customStatement('DELETE FROM notes WHERE is_inbox = 1;');
         await customStatement('ALTER TABLE notes DROP COLUMN is_inbox;');
+      }
+      if (from < 16) {
+        await m.createTable(localYjsStates);
       }
     },
     beforeOpen: (details) async {

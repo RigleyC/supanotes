@@ -69,6 +69,10 @@ dependencies:
   # Markdown parsing
   markdown: ^7.3.1
 
+  # Yjs collaborative editing
+  yjs_dart: ^1.1.15
+  web_socket_channel: ^3.0.0
+
   # UI
   cue: ^0.1.0
   adaptive_platform_ui: ^0.1.107
