@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -14,19 +15,21 @@ type projectionRunner interface {
 }
 
 type YDocService struct {
-	pool       *pgxpool.Pool
-	projection projectionRunner
-	mu         sync.Mutex
-	docs       map[string]*crdt.Doc
-	buffers    map[string][][]byte
+	pool         *pgxpool.Pool
+	projection   projectionRunner
+	mu           sync.Mutex
+	docs         map[string]*crdt.Doc
+	buffers      map[string][][]byte
+	failureCount map[string]int
 }
 
 func NewYDocService(pool *pgxpool.Pool, projection projectionRunner) *YDocService {
 	return &YDocService{
-		pool:       pool,
-		projection: projection,
-		docs:       make(map[string]*crdt.Doc),
-		buffers:    make(map[string][][]byte),
+		pool:         pool,
+		projection:   projection,
+		docs:         make(map[string]*crdt.Doc),
+		buffers:      make(map[string][][]byte),
+		failureCount: make(map[string]int),
 	}
 }
 
@@ -120,9 +123,19 @@ func (s *YDocService) FlushUpdates(ctx context.Context, noteID string) error {
 	if err := s.flushNoteToDB(ctx, noteID, updates); err != nil {
 		s.mu.Lock()
 		s.buffers[noteID] = append(updates, s.buffers[noteID]...)
+		s.failureCount[noteID]++
+		if s.failureCount[noteID] == 3 || s.failureCount[noteID]%20 == 0 {
+			slog.Error("ydoc flush repeatedly failing",
+				"note_id", noteID,
+				"failure_count", s.failureCount[noteID],
+				"error", err)
+		}
 		s.mu.Unlock()
 		return err
 	}
+	s.mu.Lock()
+	delete(s.failureCount, noteID)
+	s.mu.Unlock()
 	return nil
 }
 
@@ -141,6 +154,8 @@ func (s *YDocService) StartFlusher(ctx context.Context, interval time.Duration) 
 	}()
 }
 
+const maxConcurrentFlushes = 16
+
 func (s *YDocService) flushAll(ctx context.Context) {
 	s.mu.Lock()
 	noteIDs := make([]string, 0, len(s.buffers))
@@ -149,12 +164,19 @@ func (s *YDocService) flushAll(ctx context.Context) {
 	}
 	s.mu.Unlock()
 
+	sem := make(chan struct{}, maxConcurrentFlushes)
 	var wg sync.WaitGroup
 	for _, id := range noteIDs {
 		wg.Add(1)
 		id := id
 		go func() {
 			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
 			_ = s.FlushUpdates(ctx, id)
 		}()
 	}
