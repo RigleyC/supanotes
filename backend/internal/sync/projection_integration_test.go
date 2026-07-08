@@ -1,3 +1,5 @@
+//go:build integration
+
 package sync
 
 import (
@@ -17,8 +19,6 @@ import (
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
-const testNoteID = "00000000-0000-0000-0000-000000000001"
-const testNoteUserID = "00000000-0000-0000-0000-000000000002"
 
 func insertNote(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()

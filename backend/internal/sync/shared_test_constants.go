@@ -1,0 +1,4 @@
+package sync
+
+const testNoteID = "00000000-0000-0000-0000-000000000001"
+const testNoteUserID = "00000000-0000-0000-0000-000000000002"

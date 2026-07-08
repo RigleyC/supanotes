@@ -347,19 +347,27 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 	return crdt.EncodeStateAsUpdateV1(doc, nil), nil
 }
 
+func validateNoteID(noteID string) error {
+	_, err := parseUUIDStr(noteID)
+	if err != nil {
+		return fmt.Errorf("parse note id: %w", err)
+	}
+	return nil
+}
+
 // LoadYDocState loads the Yjs document state for a note from the database.
 // It prefers the compacted snapshot from note_yjs_states + pending updates,
 // falling back to ReconstructYDocFromNodes when no snapshot exists yet.
 // Returns nil, nil if pool is nil (used in tests).
 func LoadYDocState(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]byte, error) {
+	if err := validateNoteID(noteID); err != nil {
+		return nil, err
+	}
 	if pool == nil {
 		return nil, nil
 	}
 
 	noteUUID, err := parseUUIDStr(noteID)
-	if err != nil {
-		return nil, fmt.Errorf("parse note id: %w", err)
-	}
 
 	var state []byte
 	err = pool.QueryRow(ctx, "SELECT state FROM note_yjs_states WHERE note_id = $1", noteUUID).Scan(&state)
