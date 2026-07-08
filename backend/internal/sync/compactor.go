@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,12 +13,80 @@ import (
 	"github.com/reearth/ygo/crdt"
 )
 
+type debounceState struct {
+	timer   *time.Timer
+	skipSeq int
+}
+
 type Compactor struct {
-	pool *pgxpool.Pool
+	pool       *pgxpool.Pool
+	debounce   map[string]*debounceState
+	debounceMu sync.Mutex
 }
 
 func NewCompactor(pool *pgxpool.Pool) *Compactor {
-	return &Compactor{pool: pool}
+	return &Compactor{
+		pool:     pool,
+		debounce: make(map[string]*debounceState),
+	}
+}
+
+func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
+	c.debounceMu.Lock()
+	defer c.debounceMu.Unlock()
+	st := c.debounce[noteID]
+	if st == nil {
+		st = &debounceState{}
+		c.debounce[noteID] = st
+	}
+	if st.timer != nil {
+		st.timer.Stop()
+	}
+	st.skipSeq++
+	seq := st.skipSeq
+	st.timer = time.AfterFunc(500*time.Millisecond, func() {
+		c.debounceMu.Lock()
+		if cur := c.debounce[noteID]; cur == nil || cur.skipSeq != seq {
+			c.debounceMu.Unlock()
+			return
+		}
+		c.debounceMu.Unlock()
+		_ = c.projectCanonicalDoc(ctx, noteID)
+	})
+}
+
+func (c *Compactor) RunDebouncedProjectionForTest(ctx context.Context, svc *YDocService, noteID string, update []byte) error {
+	if err := svc.ApplyNodeMutation(ctx, noteID, update); err != nil {
+		return err
+	}
+	return c.projectCanonicalDoc(ctx, noteID)
+}
+
+func (c *Compactor) projectCanonicalDoc(ctx context.Context, noteID string) error {
+	state, err := LoadYDocState(ctx, c.pool, noteID)
+	if err != nil {
+		return err
+	}
+	if len(state) == 0 {
+		return nil
+	}
+	doc := crdt.New(crdt.WithGC(false))
+	if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
+		return err
+	}
+
+	tx, err := c.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext('nodes'))", noteID); err != nil {
+		return err
+	}
+	if err := ProjectToDBTxFromDoc(ctx, tx, doc, noteID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (c *Compactor) CompactNote(ctx context.Context, noteID string) error {

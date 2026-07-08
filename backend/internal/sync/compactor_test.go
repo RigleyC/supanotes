@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -198,6 +199,42 @@ func TestCompactorPreservesUnmodifiedNodesAcrossCycles(t *testing.T) {
 	var textB string
 	require.NoError(t, pool.QueryRow(ctx, "SELECT data->>'text' FROM note_nodes WHERE id = $1", nodeB).Scan(&textB))
 	assert.Equal(t, "established B", textB)
+}
+
+func TestCompactorRunDebouncedProjectionProjects(t *testing.T) {
+	ctx := context.Background()
+	pool := setupTestDB(t)
+	compactor := NewCompactor(pool)
+	ydocSvc := NewYDocService(pool, compactor)
+	noteID := uuid.New().String()
+	insertNoteForCompactor(t, ctx, pool, noteID)
+	t.Cleanup(func() {
+		pool.Exec(ctx, "DELETE FROM note_nodes WHERE note_id = $1", noteID)
+		pool.Exec(ctx, "DELETE FROM note_yjs_updates WHERE note_id = $1", noteID)
+		pool.Exec(ctx, "DELETE FROM note_yjs_states WHERE note_id = $1", noteID)
+		pool.Exec(ctx, "DELETE FROM notes WHERE id = $1", noteID)
+	})
+
+	nodeID := uuid.New().String()
+	doc := crdt.New(crdt.WithGC(false))
+	doc.Transact(func(txn *crdt.Transaction) {
+		m := doc.GetMap("nodes")
+		nd, _ := json.Marshal(map[string]any{
+			"id":       nodeID,
+			"position": 0.0,
+			"type":     "paragraph",
+			"data":     map[string]string{"text": "hi"},
+		})
+		m.Set(txn, nodeID, string(nd))
+		doc.GetText("content/"+nodeID).Insert(txn, 0, "hi", nil)
+	})
+	update := crdt.EncodeStateAsUpdateV1(doc, nil)
+
+	require.NoError(t, compactor.RunDebouncedProjectionForTest(ctx, ydocSvc, noteID, update))
+
+	var dataText string
+	require.NoError(t, pool.QueryRow(ctx, "SELECT data->>'text' FROM note_nodes WHERE id = $1", nodeID).Scan(&dataText))
+	assert.Equal(t, "hi", dataText)
 }
 
 func TestCompactorStartScheduler(t *testing.T) {
