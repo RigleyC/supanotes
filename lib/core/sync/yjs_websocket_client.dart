@@ -41,6 +41,7 @@ class YjsWebSocketClient {
 
   Future<void> connect(String noteId) async {
     await disconnect();
+    _reconnectAttempts = 0;
     _connectedNoteId = noteId;
     _handshakeDone = false;
     _notifier?.markSyncing();
@@ -70,6 +71,7 @@ class YjsWebSocketClient {
           _notifier?.markSynced(DateTime.now());
           _flushPending();
         }
+        _onUpdateController.add(data);
       case messageYjsUpdate:
         _onUpdateController.add(data);
       default:
@@ -119,8 +121,11 @@ class YjsWebSocketClient {
     );
     _reconnectTimer = Timer(delay, () async {
       _reconnectTimer = null;
-      await connect(_connectedNoteId!);
-      _reconnectAttempts = 0;
+      try {
+        await connect(_connectedNoteId!);
+      } catch (_) {
+        _scheduleReconnect();
+      }
     });
   }
 
@@ -132,6 +137,7 @@ class YjsWebSocketClient {
   Future<void> disconnect() async {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _reconnectAttempts = 0;
     _idleTimer?.cancel();
     _idleTimer = null;
     await _sub?.cancel();
