@@ -6,6 +6,7 @@ import 'package:yjs_dart/yjs_dart.dart';
 
 import 'sync_state.dart';
 
+const int _kMaxPendingUpdates = 1000;
 const Duration _kIdleTimeout = Duration(minutes: 5);
 
 class YjsWebSocketClient {
@@ -31,12 +32,16 @@ class YjsWebSocketClient {
   bool _isConnected = false;
   bool _handshakeDone = false;
   final List<Uint8List> _pendingUpdates = [];
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  String? _connectedNoteId;
 
   Stream<Uint8List> get onUpdate => _onUpdateController.stream;
   bool get isConnected => _isConnected;
 
   Future<void> connect(String noteId) async {
     await disconnect();
+    _connectedNoteId = noteId;
     _handshakeDone = false;
     _notifier?.markSyncing();
     _sub = _stream.listen(_handleMessage);
@@ -94,10 +99,29 @@ class YjsWebSocketClient {
     writeUpdate(enc, update);
     final framed = toUint8Array(enc);
     if (!_isConnected) {
+      if (_pendingUpdates.length >= _kMaxPendingUpdates) {
+        dev.log('[YjsWS] pendingUpdates full, dropping oldest', name: 'YjsWS');
+        _pendingUpdates.removeAt(0);
+      }
       _pendingUpdates.add(framed);
+      _scheduleReconnect();
       return;
     }
     _sendRaw(framed);
+  }
+
+  void _scheduleReconnect() {
+    if (_connectedNoteId == null) return;
+    if (_reconnectTimer != null) return;
+    _reconnectAttempts++;
+    final delay = Duration(
+      milliseconds: (500 * (1 << (_reconnectAttempts - 1))).clamp(500, 30000),
+    );
+    _reconnectTimer = Timer(delay, () async {
+      _reconnectTimer = null;
+      await connect(_connectedNoteId!);
+      _reconnectAttempts = 0;
+    });
   }
 
   void _resetIdleTimer() {
@@ -106,6 +130,8 @@ class YjsWebSocketClient {
   }
 
   Future<void> disconnect() async {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _idleTimer?.cancel();
     _idleTimer = null;
     await _sub?.cancel();
@@ -115,6 +141,7 @@ class YjsWebSocketClient {
   }
 
   Future<void> dispose() async {
+    _reconnectTimer?.cancel();
     await disconnect();
     await _onUpdateController.close();
   }
