@@ -185,12 +185,12 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 		}
 		var existingIDs []string
 		for orphanRows.Next() {
-			var id pgtype.UUID
+			var id string
 			if err := orphanRows.Scan(&id); err != nil {
 				orphanRows.Close()
 				return fmt.Errorf("scan orphan id: %w", err)
 			}
-			existingIDs = append(existingIDs, uuid.UUID(id.Bytes).String())
+			existingIDs = append(existingIDs, id)
 		}
 		orphanRows.Close()
 
@@ -198,11 +198,18 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 		for _, key := range nodesMap.Keys() {
 			activeIDs[key] = true
 		}
+		var orphanIDs []pgtype.UUID
 		for _, id := range existingIDs {
 			if !activeIDs[id] {
-				if _, err := tx.Exec(ctx, "UPDATE note_nodes SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL", id); err != nil {
-					return fmt.Errorf("soft-delete orphan node %s: %w", id, err)
+				parsed, err := parseUUIDStr(id)
+				if err == nil {
+					orphanIDs = append(orphanIDs, parsed)
 				}
+			}
+		}
+		if len(orphanIDs) > 0 {
+			if _, err := tx.Exec(ctx, "UPDATE note_nodes SET deleted_at = NOW() WHERE id = ANY($1) AND deleted_at IS NULL", orphanIDs); err != nil {
+				return fmt.Errorf("soft-delete orphan nodes: %w", err)
 			}
 		}
 	}
@@ -279,12 +286,12 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 		}
 		var existingTaskIDs []string
 		for orphanTaskRows.Next() {
-			var id pgtype.UUID
+			var id string
 			if err := orphanTaskRows.Scan(&id); err != nil {
 				orphanTaskRows.Close()
 				return fmt.Errorf("scan orphan task id: %w", err)
 			}
-			existingTaskIDs = append(existingTaskIDs, uuid.UUID(id.Bytes).String())
+			existingTaskIDs = append(existingTaskIDs, id)
 		}
 		orphanTaskRows.Close()
 
@@ -292,11 +299,18 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 		for _, key := range tasksMap.Keys() {
 			activeTaskIDs[key] = true
 		}
+		var orphanTaskIDs []pgtype.UUID
 		for _, id := range existingTaskIDs {
 			if !activeTaskIDs[id] {
-				if _, err := tx.Exec(ctx, "UPDATE tasks SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL", id); err != nil {
-					return fmt.Errorf("soft-delete orphan task %s: %w", id, err)
+				parsed, err := parseUUIDStr(id)
+				if err == nil {
+					orphanTaskIDs = append(orphanTaskIDs, parsed)
 				}
+			}
+		}
+		if len(orphanTaskIDs) > 0 {
+			if _, err := tx.Exec(ctx, "UPDATE tasks SET deleted_at = NOW() WHERE id = ANY($1) AND deleted_at IS NULL", orphanTaskIDs); err != nil {
+				return fmt.Errorf("soft-delete orphan tasks: %w", err)
 			}
 		}
 	}
