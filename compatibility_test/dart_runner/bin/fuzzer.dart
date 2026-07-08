@@ -31,6 +31,7 @@ void main() {
 
     try {
       runFuzzIteration(iter, random);
+      runPhantomDeleteTest(iter, random);
     } catch (e, stack) {
       print('❌ Fuzzing failed at iteration $iter!');
       print('Seed: $seed');
@@ -290,6 +291,60 @@ void runFuzzIteration(int iterId, Random random) {
       }
       throw Exception('Divergence detected in iteration $iterId!');
     }
+  }
+}
+
+void runPhantomDeleteTest(int iterId, Random random) {
+  final docA = Doc(DocOpts(gc: false, clientID: 65));
+  final docB = Doc(DocOpts(gc: false, clientID: 66));
+
+  docA.getText('note');
+  docB.getText('note');
+
+  const baseText = 'Hello World Example Text';
+
+  docA.transact((tr) {
+    docA.getText('note')!.insert(0, baseText);
+  });
+  final initUpdate = encodeStateAsUpdate(docA);
+  applyUpdate(docB, initUpdate);
+
+  // Pick overlapping position for concurrent insert and delete
+  final pos = random.nextInt(baseText.length - 3) + 1;
+  final insertStr = 'ins_${random.nextInt(1000)}_';
+  final deleteLen = min(random.nextInt(5) + 1, baseText.length - pos);
+
+  // A inserts at pos (simulating typing)
+  docA.transact((tr) {
+    docA.getText('note')!.insert(pos, insertStr);
+  });
+
+  // B concurrently deletes at same pos (phantom delete)
+  docB.transact((tr) {
+    docB.getText('note')!.delete(pos, deleteLen);
+  });
+
+  // Full bidirectional sync
+  final svB = encodeStateVector(docB);
+  final diffA = encodeStateAsUpdate(docA, svB);
+  applyUpdate(docB, diffA);
+
+  final svA = encodeStateVector(docA);
+  final diffB = encodeStateAsUpdate(docB, svA);
+  applyUpdate(docA, diffB);
+
+  // Verify convergence
+  final textA = docA.getText('note')!.toString();
+  final textB = docB.getText('note')!.toString();
+  if (textA != textB) {
+    print('=== PHANTOM DELETE REPRODUCIBILITY LOG ===');
+    print('Divergence in phantom delete test at iteration $iterId');
+    print('Base text: "$baseText"');
+    print('A insert at $pos: "$insertStr"');
+    print('B delete at $pos length $deleteLen');
+    print('Client A text: "$textA"');
+    print('Client B text: "$textB"');
+    throw Exception('Phantom delete divergence detected in iteration $iterId!');
   }
 }
 

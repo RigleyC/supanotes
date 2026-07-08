@@ -662,6 +662,36 @@ void main() {
     }
   };
 
+  // Case 26: Concurrent Delete (Phantom Delete)
+  cases['26_concurrent_delete'] = {
+    'name': 'Concurrent delete during peer typing (phantom delete)',
+    'clients': ['A', 'B'],
+    'steps': [
+      {'client': 'A', 'action': 'text_insert', 'name': 'note', 'index': 0, 'value': 'Hello World'},
+      {'client': 'A', 'action': 'export_update', 'id': 'u1'},
+      {'client': 'B', 'action': 'import_update', 'id': 'u1'},
+
+      // A types at index 6 (the start of "World")
+      {'client': 'A', 'action': 'text_insert', 'name': 'note', 'index': 6, 'value': '!!!'},
+
+      // B concurrently deletes the same area (index 6, length 5 removes "World")
+      {'client': 'B', 'action': 'text_delete', 'name': 'note', 'index': 6, 'length': 5},
+
+      // Sync A and B using state vector
+      {'client': 'A', 'action': 'export_state_vector', 'id': 'svA'},
+      {'client': 'B', 'action': 'import_state_vector_and_export_diff', 'state_vector_id': 'svA', 'diff_id': 'diffB'},
+      {'client': 'A', 'action': 'import_update', 'id': 'diffB'},
+
+      {'client': 'B', 'action': 'export_state_vector', 'id': 'svB'},
+      {'client': 'A', 'action': 'import_state_vector_and_export_diff', 'state_vector_id': 'svB', 'diff_id': 'diffA'},
+      {'client': 'B', 'action': 'import_update', 'id': 'diffA'}
+    ],
+    'expected': {
+      // "Hello " + "!!!" (insert survived) + "World" deleted = "Hello !!!"
+      'text': {'note': 'Hello !!!'}
+    }
+  };
+
   // Write all case steps files
   cases.forEach((dirName, data) {
     final dir = Directory('cases/$dirName');
