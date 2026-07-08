@@ -291,7 +291,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	routines.RegisterRoutes(protected, routinesH)
 
 	// WebSocket sync handler
-	wsH := syncpkg.NewWSHandler(roomMgr, pool, machineID)
+	wsH := syncpkg.NewWSHandler(cronCtx, roomMgr, pool, machineID)
 	protected.GET("/sync/ws/:note_id", wsH.HandleConnect)
 
 	// Agent Loop (built before the runner so the runner and the

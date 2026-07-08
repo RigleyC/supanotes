@@ -61,7 +61,11 @@ func (pl *PermissionListener) listenOnce(ctx context.Context, pool *pgxpool.Pool
 		return fmt.Errorf("acquire: %w", err)
 	}
 	conn := poolConn.Hijack()
-	defer conn.Close(ctx)
+	go func() {
+		<-ctx.Done()
+		conn.Close(context.Background())
+	}()
+	defer conn.Close(context.Background())
 	if _, err := conn.Exec(ctx, "LISTEN permission_revoked"); err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
@@ -126,22 +130,24 @@ func (tb *tokenBucket) Allow() bool {
 }
 
 type WSHandler struct {
-	roomMgr   *RoomManager
-	pool      *pgxpool.Pool
-	upgrader  websocket.Upgrader
-	machineID string
-	perm      *PermissionListener
-	log       *slog.Logger
+	roomMgr     *RoomManager
+	pool        *pgxpool.Pool
+	upgrader    websocket.Upgrader
+	machineID   string
+	perm        *PermissionListener
+	log         *slog.Logger
+	shutdownCtx context.Context
 }
 
-func NewWSHandler(roomMgr *RoomManager, pool *pgxpool.Pool, machineID string) *WSHandler {
+func NewWSHandler(shutdownCtx context.Context, roomMgr *RoomManager, pool *pgxpool.Pool, machineID string) *WSHandler {
 	log := slog.With("component", "ws_handler")
 	return &WSHandler{
-		roomMgr:   roomMgr,
-		pool:      pool,
-		machineID: machineID,
-		perm:      NewPermissionListener(context.Background(), pool, log),
-		log:       log,
+		roomMgr:     roomMgr,
+		pool:        pool,
+		machineID:   machineID,
+		shutdownCtx: shutdownCtx,
+		perm:        NewPermissionListener(shutdownCtx, pool, log),
+		log:         log,
 		upgrader: websocket.Upgrader{
 			CheckOrigin:     func(r *http.Request) bool { return true },
 			ReadBufferSize:  1024,
@@ -218,9 +224,10 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 		canEdit = false
 	}
 
+	var closeOnce sync.Once
 	unregister := h.perm.Register(noteID, userIDStr, func() {
 		h.log.Info("revoking WS connection due to permission change", "note_id", noteID, "user_id", userIDStr)
-		conn.Close()
+		closeOnce.Do(func() { conn.Close() })
 	})
 
 	rl := newTokenBucket(50, 50)
