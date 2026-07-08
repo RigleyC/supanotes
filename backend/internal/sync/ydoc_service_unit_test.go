@@ -3,6 +3,7 @@ package sync
 import (
 	"testing"
 
+	"github.com/reearth/ygo/crdt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,6 +26,21 @@ func TestMergeYjsUpdates_Single(t *testing.T) {
 }
 
 func TestMergeYjsUpdates_Multiple(t *testing.T) {
-	_, err := mergeYjsUpdates([][]byte{{0}, {1}})
-	_ = err
+	doc1 := crdt.New(crdt.WithGC(false))
+	text1 := doc1.GetText("content/a")
+	doc1.Transact(func(txn *crdt.Transaction) {
+		text1.Insert(txn, 0, "hi", nil)
+	})
+	update1 := crdt.EncodeStateAsUpdateV1(doc1, nil)
+
+	doc2 := crdt.New(crdt.WithGC(false))
+	text2 := doc2.GetText("content/b")
+	doc2.Transact(func(txn *crdt.Transaction) {
+		text2.Insert(txn, 0, "there", nil)
+	})
+	update2 := crdt.EncodeStateAsUpdateV1(doc2, nil)
+
+	merged, err := mergeYjsUpdates([][]byte{update1, update2})
+	require.NoError(t, err)
+	require.NotEmpty(t, merged)
 }

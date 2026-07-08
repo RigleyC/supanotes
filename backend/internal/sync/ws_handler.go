@@ -61,9 +61,14 @@ func (pl *PermissionListener) listenOnce(ctx context.Context, pool *pgxpool.Pool
 		return fmt.Errorf("acquire: %w", err)
 	}
 	conn := poolConn.Hijack()
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
-		<-ctx.Done()
-		conn.Close(context.Background())
+		select {
+		case <-ctx.Done():
+			conn.Close(context.Background())
+		case <-done:
+		}
 	}()
 	defer conn.Close(context.Background())
 	if _, err := conn.Exec(ctx, "LISTEN permission_revoked"); err != nil {

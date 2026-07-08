@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/reearth/ygo/crdt"
@@ -73,5 +72,6 @@ func TestSyncProtocolByteStripHeuristicIsGone(t *testing.T) {
 	wrapped := ygsync.EncodeUpdate(update)
 	_, err := ygsync.ApplySyncMessage(doc2, wrapped, nil)
 	require.NoError(t, err)
-	require.False(t, bytes.Equal(wrapped, update), "wrapped must differ from raw update by at least one byte")
+	require.Equal(t, ygsync.MsgUpdate, int(wrapped[0]), "wrapped must start with MsgUpdate tag, proving no heuristic byte stripping exists")
+	require.Greater(t, len(wrapped), len(update), "wrapping adds the type tag byte + length prefix")
 }
