@@ -150,7 +150,7 @@ class YjsSyncManager {
     await _db.batch((b) {
       for (final node in nodes) {
         b.insert(_db.noteNodes, node,
-            onConflict: DoUpdate((old) => node.copyWith(updatedAt: old.updatedAt)));
+            onConflict: DoUpdate<$NoteNodesTable, NoteNode>((old) => NoteNodesCompanion.custom(updatedAt: old.updatedAt)));
       }
     });
   }
