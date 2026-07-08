@@ -123,6 +123,25 @@ type NoteTag struct {
 	TagID  pgtype.UUID `json:"tag_id"`
 }
 
+type NoteWsLease struct {
+	NoteID    pgtype.UUID        `json:"note_id"`
+	MachineID string             `json:"machine_id"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+type NoteYjsState struct {
+	NoteID    pgtype.UUID        `json:"note_id"`
+	State     []byte             `json:"state"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type NoteYjsUpdate struct {
+	ID         pgtype.UUID        `json:"id"`
+	NoteID     pgtype.UUID        `json:"note_id"`
+	UpdateData []byte             `json:"update_data"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type PendingToolConfirmation struct {
 	ID         pgtype.UUID        `json:"id"`
 	UserID     pgtype.UUID        `json:"user_id"`
