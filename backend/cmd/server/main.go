@@ -298,7 +298,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// gateway can both depend on it).
 	agentRepo := agent.NewRepository(queries)
 	workingMemSvc := agent.NewWorkingMemoryService(queries)
-	yjsMutSvc := agent.NewYjsMutationService(pool, roomMgr)
+	yjsMutSvc := agent.NewYjsMutationService(ydocSvc)
 	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient, llmFactory, workingMemSvc, yjsMutSvc)
 	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools, workingMemSvc)
 	agentH := agent.NewHandler(agentLoop, agentRepo)
