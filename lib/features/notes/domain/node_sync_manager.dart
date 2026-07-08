@@ -42,12 +42,11 @@ class NodeSyncManager {
     required String noteId,
     required String userId,
     required MutableDocument document,
-    void Function(List<NodeOperation> ops)? onFlush,
+    this.onFlush,
   }) : _db = database,
        _noteId = noteId,
        _userId = userId,
-       _document = document,
-       _onFlush = onFlush {
+       _document = document {
     _document.addListener(_onDocumentChanged);
   }
 
@@ -55,15 +54,10 @@ class NodeSyncManager {
   final String _noteId;
   final String _userId;
   final MutableDocument _document;
-  void Function(List<NodeOperation> ops)? _onFlush;
+  void Function(List<NodeOperation> ops)? onFlush;
 
   final List<NodeOperation> _pendingOps = [];
   Timer? _debounceTimer;
-
-  void Function(List<NodeOperation> ops)? get onFlush => _onFlush;
-  set onFlush(void Function(List<NodeOperation> ops)? cb) {
-    _onFlush = cb;
-  }
 
   /// IDs of nodes that have local changes not yet confirmed by the DB stream.
   /// Used by the editor controller to skip reactive updates for these nodes,
@@ -294,7 +288,7 @@ class NodeSyncManager {
     locallyDirtyNodeIds.removeAll(flushedIds.difference(stillPendingIds));
 
     if (opsToProcess.isNotEmpty) {
-      _onFlush?.call(opsToProcess);
+      onFlush?.call(opsToProcess);
     }
   }
 

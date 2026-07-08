@@ -28,7 +28,7 @@ void main() {
               '"data":{"text":"edit"}}');
       doc.getText('content/node-x')!.insert(0, 'edit');
     });
-    await mgr.saveState('n-1', encodeStateAsUpdate(doc));
+    await mgr.persist('n-1');
 
     final mgr2 = YjsSyncManager(db: db);
     final restored = await mgr2.loadDoc('n-1');
