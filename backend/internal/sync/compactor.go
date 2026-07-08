@@ -160,11 +160,6 @@ func (c *Compactor) CompactNote(ctx context.Context, noteID string) error {
 		return fmt.Errorf("delete compacted updates: %w", err)
 	}
 
-	// 30-day retention safety: prune any stragglers from orphaned failures.
-	if _, err := tx.Exec(ctx, "DELETE FROM note_yjs_updates WHERE note_id = $1 AND created_at < NOW() - INTERVAL '30 days'", noteID); err != nil {
-		return fmt.Errorf("prune old updates: %w", err)
-	}
-
 	return tx.Commit(ctx)
 }
 

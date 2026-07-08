@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/internal/sync"
 )
 
 var (
@@ -21,17 +22,13 @@ var (
 	ErrEmptyNote    = errors.New("empty note")
 )
 
-type NoteStateSyncer interface {
-	SyncNoteToYjs(ctx context.Context, noteID pgtype.UUID) error
-}
-
 type Service struct {
 	repo       Repository
 	pool       *pgxpool.Pool
-	noteSyncer NoteStateSyncer
+	noteSyncer sync.NoteStateSyncer
 }
 
-func NewService(repo Repository, pool *pgxpool.Pool, noteSyncer NoteStateSyncer) *Service {
+func NewService(repo Repository, pool *pgxpool.Pool, noteSyncer sync.NoteStateSyncer) *Service {
 	return &Service{repo: repo, pool: pool, noteSyncer: noteSyncer}
 }
 

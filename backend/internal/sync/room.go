@@ -28,6 +28,10 @@ type wsConn struct {
 	wmu  sync.Mutex
 }
 
+func (w *wsConn) ReadMessage() (int, []byte, error) {
+	return w.conn.ReadMessage()
+}
+
 func (w *wsConn) writeBinary(data []byte) error {
 	w.wmu.Lock()
 	defer w.wmu.Unlock()
@@ -222,7 +226,7 @@ func (r *Room) HandleHandshake(c *wsConn) error {
 		return err
 	}
 	// Read client Step1
-	_, raw, err := c.conn.ReadMessage()
+	_, raw, err := c.ReadMessage()
 	if err != nil {
 		return err
 	}
