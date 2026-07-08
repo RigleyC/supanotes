@@ -182,10 +182,20 @@ func (c *Compactor) CompactAll(ctx context.Context) error {
 	return rows.Err()
 }
 
+func (c *Compactor) PruneOldUpdates(ctx context.Context, olderThan time.Duration) error {
+	_, err := c.pool.Exec(ctx,
+		"DELETE FROM note_yjs_updates WHERE created_at < NOW() - $1::interval",
+		olderThan.String(),
+	)
+	return err
+}
+
 func (c *Compactor) StartScheduler(ctx context.Context, interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
+		pruneTicker := time.NewTicker(24 * time.Hour)
+		defer pruneTicker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
@@ -193,6 +203,10 @@ func (c *Compactor) StartScheduler(ctx context.Context, interval time.Duration) 
 			case <-ticker.C:
 				if err := c.CompactAll(ctx); err != nil {
 					slog.Error("compaction run failed", "error", err)
+				}
+			case <-pruneTicker.C:
+				if err := c.PruneOldUpdates(ctx, 30*24*time.Hour); err != nil {
+					slog.Error("prune run failed", "error", err)
 				}
 			}
 		}
