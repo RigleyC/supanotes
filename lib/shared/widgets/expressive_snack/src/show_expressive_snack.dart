@@ -3,7 +3,7 @@ import 'snack.dart';
 import 'snack_overlay.dart';
 
 void showExpressiveSnack({
-  required BuildContext context,
+  BuildContext? context,
   required String message,
   IconData? icon,
   SnackBarAction? action,

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/reearth/ygo/crdt"
 	ygsync "github.com/reearth/ygo/sync"
 	"golang.org/x/sync/singleflight"
 )
@@ -170,36 +171,31 @@ func (r *Room) RemoveClient(c *wsConn) {
 }
 
 func (r *Room) HandleIncomingUpdate(framedMsg []byte, sender *wsConn) {
-	doc, err := r.ydocSvc.DocFor(context.Background(), r.NoteID)
-	if err != nil {
-		return
-	}
 	msgType, payload, err := ygsync.ReadSyncMessage(framedMsg)
 	if err != nil {
 		return
 	}
 
-	switch msgType {
-	case ygsync.MsgSyncStep1:
-		r.mu.Lock()
-		reply, err := ygsync.EncodeSyncStep2(doc, framedMsg)
-		r.mu.Unlock()
-		if err != nil {
-			return
+	err = r.ydocSvc.WithDoc(context.Background(), r.NoteID, func(doc *crdt.Doc) error {
+		switch msgType {
+		case ygsync.MsgSyncStep1:
+			reply, err := ygsync.EncodeSyncStep2(doc, framedMsg)
+			if err != nil {
+				return err
+			}
+			_ = sender.writeBinary(reply)
+			return nil
+		case ygsync.MsgSyncStep2, ygsync.MsgUpdate:
+		default:
+			return nil
 		}
-		_ = sender.writeBinary(reply)
-		return
-	case ygsync.MsgSyncStep2, ygsync.MsgUpdate:
-	default:
-		return
-	}
 
-	r.mu.Lock()
-	_, err = ygsync.ApplySyncMessage(doc, framedMsg, "remote")
-	if err == nil {
-		_ = r.ydocSvc.ApplyNodeMutation(context.Background(), r.NoteID, payload)
-	}
-	r.mu.Unlock()
+		_, err = ygsync.ApplySyncMessage(doc, framedMsg, "remote")
+		if err == nil {
+			_ = r.ydocSvc.ApplyNodeMutationLocked(context.Background(), doc, r.NoteID, payload)
+		}
+		return err
+	})
 	if err != nil {
 		return
 	}
@@ -220,14 +216,14 @@ func (r *Room) HandleIncomingUpdate(framedMsg []byte, sender *wsConn) {
 }
 
 func (r *Room) HandleHandshake(c *wsConn) error {
-	doc, err := r.ydocSvc.DocFor(context.Background(), r.NoteID)
+	var step1Server []byte
+	err := r.ydocSvc.WithDoc(context.Background(), r.NoteID, func(doc *crdt.Doc) error {
+		step1Server = ygsync.EncodeSyncStep1(doc)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	// Send server Step1
-	r.mu.Lock()
-	step1Server := ygsync.EncodeSyncStep1(doc)
-	r.mu.Unlock()
 	if err := c.writeBinary(step1Server); err != nil {
 		return err
 	}
@@ -244,9 +240,12 @@ func (r *Room) HandleHandshake(c *wsConn) error {
 		return fmt.Errorf("expected SyncStep1 from client, got type %d", mt)
 	}
 	// Reply with Step2 diff
-	r.mu.Lock()
-	step2, err := ygsync.EncodeSyncStep2(doc, raw)
-	r.mu.Unlock()
+	var step2 []byte
+	err = r.ydocSvc.WithDoc(context.Background(), r.NoteID, func(doc *crdt.Doc) error {
+		var err error
+		step2, err = ygsync.EncodeSyncStep2(doc, raw)
+		return err
+	})
 	if err != nil {
 		return err
 	}

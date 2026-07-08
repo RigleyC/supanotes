@@ -48,19 +48,19 @@ func (s *Service) Update(ctx context.Context, userID pgtype.UUID, req dto.Update
 		}
 	}
 
-	var prefsBytes []byte
+	var prefsText pgtype.Text
 	if req.Preferences != nil {
-		var err error
-		prefsBytes, err = json.Marshal(req.Preferences)
+		bytes, err := json.Marshal(req.Preferences)
 		if err != nil {
 			return dto.SettingsResponse{}, fmt.Errorf("serialize preferences: %w", err)
 		}
+		prefsText = pgtype.Text{String: string(bytes), Valid: true}
 	}
 
 	settings, err := s.q.UpdateUserSettings(ctx, sqlcgen.UpdateUserSettingsParams{
 		UserID:      userID,
 		Timezone:    tz,
-		Preferences: prefsBytes,
+		Preferences: prefsText,
 	})
 	if err != nil {
 		return dto.SettingsResponse{}, err

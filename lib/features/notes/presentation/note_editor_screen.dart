@@ -138,9 +138,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         final isReadOnly = note.isReadOnly;
         final hideCompleted = note.hideCompleted;
 
-        return Scaffold(
+        return AdaptiveScaffold(
           resizeToAvoidBottomInset: false,
-          appBar: AppBar(
+          appBar: /* AppBar(
             actions: [
               IconButton(
                 onPressed: () {
@@ -157,9 +157,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   },
                 ),
             ],
-          ),
+          ), */
 
-          /* AdaptiveAppBar(
+          AdaptiveAppBar(
             title: isReadOnly
                 ? '${NoteStrings.sharedByPrefix} ${note.sharedByEmail}'
                 : null,
@@ -181,7 +181,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   },
                 ),
             ],
-          ), */
+          ),
           body: NoteEditor(
             noteId: widget.noteId,
             nodes: nodes,

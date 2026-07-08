@@ -21,6 +21,8 @@ type YDocService struct {
 	docs         map[string]*crdt.Doc
 	buffers      map[string][][]byte
 	failureCount map[string]int
+	docLocks     map[string]*sync.Mutex
+	locksMu      sync.Mutex
 }
 
 func NewYDocService(pool *pgxpool.Pool, projection projectionRunner) *YDocService {
@@ -30,7 +32,31 @@ func NewYDocService(pool *pgxpool.Pool, projection projectionRunner) *YDocServic
 		docs:         make(map[string]*crdt.Doc),
 		buffers:      make(map[string][][]byte),
 		failureCount: make(map[string]int),
+		docLocks:     make(map[string]*sync.Mutex),
 	}
+}
+
+func (s *YDocService) getDocLock(noteID string) *sync.Mutex {
+	s.locksMu.Lock()
+	defer s.locksMu.Unlock()
+	l, ok := s.docLocks[noteID]
+	if !ok {
+		l = &sync.Mutex{}
+		s.docLocks[noteID] = l
+	}
+	return l
+}
+
+func (s *YDocService) WithDoc(ctx context.Context, noteID string, fn func(doc *crdt.Doc) error) error {
+	lock := s.getDocLock(noteID)
+	lock.Lock()
+	defer lock.Unlock()
+
+	doc, err := s.DocFor(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	return fn(doc)
 }
 
 func mergeYjsUpdates(updates [][]byte) ([]byte, error) {
@@ -73,10 +99,18 @@ func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, err
 }
 
 func (s *YDocService) ApplyNodeMutation(ctx context.Context, noteID string, update []byte) error {
+	lock := s.getDocLock(noteID)
+	lock.Lock()
+	defer lock.Unlock()
+
 	doc, err := s.DocFor(ctx, noteID)
 	if err != nil {
 		return err
 	}
+	return s.ApplyNodeMutationLocked(ctx, doc, noteID, update)
+}
+
+func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc, noteID string, update []byte) error {
 	if err := crdt.ApplyUpdateV1(doc, update, "local"); err != nil {
 		return err
 	}

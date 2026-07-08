@@ -13,10 +13,7 @@ class AppMessenger {
     SnackBarAction? action,
     Duration? duration,
   }) {
-    final context = key.currentContext;
-    if (context == null) return;
     showExpressiveSnack(
-      context: context,
       message: subtitle != null ? '$title\n$subtitle' : title,
       icon: Icons.check_circle,
       action: action,
@@ -30,10 +27,7 @@ class AppMessenger {
     SnackBarAction? action,
     Duration? duration,
   }) {
-    final context = key.currentContext;
-    if (context == null) return;
     showExpressiveSnack(
-      context: context,
       message: subtitle != null ? '$title\n$subtitle' : title,
       icon: Icons.error,
       action: action,
@@ -47,10 +41,7 @@ class AppMessenger {
     SnackBarAction? action,
     Duration? duration,
   }) {
-    final context = key.currentContext;
-    if (context == null) return;
     showExpressiveSnack(
-      context: context,
       message: subtitle != null ? '$title\n$subtitle' : title,
       icon: Icons.info,
       action: action,
@@ -64,10 +55,7 @@ class AppMessenger {
     required SnackBarAction action,
     Duration? duration,
   }) {
-    final context = key.currentContext;
-    if (context == null) return;
     showExpressiveSnack(
-      context: context,
       message: subtitle != null ? '$title\n$subtitle' : title,
       icon: Icons.task_alt,
       action: action,

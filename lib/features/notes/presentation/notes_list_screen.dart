@@ -62,7 +62,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         : ref.watch(searchResultsProvider(trimmedSearchQuery));
 
     final headerSlivers = [
-      const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
+      SliverToBoxAdapter(
+        child: SizedBox(
+          height: AppSpacing.lg +
+              (PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 0.0),
+        ),
+      ),
       if (_isSearching)
         SliverToBoxAdapter(
           child: Padding(

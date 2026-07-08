@@ -29,7 +29,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return AdaptiveScaffold(
       appBar: const AdaptiveAppBar(title: 'Configurações'),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+        padding: EdgeInsets.only(
+          top: PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 0.0,
+          bottom: AppSpacing.lg,
+        ),
         children: [
           const SettingsSectionHeader(title: 'Conta'),
           SettingsTile.action(

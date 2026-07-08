@@ -24,7 +24,7 @@ WHERE user_id = $1;
 UPDATE user_settings
 SET
     timezone = COALESCE(NULLIF(@timezone::text, ''), timezone),
-    preferences = COALESCE(sqlc.narg('preferences')::jsonb, preferences),
+    preferences = COALESCE(sqlc.narg('preferences')::text::jsonb, preferences),
     updated_at = NOW()
 WHERE user_id = @user_id
 RETURNING *;

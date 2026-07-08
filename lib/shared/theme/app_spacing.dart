@@ -24,4 +24,10 @@ class AppSpacing {
   static const double radiusLg = 16.0;
   static const double radiusXl = 20.0;
   static const double radiusFull = 999.0;
+
+  /// Height of the iOS 26 native Liquid Glass toolbar (UINavigationBar height).
+  /// Used to add top body padding on screens that use AdaptiveScaffold with
+  /// an AppBar on iOS 26+, since IOS26Scaffold does not automatically inset
+  /// the body below the native toolbar.
+  static const double ios26ToolbarHeight = 44.0;
 }

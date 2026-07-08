@@ -6,7 +6,7 @@ Future<T?> showAdaptivePopupMenu<T>({
   required BuildContext context,
   required List<AdaptivePopupMenuItem<T>> items,
 }) async {
-  if (Theme.of(context).platform == TargetPlatform.iOS) {
+  if (PlatformInfo.isIOS) {
     final selected = await showCupertinoModalPopup<int>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
@@ -49,7 +49,7 @@ Future<T?> showAdaptivePopupMenu<T>({
           child: Row(
             children: [
               if (item.icon != null) ...[
-                Icon(item.icon as IconData?),
+                Icon(item.icon is IconData ? item.icon as IconData : null),
                 const SizedBox(width: 8),
               ],
               Expanded(child: Text(item.label)),

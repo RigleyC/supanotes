@@ -279,7 +279,7 @@ const updateUserSettings = `-- name: UpdateUserSettings :one
 UPDATE user_settings
 SET
     timezone = COALESCE(NULLIF($1::text, ''), timezone),
-    preferences = COALESCE($2::jsonb, preferences),
+    preferences = COALESCE($2::text::jsonb, preferences),
     updated_at = NOW()
 WHERE user_id = $3
 RETURNING user_id, timezone, created_at, updated_at, preferences
@@ -287,7 +287,7 @@ RETURNING user_id, timezone, created_at, updated_at, preferences
 
 type UpdateUserSettingsParams struct {
 	Timezone    string      `json:"timezone"`
-	Preferences []byte      `json:"preferences"`
+	Preferences pgtype.Text `json:"preferences"`
 	UserID      pgtype.UUID `json:"user_id"`
 }
 

@@ -93,9 +93,8 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
 
     final router = ref.watch(goRouterProvider);
 
-    return MaterialApp.router(
+    return AdaptiveApp.router(
       title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
       routerConfig: router,
       scaffoldMessengerKey: AppMessenger.key,
       localizationsDelegates: const [
@@ -107,24 +106,28 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
         Locale('pt', 'BR'),
         Locale('en', 'US'),
       ],
+      materialLightTheme: AppTheme.lightTheme,
+      materialDarkTheme: AppTheme.darkTheme,
+      cupertinoLightTheme: AppTheme.cupertinoLightTheme,
+      cupertinoDarkTheme: AppTheme.cupertinoDarkTheme,
       builder: (context, child) {
-        Widget result = SnackOverlay(child: child!);
-        if (kDebugMode) {
-          result = CueDebugTools(child: result);
-        }
+        Widget result = child!;
         if (PlatformInfo.isIOS) {
           final brightness = MediaQuery.platformBrightnessOf(context);
-          result = CupertinoTheme(
-            data: brightness == Brightness.dark
-                ? AppTheme.cupertinoDarkTheme
-                : AppTheme.cupertinoLightTheme,
+          final themeData = brightness == Brightness.dark
+              ? AppTheme.darkTheme
+              : AppTheme.lightTheme;
+          result = Theme(
+            data: themeData,
             child: result,
           );
         }
+        result = SnackOverlay(child: result);
+        if (kDebugMode) {
+          result = CueDebugTools(child: result);
+        }
         return result;
       },
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
     );
   }
 }

@@ -1,16 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
-import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
@@ -56,11 +52,13 @@ void main() {
     );
 
     await tester.tap(find.text('Show'));
-    await tester.pump();
+    await tester.pump(); // start entry animation
+    await tester.pump(const Duration(milliseconds: 750)); // let entry animation finish
     expect(find.textContaining('Concluída!'), findsOneWidget);
 
-    await tester.pump(const Duration(seconds: 5));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2)); // wait for duration, starts exit animation
+    await tester.pump(); // process state change
+    await tester.pump(const Duration(milliseconds: 750)); // let exit animation finish
     expect(find.textContaining('Concluída!'), findsNothing);
   });
 
@@ -68,7 +66,6 @@ void main() {
       'creates a daily recurring task, clicks to complete, and snackbar disappears after default time',
       (tester) async {
     final mockTasksRepo = _MockTasksRepository();
-    final mockNotesRepo = _MockNotesRepository();
 
     // Create a daily recurring task
     final now = DateTime.now();

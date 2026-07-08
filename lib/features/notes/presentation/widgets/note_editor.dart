@@ -25,6 +25,8 @@ import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
@@ -268,7 +270,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      padding: EdgeInsets.only(
+        top: PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 0.0,
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
       child: Column(
         children: [
           Expanded(
