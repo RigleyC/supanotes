@@ -17,6 +17,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/core/auth/current_user.dart';
@@ -111,9 +112,17 @@ class SyncService {
     if (accessToken == null) return;
     _activeNoteId = noteId;
     final doc = await _yjsMgr.loadDoc(noteId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/sync/ws/$noteId');
+    final channel = IOWebSocketChannel.connect(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    final stream = channel.stream
+        .where((m) => m is List<int>)
+        .map((m) => Uint8List.fromList(m as List<int>));
     _yjsWsClient = YjsWebSocketClient(
-      baseUrl: ApiConstants.baseUrl,
-      authToken: accessToken,
+      stream: stream,
+      sink: channel.sink,
       doc: doc,
       notifier: _notifier,
     );
@@ -122,11 +131,10 @@ class SyncService {
     onReady?.call(doc, (update) => _yjsWsClient?.sendUpdate(update));
   }
 
-  void _handleIncomingUpdate(Uint8List framed) {
+  void _handleIncomingUpdate(Uint8List _) {
     final noteId = _activeNoteId;
     if (noteId == null) return;
-    final doc = _yjsMgr.docFor(noteId);
-    _yjsMgr.saveState(noteId, encodeStateAsUpdate(doc));
+    _yjsMgr.persist(noteId);
   }
 
   /// Disconnect real-time sync for the active note.

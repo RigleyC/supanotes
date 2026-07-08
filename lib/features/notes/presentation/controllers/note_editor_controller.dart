@@ -1,7 +1,6 @@
 library;
 
 import 'dart:developer' as dev;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
@@ -39,6 +38,7 @@ class NoteEditorController {
   NoteSyncCoordinator? _coordinator;
   YjsDocEditorBridge? _bridge;
   String? _noteId;
+  Doc? _pendingBridgeDoc;
 
   void initFromNodes({required List<NoteNode> nodes, String? noteId}) {
     dev.log(
@@ -79,6 +79,11 @@ class NoteEditorController {
       document: doc,
       editor: ed,
     );
+
+    if (_pendingBridgeDoc != null) {
+      attachYjsBridge(doc: _pendingBridgeDoc!);
+      _pendingBridgeDoc = null;
+    }
   }
 
   void bind(String noteId) {
@@ -87,14 +92,15 @@ class NoteEditorController {
 
   void attachYjsBridge({
     required Doc doc,
-    required void Function(Uint8List update) sendUpdate,
   }) {
     final coordinator = _coordinator;
-    if (coordinator == null) return;
+    if (coordinator == null) {
+      _pendingBridgeDoc = doc;
+      return;
+    }
     _bridge = YjsDocEditorBridge(
       doc: doc,
       coordinator: coordinator,
-      sendUpdate: sendUpdate,
     );
   }
 

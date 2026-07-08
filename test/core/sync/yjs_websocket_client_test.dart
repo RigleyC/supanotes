@@ -10,9 +10,9 @@ void main() {
   test('client sends SyncStep1 on connect', () async {
     final channelPair = _FakeChannelPair();
     final clientDoc = Doc();
-    final client = YjsWebSocketClient.forTest(
-      channelStream: channelPair.clientIncoming,
-      channelSink: channelPair.clientOutgoing,
+    final client = YjsWebSocketClient(
+      stream: channelPair.clientIncoming,
+      sink: channelPair.clientOutgoing,
       doc: clientDoc,
     );
 
@@ -40,9 +40,9 @@ void main() {
     // Pre-create matching YText so applyUpdate can populate it.
     clientDoc.getText('content_x');
 
-    final client = YjsWebSocketClient.forTest(
-      channelStream: channelPair.clientIncoming,
-      channelSink: channelPair.clientOutgoing,
+    final client = YjsWebSocketClient(
+      stream: channelPair.clientIncoming,
+      sink: channelPair.clientOutgoing,
       doc: clientDoc,
     );
 

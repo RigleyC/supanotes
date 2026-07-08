@@ -4,6 +4,7 @@ import 'dart:developer' as dev;
 import 'package:drift/drift.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
+import '../../features/notes/domain/yjs_node_codec.dart';
 import '../database/database.dart';
 
 /// Manages a local Yjs [Doc] instance per note and persists binary
@@ -132,47 +133,34 @@ class YjsSyncManager {
     dev.log('[YjsSyncManager] Saved state for note=$noteId', name: 'YjsSync');
   }
 
+  /// Persist the current in-memory Doc state for [noteId] to the database
+  /// and project it to [note_nodes]. Unlike [saveState], this does NOT call
+  /// [applyUpdate] — it is safe to call when the Doc is already up-to-date
+  /// (e.g. after the WS client applied a remote update).
+  Future<void> persist(String noteId) async {
+    final doc = _docs[noteId];
+    if (doc == null) return;
+    final state = encodeStateAsUpdate(doc);
+    await _db.into(_db.localYjsStates).insertOnConflictUpdate(
+          LocalYjsStatesCompanion(
+            noteId: Value(noteId),
+            state: Value(state),
+          ),
+        );
+    await _projectToNodes(noteId, doc);
+    _updateNodeExistence(noteId, doc);
+    dev.log('[YjsSyncManager] Persisted state for note=$noteId', name: 'YjsSync');
+  }
+
   /// Project the in-memory [Doc] state into [note_nodes] so it survives
   /// reconstruction without calling [applyUpdate].
   Future<void> _projectToNodes(String noteId, Doc doc) async {
-    final nodesMap = doc.getMap('nodes');
-    if (nodesMap == null) return;
-    final nodeIds = nodesMap.keys.toList();
-    if (nodeIds.isEmpty) return;
-
-    final now = DateTime.now().toUtc();
+    final nodes = noteNodesFromDoc(doc, noteIdOverride: noteId);
+    if (nodes.isEmpty) return;
     await _db.batch((b) {
-      for (final nodeId in nodeIds) {
-        final raw = nodesMap.get(nodeId);
-        if (raw is! String) continue;
-        try {
-          final meta = jsonDecode(raw) as Map<String, dynamic>;
-          final ytext = doc.getText('content/$nodeId');
-          final textContent = ytext?.toString() ?? '';
-          final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
-          if (textContent.isNotEmpty) {
-            data['text'] = textContent;
-          }
-          final rawParentId = meta['parentId'] as String?;
-          final resolvedParentId =
-              (rawParentId == null || rawParentId.isEmpty) ? null : rawParentId;
-          final node = NoteNode(
-            id: nodeId,
-            noteId: noteId,
-            parentId: resolvedParentId,
-            position: (meta['position'] as num?)?.toDouble() ?? 0.0,
-            type: meta['type'] as String? ?? 'paragraph',
-            data: jsonEncode(data),
-            createdAt: DateTime.fromMillisecondsSinceEpoch(
-              (meta['createdAt'] as num?)?.toInt() ??
-                  now.millisecondsSinceEpoch,
-            ),
-            updatedAt: now,
-            isDirty: false,
-          );
-          b.insert(_db.noteNodes, node,
-              onConflict: DoUpdate((_) => node));
-        } catch (_) {}
+      for (final node in nodes) {
+        b.insert(_db.noteNodes, node,
+            onConflict: DoUpdate((_) => node));
       }
     });
   }

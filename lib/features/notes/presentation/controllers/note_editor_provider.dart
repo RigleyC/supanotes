@@ -16,11 +16,8 @@ final noteEditorControllerProvider = Provider.autoDispose
 
       syncService?.connectNote(
         noteId,
-        onReady: (doc, sendUpdate) {
-          controller.attachYjsBridge(
-            doc: doc,
-            sendUpdate: sendUpdate,
-          );
+        onReady: (doc, _) {
+          controller.attachYjsBridge(doc: doc);
         },
       );
 

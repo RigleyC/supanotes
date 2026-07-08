@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:typed_data';
 
-import 'package:web_socket_channel/io.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'sync_state.dart';
@@ -11,35 +10,21 @@ const Duration _kIdleTimeout = Duration(minutes: 5);
 
 class YjsWebSocketClient {
   YjsWebSocketClient({
-    required String baseUrl,
-    required String authToken,
+    required Stream<Uint8List> stream,
+    required StreamSink<dynamic> sink,
     required Doc doc,
     SyncStateNotifier? notifier,
-  })  : _baseUrl = baseUrl,
-        _authToken = authToken,
+  })  : _stream = stream,
+        _sink = sink,
         _doc = doc,
         _notifier = notifier;
 
-  YjsWebSocketClient.forTest({
-    required Stream<Uint8List> channelStream,
-    required StreamSink<Uint8List> channelSink,
-    required Doc doc,
-    SyncStateNotifier? notifier,
-  })  : _fakeStream = channelStream,
-        _fakeSink = channelSink,
-        _doc = doc,
-        _notifier = notifier;
-
-  String? _baseUrl;
-  String? _authToken;
-  Stream<Uint8List>? _fakeStream;
-  StreamSink<Uint8List>? _fakeSink;
+  final Stream<Uint8List> _stream;
+  final StreamSink<dynamic> _sink;
   final Doc _doc;
   final SyncStateNotifier? _notifier;
 
-  IOWebSocketChannel? _channel;
   StreamSubscription<Uint8List>? _sub;
-  StreamSink<dynamic>? _sink;
   final StreamController<Uint8List> _onUpdateController =
       StreamController<Uint8List>.broadcast();
   Timer? _idleTimer;
@@ -54,22 +39,7 @@ class YjsWebSocketClient {
     await disconnect();
     _handshakeDone = false;
     _notifier?.markSyncing();
-
-    if (_fakeStream != null && _fakeSink != null) {
-      _sub = _fakeStream!.listen(_handleMessage);
-      _sink = _fakeSink;
-    } else {
-      final uri = Uri.parse('$_baseUrl/api/v1/sync/ws/$noteId');
-      _channel = IOWebSocketChannel.connect(
-        uri,
-        headers: {'Authorization': 'Bearer $_authToken'},
-      );
-      _sub = _channel!.stream
-          .where((m) => m is List<int>)
-          .map((m) => Uint8List.fromList(m as List<int>))
-          .listen(_handleMessage);
-      _sink = _channel!.sink;
-    }
+    _sub = _stream.listen(_handleMessage);
     _isConnected = true;
     _sendStep1(_doc);
     _resetIdleTimer();
@@ -109,7 +79,7 @@ class YjsWebSocketClient {
     _sendRaw(toUint8Array(enc));
   }
 
-  void _sendRaw(Uint8List bytes) => _sink?.add(bytes);
+  void _sendRaw(Uint8List bytes) => _sink.add(bytes);
 
   void _flushPending() {
     if (_pendingUpdates.isEmpty) return;
@@ -140,9 +110,6 @@ class YjsWebSocketClient {
     _idleTimer = null;
     await _sub?.cancel();
     _sub = null;
-    await _channel?.sink.close();
-    _channel = null;
-    _sink = null;
     _isConnected = false;
     _handshakeDone = false;
   }
