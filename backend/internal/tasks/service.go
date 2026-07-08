@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -42,12 +43,17 @@ func (o UpdateTaskOpts) Validate() error {
 	return nil
 }
 
-type Service struct {
-	repo Repository
+type NoteStateSyncer interface {
+	SyncNoteToYjs(ctx context.Context, noteID pgtype.UUID) error
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+type Service struct {
+	repo       Repository
+	noteSyncer NoteStateSyncer
+}
+
+func NewService(repo Repository, noteSyncer NoteStateSyncer) *Service {
+	return &Service{repo: repo, noteSyncer: noteSyncer}
 }
 
 func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, title string, dueDate *time.Time, recurrence *string, position float64) (sqlcgen.Task, error) {
@@ -63,7 +69,16 @@ func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, ti
 	if recurrence != nil {
 		arg.Recurrence = pgtype.Text{String: *recurrence, Valid: true}
 	}
-	return s.repo.CreateTask(ctx, arg)
+	task, err := s.repo.CreateTask(ctx, arg)
+	if err != nil {
+		return sqlcgen.Task{}, err
+	}
+	if s.noteSyncer != nil {
+		if err := s.noteSyncer.SyncNoteToYjs(ctx, noteID); err != nil {
+			log.Printf("ERROR: yjs sync after create task in note %v: %v", noteID, err)
+		}
+	}
+	return task, nil
 }
 
 func (s *Service) GetTaskByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Task, error) {
@@ -149,15 +164,34 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 		}
 		return sqlcgen.Task{}, err
 	}
+	if task.NoteID.Valid && s.noteSyncer != nil {
+		if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
+			log.Printf("ERROR: yjs sync after update task %v: %v", task.ID, err)
+		}
+	}
 	return task, nil
 }
 
 func (s *Service) DeleteTask(ctx context.Context, userID, id pgtype.UUID) error {
+	task, err := s.repo.GetTaskByID(ctx, id, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+
 	if err := s.repo.DeleteTask(ctx, id, userID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrTaskNotFound
 		}
 		return err
+	}
+
+	if task.NoteID.Valid && s.noteSyncer != nil {
+		if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
+			log.Printf("ERROR: yjs sync after delete task %v: %v", task.ID, err)
+		}
 	}
 	return nil
 }
@@ -206,6 +240,11 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 				}
 				return sqlcgen.Task{}, err
 			}
+			if task.NoteID.Valid && s.noteSyncer != nil {
+				if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
+					log.Printf("ERROR: yjs sync after complete+reschedule task %v: %v", task.ID, err)
+				}
+			}
 			return task, nil
 		}
 	}
@@ -226,6 +265,11 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 		}
 		return sqlcgen.Task{}, err
 	}
+	if task.NoteID.Valid && s.noteSyncer != nil {
+		if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
+			log.Printf("ERROR: yjs sync after complete task %v: %v", task.ID, err)
+		}
+	}
 	return task, nil
 }
 
@@ -241,6 +285,11 @@ func (s *Service) ReopenTask(ctx context.Context, userID, id pgtype.UUID) (sqlcg
 			return sqlcgen.Task{}, ErrTaskNotFound
 		}
 		return sqlcgen.Task{}, err
+	}
+	if task.NoteID.Valid && s.noteSyncer != nil {
+		if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
+			log.Printf("ERROR: yjs sync after reopen task %v: %v", task.ID, err)
+		}
 	}
 	return task, nil
 }

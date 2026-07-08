@@ -154,7 +154,7 @@ func TestCompleteTask_CatchUp(t *testing.T) {
 		},
 	}
 
-	svc := NewService(repo)
+	svc := NewService(repo, nil)
 	_, err := svc.CompleteTask(context.Background(), userID, taskID)
 	if err != nil {
 		t.Fatalf("CompleteTask failed: %v", err)
@@ -200,7 +200,7 @@ func TestUpdateTask_ReopenOnRecurrence(t *testing.T) {
 		},
 	}
 
-	svc := NewService(repo)
+	svc := NewService(repo, nil)
 	recurrenceStr := "daily"
 	opts := UpdateTaskOpts{
 		Recurrence: &recurrenceStr,

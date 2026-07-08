@@ -1,9 +1,15 @@
 package sync
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/reearth/ygo/crdt"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/tasks"
@@ -122,4 +128,70 @@ func fromSyncTask(t SyncTask) (sqlcgen.Task, error) {
 		out.DeletedAt = pgtype.Timestamptz{Time: *t.DeletedAt, Valid: true}
 	}
 	return out, nil
+}
+
+// ProduceUpdateFromRows serializes incoming REST Push note_nodes + tasks into a
+// single Yjs update blob suitable for IngestUpdate. This is the only path by
+// which legacy REST Push can mutate note content.
+func ProduceUpdateFromRows(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	noteID string,
+	nodes []sqlcgen.NoteNode,
+	tasks []SyncTask,
+) ([]byte, error) {
+	noteUUID, err := uuid.Parse(noteID)
+	if err != nil {
+		return nil, fmt.Errorf("parse note id: %w", err)
+	}
+
+	doc := crdt.New(crdt.WithGC(false))
+	nodesMap := doc.GetMap("nodes")
+	tasksMap := doc.GetMap("tasks")
+
+	var defaultUserID pgtype.UUID
+	if pool != nil {
+		_ = pool.QueryRow(ctx, "SELECT user_id FROM notes WHERE id = $1", noteUUID).Scan(&defaultUserID)
+	}
+
+	doc.Transact(func(txn *crdt.Transaction) {
+		for _, n := range nodes {
+			nID := uuid.UUID(n.ID.Bytes).String()
+			nd := noteNodeJSON{
+				ID:        nID,
+				ParentID:  uuidToStr(n.ParentID),
+				Position:  n.Position,
+				Type:      n.Type,
+				Data:      n.Data,
+				CreatedAt: timestamptzToMS(n.CreatedAt),
+			}
+			b, _ := json.Marshal(nd)
+			nodesMap.Set(txn, nID, string(b))
+		}
+		for _, t := range tasks {
+			tID := uuid.UUID(t.ID.Bytes).String()
+			td := taskJSON{
+				ID:        tID,
+				NoteID:    noteID,
+				UserID:    uuidToStr(t.UserID),
+				Title:     t.Title,
+				Status:    t.Status,
+				Position:  t.Position,
+				CreatedAt: float64(t.CreatedAt.UnixMilli()),
+			}
+			if t.Recurrence != nil {
+				td.Recurrence = *t.Recurrence
+			}
+			if t.DueDate != nil {
+				td.DueDate = *t.DueDate
+			}
+			if t.CompletedAt != nil {
+				td.CompletedAt = float64(t.CompletedAt.UnixMilli())
+			}
+			b, _ := json.Marshal(td)
+			tasksMap.Set(txn, tID, string(b))
+		}
+	})
+
+	return crdt.EncodeStateAsUpdateV1(doc, nil), nil
 }

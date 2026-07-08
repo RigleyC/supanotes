@@ -559,7 +559,7 @@ func TestLoopConfirmationRequired(t *testing.T) {
 	q := &stubLoopQuerier{}
 	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 	memRepo := &stubLoopMemRepo{}
-	tasksSvc := tasks.NewService(&stubLoopTasksRepo{})
+	tasksSvc := tasks.NewService(&stubLoopTasksRepo{}, nil)
 	ctxBldr := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 	llmFact := &stubLoopLLMFactory{
@@ -650,7 +650,7 @@ func TestLoopRejectsEmptyLLMResponse(t *testing.T) {
 	q := &stubLoopQuerier{}
 	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 	memRepo := &stubLoopMemRepo{}
-	tasksSvc := tasks.NewService(&stubLoopTasksRepo{})
+	tasksSvc := tasks.NewService(&stubLoopTasksRepo{}, nil)
 	ctxBldr := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 	llmFact := &stubLoopLLMFactory{
@@ -690,7 +690,7 @@ func TestLoopFallsBackWithoutToolsWhenLLMReturnsEmptyResponse(t *testing.T) {
 	q := &stubLoopQuerier{}
 	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 	memRepo := &stubLoopMemRepo{}
-	tasksSvc := tasks.NewService(&stubLoopTasksRepo{})
+	tasksSvc := tasks.NewService(&stubLoopTasksRepo{}, nil)
 	ctxBldr := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 	llmClient := &stubLoopLLMClient{
@@ -751,7 +751,7 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 	q := &stubLoopQuerier{}
 	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 	memRepo := &stubLoopMemRepo{}
-	tasksSvc := tasks.NewService(&stubLoopTasksRepo{})
+	tasksSvc := tasks.NewService(&stubLoopTasksRepo{}, nil)
 	ctxBldr := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 	llmFact := &stubLoopLLMFactory{
@@ -815,7 +815,7 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 	q := &stubLoopQuerier{}
 	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 	memRepo := &stubLoopMemRepo{}
-	tasksSvc := tasks.NewService(&stubLoopTasksRepo{})
+	tasksSvc := tasks.NewService(&stubLoopTasksRepo{}, nil)
 	ctxBldr := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 	llmFact := &stubLoopLLMFactory{

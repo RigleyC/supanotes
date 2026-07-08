@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -20,13 +21,18 @@ var (
 	ErrEmptyNote    = errors.New("empty note")
 )
 
-type Service struct {
-	repo Repository
-	pool *pgxpool.Pool
+type NoteStateSyncer interface {
+	SyncNoteToYjs(ctx context.Context, noteID pgtype.UUID) error
 }
 
-func NewService(repo Repository, pool *pgxpool.Pool) *Service {
-	return &Service{repo: repo, pool: pool}
+type Service struct {
+	repo       Repository
+	pool       *pgxpool.Pool
+	noteSyncer NoteStateSyncer
+}
+
+func NewService(repo Repository, pool *pgxpool.Pool, noteSyncer NoteStateSyncer) *Service {
+	return &Service{repo: repo, pool: pool, noteSyncer: noteSyncer}
 }
 
 func isEmptyRegularNote(content string) bool {
@@ -51,9 +57,14 @@ func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content st
 		return sqlcgen.Note{}, err
 	}
 
-	err = s.overwriteNoteNodes(ctx, userID, note.ID, content)
-	if err != nil {
+	if err = s.overwriteNoteNodes(ctx, userID, note.ID, content); err != nil {
 		return sqlcgen.Note{}, err
+	}
+
+	if s.noteSyncer != nil {
+		if err := s.noteSyncer.SyncNoteToYjs(ctx, note.ID); err != nil {
+			log.Printf("ERROR: yjs sync after create note %v: %v", note.ID, err)
+		}
 	}
 
 	return note, nil
@@ -75,6 +86,7 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 		ID:     id,
 		UserID: userID,
 	}
+	var contentChanged bool
 	if content != nil {
 		arg.Content = pgtype.Text{String: *content, Valid: true}
 		arg.EmbeddingStatus = pgtype.Text{String: "pending", Valid: true}
@@ -82,6 +94,7 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 		if err := s.overwriteNoteNodes(ctx, userID, id, *content); err != nil {
 			return sqlcgen.Note{}, err
 		}
+		contentChanged = true
 	}
 	if contextID != nil {
 		arg.ContextID = *contextID
@@ -90,7 +103,18 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 		arg.CollapseImages = pgtype.Bool{Bool: *collapseImages, Valid: true}
 	}
 
-	return s.repo.UpdateNote(ctx, arg)
+	note, err := s.repo.UpdateNote(ctx, arg)
+	if err != nil {
+		return sqlcgen.Note{}, err
+	}
+
+	if contentChanged && s.noteSyncer != nil {
+		if err := s.noteSyncer.SyncNoteToYjs(ctx, note.ID); err != nil {
+			log.Printf("ERROR: yjs sync after update note %v: %v", note.ID, err)
+		}
+	}
+
+	return note, nil
 }
 
 func (s *Service) DeleteNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID) error {
@@ -158,11 +182,22 @@ func (s *Service) AppendToNoteContent(ctx context.Context, userID pgtype.UUID, n
 		}
 	}
 
-	return s.repo.AppendToNoteContent(ctx, sqlcgen.AppendToNoteContentParams{
+	note, err := s.repo.AppendToNoteContent(ctx, sqlcgen.AppendToNoteContentParams{
 		ID:      noteID,
 		UserID:  userID,
 		Content: content,
 	})
+	if err != nil {
+		return sqlcgen.Note{}, err
+	}
+
+	if s.noteSyncer != nil {
+		if err := s.noteSyncer.SyncNoteToYjs(ctx, noteID); err != nil {
+			log.Printf("ERROR: yjs sync after append note %v: %v", noteID, err)
+		}
+	}
+
+	return note, nil
 }
 
 var (

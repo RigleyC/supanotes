@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/notifications/push_service.dart';
+import 'package:supanotes/core/sync/yjs_sync_manager.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
@@ -85,3 +86,14 @@ final tagsDaoProvider = Provider.autoDispose(
 final pushServiceProvider = NotifierProvider<PushService, bool>(
   PushService.new,
 );
+
+// ---------------------------------------------------------------------------
+// Yjs sync manager (local Yjs docs per note)
+// ---------------------------------------------------------------------------
+
+final yjsSyncManagerProvider = Provider<YjsSyncManager>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  final mgr = YjsSyncManager(db: db);
+  ref.onDispose(mgr.dispose);
+  return mgr;
+});

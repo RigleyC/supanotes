@@ -157,7 +157,8 @@ class NoteSyncCoordinator {
   String? _existingAttribution(DocumentNode node) {
     if (node is ParagraphNode) {
       final blockType = node.getMetadataValue('blockType') as Attribution?;
-      if (blockType == null) return 'text';
+      if (blockType == null) return 'paragraph';
+      if (blockType == blockquoteAttribution) return 'blockquote';
       return 'header';
     }
     if (node is TaskNode) return 'task';

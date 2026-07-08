@@ -14,21 +14,19 @@ type projectionRunner interface {
 }
 
 type YDocService struct {
-	pool        *pgxpool.Pool
-	projection  projectionRunner
-	mu          sync.Mutex
-	docs        map[string]*crdt.Doc
-	buffers     map[string][][]byte
-	lastFlushAt map[string]time.Time
+	pool       *pgxpool.Pool
+	projection projectionRunner
+	mu         sync.Mutex
+	docs       map[string]*crdt.Doc
+	buffers    map[string][][]byte
 }
 
 func NewYDocService(pool *pgxpool.Pool, projection projectionRunner) *YDocService {
 	return &YDocService{
-		pool:        pool,
-		projection:  projection,
-		docs:        make(map[string]*crdt.Doc),
-		buffers:     make(map[string][][]byte),
-		lastFlushAt: make(map[string]time.Time),
+		pool:       pool,
+		projection: projection,
+		docs:       make(map[string]*crdt.Doc),
+		buffers:    make(map[string][][]byte),
 	}
 }
 
@@ -61,6 +59,11 @@ func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, err
 		}
 	}
 	s.mu.Lock()
+	// Double-check in case another goroutine loaded concurrently.
+	if existing, ok := s.docs[noteID]; ok {
+		s.mu.Unlock()
+		return existing, nil
+	}
 	s.docs[noteID] = doc
 	s.mu.Unlock()
 	return doc, nil

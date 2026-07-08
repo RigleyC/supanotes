@@ -483,7 +483,7 @@ func TestContextBuilder_Build(t *testing.T) {
 
 	embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 	memRepo := &stubMemRepo{}
-	tasksSvc := tasks.NewService(&stubTasksRepo{})
+	tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 
 	cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 	result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "test query", IntentProjectPlanning)
@@ -538,7 +538,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("GeneralChat_fetches_only_soul", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "hello", IntentGeneralChat)
@@ -578,7 +578,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("DailySummary_skips_note_embedding_search", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "what's my day like", IntentDailySummary)
@@ -616,7 +616,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("SearchKnowledge_fetches_notes_memories_and_semantic", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "find info about X", IntentSearchKnowledge)
@@ -654,7 +654,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("ProjectPlanning_fetches_tasks_semantic_and_linked", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "plan a feature", IntentProjectPlanning)
@@ -692,7 +692,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("TaskManagement_fetches_tasks_only", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "show my tasks", IntentTaskManagement)
@@ -730,7 +730,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("MemoryQuestion_fetches_memories_and_recent_notes", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "what do I remember about Go", IntentMemoryQuestion)
@@ -768,7 +768,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("Organization_fetches_recent_notes_only", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "organize my notes", IntentOrganization)
@@ -806,7 +806,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("Brainstorming_fetches_notes_semantic_and_memories", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "brainstorm ideas", IntentBrainstorming)
@@ -844,7 +844,7 @@ func TestContextBuilderSmartPolicies(t *testing.T) {
 	t.Run("default_unknown_intent_fetches_everything", func(t *testing.T) {
 		embedCL := llm.NewEmbeddingClient("test-key", srv.URL, "text-embedding-3-small")
 		memRepo := &stubMemRepo{}
-		tasksSvc := tasks.NewService(&stubTasksRepo{})
+		tasksSvc := tasks.NewService(&stubTasksRepo{}, nil)
 		cb := NewContextBuilder(q, tasksSvc, memRepo, embedCL)
 
 		result, err := cb.Build(context.Background(), pgtype.UUID{}, pgtype.UUID{}, "something else", Intent("UnknownIntent"))

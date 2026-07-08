@@ -537,7 +537,7 @@ func TestLinkNotesTool_SourceNotFound(t *testing.T) {
 
 // newMockNotesService creates a notes.Service that uses a stubQuerier
 func newMockNotesService(q sqlcgen.Querier) *notes.Service {
-	return notes.NewService(&mockNotesRepo{q: q}, nil)
+	return notes.NewService(&mockNotesRepo{q: q}, nil, nil)
 }
 
 type mockNotesRepo struct {

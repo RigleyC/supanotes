@@ -351,7 +351,7 @@ func TestNoteSharingAndCollaborationIntegration(t *testing.T) {
 
 	repo := &mockCollabRepository{db: db}
 
-	syncSvc := sync.NewService(repo, nil)
+	syncSvc := sync.NewService(repo, nil, nil)
 	syncH := sync.NewHandler(syncSvc)
 
 	sharesSvc := shares.NewService(repo)

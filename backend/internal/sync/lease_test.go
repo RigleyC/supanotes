@@ -56,7 +56,7 @@ func TestLeaseConflict(t *testing.T) {
 	assert.False(t, acquired)
 
 	t.Cleanup(func() {
-		mgr.ReleaseLease(ctx, noteID, machineID)
+		mgr.ReleaseLease(ctx, noteID, machineA)
 	})
 }
 

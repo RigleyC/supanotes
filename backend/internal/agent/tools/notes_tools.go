@@ -64,6 +64,12 @@ func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 			ndJSON := serializeNoteNode(nodeID, nd.Type, nd.Data, float64(i), now)
 			nodesMap.Set(txn, nodeID, string(ndJSON))
 
+			// Create YText for character-level CRDT on text content
+			if nd.Text != "" {
+				textType := doc.GetText("content/" + nodeID)
+				textType.Insert(txn, 0, nd.Text, nil)
+			}
+
 			if nd.IsTask {
 				taskID := uuid.New().String()
 				status := "open"
@@ -253,6 +259,12 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 			pos := float64(startPos + i)
 			ndJSON := serializeNoteNode(nodeID, nd.Type, nd.Data, pos, now)
 			nodesMap.Set(txn, nodeID, string(ndJSON))
+
+			// Create YText for character-level CRDT on text content
+			if nd.Text != "" {
+				textType := doc.GetText("content/" + nodeID)
+				textType.Insert(txn, 0, nd.Text, nil)
+			}
 
 			if nd.IsTask {
 				taskID := uuid.New().String()

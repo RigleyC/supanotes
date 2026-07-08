@@ -74,7 +74,7 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 			capturedArg = arg
 			return sqlcgen.Note{ID: arg.ID}, nil
 		},
-	}, nil)
+	}, nil, nil)
 
 	newContent := "updated content"
 	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, nil)
@@ -91,7 +91,7 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 }
 
 func TestCreateNoteRejectsEmptyRegularNote(t *testing.T) {
-	svc := NewService(&mockRepo{}, nil)
+	svc := NewService(&mockRepo{}, nil, nil)
 	userID := pgtype.UUID{Valid: true}
 
 	_, err := svc.CreateNote(context.Background(), userID, "   ", nil, false)

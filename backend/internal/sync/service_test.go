@@ -6,9 +6,14 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/reearth/ygo/crdt"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
@@ -153,7 +158,7 @@ func (m *mockRepository) UpdateNotesContentFromNodes(ctx context.Context, noteID
 
 func TestSyncServicePushRejectsSharedNoteWithoutEditPermission(t *testing.T) {
 	repo := &mockRepository{}
-	svc := NewService(repo, nil)
+	svc := NewService(repo, nil, nil)
 
 	payload := &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
@@ -176,7 +181,7 @@ func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
 			return sqlcgen.NoteShare{Permission: "edit"}, nil
 		},
 	}
-	svc := NewService(repo, nil)
+	svc := NewService(repo, nil, nil)
 
 	payload := &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
@@ -205,7 +210,7 @@ func TestSyncServicePushAllowsTaskSyncWithoutParentNoteInPayload(t *testing.T) {
 			return pgtype.UUID{}, nil
 		},
 	}
-	svc := NewService(repo, nil)
+	svc := NewService(repo, nil, nil)
 
 
 	payload := &SyncPayload{
@@ -227,9 +232,44 @@ func TestSyncServicePushAllowsTaskSyncWithoutParentNoteInPayload(t *testing.T) {
 	}
 }
 
+func TestProduceUpdateFromRows_GeneratesYjsUpdate(t *testing.T) {
+	ctx := context.Background()
+	nodeID := uuid.New().String()
+
+	nodeUUID, err := uuid.Parse(nodeID)
+	require.NoError(t, err)
+	noteUUID := uuid.MustParse(testNoteID)
+
+	nodes := []sqlcgen.NoteNode{
+		{
+			ID:        pgtype.UUID{Bytes: nodeUUID, Valid: true},
+			NoteID:    pgtype.UUID{Bytes: noteUUID, Valid: true},
+			Position:  0,
+			Type:      "paragraph",
+			Data:      []byte(`{"text":"hello"}`),
+			CreatedAt: pgtype.Timestamptz{Time: time.UnixMilli(1700000000000), Valid: true},
+			DeletedAt: pgtype.Timestamptz{Valid: false},
+		},
+	}
+	tasks := []SyncTask{}
+
+	update, err := ProduceUpdateFromRows(ctx, nil, testNoteID, nodes, tasks)
+	require.NoError(t, err)
+	require.NotEmpty(t, update)
+
+	doc := crdt.New(crdt.WithGC(false))
+	require.NoError(t, crdt.ApplyUpdateV1(doc, update, nil))
+	keys := doc.GetMap("nodes").Keys()
+	require.Len(t, keys, 1)
+
+	raw, ok := doc.GetMap("nodes").Get(nodeID)
+	require.True(t, ok)
+	assert.Contains(t, raw, "hello")
+}
+
 func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
 	repo := &mockRepository{upsertNoteErr: pgx.ErrNoRows}
-	svc := NewService(repo, nil)
+	svc := NewService(repo, nil, nil)
 
 	userID := testUserID()
 
