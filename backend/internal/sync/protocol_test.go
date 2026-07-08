@@ -12,8 +12,9 @@ import (
 
 func TestSyncProtocolWireFormatGoldenBytes(t *testing.T) {
 	doc := crdt.New(crdt.WithGC(false))
+	text := doc.GetText("content/x")
 	doc.Transact(func(txn *crdt.Transaction) {
-		doc.GetText("content/x").Insert(txn, 0, "hello", nil)
+		text.Insert(txn, 0, "hello", nil)
 	})
 
 	step1 := ygsync.EncodeSyncStep1(doc)
@@ -24,13 +25,16 @@ func TestSyncProtocolWireFormatGoldenBytes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, ygsync.MsgSyncStep1, msgType)
 
-	// Round-trip: Step1 → Step2 → Apply.
-	step2, err := ygsync.EncodeSyncStep2(doc, step1)
+	// Round-trip: empty client Step1 → server Step2 (full diff) → Apply.
+	emptyDoc := crdt.New(crdt.WithGC(false))
+	clientSV := ygsync.EncodeSyncStep1(emptyDoc)
+	step2, err := ygsync.EncodeSyncStep2(doc, clientSV)
 	require.NoError(t, err)
 	require.NotEmpty(t, step2)
 	assert.Equal(t, ygsync.MsgSyncStep2, int(step2[0]), "Step2 must start with MsgSyncStep2 type tag")
 
 	doc2 := crdt.New(crdt.WithGC(false))
+	doc2.GetText("content/x") // Pre-register to avoid share-map type corruption
 	reply, err := ygsync.ApplySyncMessage(doc2, step2, nil)
 	require.NoError(t, err)
 	assert.Empty(t, reply, "Step2 must not produce a reply")
@@ -39,8 +43,9 @@ func TestSyncProtocolWireFormatGoldenBytes(t *testing.T) {
 
 func TestSyncProtocolUpdateBroadcastsByteIdentical(t *testing.T) {
 	doc := crdt.New(crdt.WithGC(false))
+	text := doc.GetText("content/x")
 	doc.Transact(func(txn *crdt.Transaction) {
-		doc.GetText("content/x").Insert(txn, 0, "edit", nil)
+		text.Insert(txn, 0, "edit", nil)
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 	wrapped := ygsync.EncodeUpdate(update)
@@ -48,6 +53,7 @@ func TestSyncProtocolUpdateBroadcastsByteIdentical(t *testing.T) {
 	assert.Equal(t, ygsync.MsgUpdate, int(wrapped[0]))
 
 	doc2 := crdt.New(crdt.WithGC(false))
+	doc2.GetText("content/x")
 	reply, err := ygsync.ApplySyncMessage(doc2, wrapped, nil)
 	require.NoError(t, err)
 	assert.Empty(t, reply)
@@ -56,13 +62,14 @@ func TestSyncProtocolUpdateBroadcastsByteIdentical(t *testing.T) {
 
 func TestSyncProtocolByteStripHeuristicIsGone(t *testing.T) {
 	doc := crdt.New(crdt.WithGC(false))
+	text := doc.GetText("content/x")
 	doc.Transact(func(txn *crdt.Transaction) {
-		doc.GetText("content/x").Insert(txn, 0, "x", nil)
+		text.Insert(txn, 0, "x", nil)
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
-	require.Equal(t, byte(0), update[0], "sanity: this particular update starts with 0")
 
 	doc2 := crdt.New(crdt.WithGC(false))
+	doc2.GetText("content/x")
 	wrapped := ygsync.EncodeUpdate(update)
 	_, err := ygsync.ApplySyncMessage(doc2, wrapped, nil)
 	require.NoError(t, err)

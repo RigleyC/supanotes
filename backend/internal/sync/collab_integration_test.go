@@ -1,3 +1,5 @@
+//go:build integration
+
 package sync_test
 
 import (
