@@ -24,6 +24,10 @@ type ToolExecutor interface {
 	Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error)
 }
 
+type YjsMutationService interface {
+	WriteNodeMutation(ctx context.Context, noteID string, update []byte) error
+}
+
 type defaultToolExecutor struct{}
 
 func (defaultToolExecutor) Name() string                                          { return "" }
@@ -49,13 +53,14 @@ func NewToolRegistry(
 	embedCL *llm.EmbeddingClient,
 	llmFact llm.Factory,
 	wm WorkingMemoryStore,
+	yjsSvc YjsMutationService,
 ) *ToolRegistry {
 	registry := &ToolRegistry{
 		tools: make(map[string]ToolExecutor),
 	}
 
 	executors := []ToolExecutor{
-		&AddNoteTool{notesSvc: notesSvc},
+		&AddNoteTool{notesSvc: notesSvc, q: q, yjsSvc: yjsSvc},
 		&AddTaskTool{tasksSvc: tasksSvc},
 		&SaveMemoryTool{memoriesSvc: memoriesSvc},
 		&CompleteTaskTool{tasksSvc: tasksSvc},
@@ -70,7 +75,7 @@ func NewToolRegistry(
 		&SetWeeklyBriefScheduleTool{routinesSvc: routinesSvc},
 		&GetNotesTool{notesSvc: notesSvc},
 		&GetNoteTool{notesSvc: notesSvc},
-		&AppendToNoteTool{notesSvc: notesSvc},
+		&AppendToNoteTool{notesSvc: notesSvc, q: q, yjsSvc: yjsSvc},
 		&LinkNotesTool{q: q, notesSvc: notesSvc},
 		&DeleteMemoryTool{memoriesSvc: memoriesSvc},
 		&UpdateSoulTool{soulSvc: soulSvc},

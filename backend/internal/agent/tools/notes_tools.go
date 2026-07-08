@@ -2,11 +2,15 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
+	"github.com/reearth/ygo/crdt"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/notes"
@@ -16,6 +20,8 @@ import (
 
 type AddNoteTool struct {
 	notesSvc *notes.Service
+	q        sqlcgen.Querier
+	yjsSvc   YjsMutationService
 }
 
 func (t *AddNoteTool) Name() string        { return "add_note" }
@@ -33,10 +39,48 @@ func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 	if err != nil {
 		return "", err
 	}
-	note, err := t.notesSvc.CreateNote(ctx, userID, args.Content, nil, false)
+
+	note, err := t.q.CreateNote(ctx, sqlcgen.CreateNoteParams{
+		UserID:          userID,
+		Content:         args.Content,
+		EmbeddingStatus: "pending",
+	})
 	if err != nil {
 		return "", err
 	}
+
+	noteIDStr := formatID(note.ID)
+	userIDStr := formatID(userID)
+
+	parsed := notes.ParseMarkdownToNodes(args.Content)
+	doc := crdt.New(crdt.WithGC(false))
+	nodesMap := doc.GetMap("nodes")
+	tasksMap := doc.GetMap("tasks")
+	now := float64(time.Now().UnixMilli())
+
+	doc.Transact(func(txn *crdt.Transaction) {
+		for i, nd := range parsed {
+			nodeID := formatID(nd.ID)
+			ndJSON := serializeNoteNode(nodeID, nd.Type, nd.Data, float64(i), now)
+			nodesMap.Set(txn, nodeID, string(ndJSON))
+
+			if nd.IsTask {
+				taskID := uuid.New().String()
+				status := "open"
+				if nd.Complete {
+					status = "done"
+				}
+				tdJSON := serializeTask(taskID, noteIDStr, userIDStr, nd.Text, status, float64(i), now)
+				tasksMap.Set(txn, taskID, string(tdJSON))
+			}
+		}
+	})
+	update := crdt.EncodeStateAsUpdateV1(doc, nil)
+
+	if err := t.yjsSvc.WriteNodeMutation(ctx, noteIDStr, update); err != nil {
+		return "", fmt.Errorf("write node mutation: %w", err)
+	}
+
 	return fmt.Sprintf("Note created with ID: %s", formatID(note.ID)), nil
 }
 
@@ -164,6 +208,8 @@ func (t *GetNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 
 type AppendToNoteTool struct {
 	notesSvc *notes.Service
+	q        sqlcgen.Querier
+	yjsSvc   YjsMutationService
 }
 
 func (t *AppendToNoteTool) Name() string        { return "append_to_note" }
@@ -186,10 +232,50 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 	if err != nil {
 		return "", err
 	}
+
+	existingNodes, err := t.q.GetNodesByNoteId(ctx, nid)
+	if err != nil {
+		return "", fmt.Errorf("get existing nodes: %w", err)
+	}
+	startPos := len(existingNodes)
+	noteIDStr := formatID(nid)
+	userIDStr := formatID(userID)
+
+	parsed := notes.ParseMarkdownToNodes(args.Content)
+	doc := crdt.New(crdt.WithGC(false))
+	nodesMap := doc.GetMap("nodes")
+	tasksMap := doc.GetMap("tasks")
+	now := float64(time.Now().UnixMilli())
+
+	doc.Transact(func(txn *crdt.Transaction) {
+		for i, nd := range parsed {
+			nodeID := formatID(nd.ID)
+			pos := float64(startPos + i)
+			ndJSON := serializeNoteNode(nodeID, nd.Type, nd.Data, pos, now)
+			nodesMap.Set(txn, nodeID, string(ndJSON))
+
+			if nd.IsTask {
+				taskID := uuid.New().String()
+				status := "open"
+				if nd.Complete {
+					status = "done"
+				}
+				tdJSON := serializeTask(taskID, noteIDStr, userIDStr, nd.Text, status, pos, now)
+				tasksMap.Set(txn, taskID, string(tdJSON))
+			}
+		}
+	})
+	update := crdt.EncodeStateAsUpdateV1(doc, nil)
+
+	if err := t.yjsSvc.WriteNodeMutation(ctx, noteIDStr, update); err != nil {
+		return "", fmt.Errorf("write node mutation: %w", err)
+	}
+
 	updated, err := t.notesSvc.AppendToNoteContent(ctx, userID, nid, args.Content)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("append to note content: %w", err)
 	}
+
 	return fmt.Sprintf("Content appended to note [%s] %s", formatID(updated.ID), notes.DeriveTitle(updated.Content)), nil
 }
 
@@ -239,6 +325,41 @@ func (t *LinkNotesTool) Execute(ctx context.Context, userID pgtype.UUID, session
 	}
 
 	return fmt.Sprintf("Bi-directional link created between [%s] and [%s]", args.SourceID, args.TargetID), nil
+}
+
+type noteNodeJSON struct {
+	ID        string          `json:"id"`
+	ParentID  string          `json:"parentId,omitempty"`
+	Position  float64         `json:"position"`
+	Type      string          `json:"type"`
+	Data      json.RawMessage `json:"data"`
+	CreatedAt float64         `json:"createdAt,omitempty"`
+	UpdatedAt float64         `json:"updatedAt,omitempty"`
+}
+
+type taskJSON struct {
+	ID          string  `json:"id"`
+	NoteID      string  `json:"noteId"`
+	UserID      string  `json:"userId,omitempty"`
+	Title       string  `json:"title"`
+	Status      string  `json:"status"`
+	Position    float64 `json:"position"`
+	Recurrence  string  `json:"recurrence,omitempty"`
+	DueDate     string  `json:"dueDate,omitempty"`
+	CreatedAt   float64 `json:"createdAt,omitempty"`
+	CompletedAt float64 `json:"completedAt,omitempty"`
+}
+
+func serializeNoteNode(id, typ string, data []byte, position, createdAt float64) []byte {
+	j := noteNodeJSON{ID: id, Type: typ, Data: data, Position: position, CreatedAt: createdAt}
+	b, _ := json.Marshal(j)
+	return b
+}
+
+func serializeTask(id, noteID, userID, title, status string, position, createdAt float64) []byte {
+	j := taskJSON{ID: id, NoteID: noteID, UserID: userID, Title: title, Status: status, Position: position, CreatedAt: createdAt}
+	b, _ := json.Marshal(j)
+	return b
 }
 
 type GetVaultContextTool struct {

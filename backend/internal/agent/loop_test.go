@@ -575,7 +575,7 @@ func TestLoopConfirmationRequired(t *testing.T) {
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
 	)
 
 	repo := &trackingStubLoopRepo{}
@@ -661,7 +661,7 @@ func TestLoopRejectsEmptyLLMResponse(t *testing.T) {
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
 	)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
@@ -703,7 +703,7 @@ func TestLoopFallsBackWithoutToolsWhenLLMReturnsEmptyResponse(t *testing.T) {
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
 	)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
@@ -770,7 +770,7 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
 	)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
@@ -836,7 +836,7 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, 	embedCL, llmFact, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
 	)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
