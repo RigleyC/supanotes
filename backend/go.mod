@@ -20,6 +20,7 @@ require (
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/pgvector/pgvector-go v0.4.0
+	github.com/reearth/ygo v1.30.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/zerolog v1.35.1
 	github.com/stretchr/testify v1.11.1

@@ -1,0 +1,113 @@
+package sync
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/reearth/ygo/crdt"
+)
+
+type Compactor struct {
+	pool *pgxpool.Pool
+}
+
+func NewCompactor(pool *pgxpool.Pool) *Compactor {
+	return &Compactor{pool: pool}
+}
+
+func (c *Compactor) CompactNote(ctx context.Context, noteID string) error {
+	tx, err := c.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext('nodes'))", noteID); err != nil {
+		return fmt.Errorf("advisory lock: %w", err)
+	}
+
+	rows, err := tx.Query(ctx, "SELECT update_data FROM note_yjs_updates WHERE note_id = $1 ORDER BY created_at ASC", noteID)
+	if err != nil {
+		return fmt.Errorf("query updates: %w", err)
+	}
+	defer rows.Close()
+
+	var allUpdates [][]byte
+	for rows.Next() {
+		var update []byte
+		if err := rows.Scan(&update); err != nil {
+			return fmt.Errorf("scan update: %w", err)
+		}
+		allUpdates = append(allUpdates, update)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("rows iter: %w", err)
+	}
+
+	if len(allUpdates) == 0 {
+		return nil
+	}
+
+	merged, err := crdt.MergeUpdatesV1(allUpdates...)
+	if err != nil {
+		return fmt.Errorf("merge updates: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO note_yjs_states (note_id, state, updated_at)
+		VALUES ($1, $2, NOW())
+		ON CONFLICT (note_id) DO UPDATE
+		SET state = EXCLUDED.state, updated_at = NOW()
+	`, noteID, merged); err != nil {
+		return fmt.Errorf("upsert state: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, "DELETE FROM note_yjs_updates WHERE note_id = $1", noteID); err != nil {
+		return fmt.Errorf("delete updates: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, "DELETE FROM note_yjs_updates WHERE note_id = $1 AND created_at < NOW() - INTERVAL '30 days'", noteID); err != nil {
+		return fmt.Errorf("delete old updates: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (c *Compactor) CompactAll(ctx context.Context) error {
+	rows, err := c.pool.Query(ctx, "SELECT DISTINCT note_id FROM note_yjs_updates")
+	if err != nil {
+		return fmt.Errorf("query distinct note_ids: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var noteID string
+		if err := rows.Scan(&noteID); err != nil {
+			return fmt.Errorf("scan note_id: %w", err)
+		}
+		if err := c.CompactNote(ctx, noteID); err != nil {
+			slog.Error("compact note", "note_id", noteID, "error", err)
+		}
+	}
+	return rows.Err()
+}
+
+func (c *Compactor) StartScheduler(ctx context.Context, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := c.CompactAll(ctx); err != nil {
+					slog.Error("compaction run failed", "error", err)
+				}
+			}
+		}
+	}()
+}
