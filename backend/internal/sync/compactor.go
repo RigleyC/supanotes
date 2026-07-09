@@ -22,6 +22,7 @@ type Compactor struct {
 	pool       *pgxpool.Pool
 	debounce   map[string]*debounceState
 	debounceMu sync.Mutex
+	flushFn    func(context.Context, string) error
 }
 
 func NewCompactor(pool *pgxpool.Pool) *Compactor {
@@ -29,6 +30,10 @@ func NewCompactor(pool *pgxpool.Pool) *Compactor {
 		pool:     pool,
 		debounce: make(map[string]*debounceState),
 	}
+}
+
+func (c *Compactor) SetFlushFunc(fn func(context.Context, string) error) {
+	c.flushFn = fn
 }
 
 func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
@@ -67,6 +72,11 @@ func (c *Compactor) RunDebouncedProjectionForTest(ctx context.Context, svc *YDoc
 
 func (c *Compactor) ProjectCanonicalDoc(ctx context.Context, noteID string) error {
 	startTotal := time.Now()
+	if c.flushFn != nil {
+		if err := c.flushFn(ctx, noteID); err != nil {
+			slog.Error("projectCanonicalDoc: flushFn failed", "note_id", noteID, "error", err)
+		}
+	}
 	state, err := LoadYDocState(ctx, c.pool, noteID)
 	if err != nil {
 		slog.Error("projectCanonicalDoc: LoadYDocState failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startTotal).Milliseconds())

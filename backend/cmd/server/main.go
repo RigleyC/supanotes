@@ -200,6 +200,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	leaseMgr := syncpkg.NewLeaseManager(pool)
 	compactor := syncpkg.NewCompactor(pool)
 	ydocSvc := syncpkg.NewYDocService(pool, compactor)
+	compactor.SetFlushFunc(ydocSvc.FlushUpdates)
 	roomMgr := syncpkg.NewRoomManager(leaseMgr, ydocSvc, pool)
 	ydocSvc.StartFlusher(cronCtx, 500*time.Millisecond)
 	compactor.StartScheduler(cronCtx, 5*time.Minute)
