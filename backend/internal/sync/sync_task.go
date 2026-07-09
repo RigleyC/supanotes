@@ -165,11 +165,20 @@ func ProduceUpdateFromRows(
 	nodes []sqlcgen.NoteNode,
 	tasks []SyncTask,
 ) ([]byte, error) {
+	state, err := LoadYDocState(ctx, pool, noteID)
+	if err != nil {
+		return nil, fmt.Errorf("load ydoc state: %w", err)
+	}
 
 	doc := crdt.New(crdt.WithGC(false))
+	if len(state) > 0 {
+		if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
+			return nil, fmt.Errorf("apply existing ydoc state: %w", err)
+		}
+	}
+
 	nodesMap := doc.GetMap("nodes")
 	tasksMap := doc.GetMap("tasks")
-
 
 	// Pre-create/retrieve YText types outside transaction to avoid deadlock
 	textTypes := make(map[string]*crdt.YText)
@@ -202,9 +211,9 @@ func ProduceUpdateFromRows(
 			if len(n.Data) > 0 {
 				var dataMap map[string]interface{}
 				if err := json.Unmarshal(n.Data, &dataMap); err == nil {
-					if text, ok := dataMap["text"].(string); ok && text != "" {
+					if text, ok := dataMap["text"].(string); ok {
 						if textType, ok := textTypes[nID]; ok {
-							textType.Insert(txn, 0, text, nil)
+							updateYTextIncrementally(txn, textType, text)
 						}
 					}
 				}
@@ -240,4 +249,41 @@ func ProduceUpdateFromRows(
 	})
 
 	return crdt.EncodeStateAsUpdateV1(doc, nil), nil
+}
+
+func updateYTextIncrementally(txn *crdt.Transaction, ytext *crdt.YText, newText string) {
+	oldText := ytext.ToString()
+	if oldText == newText {
+		return
+	}
+
+	oldRunes := []rune(oldText)
+	newRunes := []rune(newText)
+
+	start := 0
+	oldEnd := len(oldRunes)
+	newEnd := len(newRunes)
+
+	// Find common prefix
+	for start < oldEnd && start < newEnd && oldRunes[start] == newRunes[start] {
+		start++
+	}
+
+	// Find common suffix
+	for oldEnd > start && newEnd > start && oldRunes[oldEnd-1] == newRunes[newEnd-1] {
+		oldEnd--
+		newEnd--
+	}
+
+	// Delete deleted characters
+	deleteLen := oldEnd - start
+	if deleteLen > 0 {
+		ytext.Delete(txn, start, deleteLen)
+	}
+
+	// Insert inserted characters
+	if newEnd > start {
+		insertText := string(newRunes[start:newEnd])
+		ytext.Insert(txn, start, insertText, nil)
+	}
 }
