@@ -56,6 +56,11 @@ func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
 			return
 		}
 		c.debounceMu.Unlock()
+		if c.flushFn != nil {
+			if err := c.flushFn(context.Background(), noteID); err != nil {
+				slog.Error("RunDebouncedProjection: flushFn failed", "note_id", noteID, "error", err)
+			}
+		}
 		_ = c.ProjectCanonicalDoc(context.Background(), noteID)
 	})
 }
@@ -72,11 +77,6 @@ func (c *Compactor) RunDebouncedProjectionForTest(ctx context.Context, svc *YDoc
 
 func (c *Compactor) ProjectCanonicalDoc(ctx context.Context, noteID string) error {
 	startTotal := time.Now()
-	if c.flushFn != nil {
-		if err := c.flushFn(ctx, noteID); err != nil {
-			slog.Error("projectCanonicalDoc: flushFn failed", "note_id", noteID, "error", err)
-		}
-	}
 	state, err := LoadYDocState(ctx, c.pool, noteID)
 	if err != nil {
 		slog.Error("projectCanonicalDoc: LoadYDocState failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startTotal).Milliseconds())
