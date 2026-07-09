@@ -243,6 +243,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(noteEditorControllerProvider(widget.noteId));
     final controller = _controller;
     if (controller == null) {
       return const Center(child: CircularProgressIndicator());

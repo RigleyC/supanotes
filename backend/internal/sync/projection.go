@@ -366,6 +366,32 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 		}
 	}
 
+	// Pre-create/retrieve YText types outside transaction to avoid CGO deadlock
+	textTypes := make(map[string]*crdt.YText)
+	for _, node := range nodes {
+		nodeID := uuidToStr(node.ID)
+		nodeData := node.Data
+		if node.Type == "task" {
+			if status, ok := taskStatusMap[nodeID]; ok {
+				var dataMap map[string]interface{}
+				if err := json.Unmarshal(node.Data, &dataMap); err == nil {
+					dataMap["completed"] = (status == "done")
+					if updatedBytes, err := json.Marshal(dataMap); err == nil {
+						nodeData = updatedBytes
+					}
+				}
+			}
+		}
+		if len(nodeData) > 0 {
+			var dataMap map[string]interface{}
+			if err := json.Unmarshal(nodeData, &dataMap); err == nil {
+				if text, ok := dataMap["text"].(string); ok && text != "" {
+					textTypes[nodeID] = doc.GetText("content/" + nodeID)
+				}
+			}
+		}
+	}
+
 	doc.Transact(func(txn *crdt.Transaction) {
 		for _, node := range nodes {
 			nodeID := uuidToStr(node.ID)
@@ -397,14 +423,10 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 			}
 			nodesMap.Set(txn, nodeID, string(b))
 
-			// Create YText for the node's text content so that
-			// concurrent edits on the same paragraph get proper
-			// character-level CRDT merge.
-			if len(nodeData) > 0 {
+			if textType, ok := textTypes[nodeID]; ok {
 				var dataMap map[string]interface{}
 				if err := json.Unmarshal(nodeData, &dataMap); err == nil {
 					if text, ok := dataMap["text"].(string); ok && text != "" {
-						textType := doc.GetText("content/" + nodeID)
 						textType.Insert(txn, 0, text, nil)
 					}
 				}

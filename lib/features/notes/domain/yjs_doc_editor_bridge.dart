@@ -98,14 +98,44 @@ class YjsDocEditorBridge {
 
     final text = data['text'] as String?;
     final ytext = _doc.getText('content/$id')!;
-    final currentLen = ytext.toString().length;
-    if (currentLen > 0) {
-      ytext.delete(0, currentLen);
-    }
-    if (text != null && text.isNotEmpty) {
-      ytext.insert(0, text);
-    }
+    _updateYTextIncrementally(ytext, text ?? '');
     dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
+  }
+
+  void _updateYTextIncrementally(YText ytext, String newText) {
+    final oldText = ytext.toString();
+    if (oldText == newText) return;
+
+    int start = 0;
+    int oldEnd = oldText.length;
+    int newEnd = newText.length;
+
+    // Find common prefix
+    while (start < oldEnd &&
+        start < newEnd &&
+        oldText.codeUnitAt(start) == newText.codeUnitAt(start)) {
+      start++;
+    }
+
+    // Find common suffix
+    while (oldEnd > start &&
+        newEnd > start &&
+        oldText.codeUnitAt(oldEnd - 1) == newText.codeUnitAt(newEnd - 1)) {
+      oldEnd--;
+      newEnd--;
+    }
+
+    // Delete deleted characters
+    final deleteLen = oldEnd - start;
+    if (deleteLen > 0) {
+      ytext.delete(start, deleteLen);
+    }
+
+    // Insert inserted characters
+    final insertText = newText.substring(start, newEnd);
+    if (insertText.isNotEmpty) {
+      ytext.insert(start, insertText);
+    }
   }
 
   double? _readCreatedAt(dynamic raw) {

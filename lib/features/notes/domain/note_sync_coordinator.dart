@@ -110,7 +110,7 @@ class NoteSyncCoordinator {
     }
 
     if (requests.isNotEmpty) {
-      _editor.execute(requests);
+      _executeAndPreserveSelection(requests);
     }
   }
 
@@ -128,7 +128,61 @@ class NoteSyncCoordinator {
       }
     }
     if (requests.isNotEmpty) {
-      _editor.execute(requests);
+      _executeAndPreserveSelection(requests);
+    }
+  }
+
+  void _executeAndPreserveSelection(List<EditRequest> requests) {
+    if (requests.isEmpty) return;
+
+    final composer = _editor.context.composer;
+    final oldSelection = composer.selection;
+
+    _editor.execute(requests);
+
+    if (oldSelection != null) {
+      final baseNodeExists = _document.getNodeById(oldSelection.base.nodeId) != null;
+      final extentNodeExists = _document.getNodeById(oldSelection.extent.nodeId) != null;
+      if (baseNodeExists && extentNodeExists) {
+        // Clamp selection offsets if the text became shorter
+        DocumentSelection finalSelection = oldSelection;
+        final baseNode = _document.getNodeById(oldSelection.base.nodeId);
+        final extentNode = _document.getNodeById(oldSelection.extent.nodeId);
+        
+        DocumentPosition? newBase = oldSelection.base;
+        DocumentPosition? newExtent = oldSelection.extent;
+
+        if (baseNode is TextNode && oldSelection.base.nodePosition is TextNodePosition) {
+          final maxLen = baseNode.text.toPlainText().length;
+          final offset = (oldSelection.base.nodePosition as TextNodePosition).offset;
+          if (offset > maxLen) {
+            newBase = DocumentPosition(
+              nodeId: oldSelection.base.nodeId,
+              nodePosition: TextNodePosition(offset: maxLen),
+            );
+          }
+        }
+        if (extentNode is TextNode && oldSelection.extent.nodePosition is TextNodePosition) {
+          final maxLen = extentNode.text.toPlainText().length;
+          final offset = (oldSelection.extent.nodePosition as TextNodePosition).offset;
+          if (offset > maxLen) {
+            newExtent = DocumentPosition(
+              nodeId: oldSelection.extent.nodeId,
+              nodePosition: TextNodePosition(offset: maxLen),
+            );
+          }
+        }
+
+        finalSelection = DocumentSelection(base: newBase, extent: newExtent);
+
+        _editor.execute([
+          ChangeSelectionRequest(
+            finalSelection,
+            SelectionChangeType.placeCaret,
+            SelectionReason.contentChange,
+          ),
+        ]);
+      }
     }
   }
 

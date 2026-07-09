@@ -51,7 +51,7 @@ func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
 			return
 		}
 		c.debounceMu.Unlock()
-		_ = c.projectCanonicalDoc(ctx, noteID)
+		_ = c.projectCanonicalDoc(context.Background(), noteID)
 	})
 }
 

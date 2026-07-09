@@ -31,6 +31,28 @@ class YjsSyncManager {
     final cached = _docs[noteId];
     if (cached != null) return cached;
 
+    // Try loading snapshot first, pre-registering YText keys to avoid yjs_dart type corruption
+    final stateRow = await (_db.select(_db.localYjsStates)
+          ..where((t) => t.noteId.equals(noteId)))
+        .getSingleOrNull();
+    if (stateRow != null) {
+      final doc = Doc();
+      final nodes = await (_db.select(_db.noteNodes)
+            ..where((t) => t.noteId.equals(noteId) & t.deletedAt.isNull()))
+          .get();
+      for (final node in nodes) {
+        doc.getText('content/${node.id}');
+      }
+      try {
+        applyUpdate(doc, stateRow.state);
+        _docs[noteId] = doc;
+        dev.log('[YjsSyncManager] Loaded snapshot for note=$noteId', name: 'YjsSync');
+        return doc;
+      } catch (e) {
+        dev.log('[YjsSyncManager] Failed to apply snapshot for note=$noteId: $e, reconstructing...', name: 'YjsSync');
+      }
+    }
+
     final doc = await _reconstructFromLocal(noteId);
     _docs[noteId] = doc;
     return doc;
