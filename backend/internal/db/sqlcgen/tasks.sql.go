@@ -131,7 +131,7 @@ func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
 const deleteTaskByNodeID = `-- name: DeleteTaskByNodeID :exec
 UPDATE tasks
 SET deleted_at = NOW()
-WHERE node_id = $1 AND user_id = $2
+WHERE (node_id = $1 OR id = $1) AND user_id = $2
 `
 
 type DeleteTaskByNodeIDParams struct {
@@ -289,7 +289,7 @@ func (q *Queries) GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, err
 
 const getTasksByNodeID = `-- name: GetTasksByNodeID :many
 SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, node_id FROM tasks
-WHERE node_id = $1 AND deleted_at IS NULL
+WHERE (node_id = $1 OR id = $1) AND deleted_at IS NULL
 ORDER BY position ASC, created_at ASC
 `
 

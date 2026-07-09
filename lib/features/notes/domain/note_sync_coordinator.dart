@@ -10,6 +10,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:developer' as dev;
 
 import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
@@ -99,6 +100,30 @@ class NoteSyncCoordinator {
         requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
       } else {
         if (dirtyIds.contains(incoming.id)) continue;
+
+        // Optimization: If the only difference is the task completion status,
+        // use ChangeTaskCompletionRequest to avoid rebuilding the widget and jumping.
+        if (existingNode is TaskNode && incoming.type == 'task') {
+          try {
+            final existingData = jsonDecode(NodeSyncManager.nodeData(existingNode)) as Map<String, dynamic>;
+            final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
+            
+            final existingWithoutCompleted = Map.from(existingData)..remove('completed');
+            final incomingWithoutCompleted = Map.from(incomingData)..remove('completed');
+            
+            if (_isMapEqual(existingWithoutCompleted, incomingWithoutCompleted)) {
+              final isDbCompleted = incomingData['completed'] as bool? ?? false;
+              if (existingNode.isComplete != isDbCompleted) {
+                requests.add(ChangeTaskCompletionRequest(
+                  nodeId: incoming.id,
+                  isComplete: isDbCompleted,
+                ));
+              }
+              continue;
+            }
+          } catch (_) {}
+        }
+
         if (_isNodeEquivalent(existingNode, incoming)) continue;
         final newNode = NodeSyncManager.createNodeFromSchema(incoming);
         requests.add(
@@ -212,7 +237,16 @@ class NoteSyncCoordinator {
     try {
       final existingData = jsonDecode(existingDataStr) as Map<String, dynamic>;
       final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
-      return _isMapEqual(existingData, incomingData);
+      final isEq = _isMapEqual(existingData, incomingData);
+      if (!isEq) {
+        dev.log(
+          '[NoteSync] NODE NOT EQUIVALENT ID=${incoming.id} TYPE=${incoming.type}\n'
+          'Existing: $existingData\n'
+          'Incoming: $incomingData',
+          name: 'SyncService',
+        );
+      }
+      return isEq;
     } catch (_) {
       return false;
     }

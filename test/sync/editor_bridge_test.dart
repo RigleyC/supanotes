@@ -150,5 +150,63 @@ void main() {
       expect(composer.selection!.base.nodeId, 'p1');
       expect((composer.selection!.base.nodePosition as TextNodePosition).offset, 2); // Clamped to Hi's length
     });
+
+    test('Incremental sync of task node completion status does not replace the node object instance', () async {
+      final taskNode = TaskNode(
+        id: 't1',
+        text: AttributedText('Buy milk'),
+        isComplete: false,
+      );
+      final mutableDoc = MutableDocument(nodes: [taskNode]);
+      final composer = DocumentComposer();
+      final editor = Editor(
+        editContext: EditContext(
+          editorLayoutKey: GlobalKey(),
+          document: mutableDoc,
+          composer: composer,
+          commonOps: CommonEditorOperations(
+            editor: Editor(),
+            document: mutableDoc,
+            composer: composer,
+          ),
+        ),
+      );
+
+      final coordinator = NoteSyncCoordinator(
+        database: db,
+        noteId: 'note-1',
+        userId: 'user-1',
+        document: mutableDoc,
+        editor: editor,
+      );
+
+      // Verify initial state
+      final firstNode = mutableDoc.getNodeById('t1') as TaskNode;
+      expect(firstNode.isComplete, isFalse);
+
+      // Apply incoming node change where completion status becomes true
+      coordinator.updateNodesIncrementally([
+        NoteNode(
+          id: 't1',
+          noteId: 'note-1',
+          position: 1.0,
+          type: 'task',
+          data: jsonEncode({
+            'text': 'Buy milk',
+            'spans': [],
+            'completed': true,
+            'indent': 0,
+          }),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          isDirty: false,
+        ),
+      ]);
+
+      final updatedNode = mutableDoc.getNodeById('t1') as TaskNode;
+      expect(updatedNode.isComplete, isTrue);
+      // Crucial: The node instance must be exactly the same (not replaced)
+      expect(identical(firstNode, updatedNode), isTrue);
+    });
   });
 }

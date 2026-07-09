@@ -226,7 +226,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
-              behavior: HitTestBehavior.translucent,
+              behavior: HitTestBehavior.opaque,
               onTap: widget.viewModel.setComplete == null
                   ? null
                   : () => widget.viewModel.setComplete!(

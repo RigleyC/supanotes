@@ -164,9 +164,9 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 						}
 						// Update the corresponding tasks table status and completed_at using the transaction
 						if completed {
-							_, err = tx.Exec(ctx, "UPDATE tasks SET status = $1, completed_at = NOW(), updated_at = NOW() WHERE node_id = $2 AND deleted_at IS NULL", status, pgNodeID)
+							_, err = tx.Exec(ctx, "UPDATE tasks SET status = $1, completed_at = NOW(), updated_at = NOW() WHERE (node_id = $2 OR id = $2) AND deleted_at IS NULL", status, pgNodeID)
 						} else {
-							_, err = tx.Exec(ctx, "UPDATE tasks SET status = $1, completed_at = NULL, updated_at = NOW() WHERE node_id = $2 AND deleted_at IS NULL", status, pgNodeID)
+							_, err = tx.Exec(ctx, "UPDATE tasks SET status = $1, completed_at = NULL, updated_at = NOW() WHERE (node_id = $2 OR id = $2) AND deleted_at IS NULL", status, pgNodeID)
 						}
 						if err != nil {
 							return fmt.Errorf("update task status for node %s: %w", nd.ID, err)

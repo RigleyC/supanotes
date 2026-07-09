@@ -79,7 +79,7 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
   Widget build(BuildContext context) {
     return SizeTransition(
       sizeFactor: _size,
-      alignment: Alignment.center,
+      alignment: Alignment.topLeft,
       child: FadeTransition(opacity: _fade, child: widget.child),
     );
   }
