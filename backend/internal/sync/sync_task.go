@@ -49,7 +49,7 @@ type SyncTask struct {
 	UserID      pgtype.UUID `json:"user_id"`
 	Title       string      `json:"title"`
 	Status      string      `json:"status"`
-	Position    float64     `json:"position"`
+	Position    string      `json:"position"`
 	Recurrence  *string     `json:"recurrence"`
 	DueDate     *string     `json:"due_date"`
 	CompletedAt *time.Time  `json:"completed_at"`
@@ -178,7 +178,13 @@ func ProduceUpdateFromRows(
 	}
 
 	nodesMap := doc.GetMap("nodes")
-	tasksMap := doc.GetMap("tasks")
+
+	// Build a map of task properties from the REST tasks slice
+	restTaskMap := make(map[string]SyncTask)
+	for _, t := range tasks {
+		tID := uuid.UUID(t.ID.Bytes).String()
+		restTaskMap[tID] = t
+	}
 
 	// Pre-create/retrieve YText types and their contents outside transaction to avoid deadlock
 	textTypes := make(map[string]*crdt.YText)
@@ -199,21 +205,49 @@ func ProduceUpdateFromRows(
 				nodesMap.Delete(txn, nID)
 				continue
 			}
+
+			nodeData := n.Data
+			if n.Type == "task" {
+				if t, ok := restTaskMap[nID]; ok {
+					var dataMap map[string]interface{}
+					if len(n.Data) > 0 {
+						json.Unmarshal(n.Data, &dataMap)
+					}
+					if dataMap == nil {
+						dataMap = make(map[string]interface{})
+					}
+					dataMap["completed"] = (t.Status == "done")
+					if t.DueDate != nil {
+						dataMap["dueDate"] = *t.DueDate
+					} else {
+						delete(dataMap, "dueDate")
+					}
+					if t.Recurrence != nil {
+						dataMap["recurrence"] = *t.Recurrence
+					} else {
+						delete(dataMap, "recurrence")
+					}
+					if updatedBytes, err := json.Marshal(dataMap); err == nil {
+						nodeData = updatedBytes
+					}
+				}
+			}
+
 			nd := noteNodeJSON{
 				ID:        nID,
 				ParentID:  uuidToStr(n.ParentID),
 				Position:  n.Position,
 				Type:      n.Type,
-				Data:      n.Data,
+				Data:      nodeData,
 				CreatedAt: timestamptzToMS(n.CreatedAt),
 			}
 			b, _ := json.Marshal(nd)
 			nodesMap.Set(txn, nID, string(b))
 
 			// Populate YText for the node's text content
-			if len(n.Data) > 0 {
+			if len(nodeData) > 0 {
 				var dataMap map[string]interface{}
-				if err := json.Unmarshal(n.Data, &dataMap); err == nil {
+				if err := json.Unmarshal(nodeData, &dataMap); err == nil {
 					if text, ok := dataMap["text"].(string); ok {
 						if textType, ok := textTypes[nID]; ok {
 							updateYTextIncrementally(txn, textType, oldTexts[nID], text)
@@ -221,33 +255,6 @@ func ProduceUpdateFromRows(
 					}
 				}
 			}
-		}
-		for _, t := range tasks {
-			tID := uuid.UUID(t.ID.Bytes).String()
-			if t.DeletedAt != nil {
-				tasksMap.Delete(txn, tID)
-				continue
-			}
-			td := taskJSON{
-				ID:        tID,
-				NoteID:    noteID,
-				UserID:    uuidToStr(t.UserID),
-				Title:     t.Title,
-				Status:    t.Status,
-				Position:  t.Position,
-				CreatedAt: float64(t.CreatedAt.UnixMilli()),
-			}
-			if t.Recurrence != nil {
-				td.Recurrence = *t.Recurrence
-			}
-			if t.DueDate != nil {
-				td.DueDate = *t.DueDate
-			}
-			if t.CompletedAt != nil {
-				td.CompletedAt = float64(t.CompletedAt.UnixMilli())
-			}
-			b, _ := json.Marshal(td)
-			tasksMap.Set(txn, tID, string(b))
 		}
 	})
 

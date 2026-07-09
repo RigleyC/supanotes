@@ -155,7 +155,7 @@ func (s *Service) AppendToNoteContent(ctx context.Context, userID pgtype.UUID, n
 		_, err := s.repo.InsertNode(ctx, sqlcgen.InsertNodeParams{
 			ID:       node.ID,
 			NoteID:   noteID,
-			Position: float64(startPos + i),
+			Position: fmt.Sprintf("%g", float64(startPos+i)),
 			Type:     node.Type,
 			Data:     node.Data,
 		})
@@ -170,7 +170,7 @@ func (s *Service) AppendToNoteContent(ctx context.Context, userID pgtype.UUID, n
 				Title:      node.Text,
 				DueDate:    pgtype.Date{Valid: false},
 				Recurrence: pgtype.Text{Valid: false},
-				Position:   float64(startPos + i),
+				Position:   fmt.Sprintf("%g", float64(startPos+i)),
 				NodeID:     node.ID,
 			})
 			if err != nil {
@@ -246,7 +246,7 @@ func (s *Service) overwriteNoteNodes(ctx context.Context, userID pgtype.UUID, no
 		_, err := s.repo.InsertNode(ctx, sqlcgen.InsertNodeParams{
 			ID:       node.ID,
 			NoteID:   noteID,
-			Position: float64(i),
+			Position: fmt.Sprintf("%g", float64(i)),
 			Type:     node.Type,
 			Data:     node.Data,
 		})
@@ -261,7 +261,7 @@ func (s *Service) overwriteNoteNodes(ctx context.Context, userID pgtype.UUID, no
 				Title:      node.Text,
 				DueDate:    pgtype.Date{Valid: false},
 				Recurrence: pgtype.Text{Valid: false},
-				Position:   float64(i),
+				Position:   fmt.Sprintf("%g", float64(i)),
 				NodeID:     node.ID,
 			})
 			if err != nil {

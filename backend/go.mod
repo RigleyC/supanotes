@@ -116,4 +116,5 @@ require (
 	google.golang.org/grpc v1.81.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	roci.dev/fracdex v0.0.0-20241211175510-82d7df79e312 // indirect
 )

@@ -53,7 +53,7 @@ func (t *AddTaskTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 		}
 		dueDateTime = &t
 	}
-	task, err := t.tasksSvc.CreateTask(ctx, userID, noteID, args.Title, dueDateTime, args.Recurrence, 0)
+	task, err := t.tasksSvc.CreateTask(ctx, userID, noteID, args.Title, dueDateTime, args.Recurrence, "0")
 	if err != nil {
 		return "", err
 	}

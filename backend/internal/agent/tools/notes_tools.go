@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
 	"github.com/reearth/ygo/crdt"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/notes"
+	"github.com/RigleyC/supanotes/internal/utils"
 	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
@@ -50,34 +50,37 @@ func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 	}
 
 	noteIDStr := formatID(note.ID)
-	userIDStr := formatID(userID)
 
 	parsed := notes.ParseMarkdownToNodes(args.Content)
 	doc := crdt.New(crdt.WithGC(false))
 	nodesMap := doc.GetMap("nodes")
-	tasksMap := doc.GetMap("tasks")
 	now := float64(time.Now().UnixMilli())
 
 	doc.Transact(func(txn *crdt.Transaction) {
-		for i, nd := range parsed {
+		prev := ""
+		for _, nd := range parsed {
 			nodeID := formatID(nd.ID)
-			ndJSON := serializeNoteNode(nodeID, nd.Type, nd.Data, float64(i), now)
+			pos, err := utils.GenerateKeyBetween(prev, "")
+			if err != nil {
+				pos = prev + "1"
+			}
+			prev = pos
+
+			nodeData := nd.Data
+			if nd.IsTask {
+				var dm map[string]interface{}
+				json.Unmarshal(nd.Data, &dm)
+				dm["completed"] = nd.Complete
+				nodeData, _ = json.Marshal(dm)
+			}
+
+			ndJSON := serializeNoteNode(nodeID, nd.Type, nodeData, pos, now)
 			nodesMap.Set(txn, nodeID, string(ndJSON))
 
 			// Create YText for character-level CRDT on text content
 			if nd.Text != "" {
 				textType := doc.GetText("content/" + nodeID)
 				textType.Insert(txn, 0, nd.Text, nil)
-			}
-
-			if nd.IsTask {
-				taskID := uuid.New().String()
-				status := "open"
-				if nd.Complete {
-					status = "done"
-				}
-				tdJSON := serializeTask(taskID, noteIDStr, userIDStr, nd.Text, status, float64(i), now)
-				tasksMap.Set(txn, taskID, string(tdJSON))
 			}
 		}
 	})
@@ -243,21 +246,35 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 	if err != nil {
 		return "", fmt.Errorf("get existing nodes: %w", err)
 	}
-	startPos := len(existingNodes)
-	noteIDStr := formatID(nid)
-	userIDStr := formatID(userID)
-
 	parsed := notes.ParseMarkdownToNodes(args.Content)
 	doc := crdt.New(crdt.WithGC(false))
 	nodesMap := doc.GetMap("nodes")
-	tasksMap := doc.GetMap("tasks")
 	now := float64(time.Now().UnixMilli())
 
+	lastPos := ""
+	if len(existingNodes) > 0 {
+		lastPos = existingNodes[len(existingNodes)-1].Position
+	}
+
 	doc.Transact(func(txn *crdt.Transaction) {
-		for i, nd := range parsed {
+		prev := lastPos
+		for _, nd := range parsed {
 			nodeID := formatID(nd.ID)
-			pos := float64(startPos + i)
-			ndJSON := serializeNoteNode(nodeID, nd.Type, nd.Data, pos, now)
+			pos, err := utils.GenerateKeyBetween(prev, "")
+			if err != nil {
+				pos = prev + "1"
+			}
+			prev = pos
+
+			nodeData := nd.Data
+			if nd.IsTask {
+				var dm map[string]interface{}
+				json.Unmarshal(nd.Data, &dm)
+				dm["completed"] = nd.Complete
+				nodeData, _ = json.Marshal(dm)
+			}
+
+			ndJSON := serializeNoteNode(nodeID, nd.Type, nodeData, pos, now)
 			nodesMap.Set(txn, nodeID, string(ndJSON))
 
 			// Create YText for character-level CRDT on text content
@@ -265,21 +282,11 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 				textType := doc.GetText("content/" + nodeID)
 				textType.Insert(txn, 0, nd.Text, nil)
 			}
-
-			if nd.IsTask {
-				taskID := uuid.New().String()
-				status := "open"
-				if nd.Complete {
-					status = "done"
-				}
-				tdJSON := serializeTask(taskID, noteIDStr, userIDStr, nd.Text, status, pos, now)
-				tasksMap.Set(txn, taskID, string(tdJSON))
-			}
 		}
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 
-	if err := t.yjsSvc.WriteNodeMutation(ctx, noteIDStr, update); err != nil {
+	if err := t.yjsSvc.WriteNodeMutation(ctx, formatID(nid), update); err != nil {
 		return "", fmt.Errorf("write node mutation: %w", err)
 	}
 
@@ -342,7 +349,7 @@ func (t *LinkNotesTool) Execute(ctx context.Context, userID pgtype.UUID, session
 type noteNodeJSON struct {
 	ID        string          `json:"id"`
 	ParentID  string          `json:"parentId,omitempty"`
-	Position  float64         `json:"position"`
+	Position  string          `json:"position"`
 	Type      string          `json:"type"`
 	Data      json.RawMessage `json:"data"`
 	CreatedAt float64         `json:"createdAt,omitempty"`
@@ -355,20 +362,20 @@ type taskJSON struct {
 	UserID      string  `json:"userId,omitempty"`
 	Title       string  `json:"title"`
 	Status      string  `json:"status"`
-	Position    float64 `json:"position"`
+	Position    string  `json:"position"`
 	Recurrence  string  `json:"recurrence,omitempty"`
 	DueDate     string  `json:"dueDate,omitempty"`
 	CreatedAt   float64 `json:"createdAt,omitempty"`
 	CompletedAt float64 `json:"completedAt,omitempty"`
 }
 
-func serializeNoteNode(id, typ string, data []byte, position, createdAt float64) []byte {
+func serializeNoteNode(id, typ string, data []byte, position string, createdAt float64) []byte {
 	j := noteNodeJSON{ID: id, Type: typ, Data: data, Position: position, CreatedAt: createdAt}
 	b, _ := json.Marshal(j)
 	return b
 }
 
-func serializeTask(id, noteID, userID, title, status string, position, createdAt float64) []byte {
+func serializeTask(id, noteID, userID, title, status string, position string, createdAt float64) []byte {
 	j := taskJSON{ID: id, NoteID: noteID, UserID: userID, Title: title, Status: status, Position: position, CreatedAt: createdAt}
 	b, _ := json.Marshal(j)
 	return b

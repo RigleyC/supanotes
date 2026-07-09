@@ -248,7 +248,7 @@ func TestProduceUpdateFromRows_GeneratesYjsUpdate(t *testing.T) {
 		{
 			ID:        pgtype.UUID{Bytes: nodeUUID, Valid: true},
 			NoteID:    pgtype.UUID{Bytes: noteUUID, Valid: true},
-			Position:  0,
+			Position:  "0",
 			Type:      "paragraph",
 			Data:      []byte(`{"text":"hello"}`),
 			CreatedAt: pgtype.Timestamptz{Time: time.UnixMilli(1700000000000), Valid: true},

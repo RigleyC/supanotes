@@ -20,7 +20,7 @@ import (
 type noteNodeJSON struct {
 	ID        string          `json:"id"`
 	ParentID  string          `json:"parentId,omitempty"`
-	Position  float64         `json:"position"`
+	Position  any             `json:"position"`
 	Type      string          `json:"type"`
 	Data      json.RawMessage `json:"data"`
 	CreatedAt float64         `json:"createdAt,omitempty"`
@@ -33,12 +33,29 @@ type taskJSON struct {
 	UserID      string  `json:"userId,omitempty"`
 	Title       string  `json:"title"`
 	Status      string  `json:"status"`
-	Position    float64 `json:"position"`
+	Position    any     `json:"position"`
 	Recurrence  string  `json:"recurrence,omitempty"`
 	DueDate     string  `json:"dueDate,omitempty"`
 	CreatedAt   float64 `json:"createdAt,omitempty"`
 	CompletedAt float64 `json:"completedAt,omitempty"`
 }
+
+func posToString(pos any) string {
+	if pos == nil {
+		return ""
+	}
+	switch v := pos.(type) {
+	case string:
+		return v
+	case float64:
+		return fmt.Sprintf("%g", v)
+	case int:
+		return fmt.Sprintf("%d", v)
+	default:
+		return fmt.Sprintf("%v", pos)
+	}
+}
+
 
 func parseUUIDStr(s string) (pgtype.UUID, error) {
 	u, err := uuid.Parse(s)
@@ -85,6 +102,13 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 		return fmt.Errorf("parse note id: %w", err)
 	}
 	q := sqlcgen.New(tx)
+
+	var defaultUserID pgtype.UUID
+	if err := tx.QueryRow(ctx, "SELECT user_id FROM notes WHERE id = $1", noteUUID).Scan(&defaultUserID); err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("get note owner: %w", err)
+		}
+	}
 
 	if nodesMap := doc.GetMap("nodes"); nodesMap != nil {
 		for _, key := range nodesMap.Keys() {
@@ -143,7 +167,7 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 				ID:        pgNodeID,
 				NoteID:    noteUUID,
 				ParentID:  parentID,
-				Position:  nd.Position,
+				Position:  posToString(nd.Position),
 				Type:      nd.Type,
 				Data:      dataBytes,
 				CreatedAt: createdAt,
@@ -156,21 +180,64 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 			if nd.Type == "task" {
 				var dataMap map[string]interface{}
 				if err := json.Unmarshal(dataBytes, &dataMap); err == nil {
+					completed := false
 					if completedVal, ok := dataMap["completed"]; ok {
-						completed, _ := completedVal.(bool)
-						status := "open"
-						if completed {
-							status = "done"
+						completed, _ = completedVal.(bool)
+					}
+					status := "open"
+					if completed {
+						status = "done"
+					}
+
+					title := ""
+					if textVal, ok := dataMap["text"]; ok {
+						title, _ = textVal.(string)
+					}
+					if textType := doc.GetText("content/" + nd.ID); textType != nil {
+						textContent := textType.ToString()
+						if textContent != "" {
+							title = textContent
 						}
-						// Update the corresponding tasks table status and completed_at using the transaction
-						if completed {
-							_, err = tx.Exec(ctx, "UPDATE tasks SET status = $1, completed_at = NOW(), updated_at = NOW() WHERE (node_id = $2 OR id = $2) AND deleted_at IS NULL", status, pgNodeID)
-						} else {
-							_, err = tx.Exec(ctx, "UPDATE tasks SET status = $1, completed_at = NULL, updated_at = NOW() WHERE (node_id = $2 OR id = $2) AND deleted_at IS NULL", status, pgNodeID)
+					}
+
+					var dueDate pgtype.Date
+					if dueDateVal, ok := dataMap["dueDate"]; ok {
+						if dueDateStr, ok := dueDateVal.(string); ok && dueDateStr != "" {
+							t, err := time.Parse("2006-01-02", dueDateStr)
+							if err == nil {
+								dueDate = pgtype.Date{Time: t, Valid: true}
+							}
 						}
-						if err != nil {
-							return fmt.Errorf("update task status for node %s: %w", nd.ID, err)
+					}
+
+					var recurrence pgtype.Text
+					if recurrenceVal, ok := dataMap["recurrence"]; ok {
+						if recurrenceStr, ok := recurrenceVal.(string); ok && recurrenceStr != "" {
+							recurrence = pgtype.Text{String: recurrenceStr, Valid: true}
 						}
+					}
+
+					var completedAt pgtype.Timestamptz
+					if completed {
+						completedAt = pgtype.Timestamptz{Time: time.Now(), Valid: true}
+					}
+
+					taskParams := sqlcgen.UpsertTaskParams{
+						ID:          pgNodeID,
+						UserID:      defaultUserID,
+						NoteID:      noteUUID,
+						Title:       title,
+						Status:      status,
+						Position:    posToString(nd.Position),
+						Recurrence:  recurrence,
+						DueDate:     dueDate,
+						CompletedAt: completedAt,
+						CreatedAt:   createdAt,
+						DeletedAt:   pgtype.Timestamptz{Valid: false},
+						NodeID:      pgNodeID,
+					}
+					if _, err := q.UpsertTask(ctx, taskParams); err != nil {
+						return fmt.Errorf("upsert task for node %s: %w", nd.ID, err)
 					}
 				}
 			}
@@ -193,8 +260,18 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 		orphanRows.Close()
 
 		activeIDs := make(map[string]bool, len(nodesMap.Keys()))
+		activeTaskNodeIDs := make(map[string]bool)
 		for _, key := range nodesMap.Keys() {
 			activeIDs[key] = true
+			raw, ok := nodesMap.Get(key)
+			if ok && raw != nil {
+				if nodeStr, ok := raw.(string); ok {
+					var nd noteNodeJSON
+					if err := json.Unmarshal([]byte(nodeStr), &nd); err == nil && nd.Type == "task" {
+						activeTaskNodeIDs[nd.ID] = true
+					}
+				}
+			}
 		}
 		var orphanIDs []pgtype.UUID
 		for _, id := range existingIDs {
@@ -210,79 +287,8 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 				return fmt.Errorf("soft-delete orphan nodes: %w", err)
 			}
 		}
-	}
 
-	if tasksMap := doc.GetMap("tasks"); tasksMap != nil {
-		var defaultUserID pgtype.UUID
-		if err := tx.QueryRow(ctx, "SELECT user_id FROM notes WHERE id = $1", noteUUID).Scan(&defaultUserID); err != nil {
-			if !errors.Is(err, pgx.ErrNoRows) {
-				return fmt.Errorf("get note owner: %w", err)
-			}
-		}
-
-		for _, key := range tasksMap.Keys() {
-			raw, ok := tasksMap.Get(key)
-			if !ok || raw == nil {
-				continue
-			}
-			taskStr, ok := raw.(string)
-			if !ok {
-				continue
-			}
-			var td taskJSON
-			if err := json.Unmarshal([]byte(taskStr), &td); err != nil {
-				continue
-			}
-
-			pgTaskID, err := parseUUIDStr(td.ID)
-			if err != nil {
-				continue
-			}
-
-			userID := defaultUserID
-			if td.UserID != "" {
-				if parsed, err := parseUUIDStr(td.UserID); err == nil {
-					userID = parsed
-				}
-			}
-
-			var dueDate pgtype.Date
-			if td.DueDate != "" {
-				t, err := time.Parse("2006-01-02", td.DueDate)
-				if err == nil {
-					dueDate = pgtype.Date{Time: t, Valid: true}
-				}
-			}
-
-			var recurrence pgtype.Text
-			if td.Recurrence != "" {
-				recurrence = pgtype.Text{String: td.Recurrence, Valid: true}
-			}
-
-			createdAt := msToTimestamptz(td.CreatedAt)
-			if !createdAt.Valid {
-				createdAt = pgtype.Timestamptz{Time: time.Now(), Valid: true}
-			}
-
-			params := sqlcgen.UpsertTaskParams{
-				ID:          pgTaskID,
-				UserID:      userID,
-				NoteID:      noteUUID,
-				Title:       td.Title,
-				Status:      td.Status,
-				Position:    td.Position,
-				Recurrence:  recurrence,
-				DueDate:     dueDate,
-				CompletedAt: msToTimestamptz(td.CompletedAt),
-				CreatedAt:   createdAt,
-				DeletedAt:   pgtype.Timestamptz{Valid: false},
-			}
-			if _, err := q.UpsertTask(ctx, params); err != nil {
-				return fmt.Errorf("upsert task %s: %w", key, err)
-			}
-		}
-
-		// Soft-delete tasks removed from the YMap.
+		// Soft-delete tasks that no longer exist as task nodes in nodesMap.
 		orphanTaskRows, err := tx.Query(ctx, "SELECT id FROM tasks WHERE note_id = $1 AND deleted_at IS NULL", noteUUID)
 		if err != nil {
 			return fmt.Errorf("query active task ids: %w", err)
@@ -298,13 +304,9 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 		}
 		orphanTaskRows.Close()
 
-		activeTaskIDs := make(map[string]bool, len(tasksMap.Keys()))
-		for _, key := range tasksMap.Keys() {
-			activeTaskIDs[key] = true
-		}
 		var orphanTaskIDs []pgtype.UUID
 		for _, id := range existingTaskIDs {
-			if !activeTaskIDs[id] {
+			if !activeTaskNodeIDs[id] {
 				parsed, err := parseUUIDStr(id)
 				if err == nil {
 					orphanTaskIDs = append(orphanTaskIDs, parsed)
@@ -338,63 +340,16 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 	}
 	slog.Info("ReconstructYDocFromNodes: nodes loaded", "note_id", noteID, "count", len(nodes), "elapsed_ms", time.Since(startNodes).Milliseconds())
 
-	startTasks := time.Now()
-	rows, err := pool.Query(ctx, `SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, node_id FROM tasks WHERE note_id = $1 AND deleted_at IS NULL ORDER BY position ASC, created_at ASC`, noteUUID)
-	if err != nil {
-		slog.Error("ReconstructYDocFromNodes: query tasks failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startTasks).Milliseconds())
-		return nil, fmt.Errorf("query tasks: %w", err)
-	}
-	defer rows.Close()
-	slog.Info("ReconstructYDocFromNodes: tasks queried", "note_id", noteID, "elapsed_ms", time.Since(startTasks).Milliseconds())
-
-	var tasks []sqlcgen.Task
-	for rows.Next() {
-		var t sqlcgen.Task
-		if err := rows.Scan(
-			&t.ID, &t.NoteID, &t.UserID, &t.Title, &t.Status,
-			&t.DueDate, &t.Recurrence, &t.Position,
-			&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
-			&t.CompletedAt, &t.NodeID,
-		); err != nil {
-			return nil, fmt.Errorf("scan task: %w", err)
-		}
-		tasks = append(tasks, t)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iter: %w", err)
-	}
-
 	doc := crdt.New(crdt.WithGC(false))
 	nodesMap := doc.GetMap("nodes")
-	tasksMap := doc.GetMap("tasks")
-
-	// Build a taskStatusMap from the queried tasks
-	taskStatusMap := make(map[string]string)
-	for _, t := range tasks {
-		if t.NodeID.Valid {
-			taskStatusMap[uuidToStr(t.NodeID)] = t.Status
-		}
-	}
 
 	// Pre-create/retrieve YText types outside transaction to avoid CGO deadlock
 	textTypes := make(map[string]*crdt.YText)
 	for _, node := range nodes {
 		nodeID := uuidToStr(node.ID)
-		nodeData := node.Data
-		if node.Type == "task" {
-			if status, ok := taskStatusMap[nodeID]; ok {
-				var dataMap map[string]interface{}
-				if err := json.Unmarshal(node.Data, &dataMap); err == nil {
-					dataMap["completed"] = (status == "done")
-					if updatedBytes, err := json.Marshal(dataMap); err == nil {
-						nodeData = updatedBytes
-					}
-				}
-			}
-		}
-		if len(nodeData) > 0 {
+		if len(node.Data) > 0 {
 			var dataMap map[string]interface{}
-			if err := json.Unmarshal(nodeData, &dataMap); err == nil {
+			if err := json.Unmarshal(node.Data, &dataMap); err == nil {
 				if text, ok := dataMap["text"].(string); ok && text != "" {
 					textTypes[nodeID] = doc.GetText("content/" + nodeID)
 				}
@@ -405,25 +360,12 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 	doc.Transact(func(txn *crdt.Transaction) {
 		for _, node := range nodes {
 			nodeID := uuidToStr(node.ID)
-			nodeData := node.Data
-			if node.Type == "task" {
-				if status, ok := taskStatusMap[nodeID]; ok {
-					var dataMap map[string]interface{}
-					if err := json.Unmarshal(node.Data, &dataMap); err == nil {
-						dataMap["completed"] = (status == "done")
-						if updatedBytes, err := json.Marshal(dataMap); err == nil {
-							nodeData = updatedBytes
-						}
-					}
-				}
-			}
-
 			nd := noteNodeJSON{
 				ID:        nodeID,
 				ParentID:  uuidToStr(node.ParentID),
 				Position:  node.Position,
 				Type:      node.Type,
-				Data:      nodeData,
+				Data:      node.Data,
 				CreatedAt: timestamptzToMS(node.CreatedAt),
 				UpdatedAt: timestamptzToMS(node.UpdatedAt),
 			}
@@ -435,36 +377,12 @@ func ReconstructYDocFromNodes(ctx context.Context, pool *pgxpool.Pool, noteID st
 
 			if textType, ok := textTypes[nodeID]; ok {
 				var dataMap map[string]interface{}
-				if err := json.Unmarshal(nodeData, &dataMap); err == nil {
+				if err := json.Unmarshal(node.Data, &dataMap); err == nil {
 					if text, ok := dataMap["text"].(string); ok && text != "" {
 						textType.Insert(txn, 0, text, nil)
 					}
 				}
 			}
-		}
-
-		for _, t := range tasks {
-			td := taskJSON{
-				ID:          uuidToStr(t.ID),
-				NoteID:      uuidToStr(t.NoteID),
-				UserID:      uuidToStr(t.UserID),
-				Title:       t.Title,
-				Status:      t.Status,
-				Position:    t.Position,
-				CreatedAt:   timestamptzToMS(t.CreatedAt),
-				CompletedAt: timestamptzToMS(t.CompletedAt),
-			}
-			if t.DueDate.Valid {
-				td.DueDate = t.DueDate.Time.Format("2006-01-02")
-			}
-			if t.Recurrence.Valid {
-				td.Recurrence = t.Recurrence.String
-			}
-			b, err := json.Marshal(td)
-			if err != nil {
-				continue
-			}
-			tasksMap.Set(txn, uuidToStr(t.ID), string(b))
 		}
 	})
 
