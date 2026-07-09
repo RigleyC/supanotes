@@ -201,13 +201,15 @@ class NoteSyncCoordinator {
 
         finalSelection = DocumentSelection(base: newBase, extent: newExtent);
 
-        _editor.execute([
-          ChangeSelectionRequest(
-            finalSelection,
-            SelectionChangeType.placeCaret,
-            SelectionReason.contentChange,
-          ),
-        ]);
+        if (finalSelection != composer.selection) {
+          _editor.execute([
+            ChangeSelectionRequest(
+              finalSelection,
+              SelectionChangeType.placeCaret,
+              SelectionReason.contentChange,
+            ),
+          ]);
+        }
       }
     }
   }
