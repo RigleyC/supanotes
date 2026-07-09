@@ -5,27 +5,28 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
+import 'package:web_socket_channel/web_socket_channel.dart';
+
 import 'sync_state.dart';
 
 const int _kMaxPendingUpdates = 1000;
 const Duration _kIdleTimeout = Duration(minutes: 5);
 
+typedef ChannelBuilder = Future<WebSocketChannel> Function();
+
 class YjsWebSocketClient {
   YjsWebSocketClient({
-    required Stream<Uint8List> stream,
-    required StreamSink<dynamic> sink,
+    required this.channelBuilder,
     required Doc doc,
     SyncStateNotifier? notifier,
-  })  : _stream = stream,
-        _sink = sink,
-        _doc = doc,
+  })  : _doc = doc,
         _notifier = notifier;
 
-  final Stream<Uint8List> _stream;
-  final StreamSink<dynamic> _sink;
+  final ChannelBuilder channelBuilder;
   final Doc _doc;
   final SyncStateNotifier? _notifier;
 
+  WebSocketChannel? _channel;
   StreamSubscription<Uint8List>? _sub;
   final StreamController<Uint8List> _onUpdateController =
       StreamController<Uint8List>.broadcast();
@@ -48,12 +49,35 @@ class YjsWebSocketClient {
     _connectedNoteId = noteId;
     _handshakeDone = false;
     _notifier?.markSyncing();
-    _sub = _stream.listen(_handleMessage);
-    _isConnected = true;
-    debugPrint('[YjsWS] connect: sending Step1 elapsed=${sw.elapsedMilliseconds}ms');
-    _sendStep1(_doc);
-    _resetIdleTimer();
-    debugPrint('[YjsWS] connect DONE elapsed=${sw.elapsedMilliseconds}ms');
+    
+    try {
+      _channel = await channelBuilder();
+      final stream = _channel!.stream
+          .where((m) => m is List<int>)
+          .map((m) => Uint8List.fromList(m as List<int>));
+      _sub = stream.listen(
+        _handleMessage,
+        onError: (e) {
+          debugPrint('[YjsWS] connection error: $e');
+          _isConnected = false;
+          _scheduleReconnect();
+        },
+        onDone: () {
+          debugPrint('[YjsWS] connection closed');
+          _isConnected = false;
+          _scheduleReconnect();
+        },
+      );
+      _isConnected = true;
+      debugPrint('[YjsWS] connect: sending Step1 elapsed=${sw.elapsedMilliseconds}ms');
+      _sendStep1(_doc);
+      _resetIdleTimer();
+      debugPrint('[YjsWS] connect DONE elapsed=${sw.elapsedMilliseconds}ms');
+    } catch (e) {
+      debugPrint('[YjsWS] connect FAIL: $e');
+      _isConnected = false;
+      _scheduleReconnect();
+    }
   }
 
   void _handleMessage(Uint8List data) {
@@ -95,7 +119,11 @@ class YjsWebSocketClient {
     _sendRaw(toUint8Array(enc));
   }
 
-  void _sendRaw(Uint8List bytes) => _sink.add(bytes);
+  void _sendRaw(Uint8List bytes) {
+    if (_channel != null) {
+      _channel!.sink.add(bytes);
+    }
+  }
 
   void _flushPending() {
     if (_pendingUpdates.isEmpty) return;
@@ -157,6 +185,10 @@ class YjsWebSocketClient {
     _idleTimer = null;
     await _sub?.cancel();
     _sub = null;
+    if (_channel != null) {
+      await _channel!.sink.close();
+      _channel = null;
+    }
     _isConnected = false;
     _handshakeDone = false;
     debugPrint('[YjsWS] disconnect DONE');

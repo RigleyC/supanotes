@@ -135,16 +135,15 @@ class SyncService {
       }
       final uri = Uri.parse(wsUrl);
       debugPrint('[SyncService] connectNote connecting WS url=$wsUrl elapsed=${sw.elapsedMilliseconds}ms');
-      final channel = IOWebSocketChannel.connect(
-        uri,
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
-      final stream = channel.stream
-          .where((m) => m is List<int>)
-          .map((m) => Uint8List.fromList(m as List<int>));
       _yjsWsClient = YjsWebSocketClient(
-        stream: stream,
-        sink: channel.sink,
+        channelBuilder: () async {
+          final token = await _authStorage.getAccessToken();
+          if (token == null) throw Exception('No access token');
+          return IOWebSocketChannel.connect(
+            uri,
+            headers: {'Authorization': 'Bearer $token'},
+          );
+        },
         doc: doc,
         notifier: _notifier,
       );
