@@ -48,7 +48,7 @@ func TestWSHandler_FlyReplay(t *testing.T) {
 
 	// Should redirect with 503 Service Unavailable and fly-replay header
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-	assert.Equal(t, otherMachine, rec.Header().Get("fly-replay"))
+	assert.Equal(t, "instance="+otherMachine, rec.Header().Get("fly-replay"))
 }
 
 func TestWSHandler_AccessDenied(t *testing.T) {

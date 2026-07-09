@@ -200,7 +200,7 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 	err = h.pool.QueryRow(ctx, "SELECT machine_id FROM note_ws_leases WHERE note_id = $1 AND expires_at > NOW()", noteID).Scan(&leaseMachine)
 	if err == nil && leaseMachine != "" && leaseMachine != h.machineID {
 		slog.Info("WS HandleConnect: fly-replay redirect", "note_id", noteID, "target_machine", leaseMachine, "elapsed_ms", time.Since(startLease).Milliseconds())
-		c.Response().Header().Set("fly-replay", leaseMachine)
+		c.Response().Header().Set("fly-replay", "instance="+leaseMachine)
 		return c.NoContent(http.StatusServiceUnavailable)
 	}
 	slog.Info("WS HandleConnect: lease check done", "note_id", noteID, "elapsed_ms", time.Since(startLease).Milliseconds())
