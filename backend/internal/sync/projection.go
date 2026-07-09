@@ -158,7 +158,7 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 				if err := json.Unmarshal(dataBytes, &dataMap); err == nil {
 					if completedVal, ok := dataMap["completed"]; ok {
 						completed, _ := completedVal.(bool)
-						status := "todo"
+						status := "open"
 						if completed {
 							status = "done"
 						}

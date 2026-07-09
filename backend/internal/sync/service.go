@@ -512,8 +512,8 @@ func (s *service) canEditNote(ctx context.Context, r Repository, noteID pgtype.U
 }
 
 func sanitizeTaskStatus(status string) string {
-	if status == "done" || status == "todo" {
+	if status == "done" || status == "open" {
 		return status
 	}
-	return "todo"
+	return "open"
 }

@@ -117,21 +117,20 @@ class YjsDocEditorBridge {
     final oldText = ytext.toString();
     if (oldText == newText) return;
 
+    final oldRunes = oldText.runes.toList();
+    final newRunes = newText.runes.toList();
+
     int start = 0;
-    int oldEnd = oldText.length;
-    int newEnd = newText.length;
+    int oldEnd = oldRunes.length;
+    int newEnd = newRunes.length;
 
     // Find common prefix
-    while (start < oldEnd &&
-        start < newEnd &&
-        oldText.codeUnitAt(start) == newText.codeUnitAt(start)) {
+    while (start < oldEnd && start < newEnd && oldRunes[start] == newRunes[start]) {
       start++;
     }
 
     // Find common suffix
-    while (oldEnd > start &&
-        newEnd > start &&
-        oldText.codeUnitAt(oldEnd - 1) == newText.codeUnitAt(newEnd - 1)) {
+    while (oldEnd > start && newEnd > start && oldRunes[oldEnd - 1] == newRunes[newEnd - 1]) {
       oldEnd--;
       newEnd--;
     }
@@ -143,8 +142,8 @@ class YjsDocEditorBridge {
     }
 
     // Insert inserted characters
-    final insertText = newText.substring(start, newEnd);
-    if (insertText.isNotEmpty) {
+    if (newEnd > start) {
+      final insertText = String.fromCharCodes(newRunes.sublist(start, newEnd));
       ytext.insert(start, insertText);
     }
   }
