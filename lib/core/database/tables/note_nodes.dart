@@ -6,7 +6,7 @@ class NoteNodes extends Table {
   TextColumn get id => text()();
   TextColumn get noteId => text().references(Notes, #id)();
   TextColumn get parentId => text().nullable().references(NoteNodes, #id)();
-  RealColumn get position => real()();
+  TextColumn get position => text().withDefault(const Constant('a0'))();
   TextColumn get type => text()();
   TextColumn get data => text()();
   DateTimeColumn get createdAt => dateTime()();

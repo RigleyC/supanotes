@@ -10,7 +10,7 @@ class Tasks extends Table {
   TextColumn get noteId => text()();
   TextColumn get title => text()();
   TextColumn get status => text()();
-  RealColumn get position => real().withDefault(const Constant(0.0))();
+  TextColumn get position => text().withDefault(const Constant('a0'))();
   TextColumn get recurrence =>
       text().map(const EnumNameConverter(TaskRecurrence.values)).nullable()();
   DateTimeColumn get dueDate => dateTime().nullable()();
