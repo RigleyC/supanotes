@@ -12,7 +12,6 @@ library;
 import 'dart:convert';
 import 'dart:developer' as dev;
 
-import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
 
 import '../../../core/database/database.dart';

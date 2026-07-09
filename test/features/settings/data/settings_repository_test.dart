@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
-import 'package:supanotes/features/settings/data/settings_models.dart';
 
 class _StubAdapter implements HttpClientAdapter {
   _StubAdapter(this.responder);

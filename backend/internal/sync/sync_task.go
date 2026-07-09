@@ -180,12 +180,15 @@ func ProduceUpdateFromRows(
 	nodesMap := doc.GetMap("nodes")
 	tasksMap := doc.GetMap("tasks")
 
-	// Pre-create/retrieve YText types outside transaction to avoid deadlock
+	// Pre-create/retrieve YText types and their contents outside transaction to avoid deadlock
 	textTypes := make(map[string]*crdt.YText)
+	oldTexts := make(map[string]string)
 	for _, n := range nodes {
 		if !n.DeletedAt.Valid {
 			nID := uuid.UUID(n.ID.Bytes).String()
-			textTypes[nID] = doc.GetText("content/" + nID)
+			ytext := doc.GetText("content/" + nID)
+			textTypes[nID] = ytext
+			oldTexts[nID] = ytext.ToString()
 		}
 	}
 
@@ -213,7 +216,7 @@ func ProduceUpdateFromRows(
 				if err := json.Unmarshal(n.Data, &dataMap); err == nil {
 					if text, ok := dataMap["text"].(string); ok {
 						if textType, ok := textTypes[nID]; ok {
-							updateYTextIncrementally(txn, textType, text)
+							updateYTextIncrementally(txn, textType, oldTexts[nID], text)
 						}
 					}
 				}
@@ -251,8 +254,7 @@ func ProduceUpdateFromRows(
 	return crdt.EncodeStateAsUpdateV1(doc, nil), nil
 }
 
-func updateYTextIncrementally(txn *crdt.Transaction, ytext *crdt.YText, newText string) {
-	oldText := ytext.ToString()
+func updateYTextIncrementally(txn *crdt.Transaction, ytext *crdt.YText, oldText string, newText string) {
 	if oldText == newText {
 		return
 	}

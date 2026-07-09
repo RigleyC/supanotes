@@ -2,7 +2,6 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../features/tasks/domain/task_recurrence.dart';
-import '../../utils/date_time_extensions.dart';
 
 import '../database.dart';
 import '../tables/tasks.dart';

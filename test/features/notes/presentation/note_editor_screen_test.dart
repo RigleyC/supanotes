@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/auth/current_user.dart';

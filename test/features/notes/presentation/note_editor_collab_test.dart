@@ -9,7 +9,6 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
-import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 

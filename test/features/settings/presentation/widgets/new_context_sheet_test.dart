@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/widgets/new_context_sheet.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';

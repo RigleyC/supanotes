@@ -139,7 +139,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         final hideCompleted = note.hideCompleted;
 
         return AdaptiveScaffold(
-          resizeToAvoidBottomInset: false,
           appBar: /* AppBar(
             actions: [
               IconButton(
@@ -157,9 +156,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   },
                 ),
             ],
-          ), */
-
-          AdaptiveAppBar(
+          ), */ AdaptiveAppBar(
+            useNativeToolbar:
+                false, // Evita conflitos de foco nativo com o SuperEditor
             title: isReadOnly
                 ? '${NoteStrings.sharedByPrefix} ${note.sharedByEmail}'
                 : null,
@@ -167,7 +166,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               AdaptiveAppBarAction(
                 icon: Icons.more_vert,
                 iosSymbol: 'ellipsis',
-                onPressed: () => _showMoreMenu(context, ref, note, hideCompleted, repo),
+                onPressed: () =>
+                    _showMoreMenu(context, ref, note, hideCompleted, repo),
               ),
               if (!isReadOnly)
                 AdaptiveAppBarAction(
@@ -175,45 +175,47 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   iosSymbol: 'checkmark',
                   onPressed: () {
                     FocusManager.instance.primaryFocus?.unfocus();
-                    SystemChannels.textInput.invokeMethod(
-                      'TextInput.hide',
-                    );
+                    SystemChannels.textInput.invokeMethod('TextInput.hide');
                   },
                 ),
             ],
           ),
-          body: NoteEditor(
-            noteId: widget.noteId,
-            nodes: nodes,
-            taskMetadata: tasksMap,
-            hideCompleted: hideCompleted,
-            collapseImages: note.collapseImages,
-            isReadOnly: isReadOnly,
-            delegate: NoteEditorDelegate(
-              onTaskLongPress: isReadOnly
-                  ? null
-                  : (task, flushSnapshot) =>
-                        _openTaskActions(task, flushSnapshot),
-              onTaskComplete: (taskId) =>
-                  TaskSnackBarHelper.completeTaskWithFeedback(
-                    onComplete: () =>
-                        ref.read(tasksRepositoryProvider).completeTask(taskId),
-                    onUndo: (previousDue) => ref
-                        .read(tasksRepositoryProvider)
-                        .reopenTask(taskId, originalDueDate: previousDue),
-                  ),
-              onTaskReopen: (taskId) =>
-                  ref.read(tasksRepositoryProvider).reopenTask(taskId),
-              onUploadFile: isReadOnly
-                  ? null
-                  : (id, noteId, filePath, mimeType) => ref
-                        .read(attachmentsRepositoryProvider)
-                        .upload(
-                          id: id,
-                          noteId: noteId,
-                          file: File(filePath),
-                          mimeType: mimeType,
-                        ),
+          body: SafeArea(
+            bottom: false,
+            child: NoteEditor(
+              noteId: widget.noteId,
+              nodes: nodes,
+              taskMetadata: tasksMap,
+              hideCompleted: hideCompleted,
+              collapseImages: note.collapseImages,
+              isReadOnly: isReadOnly,
+              delegate: NoteEditorDelegate(
+                onTaskLongPress: isReadOnly
+                    ? null
+                    : (task, flushSnapshot) =>
+                          _openTaskActions(task, flushSnapshot),
+                onTaskComplete: (taskId) =>
+                    TaskSnackBarHelper.completeTaskWithFeedback(
+                      onComplete: () => ref
+                          .read(tasksRepositoryProvider)
+                          .completeTask(taskId),
+                      onUndo: (previousDue) => ref
+                          .read(tasksRepositoryProvider)
+                          .reopenTask(taskId, originalDueDate: previousDue),
+                    ),
+                onTaskReopen: (taskId) =>
+                    ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                onUploadFile: isReadOnly
+                    ? null
+                    : (id, noteId, filePath, mimeType) => ref
+                          .read(attachmentsRepositoryProvider)
+                          .upload(
+                            id: id,
+                            noteId: noteId,
+                            file: File(filePath),
+                            mimeType: mimeType,
+                          ),
+              ),
             ),
           ),
         );

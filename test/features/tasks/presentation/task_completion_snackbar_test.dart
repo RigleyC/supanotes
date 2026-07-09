@@ -9,7 +9,6 @@ import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
-import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -19,7 +18,6 @@ import 'package:intl/date_symbol_data_local.dart';
 
 class _MockTasksRepository extends Mock implements ITasksRepository {}
 
-class _MockNotesRepository extends Mock implements INotesRepository {}
 
 void main() {
   setUpAll(() async {

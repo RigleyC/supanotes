@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
-import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/yjs_sync_manager.dart';
@@ -62,7 +61,7 @@ void main() {
           );
 
       // Reconstruct/Load Doc again, simulating merge of offline change
-      final updatedDoc = await mgr.loadDoc('note-1');
+      await mgr.loadDoc('note-1');
       
       // Force reconstruction from local node modifications
       final freshMgr = YjsSyncManager(db: db);
