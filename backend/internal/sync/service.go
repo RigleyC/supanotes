@@ -191,6 +191,10 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			log.Error().Interface("note_id", n.ID).Interface("user_id", userID).Interface("note_owner_id", n.UserID).Err(err).Msg("sync push conflict: note permission check failed")
 			return ErrSyncConflict
 		}
+		if !canEdit && n.UserID == userID {
+			canEdit = true
+			editableNotes[n.ID] = true
+		}
 		if !canEdit {
 			share, shareErr := s.repo.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
 				NoteID: n.ID, UserID: userID,
@@ -419,6 +423,15 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			}
 			log.Info().Str("note_id", noteIDStr).Dur("apply_elapsed", time.Since(startApply)).Msg("PUSH YJS: mutation applied")
 
+			if err := s.ydoc.FlushUpdates(ctx, noteIDStr); err != nil {
+				log.Error().Str("note_id", noteIDStr).Err(err).Msg("PUSH FAIL: FlushUpdates")
+				return fmt.Errorf("flush updates for note %s: %w", noteIDStr, err)
+			}
+			if err := s.ydoc.ProjectCanonicalDoc(ctx, noteIDStr); err != nil {
+				log.Error().Str("note_id", noteIDStr).Err(err).Msg("PUSH FAIL: ProjectCanonicalDoc")
+				return fmt.Errorf("project canonical doc for note %s: %w", noteIDStr, err)
+			}
+
 			if s.roomMgr != nil {
 				startBroadcast := time.Now()
 				s.roomMgr.BroadcastIfActive(noteIDStr, update)
@@ -427,6 +440,38 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			log.Info().Str("note_id", noteIDStr).Dur("note_total", time.Since(startNote)).Msg("PUSH YJS: note done")
 		}
 		log.Info().Dur("yjs_total", time.Since(startYjs)).Msg("PUSH YJS: all notes done")
+	} else {
+		for _, nn := range payload.NoteNodes {
+			if _, err := r.UpsertNoteNode(ctx, sqlcgen.UpsertNoteNodeParams{
+				ID: nn.ID, NoteID: nn.NoteID, ParentID: nn.ParentID,
+				Position: nn.Position, Type: nn.Type, Data: nn.Data,
+				CreatedAt: nn.CreatedAt, DeletedAt: nn.DeletedAt,
+			}); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					log.Error().Interface("node_id", nn.ID).Err(err).Msg("sync push conflict: UpsertNoteNode returned ErrNoRows")
+					return ErrSyncConflict
+				}
+				return err
+			}
+		}
+		for _, st := range payload.Tasks {
+			t, err := fromSyncTask(st)
+			if err != nil {
+				return err
+			}
+			if _, err := r.UpsertTask(ctx, sqlcgen.UpsertTaskParams{
+				ID: t.ID, UserID: userID, NoteID: t.NoteID,
+				Title: t.Title, Status: sanitizeTaskStatus(t.Status),
+				Position: t.Position, Recurrence: t.Recurrence,
+				DueDate: t.DueDate, CreatedAt: t.CreatedAt, DeletedAt: t.DeletedAt,
+			}); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					log.Error().Interface("task_id", t.ID).Err(err).Msg("sync push conflict: UpsertTask returned ErrNoRows")
+					return ErrSyncConflict
+				}
+				return err
+			}
+		}
 	}
 
 	log.Info().Dur("total", time.Since(startTotal)).Msg("PUSH DONE")
@@ -443,12 +488,15 @@ func (s *service) canEditNote(ctx context.Context, r Repository, noteID pgtype.U
 			share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
 				NoteID: noteID, UserID: userID,
 			})
-			if shareErr != nil || share.Permission != "edit" {
-				editableNotes[noteID] = false
+			if shareErr != nil {
+				if errors.Is(shareErr, pgx.ErrNoRows) {
+					return false, nil
+				}
 				return false, shareErr
 			}
-			editableNotes[noteID] = true
-			return true, nil
+			canEdit := share.Permission == "edit"
+			editableNotes[noteID] = canEdit
+			return canEdit, nil
 		}
 		return false, err
 	}
@@ -461,4 +509,11 @@ func (s *service) canEditNote(ctx context.Context, r Repository, noteID pgtype.U
 	}
 	editableNotes[noteID] = canEdit
 	return canEdit, nil
+}
+
+func sanitizeTaskStatus(status string) string {
+	if status == "done" || status == "todo" {
+		return status
+	}
+	return "todo"
 }

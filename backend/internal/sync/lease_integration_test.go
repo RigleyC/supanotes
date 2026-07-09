@@ -4,6 +4,8 @@ package sync
 
 import (
 	"context"
+	"os"
+	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,12 +13,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	testPool   *pgxpool.Pool
+	testPoolMu sync.Once
+)
+
 func setupTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	pool, err := pgxpool.New(context.Background(), "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable")
+	testPoolMu.Do(func() {
+		url := os.Getenv("TEST_DATABASE_URL")
+		if url == "" {
+			url = "postgres://supanotes:supanotes@localhost:5432/supanotes?sslmode=disable"
+		}
+		config, err := pgxpool.ParseConfig(url)
+		if err != nil {
+			t.Fatalf("failed to parse config: %v", err)
+		}
+		config.MaxConns = 10
+		testPool, err = pgxpool.NewWithConfig(context.Background(), config)
+		if err != nil {
+			t.Fatalf("failed to create pool: %v", err)
+		}
+	})
+	return testPool
+}
+
+func insertNoteForTest(t *testing.T, ctx context.Context, pool *pgxpool.Pool, noteID string) {
+	t.Helper()
+	_, err := pool.Exec(ctx,
+		`INSERT INTO users (id, email, name, password_hash, created_at, updated_at) 
+		 VALUES ('00000000-0000-0000-0000-000000000000', 'system@test.com', 'System', '', NOW(), NOW()) 
+		 ON CONFLICT (id) DO NOTHING`,
+	)
 	require.NoError(t, err)
-	t.Cleanup(pool.Close)
-	return pool
+
+	_, err = pool.Exec(ctx,
+		`INSERT INTO notes (id, user_id, content, created_at, updated_at) 
+		 VALUES ($1, '00000000-0000-0000-0000-000000000000', '', NOW(), NOW()) 
+		 ON CONFLICT (id) DO NOTHING`,
+		noteID,
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM note_ws_leases WHERE note_id = $1", noteID)
+		_, _ = pool.Exec(ctx, "DELETE FROM notes WHERE id = $1", noteID)
+	})
 }
 
 func TestLeaseAcquireAndGet(t *testing.T) {
@@ -25,6 +66,7 @@ func TestLeaseAcquireAndGet(t *testing.T) {
 	ctx := context.Background()
 
 	noteID := "00000000-0000-0000-0000-000000000001"
+	insertNoteForTest(t, ctx, pool, noteID)
 	machineID := "machine-a"
 
 	_, acquired, err := mgr.AcquireLease(ctx, noteID, machineID)
@@ -34,10 +76,6 @@ func TestLeaseAcquireAndGet(t *testing.T) {
 	got, err := mgr.GetLeaseMachine(ctx, noteID)
 	require.NoError(t, err)
 	assert.Equal(t, machineID, got)
-
-	t.Cleanup(func() {
-		mgr.ReleaseLease(ctx, noteID, machineID)
-	})
 }
 
 func TestLeaseConflict(t *testing.T) {
@@ -46,6 +84,7 @@ func TestLeaseConflict(t *testing.T) {
 	ctx := context.Background()
 
 	noteID := "00000000-0000-0000-0000-000000000002"
+	insertNoteForTest(t, ctx, pool, noteID)
 	machineA := "machine-a"
 	machineB := "machine-b"
 
@@ -56,10 +95,6 @@ func TestLeaseConflict(t *testing.T) {
 	_, acquired, err = mgr.AcquireLease(ctx, noteID, machineB)
 	require.NoError(t, err)
 	assert.False(t, acquired)
-
-	t.Cleanup(func() {
-		mgr.ReleaseLease(ctx, noteID, machineA)
-	})
 }
 
 func TestLeaseAcquireReturnsWinnerMachineID(t *testing.T) {
@@ -67,6 +102,7 @@ func TestLeaseAcquireReturnsWinnerMachineID(t *testing.T) {
 	mgr := NewLeaseManager(pool)
 	ctx := context.Background()
 	noteID := "00000000-0000-0000-0000-000000000100"
+	insertNoteForTest(t, ctx, pool, noteID)
 	machineID := "machine-a"
 
 	winner, acquired, err := mgr.AcquireLease(ctx, noteID, machineID)
@@ -78,8 +114,6 @@ func TestLeaseAcquireReturnsWinnerMachineID(t *testing.T) {
 	_, acquiredB, errB := mgr.AcquireLease(ctx, noteID, "machine-b")
 	require.NoError(t, errB)
 	assert.False(t, acquiredB)
-
-	t.Cleanup(func() { mgr.ReleaseLease(ctx, noteID, machineID) })
 }
 
 func TestLeaseRelease(t *testing.T) {
@@ -88,6 +122,7 @@ func TestLeaseRelease(t *testing.T) {
 	ctx := context.Background()
 
 	noteID := "00000000-0000-0000-0000-000000000003"
+	insertNoteForTest(t, ctx, pool, noteID)
 	machineID := "machine-a"
 
 	_, _, err := mgr.AcquireLease(ctx, noteID, machineID)
@@ -107,6 +142,7 @@ func TestLeaseRenew(t *testing.T) {
 	ctx := context.Background()
 
 	noteID := "00000000-0000-0000-0000-000000000004"
+	insertNoteForTest(t, ctx, pool, noteID)
 	machineID := "machine-a"
 
 	_, _, err := mgr.AcquireLease(ctx, noteID, machineID)
@@ -117,10 +153,6 @@ func TestLeaseRenew(t *testing.T) {
 
 	_, err = mgr.GetLeaseMachine(ctx, noteID)
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		mgr.ReleaseLease(ctx, noteID, machineID)
-	})
 }
 
 func TestLeaseExpiry(t *testing.T) {
@@ -129,6 +161,7 @@ func TestLeaseExpiry(t *testing.T) {
 	ctx := context.Background()
 
 	noteID := "00000000-0000-0000-0000-000000000005"
+	insertNoteForTest(t, ctx, pool, noteID)
 	machineID := "machine-a"
 
 	_, _, err := mgr.AcquireLease(ctx, noteID, machineID)
@@ -141,8 +174,4 @@ func TestLeaseExpiry(t *testing.T) {
 	got, err := mgr.GetLeaseMachine(ctx, noteID)
 	assert.Error(t, err)
 	assert.Equal(t, "", got)
-
-	t.Cleanup(func() {
-		mgr.ReleaseLease(ctx, noteID, machineID)
-	})
 }

@@ -12,6 +12,7 @@ import (
 
 type projectionRunner interface {
 	RunDebouncedProjection(ctx context.Context, noteID string)
+	ProjectCanonicalDoc(ctx context.Context, noteID string) error
 }
 
 type YDocService struct {
@@ -205,6 +206,13 @@ func (s *YDocService) flushNoteToDB(ctx context.Context, noteID string, updates 
 	}
 	slog.Info("flushNoteToDB: committed", "note_id", noteID, "elapsed_ms", time.Since(startCommit).Milliseconds(), "total_elapsed_ms", time.Since(startTx).Milliseconds())
 	return nil
+}
+
+func (s *YDocService) ProjectCanonicalDoc(ctx context.Context, noteID string) error {
+	if s.projection == nil {
+		return nil
+	}
+	return s.projection.ProjectCanonicalDoc(ctx, noteID)
 }
 
 func (s *YDocService) FlushUpdates(ctx context.Context, noteID string) error {

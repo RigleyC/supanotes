@@ -67,8 +67,21 @@ func TestCompactorCompactNote(t *testing.T) {
 	noteID := uuid.New().String()
 	insertNoteForCompactor(t, ctx, pool, noteID)
 
-	update1 := makeTestUpdateWithText(t, "hello ")
-	update2 := makeTestUpdateWithText(t, "world")
+	// Create sequential deterministic updates:
+	// update1: insert "hello " at 0
+	// update2: insert "world" at 6 (full state after both inserts)
+	doc := crdt.New(crdt.WithGC(false))
+	textType := doc.GetText("content")
+	doc.Transact(func(txn *crdt.Transaction) {
+		textType.Insert(txn, 0, "hello ", nil)
+	})
+	update1 := crdt.EncodeStateAsUpdateV1(doc, nil)
+
+	doc.Transact(func(txn *crdt.Transaction) {
+		textType.Insert(txn, 6, "world", nil)
+	})
+	update2 := crdt.EncodeStateAsUpdateV1(doc, nil)
+
 	insertYjsUpdate(t, ctx, pool, noteID, update1)
 	insertYjsUpdate(t, ctx, pool, noteID, update2)
 	t.Cleanup(func() {
@@ -94,10 +107,10 @@ func TestCompactorCompactNote(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, storedState, "merged state should not be empty")
 
-	doc := crdt.New(crdt.WithGC(false))
-	err = crdt.ApplyUpdateV1(doc, storedState, nil)
+	docMerged := crdt.New(crdt.WithGC(false))
+	err = crdt.ApplyUpdateV1(docMerged, storedState, nil)
 	require.NoError(t, err)
-	assert.Equal(t, "hello world", doc.GetText("content").ToString(),
+	assert.Equal(t, "hello world", docMerged.GetText("content").ToString(),
 		"merged state should contain both text updates")
 }
 
@@ -185,8 +198,9 @@ func TestCompactorPreservesUnmodifiedNodesAcrossCycles(t *testing.T) {
 
 	// Now push a SECOND update that only mutates node A's YText content.
 	docPartial := crdt.New(crdt.WithGC(false))
+	textA := docPartial.GetText("content/" + nodeA)
 	docPartial.Transact(func(txn *crdt.Transaction) {
-		docPartial.GetText("content/"+nodeA).Insert(txn, 0, "CHANGED", nil)
+		textA.Insert(txn, 0, "CHANGED", nil)
 	})
 	partialUpdate := crdt.EncodeStateAsUpdateV1(docPartial, nil)
 	insertYjsUpdate(t, ctx, pool, noteID, partialUpdate)
@@ -219,16 +233,17 @@ func TestCompactorRunDebouncedProjectionProjects(t *testing.T) {
 
 	nodeID := uuid.New().String()
 	doc := crdt.New(crdt.WithGC(false))
+	textNode := doc.GetText("content/" + nodeID)
+	nodesMap := doc.GetMap("nodes")
 	doc.Transact(func(txn *crdt.Transaction) {
-		m := doc.GetMap("nodes")
 		nd, _ := json.Marshal(map[string]any{
 			"id":       nodeID,
 			"position": 0.0,
 			"type":     "paragraph",
 			"data":     map[string]string{"text": "hi"},
 		})
-		m.Set(txn, nodeID, string(nd))
-		doc.GetText("content/"+nodeID).Insert(txn, 0, "hi", nil)
+		nodesMap.Set(txn, nodeID, string(nd))
+		textNode.Insert(txn, 0, "hi", nil)
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 

@@ -324,6 +324,10 @@ func (m *mockCollabRepository) UpdateNotesContentFromNodes(ctx context.Context, 
 	return nil
 }
 
+func (m *mockCollabRepository) GetSyncNoteYjsStates(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteYjsState, error) {
+	return nil, nil
+}
+
 func (m *mockCollabRepository) WithQuerier(q sqlcgen.Querier) sync.Repository {
 	return m
 }

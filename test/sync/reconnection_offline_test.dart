@@ -1,0 +1,120 @@
+import 'dart:convert';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/native.dart';
+import 'package:yjs_dart/yjs_dart.dart';
+
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/sync/yjs_sync_manager.dart';
+
+void main() {
+  late AppDatabase db;
+
+  setUp(() {
+    db = AppDatabase.test(executor: NativeDatabase.memory());
+  });
+
+  tearDown(() async {
+    await db.close();
+  });
+
+  group('Reconnection and Offline Sync', () {
+    test('Offline edits merge successfully without duplication', () async {
+      // 1. Initial State: Client has note version A
+      final now = DateTime.now().toUtc();
+      await db.into(db.notes).insert(
+            NotesCompanion.insert(
+              id: 'note-1',
+              userId: 'user-1',
+              content: 'Hello',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      await db.into(db.noteNodes).insert(
+            NoteNodesCompanion.insert(
+              id: 'node-1',
+              noteId: 'note-1',
+              position: 0.0,
+              type: 'paragraph',
+              data: jsonEncode({'text': 'Hello', 'spans': []}),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      // Initialize Manager
+      final mgr = YjsSyncManager(db: db);
+      final doc = await mgr.loadDoc('note-1');
+      expect(doc.getText('content/node-1').toString(), 'Hello');
+
+      // 2. Offline change locally: edit "Hello" -> "Hello World"
+      await db.into(db.noteNodes).insertOnConflictUpdate(
+            NoteNodesCompanion.insert(
+              id: 'node-1',
+              noteId: 'note-1',
+              position: 0.0,
+              type: 'paragraph',
+              data: jsonEncode({'text': 'Hello World', 'spans': []}),
+              createdAt: now,
+              updatedAt: now.add(const Duration(seconds: 1)),
+            ),
+          );
+
+      // Reconstruct/Load Doc again, simulating merge of offline change
+      final updatedDoc = await mgr.loadDoc('note-1');
+      
+      // Force reconstruction from local node modifications
+      final freshMgr = YjsSyncManager(db: db);
+      final freshDoc = await freshMgr.loadDoc('note-1');
+      expect(freshDoc.getText('content/node-1').toString(), 'Hello World');
+    });
+
+    test('Process kill recovery restores Doc from localYjsStates', () async {
+      final now = DateTime.now().toUtc();
+      await db.into(db.notes).insert(
+            NotesCompanion.insert(
+              id: 'note-2',
+              userId: 'user-1',
+              content: '',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      final mgr1 = YjsSyncManager(db: db);
+      final doc1 = await mgr1.loadDoc('note-2');
+
+      // Edit document
+      doc1.transact((t) {
+        doc1.getMap('nodes')!.set(
+              'p1',
+              jsonEncode({
+                'id': 'p1',
+                'position': 0.0,
+                'type': 'paragraph',
+                'data': {'text': 'Relaunched!'},
+                'createdAt': now.millisecondsSinceEpoch.toDouble(),
+              }),
+            );
+        doc1.getText('content/p1')!.insert(0, 'Relaunched!');
+      });
+
+      // Persist doc1 to SQLite
+      await mgr1.persist('note-2');
+
+      // Verify that localYjsStates row exists
+      final yjsRow = await (db.select(db.localYjsStates)
+            ..where((t) => t.noteId.equals('note-2')))
+          .getSingle();
+      expect(yjsRow.state, isNotEmpty);
+
+      // Simulate App relaunch with clean manager
+      final mgr2 = YjsSyncManager(db: db);
+      final doc2 = await mgr2.loadDoc('note-2');
+
+      expect(doc2.getMap('nodes')!.keys, contains('p1'));
+      expect(doc2.getText('content/p1').toString(), 'Relaunched!');
+    });
+  });
+}

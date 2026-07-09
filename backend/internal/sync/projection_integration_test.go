@@ -23,7 +23,14 @@ import (
 func insertNote(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(context.Background(),
-		`INSERT INTO notes (id, user_id) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+		`INSERT INTO users (id, email, name, password_hash, created_at, updated_at) 
+		 VALUES ($1, 'testuser@test.com', 'Test User', '', NOW(), NOW()) 
+		 ON CONFLICT (id) DO NOTHING`,
+		testNoteUserID)
+	require.NoError(t, err)
+
+	_, err = pool.Exec(context.Background(),
+		`INSERT INTO notes (id, user_id, content, created_at) VALUES ($1, $2, '', NOW()) ON CONFLICT (id) DO NOTHING`,
 		testNoteID, testNoteUserID)
 	require.NoError(t, err)
 }
@@ -266,8 +273,12 @@ func TestProjectToDBTx_RoundTripsFullDoc(t *testing.T) {
 	require.NoError(t, projectUpdateHelper(ctx, pool, testNoteID, seed))
 
 	docPartial := crdt.New(crdt.WithGC(false))
+	textNode := docPartial.GetText("content/" + nodeID)
 	docPartial.Transact(func(txn *crdt.Transaction) {
-		docPartial.GetText("content/"+nodeID).Insert(txn, 0, " CHANGED", nil)
+		textNode.Insert(txn, 0, "hello", nil)
+	})
+	docPartial.Transact(func(txn *crdt.Transaction) {
+		textNode.Insert(txn, 5, " CHANGED", nil)
 	})
 	partial := crdt.EncodeStateAsUpdateV1(docPartial, nil)
 
@@ -296,6 +307,11 @@ func TestLoadYDocState_RejectsMalformedUUID(t *testing.T) {
 func TestReconstructYDocFromNodes_EmptyNote(t *testing.T) {
 	ctx := context.Background()
 	pool := setupTestDB(t)
+	_, err := pool.Exec(ctx, "DELETE FROM note_nodes WHERE note_id = $1", testNoteID)
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, "DELETE FROM tasks WHERE note_id = $1", testNoteID)
+	require.NoError(t, err)
+
 	insertNote(t, pool)
 
 	update, err := ReconstructYDocFromNodes(ctx, pool, testNoteID)

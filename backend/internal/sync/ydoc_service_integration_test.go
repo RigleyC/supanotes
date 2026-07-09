@@ -88,14 +88,18 @@ func TestYDocServiceFlush(t *testing.T) {
 	})
 
 	doc1 := crdt.New()
+	textNode1 := doc1.GetText("content")
 	doc1.Transact(func(txn *crdt.Transaction) {
-		doc1.GetText("content").Insert(txn, 0, "hello", nil)
+		textNode1.Insert(txn, 0, "hello", nil)
 	})
 	update1 := crdt.EncodeStateAsUpdateV1(doc1, nil)
 
 	doc2 := crdt.New()
+	err = crdt.ApplyUpdateV1(doc2, update1, nil)
+	require.NoError(t, err)
+	textNode2 := doc2.GetText("content")
 	doc2.Transact(func(txn *crdt.Transaction) {
-		doc2.GetText("content").Insert(txn, 5, " world", nil)
+		textNode2.Insert(txn, 5, " world", nil)
 	})
 	update2 := crdt.EncodeStateAsUpdateV1(doc2, nil)
 
@@ -146,8 +150,9 @@ func TestYDocServiceFlusher(t *testing.T) {
 	})
 
 	doc := crdt.New()
+	textNode := doc.GetText("content")
 	doc.Transact(func(txn *crdt.Transaction) {
-		doc.GetText("content").Insert(txn, 0, "flusher test", nil)
+		textNode.Insert(txn, 0, "flusher test", nil)
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 	require.NotEmpty(t, update)
@@ -178,8 +183,9 @@ func TestYDocServiceRetainsCanonicalDoc(t *testing.T) {
 	t.Cleanup(func() { pool.Exec(ctx, "DELETE FROM notes WHERE id = $1", noteID) })
 
 	doc1 := crdt.New()
+	textNode1 := doc1.GetText("content/x")
 	doc1.Transact(func(txn *crdt.Transaction) {
-		doc1.GetText("content/x").Insert(txn, 0, "hello", nil)
+		textNode1.Insert(txn, 0, "hello", nil)
 	})
 	update1 := crdt.EncodeStateAsUpdateV1(doc1, nil)
 

@@ -51,7 +51,7 @@ func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
 			return
 		}
 		c.debounceMu.Unlock()
-		_ = c.projectCanonicalDoc(context.Background(), noteID)
+		_ = c.ProjectCanonicalDoc(context.Background(), noteID)
 	})
 }
 
@@ -59,10 +59,13 @@ func (c *Compactor) RunDebouncedProjectionForTest(ctx context.Context, svc *YDoc
 	if err := svc.ApplyNodeMutation(ctx, noteID, update); err != nil {
 		return err
 	}
-	return c.projectCanonicalDoc(ctx, noteID)
+	if err := svc.FlushUpdates(ctx, noteID); err != nil {
+		return err
+	}
+	return c.ProjectCanonicalDoc(ctx, noteID)
 }
 
-func (c *Compactor) projectCanonicalDoc(ctx context.Context, noteID string) error {
+func (c *Compactor) ProjectCanonicalDoc(ctx context.Context, noteID string) error {
 	startTotal := time.Now()
 	state, err := LoadYDocState(ctx, c.pool, noteID)
 	if err != nil {

@@ -134,6 +134,11 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 				dataBytes = nd.Data
 			}
 
+			createdAt := msToTimestamptz(nd.CreatedAt)
+			if !createdAt.Valid {
+				createdAt = pgtype.Timestamptz{Time: time.Now(), Valid: true}
+			}
+
 			params := sqlcgen.UpsertNoteNodeParams{
 				ID:        pgNodeID,
 				NoteID:    noteUUID,
@@ -141,7 +146,7 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 				Position:  nd.Position,
 				Type:      nd.Type,
 				Data:      dataBytes,
-				CreatedAt: msToTimestamptz(nd.CreatedAt),
+				CreatedAt: createdAt,
 				DeletedAt: pgtype.Timestamptz{Valid: false},
 			}
 			if _, err := q.UpsertNoteNode(ctx, params); err != nil {
@@ -254,6 +259,11 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 				recurrence = pgtype.Text{String: td.Recurrence, Valid: true}
 			}
 
+			createdAt := msToTimestamptz(td.CreatedAt)
+			if !createdAt.Valid {
+				createdAt = pgtype.Timestamptz{Time: time.Now(), Valid: true}
+			}
+
 			params := sqlcgen.UpsertTaskParams{
 				ID:          pgTaskID,
 				UserID:      userID,
@@ -264,7 +274,7 @@ func projectDocToDB(ctx context.Context, tx pgx.Tx, doc *crdt.Doc, noteID string
 				Recurrence:  recurrence,
 				DueDate:     dueDate,
 				CompletedAt: msToTimestamptz(td.CompletedAt),
-				CreatedAt:   msToTimestamptz(td.CreatedAt),
+				CreatedAt:   createdAt,
 				DeletedAt:   pgtype.Timestamptz{Valid: false},
 			}
 			if _, err := q.UpsertTask(ctx, params); err != nil {
@@ -493,12 +503,17 @@ func LoadYDocState(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]by
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			slog.Info("LoadYDocState: no snapshot, reconstructing", "note_id", noteID, "query_ms", queryElapsed.Milliseconds())
-			return ReconstructYDocFromNodes(ctx, pool, noteID)
+			state, err = ReconstructYDocFromNodes(ctx, pool, noteID)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			slog.Error("LoadYDocState: query state failed", "note_id", noteID, "error", err, "elapsed_ms", queryElapsed.Milliseconds())
+			return nil, fmt.Errorf("load state: %w", err)
 		}
-		slog.Error("LoadYDocState: query state failed", "note_id", noteID, "error", err, "elapsed_ms", queryElapsed.Milliseconds())
-		return nil, fmt.Errorf("load state: %w", err)
+	} else {
+		slog.Info("LoadYDocState: state loaded", "note_id", noteID, "state_bytes", len(state), "query_ms", queryElapsed.Milliseconds())
 	}
-	slog.Info("LoadYDocState: state loaded", "note_id", noteID, "state_bytes", len(state), "query_ms", queryElapsed.Milliseconds())
 
 	startPending := time.Now()
 	rows, err := pool.Query(ctx, "SELECT update_data FROM note_yjs_updates WHERE note_id = $1 ORDER BY created_at ASC", noteUUID)
