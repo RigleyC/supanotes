@@ -31,7 +31,13 @@ class YjsDocEditorBridge {
   final void Function(Uint8List update) _sendUpdate;
   late final void Function(dynamic, Transaction) _nodesSub;
 
+  bool _isFlushingLocal = false;
+
   void _onNodesChanged(dynamic event, Transaction tr) {
+    if (_isFlushingLocal) {
+      dev.log('[YjsBridge] _onNodesChanged: SKIP (local flush)', name: 'YjsBridge');
+      return;
+    }
     final sw = Stopwatch()..start();
     final nodes = noteNodesFromDoc(_doc);
     dev.log('[YjsBridge] _onNodesChanged: ${nodes.length} nodes from YDoc, elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
@@ -45,24 +51,29 @@ class YjsDocEditorBridge {
     final sw = Stopwatch()..start();
     dev.log('[YjsBridge] onLocalFlush START ops=${ops.length}', name: 'YjsBridge');
 
-    final nodesMap = _doc.getMap('nodes')!;
+    _isFlushingLocal = true;
+    try {
+      final nodesMap = _doc.getMap('nodes')!;
 
-    for (final op in ops) {
-      switch (op) {
-        case InsertOp(:final id, :final node, :final index):
-          _serializeNode(node, index.toDouble(), id, nodesMap);
-        case DeleteOp(:final id):
-          nodesMap.delete(id);
-        case UpdateOp(:final id, :final node):
-          _serializeNode(node, null, id, nodesMap);
-        case MoveOp(:final id, :final to):
-          _repositionNode(id, to.toDouble(), nodesMap);
+      for (final op in ops) {
+        switch (op) {
+          case InsertOp(:final id, :final node, :final index):
+            _serializeNode(node, index.toDouble(), id, nodesMap);
+          case DeleteOp(:final id):
+            nodesMap.delete(id);
+          case UpdateOp(:final id, :final node):
+            _serializeNode(node, null, id, nodesMap);
+          case MoveOp(:final id, :final to):
+            _repositionNode(id, to.toDouble(), nodesMap);
+        }
       }
-    }
 
-    final update = encodeStateAsUpdate(_doc);
-    dev.log('[YjsBridge] onLocalFlush: sending update updateLen=${update.length} elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
-    _sendUpdate(update);
+      final update = encodeStateAsUpdate(_doc);
+      dev.log('[YjsBridge] onLocalFlush: sending update updateLen=${update.length} elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
+      _sendUpdate(update);
+    } finally {
+      _isFlushingLocal = false;
+    }
     dev.log('[YjsBridge] onLocalFlush DONE elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
   }
 

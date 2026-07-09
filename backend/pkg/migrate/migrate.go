@@ -5,6 +5,7 @@ package migrate
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -25,9 +26,18 @@ func Up(databaseURL, path string) error {
 	}
 
 	src := "file://" + path
-	m, err := migrate.New(src, databaseURL)
+	var m *migrate.Migrate
+	var err error
+	for attempt := 1; attempt <= 15; attempt++ {
+		m, err = migrate.New(src, databaseURL)
+		if err == nil {
+			break
+		}
+		log.Warn().Err(err).Int("attempt", attempt).Msg("migrate: failed to connect to database, retrying in 2s...")
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
-		return fmt.Errorf("migrate: open: %w", err)
+		return fmt.Errorf("migrate: open after 15 attempts: %w", err)
 	}
 	defer m.Close()
 

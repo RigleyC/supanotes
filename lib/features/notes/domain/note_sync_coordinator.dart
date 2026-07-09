@@ -11,6 +11,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
 
 import '../../../core/database/database.dart';
@@ -206,12 +207,48 @@ class NoteSyncCoordinator {
       }
     }
 
-    // Full structural equality via serialisation fallback.
-    final existingData = NodeSyncManager.nodeData(existingNode);
-    return existingData ==
-        NodeSyncManager.nodeData(
-          NodeSyncManager.createNodeFromSchema(incoming),
-        );
+    // Full structural equality via deep Map comparison of serialised data.
+    final existingDataStr = NodeSyncManager.nodeData(existingNode);
+    try {
+      final existingData = jsonDecode(existingDataStr) as Map<String, dynamic>;
+      final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
+      return _isMapEqual(existingData, incomingData);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _isMapEqual(Map<dynamic, dynamic> a, Map<dynamic, dynamic> b) {
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key)) return false;
+      final valA = a[key];
+      final valB = b[key];
+      if (valA is Map && valB is Map) {
+        if (!_isMapEqual(valA, valB)) return false;
+      } else if (valA is List && valB is List) {
+        if (!_isListEqual(valA, valB)) return false;
+      } else {
+        if (valA != valB) return false;
+      }
+    }
+    return true;
+  }
+
+  bool _isListEqual(List<dynamic> a, List<dynamic> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      final valA = a[i];
+      final valB = b[i];
+      if (valA is Map && valB is Map) {
+        if (!_isMapEqual(valA, valB)) return false;
+      } else if (valA is List && valB is List) {
+        if (!_isListEqual(valA, valB)) return false;
+      } else {
+        if (valA != valB) return false;
+      }
+    }
+    return true;
   }
 
   String? _existingAttribution(DocumentNode node) {
