@@ -212,3 +212,14 @@ SET note_id = EXCLUDED.note_id,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
 RETURNING *;
+
+-- name: GetSyncNoteYjsStates :many
+SELECT nys.*
+FROM note_yjs_states nys
+JOIN notes n ON n.id = nys.note_id
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
+WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
+  AND nys.updated_at > sqlc.arg('last_synced_at')
+ORDER BY nys.updated_at ASC
+LIMIT sqlc.arg('limit');
+

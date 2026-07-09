@@ -140,6 +140,10 @@ func (m *mockRepository) GetSyncNoteNodes(ctx context.Context, userID pgtype.UUI
 	return nil, nil
 }
 
+func (m *mockRepository) GetSyncNoteYjsStates(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteYjsState, error) {
+	return nil, nil
+}
+
 func (m *mockRepository) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
 	return sqlcgen.NoteNode{}, nil
 }

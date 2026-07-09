@@ -254,4 +254,12 @@ class SyncMapper {
       isDirty: const Value(false),
     );
   }
+
+  LocalYjsState localYjsStateFromJson(Map<String, dynamic> json) {
+    return LocalYjsState(
+      noteId: json['note_id'] as String,
+      state: base64Decode(json['state'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+    );
+  }
 }

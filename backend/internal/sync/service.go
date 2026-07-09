@@ -36,6 +36,7 @@ type SyncPayload struct {
 	NoteTags            []sqlcgen.NoteTag            `json:"note_tags"`
 	NoteLinks           []sqlcgen.NoteLink           `json:"note_links"`
 	UserNotePreferences []UserNotePreferencePayload `json:"user_note_preferences"`
+	NoteYjsStates       []sqlcgen.NoteYjsState       `json:"note_yjs_states"`
 }
 
 type Service interface {
@@ -137,6 +138,14 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		noteNodes = make([]sqlcgen.NoteNode, 0)
 	}
 
+	yjsStates, err := s.repo.GetSyncNoteYjsStates(ctx, userID, lastSyncedAt, limit)
+	if err != nil {
+		return nil, err
+	}
+	if yjsStates == nil {
+		yjsStates = make([]sqlcgen.NoteYjsState, 0)
+	}
+
 	return &SyncPayload{
 		SyncedAt:            time.Now().UTC(),
 		Notes:               notes,
@@ -148,6 +157,7 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		NoteTags:            noteTags,
 		NoteLinks:           noteLinks,
 		UserNotePreferences: prefs,
+		NoteYjsStates:       yjsStates,
 	}, nil
 }
 

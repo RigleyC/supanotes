@@ -457,6 +457,16 @@ class SyncService {
           onConflict: DoUpdate((_) => pref),
         );
       }
+      for (final raw in (data['note_yjs_states'] as List? ?? [])) {
+        final state = _mapper.localYjsStateFromJson(
+          raw as Map<String, dynamic>,
+        );
+        batch.insert(
+          _db.localYjsStates,
+          state,
+          onConflict: DoUpdate((_) => state),
+        );
+      }
     });
 
     final nextSyncedAtStr = data['synced_at'] as String?;

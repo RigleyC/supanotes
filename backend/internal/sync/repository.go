@@ -28,6 +28,7 @@ type Repository interface {
 	GetSyncUserNotePreferences(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.UserNotePreference, error)
 	UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error)
 	GetSyncNoteNodes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteNode, error)
+	GetSyncNoteYjsStates(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteYjsState, error)
 	UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error)
 	GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error)
 	UpdateNotesContentFromNodes(ctx context.Context, noteIDs []pgtype.UUID) error
@@ -140,6 +141,14 @@ func (r *repo) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertU
 
 func (r *repo) GetSyncNoteNodes(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteNode, error) {
 	return r.q.GetSyncNoteNodes(ctx, sqlcgen.GetSyncNoteNodesParams{
+		UserID:       userID,
+		LastSyncedAt: lastSyncedAt,
+		Limit:        limit,
+	})
+}
+
+func (r *repo) GetSyncNoteYjsStates(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.NoteYjsState, error) {
+	return r.q.GetSyncNoteYjsStates(ctx, sqlcgen.GetSyncNoteYjsStatesParams{
 		UserID:       userID,
 		LastSyncedAt: lastSyncedAt,
 		Limit:        limit,

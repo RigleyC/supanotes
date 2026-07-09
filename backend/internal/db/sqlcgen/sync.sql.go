@@ -173,6 +173,43 @@ func (q *Queries) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]No
 	return items, nil
 }
 
+const getSyncNoteYjsStates = `-- name: GetSyncNoteYjsStates :many
+SELECT nys.note_id, nys.state, nys.updated_at
+FROM note_yjs_states nys
+JOIN notes n ON n.id = nys.note_id
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
+WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
+  AND nys.updated_at > $2
+ORDER BY nys.updated_at ASC
+LIMIT $3
+`
+
+type GetSyncNoteYjsStatesParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	LastSyncedAt pgtype.Timestamptz `json:"last_synced_at"`
+	Limit        int32              `json:"limit"`
+}
+
+func (q *Queries) GetSyncNoteYjsStates(ctx context.Context, arg GetSyncNoteYjsStatesParams) ([]NoteYjsState, error) {
+	rows, err := q.db.Query(ctx, getSyncNoteYjsStates, arg.UserID, arg.LastSyncedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NoteYjsState
+	for rows.Next() {
+		var i NoteYjsState
+		if err := rows.Scan(&i.NoteID, &i.State, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSyncNotes = `-- name: GetSyncNotes :many
 SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,

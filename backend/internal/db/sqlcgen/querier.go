@@ -75,6 +75,7 @@ type Querier interface {
 	GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]NoteLink, error)
 	GetSyncNoteNodes(ctx context.Context, arg GetSyncNoteNodesParams) ([]NoteNode, error)
 	GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]NoteTag, error)
+	GetSyncNoteYjsStates(ctx context.Context, arg GetSyncNoteYjsStatesParams) ([]NoteYjsState, error)
 	GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]GetSyncNotesRow, error)
 	GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error)
 	GetSyncTaskCompletions(ctx context.Context, arg GetSyncTaskCompletionsParams) ([]TaskCompletion, error)
