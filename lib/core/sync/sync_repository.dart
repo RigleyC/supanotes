@@ -12,7 +12,7 @@ abstract class ISyncRepository {
   Future<void> push(Map<String, dynamic> payload);
   Future<Map<String, dynamic>> pull({
     required String lastSyncedAt,
-    int limit = 500,
+    int limit = 100000,
   });
 }
 
@@ -34,7 +34,7 @@ class SyncRepository implements ISyncRepository {
   /// for converting it into typed data objects.
   Future<Map<String, dynamic>> pull({
     required String lastSyncedAt,
-    int limit = 500,
+    int limit = 100000,
   }) async {
     final response = await _api.post<Map<String, dynamic>>(
       '/sync/pull',

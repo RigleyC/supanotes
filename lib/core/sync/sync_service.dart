@@ -459,10 +459,15 @@ class SyncService {
       }
     });
 
-    await prefs.setString(
-      _kLastSyncedAtPref,
-      DateTime.now().toUtc().toIso8601String(),
-    );
+    final nextSyncedAtStr = data['synced_at'] as String?;
+    if (nextSyncedAtStr != null) {
+      await prefs.setString(_kLastSyncedAtPref, nextSyncedAtStr);
+    } else {
+      await prefs.setString(
+        _kLastSyncedAtPref,
+        DateTime.now().toUtc().toIso8601String(),
+      );
+    }
     debugPrint('[SyncService] pull DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
 }

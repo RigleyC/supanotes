@@ -65,6 +65,16 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
     : super(executor ?? NativeDatabase.memory());
 
+  Future<void> clearAllData() async {
+    await transaction(() async {
+      for (final entity in allSchemaEntities) {
+        if (entity is TableInfo) {
+          await delete(entity).go();
+        }
+      }
+    });
+  }
+
   @override
   int get schemaVersion => 16;
 

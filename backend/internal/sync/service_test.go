@@ -258,6 +258,7 @@ func TestProduceUpdateFromRows_GeneratesYjsUpdate(t *testing.T) {
 	require.NotEmpty(t, update)
 
 	doc := crdt.New(crdt.WithGC(false))
+	doc.GetText("content/" + nodeID) // Pre-register to avoid share-map type corruption
 	require.NoError(t, crdt.ApplyUpdateV1(doc, update, nil))
 	keys := doc.GetMap("nodes").Keys()
 	require.Len(t, keys, 1)
@@ -265,6 +266,10 @@ func TestProduceUpdateFromRows_GeneratesYjsUpdate(t *testing.T) {
 	raw, ok := doc.GetMap("nodes").Get(nodeID)
 	require.True(t, ok)
 	assert.Contains(t, raw, "hello")
+
+	textType := doc.GetText("content/" + nodeID)
+	require.NotNil(t, textType)
+	assert.Equal(t, "hello", textType.ToString())
 }
 
 func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {

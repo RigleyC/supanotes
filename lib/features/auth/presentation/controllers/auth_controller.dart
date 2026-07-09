@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/last_route_store.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
@@ -83,6 +84,22 @@ class AuthController extends AsyncNotifier<User?> {
   Future<void> _clearSession() async {
     await _storage.clear();
     _sessionCache.clear();
+    
+    // Clear last synced time to force a full pull next time
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.remove('last_synced_at');
+    } catch (e) {
+      debugPrint('Error clearing last_synced_at: $e');
+    }
+
+    // Wipe local SQLite data
+    try {
+      await ref.read(appDatabaseProvider).clearAllData();
+    } catch (e) {
+      debugPrint('Error clearing local database: $e');
+    }
+
     // Note: lastRouteStore is intentionally NOT cleared here.
     // The route is UX metadata, not security-sensitive data — authGuard already
     // blocks unauthenticated access to protected routes. Preserving the route

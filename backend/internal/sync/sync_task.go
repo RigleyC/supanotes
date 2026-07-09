@@ -171,6 +171,15 @@ func ProduceUpdateFromRows(
 	tasksMap := doc.GetMap("tasks")
 
 
+	// Pre-create/retrieve YText types outside transaction to avoid deadlock
+	textTypes := make(map[string]*crdt.YText)
+	for _, n := range nodes {
+		if !n.DeletedAt.Valid {
+			nID := uuid.UUID(n.ID.Bytes).String()
+			textTypes[nID] = doc.GetText("content/" + nID)
+		}
+	}
+
 	doc.Transact(func(txn *crdt.Transaction) {
 		for _, n := range nodes {
 			nID := uuid.UUID(n.ID.Bytes).String()
@@ -188,6 +197,18 @@ func ProduceUpdateFromRows(
 			}
 			b, _ := json.Marshal(nd)
 			nodesMap.Set(txn, nID, string(b))
+
+			// Populate YText for the node's text content
+			if len(n.Data) > 0 {
+				var dataMap map[string]interface{}
+				if err := json.Unmarshal(n.Data, &dataMap); err == nil {
+					if text, ok := dataMap["text"].(string); ok && text != "" {
+						if textType, ok := textTypes[nID]; ok {
+							textType.Insert(txn, 0, text, nil)
+						}
+					}
+				}
+			}
 		}
 		for _, t := range tasks {
 			tID := uuid.UUID(t.ID.Bytes).String()

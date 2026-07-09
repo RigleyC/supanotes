@@ -36,8 +36,8 @@ func (h *Handler) Pull(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Limit <= 0 || req.Limit > 1000 {
-		req.Limit = 100
+	if req.Limit <= 0 || req.Limit > 100000 {
+		req.Limit = 100000
 	}
 
 	lastSyncedAt := pgtype.Timestamptz{

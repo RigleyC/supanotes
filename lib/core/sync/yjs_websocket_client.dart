@@ -165,4 +165,6 @@ class YjsWebSocketClient {
   Future<void> dispose() async {
     _reconnectTimer?.cancel();
     await disconnect();
-   
+    await _onUpdateController.close();
+  }
+}

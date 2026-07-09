@@ -505,7 +505,7 @@ INSERT INTO notes (id, user_id, context_id, content, embedding_status, collapse_
 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
 ON CONFLICT (id) DO UPDATE
 SET context_id = EXCLUDED.context_id,
-    content = EXCLUDED.content,
+    content = CASE WHEN EXCLUDED.content <> '' THEN EXCLUDED.content ELSE notes.content END,
     embedding_status = EXCLUDED.embedding_status,
     collapse_images = EXCLUDED.collapse_images,
     updated_at = NOW(),

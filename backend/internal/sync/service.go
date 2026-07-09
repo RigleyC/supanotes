@@ -26,6 +26,7 @@ import (
 //     client stamps user_id locally with the currently authenticated
 //     user because the table itself has no user_id column.
 type SyncPayload struct {
+	SyncedAt            time.Time                   `json:"synced_at,omitempty"`
 	Notes               []sqlcgen.GetSyncNotesRow    `json:"notes"`
 	NoteNodes           []sqlcgen.NoteNode           `json:"note_nodes"`
 	Tasks               []SyncTask                   `json:"tasks"`
@@ -137,6 +138,7 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 	}
 
 	return &SyncPayload{
+		SyncedAt:            time.Now().UTC(),
 		Notes:               notes,
 		NoteNodes:           noteNodes,
 		Tasks:               syncTasks,

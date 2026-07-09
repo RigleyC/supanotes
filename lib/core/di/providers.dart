@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/notifications/push_service.dart';
 import 'package:supanotes/core/sync/yjs_sync_manager.dart';
@@ -93,6 +94,7 @@ final pushServiceProvider = NotifierProvider<PushService, bool>(
 
 final yjsSyncManagerProvider = Provider<YjsSyncManager>((ref) {
   final db = ref.watch(appDatabaseProvider);
+  ref.watch(currentUserIdProvider);
   final mgr = YjsSyncManager(db: db);
   ref.onDispose(mgr.dispose);
   return mgr;
