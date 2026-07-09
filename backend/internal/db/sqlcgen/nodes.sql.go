@@ -73,7 +73,7 @@ type InsertNodeParams struct {
 	ID       pgtype.UUID `json:"id"`
 	NoteID   pgtype.UUID `json:"note_id"`
 	ParentID pgtype.UUID `json:"parent_id"`
-	Position float64     `json:"position"`
+	Position string      `json:"position"`
 	Type     string      `json:"type"`
 	Data     []byte      `json:"data"`
 }
@@ -111,7 +111,7 @@ RETURNING id, note_id, parent_id, position, type, data, created_at, updated_at, 
 
 type UpdateNodeParams struct {
 	ID       pgtype.UUID `json:"id"`
-	Position float64     `json:"position"`
+	Position string      `json:"position"`
 	Data     []byte      `json:"data"`
 }
 
