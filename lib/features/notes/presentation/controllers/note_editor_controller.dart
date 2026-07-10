@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
