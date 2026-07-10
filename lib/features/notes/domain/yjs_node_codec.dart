@@ -1,22 +1,20 @@
 import 'dart:convert';
 
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
 import '../../../core/database/database.dart';
 
 List<NoteNode> noteNodesFromDoc(Doc doc, {String? noteIdOverride}) {
   final nodes = <NoteNode>[];
   final nodesMap = doc.getMap('nodes');
-  if (nodesMap == null) return nodes;
-
-  for (final key in nodesMap.keys) {
-    final raw = nodesMap.get(key);
+  for (final key in nodesMap.attrKeys) {
+    final raw = nodesMap.getAttr(key);
     if (raw is! String) continue;
     try {
       final meta = jsonDecode(raw) as Map<String, dynamic>;
       final nodeId = meta['id'] as String;
       final ytext = doc.getText('content/$nodeId');
-      final textContent = ytext?.toString() ?? '';
+      final textContent = ytext.toPlainText();
       final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
       if (textContent.isNotEmpty) {
         data['text'] = textContent;
