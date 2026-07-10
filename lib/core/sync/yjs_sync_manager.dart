@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:drift/drift.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
 import '../../features/notes/domain/yjs_node_codec.dart';
 import '../../features/tasks/domain/task_recurrence.dart';
@@ -23,11 +23,10 @@ class YjsSyncManager {
 
   /// Load (or reconstruct) the canonical [Doc] for [noteId].
   ///
-  /// Always reconstructs from [note_nodes] rather than calling [applyUpdate]
-  /// on the persisted snapshot because `yjs_dart` v1.1.15 has a confirmed bug:
-  /// [encodeStateAsUpdate] + [applyUpdate] deserialises YText types as YMap
-  /// in the share map. The snapshot is still written by [persist] and used
-  /// for server-side sync, but not for local Doc reconstruction.
+  /// Reconstructs from [note_nodes] rather than relying solely on the
+  /// persisted snapshot because the snapshot may be stale if offline edits
+  /// were written directly to SQLite. The snapshot is still written by
+  /// [persist] and used for server-side sync.
   Future<Doc> loadDoc(String noteId) async {
     final cached = _docs[noteId];
     if (cached != null) return cached;
@@ -41,39 +40,32 @@ class YjsSyncManager {
             ..where((t) => t.noteId.equals(noteId)))
           .get();
 
-      for (final node in allNodes) {
-        if (node.deletedAt == null) {
-          final t = node.type;
-          if (t == 'paragraph' || t == 'header' || t == 'list_item' || t == 'task') {
-            doc.getText('content/${node.id}');
-          }
-        }
-      }
       try {
         applyUpdate(doc, stateRow.state);
 
         // Merge offline changes from SQLite into YDoc
-        final nodesMap = doc.getMap('nodes')!;
+        final nodesMap = doc.getMap('nodes');
         bool mutated = false;
         doc.transact((txn) {
           for (final node in allNodes) {
             if (node.deletedAt != null) {
-              if (nodesMap.get(node.id) != null) {
-                nodesMap.delete(node.id);
-                final ytext = doc.getText('content/${node.id}')!;
-                if (ytext.length > 0) {
-                  ytext.delete(0, ytext.length);
+              if (nodesMap.getAttr(node.id) != null) {
+                nodesMap.deleteAttr(node.id);
+                final ytext = doc.getText('content/${node.id}');
+                final textLen = ytext.toPlainText().length;
+                if (textLen > 0) {
+                  ytext.deleteText(0, textLen);
                 }
                 mutated = true;
               }
               continue;
             }
 
-            final rawMeta = nodesMap.get(node.id) as String?;
+            final rawMeta = nodesMap.getAttr(node.id) as String?;
             final dbData = jsonDecode(node.data) as Map<String, dynamic>;
             final dbText = dbData['text'] as String? ?? '';
-            final ytext = doc.getText('content/${node.id}')!;
-            final ytextStr = ytext.toString();
+            final ytext = doc.getText('content/${node.id}');
+            final ytextStr = ytext.toPlainText();
 
             if (rawMeta == null || ytextStr != dbText) {
               final newMeta = {
@@ -84,14 +76,15 @@ class YjsSyncManager {
                 'data': dbData,
                 'createdAt': node.createdAt.millisecondsSinceEpoch.toDouble(),
               };
-              nodesMap.set(node.id, jsonEncode(newMeta));
+              nodesMap.setAttr(node.id, jsonEncode(newMeta));
 
               if (ytextStr != dbText) {
-                if (ytext.length > 0) {
-                  ytext.delete(0, ytext.length);
+                final textLen = ytext.toPlainText().length;
+                if (textLen > 0) {
+                  ytext.deleteText(0, textLen);
                 }
                 if (dbText.isNotEmpty) {
-                  ytext.insert(0, dbText);
+                  ytext.insertText(0, dbText);
                 }
               }
               mutated = true;
@@ -167,9 +160,9 @@ class YjsSyncManager {
         'createdAt': node.createdAt.millisecondsSinceEpoch.toDouble(),
       };
 
-      doc.getMap('nodes')!.set(nodeId, jsonEncode(meta));
+      doc.getMap('nodes').setAttr(nodeId, jsonEncode(meta));
       if (textContent.isNotEmpty) {
-        doc.getText('content/$nodeId')!.insert(0, textContent);
+        doc.getText('content/$nodeId').insertText(0, textContent);
       }
     }
 
