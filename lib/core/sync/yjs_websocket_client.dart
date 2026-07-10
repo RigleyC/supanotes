@@ -3,7 +3,7 @@ import 'dart:developer' as dev;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -13,6 +13,51 @@ const int _kMaxPendingUpdates = 1000;
 const Duration _kIdleTimeout = Duration(minutes: 5);
 
 typedef ChannelBuilder = Future<WebSocketChannel> Function();
+
+// ---- Yjs wire-protocol helpers (7-bit varUint encoding) ----
+
+(int, int) _readVarUint(Uint8List data, int offset) {
+  int value = 0;
+  int shift = 0;
+  int i = offset;
+  while (i < data.length) {
+    final byte = data[i];
+    i++;
+    value |= (byte & 127) << shift;
+    shift += 7;
+    if ((byte & 128) == 0) return (value, i - offset);
+  }
+  throw FormatException('Unexpected end of data in varint');
+}
+
+(int, Uint8List) _readVarUint8Array(Uint8List data, int offset) {
+  final (length, lenSize) = _readVarUint(data, offset);
+  final start = offset + lenSize;
+  if (start + length > data.length) {
+    throw FormatException('Unexpected end of data in varuint8array');
+  }
+  return (length, data.sublist(start, start + length));
+}
+
+List<int> _encodeVarUint(int value) {
+  final bytes = <int>[];
+  while (value > 127) {
+    bytes.add((value & 127) | 128);
+    value >>= 7;
+  }
+  bytes.add(value & 127);
+  return bytes;
+}
+
+Uint8List _encodeMessage(int type, List<int> payload) {
+  final typeBytes = _encodeVarUint(type);
+  final payloadLen = _encodeVarUint(payload.length);
+  final result = Uint8List(typeBytes.length + payloadLen.length + payload.length);
+  result.setRange(0, typeBytes.length, typeBytes);
+  result.setRange(typeBytes.length, typeBytes.length + payloadLen.length, payloadLen);
+  result.setRange(typeBytes.length + payloadLen.length, result.length, payload);
+  return result;
+}
 
 class YjsWebSocketClient {
   YjsWebSocketClient({
@@ -49,7 +94,7 @@ class YjsWebSocketClient {
     _connectedNoteId = noteId;
     _handshakeDone = false;
     _notifier?.markSyncing();
-    
+
     try {
       _channel = await channelBuilder();
       final stream = _channel!.stream
@@ -70,7 +115,7 @@ class YjsWebSocketClient {
       );
       _isConnected = true;
       debugPrint('[YjsWS] connect: sending Step1 elapsed=${sw.elapsedMilliseconds}ms');
-      _sendStep1(_doc);
+      _sendStep1();
       _resetIdleTimer();
       debugPrint('[YjsWS] connect DONE elapsed=${sw.elapsedMilliseconds}ms');
     } catch (e) {
@@ -83,40 +128,48 @@ class YjsWebSocketClient {
   void _handleMessage(Uint8List data) {
     if (data.isEmpty) return;
     final sw = Stopwatch()..start();
-    final decoder = createDecoder(data);
-    final encoder = createEncoder();
-    final msgType = readSyncMessage(decoder, encoder, _doc, 'remote');
-    debugPrint('[YjsWS] _handleMessage msgType=$msgType dataLen=${data.length} elapsed=${sw.elapsedMilliseconds}ms');
-    switch (msgType) {
-      case messageSyncStep1:
-        final step2 = toUint8Array(encoder);
-        _sendRaw(step2);
-        if (!_handshakeDone) {
-          _handshakeDone = true;
-          debugPrint('[YjsWS] HANDSHAKE DONE (via Step1) elapsed=${sw.elapsedMilliseconds}ms');
-          _notifier?.markSynced(DateTime.now());
-          _flushPending();
-        }
-      case messageSyncStep2:
-        if (!_handshakeDone) {
-          _handshakeDone = true;
-          debugPrint('[YjsWS] HANDSHAKE DONE (via Step2) elapsed=${sw.elapsedMilliseconds}ms');
-          _notifier?.markSynced(DateTime.now());
-          _flushPending();
-        }
-        _onUpdateController.add(data);
-      case messageYjsUpdate:
-        _onUpdateController.add(data);
-      default:
-        dev.log('[YjsWS] Unknown sync message type: $msgType', name: 'YjsWS');
+    try {
+      final (msgType, typeSize) = _readVarUint(data, 0);
+      debugPrint('[YjsWS] _handleMessage msgType=$msgType dataLen=${data.length} elapsed=${sw.elapsedMilliseconds}ms');
+      switch (msgType) {
+        case 0: // messageSyncStep1 — server sent state vector
+          final (_, svBytes) = _readVarUint8Array(data, typeSize);
+          final missing = encodeStateAsUpdate(_doc, svBytes);
+          final step2 = _encodeMessage(1, missing);
+          _sendRaw(step2);
+          if (!_handshakeDone) {
+            _handshakeDone = true;
+            debugPrint('[YjsWS] HANDSHAKE DONE (via Step1) elapsed=${sw.elapsedMilliseconds}ms');
+            _notifier?.markSynced(DateTime.now());
+            _flushPending();
+          }
+        case 1: // messageSyncStep2 — server sent update (from our Step1)
+          final (_, updateBytes) = _readVarUint8Array(data, typeSize);
+          applyUpdate(_doc, updateBytes);
+          if (!_handshakeDone) {
+            _handshakeDone = true;
+            debugPrint('[YjsWS] HANDSHAKE DONE (via Step2) elapsed=${sw.elapsedMilliseconds}ms');
+            _notifier?.markSynced(DateTime.now());
+            _flushPending();
+          }
+          _onUpdateController.add(data);
+        case 2: // messageYjsUpdate — raw update broadcast
+          final (_, updateBytes) = _readVarUint8Array(data, typeSize);
+          applyUpdate(_doc, updateBytes);
+          _onUpdateController.add(data);
+        default:
+          dev.log('[YjsWS] Unknown sync message type: $msgType', name: 'YjsWS');
+      }
+    } catch (e) {
+      dev.log('[YjsWS] Error handling message: $e', name: 'YjsWS');
     }
     _resetIdleTimer();
   }
 
-  void _sendStep1(Doc doc) {
-    final enc = createEncoder();
-    writeSyncStep1(enc, doc);
-    _sendRaw(toUint8Array(enc));
+  void _sendStep1() {
+    final sv = encodeDocumentStateVector(_doc);
+    final msg = _encodeMessage(0, sv);
+    _sendRaw(msg);
   }
 
   void _sendRaw(Uint8List bytes) {
@@ -134,9 +187,7 @@ class YjsWebSocketClient {
   }
 
   void sendUpdate(Uint8List update) {
-    final enc = createEncoder();
-    writeUpdate(enc, update);
-    final framed = toUint8Array(enc);
+    final framed = _encodeMessage(2, update);
     if (!_isConnected) {
       if (_pendingUpdates.length >= _kMaxPendingUpdates) {
         debugPrint('[YjsWS] sendUpdate: pendingUpdates full, dropping oldest (was ${_pendingUpdates.length})');
