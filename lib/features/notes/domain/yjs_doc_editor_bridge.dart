@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:supanotes/core/utils/fractional_indexing.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
 import 'attachment_nodes.dart';
 import 'node_sync_manager.dart';
@@ -23,18 +23,18 @@ class YjsDocEditorBridge {
   })  : _doc = doc,
         _coordinator = coordinator,
         _sendUpdate = sendUpdate {
-    _nodesSub = _doc.getMap('nodes')!.observe(_onNodesChanged);
+    _nodesSub = _doc.getMap('nodes').observe((e) => _onNodesChanged());
     coordinator.onNodeFlush = onLocalFlush;
   }
 
   final Doc _doc;
   final NoteSyncCoordinator _coordinator;
   final void Function(Uint8List update) _sendUpdate;
-  late final void Function(dynamic, Transaction) _nodesSub;
+  late final void Function() _nodesSub;
 
   bool _isFlushingLocal = false;
 
-  void _onNodesChanged(dynamic event, Transaction tr) {
+  void _onNodesChanged() {
     if (_isFlushingLocal) {
       dev.log('[YjsBridge] _onNodesChanged: SKIP (local flush)', name: 'YjsBridge');
       return;
@@ -54,7 +54,7 @@ class YjsDocEditorBridge {
 
     _isFlushingLocal = true;
     try {
-      final nodesMap = _doc.getMap('nodes')!;
+      final nodesMap = _doc.getMap('nodes');
 
       for (final op in ops) {
         switch (op) {
@@ -62,7 +62,7 @@ class YjsDocEditorBridge {
             final pos = _calcPosition(index, id, nodesMap);
             _serializeNode(node, pos, id, nodesMap);
           case DeleteOp(:final id):
-            nodesMap.delete(id);
+            nodesMap.deleteAttr(id);
           case UpdateOp(:final id, :final node):
             _serializeNode(node, null, id, nodesMap);
           case MoveOp(:final id, :final to):
@@ -84,7 +84,7 @@ class YjsDocEditorBridge {
     DocumentNode node,
     String? position,
     String id,
-    YMap nodesMap,
+    SharedType nodesMap,
   ) {
     final dataStr = NodeSyncManager.nodeData(node);
     final data = jsonDecode(dataStr) as Map<String, dynamic>;
@@ -94,7 +94,7 @@ class YjsDocEditorBridge {
       position = existing ?? 'a0';
     }
 
-    final existingRaw = nodesMap.get(id);
+    final existingRaw = nodesMap.getAttr(id);
     final createdAt = _readCreatedAt(existingRaw) ??
         DateTime.now().millisecondsSinceEpoch.toDouble();
     final parentId = _readParentId(existingRaw) ?? '';
@@ -108,51 +108,47 @@ class YjsDocEditorBridge {
       'createdAt': createdAt,
     };
 
-    nodesMap.set(id, jsonEncode(meta));
+    nodesMap.setAttr(id, jsonEncode(meta));
 
     final text = data['text'] as String?;
-    final ytext = _doc.getText('content/$id')!;
+    final ytext = _doc.getText('content/$id');
     _updateYTextIncrementally(ytext, text ?? '');
     dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
   }
 
-  void _updateYTextIncrementally(YText ytext, String newText) {
-    final oldText = ytext.toString();
+  void _updateYTextIncrementally(SharedType ytext, String newText) {
+    final oldText = ytext.toPlainText();
     if (oldText == newText) return;
 
     int start = 0;
     int oldEnd = oldText.length;
     int newEnd = newText.length;
 
-    // Find common prefix
     while (start < oldEnd && start < newEnd && oldText.codeUnitAt(start) == newText.codeUnitAt(start)) {
       start++;
     }
 
-    // Find common suffix
     while (oldEnd > start && newEnd > start && oldText.codeUnitAt(oldEnd - 1) == newText.codeUnitAt(newEnd - 1)) {
       oldEnd--;
       newEnd--;
     }
 
-    // Delete deleted characters
     final deleteLen = oldEnd - start;
     if (deleteLen > 0) {
-      ytext.delete(start, deleteLen);
+      ytext.deleteText(start, deleteLen);
     }
 
-    // Insert inserted characters
     if (newEnd > start) {
       final insertText = newText.substring(start, newEnd);
-      ytext.insert(start, insertText);
+      ytext.insertText(start, insertText);
     }
   }
 
-  String _calcPosition(int targetIndex, String? ignoreId, YMap nodesMap) {
+  String _calcPosition(int targetIndex, String? ignoreId, SharedType nodesMap) {
     final positions = <String, String>{};
-    for (final key in nodesMap.keys) {
+    for (final key in nodesMap.attrKeys) {
       if (key == ignoreId) continue;
-      final raw = nodesMap.get(key);
+      final raw = nodesMap.getAttr(key);
       if (raw != null) {
         try {
           final meta = jsonDecode(raw as String) as Map<String, dynamic>;
@@ -199,18 +195,18 @@ class YjsDocEditorBridge {
     }
   }
 
-  void _repositionNode(String id, String position, YMap nodesMap) {
-    final raw = nodesMap.get(id);
+  void _repositionNode(String id, String position, SharedType nodesMap) {
+    final raw = nodesMap.getAttr(id);
     if (raw == null) return;
     try {
       final meta = jsonDecode(raw as String) as Map<String, dynamic>;
       meta['position'] = position;
-      nodesMap.set(id, jsonEncode(meta));
+      nodesMap.setAttr(id, jsonEncode(meta));
     } catch (_) {}
   }
 
-  String? _readPosition(String id, YMap nodesMap) {
-    final raw = nodesMap.get(id);
+  String? _readPosition(String id, SharedType nodesMap) {
+    final raw = nodesMap.getAttr(id);
     if (raw == null) return null;
     try {
       final meta = jsonDecode(raw as String) as Map<String, dynamic>;
@@ -237,7 +233,7 @@ class YjsDocEditorBridge {
   }
 
   void dispose() {
-    _doc.getMap('nodes')?.unobserve(_nodesSub);
+    _nodesSub();
     _coordinator.onNodeFlush = null;
   }
 }
