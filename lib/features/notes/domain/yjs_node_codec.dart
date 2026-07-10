@@ -4,6 +4,30 @@ import 'package:dart_crdt/dart_crdt.dart';
 
 import '../../../core/database/database.dart';
 
+Map<String, dynamic> parseNodeData(NoteNode node) {
+  if (node.data.isEmpty) return {};
+  try {
+    return jsonDecode(node.data) as Map<String, dynamic>;
+  } catch (_) {
+    return {};
+  }
+}
+
+String extractTextFromData(Map<String, dynamic> data) {
+  return data['text'] as String? ?? '';
+}
+
+Map<String, dynamic> buildYjsNodeMeta(NoteNode node, Map<String, dynamic> data) {
+  return {
+    'id': node.id,
+    'parentId': node.parentId,
+    'position': node.position,
+    'type': node.type,
+    'data': data,
+    'createdAt': node.createdAt.millisecondsSinceEpoch.toDouble(),
+  };
+}
+
 List<NoteNode> noteNodesFromDoc(Doc doc, {String? noteIdOverride}) {
   final nodes = <NoteNode>[];
   final nodesMap = doc.getMap('nodes');

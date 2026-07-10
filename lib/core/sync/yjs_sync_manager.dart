@@ -48,45 +48,7 @@ class YjsSyncManager {
         bool mutated = false;
         doc.transact((txn) {
           for (final node in allNodes) {
-            if (node.deletedAt != null) {
-              if (nodesMap.getAttr(node.id) != null) {
-                nodesMap.deleteAttr(node.id);
-                final ytext = doc.getText('content/${node.id}');
-                final textLen = ytext.toPlainText().length;
-                if (textLen > 0) {
-                  ytext.deleteText(0, textLen);
-                }
-                mutated = true;
-              }
-              continue;
-            }
-
-            final rawMeta = nodesMap.getAttr(node.id) as String?;
-            final dbData = jsonDecode(node.data) as Map<String, dynamic>;
-            final dbText = dbData['text'] as String? ?? '';
-            final ytext = doc.getText('content/${node.id}');
-            final ytextStr = ytext.toPlainText();
-
-            if (rawMeta == null || ytextStr != dbText) {
-              final newMeta = {
-                'id': node.id,
-                'parentId': node.parentId,
-                'position': node.position,
-                'type': node.type,
-                'data': dbData,
-                'createdAt': node.createdAt.millisecondsSinceEpoch.toDouble(),
-              };
-              nodesMap.setAttr(node.id, jsonEncode(newMeta));
-
-              if (ytextStr != dbText) {
-                final textLen = ytext.toPlainText().length;
-                if (textLen > 0) {
-                  ytext.deleteText(0, textLen);
-                }
-                if (dbText.isNotEmpty) {
-                  ytext.insertText(0, dbText);
-                }
-              }
+            if (_mergeOfflineNodeIntoDoc(node, nodesMap, doc)) {
               mutated = true;
             }
           }
@@ -134,6 +96,46 @@ class YjsSyncManager {
     return doc;
   }
 
+  /// Merges a single [NoteNode] from SQLite into the YDoc's [nodesMap].
+  /// Returns `true` if the document was mutated.
+  bool _mergeOfflineNodeIntoDoc(NoteNode node, SharedType nodesMap, Doc doc) {
+    if (node.deletedAt != null) {
+      if (nodesMap.getAttr(node.id) != null) {
+        nodesMap.deleteAttr(node.id);
+        final ytext = doc.getText('content/${node.id}');
+        final textLen = ytext.toPlainText().length;
+        if (textLen > 0) {
+          ytext.deleteText(0, textLen);
+        }
+        return true;
+      }
+      return false;
+    }
+
+    final rawMeta = nodesMap.getAttr(node.id) as String?;
+    final dbData = parseNodeData(node);
+    final dbText = extractTextFromData(dbData);
+    final ytext = doc.getText('content/${node.id}');
+    final ytextStr = ytext.toPlainText();
+
+    if (rawMeta == null || ytextStr != dbText) {
+      final newMeta = buildYjsNodeMeta(node, dbData);
+      nodesMap.setAttr(node.id, jsonEncode(newMeta));
+
+      if (ytextStr != dbText) {
+        final textLen = ytext.toPlainText().length;
+        if (textLen > 0) {
+          ytext.deleteText(0, textLen);
+        }
+        if (dbText.isNotEmpty) {
+          ytext.insertText(0, dbText);
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
   Future<Doc> _reconstructFromLocal(String noteId) async {
     final doc = Doc();
     final nodes = await (_db.select(_db.noteNodes)
@@ -143,22 +145,9 @@ class YjsSyncManager {
 
     for (final node in nodes) {
       final nodeId = node.id;
-      Map<String, dynamic> dataMap = {};
-      if (node.data.isNotEmpty) {
-        try {
-          dataMap = jsonDecode(node.data) as Map<String, dynamic>;
-        } catch (_) {}
-      }
-      final textContent = dataMap['text'] as String? ?? '';
-
-      final meta = <String, dynamic>{
-        'id': nodeId,
-        'parentId': node.parentId,
-        'position': node.position,
-        'type': node.type,
-        'data': dataMap,
-        'createdAt': node.createdAt.millisecondsSinceEpoch.toDouble(),
-      };
+      final dataMap = parseNodeData(node);
+      final textContent = extractTextFromData(dataMap);
+      final meta = buildYjsNodeMeta(node, dataMap);
 
       doc.getMap('nodes').setAttr(nodeId, jsonEncode(meta));
       if (textContent.isNotEmpty) {
