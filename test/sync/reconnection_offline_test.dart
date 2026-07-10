@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:dart_crdt/dart_crdt.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -46,7 +47,7 @@ void main() {
       // Initialize Manager
       final mgr = YjsSyncManager(db: db);
       final doc = await mgr.loadDoc('note-1');
-      expect(doc.getText('content/node-1').toString(), 'Hello');
+      expect(doc.getText('content/node-1').toPlainText(), 'Hello');
 
       // 2. Offline change locally: edit "Hello" -> "Hello World"
       await db.into(db.noteNodes).insertOnConflictUpdate(
@@ -67,7 +68,7 @@ void main() {
       // Force reconstruction from local node modifications
       final freshMgr = YjsSyncManager(db: db);
       final freshDoc = await freshMgr.loadDoc('note-1');
-      expect(freshDoc.getText('content/node-1').toString(), 'Hello World');
+      expect(freshDoc.getText('content/node-1').toPlainText(), 'Hello World');
     });
 
     test('Process kill recovery restores Doc from localYjsStates', () async {
@@ -86,8 +87,8 @@ void main() {
       final doc1 = await mgr1.loadDoc('note-2');
 
       // Edit document
-      doc1.transact((t) {
-        doc1.getMap('nodes')!.set(
+      doc1.transact((txn) {
+        doc1.getMap('nodes').setAttr(
               'p1',
               jsonEncode({
                 'id': 'p1',
@@ -97,7 +98,7 @@ void main() {
                 'createdAt': now.millisecondsSinceEpoch.toDouble(),
               }),
             );
-        doc1.getText('content/p1')!.insert(0, 'Relaunched!');
+        doc1.getText('content/p1').insertText(0, 'Relaunched!');
       });
 
       // Persist doc1 to SQLite
@@ -113,8 +114,8 @@ void main() {
       final mgr2 = YjsSyncManager(db: db);
       final doc2 = await mgr2.loadDoc('note-2');
 
-      expect(doc2.getMap('nodes')!.keys, contains('p1'));
-      expect(doc2.getText('content/p1').toString(), 'Relaunched!');
+      expect(doc2.getMap('nodes').attrKeys, contains('p1'));
+      expect(doc2.getText('content/p1').toPlainText(), 'Relaunched!');
     });
   });
 }

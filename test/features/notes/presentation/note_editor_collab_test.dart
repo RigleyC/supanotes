@@ -107,7 +107,7 @@ void main() {
     expect(originalTextFinder, findsNothing);
 
     // Also assert on the document state directly for extra verification
-    final docText = controller.document!.map((n) => n is TextNode ? n.text.text : '').join(' ');
+    final docText = controller.document!.map((n) => n is TextNode ? n.text.toPlainText() : '').join(' ');
     expect(docText, contains('Updated content from User B'));
     expect(docText, isNot(contains('Original content from User A')));
 

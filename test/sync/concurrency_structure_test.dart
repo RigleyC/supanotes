@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
 void main() {
   group('Multi-Device Convergence & Structure', () {
@@ -15,13 +15,13 @@ void main() {
       applyUpdate(docB, stateA);
 
       // Device A inserts "Hello " at 0
-      docA.transact((t) {
-        docA.getText('text')!.insert(0, 'Hello ');
+      docA.transact((txn) {
+        docA.getText('text').insertText(0, 'Hello ');
       });
 
       // Device B inserts "World" at 0 concurrently
-      docB.transact((t) {
-        docB.getText('text')!.insert(0, 'World');
+      docB.transact((txn) {
+        docB.getText('text').insertText(0, 'World');
       });
 
       // Sync changes from A -> B
@@ -33,8 +33,8 @@ void main() {
       applyUpdate(docA, updateB);
 
       // Both documents must converge on exactly the same text!
-      final textA = docA.getText('text').toString();
-      final textB = docB.getText('text').toString();
+      final textA = docA.getText('text').toPlainText();
+      final textB = docB.getText('text').toPlainText();
 
       expect(textA, textB);
       expect(textA, isNotEmpty);
@@ -47,22 +47,22 @@ void main() {
       final docB = Doc();
 
       // Setup initial node list in both
-      docA.transact((t) {
-        docA.getMap('nodes')!.set('node-1', '{"id":"node-1","position":10.0}');
-        docA.getMap('nodes')!.set('node-2', '{"id":"node-2","position":20.0}');
+      docA.transact((txn) {
+        docA.getMap('nodes').setAttr('node-1', '{"id":"node-1","position":10.0}');
+        docA.getMap('nodes').setAttr('node-2', '{"id":"node-2","position":20.0}');
       });
 
       // Sync A -> B
       applyUpdate(docB, encodeStateAsUpdate(docA));
 
       // Device A moves node-2 before node-1 (fractional index position = 5.0)
-      docA.transact((t) {
-        docA.getMap('nodes')!.set('node-2', '{"id":"node-2","position":5.0}');
+      docA.transact((txn) {
+        docA.getMap('nodes').setAttr('node-2', '{"id":"node-2","position":5.0}');
       });
 
       // Device B concurrently moves node-1 after node-2 (fractional index position = 25.0)
-      docB.transact((t) {
-        docB.getMap('nodes')!.set('node-1', '{"id":"node-1","position":25.0}');
+      docB.transact((txn) {
+        docB.getMap('nodes').setAttr('node-1', '{"id":"node-1","position":25.0}');
       });
 
       // Exchange updates
@@ -70,11 +70,11 @@ void main() {
       applyUpdate(docA, encodeStateAsUpdate(docB));
 
       // Confirm both devices ended up with the same configuration
-      final nodesA = docA.getMap('nodes')!;
-      final nodesB = docB.getMap('nodes')!;
+      final nodesA = docA.getMap('nodes');
+      final nodesB = docB.getMap('nodes');
 
-      expect(nodesA.get('node-1'), nodesB.get('node-1'));
-      expect(nodesA.get('node-2'), nodesB.get('node-2'));
+      expect(nodesA.getAttr('node-1'), nodesB.getAttr('node-1'));
+      expect(nodesA.getAttr('node-2'), nodesB.getAttr('node-2'));
     });
   });
 }

@@ -30,7 +30,7 @@ class YjsDocEditorBridge {
   final Doc _doc;
   final NoteSyncCoordinator _coordinator;
   final void Function(Uint8List update) _sendUpdate;
-  late final void Function() _nodesSub;
+  late final EventSubscription _nodesSub;
 
   bool _isFlushingLocal = false;
 
@@ -233,7 +233,7 @@ class YjsDocEditorBridge {
   }
 
   void dispose() {
-    _nodesSub();
+    _nodesSub.cancel();
     _coordinator.onNodeFlush = null;
   }
 }

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:supanotes/core/sync/yjs_websocket_client.dart';
 
@@ -87,8 +87,8 @@ void main() {
     // 2. Setup Yjs clients connected via WebSocket
     final docA = Doc();
     final docB = Doc();
-    final textA = docA.getText('content')!;
-    final textB = docB.getText('content')!;
+    final textA = docA.getText('content');
+    final textB = docB.getText('content');
 
     // Create client A
     final clientA = YjsWebSocketClient(
@@ -107,15 +107,15 @@ void main() {
     );
 
     // Listen to local document updates and forward them via WebSocket
-    docA.on('update', (dynamic update, dynamic origin, dynamic doc, dynamic transaction) {
-      if (origin != 'remote') {
-        clientA.sendUpdate(update as Uint8List);
+    docA.update.add((event) {
+      if (event.origin != 'remote') {
+        clientA.sendUpdate(event.update);
       }
     });
 
-    docB.on('update', (dynamic update, dynamic origin, dynamic doc, dynamic transaction) {
-      if (origin != 'remote') {
-        clientB.sendUpdate(update as Uint8List);
+    docB.update.add((event) {
+      if (event.origin != 'remote') {
+        clientB.sendUpdate(event.update);
       }
     });
 
@@ -144,33 +144,33 @@ void main() {
 
     // Insert initial text on Client A
     print('Inserindo texto inicial no Cliente A...');
-    docA.transact((_) {
-      textA.insert(0, 'hello world');
+    docA.transact((txn) {
+      textA.insertText(0, 'hello world');
     });
 
     // Wait for propagation to Client B
     await waitFor(
-      () => textB.toString() == 'hello world',
-      message: "Cliente B não recebeu o texto inicial 'hello world'. Atual: '${textB.toString()}'",
+      () => textB.toPlainText() == 'hello world',
+      message: "Cliente B não recebeu o texto inicial 'hello world'. Atual: '${textB.toPlainText()}'",
     );
     print('Texto inicial propagado com sucesso!');
 
     // Concurrent edits
     print('Aplicando edições concorrentes...');
-    docA.transact((_) {
-      textA.insert(5, 'XXX');
+    docA.transact((txn) {
+      textA.insertText(5, 'XXX');
     });
-    docB.transact((_) {
-      textB.insert(3, 'YYY');
+    docB.transact((txn) {
+      textB.insertText(3, 'YYY');
     });
 
     // Wait for convergence
     await waitFor(
-      () => textA.toString() == textB.toString(),
-      message: "Os documentos A e B não convergiram. A: '${textA.toString()}', B: '${textB.toString()}'",
+      () => textA.toPlainText() == textB.toPlainText(),
+      message: "Os documentos A e B não convergiram. A: '${textA.toPlainText()}', B: '${textB.toPlainText()}'",
     );
 
-    final finalResult = textA.toString();
+    final finalResult = textA.toPlainText();
     print('✅ Convergência atingida via WebSocket: "$finalResult"');
 
     expect(finalResult, equals('helYYYloXXX world'));

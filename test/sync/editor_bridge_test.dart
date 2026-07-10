@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
@@ -61,15 +61,15 @@ void main() {
       }).toList());
 
       // Verify that YDoc map got the node serialized and the text updated
-      final nodesMap = doc.getMap('nodes')!;
-      expect(nodesMap.keys, contains('p1'));
+      final nodesMap = doc.getMap('nodes');
+      expect(nodesMap.attrKeys, contains('p1'));
 
-      final meta = jsonDecode(nodesMap.get('p1') as String) as Map<String, dynamic>;
+      final meta = jsonDecode(nodesMap.getAttr('p1') as String) as Map<String, dynamic>;
       expect(meta['id'], 'p1');
       expect(meta['type'], 'paragraph');
 
-      final ytext = doc.getText('content/p1')!;
-      expect(ytext.toString(), 'Hello World');
+      final ytext = doc.getText('content/p1');
+      expect(ytext.toPlainText(), 'Hello World');
       expect(updates, isNotEmpty);
 
       bridge.dispose();

@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/yjs_sync_manager.dart';
@@ -38,9 +38,9 @@ void main() {
       () async {
     final mgr = YjsSyncManager(db: db);
     final doc = await mgr.loadDoc('note-1');
-    expect(doc.getMap('nodes')!.keys, contains('node-1'));
+    expect(doc.getMap('nodes').attrKeys, contains('node-1'));
     final ytext = doc.getText('content/node-1');
-    expect(ytext.toString(), 'hi');
+    expect(ytext.toPlainText(), 'hi');
   });
 
   test('persist saves mutated doc and data survives fresh load', () async {
@@ -48,20 +48,20 @@ void main() {
     final doc = await mgr.loadDoc('note-1');
 
     // Mutate the canonical doc directly.
-    doc.transact((t) {
-      doc.getMap('nodes')!.set(
+    doc.transact((txn) {
+      doc.getMap('nodes').setAttr(
           'node-2',
           '{"id":"node-2","position":1,"type":"paragraph","data":{"text":"new"}}');
-      doc.getText('content/node-2')!.insert(0, 'new');
+      doc.getText('content/node-2').insertText(0, 'new');
     });
     await mgr.persist('note-1');
 
     // New manager to bypass cache, then reload.
     final mgr2 = YjsSyncManager(db: db);
     final doc2 = await mgr2.loadDoc('note-1');
-    expect(doc2.getMap('nodes')!.keys, containsAll(['node-1', 'node-2']));
-    expect(doc2.getText('content/node-2').toString(), 'new');
-    expect(doc2.getText('content/node-1').toString(), 'hi');
+    expect(doc2.getMap('nodes').attrKeys, containsAll(['node-1', 'node-2']));
+    expect(doc2.getText('content/node-2').toPlainText(), 'new');
+    expect(doc2.getText('content/node-1').toPlainText(), 'hi');
 
     final state = encodeStateAsUpdate(doc2);
     expect(state.length, greaterThan(0));
@@ -70,7 +70,7 @@ void main() {
   test('loadDoc preserves text content on existing nodes', () async {
     final mgr = YjsSyncManager(db: db);
     final doc = await mgr.loadDoc('note-1');
-    expect(doc.getText('content/node-1').toString(), 'hi');
+    expect(doc.getText('content/node-1').toPlainText(), 'hi');
   });
 
   test('loadDoc returns cached doc on second call', () async {

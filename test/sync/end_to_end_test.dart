@@ -1,3 +1,4 @@
+import 'package:dart_crdt/dart_crdt.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,19 +21,19 @@ void main() {
 
     final mgr = YjsSyncManager(db: db);
     final doc = await mgr.loadDoc('n-1');
-    doc.transact((t) {
-      doc.getMap('nodes')!.set(
+    doc.transact((txn) {
+      doc.getMap('nodes').setAttr(
           'node-x',
           '{"id":"node-x","position":0,"type":"paragraph",'
               '"data":{"text":"edit"}}');
-      doc.getText('content/node-x')!.insert(0, 'edit');
+      doc.getText('content/node-x').insertText(0, 'edit');
     });
     await mgr.persist('n-1');
 
     final mgr2 = YjsSyncManager(db: db);
     final restored = await mgr2.loadDoc('n-1');
-    expect(restored.getMap('nodes')!.keys, contains('node-x'));
-    expect(restored.getText('content/node-x').toString(), 'edit');
+    expect(restored.getMap('nodes').attrKeys, contains('node-x'));
+    expect(restored.getText('content/node-x').toPlainText(), 'edit');
     await db.close();
   });
 }

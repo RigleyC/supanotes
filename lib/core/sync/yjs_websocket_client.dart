@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:developer' as dev;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:dart_crdt/dart_crdt.dart';

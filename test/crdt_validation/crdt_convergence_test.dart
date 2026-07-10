@@ -3,15 +3,13 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yjs_dart/yjs_dart.dart';
+import 'package:dart_crdt/dart_crdt.dart';
 
-// Helpers: inicializa um YText dentro de um Doc (necessário antes de usar)
-YText _text(Doc doc, String key) {
-  // Chamar getText() em um doc já registra o tipo no share-map
-  return doc.getText(key)!;
+SharedType _text(Doc doc, String key) {
+  return doc.getText(key);
 }
 
-String _str(Doc doc, String key) => doc.getText(key)!.toString();
+String _str(Doc doc, String key) => doc.getText(key).toPlainText();
 
 // =============================================================================
 // Teste 2 — Dart sozinho, sem rede
@@ -31,8 +29,8 @@ void main() {
       const initial = 'hello world';
 
       // Ambos partem do mesmo estado inicial
-      docA.transact((_) {
-        _text(docA, 'content').insert(0, initial);
+      docA.transact((txn) {
+        _text(docA, 'content').insertText(0, initial);
       });
       // Sync initial state: send full state of A to B
       final stateA = encodeStateAsUpdate(docA);
@@ -43,14 +41,14 @@ void main() {
 
       // Edições concorrentes — antes de trocar updates
       // Capture state vectors BEFORE the concurrent edits
-      final svA = encodeStateVector(docA);
-      final svB = encodeStateVector(docB);
+      final svA = encodeDocumentStateVector(docA);
+      final svB = encodeDocumentStateVector(docB);
 
-      docA.transact((_) {
-        _text(docA, 'content').insert(5, 'XXX');
+      docA.transact((txn) {
+        _text(docA, 'content').insertText(5, 'XXX');
       });
-      docB.transact((_) {
-        _text(docB, 'content').insert(3, 'YYY');
+      docB.transact((txn) {
+        _text(docB, 'content').insertText(3, 'YYY');
       });
 
       // Troca de updates — only the DIFF since svA/svB (not full state)
@@ -84,26 +82,26 @@ void main() {
         docB.getText('content');
 
         const initial = 'abcdefghijklmnopqrstuvwxyz';
-        docA.transact((_) {
-          _text(docA, 'content').insert(0, initial);
-        });
-        final stateA = encodeStateAsUpdate(docA);
-        applyUpdate(docB, stateA);
+      docA.transact((txn) {
+        _text(docA, 'content').insertText(0, initial);
+      });
+      final stateA = encodeStateAsUpdate(docA);
+      applyUpdate(docB, stateA);
 
-        final len = _text(docA, 'content').length;
-        final posA = rng.nextInt(len + 1);
-        final posB = rng.nextInt(len + 1);
+      final len = _text(docA, 'content').toPlainText().length;
+      final posA = rng.nextInt(len + 1);
+      final posB = rng.nextInt(len + 1);
 
-        // Capture state vectors BEFORE the concurrent edits
-        final svA = encodeStateVector(docA);
-        final svB = encodeStateVector(docB);
+      // Capture state vectors BEFORE the concurrent edits
+      final svA = encodeDocumentStateVector(docA);
+      final svB = encodeDocumentStateVector(docB);
 
-        docA.transact((_) {
-          _text(docA, 'content').insert(posA, 'XXX');
-        });
-        docB.transact((_) {
-          _text(docB, 'content').insert(posB, 'YYY');
-        });
+      docA.transact((txn) {
+        _text(docA, 'content').insertText(posA, 'XXX');
+      });
+      docB.transact((txn) {
+        _text(docB, 'content').insertText(posB, 'YYY');
+      });
 
         // Exchange only the DIFF (not full state)
         final diffA = encodeStateAsUpdate(docA, svB);
@@ -136,12 +134,12 @@ void main() {
       final docA = Doc();
       docA.getText('content');
 
-      docA.transact((_) {
-        _text(docA, 'content').insert(0, 'hello world');
+      docA.transact((txn) {
+        _text(docA, 'content').insertText(0, 'hello world');
       });
       // Edição conhecida: insere "DART_EDIT" na posição 5
-      docA.transact((_) {
-        _text(docA, 'content').insert(5, 'DART_EDIT');
+      docA.transact((txn) {
+        _text(docA, 'content').insertText(5, 'DART_EDIT');
       });
 
       final update = encodeStateAsUpdate(docA);
@@ -213,11 +211,11 @@ void main() {
       // e faz uma edição local diferente
       final peerB = Doc();
       peerB.getText('content');
-      peerB.transact((_) {
-        _text(peerB, 'content').insert(0, 'hello world');
+      peerB.transact((txn) {
+        _text(peerB, 'content').insertText(0, 'hello world');
       });
-      peerB.transact((_) {
-        _text(peerB, 'content').insert(0, 'DART_PREFIX_');
+      peerB.transact((txn) {
+        _text(peerB, 'content').insertText(0, 'DART_PREFIX_');
       });
 
       // Agora troca updates
