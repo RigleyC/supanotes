@@ -136,6 +136,8 @@ dependency_overrides:
       url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
       ref: main
       path: super_editor_clipboard
+  yjs_dart:
+    path: packages/yjs_dart
 
   device_info_plus: ^12.0.0
 

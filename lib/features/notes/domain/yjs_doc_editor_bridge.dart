@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as dev;
 import 'dart:typed_data';
 
+import 'package:supanotes/core/utils/fractional_indexing.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
@@ -58,13 +59,15 @@ class YjsDocEditorBridge {
       for (final op in ops) {
         switch (op) {
           case InsertOp(:final id, :final node, :final index):
-            _serializeNode(node, index.toDouble(), id, nodesMap);
+            final pos = _calcPosition(index, id, nodesMap);
+            _serializeNode(node, pos, id, nodesMap);
           case DeleteOp(:final id):
             nodesMap.delete(id);
           case UpdateOp(:final id, :final node):
             _serializeNode(node, null, id, nodesMap);
           case MoveOp(:final id, :final to):
-            _repositionNode(id, to.toDouble(), nodesMap);
+            final pos = _calcPosition(to, id, nodesMap);
+            _repositionNode(id, pos, nodesMap);
         }
       }
 
@@ -79,7 +82,7 @@ class YjsDocEditorBridge {
 
   void _serializeNode(
     DocumentNode node,
-    double? position,
+    String? position,
     String id,
     YMap nodesMap,
   ) {
@@ -88,7 +91,7 @@ class YjsDocEditorBridge {
 
     if (position == null) {
       final existing = _readPosition(id, nodesMap);
-      position = existing ?? 0.0;
+      position = existing ?? 'a0';
     }
 
     final existingRaw = nodesMap.get(id);
@@ -145,12 +148,42 @@ class YjsDocEditorBridge {
     }
   }
 
-  double? _readCreatedAt(dynamic raw) {
+  String _calcPosition(int targetIndex, String? ignoreId, YMap nodesMap) {
+    final positions = <String, String>{};
+    for (final key in nodesMap.keys) {
+      if (key == ignoreId) continue;
+      final raw = nodesMap.get(key);
+      if (raw != null) {
+        try {
+          final meta = jsonDecode(raw as String) as Map<String, dynamic>;
+          final pos = meta['position']?.toString() ?? '';
+          positions[key] = pos;
+        } catch (_) {}
+      }
+    }
+
+    final sortedKeys = positions.keys.toList()
+      ..sort((a, b) => positions[a]!.compareTo(positions[b]!));
+
+    final prevKey = targetIndex > 0 && targetIndex - 1 < sortedKeys.length
+        ? sortedKeys[targetIndex - 1]
+        : null;
+    final nextKey = targetIndex >= 0 && targetIndex < sortedKeys.length
+        ? sortedKeys[targetIndex]
+        : null;
+
+    final prevPos = prevKey != null ? positions[prevKey] : null;
+    final nextPos = nextKey != null ? positions[nextKey] : null;
+
+    return FractionalIndex.between(prevPos, nextPos);
+  }
+
+  String? _readCreatedAt(dynamic raw) {
     if (raw is! String) return null;
     try {
       final meta = jsonDecode(raw) as Map<String, dynamic>;
       final ca = meta['createdAt'] as num?;
-      return ca?.toDouble();
+      return ca?.toString();
     } catch (_) {
       return null;
     }
@@ -166,7 +199,7 @@ class YjsDocEditorBridge {
     }
   }
 
-  void _repositionNode(String id, double position, YMap nodesMap) {
+  void _repositionNode(String id, String position, YMap nodesMap) {
     final raw = nodesMap.get(id);
     if (raw == null) return;
     try {
@@ -176,12 +209,12 @@ class YjsDocEditorBridge {
     } catch (_) {}
   }
 
-  double? _readPosition(String id, YMap nodesMap) {
+  String? _readPosition(String id, YMap nodesMap) {
     final raw = nodesMap.get(id);
     if (raw == null) return null;
     try {
       final meta = jsonDecode(raw as String) as Map<String, dynamic>;
-      return (meta['position'] as num?)?.toDouble();
+      return meta['position']?.toString();
     } catch (_) {
       return null;
     }

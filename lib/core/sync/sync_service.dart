@@ -251,10 +251,10 @@ class SyncService {
     final noteNodes = await (_db.select(
       _db.noteNodes,
     )..where((t) => t.isDirty.equals(true) & t.deletedAt.isNull())).get();
-    final filteredNoteNodes = noteNodes.where((nn) => allowedNoteIds.contains(nn.noteId)).toList();
+    final filteredNoteNodes = noteNodes.where((nn) => allowedNoteIds.contains(nn.noteId) && nn.noteId != _activeNoteId).toList();
 
     final tasks = await _db.tasksDao.getDirtyTasks();
-    final filteredTasks = tasks.where((t) => allowedNoteIds.contains(t.noteId)).toList();
+    final filteredTasks = tasks.where((t) => allowedNoteIds.contains(t.noteId) && t.noteId != _activeNoteId).toList();
 
     final completions = await _db.taskCompletionsDao.getDirtyCompletions();
     final List<LocalTaskCompletionData> filteredCompletions;
@@ -266,7 +266,7 @@ class SyncService {
       final taskIdToNoteId = {for (final t in tasksForCompletions) t.id: t.noteId};
       filteredCompletions = completions.where((c) {
         final noteId = taskIdToNoteId[c.taskId];
-        return noteId != null && allowedNoteIds.contains(noteId);
+        return noteId != null && allowedNoteIds.contains(noteId) && noteId != _activeNoteId;
       }).toList();
     }
 
@@ -393,12 +393,20 @@ class SyncService {
         final node = _mapper
             .noteNodeFromJson(raw as Map<String, dynamic>)
             .copyWith(isDirty: false);
+        if (_activeNoteId != null && node.noteId == _activeNoteId) {
+          debugPrint('[SyncService] pull: skipping note_node for active note=$_activeNoteId');
+          continue;
+        }
         batch.insert(_db.noteNodes, node, onConflict: DoUpdate((_) => node));
       }
       for (final raw in (data['tasks'] as List? ?? [])) {
         final task = _mapper
             .taskFromJson(raw as Map<String, dynamic>)
             .copyWith(isDirty: false);
+        if (_activeNoteId != null && task.noteId == _activeNoteId) {
+          debugPrint('[SyncService] pull: skipping task for active note=$_activeNoteId');
+          continue;
+        }
         batch.insert(_db.tasks, task, onConflict: DoUpdate((_) => task));
       }
       for (final raw in (data['contexts'] as List? ?? [])) {
@@ -460,6 +468,10 @@ class SyncService {
         final state = _mapper.localYjsStateFromJson(
           raw as Map<String, dynamic>,
         );
+        if (_activeNoteId != null && state.noteId == _activeNoteId) {
+          debugPrint('[SyncService] pull: skipping note_yjs_state for active note=$_activeNoteId');
+          continue;
+        }
         batch.insert(
           _db.localYjsStates,
           state,

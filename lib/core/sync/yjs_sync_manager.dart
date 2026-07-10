@@ -43,7 +43,10 @@ class YjsSyncManager {
 
       for (final node in allNodes) {
         if (node.deletedAt == null) {
-          doc.getText('content/${node.id}');
+          final t = node.type;
+          if (t == 'paragraph' || t == 'header' || t == 'list_item' || t == 'task') {
+            doc.getText('content/${node.id}');
+          }
         }
       }
       try {
@@ -108,11 +111,31 @@ class YjsSyncManager {
         _docs[noteId] = doc;
         dev.log('[YjsSyncManager] Loaded snapshot for note=$noteId', name: 'YjsSync');
         return doc;
-      } catch (e) {
-        dev.log('[YjsSyncManager] Failed to apply snapshot for note=$noteId: $e, reconstructing...', name: 'YjsSync');
+      } catch (e, stackTrace) {
+        dev.log('[YjsSyncManager] CRITICAL: Failed to apply snapshot for note=$noteId: $e. Clearing corrupted snapshot.',
+            name: 'YjsSync', error: e, stackTrace: stackTrace);
+        // Clear corrupted snapshot to avoid repeating failure loop
+        await (_db.delete(_db.localYjsStates)..where((t) => t.noteId.equals(noteId))).go();
+        
+        // Return a clean empty doc, allowing WebSocket/Server sync to safely populate it.
+        final doc = Doc();
+        _docs[noteId] = doc;
+        dev.log('[YjsSyncManager] Initialized empty doc for note=$noteId after clearing corrupted snapshot. Waiting for server sync.', name: 'YjsSync');
+        return doc;
       }
     }
 
+    // No snapshot exists. Check if this is a brand new local note or an existing note from server.
+    final note = await (_db.select(_db.notes)..where((t) => t.id.equals(noteId))).getSingleOrNull();
+    if (note != null && note.hasRemoteCopy) {
+      // Existing note from server - return empty doc and wait for server sync to populate it
+      final doc = Doc();
+      _docs[noteId] = doc;
+      dev.log('[YjsSyncManager] Initialized empty doc for existing note=$noteId from server. Waiting for sync.', name: 'YjsSync');
+      return doc;
+    }
+
+    dev.log('[YjsSyncManager] Reconstruction triggered (new local note) for noteId=$noteId at ${DateTime.now()}', name: 'YjsSync');
     final doc = await _reconstructFromLocal(noteId);
     _docs[noteId] = doc;
     return doc;
