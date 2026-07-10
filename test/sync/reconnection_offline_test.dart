@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
 import 'package:supanotes/core/database/database.dart';
@@ -34,7 +35,7 @@ void main() {
             NoteNodesCompanion.insert(
               id: 'node-1',
               noteId: 'note-1',
-              position: 0.0,
+              position: const Value('0.0'),
               type: 'paragraph',
               data: jsonEncode({'text': 'Hello', 'spans': []}),
               createdAt: now,
@@ -52,7 +53,7 @@ void main() {
             NoteNodesCompanion.insert(
               id: 'node-1',
               noteId: 'note-1',
-              position: 0.0,
+              position: const Value('0.0'),
               type: 'paragraph',
               data: jsonEncode({'text': 'Hello World', 'spans': []}),
               createdAt: now,

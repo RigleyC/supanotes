@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import '../../features/notes/domain/yjs_node_codec.dart';
+import '../../features/tasks/domain/task_recurrence.dart';
 import '../database/database.dart';
 
 /// Manages a local Yjs [Doc] instance per note and persists binary
@@ -31,20 +32,79 @@ class YjsSyncManager {
     final cached = _docs[noteId];
     if (cached != null) return cached;
 
-    // Try loading snapshot first, pre-registering YText keys to avoid yjs_dart type corruption
     final stateRow = await (_db.select(_db.localYjsStates)
           ..where((t) => t.noteId.equals(noteId)))
         .getSingleOrNull();
     if (stateRow != null) {
       final doc = Doc();
-      final nodes = await (_db.select(_db.noteNodes)
-            ..where((t) => t.noteId.equals(noteId) & t.deletedAt.isNull()))
+      final allNodes = await (_db.select(_db.noteNodes)
+            ..where((t) => t.noteId.equals(noteId)))
           .get();
-      for (final node in nodes) {
-        doc.getText('content/${node.id}');
+
+      for (final node in allNodes) {
+        if (node.deletedAt == null) {
+          doc.getText('content/${node.id}');
+        }
       }
       try {
         applyUpdate(doc, stateRow.state);
+
+        // Merge offline changes from SQLite into YDoc
+        final nodesMap = doc.getMap('nodes')!;
+        bool mutated = false;
+        doc.transact((txn) {
+          for (final node in allNodes) {
+            if (node.deletedAt != null) {
+              if (nodesMap.get(node.id) != null) {
+                nodesMap.delete(node.id);
+                final ytext = doc.getText('content/${node.id}')!;
+                if (ytext.length > 0) {
+                  ytext.delete(0, ytext.length);
+                }
+                mutated = true;
+              }
+              continue;
+            }
+
+            final rawMeta = nodesMap.get(node.id) as String?;
+            final dbData = jsonDecode(node.data) as Map<String, dynamic>;
+            final dbText = dbData['text'] as String? ?? '';
+            final ytext = doc.getText('content/${node.id}')!;
+            final ytextStr = ytext.toString();
+
+            if (rawMeta == null || ytextStr != dbText) {
+              final newMeta = {
+                'id': node.id,
+                'parentId': node.parentId,
+                'position': node.position,
+                'type': node.type,
+                'data': dbData,
+                'createdAt': node.createdAt.millisecondsSinceEpoch.toDouble(),
+              };
+              nodesMap.set(node.id, jsonEncode(newMeta));
+
+              if (ytextStr != dbText) {
+                if (ytext.length > 0) {
+                  ytext.delete(0, ytext.length);
+                }
+                if (dbText.isNotEmpty) {
+                  ytext.insert(0, dbText);
+                }
+              }
+              mutated = true;
+            }
+          }
+        });
+
+        if (mutated) {
+          await _db.into(_db.localYjsStates).insertOnConflictUpdate(
+                LocalYjsStatesCompanion(
+                  noteId: Value(noteId),
+                  state: Value(encodeStateAsUpdate(doc)),
+                ),
+              );
+        }
+
         _docs[noteId] = doc;
         dev.log('[YjsSyncManager] Loaded snapshot for note=$noteId', name: 'YjsSync');
         return doc;
@@ -88,24 +148,6 @@ class YjsSyncManager {
       if (textContent.isNotEmpty) {
         doc.getText('content/$nodeId')!.insert(0, textContent);
       }
-    }
-
-    final tasks = await (_db.select(_db.tasks)
-          ..where((t) => t.noteId.equals(noteId) & t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.position)]))
-        .get();
-
-    for (final t in tasks) {
-      final taskMeta = <String, dynamic>{
-        'id': t.id,
-        'noteId': noteId,
-        'userId': t.userId,
-        'title': t.title,
-        'status': t.status,
-        'position': t.position,
-        'createdAt': t.createdAt.millisecondsSinceEpoch.toDouble(),
-      };
-      doc.getMap('tasks')!.set(t.id, jsonEncode(taskMeta));
     }
 
     await _db.into(_db.localYjsStates).insertOnConflictUpdate(
@@ -155,24 +197,102 @@ class YjsSyncManager {
     final staleNodes = await (_db.select(_db.noteNodes)
           ..where((t) => t.noteId.equals(noteId) & t.deletedAt.isNull()))
         .get();
+
+    final noteRow = await (_db.select(_db.notes)
+          ..where((t) => t.id.equals(noteId)))
+        .getSingleOrNull();
+    final userId = noteRow?.userId ?? '';
+
     final now = DateTime.now().toUtc();
-    await _db.batch((b) {
-      for (final stale in staleNodes) {
-        if (!activeIds.contains(stale.id)) {
-          b.update(_db.noteNodes, NoteNodesCompanion(
-            deletedAt: Value(now),
-            updatedAt: Value(now),
-          ), where: (t) => t.id.equals(stale.id));
+    await _db.transaction(() async {
+      await _db.batch((b) {
+        for (final stale in staleNodes) {
+          if (!activeIds.contains(stale.id)) {
+            b.update(_db.noteNodes, NoteNodesCompanion(
+              deletedAt: Value(now),
+              updatedAt: Value(now),
+            ), where: (t) => t.id.equals(stale.id));
+
+            b.update(_db.tasks, TasksCompanion(
+              deletedAt: Value(now),
+              updatedAt: Value(now),
+            ), where: (t) => t.id.equals(stale.id));
+          }
         }
-      }
-    });
+      });
 
-    if (nodes.isEmpty) return;
+      if (nodes.isNotEmpty) {
+        await _db.batch((b) {
+          for (final node in nodes) {
+            b.insert(
+              _db.noteNodes,
+              node,
+              onConflict: DoUpdate(
+                (old) => NoteNodesCompanion(
+                  parentId: Value(node.parentId),
+                  position: Value(node.position),
+                  type: Value(node.type),
+                  data: Value(node.data),
+                  updatedAt: Value(node.updatedAt),
+                  deletedAt: const Value(null),
+                ),
+              ),
+            );
 
-    await _db.batch((b) {
-      for (final node in nodes) {
-        b.insert(_db.noteNodes, node,
-            onConflict: DoUpdate<$NoteNodesTable, NoteNode>((old) => NoteNodesCompanion.custom(updatedAt: old.updatedAt)));
+            if (node.type == 'task') {
+              Map<String, dynamic> dataMap = {};
+              try {
+                dataMap = jsonDecode(node.data) as Map<String, dynamic>;
+              } catch (_) {}
+
+              final completed = dataMap['completed'] == true || dataMap['isComplete'] == true;
+              final dueDateStr = dataMap['dueDate'] as String?;
+              final recurrenceStr = dataMap['recurrence'] as String?;
+
+              DateTime? dueDate;
+              if (dueDateStr != null && dueDateStr.isNotEmpty) {
+                try {
+                  dueDate = DateTime.parse(dueDateStr).toUtc();
+                } catch (_) {}
+              }
+
+              final recurrence = TaskRecurrence.parse(recurrenceStr);
+
+              final taskCompanion = TasksCompanion.insert(
+                id: node.id,
+                userId: userId,
+                noteId: noteId,
+                title: dataMap['text'] as String? ?? '',
+                status: completed ? 'done' : 'open',
+                position: Value(node.position),
+                recurrence: Value(recurrence),
+                dueDate: Value(dueDate),
+                completedAt: Value(completed ? now : null),
+                createdAt: node.createdAt,
+                updatedAt: now,
+                deletedAt: const Value(null),
+                nodeId: Value(node.id),
+              );
+
+              b.insert(
+                _db.tasks,
+                taskCompanion,
+                onConflict: DoUpdate(
+                  (old) => TasksCompanion(
+                    title: Value(dataMap['text'] as String? ?? ''),
+                    status: Value(completed ? 'done' : 'open'),
+                    position: Value(node.position),
+                    recurrence: Value(recurrence),
+                    dueDate: Value(dueDate),
+                    completedAt: Value(completed ? now : null),
+                    updatedAt: Value(now),
+                    deletedAt: const Value(null),
+                  ),
+                ),
+              );
+            }
+          }
+        });
       }
     });
   }

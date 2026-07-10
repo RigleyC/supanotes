@@ -200,7 +200,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       noteId: row.read<String>('task_note_id'),
       title: row.read<String>('task_title'),
       status: row.read<String>('task_status'),
-      position: row.read<double>('task_position'),
+      position: row.read<String>('task_position'),
       dueDate: row.read<DateTime?>('task_due_date'),
       recurrence: recurrenceRaw != null
           ? TaskRecurrence.values.byName(recurrenceRaw)

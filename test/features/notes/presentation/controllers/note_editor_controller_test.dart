@@ -13,7 +13,7 @@ AppDatabase _createDb() => createTestDatabase();
 NoteNode _paragraphNode({
   required String id,
   required String text,
-  double position = 1.0,
+  String position = '1.0',
 }) {
   return NoteNode(
     id: id,
@@ -30,7 +30,7 @@ NoteNode _paragraphNode({
 NoteNode _imageNode({
   required String id,
   required String url,
-  double position = 1.0,
+  String position = '1.0',
 }) {
   return NoteNode(
     id: id,

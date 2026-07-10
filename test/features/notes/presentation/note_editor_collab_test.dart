@@ -49,7 +49,7 @@ void main() {
       NoteNodesCompanion.insert(
         id: 'node-1',
         noteId: 'note-1',
-        position: 0.0,
+        position: const Value('0.0'),
         type: 'paragraph',
         data: '{"text":"Original content from User A"}',
         createdAt: now,
@@ -88,7 +88,7 @@ void main() {
       NoteNodesCompanion.insert(
         id: 'node-1',
         noteId: 'note-1',
-        position: 0.0,
+        position: const Value('0.0'),
         type: 'paragraph',
         data: '{"text":"Updated content from User B"}',
         createdAt: now,

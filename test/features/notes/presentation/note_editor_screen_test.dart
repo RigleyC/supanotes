@@ -70,7 +70,7 @@ class _FakeNotesRepository implements INotesRepository {
         nodes.add(NoteNode(
           id: id,
           noteId: noteId,
-          position: i.toDouble(),
+          position: i.toString(),
           type: type,
           data: isTask
               ? '{"text":"$title","completed":$isComplete}'
@@ -243,7 +243,7 @@ void main() {
                 NoteNode(
                   id: 'task-1',
                   noteId: 'note-1',
-                  position: 0,
+                  position: '0',
                   type: 'task',
                   data: '{"text":"tarefa concluida","completed":true}',
                   createdAt: DateTime.now(),
@@ -253,7 +253,7 @@ void main() {
                 NoteNode(
                   id: 'node-2',
                   noteId: 'note-1',
-                  position: 1,
+                  position: '1',
                   type: 'paragraph',
                   data: '{"text":"texto visivel"}',
                   createdAt: DateTime.now(),
@@ -310,7 +310,7 @@ void main() {
                           NoteNode(
                             id: 'task-1',
                             noteId: 'note-1',
-                            position: 0,
+                            position: '0',
                             type: 'task',
                             data: '{"text":"tarefa concluida","completed":true}',
                             createdAt: DateTime.now(),
@@ -320,7 +320,7 @@ void main() {
                           NoteNode(
                             id: 'node-2',
                             noteId: 'note-1',
-                            position: 1,
+                            position: '1',
                             type: 'paragraph',
                             data: '{"text":"texto visivel"}',
                             createdAt: DateTime.now(),
@@ -454,7 +454,7 @@ void main() {
           noteId: 'note-1',
           title: 'buy milk',
           status: 'open',
-          position: 0,
+          position: '0',
           dueDate: DateTime.now().add(const Duration(days: 1)),
           completedAt: null,
           recurrence: null,
@@ -522,7 +522,7 @@ void main() {
             noteId: 'note-1',
             title: 'buy milk',
             status: 'done',
-            position: 0,
+            position: '0',
             dueDate: DateTime.now().add(const Duration(days: 1)),
             completedAt: DateTime.now(),
             recurrence: null,

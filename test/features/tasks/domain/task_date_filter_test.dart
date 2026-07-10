@@ -8,7 +8,7 @@ TaskModel _task({DateTime? dueDate, bool completed = false, DateTime? createdAt}
       noteId: 'n',
       title: 't',
       status: completed ? 'done' : 'open',
-      position: 0,
+      position: '0',
       dueDate: dueDate,
       completedAt: completed ? DateTime.now() : null,
       recurrence: null,

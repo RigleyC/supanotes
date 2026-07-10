@@ -101,14 +101,14 @@ void main() {
       // Seed 3 nodes at distinct positions directly in the DB
       final now = DateTime.now().toUtc();
       for (final entry in [
-        ('p1', 1.0, 'First'),
-        ('p2', 2.0, 'Second'),
-        ('p3', 3.0, 'Third'),
+        ('p1', '1.0', 'First'),
+        ('p2', '2.0', 'Second'),
+        ('p3', '3.0', 'Third'),
       ]) {
         await db.into(db.noteNodes).insert(NoteNodesCompanion.insert(
           id: entry.$1,
           noteId: 'test-note',
-          position: entry.$2,
+          position: Value(entry.$2),
           type: 'paragraph',
           data: '{"text":"${entry.$3}"}',
           createdAt: now,

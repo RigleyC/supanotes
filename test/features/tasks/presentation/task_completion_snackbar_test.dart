@@ -73,7 +73,7 @@ void main() {
       noteId: 'note-1',
       title: 'Daily Task',
       status: 'open',
-      position: 0,
+      position: '0',
       dueDate: now,
       completedAt: null,
       recurrence: TaskRecurrence.daily,
@@ -101,7 +101,7 @@ void main() {
                 NoteNode(
                   id: 'task-1',
                   noteId: 'note-1',
-                  position: 0,
+                  position: '0',
                   type: 'task',
                   data: '{"text":"Daily Task","completed":false}',
                   createdAt: now,

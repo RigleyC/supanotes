@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yjs_dart/yjs_dart.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:stream_channel/stream_channel.dart';
 
 import 'package:supanotes/core/sync/yjs_websocket_client.dart';
 
@@ -11,8 +13,10 @@ void main() {
     final channelPair = _FakeChannelPair();
     final clientDoc = Doc();
     final client = YjsWebSocketClient(
-      stream: channelPair.clientIncoming,
-      sink: channelPair.clientOutgoing,
+      channelBuilder: () async => _FakeWebSocketChannel(
+        channelPair.clientIncoming,
+        channelPair.clientOutgoing,
+      ),
       doc: clientDoc,
     );
 
@@ -41,8 +45,10 @@ void main() {
     clientDoc.getText('content_x');
 
     final client = YjsWebSocketClient(
-      stream: channelPair.clientIncoming,
-      sink: channelPair.clientOutgoing,
+      channelBuilder: () async => _FakeWebSocketChannel(
+        channelPair.clientIncoming,
+        channelPair.clientOutgoing,
+      ),
       doc: clientDoc,
     );
 
@@ -72,4 +78,47 @@ class _FakeChannelPair {
   StreamSink<Uint8List> get clientOutgoing => clientToServer.sink;
   StreamSink<Uint8List> get serverOutgoing => serverToClient.sink;
   Stream<Uint8List> get serverIncoming => clientToServer.stream;
+}
+
+class _FakeWebSocketChannel with StreamChannelMixin implements WebSocketChannel {
+  @override
+  final Stream stream;
+
+  @override
+  final WebSocketSink sink;
+
+  _FakeWebSocketChannel(this.stream, StreamSink sink)
+      : sink = _FakeWebSocketSink(sink);
+
+  @override
+  String? get protocol => null;
+
+  @override
+  int? get closeCode => null;
+
+  @override
+  String? get closeReason => null;
+
+  @override
+  Future<void> get ready => Future.value();
+}
+
+class _FakeWebSocketSink implements WebSocketSink {
+  final StreamSink _sink;
+  _FakeWebSocketSink(this._sink);
+
+  @override
+  void add(dynamic event) => _sink.add(event);
+
+  @override
+  void addError(Object error, [StackTrace? stackTrace]) => _sink.addError(error, stackTrace);
+
+  @override
+  Future addStream(Stream stream) => _sink.addStream(stream);
+
+  @override
+  Future get done => _sink.done;
+
+  @override
+  Future close([int? closeCode, String? closeReason]) => _sink.close();
 }

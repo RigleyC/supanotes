@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
@@ -271,7 +271,7 @@ void main() {
                   noteId: '',
                   title: 'Tarefa recorrente',
                   status: 'open',
-                  position: 0,
+                  position: '0',
                   dueDate: now,
                   completedAt: null,
                   recurrence: TaskRecurrence.daily,
@@ -560,7 +560,7 @@ void main() {
                   noteId: '',
                   title: 'Tarefa recorrente',
                   status: 'open',
-                  position: 0,
+                  position: '0',
                   dueDate: now,
                   completedAt: null,
                   recurrence: TaskRecurrence.daily,

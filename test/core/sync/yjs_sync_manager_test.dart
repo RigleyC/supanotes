@@ -23,7 +23,7 @@ void main() {
     await db.into(db.noteNodes).insert(NoteNodesCompanion.insert(
           id: 'node-1',
           noteId: 'note-1',
-          position: 0.0,
+          position: const Value('0.0'),
           type: 'paragraph',
           data: '{"text":"hi"}',
           createdAt: DateTime.utc(2025, 1, 1),

@@ -5,6 +5,7 @@ import '../../../features/tasks/domain/task_recurrence.dart';
 
 import '../database.dart';
 import '../tables/tasks.dart';
+import '../../utils/fractional_indexing.dart';
 import 'task_completions_dao.dart';
 
 part 'tasks_dao.g.dart';
@@ -325,12 +326,15 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
   Future<void> reorderTasksBatch(List<String> orderedIds) async {
     await batch((b) {
+      var prev = '';
       for (var i = 0; i < orderedIds.length; i++) {
+        final pos = FractionalIndex.between(prev, '');
         b.update(
           tasks,
-          TasksCompanion(position: Value(i.toDouble())),
+          TasksCompanion(position: Value(pos)),
           where: (t) => t.id.equals(orderedIds[i]),
         );
+        prev = pos;
       }
     });
   }

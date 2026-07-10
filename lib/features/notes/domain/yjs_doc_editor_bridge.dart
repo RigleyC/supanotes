@@ -195,7 +195,8 @@ class YjsDocEditorBridge {
       final blockType = node.getMetadataValue('blockType') as Attribution?;
       if (blockType == null) return 'paragraph';
       if (blockType == blockquoteAttribution) return 'blockquote';
-      return 'header';
+      if (blockType.id.startsWith('header')) return 'header';
+      return 'paragraph';
     }
     if (node is TaskNode) return 'task';
     if (node is ListItemNode) return 'list_item';

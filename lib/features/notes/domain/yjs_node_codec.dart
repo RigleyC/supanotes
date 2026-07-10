@@ -28,7 +28,7 @@ List<NoteNode> noteNodesFromDoc(Doc doc, {String? noteIdOverride}) {
         id: nodeId,
         noteId: noteIdOverride ?? meta['noteId'] as String? ?? '',
         parentId: resolvedParentId,
-        position: (meta['position'] as num?)?.toDouble() ?? 0.0,
+        position: meta['position']?.toString() ?? 'a0',
         type: meta['type'] as String? ?? 'paragraph',
         data: jsonEncode(data),
         createdAt: DateTime.fromMillisecondsSinceEpoch(

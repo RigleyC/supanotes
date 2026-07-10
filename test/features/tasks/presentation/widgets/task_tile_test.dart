@@ -25,7 +25,7 @@ void main() {
       noteId: 'n',
       title: title,
       status: status,
-      position: 0,
+      position: '0',
       recurrence: recurrence,
       dueDate: dueDate,
       completedAt: null,
