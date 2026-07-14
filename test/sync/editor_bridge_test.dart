@@ -7,6 +7,7 @@ import 'package:dart_crdt/dart_crdt.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
+import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/features/notes/domain/note_sync_coordinator.dart';
 import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
 
@@ -32,9 +33,6 @@ void main() {
       )..reactionPipeline.clear();
 
       final coordinator = NoteSyncCoordinator(
-        database: db,
-        noteId: 'note-1',
-        userId: 'user-1',
         document: mutableDoc,
         editor: editor,
       );
@@ -93,9 +91,6 @@ void main() {
       );
 
       final coordinator = NoteSyncCoordinator(
-        database: db,
-        noteId: 'note-1',
-        userId: 'user-1',
         document: mutableDoc,
         editor: editor,
       );
@@ -110,7 +105,6 @@ void main() {
           data: jsonEncode({'text': 'Hello World', 'spans': []}),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
-          isDirty: false,
         ),
       ]);
 
@@ -128,7 +122,6 @@ void main() {
           data: jsonEncode({'text': 'Hi', 'spans': []}),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
-          isDirty: false,
         ),
       ]);
 
@@ -151,9 +144,6 @@ void main() {
       );
 
       final coordinator = NoteSyncCoordinator(
-        database: db,
-        noteId: 'note-1',
-        userId: 'user-1',
         document: mutableDoc,
         editor: editor,
       );
@@ -177,7 +167,6 @@ void main() {
           }),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
-          isDirty: false,
         ),
       ]);
 

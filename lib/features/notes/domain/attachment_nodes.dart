@@ -3,6 +3,7 @@ import 'package:super_editor/super_editor.dart';
 abstract class AttachmentNode extends BlockNode {
   AttachmentNode({Map<String, dynamic>? metadata}) : super(metadata: metadata);
 
+  @override
   String get id;
 
   @override

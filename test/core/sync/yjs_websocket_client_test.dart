@@ -6,10 +6,11 @@ import 'package:dart_crdt/dart_crdt.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:stream_channel/stream_channel.dart';
 
+import 'package:supanotes/core/sync/yjs_sync_protocol_codec.dart';
 import 'package:supanotes/core/sync/yjs_websocket_client.dart';
 
 void main() {
-  test('client sends SyncStep1 on connect', skip: true, () async {
+  test('client sends SyncStep1 on connect', () async {
     final channelPair = _FakeChannelPair();
     final clientDoc = Doc();
     final client = YjsWebSocketClient(
@@ -31,7 +32,7 @@ void main() {
     expect(serverIncoming.first[0], 0);
   });
 
-  test('client applies incoming SyncStep2 and completes handshake', skip: true, () async {
+  test('client applies incoming SyncStep2 and completes handshake', () async {
     final serverDoc = Doc();
     // Pre-create YText before transact to work around yjs_dart type bug.
     serverDoc.getText('content_x');
@@ -59,11 +60,11 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     // Server received client's Step1 — respond with Step2.
-    // Note: wire protocol encoding changed with dart_crdt migration
-    // final svBytes = serverIncoming.first;
-    // final step2Enc = createEncoder();
-    // writeSyncStep2(step2Enc, serverDoc, svBytes);
-    // channelPair.serverOutgoing.add(toUint8Array(step2Enc));
+    final rawMsg = serverIncoming.first;
+    final (msgType, svPayload) = YjsSyncProtocolCodec.decode(rawMsg);
+    expect(msgType, YjsSyncProtocolCodec.messageSyncStep1);
+    final step2 = YjsSyncProtocolCodec.encodeStep2(serverDoc, svPayload);
+    channelPair.serverOutgoing.add(step2);
 
     await Future<void>.delayed(Duration.zero);
 

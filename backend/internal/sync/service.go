@@ -3,40 +3,36 @@ package sync
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog/log"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
 // SyncPayload is the wire shape for both push (client → server) and
-// pull (server → client). The asymmetry between directions lives in
-// the server logic, not the type:
-//   - On push, the server only reads id / task_id / completed_at from
-//     each completion; status is always hardcoded to 'completed' and
-//     user_id always comes from the auth context. The client may leave
-//     status unset (or set it) and the server ignores it.
-//   - On pull, the server returns the full row as stored. The Flutter
-//     client stamps user_id locally with the currently authenticated
-//     user because the table itself has no user_id column.
+// pull (server → client). task_completions are now derived from the
+// YDoc projection and are no longer synced via REST.
 type SyncPayload struct {
 	SyncedAt            time.Time                   `json:"synced_at,omitempty"`
 	Notes               []sqlcgen.GetSyncNotesRow    `json:"notes"`
-	NoteNodes           []sqlcgen.NoteNode           `json:"note_nodes"`
-	Tasks               []SyncTask                   `json:"tasks"`
 	Contexts            []sqlcgen.Context            `json:"contexts"`
 	Tags                []sqlcgen.Tag                `json:"tags"`
-	TaskCompletions     []sqlcgen.TaskCompletion     `json:"task_completions"`
 	NoteTags            []sqlcgen.NoteTag            `json:"note_tags"`
 	NoteLinks           []sqlcgen.NoteLink           `json:"note_links"`
 	UserNotePreferences []UserNotePreferencePayload `json:"user_note_preferences"`
-	NoteYjsStates       []sqlcgen.NoteYjsState       `json:"note_yjs_states"`
+	NoteYjsStates       []NoteYjsStatePayload       `json:"note_yjs_states"`
+}
+
+// NoteYjsStatePayload is the wire shape for a Yjs state snapshot pushed
+// or pulled via REST.
+type NoteYjsStatePayload struct {
+	NoteID    string    `json:"note_id"`
+	State     []byte    `json:"state"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Service interface {
@@ -44,10 +40,7 @@ type Service interface {
 	Push(ctx context.Context, userID pgtype.UUID, payload *SyncPayload) error
 }
 
-var (
-	ErrSyncConflict = errors.New("sync conflict")
-	ErrEmptyNote    = errors.New("empty note")
-)
+var ErrSyncConflict = errors.New("sync conflict")
 
 type service struct {
 	repo    Repository
@@ -69,18 +62,6 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		notes = make([]sqlcgen.GetSyncNotesRow, 0)
 	}
 
-	tasks, err := s.repo.GetSyncTasks(ctx, userID, lastSyncedAt, limit)
-	if err != nil {
-		return nil, err
-	}
-	if tasks == nil {
-		tasks = make([]sqlcgen.Task, 0)
-	}
-	syncTasks := make([]SyncTask, len(tasks))
-	for i, t := range tasks {
-		syncTasks[i] = toSyncTask(t)
-	}
-
 	contexts, err := s.repo.GetSyncContexts(ctx, userID, lastSyncedAt, limit)
 	if err != nil {
 		return nil, err
@@ -95,14 +76,6 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 	}
 	if tags == nil {
 		tags = make([]sqlcgen.Tag, 0)
-	}
-
-	completions, err := s.repo.GetSyncTaskCompletions(ctx, userID, lastSyncedAt, limit)
-	if err != nil {
-		return nil, err
-	}
-	if completions == nil {
-		completions = make([]sqlcgen.TaskCompletion, 0)
 	}
 
 	noteTags, err := s.repo.GetSyncNoteTags(ctx, userID)
@@ -130,30 +103,43 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		prefs[i] = toUserNotePreferencePayload(p)
 	}
 
-	noteNodes, err := s.repo.GetSyncNoteNodes(ctx, userID, lastSyncedAt, limit)
+	yjsStateRows, err := s.pool.Query(ctx, `
+		SELECT ns.note_id::text, ns.state, ns.updated_at
+		FROM note_yjs_states ns
+		JOIN notes n ON n.id = ns.note_id
+		LEFT JOIN note_shares nsh ON nsh.note_id = n.id AND nsh.user_id = $1
+		WHERE (n.user_id = $1 OR nsh.user_id = $1)
+		AND ($2::timestamptz IS NULL OR ns.updated_at > $2)
+		ORDER BY ns.updated_at ASC
+		LIMIT $3
+	`, userID, lastSyncedAt, limit)
 	if err != nil {
 		return nil, err
 	}
-	if noteNodes == nil {
-		noteNodes = make([]sqlcgen.NoteNode, 0)
-	}
+	defer yjsStateRows.Close()
 
-	yjsStates, err := s.repo.GetSyncNoteYjsStates(ctx, userID, lastSyncedAt, limit)
-	if err != nil {
+	var yjsStates []NoteYjsStatePayload
+	for yjsStateRows.Next() {
+		var ys NoteYjsStatePayload
+		var updatedAt pgtype.Timestamptz
+		if err := yjsStateRows.Scan(&ys.NoteID, &ys.State, &updatedAt); err != nil {
+			return nil, err
+		}
+		ys.UpdatedAt = updatedAt.Time
+		yjsStates = append(yjsStates, ys)
+	}
+	if err := yjsStateRows.Err(); err != nil {
 		return nil, err
 	}
 	if yjsStates == nil {
-		yjsStates = make([]sqlcgen.NoteYjsState, 0)
+		yjsStates = make([]NoteYjsStatePayload, 0)
 	}
 
 	return &SyncPayload{
 		SyncedAt:            time.Now().UTC(),
 		Notes:               notes,
-		NoteNodes:           noteNodes,
-		Tasks:               syncTasks,
 		Contexts:            contexts,
 		Tags:                tags,
-		TaskCompletions:     completions,
 		NoteTags:            noteTags,
 		NoteLinks:           noteLinks,
 		UserNotePreferences: prefs,
@@ -163,7 +149,7 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 
 func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPayload) error {
 	startTotal := time.Now()
-	log.Info().Interface("user_id", userID).Int("notes", len(payload.Notes)).Int("nodes", len(payload.NoteNodes)).Int("tasks", len(payload.Tasks)).Msg("PUSH START")
+	slog.Info("PUSH START", "user_id", userID, "notes", len(payload.Notes))
 
 	r := s.repo
 	var tx pgx.Tx
@@ -173,22 +159,21 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		var err error
 		tx, err = s.pool.Begin(ctx)
 		if err != nil {
-			log.Error().Dur("elapsed", time.Since(startTotal)).Err(err).Msg("PUSH FAIL: pool.Begin")
+			slog.Error("PUSH FAIL: pool.Begin", "elapsed", time.Since(startTotal), "error", err)
 			return err
 		}
 		defer tx.Rollback(ctx)
-		log.Info().Dur("elapsed", time.Since(startTx)).Msg("PUSH TX BEGIN")
+		slog.Info("PUSH TX BEGIN", "elapsed", time.Since(startTx))
 		r = s.repo.WithQuerier(sqlcgen.New(tx))
 	}
 
 	// Track note IDs the authenticated user can edit (owned or shared with edit).
 	editableNotes := make(map[pgtype.UUID]bool)
-	affectedNotes := make(map[pgtype.UUID]bool)
 
 	for _, n := range payload.Notes {
 		canEdit, err := s.canEditNote(ctx, r, n.ID, userID, editableNotes)
 		if err != nil {
-			log.Error().Interface("note_id", n.ID).Interface("user_id", userID).Interface("note_owner_id", n.UserID).Err(err).Msg("sync push conflict: note permission check failed")
+			slog.Error("sync push conflict: note permission check failed", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID, "error", err)
 			return ErrSyncConflict
 		}
 		if !canEdit && n.UserID == userID {
@@ -202,7 +187,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			if shareErr == nil && share.Permission == "view" {
 				continue
 			}
-			log.Error().Interface("note_id", n.ID).Interface("user_id", userID).Interface("note_owner_id", n.UserID).Msg("sync push conflict: note edit permission denied")
+			slog.Error("sync push conflict: note edit permission denied", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID)
 			return ErrSyncConflict
 		}
 
@@ -225,7 +210,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			ID:              noteID,
 			UserID:          upsertUserID,
 			ContextID:       n.ContextID,
-			Content:         "", // Derived automatically by trigger from note_nodes
+			Content:         "", // Derived by projection (ProjectNoteContentFromYDoc)
 			EmbeddingStatus: embStatus,
 			CollapseImages:  n.CollapseImages,
 			CreatedAt:       n.CreatedAt,
@@ -233,51 +218,12 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				log.Error().Interface("note_id", noteID).Interface("user_id", upsertUserID).Err(err).Msg("sync push conflict: UpsertNote returned ErrNoRows")
+				slog.Error("sync push conflict: UpsertNote returned ErrNoRows", "note_id", noteID, "user_id", upsertUserID, "error", err)
 				return ErrSyncConflict
 			}
 			return err
 		}
 	}
-
-	// Group nodes and tasks by note for Yjs ingestion.
-	nodesByNote := make(map[pgtype.UUID][]sqlcgen.NoteNode)
-	for _, nn := range payload.NoteNodes {
-		noteID := nn.NoteID
-		canEdit, err := s.canEditNote(ctx, r, noteID, userID, editableNotes)
-		if err != nil {
-			log.Error().Interface("node_id", nn.ID).Interface("note_id", noteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: note node permission check failed")
-			return ErrSyncConflict
-		}
-		if !canEdit {
-			log.Error().Interface("node_id", nn.ID).Interface("note_id", noteID).Interface("user_id", userID).Msg("sync push conflict: node unauthorized")
-			return ErrSyncConflict
-		}
-		nodesByNote[noteID] = append(nodesByNote[noteID], nn)
-		affectedNotes[noteID] = true
-	}
-	log.Info().Int("nodes_grouped", len(payload.NoteNodes)).Int("unique_notes", len(nodesByNote)).Msg("PUSH: nodes grouped by note")
-
-	tasksByNote := make(map[pgtype.UUID][]SyncTask)
-	for _, st := range payload.Tasks {
-		t, err := fromSyncTask(st)
-		if err != nil {
-			return err
-		}
-		noteID := t.NoteID
-		canEdit, err := s.canEditNote(ctx, r, noteID, userID, editableNotes)
-		if err != nil {
-			log.Error().Interface("task_id", t.ID).Interface("note_id", noteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: task permission check failed")
-			return ErrSyncConflict
-		}
-		if !canEdit {
-			log.Error().Interface("task_id", t.ID).Interface("note_id", noteID).Interface("user_id", userID).Msg("sync push conflict: task unauthorized")
-			return ErrSyncConflict
-		}
-		tasksByNote[noteID] = append(tasksByNote[noteID], st)
-		affectedNotes[noteID] = true
-	}
-	log.Info().Int("tasks_grouped", len(payload.Tasks)).Int("unique_notes", len(tasksByNote)).Msg("PUSH: tasks grouped by note")
 
 	for _, c := range payload.Contexts {
 		_, err := r.UpsertContext(ctx, sqlcgen.UpsertContextParams{
@@ -289,7 +235,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				log.Error().Interface("context_id", c.ID).Err(err).Msg("sync push conflict: UpsertContext returned ErrNoRows")
+				slog.Error("sync push conflict: UpsertContext returned ErrNoRows", "context_id", c.ID, "error", err)
 				return ErrSyncConflict
 			}
 			return err
@@ -305,21 +251,9 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				log.Error().Interface("tag_id", t.ID).Err(err).Msg("sync push conflict: UpsertTag returned ErrNoRows")
+				slog.Error("sync push conflict: UpsertTag returned ErrNoRows", "tag_id", t.ID, "error", err)
 				return ErrSyncConflict
 			}
-			return err
-		}
-	}
-
-	for _, c := range payload.TaskCompletions {
-		err := r.UpsertTaskCompletion(ctx, sqlcgen.UpsertTaskCompletionParams{
-			ID:          c.ID,
-			TaskID:      c.TaskID,
-			CompletedAt: c.CompletedAt,
-			UserID:      userID,
-		})
-		if err != nil {
 			return err
 		}
 	}
@@ -349,13 +283,58 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		}
 	}
 
+	for _, ys := range payload.NoteYjsStates {
+		noteUUID, err := parseUUIDStr(ys.NoteID)
+		if err != nil {
+			slog.Error("sync push: invalid note UUID in Yjs state", "note_id", ys.NoteID, "error", err)
+			return err
+		}
 
+		canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes)
+		if err != nil {
+			slog.Error("sync push: Yjs state permission check failed", "note_id", ys.NoteID, "user_id", userID, "error", err)
+			return ErrSyncConflict
+		}
+		if !canEdit {
+			slog.Error("sync push: Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
+			return ErrSyncConflict
+		}
+
+		// If there's an active WS room, skip — WS is canonical.
+		if s.roomMgr.HasActiveRoom(ys.NoteID) {
+			slog.Warn("sync push: skipping Yjs state for note with active WS room", "note_id", ys.NoteID)
+			continue
+		}
+
+		// No active room — apply via YDocService (merge + persistence)
+		if s.ydoc != nil {
+			if err := s.ydoc.ApplyNodeMutation(ctx, ys.NoteID, ys.State); err != nil {
+				slog.Error("sync push: ApplyNodeMutation failed", "note_id", ys.NoteID, "error", err)
+				return err
+			}
+			if err := s.ydoc.FlushUpdates(ctx, ys.NoteID); err != nil {
+				slog.Error("sync push: FlushUpdates failed", "note_id", ys.NoteID, "error", err)
+				return err
+			}
+			continue
+		}
+
+		// No YDoc service - direct upsert (legacy/fallback)
+		if err := r.UpsertNoteYjsState(ctx, sqlcgen.UpsertNoteYjsStateParams{
+			NoteID:    noteUUID,
+			State:     ys.State,
+			UpdatedAt: pgtype.Timestamptz{Time: ys.UpdatedAt, Valid: true},
+		}); err != nil {
+			slog.Error("sync push: upsert Yjs state failed", "note_id", ys.NoteID, "error", err)
+			return err
+		}
+	}
 
 	for _, p := range payload.UserNotePreferences {
 		ownerID, err := r.GetNoteOwnerID(ctx, p.NoteID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				log.Error().Interface("pref_note_id", p.NoteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: GetNoteOwnerID for preference note ID returned ErrNoRows")
+				slog.Error("sync push conflict: GetNoteOwnerID for preference note ID returned ErrNoRows", "pref_note_id", p.NoteID, "user_id", userID, "error", err)
 				return ErrSyncConflict
 			}
 			return err
@@ -366,115 +345,30 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				UserID: userID,
 			})
 			if shareErr != nil {
-				log.Error().Interface("pref_note_id", p.NoteID).Interface("owner_id", ownerID).Interface("user_id", userID).Err(shareErr).Msg("sync push conflict: preference note not owned and share not found/valid")
+				slog.Error("sync push conflict: preference note not owned and share not found/valid", "pref_note_id", p.NoteID, "owner_id", ownerID, "user_id", userID, "error", shareErr)
 				return ErrSyncConflict
 			}
 		}
 		_, err = r.UpsertUserNotePreference(ctx, fromUserNotePreferencePayload(p))
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				log.Error().Interface("pref_note_id", p.NoteID).Interface("user_id", userID).Err(err).Msg("sync push conflict: UpsertUserNotePreference returned ErrNoRows")
+				slog.Error("sync push conflict: UpsertUserNotePreference returned ErrNoRows", "pref_note_id", p.NoteID, "user_id", userID, "error", err)
 				return ErrSyncConflict
 			}
 			return err
 		}
 	}
 
-	if len(affectedNotes) > 0 {
-		startContent := time.Now()
-		noteIDs := make([]pgtype.UUID, 0, len(affectedNotes))
-		for id := range affectedNotes {
-			noteIDs = append(noteIDs, id)
-		}
-		if err := r.UpdateNotesContentFromNodes(ctx, noteIDs); err != nil {
-			log.Error().Dur("elapsed", time.Since(startContent)).Err(err).Msg("PUSH FAIL: UpdateNotesContentFromNodes")
-			return err
-		}
-		log.Info().Dur("elapsed", time.Since(startContent)).Int("notes", len(noteIDs)).Msg("PUSH: UpdateNotesContentFromNodes done")
-	}
-
 	if tx != nil {
 		startCommit := time.Now()
 		if err := tx.Commit(ctx); err != nil {
-			log.Error().Dur("elapsed", time.Since(startCommit)).Err(err).Msg("PUSH FAIL: tx.Commit")
+			slog.Error("PUSH FAIL: tx.Commit", "elapsed", time.Since(startCommit), "error", err)
 			return err
 		}
-		log.Info().Dur("elapsed", time.Since(startCommit)).Msg("PUSH TX COMMIT")
+		slog.Info("PUSH TX COMMIT", "elapsed", time.Since(startCommit))
 	}
 
-	if s.ydoc != nil {
-		startYjs := time.Now()
-		log.Info().Int("affected_notes", len(nodesByNote)).Msg("PUSH YJS: starting ingestion")
-		for noteIDUUID, nodes := range nodesByNote {
-			tasks := tasksByNote[noteIDUUID]
-			noteIDStr := uuid.UUID(noteIDUUID.Bytes).String()
-			startNote := time.Now()
-			update, err := ProduceUpdateFromRows(ctx, s.pool, noteIDStr, nodes, tasks)
-			if err != nil {
-				log.Error().Str("note_id", noteIDStr).Dur("elapsed", time.Since(startNote)).Err(err).Msg("PUSH FAIL: ProduceUpdateFromRows")
-				return fmt.Errorf("produce update for note %s: %w", noteIDStr, err)
-			}
-			log.Info().Str("note_id", noteIDStr).Dur("produce_elapsed", time.Since(startNote)).Int("update_bytes", len(update)).Msg("PUSH YJS: update produced")
-
-			startApply := time.Now()
-			if err := s.ydoc.ApplyNodeMutation(ctx, noteIDStr, update); err != nil {
-				log.Error().Str("note_id", noteIDStr).Dur("elapsed", time.Since(startApply)).Err(err).Msg("PUSH FAIL: ApplyNodeMutation")
-				return fmt.Errorf("ingest update for note %s: %w", noteIDStr, err)
-			}
-			log.Info().Str("note_id", noteIDStr).Dur("apply_elapsed", time.Since(startApply)).Msg("PUSH YJS: mutation applied")
-
-			if err := s.ydoc.FlushUpdates(ctx, noteIDStr); err != nil {
-				log.Error().Str("note_id", noteIDStr).Err(err).Msg("PUSH FAIL: FlushUpdates")
-				return fmt.Errorf("flush updates for note %s: %w", noteIDStr, err)
-			}
-			if err := s.ydoc.ProjectCanonicalDoc(ctx, noteIDStr); err != nil {
-				log.Error().Str("note_id", noteIDStr).Err(err).Msg("PUSH FAIL: ProjectCanonicalDoc")
-				return fmt.Errorf("project canonical doc for note %s: %w", noteIDStr, err)
-			}
-
-			if s.roomMgr != nil {
-				startBroadcast := time.Now()
-				s.roomMgr.BroadcastIfActive(noteIDStr, update)
-				log.Info().Str("note_id", noteIDStr).Dur("elapsed", time.Since(startBroadcast)).Msg("PUSH YJS: broadcast done")
-			}
-			log.Info().Str("note_id", noteIDStr).Dur("note_total", time.Since(startNote)).Msg("PUSH YJS: note done")
-		}
-		log.Info().Dur("yjs_total", time.Since(startYjs)).Msg("PUSH YJS: all notes done")
-	} else {
-		for _, nn := range payload.NoteNodes {
-			if _, err := r.UpsertNoteNode(ctx, sqlcgen.UpsertNoteNodeParams{
-				ID: nn.ID, NoteID: nn.NoteID, ParentID: nn.ParentID,
-				Position: nn.Position, Type: nn.Type, Data: nn.Data,
-				CreatedAt: nn.CreatedAt, DeletedAt: nn.DeletedAt,
-			}); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					log.Error().Interface("node_id", nn.ID).Err(err).Msg("sync push conflict: UpsertNoteNode returned ErrNoRows")
-					return ErrSyncConflict
-				}
-				return err
-			}
-		}
-		for _, st := range payload.Tasks {
-			t, err := fromSyncTask(st)
-			if err != nil {
-				return err
-			}
-			if _, err := r.UpsertTask(ctx, sqlcgen.UpsertTaskParams{
-				ID: t.ID, UserID: userID, NoteID: t.NoteID,
-				Title: t.Title, Status: sanitizeTaskStatus(t.Status),
-				Position: t.Position, Recurrence: t.Recurrence,
-				DueDate: t.DueDate, CreatedAt: t.CreatedAt, DeletedAt: t.DeletedAt,
-			}); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					log.Error().Interface("task_id", t.ID).Err(err).Msg("sync push conflict: UpsertTask returned ErrNoRows")
-					return ErrSyncConflict
-				}
-				return err
-			}
-		}
-	}
-
-	log.Info().Dur("total", time.Since(startTotal)).Msg("PUSH DONE")
+	slog.Info("PUSH DONE", "total", time.Since(startTotal))
 	return nil
 }
 
@@ -511,9 +405,42 @@ func (s *service) canEditNote(ctx context.Context, r Repository, noteID pgtype.U
 	return canEdit, nil
 }
 
-func sanitizeTaskStatus(status string) string {
-	if status == "done" || status == "open" {
-		return status
-	}
-	return "open"
+// UserNotePreferencePayload is the wire shape of a user note preference
+// in the sync payload. It uses string for Filters instead of []byte to
+// avoid base64 encoding issues with the sqlcgen type.
+type UserNotePreferencePayload struct {
+	UserID        pgtype.UUID        `json:"user_id"`
+	NoteID        pgtype.UUID        `json:"note_id"`
+	HideCompleted bool               `json:"hide_completed"`
+	Filters       string             `json:"filters"`
+	Favorite      bool               `json:"favorite"`
+	Archived      bool               `json:"archived"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
+
+func toUserNotePreferencePayload(p sqlcgen.UserNotePreference) UserNotePreferencePayload {
+	return UserNotePreferencePayload{
+		UserID:        p.UserID,
+		NoteID:        p.NoteID,
+		HideCompleted: p.HideCompleted,
+		Filters:       string(p.Filters),
+		Favorite:      p.Favorite,
+		Archived:      p.Archived,
+		CreatedAt:     p.CreatedAt,
+		UpdatedAt:     p.UpdatedAt,
+	}
+}
+
+func fromUserNotePreferencePayload(p UserNotePreferencePayload) sqlcgen.UpsertUserNotePreferenceParams {
+	return sqlcgen.UpsertUserNotePreferenceParams{
+		UserID:        p.UserID,
+		NoteID:        p.NoteID,
+		HideCompleted: p.HideCompleted,
+		Filters:       []byte(p.Filters),
+		Favorite:      p.Favorite,
+		Archived:      p.Archived,
+		CreatedAt:     p.CreatedAt,
+	}
+}
+

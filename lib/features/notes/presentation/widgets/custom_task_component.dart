@@ -19,6 +19,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
+    this.onRecurringTaskComplete,
     this.animatingNodeIds = const {},
     this.completingTaskIds = const {},
     this.onAnimationStart,
@@ -47,6 +48,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ValueChanged<String>? onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
+  final void Function(String taskId, DateTime nextDue)? onRecurringTaskComplete;
   final Set<String> animatingNodeIds;
   final Set<String> completingTaskIds;
   final ValueChanged<String>? onAnimationStart;
@@ -97,6 +99,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
           try {
             final nextDue = await onTaskComplete?.call(node.id);
             if (nextDue != null && isRecurring) {
+              onRecurringTaskComplete?.call(node.id, nextDue);
               await Future.delayed(const Duration(seconds: 1));
             }
           } finally {

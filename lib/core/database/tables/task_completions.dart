@@ -17,7 +17,6 @@ class LocalTaskCompletions extends Table {
   TextColumn get taskId => text()();
   TextColumn get userId => text()();
   DateTimeColumn get completedAt => dateTime()();
-  BoolColumn get isDirty => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};

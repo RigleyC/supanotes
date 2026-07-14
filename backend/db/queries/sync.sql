@@ -42,19 +42,9 @@ SET context_id = EXCLUDED.context_id,
 WHERE notes.user_id = EXCLUDED.user_id
 RETURNING *;
 
--- name: GetSyncTasks :many
-SELECT t.*
-FROM tasks t
-JOIN notes n ON n.id = t.note_id
-LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
-WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
-  AND t.updated_at > sqlc.arg('last_synced_at')
-ORDER BY t.updated_at ASC
-LIMIT sqlc.arg('limit');
-
 -- name: UpsertTask :one
-INSERT INTO tasks (id, user_id, note_id, title, status, position, recurrence, due_date, completed_at, created_at, updated_at, deleted_at, node_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11, $12)
+INSERT INTO tasks (id, user_id, note_id, title, status, position, recurrence, due_date, completed_at, created_at, updated_at, deleted_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
 ON CONFLICT (id) DO UPDATE
 SET note_id = EXCLUDED.note_id,
     title = EXCLUDED.title,
@@ -64,8 +54,7 @@ SET note_id = EXCLUDED.note_id,
     due_date = EXCLUDED.due_date,
     completed_at = EXCLUDED.completed_at,
     updated_at = NOW(),
-    deleted_at = EXCLUDED.deleted_at,
-    node_id = EXCLUDED.node_id
+    deleted_at = EXCLUDED.deleted_at
 RETURNING *;
 
 -- name: GetSyncContexts :many
@@ -112,17 +101,6 @@ WHERE tasks.id = sqlc.arg('task_id')::uuid
                     AND ns.user_id = sqlc.arg('user_id')::uuid
                     AND ns.permission = 'edit'))
 ON CONFLICT (id) DO NOTHING;
-
--- name: GetSyncTaskCompletions :many
-SELECT tc.id, tc.task_id, tc.completed_at, tc.due_date
-FROM task_completions tc
-JOIN tasks t ON t.id = tc.task_id
-JOIN notes n ON n.id = t.note_id
-LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
-WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
-  AND tc.completed_at > sqlc.arg('last_synced_at')
-ORDER BY tc.completed_at ASC
-LIMIT sqlc.arg('limit');
 
 -- name: GetSyncNoteTags :many
 SELECT nt.note_id, nt.tag_id
@@ -180,6 +158,12 @@ LIMIT sqlc.arg('limit');
 -- name: GetNoteOwnerID :one
 SELECT user_id FROM notes WHERE id = $1;
 
+-- name: UpsertNoteYjsState :exec
+INSERT INTO note_yjs_states (note_id, state, updated_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (note_id) DO UPDATE
+SET state = EXCLUDED.state, updated_at = EXCLUDED.updated_at;
+
 -- name: UpsertUserNotePreference :one
 INSERT INTO user_note_preferences (user_id, note_id, hide_completed, filters, favorite, archived, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
@@ -191,36 +175,5 @@ SET hide_completed = EXCLUDED.hide_completed,
     updated_at = NOW()
 RETURNING *;
 
--- name: GetSyncNoteNodes :many
-SELECT nn.*
-FROM note_nodes nn
-JOIN notes n ON n.id = nn.note_id
-LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
-WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
-  AND nn.updated_at > sqlc.arg('last_synced_at')
-ORDER BY nn.updated_at ASC
-LIMIT sqlc.arg('limit');
 
--- name: UpsertNoteNode :one
-INSERT INTO note_nodes (id, note_id, parent_id, position, type, data, created_at, updated_at, deleted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
-ON CONFLICT (id) DO UPDATE
-SET note_id = EXCLUDED.note_id,
-    parent_id = EXCLUDED.parent_id,
-    position = EXCLUDED.position,
-    type = EXCLUDED.type,
-    data = EXCLUDED.data,
-    updated_at = NOW(),
-    deleted_at = EXCLUDED.deleted_at
-RETURNING *;
-
--- name: GetSyncNoteYjsStates :many
-SELECT nys.*
-FROM note_yjs_states nys
-JOIN notes n ON n.id = nys.note_id
-LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
-WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
-  AND nys.updated_at > sqlc.arg('last_synced_at')
-ORDER BY nys.updated_at ASC
-LIMIT sqlc.arg('limit');
 

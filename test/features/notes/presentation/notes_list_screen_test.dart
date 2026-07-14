@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
@@ -26,9 +25,6 @@ class _FakeNotesRepository implements INotesRepository {
 
   @override
   Stream<NoteModel?> watchNoteById(String id) => Stream<NoteModel?>.value(null);
-
-  @override
-  Stream<List<NoteNode>> watchNodes(String noteId) => Stream<List<NoteNode>>.value([]);
 
   @override
   Future<NoteModel?> getNoteById(String id) async => null;

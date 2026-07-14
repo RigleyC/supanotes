@@ -199,20 +199,21 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	}
 	leaseMgr := syncpkg.NewLeaseManager(pool)
 	compactor := syncpkg.NewCompactor(pool)
-	ydocSvc := syncpkg.NewYDocService(pool, compactor)
-	compactor.SetFlushFunc(ydocSvc.FlushUpdates)
+	// Circular dependency: YDocService ↔ RoomManager.
+	// Construct YDocService without RoomManager first, then wire it.
+	ydocSvc := syncpkg.NewYDocService(pool, compactor, nil)
 	roomMgr := syncpkg.NewRoomManager(leaseMgr, ydocSvc, pool)
+	ydocSvc.SetRoomManager(roomMgr)
+	compactor.SetFlushFunc(ydocSvc.FlushUpdates)
 	ydocSvc.StartFlusher(cronCtx, 500*time.Millisecond)
 	compactor.StartScheduler(cronCtx, 5*time.Minute)
-	noteSyncer := syncpkg.NewNoteStateSyncer(pool, ydocSvc)
-
 	// Notes
 	notesRepo := notes.NewRepository(queries)
-	notesSvc := notes.NewService(notesRepo, pool, noteSyncer)
+	notesSvc := notes.NewService(notesRepo, pool)
 
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
-	tasksSvc := tasks.NewService(tasksRepo, noteSyncer)
+	tasksSvc := tasks.NewService(tasksRepo, ydocSvc)
 	tasksH := tasks.NewHandler(tasksSvc)
 	protected.POST("/tasks", tasksH.Create)
 	protected.GET("/tasks", tasksH.List)
@@ -306,8 +307,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// gateway can both depend on it).
 	agentRepo := agent.NewRepository(queries)
 	workingMemSvc := agent.NewWorkingMemoryService(queries)
-	yjsMutSvc := agent.NewYjsMutationService(ydocSvc)
-	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient, llmFactory, workingMemSvc, yjsMutSvc)
+	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient, llmFactory, workingMemSvc, ydocSvc, pool)
 	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools, workingMemSvc)
 	agentH := agent.NewHandler(agentLoop, agentRepo)
 	protected.POST("/agent/chat", agentH.Chat)

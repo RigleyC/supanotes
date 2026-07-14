@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
-import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 import '../../domain/task_model.dart';
 import '../../domain/task_recurrence.dart';
-import '../controllers/task_controller.dart';
 import 'due_date_picker.dart';
 import 'recurrence_picker.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
@@ -53,22 +52,17 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
     _recurrence = t.recurrence;
   }
 
-  Future<void> _onSave() async {
-    final controller = ref.read(taskControllerProvider.notifier);
+  void _onSave() {
+    final noteId = widget.noteId;
+    final taskId = widget.task.id;
 
-    await controller.updateTaskMetadata(
-      taskId: widget.task.id,
-      title: widget.task.title,
+    ref.read(noteEditorControllerProvider(noteId)).updateTaskMetadataInYDoc(
+      taskId,
       dueDate: _dueDate,
-      recurrence: _recurrence,
       clearDueDate: _dueDate == null,
+      recurrence: _recurrence?.name,
       clearRecurrence: _recurrence == null,
     );
-
-    if (ref.read(taskControllerProvider).hasError) {
-      if (mounted) AppMessenger.showError('Erro ao salvar tarefa');
-      return;
-    }
 
     if (mounted) Navigator.pop(context);
   }
@@ -111,9 +105,7 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
               Expanded(
                 child: AppButton(
                   text: 'Cancelar',
-                  onPressed: ref.watch(taskControllerProvider).isLoading
-                      ? null
-                      : () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(context).pop(),
                   variant: AppButtonVariant.secondary,
                 ),
               ),
@@ -121,10 +113,7 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
               Expanded(
                 child: AppButton(
                   text: 'Salvar',
-                  onPressed: ref.watch(taskControllerProvider).isLoading
-                      ? null
-                      : _onSave,
-                  isLoading: ref.watch(taskControllerProvider).isLoading,
+                  onPressed: _onSave,
                 ),
               ),
             ],

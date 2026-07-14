@@ -137,6 +137,8 @@ dependency_overrides:
       ref: main
       path: super_editor_clipboard
   device_info_plus: ^12.0.0
+  dart_crdt:
+    path: packages/dart_crdt
 
 flutter:
   uses-material-design: true

@@ -69,9 +69,6 @@ func (h *Handler) Push(c echo.Context) error {
 		if errors.Is(err, ErrSyncConflict) {
 			return web.JSONError(c, http.StatusConflict, "sync conflict")
 		}
-		if errors.Is(err, ErrEmptyNote) {
-			return web.JSONError(c, http.StatusBadRequest, "empty notes cannot be synced")
-		}
 		c.Logger().Errorf("sync.Push failed: %v", err)
 		return web.JSONError(c, http.StatusInternalServerError, "sync failed: "+err.Error())
 	}

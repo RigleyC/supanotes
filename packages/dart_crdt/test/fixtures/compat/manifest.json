@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "tool/generate_fixtures.dart",
+  "caseFile": "cases.jsonl",
+  "requiredCategories": [
+    "empty-docs",
+    "nested-docs",
+    "arrays",
+    "maps",
+    "text",
+    "rich-text-formats",
+    "xml-tree-content",
+    "subdocs",
+    "binary-content",
+    "embeds",
+    "json",
+    "pending-updates",
+    "deletes",
+    "gc-disabled-snapshots",
+    "attribution-maps"
+  ],
+  "serializedFormats": [
+    "update-v1",
+    "update-v2",
+    "state-vector",
+    "snapshot",
+    "relative-position",
+    "id-map",
+    "content-map"
+  ],
+  "roundTripDirections": [
+    "reference-to-dart",
+    "dart-to-reference"
+  ],
+  "cases": [
+    {
+      "id": "empty-docs",
+      "category": "empty-docs"
+    },
+    {
+      "id": "nested-docs",
+      "category": "nested-docs"
+    },
+    {
+      "id": "arrays",
+      "category": "arrays"
+    },
+    {
+      "id": "maps",
+      "category": "maps"
+    },
+    {
+      "id": "text",
+      "category": "text"
+    },
+    {
+      "id": "rich-text-formats",
+      "category": "rich-text-formats"
+    },
+    {
+      "id": "xml-tree-content",
+      "category": "xml-tree-content"
+    },
+    {
+      "id": "subdocs",
+      "category": "subdocs"
+    },
+    {
+      "id": "binary-content",
+      "category": "binary-content"
+    },
+    {
+      "id": "embeds",
+      "category": "embeds"
+    },
+    {
+      "id": "json",
+      "category": "json"
+    },
+    {
+      "id": "pending-updates",
+      "category": "pending-updates"
+    },
+    {
+      "id": "deletes",
+      "category": "deletes"
+    },
+    {
+      "id": "gc-disabled-snapshots",
+      "category": "gc-disabled-snapshots"
+    },
+    {
+      "id": "attribution-maps",
+      "category": "attribution-maps"
+    }
+  ]
+}

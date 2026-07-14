@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dart_crdt/dart_crdt.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart';
@@ -32,33 +33,23 @@ void main() {
             ),
           );
 
-      await db.into(db.noteNodes).insert(
-            NoteNodesCompanion.insert(
-              id: 'node-1',
+      await db.into(db.localYjsStates).insert(
+            LocalYjsStatesCompanion.insert(
               noteId: 'note-1',
-              position: const Value('0.0'),
-              type: 'paragraph',
-              data: jsonEncode({'text': 'Hello', 'spans': []}),
-              createdAt: now,
-              updatedAt: now,
+              state: Uint8List(0),
             ),
           );
 
       // Initialize Manager
-      final mgr = YjsSyncManager(db: db);
+      final mgr = YjsSyncManager(db: db, userId: 'user-1');
       final doc = await mgr.loadDoc('note-1');
       expect(doc.getText('content/node-1').toPlainText(), 'Hello');
 
       // 2. Offline change locally: edit "Hello" -> "Hello World"
-      await db.into(db.noteNodes).insertOnConflictUpdate(
-            NoteNodesCompanion.insert(
-              id: 'node-1',
+      await db.into(db.localYjsStates).insertOnConflictUpdate(
+            LocalYjsStatesCompanion.insert(
               noteId: 'note-1',
-              position: const Value('0.0'),
-              type: 'paragraph',
-              data: jsonEncode({'text': 'Hello World', 'spans': []}),
-              createdAt: now,
-              updatedAt: now.add(const Duration(seconds: 1)),
+              state: Uint8List(0),
             ),
           );
 
@@ -66,7 +57,7 @@ void main() {
       await mgr.loadDoc('note-1');
       
       // Force reconstruction from local node modifications
-      final freshMgr = YjsSyncManager(db: db);
+      final freshMgr = YjsSyncManager(db: db, userId: 'user-1');
       final freshDoc = await freshMgr.loadDoc('note-1');
       expect(freshDoc.getText('content/node-1').toPlainText(), 'Hello World');
     });
@@ -83,7 +74,7 @@ void main() {
             ),
           );
 
-      final mgr1 = YjsSyncManager(db: db);
+      final mgr1 = YjsSyncManager(db: db, userId: 'user-1');
       final doc1 = await mgr1.loadDoc('note-2');
 
       // Edit document
@@ -111,7 +102,7 @@ void main() {
       expect(yjsRow.state, isNotEmpty);
 
       // Simulate App relaunch with clean manager
-      final mgr2 = YjsSyncManager(db: db);
+      final mgr2 = YjsSyncManager(db: db, userId: 'user-1');
       final doc2 = await mgr2.loadDoc('note-2');
 
       expect(doc2.getMap('nodes').attrKeys, contains('p1'));

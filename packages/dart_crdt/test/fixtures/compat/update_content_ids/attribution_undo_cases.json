@@ -1,0 +1,14 @@
+{
+  "attribution": {
+    "inserts": [
+      {"client": 1, "start": 0, "length": 1}
+    ],
+    "deletes": []
+  },
+  "undo": {
+    "inserts": [],
+    "deletes": [
+      {"client": 1, "start": 0, "length": 1}
+    ]
+  }
+}

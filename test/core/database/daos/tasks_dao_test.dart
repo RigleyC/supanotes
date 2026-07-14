@@ -23,7 +23,6 @@ void main() {
       createdAt: todayStart,
       updatedAt: todayStart,
       deletedAt: null,
-      isDirty: true,
     ));
 
     await db.tasksDao.completeTask('task-1');
@@ -61,7 +60,6 @@ void main() {
       createdAt: DateTime(2026, 6, 15),
       updatedAt: DateTime(2026, 6, 15),
       deletedAt: null,
-      isDirty: true,
     ));
 
     await db.tasksDao.completeTask('task-2');
@@ -91,7 +89,6 @@ void main() {
       createdAt: DateTime(2026, 6, 15),
       updatedAt: DateTime(2026, 6, 15),
       deletedAt: null,
-      isDirty: true,
     ));
 
     await db.tasksDao.completeTask('task-3');
@@ -132,7 +129,6 @@ void main() {
       createdAt: due,
       updatedAt: due,
       deletedAt: null,
-      isDirty: true,
     ));
 
     await db.tasksDao.completeTask('task-4');
@@ -167,7 +163,6 @@ void main() {
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
       deletedAt: null,
-      isDirty: true,
     ));
 
     await db.tasksDao.catchUpRecurringTasks();
@@ -177,8 +172,6 @@ void main() {
     final task = tasks.single;
     expect(task.status, 'open');
     expect(task.dueDate, todayStart);
-    expect(task.isDirty, isTrue);
-
     // No completion records — the missed days are just skipped
     final completions = await db.select(db.localTaskCompletions).get();
     expect(completions, isEmpty);
@@ -204,15 +197,13 @@ void main() {
       createdAt: todayStart,
       updatedAt: todayStart,
       deletedAt: null,
-      isDirty: false,
     ));
 
     await db.tasksDao.catchUpRecurringTasks();
 
     final tasks = await db.select(db.tasks).get();
     final task = tasks.single;
-    expect(task.dueDate, todayStart);
-    expect(task.isDirty, isFalse); // Not touched
+    expect(task.dueDate, todayStart); // Not touched
 
     await db.close();
   });
@@ -236,7 +227,6 @@ void main() {
       createdAt: yesterday,
       updatedAt: yesterday,
       deletedAt: null,
-      isDirty: false,
     ));
 
     await db.tasksDao.catchUpRecurringTasks();
@@ -244,7 +234,6 @@ void main() {
     final tasks = await db.select(db.tasks).get();
     final task = tasks.single;
     expect(task.dueDate, yesterday); // Unchanged
-    expect(task.isDirty, isFalse);
 
     await db.close();
   });
@@ -269,7 +258,6 @@ void main() {
       createdAt: todayStart,
       updatedAt: todayStart,
       deletedAt: null,
-      isDirty: false,
     ));
 
     await db.tasksDao.updateTask(TasksCompanion(
@@ -283,8 +271,6 @@ void main() {
     expect(task.completedAt, isNull);
     expect(task.recurrence, TaskRecurrence.daily);
     expect(task.dueDate!.isAfter(todayStart.subtract(const Duration(days: 1))), isTrue);
-    expect(task.isDirty, isTrue);
-
     await db.close();
   });
 
@@ -308,7 +294,6 @@ void main() {
       createdAt: threeDaysAgo,
       updatedAt: threeDaysAgo,
       deletedAt: null,
-      isDirty: true,
     ));
 
     final result = await db.tasksDao.completeTask('complete-catchup-1');

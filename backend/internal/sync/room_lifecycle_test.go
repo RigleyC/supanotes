@@ -69,7 +69,7 @@ func TestRoomLifecycle_MultiClientBroadcast(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil),
 	}
 
 	wsA := &wsConn{conn: connA}
@@ -130,7 +130,7 @@ func TestRoomLifecycle_QuickReconnect(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil),
 	}
 
 	// 1. Initial connect
@@ -215,7 +215,7 @@ func TestRoomLifecycle_ThreeClientsOneDisconnects(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil),
 	}
 
 	wsA := &wsConn{conn: connA}

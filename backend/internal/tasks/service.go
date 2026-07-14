@@ -3,14 +3,14 @@ package tasks
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
-	"github.com/RigleyC/supanotes/internal/sync"
 )
 
 var (
@@ -45,12 +45,12 @@ func (o UpdateTaskOpts) Validate() error {
 }
 
 type Service struct {
-	repo       Repository
-	noteSyncer sync.NoteStateSyncer
+	repo Repository
+	ydoc yDocIngest
 }
 
-func NewService(repo Repository, noteSyncer sync.NoteStateSyncer) *Service {
-	return &Service{repo: repo, noteSyncer: noteSyncer}
+func NewService(repo Repository, ydoc yDocIngest) *Service {
+	return &Service{repo: repo, ydoc: ydoc}
 }
 
 func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, title string, dueDate *time.Time, recurrence *string, position string) (sqlcgen.Task, error) {
@@ -70,11 +70,6 @@ func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, ti
 	if err != nil {
 		return sqlcgen.Task{}, err
 	}
-	if s.noteSyncer != nil {
-		if err := s.noteSyncer.SyncNoteToYjs(ctx, noteID); err != nil {
-			log.Printf("ERROR: yjs sync after create task in note %v: %v", noteID, err)
-		}
-	}
 	return task, nil
 }
 
@@ -92,31 +87,6 @@ func (s *Service) GetTaskByID(ctx context.Context, id pgtype.UUID, userID pgtype
 func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts UpdateTaskOpts) (sqlcgen.Task, error) {
 	if err := opts.Validate(); err != nil {
 		return sqlcgen.Task{}, err
-	}
-
-	// If adding recurrence to a completed task, re-open it.
-	if opts.Recurrence != nil {
-		existing, err := s.repo.GetTaskByID(ctx, id, userID)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return sqlcgen.Task{}, err
-		}
-		if err == nil && existing.Status == "done" {
-			baseTime := time.Now().UTC()
-			if existing.CompletedAt.Valid {
-				baseTime = existing.CompletedAt.Time
-			} else if existing.DueDate.Valid {
-				baseTime = existing.DueDate.Time
-			}
-			baseTime = time.Date(baseTime.Year(), baseTime.Month(), baseTime.Day(), 0, 0, 0, 0, time.UTC)
-			nextDue, ok := scheduleNextOccurrence(baseTime, *opts.Recurrence)
-			if ok {
-				statusOpen := "open"
-				opts.Status = &statusOpen
-				opts.DueDate = &nextDue
-				// ClearDueDate must be false since we're setting a due date
-				opts.ClearDueDate = false
-			}
-		}
 	}
 
 	arg := sqlcgen.UpdateTaskParams{
@@ -161,23 +131,10 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 		}
 		return sqlcgen.Task{}, err
 	}
-	if task.NoteID.Valid && s.noteSyncer != nil {
-		if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
-			log.Printf("ERROR: yjs sync after update task %v: %v", task.ID, err)
-		}
-	}
 	return task, nil
 }
 
 func (s *Service) DeleteTask(ctx context.Context, userID, id pgtype.UUID) error {
-	task, err := s.repo.GetTaskByID(ctx, id, userID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrTaskNotFound
-		}
-		return err
-	}
-
 	if err := s.repo.DeleteTask(ctx, id, userID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrTaskNotFound
@@ -185,11 +142,6 @@ func (s *Service) DeleteTask(ctx context.Context, userID, id pgtype.UUID) error 
 		return err
 	}
 
-	if task.NoteID.Valid && s.noteSyncer != nil {
-		if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
-			log.Printf("ERROR: yjs sync after delete task %v: %v", task.ID, err)
-		}
-	}
 	return nil
 }
 
@@ -202,70 +154,39 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 		return sqlcgen.Task{}, err
 	}
 
-	// Catch up: if recurring and overdue, walk forward to the current active date.
-	taskDueDate := task.DueDate.Time
-	if task.Recurrence.Valid && task.Recurrence.String != "" && task.DueDate.Valid {
-		now := time.Now().UTC()
-		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-		taskDueDate = catchUpDueDate(taskDueDate, task.Recurrence.String, today)
-	}
+	noteIDStr := uuid.UUID(task.NoteID.Bytes).String()
+	nodeIDStr := uuid.UUID(id.Bytes).String()
 
-	// Record completion with the caught-up due date.
-	dueDateParam := pgtype.Date{}
-	if task.DueDate.Valid {
-		dueDateParam = pgtype.Date{Time: taskDueDate, Valid: true}
-	}
-	if _, err := s.repo.CreateTaskCompletion(ctx, id, dueDateParam); err != nil {
-		return sqlcgen.Task{}, err
-	}
-
-	// Recurring task: schedule next occurrence from caught-up date.
-	if task.Recurrence.Valid && task.Recurrence.String != "" && task.DueDate.Valid {
-		nextDue, ok := scheduleNextOccurrence(taskDueDate, task.Recurrence.String)
-		if ok {
-			task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
-				ID:         id,
-				UserID:     userID,
-				SetDueDate: pgtype.Bool{Bool: true, Valid: true},
-				DueDate:    pgtype.Date{Time: nextDue, Valid: true},
-				SetStatus:  pgtype.Bool{Bool: true, Valid: true},
-				Status:     pgtype.Text{String: "open", Valid: true},
-			})
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return sqlcgen.Task{}, ErrTaskNotFound
-				}
-				return sqlcgen.Task{}, err
+	if s.ydoc != nil {
+		if err := CompleteTaskYjs(ctx, s.ydoc, noteIDStr, nodeIDStr); err != nil {
+			return sqlcgen.Task{}, fmt.Errorf("complete task via yjs: %w", err)
+		}
+	} else {
+		// Fallback: direct SQL mutation when no YDoc service available
+		now := time.Now()
+		task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
+			ID:             id,
+			UserID:         userID,
+			SetStatus:      pgtype.Bool{Bool: true, Valid: true},
+			Status:         pgtype.Text{String: "done", Valid: true},
+			SetCompletedAt: pgtype.Bool{Bool: true, Valid: true},
+			CompletedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return sqlcgen.Task{}, ErrTaskNotFound
 			}
-			if task.NoteID.Valid && s.noteSyncer != nil {
-				if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
-					log.Printf("ERROR: yjs sync after complete+reschedule task %v: %v", task.ID, err)
-				}
-			}
-			return task, nil
+			return sqlcgen.Task{}, err
 		}
 	}
 
-	// Non-recurring: mark completed.
-	now := time.Now()
-	task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
-		ID:             id,
-		UserID:         userID,
-		SetStatus:      pgtype.Bool{Bool: true, Valid: true},
-		Status:         pgtype.Text{String: "done", Valid: true},
-		SetCompletedAt: pgtype.Bool{Bool: true, Valid: true},
-		CompletedAt:    pgtype.Timestamptz{Time: now, Valid: true},
-	})
+	// Re-read after projection to return projected state
+	task, err = s.repo.GetTaskByID(ctx, id, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return sqlcgen.Task{}, ErrTaskNotFound
 		}
 		return sqlcgen.Task{}, err
-	}
-	if task.NoteID.Valid && s.noteSyncer != nil {
-		if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
-			log.Printf("ERROR: yjs sync after complete task %v: %v", task.ID, err)
-		}
 	}
 	return task, nil
 }
@@ -282,11 +203,6 @@ func (s *Service) ReopenTask(ctx context.Context, userID, id pgtype.UUID) (sqlcg
 			return sqlcgen.Task{}, ErrTaskNotFound
 		}
 		return sqlcgen.Task{}, err
-	}
-	if task.NoteID.Valid && s.noteSyncer != nil {
-		if err := s.noteSyncer.SyncNoteToYjs(ctx, task.NoteID); err != nil {
-			log.Printf("ERROR: yjs sync after reopen task %v: %v", task.ID, err)
-		}
 	}
 	return task, nil
 }
@@ -343,55 +259,3 @@ func (s *Service) GetRecentlyCompletedTasks(ctx context.Context, userID pgtype.U
 	})
 }
 
-func calculateNextDueDate(current time.Time, recurrence string) (time.Time, bool) {
-	switch recurrence {
-	case "daily":
-		return current.AddDate(0, 0, 1), true
-	case "weekdays":
-		next := current.AddDate(0, 0, 1)
-		for next.Weekday() == time.Saturday || next.Weekday() == time.Sunday {
-			next = next.AddDate(0, 0, 1)
-		}
-		return next, true
-	case "weekly":
-		return current.AddDate(0, 0, 7), true
-	case "monthly":
-		return current.AddDate(0, 1, 0), true
-	default:
-		return time.Time{}, false
-	}
-}
-
-func catchUpDueDate(from time.Time, recurrence string, today time.Time) time.Time {
-	taskDueDate := from
-	if recurrence == "daily" {
-		if taskDueDate.Before(today) || taskDueDate.Equal(today) {
-			daysDiff := int(today.Sub(taskDueDate).Hours() / 24)
-			return taskDueDate.AddDate(0, 0, daysDiff)
-		}
-	} else if recurrence == "weekly" {
-		if taskDueDate.Before(today) || taskDueDate.Equal(today) {
-			weeksDiff := int(today.Sub(taskDueDate).Hours() / (24 * 7))
-			return taskDueDate.AddDate(0, 0, weeksDiff*7)
-		}
-	}
-
-	nextDue, ok := calculateNextDueDate(taskDueDate, recurrence)
-	limit := 0
-	for ok && (nextDue.Before(today) || nextDue.Equal(today)) && limit < 1000 {
-		taskDueDate = nextDue
-		nextDue, ok = calculateNextDueDate(taskDueDate, recurrence)
-		limit++
-	}
-	return taskDueDate
-}
-
-func scheduleNextOccurrence(taskDueDate time.Time, recurrence string) (time.Time, bool) {
-	today := time.Now().UTC()
-	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
-	nextDue, ok := calculateNextDueDate(taskDueDate, recurrence)
-	if !ok {
-		return time.Time{}, false
-	}
-	return catchUpDueDate(nextDue, recurrence, today), true
-}

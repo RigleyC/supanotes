@@ -36,26 +36,8 @@ func (m *mockRepo) DeleteNote(ctx context.Context, id pgtype.UUID, userID pgtype
 func (m *mockRepo) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	return nil, nil
 }
-func (m *mockRepo) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
-}
 func (m *mockRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
-}
-func (m *mockRepo) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
-	return nil, nil
-}
-func (m *mockRepo) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
-	return sqlcgen.NoteNode{}, nil
-}
-func (m *mockRepo) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
-	return nil
-}
-func (m *mockRepo) CreateTask(ctx context.Context, arg sqlcgen.CreateTaskParams) (sqlcgen.Task, error) {
-	return sqlcgen.Task{}, nil
-}
-func (m *mockRepo) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
-	return nil
 }
 func (m *mockRepo) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error) {
 	return nil, nil
@@ -74,7 +56,7 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 			capturedArg = arg
 			return sqlcgen.Note{ID: arg.ID}, nil
 		},
-	}, nil, nil)
+	}, nil)
 
 	newContent := "updated content"
 	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, nil)
@@ -91,7 +73,7 @@ func TestService_UpdateNote_SetsEmbeddingPendingOnContentChange(t *testing.T) {
 }
 
 func TestCreateNoteRejectsEmptyRegularNote(t *testing.T) {
-	svc := NewService(&mockRepo{}, nil, nil)
+	svc := NewService(&mockRepo{}, nil)
 	userID := pgtype.UUID{Valid: true}
 
 	_, err := svc.CreateNote(context.Background(), userID, "   ", nil, false)

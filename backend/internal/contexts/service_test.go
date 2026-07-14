@@ -39,9 +39,6 @@ func (m *mockQuerier) DeleteContext(ctx context.Context, arg sqlcgen.DeleteConte
 	return nil
 }
 func (m *mockQuerier) AddTagToNote(_ context.Context, _ sqlcgen.AddTagToNoteParams) error { return nil }
-func (m *mockQuerier) AppendToNoteContent(_ context.Context, _ sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
-}
 func (m *mockQuerier) CleanupOldMessages(_ context.Context) error                 { return nil }
 func (m *mockQuerier) CountNotes(_ context.Context, _ pgtype.UUID) (int64, error) { return 0, nil }
 func (m *mockQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
@@ -158,9 +155,6 @@ func (m *mockQuerier) GetSyncNotes(_ context.Context, _ sqlcgen.GetSyncNotesPara
 func (m *mockQuerier) GetSyncTags(_ context.Context, _ sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetSyncTasks(_ context.Context, _ sqlcgen.GetSyncTasksParams) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
 func (m *mockQuerier) GetTags(_ context.Context, _ pgtype.UUID) ([]sqlcgen.Tag, error) {
 	return nil, nil
 }
@@ -259,9 +253,6 @@ func (m *mockQuerier) UpsertTask(_ context.Context, _ sqlcgen.UpsertTaskParams) 
 }
 func (m *mockQuerier) UpsertTaskCompletion(_ context.Context, _ sqlcgen.UpsertTaskCompletionParams) error {
 	return nil
-}
-func (m *mockQuerier) GetSyncTaskCompletions(_ context.Context, _ sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
-	return nil, nil
 }
 func (m *mockQuerier) GetSyncNoteTags(_ context.Context, _ pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	return nil, nil

@@ -15,21 +15,23 @@ typedef NoteQueryResult = ({
   bool hideCompleted,
 });
 
-/// SQL subselect that returns the plain text of the first non-deleted
-/// note_nodes row with non-empty text, ordered by position. Used as the
-/// note title everywhere notes are listed. Returns NULL when the note has
-/// no text-bearing node; the Dart row reader applies the fallback.
-const _titleFromNodesSubselect =
-    "(SELECT nn.data->>'text' FROM note_nodes nn "
-    "WHERE nn.note_id = n.id AND nn.deleted_at IS NULL "
-    "AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' "
-    "ORDER BY nn.position ASC LIMIT 1) AS title";
+/// Derives a display title from note content by extracting the first non-empty
+/// line and stripping markdown heading markers.
+String deriveNoteTitle(String content) {
+  final lines = content.split('\n');
+  for (final line in lines) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) continue;
+    return trimmed.replaceFirst(RegExp(r'^#+\s*'), '');
+  }
+  return '';
+}
 
 const _noteSelectColumns = 'SELECT n.*, '
     'COALESCE(unp.favorite, 0) AS favorite, '
     'COALESCE(unp.archived, 0) AS archived, '
     'COALESCE(unp.hide_completed, 0) AS hide_completed, '
-    '$_titleFromNodesSubselect';
+    'n.content AS title';
 
 typedef NoteWithTasksQueryResult = ({
   NoteQueryResult note,
@@ -70,7 +72,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
-      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
+      readsFrom: {notes, userNotePreferences},
     ).get().then(
       (rows) => rows.isEmpty ? null : _queryResultFromRow(rows.first),
     );
@@ -84,7 +86,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
-      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
+      readsFrom: {notes, userNotePreferences},
     ).watch().map((rows) {
       if (rows.isEmpty) return null;
       return _queryResultFromRow(rows.first);
@@ -115,7 +117,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       '  ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE n.id = ?',
       variables: [Variable.withString(userId), Variable.withString(id)],
-      readsFrom: {notes, attachedDatabase.tasks, userNotePreferences, attachedDatabase.noteNodes},
+      readsFrom: {notes, attachedDatabase.tasks, userNotePreferences},
     ).watch().map((rows) {
       if (rows.isEmpty) return null;
       return _noteWithTasksFromRows(rows);
@@ -173,7 +175,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
     return (
       note: note,
-      title: row.read<String?>('title') ?? NoteStrings.fallbackTitle,
+      title: deriveNoteTitle(row.read<String>('content')),
       favorite: row.read<bool>('favorite'),
       archived: row.read<bool>('archived'),
       hideCompleted: row.read<bool>('hide_completed'),
@@ -209,7 +211,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       createdAt: row.read<DateTime>('task_created_at'),
       updatedAt: row.read<DateTime>('task_updated_at'),
       deletedAt: row.read<DateTime?>('task_deleted_at'),
-      isDirty: true,
     );
   }
 
@@ -221,7 +222,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return customSelect(
       sql,
       variables: [Variable.withString(userId), ...extraVariables],
-      readsFrom: {notes, userNotePreferences, attachedDatabase.noteNodes},
+      readsFrom: {notes, userNotePreferences},
     ).watch().map((rows) {
       final result = <NoteQueryResult>[];
       for (final row in rows) {

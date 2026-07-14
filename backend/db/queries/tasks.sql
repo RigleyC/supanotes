@@ -1,11 +1,11 @@
 -- name: CreateTask :one
-INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position, node_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: GetTasksByNodeID :many
 SELECT * FROM tasks
-WHERE (node_id = $1 OR id = $1) AND deleted_at IS NULL
+WHERE id = $1 AND deleted_at IS NULL
 ORDER BY position ASC, created_at ASC;
 
 -- name: GetTaskByID :one
@@ -32,7 +32,7 @@ WHERE id = $1 AND user_id = $2;
 -- name: DeleteTaskByNodeID :exec
 UPDATE tasks
 SET deleted_at = NOW()
-WHERE (node_id = $1 OR id = $1) AND user_id = $2;
+WHERE id = $1 AND user_id = $2;
 
 -- name: GetTasks :many
 SELECT * FROM tasks
@@ -82,6 +82,11 @@ WHERE user_id = $1
   AND (sqlc.narg('status')::varchar IS NULL OR status = sqlc.narg('status'))
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3;
+
+-- name: DeleteTasksByNoteID :exec
+UPDATE tasks
+SET deleted_at = NOW()
+WHERE note_id = $1 AND deleted_at IS NULL AND id <> ALL(sqlc.arg('keep_ids')::uuid[]);
 
 -- name: GetRecentlyCompletedTasks :many
 SELECT * FROM tasks

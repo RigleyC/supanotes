@@ -25,7 +25,6 @@ abstract class INotesRepository {
   });
   Stream<NoteModel?> watchNoteById(String id);
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId);
-  Stream<List<NoteNode>> watchNodes(String noteId);
   Future<NoteModel?> getNoteById(String id);
   Future<NoteModel> upsertNote({
     required String id,
@@ -101,14 +100,6 @@ class NotesRepository implements INotesRepository {
         tasks: result.tasks.map(TaskModel.fromData).toList(),
       );
     });
-  }
-
-  @override
-  Stream<List<NoteNode>> watchNodes(String noteId) {
-    return (_db.select(_db.noteNodes)
-          ..where((t) => t.noteId.equals(noteId) & t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.position)]))
-        .watch();
   }
 
   @override

@@ -10,6 +10,7 @@ import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
@@ -38,51 +39,6 @@ class _FakeNotesRepository implements INotesRepository {
 
   @override
   Future<void> deleteIfEmptyOrTombstone(String id) async {}
-
-  @override
-  Stream<List<NoteNode>> watchNodes(String noteId) {
-    return _broadcast.map((note) {
-      if (note == null) return const [];
-      final lines = note.content.split('\n');
-      final nodes = <NoteNode>[];
-      for (var i = 0; i < lines.length; i++) {
-        final line = lines[i];
-        if (line.isEmpty) continue;
-
-        final isTask = line.startsWith('- [ ]') || line.startsWith('- [x]');
-        final type = isTask ? 'task' : 'paragraph';
-
-        var title = line;
-        var isComplete = false;
-        if (isTask) {
-          isComplete = line.startsWith('- [x]');
-          title = line.substring(5).trim();
-        }
-
-        var id = 'node-$i';
-        if (title.contains('<!-- task:')) {
-          final startIdx = title.indexOf('<!-- task:') + 10;
-          final endIdx = title.indexOf('-->', startIdx);
-          id = title.substring(startIdx, endIdx).trim();
-          title = title.substring(0, title.indexOf('<!-- task:')).trim();
-        }
-
-        nodes.add(NoteNode(
-          id: id,
-          noteId: noteId,
-          position: i.toString(),
-          type: type,
-          data: isTask
-              ? '{"text":"$title","completed":$isComplete}'
-              : '{"text":"$title"}',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          isDirty: false,
-        ));
-      }
-      return nodes;
-    });
-  }
 
   @override
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId) =>
@@ -248,7 +204,6 @@ void main() {
                   data: '{"text":"tarefa concluida","completed":true}',
                   createdAt: DateTime.now(),
                   updatedAt: DateTime.now(),
-                  isDirty: false,
                 ),
                 NoteNode(
                   id: 'node-2',
@@ -258,7 +213,6 @@ void main() {
                   data: '{"text":"texto visivel"}',
                   createdAt: DateTime.now(),
                   updatedAt: DateTime.now(),
-                  isDirty: false,
                 ),
               ],
               taskMetadata: const {},
@@ -315,7 +269,6 @@ void main() {
                             data: '{"text":"tarefa concluida","completed":true}',
                             createdAt: DateTime.now(),
                             updatedAt: DateTime.now(),
-                            isDirty: false,
                           ),
                           NoteNode(
                             id: 'node-2',
@@ -325,7 +278,6 @@ void main() {
                             data: '{"text":"texto visivel"}',
                             createdAt: DateTime.now(),
                             updatedAt: DateTime.now(),
-                            isDirty: false,
                           ),
                         ],
                         taskMetadata: const {},

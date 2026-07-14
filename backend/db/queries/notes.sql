@@ -44,7 +44,10 @@ WHERE id = $1 AND user_id = $2;
 
 -- name: GetNotes :many
 SELECT n.*,
-  COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title,
+  COALESCE(
+    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+    'Untitled'
+  )::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -87,7 +90,10 @@ WHERE note_id = $1 AND tag_id = $2;
 
 -- name: GetRecentNotes :many
 SELECT n.*,
-  COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title,
+  COALESCE(
+    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+    'Untitled'
+  )::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -107,13 +113,6 @@ WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.deleted_at IS NULL
 LIMIT 5;
 
--- name: AppendToNoteContent :one
-UPDATE notes
-SET content = content || E'\n\n' || $3, updated_at = NOW()
-WHERE notes.id = $1 AND notes.deleted_at IS NULL
-  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
-RETURNING *;
-
 -- name: CreateNoteLink :exec
 INSERT INTO note_links (source_id, target_id)
 VALUES ($1, $2)
@@ -128,19 +127,7 @@ SELECT id, content FROM notes WHERE content IS NOT NULL AND content != '';
 -- name: CountNotes :one
 SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL;
 
--- name: UpdateNotesContentFromNodes :exec
-UPDATE notes n
-SET content = (
-    SELECT COALESCE(string_agg(
-        CASE 
-            WHEN type = 'header' THEN repeat('#', COALESCE((data->>'level')::int, 1)) || ' ' || COALESCE(data->>'text', '')
-            WHEN type = 'task' THEN '- [' || CASE WHEN (data->>'completed')::boolean = TRUE THEN 'x' ELSE ' ' END || '] ' || COALESCE(data->>'text', '')
-            WHEN type = 'list_item' THEN '- ' || COALESCE(data->>'text', '')
-            ELSE COALESCE(data->>'text', '')
-        END,
-        E'\n' ORDER BY position
-    ), '')
-    FROM note_nodes
-    WHERE note_id = n.id AND deleted_at IS NULL
-)
-WHERE n.id = ANY($1::uuid[]);
+-- name: UpdateNoteContent :exec
+UPDATE notes SET content = $2, excerpt = COALESCE(substring($2 FROM 1 FOR 200), ''), embedding_status = 'pending', updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL;
+
+

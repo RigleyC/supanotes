@@ -103,7 +103,7 @@ class NotesLocalRepository {
       content: content,
       createdAt: now,
       updatedAt: now,
-      isDirty: const Value(false),
+      isDirty: const Value(true),
       hasRemoteCopy: const Value(false),
     );
     await _dao.createNote(companion);

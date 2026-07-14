@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:drift/drift.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 
@@ -13,28 +12,6 @@ void main() {
             id: 'note-title-1',
             userId: 'user-1',
             content: 'irrelevant snapshot',
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-    await db.into(db.noteNodes).insert(
-          NoteNodesCompanion.insert(
-            id: 'node-1',
-            noteId: 'note-title-1',
-            position: const Value('0.0'),
-            type: 'paragraph',
-            data: '{"text":"My Trip"}',
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-    await db.into(db.noteNodes).insert(
-          NoteNodesCompanion.insert(
-            id: 'node-2',
-            noteId: 'note-title-1',
-            position: const Value('1.0'),
-            type: 'paragraph',
-            data: '{"text":"Buy tickets"}',
             createdAt: now,
             updatedAt: now,
           ),

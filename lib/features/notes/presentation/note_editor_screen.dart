@@ -121,13 +121,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(notesRepositoryProvider);
-    final combinedAsync = ref.watch(
-      combinedNoteEditorStateProvider(widget.noteId),
+    final noteWithTasksAsync = ref.watch(
+      noteWithTasksProvider(widget.noteId),
     );
 
-    return combinedAsync.when(
-      data: (data) {
-        final (nodes, noteWithTasks) = data;
+    return noteWithTasksAsync.when(
+      data: (noteWithTasks) {
         final note = noteWithTasks.note;
         if (note == null) {
           return _fallbackScaffold(Text(NoteStrings.errorNotFound));
@@ -184,7 +183,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             bottom: false,
             child: NoteEditor(
               noteId: widget.noteId,
-              nodes: nodes,
+              nodes: const [],
               taskMetadata: tasksMap,
               hideCompleted: hideCompleted,
               collapseImages: note.collapseImages,

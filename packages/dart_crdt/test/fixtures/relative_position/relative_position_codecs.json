@@ -1,0 +1,36 @@
+{
+  "item": {
+    "json": {
+      "item": {
+        "client": 1,
+        "clock": 2
+      },
+      "assoc": 0
+    },
+    "bytesHex": "00010200"
+  },
+  "root": {
+    "json": {
+      "tname": "body",
+      "assoc": -1
+    },
+    "bytesHex": "0104626f647941"
+  },
+  "type": {
+    "json": {
+      "type": {
+        "client": 5,
+        "clock": 9
+      },
+      "assoc": 2
+    },
+    "bytesHex": "02050902"
+  },
+  "emptyRootName": {
+    "json": {
+      "tname": "",
+      "assoc": 0
+    },
+    "bytesHex": "010000"
+  }
+}

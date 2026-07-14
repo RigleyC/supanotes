@@ -5,12 +5,14 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/routines"
 	"github.com/RigleyC/supanotes/internal/soul"
+	syncpkg "github.com/RigleyC/supanotes/internal/sync"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/llm"
 )
@@ -22,10 +24,6 @@ type ToolExecutor interface {
 	Label() string
 	Summary(rawOutput string) string
 	Execute(ctx context.Context, userID pgtype.UUID, sessionID string, argsJSON string) (string, error)
-}
-
-type YjsMutationService interface {
-	WriteNodeMutation(ctx context.Context, noteID string, update []byte) error
 }
 
 type defaultToolExecutor struct{}
@@ -53,7 +51,8 @@ func NewToolRegistry(
 	embedCL *llm.EmbeddingClient,
 	llmFact llm.Factory,
 	wm WorkingMemoryStore,
-	yjsSvc YjsMutationService,
+	yjsSvc *syncpkg.YDocService,
+	pool *pgxpool.Pool,
 ) *ToolRegistry {
 	registry := &ToolRegistry{
 		tools: make(map[string]ToolExecutor),
@@ -75,7 +74,7 @@ func NewToolRegistry(
 		&SetWeeklyBriefScheduleTool{routinesSvc: routinesSvc},
 		&GetNotesTool{notesSvc: notesSvc},
 		&GetNoteTool{notesSvc: notesSvc},
-		&AppendToNoteTool{notesSvc: notesSvc, q: q, yjsSvc: yjsSvc},
+		&AppendToNoteTool{notesSvc: notesSvc, q: q, yjsSvc: yjsSvc, pool: pool},
 		&LinkNotesTool{q: q, notesSvc: notesSvc},
 		&DeleteMemoryTool{memoriesSvc: memoriesSvc},
 		&UpdateSoulTool{soulSvc: soulSvc},

@@ -61,8 +61,12 @@ func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
 				slog.Error("RunDebouncedProjection: flushFn failed", "note_id", noteID, "error", err)
 			}
 		}
-		_ = c.ProjectCanonicalDoc(context.Background(), noteID)
+		_ = ProjectNoteContentFromYDoc(context.Background(), c.pool, noteID)
 	})
+}
+
+func (c *Compactor) ProjectCanonicalDoc(ctx context.Context, noteID string) error {
+	return ProjectNoteContentFromYDoc(ctx, c.pool, noteID)
 }
 
 func (c *Compactor) RunDebouncedProjectionForTest(ctx context.Context, svc *YDocService, noteID string, update []byte) error {
@@ -72,53 +76,7 @@ func (c *Compactor) RunDebouncedProjectionForTest(ctx context.Context, svc *YDoc
 	if err := svc.FlushUpdates(ctx, noteID); err != nil {
 		return err
 	}
-	return c.ProjectCanonicalDoc(ctx, noteID)
-}
-
-func (c *Compactor) ProjectCanonicalDoc(ctx context.Context, noteID string) error {
-	startTotal := time.Now()
-	state, err := LoadYDocState(ctx, c.pool, noteID)
-	if err != nil {
-		slog.Error("projectCanonicalDoc: LoadYDocState failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startTotal).Milliseconds())
-		return err
-	}
-	if len(state) == 0 {
-		slog.Debug("projectCanonicalDoc: empty state, skip", "note_id", noteID)
-		return nil
-	}
-	startApply := time.Now()
-	doc := crdt.New(crdt.WithGC(false))
-	if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
-		slog.Error("projectCanonicalDoc: ApplyUpdateV1 failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startApply).Milliseconds())
-		return err
-	}
-	slog.Debug("projectCanonicalDoc: doc loaded", "note_id", noteID, "state_bytes", len(state), "apply_ms", time.Since(startApply).Milliseconds())
-
-	startTx := time.Now()
-	tx, err := c.pool.Begin(ctx)
-	if err != nil {
-		slog.Error("projectCanonicalDoc: begin tx failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startTx).Milliseconds())
-		return err
-	}
-	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext('nodes'))", noteID); err != nil {
-		slog.Error("projectCanonicalDoc: advisory lock failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startTx).Milliseconds())
-		return err
-	}
-	startProj := time.Now()
-	if err := ProjectToDBTxFromDoc(ctx, tx, doc, noteID); err != nil {
-		slog.Error("projectCanonicalDoc: project failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startProj).Milliseconds())
-		return err
-	}
-	slog.Debug("projectCanonicalDoc: project done", "note_id", noteID, "project_ms", time.Since(startProj).Milliseconds())
-
-	startCommit := time.Now()
-	if err := tx.Commit(ctx); err != nil {
-		slog.Error("projectCanonicalDoc: commit failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startCommit).Milliseconds())
-		return err
-	}
-	slog.Info("projectCanonicalDoc: done", "note_id", noteID, "total_ms", time.Since(startTotal).Milliseconds())
-	return nil
+	return ProjectNoteContentFromYDoc(ctx, c.pool, noteID)
 }
 
 func (c *Compactor) CompactNote(ctx context.Context, noteID string) error {
@@ -185,19 +143,6 @@ func (c *Compactor) CompactNote(ctx context.Context, noteID string) error {
 		return fmt.Errorf("merge updates: %w", err)
 	}
 	slog.Info("CompactNote: merged", "note_id", noteID, "merged_bytes", len(merged), "merge_ms", time.Since(startMerge).Milliseconds())
-
-	// PROJECT FROM THE FULL DOC STATE — not from the partial update.
-	startProj := time.Now()
-	doc := crdt.New(crdt.WithGC(false))
-	if err := crdt.ApplyUpdateV1(doc, merged, nil); err != nil {
-		slog.Error("CompactNote: ApplyUpdateV1 failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startProj).Milliseconds())
-		return fmt.Errorf("apply merged state for projection: %w", err)
-	}
-	if err := projectDocToDB(ctx, tx, doc, noteID); err != nil {
-		slog.Error("CompactNote: projectDocToDB failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startProj).Milliseconds())
-		return fmt.Errorf("project during compaction: %w", err)
-	}
-	slog.Info("CompactNote: project done", "note_id", noteID, "project_ms", time.Since(startProj).Milliseconds())
 
 	startPersist := time.Now()
 	if _, err := tx.Exec(ctx, `

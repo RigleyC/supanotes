@@ -1,0 +1,25 @@
+{
+  "scenarios": {
+    "sequence": {
+      "seed": 404,
+      "replicaCount": 3,
+      "operationCount": 18,
+      "networkChurnEvery": 2,
+      "duplicateDeliveries": 1
+    },
+    "map": {
+      "seed": 505,
+      "replicaCount": 3,
+      "operationCount": 20,
+      "networkChurnEvery": 2,
+      "duplicateDeliveries": 1
+    },
+    "text": {
+      "seed": 606,
+      "replicaCount": 3,
+      "operationCount": 18,
+      "networkChurnEvery": 2,
+      "duplicateDeliveries": 1
+    }
+  }
+}

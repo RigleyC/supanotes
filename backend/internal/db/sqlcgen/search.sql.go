@@ -13,7 +13,10 @@ import (
 )
 
 const searchNotesFTS = `-- name: SearchNotesFTS :many
-SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+SELECT n.id, COALESCE(
+    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+    'Untitled'
+  )::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
        COALESCE(unp.favorite, FALSE) AS favorite,
        COALESCE(unp.archived, FALSE) AS archived,
        ts_rank(n.search_vector, plainto_tsquery('simple', $1::text)) AS score
@@ -77,7 +80,10 @@ func (q *Queries) SearchNotesFTS(ctx context.Context, arg SearchNotesFTSParams) 
 
 const searchNotesHybrid = `-- name: SearchNotesHybrid :many
 WITH fts AS (
-  SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+  SELECT n.id, COALESCE(
+      NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+      'Untitled'
+    )::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
          COALESCE(unp.favorite, FALSE) AS favorite,
          COALESCE(unp.archived, FALSE) AS archived,
          row_number() OVER (ORDER BY ts_rank(n.search_vector, to_tsquery('simple', $2::text)) DESC) as rank
@@ -90,7 +96,10 @@ WITH fts AS (
   LIMIT $4::int
 ),
 semantic AS (
-  SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+  SELECT n.id, COALESCE(
+      NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+      'Untitled'
+    )::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
          COALESCE(unp.favorite, FALSE) AS favorite,
          COALESCE(unp.archived, FALSE) AS archived,
          row_number() OVER (ORDER BY ne.embedding <=> $5::vector) as rank
@@ -177,7 +186,10 @@ func (q *Queries) SearchNotesHybrid(ctx context.Context, arg SearchNotesHybridPa
 }
 
 const searchNotesSemantic = `-- name: SearchNotesSemantic :many
-SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+SELECT n.id, COALESCE(
+    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+    'Untitled'
+  )::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
        COALESCE(unp.favorite, FALSE) AS favorite,
        COALESCE(unp.archived, FALSE) AS archived,
        (1.0 - (ne.embedding <=> $1::vector))::float8 AS score

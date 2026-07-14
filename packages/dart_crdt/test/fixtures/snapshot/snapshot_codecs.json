@@ -1,0 +1,28 @@
+{
+  "empty": {
+    "deleteSet": [],
+    "stateVector": {},
+    "v1Hex": "0000",
+    "v2Hex": "0000"
+  },
+  "deletedAndVisible": {
+    "deleteSet": [
+      {
+        "client": 1,
+        "start": 0,
+        "length": 1
+      },
+      {
+        "client": 2,
+        "start": 1,
+        "length": 3
+      }
+    ],
+    "stateVector": {
+      "1": 4,
+      "2": 3
+    },
+    "v1Hex": "0201010001020101030202030104",
+    "v2Hex": "0201010001020101030202030104"
+  }
+}

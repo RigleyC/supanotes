@@ -2,12 +2,11 @@ import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:convert';
 
-import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
 
-import '../../../core/database/database.dart';
+import 'note_node.dart';
 import 'attachment_nodes.dart';
-import 'note_display_text.dart';
 
 sealed class NodeOperation {}
 
@@ -38,21 +37,12 @@ class DeleteOp extends NodeOperation {
 
 class NodeSyncManager {
   NodeSyncManager({
-    required AppDatabase database,
-    required String noteId,
-    required String userId,
     required MutableDocument document,
     this.onFlush,
-  }) : _db = database,
-       _noteId = noteId,
-       _userId = userId,
-       _document = document {
+  }) : _document = document {
     _document.addListener(_onDocumentChanged);
   }
 
-  final AppDatabase _db;
-  final String _noteId;
-  final String _userId;
   final MutableDocument _document;
   void Function(List<NodeOperation> ops)? onFlush;
 
@@ -82,6 +72,7 @@ class NodeSyncManager {
 
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
+    debugPrint('[DEBUG-DIAG-EDIT] _onDocumentChanged: changes=${changeLog.changes.length} types=${changeLog.changes.map((c) => c.runtimeType).join(',')}');
     _opSequence++;
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
@@ -115,55 +106,15 @@ class NodeSyncManager {
     });
   }
 
-  String _buildContentSnapshot() {
-    return _document
-        .where((n) => n is TextNode || n is TaskNode)
-        .map((n) {
-          if (n is TaskNode) {
-            return '- [${n.isComplete ? 'x' : ' '}] ${n.text.toPlainText()}';
-          }
-          return (n as TextNode).text.toPlainText();
-        })
-        .join('\n');
-  }
-
-  Future<void> _flushNoteExcerptFromSnapshot(String fullText, DateTime now) async {
-    final excerpt = deriveNoteExcerpt(fullText);
-
-    await (_db.update(_db.notes)..where((t) => t.id.equals(_noteId))).write(
-      NotesCompanion(
-        content: Value(fullText),
-        excerpt: Value(excerpt),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-    );
-  }
-
-  Future<void> _applyOpsTransaction(
-    List<NodeOperation> opsToProcess,
-    DateTime now,
-    String snapshotText,
-  ) async {
-    await _db.transaction(() async {
-      await _flushNoteExcerptFromSnapshot(snapshotText, now);
-    });
-  }
-
   Future<void> _drainQueue() async {
+    debugPrint('[DEBUG-DIAG-EDIT] _drainQueue: pending=${_pendingOps.length}');
     if (_pendingOps.isEmpty) return;
 
     final opsToProcess = List<NodeOperation>.from(_pendingOps);
     _pendingOps.clear();
     final snapshotSeq = _opSequence;
 
-    final now = DateTime.now().toUtc();
-    final snapshotText = _buildContentSnapshot();
-
-    await _applyOpsTransaction(opsToProcess, now, snapshotText);
-
     // Clear dirty flags for flushed nodes only if no new ops arrived
-    // during the transaction. If new ops arrived, those IDs stay dirty.
     final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
     for (final id in flushedIds) {
       final seq = _dirtyNodeSequences[id];
@@ -174,6 +125,7 @@ class NodeSyncManager {
     }
 
     if (opsToProcess.isNotEmpty) {
+      debugPrint('[DEBUG-DIAG-EDIT] _drainQueue: calling onFlush with ${opsToProcess.length} ops');
       onFlush?.call(opsToProcess);
     }
   }
@@ -186,11 +138,7 @@ class NodeSyncManager {
     _pendingOps.clear();
     final snapshotSeq = _opSequence;
 
-    final now = DateTime.now().toUtc();
-    final snapshotText = _buildContentSnapshot();
-
     _enqueueDbWrite(() async {
-      await _applyOpsTransaction(opsToProcess, now, snapshotText);
       final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
       for (final id in flushedIds) {
         final seq = _dirtyNodeSequences[id];
@@ -200,6 +148,10 @@ class NodeSyncManager {
         }
       }
     });
+
+    if (opsToProcess.isNotEmpty) {
+      onFlush?.call(opsToProcess);
+    }
 
     return _writeLock;
   }
@@ -212,30 +164,6 @@ class NodeSyncManager {
   };
 
 
-
-  String? _nodeType(DocumentNode node) {
-    if (node is TaskNode) return 'task';
-    if (node is AttachmentNode) return 'attachment';
-    if (node is HorizontalRuleNode) return 'divider';
-    if (node is ParagraphNode) {
-      final blockType = node.metadata['blockType'];
-      if (blockType == header1Attribution ||
-          blockType == header2Attribution ||
-          blockType == header3Attribution ||
-          blockType == header4Attribution ||
-          blockType == header5Attribution ||
-          blockType == header6Attribution) {
-        return 'header';
-      }
-      if (blockType == blockquoteAttribution) {
-        return 'blockquote';
-      }
-      return 'paragraph';
-    }
-    if (node is ListItemNode) return 'list_item';
-    if (node is ImageNode) return 'image';
-    return null;
-  }
 
   static Map<String, dynamic> _serializeAttributedText(AttributedText text) {
     final spansList = <Map<String, dynamic>>[];
@@ -252,7 +180,7 @@ class NodeSyncManager {
         } else if (attribution == underlineAttribution) {
           attributionName = 'underline';
         } else if (attribution is LinkAttribution) {
-          attributionName = 'link:${attribution.url.toString()}';
+          attributionName = 'link:${attribution.plainTextUri.toString()}';
         } else {
           attributionName = attribution.id;
         }
@@ -274,7 +202,7 @@ class NodeSyncManager {
         } else if (attribution == underlineAttribution) {
           attributionName = 'underline';
         } else if (attribution is LinkAttribution) {
-          attributionName = 'link:${attribution.url.toString()}';
+          attributionName = 'link:${attribution.plainTextUri.toString()}';
         } else {
           attributionName = attribution.id;
         }
@@ -365,7 +293,11 @@ class NodeSyncManager {
       }
     }
     if (documentNodes.isEmpty) {
-      return MutableDocument.empty();
+      return MutableDocument(
+        nodes: [
+          ParagraphNode(id: Editor.createNodeId(), text: AttributedText()),
+        ],
+      );
     }
     return MutableDocument(nodes: documentNodes);
   }

@@ -1,0 +1,43 @@
+{
+  "ids": {
+    "inserts": [
+      {"client": 1, "start": 0, "length": 3},
+      {"client": 2, "start": 4, "length": 2}
+    ],
+    "deletes": [
+      {"client": 1, "start": 7, "length": 2}
+    ]
+  },
+  "otherIds": {
+    "inserts": [
+      {"client": 1, "start": 2, "length": 3}
+    ],
+    "deletes": [
+      {"client": 3, "start": 0, "length": 1}
+    ]
+  },
+  "map": {
+    "inserts": [
+      {
+        "client": 1,
+        "start": 0,
+        "length": 2,
+        "attrs": [{"name": "insert", "value": "Alice"}]
+      },
+      {
+        "client": 1,
+        "start": 1,
+        "length": 3,
+        "attrs": [{"name": "review", "value": "Bob"}]
+      }
+    ],
+    "deletes": [
+      {
+        "client": 2,
+        "start": 5,
+        "length": 2,
+        "attrs": [{"name": "delete", "value": "Alice"}]
+      }
+    ]
+  }
+}

@@ -6,28 +6,12 @@
 library;
 
 import 'dart:convert';
-import 'package:drift/drift.dart';
-import 'package:intl/intl.dart';
 
-import '../../features/tasks/domain/task_recurrence.dart';
+import 'package:drift/drift.dart';
+
 import 'package:supanotes/core/database/database.dart';
 
 String? _nullIfEmpty(String? s) => (s != null && s.isEmpty) ? null : s;
-
-DateTime? _parseDueDate(String? s) {
-  if (s == null) return null;
-  // Server contract: always YYYY-MM-DD. We construct a local DateTime
-  // at midnight so isSameDayAs() comparisons work without UTC drift.
-  final parts = s.split('-');
-  if (parts.length != 3) {
-    throw FormatException('expected YYYY-MM-DD, got: $s');
-  }
-  return DateTime(
-    int.parse(parts[0]),
-    int.parse(parts[1]),
-    int.parse(parts[2]),
-  );
-}
 
 class SyncMapper {
   // ---------------------------------------------------------------------------
@@ -48,23 +32,6 @@ class SyncMapper {
     'deleted_at': n.deletedAt?.toUtc().toIso8601String(),
   };
 
-  Map<String, dynamic> taskToJson(TaskData t) => {
-    'id': t.id,
-    'user_id': t.userId,
-    'note_id': t.noteId,
-    'title': t.title,
-    'status': t.status,
-    'position': t.position,
-    'recurrence': t.recurrence?.name,
-    'due_date': t.dueDate != null
-        ? DateFormat('yyyy-MM-dd').format(t.dueDate!)
-        : null,
-    'completed_at': t.completedAt?.toUtc().toIso8601String(),
-    'created_at': t.createdAt.toUtc().toIso8601String(),
-    'updated_at': t.updatedAt.toUtc().toIso8601String(),
-    'deleted_at': t.deletedAt?.toUtc().toIso8601String(),
-  };
-
   Map<String, dynamic> contextToJson(ContextData c) => {
     'id': c.id,
     'slug': c.slug,
@@ -80,12 +47,6 @@ class SyncMapper {
     'updated_at': t.updatedAt.toUtc().toIso8601String(),
   };
 
-  Map<String, dynamic> taskCompletionToJson(LocalTaskCompletionData c) => {
-    'id': c.id,
-    'task_id': c.taskId,
-    'completed_at': c.completedAt.toUtc().toIso8601String(),
-  };
-
   Map<String, dynamic> noteLinkToJson(NoteLinkData l) => {
     'id': l.id,
     'source_id': l.sourceId,
@@ -98,18 +59,6 @@ class SyncMapper {
   Map<String, dynamic> localNoteTagToJson(LocalNoteTagData t) => {
     'note_id': t.noteId,
     'tag_id': t.tagId,
-  };
-
-  Map<String, dynamic> noteNodeToJson(NoteNode nn) => {
-    'id': nn.id,
-    'note_id': nn.noteId,
-    'parent_id': nn.parentId,
-    'position': nn.position,
-    'type': nn.type,
-    'data': base64Encode(utf8.encode(nn.data)),
-    'created_at': nn.createdAt.toUtc().toIso8601String(),
-    'updated_at': nn.updatedAt.toUtc().toIso8601String(),
-    'deleted_at': nn.deletedAt?.toUtc().toIso8601String(),
   };
 
   // ---------------------------------------------------------------------------
@@ -136,26 +85,6 @@ class SyncMapper {
     collapseImages: (json['collapse_images'] as bool?) ?? false,
   );
 
-  TaskData taskFromJson(Map<String, dynamic> json) => TaskData(
-    id: json['id'] as String,
-    userId: json['user_id'] as String,
-    noteId: json['note_id'] as String,
-    title: json['title'] as String,
-    status: json['status'] as String,
-    position: json['position']?.toString() ?? 'a0',
-    recurrence: TaskRecurrence.parse(json['recurrence'] as String?),
-    dueDate: _parseDueDate(json['due_date'] as String?),
-    completedAt: json['completed_at'] != null
-        ? DateTime.parse(json['completed_at'] as String).toLocal()
-        : null,
-    createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-    updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
-    deletedAt: json['deleted_at'] != null
-        ? DateTime.parse(json['deleted_at'] as String).toLocal()
-        : null,
-    isDirty: false,
-  );
-
   ContextData contextFromJson(Map<String, dynamic> json) => ContextData(
     id: json['id'] as String,
     userId: json['user_id'] as String,
@@ -172,21 +101,6 @@ class SyncMapper {
     name: json['name'] as String,
     createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
     updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
-    isDirty: false,
-  );
-
-  /// Pull-side completion mapper. Wire format omits `user_id` (server
-  /// derives ownership from the parent task) — caller stamps the row
-  /// with the current authenticated [userId]. `status` is dropped
-  /// because the local schema only stores the completion event.
-  LocalTaskCompletionData taskCompletionFromJson(
-    Map<String, dynamic> json, {
-    required String userId,
-  }) => LocalTaskCompletionData(
-    id: json['id'] as String,
-    taskId: json['task_id'] as String,
-    userId: userId,
-    completedAt: DateTime.parse(json['completed_at'] as String).toLocal(),
     isDirty: false,
   );
 
@@ -210,21 +124,6 @@ class SyncMapper {
         tagId: json['tag_id'] as String,
         isDirty: false,
       );
-
-  NoteNode noteNodeFromJson(Map<String, dynamic> json) => NoteNode(
-    id: json['id'] as String,
-    noteId: json['note_id'] as String,
-    parentId: json['parent_id'] as String?,
-    position: json['position'] as String? ?? 'a0',
-    type: json['type'] as String,
-    data: utf8.decode(base64Decode(json['data'] as String)),
-    createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-    updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
-    deletedAt: json['deleted_at'] != null
-        ? DateTime.parse(json['deleted_at'] as String).toLocal()
-        : null,
-    isDirty: false,
-  );
 
   Map<String, dynamic> userNotePreferenceToJson(UserNotePreferenceData p) {
     return {
@@ -254,6 +153,12 @@ class SyncMapper {
       isDirty: const Value(false),
     );
   }
+
+  Map<String, dynamic> localYjsStateToJson(LocalYjsState s) => {
+    'note_id': s.noteId,
+    'state': base64Encode(s.state),
+    'updated_at': s.updatedAt.toUtc().toIso8601String(),
+  };
 
   LocalYjsState localYjsStateFromJson(Map<String, dynamic> json) {
     return LocalYjsState(

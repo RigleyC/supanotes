@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"
 	"github.com/reearth/ygo/crdt"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/notes"
+	syncpkg "github.com/RigleyC/supanotes/internal/sync"
 	"github.com/RigleyC/supanotes/internal/utils"
 	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/uid"
@@ -21,7 +23,7 @@ import (
 type AddNoteTool struct {
 	notesSvc *notes.Service
 	q        sqlcgen.Querier
-	yjsSvc   YjsMutationService
+	yjsSvc   *syncpkg.YDocService
 }
 
 func (t *AddNoteTool) Name() string        { return "add_note" }
@@ -42,7 +44,7 @@ func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 
 	note, err := t.q.CreateNote(ctx, sqlcgen.CreateNoteParams{
 		UserID:          userID,
-		Content:         args.Content,
+		Content:         "",
 		EmbeddingStatus: "pending",
 	})
 	if err != nil {
@@ -86,7 +88,7 @@ func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 
-	if err := t.yjsSvc.WriteNodeMutation(ctx, noteIDStr, update); err != nil {
+	if err := t.yjsSvc.ApplyNodeMutation(ctx, noteIDStr, update); err != nil {
 		return "", fmt.Errorf("write node mutation: %w", err)
 	}
 
@@ -218,7 +220,8 @@ func (t *GetNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 type AppendToNoteTool struct {
 	notesSvc *notes.Service
 	q        sqlcgen.Querier
-	yjsSvc   YjsMutationService
+	yjsSvc   *syncpkg.YDocService
+	pool     *pgxpool.Pool
 }
 
 func (t *AppendToNoteTool) Name() string        { return "append_to_note" }
@@ -242,22 +245,39 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 		return "", err
 	}
 
-	existingNodes, err := t.q.GetNodesByNoteId(ctx, nid)
+	var hasAccess bool
+	err = t.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM notes WHERE id = $1 AND user_id = $2
+			UNION ALL
+			SELECT 1 FROM note_shares WHERE note_id = $1 AND user_id = $2 AND permission = 'edit'
+		)
+	`, nid, userID).Scan(&hasAccess)
 	if err != nil {
-		return "", fmt.Errorf("get existing nodes: %w", err)
+		return "", fmt.Errorf("permission check: %w", err)
 	}
+	if !hasAccess {
+		return "", fmt.Errorf("access denied: note %s", formatID(nid))
+	}
+
+	// Find max position of existing nodes so new content appends at the end
+	prev := ""
+	if t.pool != nil {
+		state, err := syncpkg.LoadYDocState(ctx, t.pool, formatID(nid))
+		if err == nil && len(state) > 0 {
+			existing := crdt.New(crdt.WithGC(false))
+			if err := crdt.ApplyUpdateV1(existing, state, nil); err == nil {
+				prev = lastNodePosition(existing)
+			}
+		}
+	}
+
 	parsed := notes.ParseMarkdownToNodes(args.Content)
 	doc := crdt.New(crdt.WithGC(false))
 	nodesMap := doc.GetMap("nodes")
 	now := float64(time.Now().UnixMilli())
 
-	lastPos := ""
-	if len(existingNodes) > 0 {
-		lastPos = existingNodes[len(existingNodes)-1].Position
-	}
-
 	doc.Transact(func(txn *crdt.Transaction) {
-		prev := lastPos
 		for _, nd := range parsed {
 			nodeID := formatID(nd.ID)
 			pos, err := utils.GenerateKeyBetween(prev, "")
@@ -286,16 +306,11 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 	})
 	update := crdt.EncodeStateAsUpdateV1(doc, nil)
 
-	if err := t.yjsSvc.WriteNodeMutation(ctx, formatID(nid), update); err != nil {
+	if err := t.yjsSvc.ApplyNodeMutation(ctx, formatID(nid), update); err != nil {
 		return "", fmt.Errorf("write node mutation: %w", err)
 	}
 
-	updated, err := t.notesSvc.AppendToNoteContent(ctx, userID, nid, args.Content)
-	if err != nil {
-		return "", fmt.Errorf("append to note content: %w", err)
-	}
-
-	return fmt.Sprintf("Content appended to note [%s] %s", formatID(updated.ID), notes.DeriveTitle(updated.Content)), nil
+	return fmt.Sprintf("Content appended to note [%s]", formatID(nid)), nil
 }
 
 type LinkNotesTool struct {
@@ -356,27 +371,8 @@ type noteNodeJSON struct {
 	UpdatedAt float64         `json:"updatedAt,omitempty"`
 }
 
-type taskJSON struct {
-	ID          string  `json:"id"`
-	NoteID      string  `json:"noteId"`
-	UserID      string  `json:"userId,omitempty"`
-	Title       string  `json:"title"`
-	Status      string  `json:"status"`
-	Position    string  `json:"position"`
-	Recurrence  string  `json:"recurrence,omitempty"`
-	DueDate     string  `json:"dueDate,omitempty"`
-	CreatedAt   float64 `json:"createdAt,omitempty"`
-	CompletedAt float64 `json:"completedAt,omitempty"`
-}
-
 func serializeNoteNode(id, typ string, data []byte, position string, createdAt float64) []byte {
 	j := noteNodeJSON{ID: id, Type: typ, Data: data, Position: position, CreatedAt: createdAt}
-	b, _ := json.Marshal(j)
-	return b
-}
-
-func serializeTask(id, noteID, userID, title, status string, position string, createdAt float64) []byte {
-	j := taskJSON{ID: id, NoteID: noteID, UserID: userID, Title: title, Status: status, Position: position, CreatedAt: createdAt}
 	b, _ := json.Marshal(j)
 	return b
 }
@@ -422,6 +418,46 @@ func (t *GetVaultContextTool) Execute(ctx context.Context, userID pgtype.UUID, s
 - Completed Tasks: %d
 - Contexts: %d
 - Tags: %d`, noteCount, openTaskCount, completedTaskCount, len(contexts), len(tags)), nil
+}
+
+// lastNodePosition returns the maximum position value across all YMap("nodes") entries.
+func lastNodePosition(doc *crdt.Doc) string {
+	nodesMap := doc.GetMap("nodes")
+	if nodesMap == nil {
+		return ""
+	}
+	var maxPos string
+	for _, key := range nodesMap.Keys() {
+		raw, ok := nodesMap.Get(key)
+		if !ok {
+			continue
+		}
+		nodeStr, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		var nd struct {
+			Position any `json:"position"`
+		}
+		if json.Unmarshal([]byte(nodeStr), &nd) != nil {
+			continue
+		}
+		var posStr string
+		if nd.Position != nil {
+			switch v := nd.Position.(type) {
+			case string:
+				posStr = v
+			case float64:
+				posStr = fmt.Sprintf("%g", v)
+			default:
+				posStr = fmt.Sprintf("%v", nd.Position)
+			}
+		}
+		if posStr > maxPos {
+			maxPos = posStr
+		}
+	}
+	return maxPos
 }
 
 

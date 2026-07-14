@@ -1,0 +1,25 @@
+{
+  "schema": "compat-fixture-manifest",
+  "version": 1,
+  "requiredTopLevelKeys": [
+    "schemaVersion",
+    "generatedBy",
+    "caseFile",
+    "requiredCategories",
+    "serializedFormats",
+    "roundTripDirections",
+    "cases"
+  ],
+  "caseRequiredKeys": [
+    "id",
+    "category",
+    "description",
+    "formats",
+    "roundTrips"
+  ],
+  "roundTripRequiredKeys": [
+    "direction",
+    "format",
+    "payloadHex"
+  ]
+}

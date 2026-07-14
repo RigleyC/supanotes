@@ -65,7 +65,6 @@ class TasksLocalRepository {
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
-        isDirty: true,
       ),
     );
   }

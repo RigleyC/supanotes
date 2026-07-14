@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -153,7 +154,23 @@ func NewWSHandler(shutdownCtx context.Context, roomMgr *RoomManager, pool *pgxpo
 		perm:        NewPermissionListener(shutdownCtx, pool, log),
 		log:         log,
 		upgrader: websocket.Upgrader{
-			CheckOrigin:     func(r *http.Request) bool { return true },
+			CheckOrigin: func(r *http.Request) bool {
+				origin := r.Header.Get("Origin")
+				if origin == "" {
+					return true
+				}
+				allowed := []string{
+					"http://localhost",
+					"http://127.0.0.1",
+					"https://supanotes.app",
+				}
+				for _, a := range allowed {
+					if strings.HasPrefix(origin, a) {
+						return true
+					}
+				}
+				return false
+			},
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
@@ -188,8 +205,9 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 		slog.Error("WS HandleConnect: permission check failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startPerm).Milliseconds())
 		return web.JSONError(c, http.StatusInternalServerError, "permission check failed")
 	}
+
 	if !hasAccess {
-		slog.Error("WS HandleConnect: access denied", "note_id", noteID, "user_id", userIDStr, "elapsed_ms", time.Since(startPerm).Milliseconds())
+		slog.Error("WS HandleConnect: access denied (note does not exist or not owned or shared)", "note_id", noteID, "user_id", userIDStr, "elapsed_ms", time.Since(startPerm).Milliseconds())
 		return web.JSONError(c, http.StatusForbidden, "access denied")
 	}
 	slog.Info("WS HandleConnect: permission OK", "note_id", noteID, "elapsed_ms", time.Since(startPerm).Milliseconds())
@@ -212,6 +230,29 @@ func (h *WSHandler) HandleConnect(c echo.Context) error {
 		return fmt.Errorf("websocket upgrade: %w", err)
 	}
 	slog.Info("WS HandleConnect: upgraded", "note_id", noteID, "elapsed_ms", time.Since(startUpgrade).Milliseconds())
+	conn.SetReadLimit(64 * 1024)
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+
+	ticker := time.NewTicker(30 * time.Second)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
+					conn.Close()
+					return
+				}
+			case <-h.shutdownCtx.Done():
+				return
+			}
+		}
+	}()
+
 	wsC := &wsConn{conn: conn}
 
 	startRoom := time.Now()

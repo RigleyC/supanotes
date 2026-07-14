@@ -39,8 +39,7 @@ void main() {
       for (final note in allNotes) {
         if (note.content.trim().isEmpty) {
           missingCount++;
-          final nodes = await (db.select(db.noteNodes)..where((t) => t.noteId.equals(note.id))).get();
-          print('  - Note ID: ${note.id}, content length: 0, has ${nodes.length} note_nodes');
+          print('  - Note ID: ${note.id}, content length: 0');
         }
       }
       

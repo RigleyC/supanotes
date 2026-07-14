@@ -86,9 +86,6 @@ func (s *stubWMQuerier) SearchNotesByEmbedding(ctx context.Context, arg sqlcgen.
 	panic("unimplemented")
 }
 func (s *stubWMQuerier) AddTagToNote(ctx context.Context, arg sqlcgen.AddTagToNoteParams) error { panic("unimplemented") }
-func (s *stubWMQuerier) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
-	panic("unimplemented")
-}
 func (s *stubWMQuerier) CleanupOldMessages(ctx context.Context) error { panic("unimplemented") }
 func (s *stubWMQuerier) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) { return 0, nil }
 func (s *stubWMQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) { return 0, nil }
@@ -203,9 +200,6 @@ func (s *stubWMQuerier) GetSyncNotes(ctx context.Context, arg sqlcgen.GetSyncNot
 func (s *stubWMQuerier) GetSyncTags(ctx context.Context, arg sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {
 	panic("unimplemented")
 }
-func (s *stubWMQuerier) GetSyncTasks(ctx context.Context, arg sqlcgen.GetSyncTasksParams) ([]sqlcgen.Task, error) {
-	panic("unimplemented")
-}
 func (s *stubWMQuerier) GetTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Tag, error) { panic("unimplemented") }
 func (s *stubWMQuerier) GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Tag, error) {
 	panic("unimplemented")
@@ -295,9 +289,6 @@ func (s *stubWMQuerier) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UU
 func (s *stubWMQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
 	panic("unimplemented")
 }
-func (s *stubWMQuerier) GetSyncTaskCompletions(ctx context.Context, arg sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
-	panic("unimplemented")
-}
 func (s *stubWMQuerier) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	panic("unimplemented")
 }
@@ -348,21 +339,6 @@ func (s *stubWMQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sqlc
 func (s *stubWMQuerier) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
 	return sqlcgen.UserNotePreference{}, nil
 }
-func (s *stubWMQuerier) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
-	return sqlcgen.NoteNode{}, nil
-}
-func (s *stubWMQuerier) UpdateNode(ctx context.Context, arg sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) {
-	return sqlcgen.NoteNode{}, nil
-}
-func (s *stubWMQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error {
-	return nil
-}
-func (s *stubWMQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
-	return nil, nil
-}
-func (s *stubWMQuerier) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
-	return nil
-}
 func (s *stubWMQuerier) UpdateNoteSearchVector(ctx context.Context, arg sqlcgen.UpdateNoteSearchVectorParams) error {
 	return nil
 }
@@ -374,12 +350,6 @@ func (s *stubWMQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID
 }
 func (s *stubWMQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
 	return nil
-}
-func (s *stubWMQuerier) GetSyncNoteNodes(ctx context.Context, arg sqlcgen.GetSyncNoteNodesParams) ([]sqlcgen.NoteNode, error) {
-	return nil, nil
-}
-func (s *stubWMQuerier) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
-	return sqlcgen.NoteNode{}, nil
 }
 
 var _ sqlcgen.Querier = (*stubWMQuerier)(nil)

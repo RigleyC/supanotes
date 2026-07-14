@@ -188,9 +188,6 @@ func (s *stubLoopQuerier) SearchNotesByEmbedding(ctx context.Context, arg sqlcge
 func (s *stubLoopQuerier) AddTagToNote(ctx context.Context, arg sqlcgen.AddTagToNoteParams) error {
 	panic("unimplemented")
 }
-func (s *stubLoopQuerier) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
-	panic("unimplemented")
-}
 func (s *stubLoopQuerier) CleanupOldMessages(ctx context.Context) error { panic("unimplemented") }
 func (s *stubLoopQuerier) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
@@ -327,9 +324,6 @@ func (s *stubLoopQuerier) GetSyncNotes(ctx context.Context, arg sqlcgen.GetSyncN
 func (s *stubLoopQuerier) GetSyncTags(ctx context.Context, arg sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {
 	panic("unimplemented")
 }
-func (s *stubLoopQuerier) GetSyncTasks(ctx context.Context, arg sqlcgen.GetSyncTasksParams) ([]sqlcgen.Task, error) {
-	panic("unimplemented")
-}
 func (s *stubLoopQuerier) GetTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Tag, error) {
 	panic("unimplemented")
 }
@@ -431,9 +425,6 @@ func (s *stubLoopQuerier) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.
 func (s *stubLoopQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
 	panic("unimplemented")
 }
-func (s *stubLoopQuerier) GetSyncTaskCompletions(ctx context.Context, arg sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
-	panic("unimplemented")
-}
 func (s *stubLoopQuerier) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	panic("unimplemented")
 }
@@ -498,21 +489,6 @@ func (s *stubLoopQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sq
 func (s *stubLoopQuerier) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
 	return sqlcgen.UserNotePreference{}, nil
 }
-func (s *stubLoopQuerier) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
-	panic("unimplemented")
-}
-func (s *stubLoopQuerier) UpdateNode(ctx context.Context, arg sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) {
-	panic("unimplemented")
-}
-func (s *stubLoopQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error {
-	return nil
-}
-func (s *stubLoopQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
-	return nil, nil
-}
-func (s *stubLoopQuerier) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
-	return nil
-}
 func (s *stubLoopQuerier) UpdateNoteSearchVector(ctx context.Context, arg sqlcgen.UpdateNoteSearchVectorParams) error {
 	return nil
 }
@@ -525,13 +501,6 @@ func (s *stubLoopQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UU
 func (s *stubLoopQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
 	return nil
 }
-func (s *stubLoopQuerier) GetSyncNoteNodes(ctx context.Context, arg sqlcgen.GetSyncNoteNodesParams) ([]sqlcgen.NoteNode, error) {
-	return nil, nil
-}
-func (s *stubLoopQuerier) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
-	return sqlcgen.NoteNode{}, nil
-}
-
 type trackingStubLoopRepo struct {
 	stubLoopRepo
 	pendingConfirmations []string
@@ -575,7 +544,7 @@ func TestLoopConfirmationRequired(t *testing.T) {
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil, nil,
 	)
 
 	repo := &trackingStubLoopRepo{}
@@ -661,7 +630,7 @@ func TestLoopRejectsEmptyLLMResponse(t *testing.T) {
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil, nil,
 	)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
@@ -703,7 +672,7 @@ func TestLoopFallsBackWithoutToolsWhenLLMReturnsEmptyResponse(t *testing.T) {
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil, nil,
 	)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
@@ -770,7 +739,7 @@ func TestLoopFinishesWithToolResultWhenLLMResponseAfterToolIsEmpty(t *testing.T)
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil, nil,
 	)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)
@@ -836,7 +805,7 @@ func TestLoopFinishesWithToolResultWhenLLMCallAfterToolFails(t *testing.T) {
 
 	memSvc := memories.NewService(memRepo, embedCL, nil)
 	toolReg := tools.NewToolRegistry(
-		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil,
+		q, nil, tasksSvc, memSvc, nil, nil, embedCL, llmFact, nil, nil, nil,
 	)
 
 	loop := NewLoop(&stubLoopRepo{}, llmFact, ctxBldr, toolReg, nil)

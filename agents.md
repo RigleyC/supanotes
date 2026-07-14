@@ -170,3 +170,19 @@ See `backend/.env.example` for all required variables.
 3. Wait for user approval.
 4. Implement and update `task.md` as you go.
 5. Create `walkthrough.md` after completion.
+
+## Known Tech Debt
+
+### Dual-write avoidance document (061)
+
+The YDoc is the single source of truth for task metadata (dueDate, recurrence).
+`YjsSyncManager.projectNodes` propagates these to the SQLite `tasks` table.
+The UI writes ONLY to the YDoc via `NoteEditorController.updateTaskMetadataInYDoc` —
+no separate SQLite update is needed. The projection handles SQLite automatically.
+
+If you add a new metadata field to tasks:
+1. Add it to `YjsTaskEntry` model (`lib/features/notes/domain/yjs_task_entry.dart`)
+2. Write it to the YDoc via the bridge (the bridge's `updateTaskMetadataInYDoc` already uses `YjsTaskEntry.copyWith`)
+3. Optionally propagate it in `YjsSyncManager.projectNodes` if the SQLite table needs it for queries
+
+The SQLite update path (`TaskController.updateTaskMetadata` + `TasksRepository.updateTask`) is the *legacy* code path and should NOT be called from the UI for metadata-only changes. It exists for batch operations and catch-up scenarios. New features should go through YDoc first.

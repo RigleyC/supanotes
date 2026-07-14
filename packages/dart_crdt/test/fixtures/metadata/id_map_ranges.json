@@ -1,0 +1,50 @@
+{
+  "base": [
+    {
+      "client": 1,
+      "start": 0,
+      "length": 3,
+      "attrs": [{"name": "user", "value": "Alice"}]
+    },
+    {
+      "client": 1,
+      "start": 5,
+      "length": 2,
+      "attrs": [{"name": "user", "value": "Alice"}]
+    },
+    {
+      "client": 2,
+      "start": 1,
+      "length": 2,
+      "attrs": [{"name": "origin", "value": "local"}]
+    }
+  ],
+  "other": [
+    {
+      "client": 1,
+      "start": 2,
+      "length": 3,
+      "attrs": [{"name": "reviewer", "value": "Bob"}]
+    },
+    {
+      "client": 3,
+      "start": 0,
+      "length": 1,
+      "attrs": [{"name": "user", "value": "Alice"}]
+    }
+  ],
+  "repeated": [
+    {
+      "client": 4,
+      "start": 0,
+      "length": 1,
+      "attrs": [{"name": "user", "value": "Alice"}]
+    },
+    {
+      "client": 4,
+      "start": 2,
+      "length": 1,
+      "attrs": [{"name": "user", "value": "Alice"}]
+    }
+  ]
+}

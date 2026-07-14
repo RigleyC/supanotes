@@ -94,8 +94,8 @@ final pushServiceProvider = NotifierProvider<PushService, bool>(
 
 final yjsSyncManagerProvider = Provider<YjsSyncManager>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  ref.watch(currentUserIdProvider);
-  final mgr = YjsSyncManager(db: db);
+  final userId = ref.watch(currentUserIdProvider)!;
+  final mgr = YjsSyncManager(db: db, userId: userId);
   ref.onDispose(mgr.dispose);
   return mgr;
 });

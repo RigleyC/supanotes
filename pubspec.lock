@@ -276,10 +276,9 @@ packages:
   dart_crdt:
     dependency: "direct main"
     description:
-      name: dart_crdt
-      sha256: "6c0bcbbb4d25da3e15be2a56f734a6d4ceb66d9dfd7b44c63e6aa25982ec1bfd"
-      url: "https://pub.dev"
-    source: hosted
+      path: "packages/dart_crdt"
+      relative: true
+    source: path
     version: "0.3.0"
   dart_quill_delta:
     dependency: transitive

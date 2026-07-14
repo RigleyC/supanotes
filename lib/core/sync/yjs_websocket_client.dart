@@ -19,12 +19,15 @@ class YjsWebSocketClient {
     required this.channelBuilder,
     required Doc doc,
     SyncStateNotifier? notifier,
+    void Function()? onIdleDisconnect,
   })  : _doc = doc,
-        _notifier = notifier;
+        _notifier = notifier,
+        _onIdleDisconnect = onIdleDisconnect;
 
   final ChannelBuilder channelBuilder;
   final Doc _doc;
   final SyncStateNotifier? _notifier;
+  final void Function()? _onIdleDisconnect;
 
   WebSocketChannel? _channel;
   StreamSubscription<Uint8List>? _sub;
@@ -111,8 +114,8 @@ class YjsWebSocketClient {
         default:
           dev.log('[YjsWS] Unknown sync message type: $msgType', name: 'YjsWS');
       }
-    } catch (e) {
-      dev.log('[YjsWS] Error handling message: $e', name: 'YjsWS');
+    } catch (e, stackTrace) {
+      dev.log('[YjsWS] Error handling message: $e', name: 'YjsWS', error: e, stackTrace: stackTrace);
     }
     _resetIdleTimer();
   }
@@ -136,8 +139,10 @@ class YjsWebSocketClient {
   }
 
   void sendUpdate(Uint8List update) {
+    _resetIdleTimer();
+    debugPrint('[DEBUG-DIAG-EDIT] sendUpdate: connected=$_isConnected updateLen=${update.length}');
     final framed = YjsSyncProtocolCodec.encodeUpdate(update);
-    if (!_isConnected) {
+    if (!_isConnected || !_handshakeDone) {
       if (_pendingUpdates.length >= _kMaxPendingUpdates) {
         debugPrint('[YjsWS] sendUpdate: pendingUpdates full, dropping oldest (was ${_pendingUpdates.length})');
         _pendingUpdates.removeAt(0);
@@ -173,7 +178,10 @@ class YjsWebSocketClient {
 
   void _resetIdleTimer() {
     _idleTimer?.cancel();
-    _idleTimer = Timer(_kIdleTimeout, disconnect);
+    _idleTimer = Timer(_kIdleTimeout, () {
+      _onIdleDisconnect?.call();
+      disconnect();
+    });
   }
 
   Future<void> disconnect() async {

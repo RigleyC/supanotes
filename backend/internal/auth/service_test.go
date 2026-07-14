@@ -169,9 +169,6 @@ func (m *mockQuerier) DeleteDeviceTokenByToken(ctx context.Context, arg sqlcgen.
 func (m *mockQuerier) AddTagToNote(ctx context.Context, arg sqlcgen.AddTagToNoteParams) error {
 	return nil
 }
-func (m *mockQuerier) AppendToNoteContent(ctx context.Context, arg sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
-}
 func (m *mockQuerier) CreateContext(ctx context.Context, arg sqlcgen.CreateContextParams) (sqlcgen.Context, error) {
 	return sqlcgen.Context{}, nil
 }
@@ -594,10 +591,6 @@ func (m *mockQuerier) UpsertNote(ctx context.Context, arg sqlcgen.UpsertNotePara
 	return sqlcgen.Note{}, nil
 }
 
-func (m *mockQuerier) GetSyncTasks(ctx context.Context, arg sqlcgen.GetSyncTasksParams) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
-
 func (m *mockQuerier) UpsertTask(ctx context.Context, arg sqlcgen.UpsertTaskParams) (sqlcgen.Task, error) {
 	return sqlcgen.Task{}, nil
 }
@@ -642,9 +635,6 @@ func (m *mockQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.Upse
 	return nil
 }
 
-func (m *mockQuerier) GetSyncTaskCompletions(ctx context.Context, arg sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
-	return nil, nil
-}
 func (m *mockQuerier) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	return nil, nil
 }

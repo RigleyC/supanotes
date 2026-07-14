@@ -41,7 +41,6 @@ class TaskCompletionsDao extends DatabaseAccessor<AppDatabase>
       taskId: taskId,
       userId: userId,
       completedAt: when,
-      isDirty: true,
     );
   }
 
@@ -78,26 +77,8 @@ class TaskCompletionsDao extends DatabaseAccessor<AppDatabase>
     }
   }
 
-  /// Returns every row still pending sync.
-  Future<List<LocalTaskCompletionData>> getDirtyCompletions() {
-    return (select(
-      localTaskCompletions,
-    )..where((c) => c.isDirty.equals(true))).get();
-  }
-
-  /// Flips the dirty flag off after a successful push.
-  Future<void> clearDirtyFlag(String id) async {
-    await (update(localTaskCompletions)..where((c) => c.id.equals(id))).write(
-      const LocalTaskCompletionsCompanion(isDirty: Value(false)),
-    );
-  }
-
-  /// Stores a completion row that came back from the backend. Uses
-  /// `insertOnConflictUpdate` so a re-pulled row replaces the local copy
-  /// in place, and always sets [isDirty] to `false` so the row does not
-  /// get pushed back to the server.
+  /// Stores a completion row from the server projection.
   Future<void> upsertFromRemote(LocalTaskCompletionData completion) async {
-    final incoming = completion.copyWith(isDirty: false);
-    await into(localTaskCompletions).insertOnConflictUpdate(incoming);
+    await into(localTaskCompletions).insertOnConflictUpdate(completion);
   }
 }

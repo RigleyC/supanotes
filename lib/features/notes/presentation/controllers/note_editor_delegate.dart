@@ -6,6 +6,7 @@ class NoteEditorDelegate {
   onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
+  final void Function(String taskId, DateTime nextDue)? onRecurringTaskComplete;
   final Future<void> Function(
     String id,
     String noteId,
@@ -19,6 +20,7 @@ class NoteEditorDelegate {
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
+    this.onRecurringTaskComplete,
     this.onUploadFile,
   });
 }

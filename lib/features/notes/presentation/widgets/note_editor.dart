@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
@@ -69,21 +69,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   void initState() {
     super.initState();
     _controller = ref.read(noteEditorControllerProvider(widget.noteId));
-    if (_controller!.document == null) {
-      _controller!.initFromNodes(nodes: widget.nodes, noteId: widget.noteId);
-      _controller!.syncTaskStates(
-        widget.taskMetadata.map((k, v) => MapEntry(k, v.isCompleted)),
-      );
+    _controller!.addListener(_onControllerReady);
+    if (!widget.isReadOnly && _controller!.hasDocument) {
+      _controller!.document!.addListener(_onDocumentChanged);
     }
-    if (!widget.isReadOnly) {
-      _controller!.document?.addListener(_onDocumentChanged);
-      if (widget.nodes.isEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _controller!.focusNode.requestFocus();
-        });
-      }
-    }
-    _notifyContentChanged();
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
       editor: _controller!.editor,
@@ -98,6 +87,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             ),
       onTaskComplete: widget.delegate.onTaskComplete,
       onTaskReopen: widget.delegate.onTaskReopen,
+      onRecurringTaskComplete: (taskId, nextDue) {
+        _controller?.completeRecurringTask(taskId, nextDue);
+        widget.delegate.onRecurringTaskComplete?.call(taskId, nextDue);
+      },
       animatingNodeIds: _animatingNodeIds,
       completingTaskIds: _completingTaskIds,
       onAnimationStart: _onAnimationStart,
@@ -166,13 +159,24 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       );
     }
 
-    if (!identical(widget.nodes, oldWidget.nodes)) {
-      _controller?.updateNodesIncrementally(widget.nodes);
-    }
+    // NOTE: nodes prop is reserved for future incremental sync;
+    // currently always const [] in production.
   }
 
-  @override
+  void _onControllerReady() {
+    if (!mounted) return;
+    setState(() {
+      if (!widget.isReadOnly && _controller!.hasDocument) {
+        _controller!.document!.addListener(_onDocumentChanged);
+        _controller!.syncTaskStates(
+          widget.taskMetadata.map((k, v) => MapEntry(k, v.isCompleted)),
+        );
+      }
+    });
+  }
+
   void dispose() {
+    _controller?.removeListener(_onControllerReady);
     if (!widget.isReadOnly) {
       _controller?.document?.removeListener(_onDocumentChanged);
     }
@@ -245,7 +249,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   Widget build(BuildContext context) {
     ref.watch(noteEditorControllerProvider(widget.noteId));
     final controller = _controller;
-    if (controller == null) {
+    if (controller == null || !controller.hasDocument) {
       return const Center(child: CircularProgressIndicator());
     }
     if (controller.document == null ||
@@ -278,59 +282,55 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       child: Column(
         children: [
           Expanded(
-            child: CustomScrollView(
-              slivers: [
-                SuperEditorAndroidControlsScope(
-                  controller: _androidController!,
-                  child: SuperEditorIosControlsScope(
-                    controller: _iosController!,
-                    child: SuperEditor(
-                      editor: controller.editor!,
-                      focusNode: widget.isReadOnly
-                          ? null
-                          : controller.focusNode,
-                      documentLayoutKey: _docLayoutKey,
-                      stylesheet: _cachedStylesheet!,
-                      selectionStyle: SelectionStyles(
-                        selectionColor:
-                            Theme.of(
-                              context,
-                            ).textSelectionTheme.selectionColor ??
-                            Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.4),
-                      ),
-                      contentTapDelegateFactories: widget.isReadOnly
-                          ? null
-                          : [
-                              (editContext) => NoteLinkTapHandler(
-                                editContext.document,
-                                editContext.composer,
-                                onNoteTap: (targetId) =>
-                                    context.push(AppRoutes.note(targetId)),
-                              ),
-                              superEditorLaunchLinkTapHandlerFactory,
-                            ],
-                      keyboardActions: buildRichKeyboardActions(
-                        baseActions:
-                            defaultTargetPlatform == TargetPlatform.iOS ||
-                                defaultTargetPlatform == TargetPlatform.android
-                            ? defaultImeKeyboardActions
-                            : defaultKeyboardActions,
-                      ),
-                      componentBuilders: [
-                        const CustomDividerComponentBuilder(),
-                        _taskComponentBuilder,
-                        AttachmentComponentBuilder(
-                          editor: controller.editor!,
-                          collapseImages: widget.collapseImages,
-                        ),
-                        ...defaultComponentBuilders,
-                      ],
-                    ),
+            child: SuperEditorAndroidControlsScope(
+              controller: _androidController!,
+              child: SuperEditorIosControlsScope(
+                controller: _iosController!,
+                child: SuperEditor(
+                  editor: controller.editor!,
+                  focusNode: widget.isReadOnly
+                      ? null
+                      : controller.focusNode,
+                  documentLayoutKey: _docLayoutKey,
+                  stylesheet: _cachedStylesheet!,
+                  selectionStyle: SelectionStyles(
+                    selectionColor:
+                        Theme.of(
+                          context,
+                        ).textSelectionTheme.selectionColor ??
+                        Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.4),
                   ),
+                  contentTapDelegateFactories: widget.isReadOnly
+                      ? null
+                      : [
+                          (editContext) => NoteLinkTapHandler(
+                            editContext.document,
+                            editContext.composer,
+                            onNoteTap: (targetId) =>
+                                context.push(AppRoutes.note(targetId)),
+                          ),
+                          superEditorLaunchLinkTapHandlerFactory,
+                        ],
+                  keyboardActions: buildRichKeyboardActions(
+                    baseActions:
+                        defaultTargetPlatform == TargetPlatform.iOS ||
+                            defaultTargetPlatform == TargetPlatform.android
+                        ? defaultImeKeyboardActions
+                        : defaultKeyboardActions,
+                  ),
+                  componentBuilders: [
+                    const CustomDividerComponentBuilder(),
+                    _taskComponentBuilder,
+                    AttachmentComponentBuilder(
+                      editor: controller.editor!,
+                      collapseImages: widget.collapseImages,
+                    ),
+                    ...defaultComponentBuilders,
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           if (!widget.isReadOnly)

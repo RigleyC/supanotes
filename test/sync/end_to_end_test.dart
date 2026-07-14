@@ -19,7 +19,7 @@ void main() {
           hasRemoteCopy: const Value(true),
         ));
 
-    final mgr = YjsSyncManager(db: db);
+    final mgr = YjsSyncManager(db: db, userId: 'u-1');
     final doc = await mgr.loadDoc('n-1');
     doc.transact((txn) {
       doc.getMap('nodes').setAttr(
@@ -30,7 +30,7 @@ void main() {
     });
     await mgr.persist('n-1');
 
-    final mgr2 = YjsSyncManager(db: db);
+    final mgr2 = YjsSyncManager(db: db, userId: 'u-1');
     final restored = await mgr2.loadDoc('n-1');
     expect(restored.getMap('nodes').attrKeys, contains('node-x'));
     expect(restored.getText('content/node-x').toPlainText(), 'edit');

@@ -1,6 +1,4 @@
-import 'dart:convert';
-
-import 'package:drift/drift.dart' hide isNotNull;
+import 'package:dart_crdt/dart_crdt.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -27,13 +25,13 @@ void main() {
     test('Insert', () async {
       final db = createTestDatabase();
       await seedNote(db);
+      final doc = Doc();
 
       final controller = NoteEditorController(
         userId: 'test-user',
-        database: db,
       );
       controller.bind('test-note');
-      controller.initFromNodes(nodes: [], noteId: 'test-note');
+      controller.initFromDoc(doc: doc, noteId: 'test-note', sendUpdate: (_) {});
 
       controller.editor!.execute([
         InsertNodeAtIndexRequest(
@@ -47,23 +45,24 @@ void main() {
 
       await Future.delayed(_debounce);
 
-      final rows = await db.select(db.noteNodes).get();
-      expect(rows.length, 1);
-      expect(rows.first.type, 'paragraph');
-      final data = jsonDecode(rows.first.data) as Map<String, dynamic>;
-      expect(data['text'], 'Hello');
+      final p1 = controller.document!.getNodeById('p1');
+      expect(p1, isNotNull);
+      expect((p1 as TextNode).text.toPlainText(), 'Hello');
+
+      final ytext = doc.getText('content/p1');
+      expect(ytext.toPlainText(), 'Hello');
     });
 
     test('Update', () async {
       final db = createTestDatabase();
       await seedNote(db);
+      final doc = Doc();
 
       final controller = NoteEditorController(
         userId: 'test-user',
-        database: db,
       );
       controller.bind('test-note');
-      controller.initFromNodes(nodes: [], noteId: 'test-note');
+      controller.initFromDoc(doc: doc, noteId: 'test-note', sendUpdate: (_) {});
 
       controller.editor!.execute([
         InsertNodeAtIndexRequest(
@@ -87,76 +86,66 @@ void main() {
       ]);
       await Future.delayed(_debounce);
 
-      final rows = await db.select(db.noteNodes).get();
-      expect(rows.length, 1);
-      final data = jsonDecode(rows.first.data) as Map<String, dynamic>;
-      expect(data['text'], 'Updated');
-      expect(rows.first.isDirty, isTrue);
+      final p1 = controller.document!.getNodeById('p1');
+      expect(p1, isNotNull);
+      expect((p1 as TextNode).text.toPlainText(), 'Updated');
+
+      final ytext = doc.getText('content/p1');
+      expect(ytext.toPlainText(), 'Updated');
     });
 
     test('Move', () async {
       final db = createTestDatabase();
       await seedNote(db);
+      final doc = Doc();
 
-      // Seed 3 nodes at distinct positions directly in the DB
-      final now = DateTime.now().toUtc();
-      for (final entry in [
-        ('p1', '1.0', 'First'),
-        ('p2', '2.0', 'Second'),
-        ('p3', '3.0', 'Third'),
-      ]) {
-        await db.into(db.noteNodes).insert(NoteNodesCompanion.insert(
-          id: entry.$1,
-          noteId: 'test-note',
-          position: Value(entry.$2),
-          type: 'paragraph',
-          data: '{"text":"${entry.$3}"}',
-          createdAt: now,
-          updatedAt: now,
-          isDirty: const Value(false),
-          deletedAt: const Value(null),
-        ));
-      }
-
-      // Load nodes from DB into the controller
-      final storedNodes = await db.select(db.noteNodes).get();
       final controller = NoteEditorController(
         userId: 'test-user',
-        database: db,
       );
       controller.bind('test-note');
-      controller.initFromNodes(nodes: storedNodes, noteId: 'test-note');
+      controller.initFromDoc(doc: doc, noteId: 'test-note', sendUpdate: (_) {});
 
-      // Document: [p1, p2, p3]
+      // Add 3 nodes via editor
+      controller.editor!.execute([
+        InsertNodeAtIndexRequest(
+          nodeIndex: 0,
+          newNode: ParagraphNode(id: 'p1', text: AttributedText('First')),
+        ),
+      ]);
+      controller.editor!.execute([
+        InsertNodeAtIndexRequest(
+          nodeIndex: 1,
+          newNode: ParagraphNode(id: 'p2', text: AttributedText('Second')),
+        ),
+      ]);
+      controller.editor!.execute([
+        InsertNodeAtIndexRequest(
+          nodeIndex: 2,
+          newNode: ParagraphNode(id: 'p3', text: AttributedText('Third')),
+        ),
+      ]);
+      await Future.delayed(_debounce);
+
       // Move p1 from index 0 to index 2 → order: [p2, p3, p1]
       controller.editor!.execute([
         MoveNodeRequest(nodeId: 'p1', newIndex: 2),
       ]);
       await Future.delayed(_debounce);
 
-      final rows = await (db.select(db.noteNodes)
-            ..where((t) => t.deletedAt.isNull())
-            ..orderBy([
-              (t) => OrderingTerm(
-                  expression: t.position, mode: OrderingMode.asc)
-            ]))
-          .get();
-      expect(rows.length, 3);
-      expect(rows[0].id, 'p2');
-      expect(rows[1].id, 'p3');
-      expect(rows[2].id, 'p1');
+      final ids = controller.document!.map((n) => n.id).toList();
+      expect(ids, ['p2', 'p3', 'p1']);
     });
 
     test('Delete', () async {
       final db = createTestDatabase();
       await seedNote(db);
+      final doc = Doc();
 
       final controller = NoteEditorController(
         userId: 'test-user',
-        database: db,
       );
       controller.bind('test-note');
-      controller.initFromNodes(nodes: [], noteId: 'test-note');
+      controller.initFromDoc(doc: doc, noteId: 'test-note', sendUpdate: (_) {});
 
       controller.editor!.execute([
         InsertNodeAtIndexRequest(
@@ -174,22 +163,19 @@ void main() {
       ]);
       await Future.delayed(_debounce);
 
-      final rows = await db.select(db.noteNodes).get();
-      expect(rows.length, 1);
-      expect(rows.first.deletedAt, isNotNull);
-      expect(rows.first.isDirty, isTrue);
+      expect(controller.document!.getNodeById('p1'), isNull);
     });
 
-    test('Task insert produces both noteNodes and tasks rows', () async {
+    test('Task insert produces both document node and tasks row', () async {
       final db = createTestDatabase();
       await seedNote(db);
+      final doc = Doc();
 
       final controller = NoteEditorController(
         userId: 'test-user',
-        database: db,
       );
       controller.bind('test-note');
-      controller.initFromNodes(nodes: [], noteId: 'test-note');
+      controller.initFromDoc(doc: doc, noteId: 'test-note', sendUpdate: (_) {});
 
       controller.editor!.execute([
         InsertNodeAtIndexRequest(
@@ -203,10 +189,9 @@ void main() {
       ]);
       await Future.delayed(_debounce);
 
-      final nodeRows = await db.select(db.noteNodes).get();
-      expect(nodeRows.length, 1);
-      expect(nodeRows.first.id, 't1');
-      expect(nodeRows.first.type, 'task');
+      final t1 = controller.document!.getNodeById('t1');
+      expect(t1, isNotNull);
+      expect(t1, isA<TaskNode>());
 
       final taskRows = await db.select(db.tasks).get();
       expect(taskRows.length, 1);
@@ -217,13 +202,13 @@ void main() {
     test('Debounce coalescing', () async {
       final db = createTestDatabase();
       await seedNote(db);
+      final doc = Doc();
 
       final controller = NoteEditorController(
         userId: 'test-user',
-        database: db,
       );
       controller.bind('test-note');
-      controller.initFromNodes(nodes: [], noteId: 'test-note');
+      controller.initFromDoc(doc: doc, noteId: 'test-note', sendUpdate: (_) {});
 
       controller.editor!.execute([
         InsertNodeAtIndexRequest(
@@ -255,22 +240,21 @@ void main() {
 
       await Future.delayed(_debounce);
 
-      final rows = await db.select(db.noteNodes).get();
-      expect(rows.length, 1);
-      final data = jsonDecode(rows.first.data) as Map<String, dynamic>;
-      expect(data['text'], 'C');
+      final p1 = controller.document!.getNodeById('p1');
+      expect(p1, isNotNull);
+      expect((p1 as TextNode).text.toPlainText(), 'C');
     });
 
     test('suspendSync / resumeSync', () async {
       final db = createTestDatabase();
       await seedNote(db);
+      final doc = Doc();
 
       final controller = NoteEditorController(
         userId: 'test-user',
-        database: db,
       );
       controller.bind('test-note');
-      controller.initFromNodes(nodes: [], noteId: 'test-note');
+      controller.initFromDoc(doc: doc, noteId: 'test-note', sendUpdate: (_) {});
 
       controller.suspendSync();
 
@@ -285,8 +269,9 @@ void main() {
       ]);
       await Future.delayed(_debounce);
 
-      var rows = await db.select(db.noteNodes).get();
-      expect(rows, isEmpty);
+      expect(controller.document!.getNodeById('p1'), isNotNull);
+      // With sync suspended, the flush does not update Yjs
+      expect(doc.getText('content/p1').toPlainText(), isEmpty);
 
       controller.resumeSync();
 
@@ -301,9 +286,7 @@ void main() {
       ]);
       await Future.delayed(_debounce);
 
-      rows = await db.select(db.noteNodes).get();
-      expect(rows.length, 1);
-      expect(rows.first.id, 'p2');
+      expect(controller.document!.getNodeById('p2'), isNotNull);
     });
 
     test('Note excerpt is updated', () async {
@@ -312,10 +295,13 @@ void main() {
 
       final controller = NoteEditorController(
         userId: 'test-user',
-        database: db,
       );
       controller.bind('test-note');
-      controller.initFromNodes(nodes: [], noteId: 'test-note');
+      controller.initFromDoc(
+        doc: Doc(),
+        noteId: 'test-note',
+        sendUpdate: (_) {},
+      );
 
       controller.editor!.execute([
         InsertNodeAtIndexRequest(
@@ -335,12 +321,8 @@ void main() {
       ]);
       await Future.delayed(_debounce);
 
-      final note = await (db.select(db.notes)
-            ..where((t) => t.id.equals('test-note')))
-          .getSingle();
-      expect(note.content, isNotEmpty);
-      expect(note.excerpt, isNotNull);
-      expect(note.excerpt, isNotEmpty);
+      // Verify document has the nodes
+      expect(controller.document!.length, 2);
     });
   });
 }

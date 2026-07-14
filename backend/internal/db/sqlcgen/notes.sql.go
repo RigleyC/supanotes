@@ -27,39 +27,6 @@ func (q *Queries) AddTagToNote(ctx context.Context, arg AddTagToNoteParams) erro
 	return err
 }
 
-const appendToNoteContent = `-- name: AppendToNoteContent :one
-UPDATE notes
-SET content = content || E'\n\n' || $3, updated_at = NOW()
-WHERE notes.id = $1 AND notes.deleted_at IS NULL
-  AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
-RETURNING id, user_id, context_id, content, excerpt, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
-`
-
-type AppendToNoteContentParams struct {
-	ID      pgtype.UUID `json:"id"`
-	UserID  pgtype.UUID `json:"user_id"`
-	Content string      `json:"content"`
-}
-
-func (q *Queries) AppendToNoteContent(ctx context.Context, arg AppendToNoteContentParams) (Note, error) {
-	row := q.db.QueryRow(ctx, appendToNoteContent, arg.ID, arg.UserID, arg.Content)
-	var i Note
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ContextID,
-		&i.Content,
-		&i.Excerpt,
-		&i.SearchVector,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.EmbeddingStatus,
-		&i.CollapseImages,
-	)
-	return i, err
-}
-
 const countNotes = `-- name: CountNotes :one
 SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL
 `
@@ -386,7 +353,10 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 
 const getNotes = `-- name: GetNotes :many
 SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
-  COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title,
+  COALESCE(
+    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+    'Untitled'
+  )::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -470,7 +440,10 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 
 const getRecentNotes = `-- name: GetRecentNotes :many
 SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
-  COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title,
+  COALESCE(
+    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+    'Untitled'
+  )::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -658,6 +631,20 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 	return i, err
 }
 
+const updateNoteContent = `-- name: UpdateNoteContent :exec
+UPDATE notes SET content = $2, excerpt = COALESCE(substring($2 FROM 1 FOR 200), ''), embedding_status = 'pending', updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL
+`
+
+type UpdateNoteContentParams struct {
+	ID      pgtype.UUID `json:"id"`
+	Content string      `json:"content"`
+}
+
+func (q *Queries) UpdateNoteContent(ctx context.Context, arg UpdateNoteContentParams) error {
+	_, err := q.db.Exec(ctx, updateNoteContent, arg.ID, arg.Content)
+	return err
+}
+
 const updateNoteSearchVector = `-- name: UpdateNoteSearchVector :exec
 UPDATE notes SET search_vector = $2 WHERE id = $1
 `
@@ -669,28 +656,5 @@ type UpdateNoteSearchVectorParams struct {
 
 func (q *Queries) UpdateNoteSearchVector(ctx context.Context, arg UpdateNoteSearchVectorParams) error {
 	_, err := q.db.Exec(ctx, updateNoteSearchVector, arg.ID, arg.SearchVector)
-	return err
-}
-
-const updateNotesContentFromNodes = `-- name: UpdateNotesContentFromNodes :exec
-UPDATE notes n
-SET content = (
-    SELECT COALESCE(string_agg(
-        CASE 
-            WHEN type = 'header' THEN repeat('#', COALESCE((data->>'level')::int, 1)) || ' ' || COALESCE(data->>'text', '')
-            WHEN type = 'task' THEN '- [' || CASE WHEN (data->>'completed')::boolean = TRUE THEN 'x' ELSE ' ' END || '] ' || COALESCE(data->>'text', '')
-            WHEN type = 'list_item' THEN '- ' || COALESCE(data->>'text', '')
-            ELSE COALESCE(data->>'text', '')
-        END,
-        E'\n' ORDER BY position
-    ), '')
-    FROM note_nodes
-    WHERE note_id = n.id AND deleted_at IS NULL
-)
-WHERE n.id = ANY($1::uuid[])
-`
-
-func (q *Queries) UpdateNotesContentFromNodes(ctx context.Context, dollar_1 []pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, updateNotesContentFromNodes, dollar_1)
 	return err
 }

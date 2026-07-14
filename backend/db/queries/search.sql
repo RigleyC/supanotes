@@ -1,5 +1,8 @@
 -- name: SearchNotesFTS :many
-SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+SELECT n.id, COALESCE(
+    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+    'Untitled'
+  )::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
        COALESCE(unp.favorite, FALSE) AS favorite,
        COALESCE(unp.archived, FALSE) AS archived,
        ts_rank(n.search_vector, plainto_tsquery('simple', sqlc.arg('query')::text)) AS score
@@ -13,7 +16,10 @@ ORDER BY score DESC
 LIMIT sqlc.arg('limit');
 
 -- name: SearchNotesSemantic :many
-SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+SELECT n.id, COALESCE(
+    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+    'Untitled'
+  )::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
        COALESCE(unp.favorite, FALSE) AS favorite,
        COALESCE(unp.archived, FALSE) AS archived,
        (1.0 - (ne.embedding <=> sqlc.arg('embedding')::vector))::float8 AS score
@@ -28,7 +34,10 @@ LIMIT sqlc.arg('limit');
 
 -- name: SearchNotesHybrid :many
 WITH fts AS (
-  SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+  SELECT n.id, COALESCE(
+      NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+      'Untitled'
+    )::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
          COALESCE(unp.favorite, FALSE) AS favorite,
          COALESCE(unp.archived, FALSE) AS archived,
          row_number() OVER (ORDER BY ts_rank(n.search_vector, to_tsquery('simple', sqlc.arg('query')::text)) DESC) as rank
@@ -41,7 +50,10 @@ WITH fts AS (
   LIMIT sqlc.arg('fts_limit')::int
 ),
 semantic AS (
-  SELECT n.id, COALESCE((SELECT (nn.data->>'text')::text FROM note_nodes nn WHERE nn.note_id = n.id AND nn.deleted_at IS NULL AND nn.data->>'text' IS NOT NULL AND nn.data->>'text' <> '' ORDER BY nn.position ASC LIMIT 1), 'Untitled')::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
+  SELECT n.id, COALESCE(
+      NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
+      'Untitled'
+    )::text AS title, n.content, n.excerpt, n.updated_at, n.context_id,
          COALESCE(unp.favorite, FALSE) AS favorite,
          COALESCE(unp.archived, FALSE) AS archived,
          row_number() OVER (ORDER BY ne.embedding <=> sqlc.arg('embedding')::vector) as rank

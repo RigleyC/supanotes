@@ -121,6 +121,19 @@ func (m *RoomManager) GetOrCreateRoom(ctx context.Context, noteID string, machin
 	return result.(*Room), nil
 }
 
+func (m *RoomManager) HasActiveRoom(noteID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	room, ok := m.rooms[noteID]
+	if !ok {
+		return false
+	}
+	room.mu.Lock()
+	hasClients := len(room.clients) > 0
+	room.mu.Unlock()
+	return hasClients
+}
+
 func (m *RoomManager) BroadcastIfActive(noteID string, update []byte) bool {
 	startTotal := time.Now()
 	m.mu.Lock()

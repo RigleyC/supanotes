@@ -18,6 +18,14 @@ func JWT(cfg *config.Config) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			header := c.Request().Header.Get(echo.HeaderAuthorization)
 			if header == "" {
+				// Fallback for WebSocket connections: mobile platforms (Android/iOS)
+				// cannot send custom headers during WS handshake, so the token is
+				// passed as a query param instead.
+				if q := c.QueryParam("token"); q != "" {
+					header = "Bearer " + q
+				}
+			}
+			if header == "" {
 				return web.JSONError(c, http.StatusUnauthorized, "missing authorization header")
 			}
 

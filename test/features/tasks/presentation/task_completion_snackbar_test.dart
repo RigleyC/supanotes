@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
@@ -106,7 +107,6 @@ void main() {
                   data: '{"text":"Daily Task","completed":false}',
                   createdAt: now,
                   updatedAt: now,
-                  isDirty: false,
                 )
               ],
               taskMetadata: {

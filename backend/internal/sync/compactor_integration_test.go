@@ -167,56 +167,6 @@ func TestCompactorCompactAllWithNoUpdates(t *testing.T) {
 	require.NoError(t, err, "CompactAll with no updates should not error")
 }
 
-func TestCompactorPreservesUnmodifiedNodesAcrossCycles(t *testing.T) {
-	ctx := context.Background()
-	pool := setupTestDB(t)
-	compactor := NewCompactor(pool)
-	noteID := uuid.New().String()
-	insertNoteForCompactor(t, ctx, pool, noteID)
-
-	// Insert two pre-existing note_nodes rows that represent "established" state.
-	nodeA := uuid.New().String()
-	nodeB := uuid.New().String()
-	_, err := pool.Exec(ctx, `
-		INSERT INTO note_nodes (id, note_id, parent_id, position, type, data, created_at)
-		VALUES ($1, $2, NULL, 0, 'paragraph', '{"text":"established A"}'::jsonb, NOW()),
-		       ($3, $2, NULL, 1, 'paragraph', '{"text":"established B"}'::jsonb, NOW())
-		ON CONFLICT DO NOTHING`, nodeA, noteID, nodeB)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		pool.Exec(ctx, "DELETE FROM note_nodes WHERE note_id = $1", noteID)
-		pool.Exec(ctx, "DELETE FROM note_yjs_updates WHERE note_id = $1", noteID)
-		pool.Exec(ctx, "DELETE FROM note_yjs_states WHERE note_id = $1", noteID)
-		pool.Exec(ctx, "DELETE FROM notes WHERE id = $1", noteID)
-	})
-
-	// Seed the snapshot with both nodes by running compaction once.
-	snapshotUpdate, err := ReconstructYDocFromNodes(ctx, pool, noteID)
-	require.NoError(t, err)
-	insertYjsUpdate(t, ctx, pool, noteID, snapshotUpdate)
-	require.NoError(t, compactor.CompactNote(ctx, noteID))
-
-	// Now push a SECOND update that only mutates node A's YText content.
-	docPartial := crdt.New(crdt.WithGC(false))
-	textA := docPartial.GetText("content/" + nodeA)
-	docPartial.Transact(func(txn *crdt.Transaction) {
-		textA.Insert(txn, 0, "CHANGED", nil)
-	})
-	partialUpdate := crdt.EncodeStateAsUpdateV1(docPartial, nil)
-	insertYjsUpdate(t, ctx, pool, noteID, partialUpdate)
-
-	// Compact again — projection must NOT lose node B (which is absent from this update).
-	require.NoError(t, compactor.CompactNote(ctx, noteID))
-
-	var count int
-	require.NoError(t, pool.QueryRow(ctx, "SELECT COUNT(*) FROM note_nodes WHERE note_id = $1 AND deleted_at IS NULL", noteID).Scan(&count))
-	assert.Equal(t, 2, count, "node B must still be present after partial-update compaction")
-
-	var textB string
-	require.NoError(t, pool.QueryRow(ctx, "SELECT data->>'text' FROM note_nodes WHERE id = $1", nodeB).Scan(&textB))
-	assert.Equal(t, "established B", textB)
-}
-
 func TestCompactorRunDebouncedProjectionProjects(t *testing.T) {
 	ctx := context.Background()
 	pool := setupTestDB(t)
@@ -225,7 +175,6 @@ func TestCompactorRunDebouncedProjectionProjects(t *testing.T) {
 	noteID := uuid.New().String()
 	insertNoteForCompactor(t, ctx, pool, noteID)
 	t.Cleanup(func() {
-		pool.Exec(ctx, "DELETE FROM note_nodes WHERE note_id = $1", noteID)
 		pool.Exec(ctx, "DELETE FROM note_yjs_updates WHERE note_id = $1", noteID)
 		pool.Exec(ctx, "DELETE FROM note_yjs_states WHERE note_id = $1", noteID)
 		pool.Exec(ctx, "DELETE FROM notes WHERE id = $1", noteID)
@@ -249,9 +198,9 @@ func TestCompactorRunDebouncedProjectionProjects(t *testing.T) {
 
 	require.NoError(t, compactor.RunDebouncedProjectionForTest(ctx, ydocSvc, noteID, update))
 
-	var dataText string
-	require.NoError(t, pool.QueryRow(ctx, "SELECT data->>'text' FROM note_nodes WHERE id = $1", nodeID).Scan(&dataText))
-	assert.Equal(t, "hi", dataText)
+	var content string
+	require.NoError(t, pool.QueryRow(ctx, "SELECT content FROM notes WHERE id = $1", noteID).Scan(&content))
+	assert.Equal(t, "hi", content)
 }
 
 func TestCompactorStartScheduler(t *testing.T) {

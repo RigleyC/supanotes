@@ -21,8 +21,14 @@ STOP conditions, and update your row when done.
 | 055  | Avoid Full-Scan `listEquals` in `NoteEditor.didUpdateWidget` | P3  | S  | —                    | TODO   |
 | 056  | Migrate NoteEditor Body to `SliverFillRemaining`       | P3       | M      | 046 (recommended)    | TODO   |
 | 057  | Unify Editor Document Diff Logic (Stretch Plan)        | P3       | L      | 046, 047, 048, 049   | TODO   |
+| 058  | Concluir a arquitetura Yjs-first (correções + visão 2-nível CRDT) | P1 | L | — | DONE |
+| 059  | Presence em memória + notificações event-driven (P6 do 058)     | P3 | M | 058 | TODO |
+| 060  | Agente como executor de operações declarativas (P5 do 058)       | P3 | L | 058 | TODO |
+| 061  | Fix Task Sync Data Loss & Metadata Propagation | P0 | S | 058 | DONE |
 
 ## Dependency notes
+
+- **058** é independente dos planos de editor (046–057): toca sync/projeção/agente. Pode correr em paralelo, exceto se tocar os mesmos arquivos de `note_sync_coordinator` (coordenar com 047/049). Fases P0/P1 do 058 têm prioridade sobre 046+.
 
 - **046 must land first.** It is the characterization-test safety net that
   makes 047 (deletion race), 048 (flush-dispose race), and 049 (diff-covers-

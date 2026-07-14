@@ -1,11 +1,10 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../features/tasks/domain/task_recurrence.dart';
-
 import '../database.dart';
 import '../tables/tasks.dart';
 import '../../utils/fractional_indexing.dart';
+import '../../utils/recurrence.dart';
 import 'task_completions_dao.dart';
 
 part 'tasks_dao.g.dart';
@@ -98,7 +97,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     await transaction(() async {
       var updatedCompanion = companion.copyWith(
         updatedAt: Value(now),
-        isDirty: const Value(true),
       );
 
       if (companion.recurrence.present && companion.recurrence.value != null) {
@@ -109,10 +107,10 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         if (current != null && current.status == 'done') {
           final recurrence = companion.recurrence.value!;
           final baseTime = current.completedAt ?? current.dueDate ?? now;
-          var nextDue = _nextDueDate(from: baseTime, recurrence: recurrence);
+          var nextDue = nextDueDate(from: baseTime, recurrence: recurrence);
           if (nextDue != null) {
             final today = DateTime(now.year, now.month, now.day);
-            nextDue = _catchUpDueDate(
+            nextDue = catchUpDueDate(
               from: nextDue,
               recurrence: recurrence,
               today: today,
@@ -148,7 +146,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     await transaction(() async {
       for (final task in overdue) {
         final recurrence = task.recurrence!;
-        final currentDue = _catchUpDueDate(
+        final currentDue = catchUpDueDate(
           from: task.dueDate!,
           recurrence: recurrence,
           today: today,
@@ -159,7 +157,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
             TasksCompanion(
               dueDate: Value(currentDue),
               updatedAt: Value(now),
-              isDirty: const Value(true),
             ),
           );
         }
@@ -208,7 +205,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       if (recurrence != null &&
           taskDueDate != null &&
           taskDueDate.isBefore(today)) {
-        taskDueDate = _catchUpDueDate(
+        taskDueDate = catchUpDueDate(
           from: taskDueDate,
           recurrence: recurrence,
           today: today,
@@ -226,7 +223,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
       // 3. If recurring, schedule the next occurrence on the same row.
       if (recurrence != null) {
-        nextDue = _nextDueDate(
+        nextDue = nextDueDate(
           from: taskDueDate ?? now,
           recurrence: recurrence,
         );
@@ -237,7 +234,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
               completedAt: const Value(null),
               status: const Value('open'),
               updatedAt: Value(now),
-              isDirty: const Value(true),
             ),
           );
           return;
@@ -250,7 +246,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
           status: const Value('done'),
           completedAt: Value(now),
           updatedAt: Value(now),
-          isDirty: const Value(true),
         ),
       );
     });
@@ -272,7 +267,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     await (update(tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(
         deletedAt: Value(DateTime.now().toUtc()),
-        isDirty: const Value(true),
       ),
     );
   }
@@ -288,7 +282,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
           completedAt: const Value(null),
           dueDate: originalDueDate != null ? Value(originalDueDate) : const Value.absent(),
           updatedAt: Value(DateTime.now()),
-          isDirty: const Value(true),
         ),
       );
       debugPrint('[TasksDao] reopenTask: task row updated');
@@ -301,27 +294,9 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     debugPrint('[TasksDao] reopenTask: transaction committed');
   }
 
-  /// Returns every task that has unsynced local changes.
-  Future<List<TaskData>> getDirtyTasks() {
-    return (select(tasks)..where((t) => t.isDirty.equals(true))).get();
-  }
-
-  /// Flips the dirty flag off only if the row's [updatedAt] still matches
-  /// [pushedUpdatedAt] — if the user edited while the push was in flight
-  /// the flag stays on so the next sync round picks up the new change.
-  Future<void> clearDirtyFlag(String id, DateTime pushedUpdatedAt) async {
-    await (update(tasks)
-          ..where((t) => t.id.equals(id) & t.updatedAt.equals(pushedUpdatedAt)))
-        .write(const TasksCompanion(isDirty: Value(false)));
-  }
-
-  /// Stores a task that came back from the backend. Uses
-  /// `insertOnConflictUpdate` so a re-pulled row replaces the local copy
-  /// in place, and always sets [isDirty] to `false` so the row does not
-  /// get pushed back to the server.
+  /// Stores a task that came from the server projection.
   Future<void> upsertFromRemote(TaskData task) async {
-    final incoming = task.copyWith(isDirty: false);
-    await into(tasks).insertOnConflictUpdate(incoming);
+    await into(tasks).insertOnConflictUpdate(task);
   }
 
   Future<void> reorderTasksBatch(List<String> orderedIds) async {
@@ -347,60 +322,4 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       await action();
     });
   }
-}
-
-/// Pure helper that returns the next due date for a given [recurrence]
-/// rule starting from [from]. Returns `null` when the rule is not
-/// recognised, in which case the caller leaves the task as completed
-/// without scheduling a follow-up.
-DateTime? _nextDueDate({
-  required DateTime from,
-  required TaskRecurrence recurrence,
-}) {
-  DateTime? raw;
-  switch (recurrence) {
-    case TaskRecurrence.daily:
-      raw = from.add(const Duration(days: 1));
-    case TaskRecurrence.weekdays:
-      var day = from.add(const Duration(days: 1));
-      // Skip Saturday (6) and Sunday (7) — Dart's DateTime.weekday is
-      // 1-based with Monday=1.
-      while (day.weekday == DateTime.saturday ||
-          day.weekday == DateTime.sunday) {
-        day = day.add(const Duration(days: 1));
-      }
-      raw = day;
-    case TaskRecurrence.weekly:
-      raw = from.add(const Duration(days: 7));
-    case TaskRecurrence.monthly:
-      final desiredMonth = from.month + 1;
-      final overflow = desiredMonth > 12;
-      final year = from.year + (overflow ? 1 : 0);
-      final month = overflow ? 1 : desiredMonth;
-      // Clamp the day to the last valid day of the target month so e.g.
-      // Jan 31 → Feb 28 (or 29 in a leap year) rather than overflowing
-      // into March.
-      final lastDayOfTarget = DateTime(year, month + 1, 0).day;
-      final day = from.day <= lastDayOfTarget ? from.day : lastDayOfTarget;
-      raw = DateTime(year, month, day);
-  }
-
-  return raw;
-}
-
-DateTime _catchUpDueDate({
-  required DateTime from,
-  required TaskRecurrence recurrence,
-  required DateTime today,
-}) {
-  var currentDue = from;
-  var next = _nextDueDate(from: currentDue, recurrence: recurrence);
-  while (next != null && next.isBefore(today)) {
-    currentDue = next;
-    next = _nextDueDate(from: currentDue, recurrence: recurrence);
-  }
-  if (next != null && next.isAtSameMomentAs(today)) {
-    currentDue = next;
-  }
-  return currentDue;
 }

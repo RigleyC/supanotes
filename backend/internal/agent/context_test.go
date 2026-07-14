@@ -97,21 +97,6 @@ func (s *stubQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([
 	}
 	panic("unimplemented")
 }
-func (s *stubQuerier) InsertNode(ctx context.Context, arg sqlcgen.InsertNodeParams) (sqlcgen.NoteNode, error) {
-	return sqlcgen.NoteNode{}, nil
-}
-func (s *stubQuerier) UpdateNode(ctx context.Context, arg sqlcgen.UpdateNodeParams) (sqlcgen.NoteNode, error) {
-	return sqlcgen.NoteNode{}, nil
-}
-func (s *stubQuerier) DeleteNode(ctx context.Context, id pgtype.UUID) error {
-	return nil
-}
-func (s *stubQuerier) GetNodesByNoteId(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.NoteNode, error) {
-	return nil, nil
-}
-func (s *stubQuerier) DeleteNodesByNoteID(ctx context.Context, noteID pgtype.UUID) error {
-	return nil
-}
 func (s *stubQuerier) UpdateNoteSearchVector(ctx context.Context, arg sqlcgen.UpdateNoteSearchVectorParams) error {
 	return nil
 }
@@ -123,12 +108,6 @@ func (s *stubQuerier) GetTasksByNodeID(ctx context.Context, nodeID pgtype.UUID) 
 }
 func (s *stubQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
 	return nil
-}
-func (s *stubQuerier) GetSyncNoteNodes(ctx context.Context, arg sqlcgen.GetSyncNoteNodesParams) ([]sqlcgen.NoteNode, error) {
-	return nil, nil
-}
-func (s *stubQuerier) UpsertNoteNode(ctx context.Context, arg sqlcgen.UpsertNoteNodeParams) (sqlcgen.NoteNode, error) {
-	return sqlcgen.NoteNode{}, nil
 }
 func (s *stubQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
@@ -142,9 +121,6 @@ func (s *stubQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen
 
 // remaining Querier methods (unused by context tests)
 func (s *stubQuerier) AddTagToNote(context.Context, sqlcgen.AddTagToNoteParams) error {
-	panic("unimplemented")
-}
-func (s *stubQuerier) AppendToNoteContent(context.Context, sqlcgen.AppendToNoteContentParams) (sqlcgen.Note, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) CleanupOldMessages(context.Context) error               { panic("unimplemented") }
@@ -267,9 +243,6 @@ func (s *stubQuerier) GetSyncNotes(context.Context, sqlcgen.GetSyncNotesParams) 
 func (s *stubQuerier) GetSyncTags(context.Context, sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetSyncTasks(context.Context, sqlcgen.GetSyncTasksParams) ([]sqlcgen.Task, error) {
-	panic("unimplemented")
-}
 func (s *stubQuerier) GetTags(context.Context, pgtype.UUID) ([]sqlcgen.Tag, error) {
 	panic("unimplemented")
 }
@@ -365,9 +338,6 @@ func (s *stubQuerier) UpdateRoutineLastRunAt(context.Context, pgtype.UUID) error
 	panic("unimplemented")
 }
 func (s *stubQuerier) UpsertTaskCompletion(context.Context, sqlcgen.UpsertTaskCompletionParams) error {
-	panic("unimplemented")
-}
-func (s *stubQuerier) GetSyncTaskCompletions(context.Context, sqlcgen.GetSyncTaskCompletionsParams) ([]sqlcgen.TaskCompletion, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetSyncNoteTags(context.Context, pgtype.UUID) ([]sqlcgen.NoteTag, error) {

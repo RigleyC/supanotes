@@ -14,24 +14,18 @@ import 'dart:developer' as dev;
 
 import 'package:super_editor/super_editor.dart';
 
-import '../../../core/database/database.dart';
+import 'note_node.dart';
 import 'node_sync_manager.dart';
 
 class NoteSyncCoordinator {
   late final NodeSyncManager _nodeSyncManager;
 
   NoteSyncCoordinator({
-    required AppDatabase database,
-    required String noteId,
-    required String userId,
     required MutableDocument document,
     required Editor editor,
   })  : _document = document,
         _editor = editor {
     _nodeSyncManager = NodeSyncManager(
-      database: database,
-      noteId: noteId,
-      userId: userId,
       document: document,
     );
   }
@@ -51,10 +45,12 @@ class NoteSyncCoordinator {
   static MutableDocument documentFromNodes(List<NoteNode> nodes) =>
       NodeSyncManager.documentFromNodes(nodes);
 
+  // Remote NoteNode changes should come through YDoc observation
   void updateNodesIncrementally(List<NoteNode> incomingNodes) {
     _applyRemote(() => _applyIncomingNodes(incomingNodes));
   }
 
+  // Remote task state changes should come through YDoc observation
   void syncTaskStates(Map<String, bool> taskCompletionMap) {
     _applyRemote(() => _applyTaskCompletionStates(taskCompletionMap));
   }
@@ -79,6 +75,13 @@ class NoteSyncCoordinator {
   }
 
   void _applyIncomingNodes(List<NoteNode> incomingNodes) {
+    if (incomingNodes.isEmpty) {
+      // The YDoc is completely empty (happens on newly created notes).
+      // If we proceed, we would delete the local fallback node,
+      // leaving the MutableDocument empty and breaking the editor cursor.
+      return;
+    }
+
     final dirtyIds = _nodeSyncManager.locallyDirtyNodeIds;
     final requests = <EditRequest>[];
     final incomingIds = incomingNodes.map((n) => n.id).toSet();
