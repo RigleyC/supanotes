@@ -86,13 +86,6 @@ class NoteSyncCoordinator {
     final requests = <EditRequest>[];
     final incomingIds = incomingNodes.map((n) => n.id).toSet();
 
-    for (final node in _document) {
-      if (!incomingIds.contains(node.id)) {
-        if (dirtyIds.contains(node.id)) continue;
-        requests.add(DeleteNodeRequest(nodeId: node.id));
-      }
-    }
-
     for (int i = 0; i < incomingNodes.length; i++) {
       final incoming = incomingNodes[i];
       final existingNode = _document.getNodeById(incoming.id);
@@ -134,6 +127,13 @@ class NoteSyncCoordinator {
             newNode: newNode,
           ),
         );
+      }
+    }
+
+    for (final node in _document.toList()) {
+      if (!incomingIds.contains(node.id)) {
+        if (dirtyIds.contains(node.id)) continue;
+        requests.add(DeleteNodeRequest(nodeId: node.id));
       }
     }
 

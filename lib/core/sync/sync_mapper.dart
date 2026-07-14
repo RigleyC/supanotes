@@ -22,6 +22,8 @@ class SyncMapper {
     'id': n.id,
     'user_id': n.userId,
     'context_id': n.contextId,
+    // 'content' and 'excerpt' are intentionally excluded from the push payload.
+    // The Go backend automatically derives them from the synced Yjs state.
     'collapse_images': n.collapseImages,
     'embedding_status': n.embeddingStatus,
     'shared_permission': n.permission ?? '',

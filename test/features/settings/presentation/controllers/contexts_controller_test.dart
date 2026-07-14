@@ -9,7 +9,7 @@ class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
 void main() {
   group('contextsProvider', () {
-    ProviderContainer _makeContainer() {
+    ProviderContainer makeContainer() {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getSessionData()).thenAnswer((_) async => const {});
       when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
@@ -22,7 +22,7 @@ void main() {
     }
 
     test('returns contexts from cache when available', () async {
-      final container = _makeContainer();
+      final container = makeContainer();
       await container.read(sessionCacheProvider.notifier).hydrate({
         'contexts': [
           {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/reearth/ygo/crdt"
 
 	"github.com/RigleyC/supanotes/internal/agent"
 	"github.com/RigleyC/supanotes/internal/attachments"
@@ -248,6 +250,95 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	memoriesSvc := memories.NewService(memoriesRepo, embeddingClient, llmFactory.For(llm.TaskTypeAgentHelper))
 	memoriesH := memories.NewHandler(memoriesSvc)
 	protected.GET("/memories", memoriesH.List)
+
+	// Admin route for forced migration
+	protected.POST("/admin/migrate-legacy", func(c echo.Context) error {
+		reqCtx := c.Request().Context()
+		rows, err := pool.Query(reqCtx, "SELECT DISTINCT note_id::text FROM note_yjs_states UNION SELECT DISTINCT note_id::text FROM note_yjs_updates")
+		if err != nil {
+			return c.JSON(500, map[string]string{"error": err.Error()})
+		}
+		var allNoteIDs []string
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err == nil {
+				allNoteIDs = append(allNoteIDs, id)
+			}
+		}
+		rows.Close()
+
+		var migrated []string
+		for _, noteID := range allNoteIDs {
+			// Check if it needs migration
+			state, err := syncpkg.LoadYDocState(reqCtx, pool, noteID)
+			if err != nil || len(state) == 0 {
+				continue
+			}
+			doc := crdt.New(crdt.WithGC(false))
+			if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
+				continue
+			}
+
+			// Use the same logic to detect if migration is needed
+			needsMigration := false
+			nodesMap := doc.GetMap("nodes")
+			tasksMap := doc.GetMap("tasks")
+			if nodesMap != nil {
+				for _, key := range nodesMap.Keys() {
+					raw, ok := nodesMap.Get(key)
+					if !ok {
+						continue
+					}
+					rawStr, ok := raw.(string)
+					if !ok {
+						continue
+					}
+					var nd struct {
+						Type string          `json:"type"`
+						Data json.RawMessage `json:"data"`
+					}
+					if err := json.Unmarshal([]byte(rawStr), &nd); err != nil {
+						continue
+					}
+					if nd.Type != "task" {
+						continue
+					}
+					var dataFields map[string]any
+					if err := json.Unmarshal(nd.Data, &dataFields); err != nil {
+						continue
+					}
+					_, hasLegacyCompleted := dataFields["completed"]
+					hasTaskEntry := false
+					if tasksMap != nil {
+						_, hasTaskEntry = tasksMap.Get(key)
+					}
+					if hasLegacyCompleted && !hasTaskEntry {
+						needsMigration = true
+						break
+					}
+				}
+			}
+
+			if needsMigration {
+				// We force a load through YDocService which implicitly runs MigrateLegacyDoc,
+				// and then we generate a dummy mutation to force the flusher to persist it.
+				// This relies on the standard server-side mechanisms!
+				dummyDoc, err := ydocSvc.DocFor(reqCtx, noteID)
+				if err != nil {
+					log.Error().Err(err).Msgf("admin migrate: DocFor failed for %s", noteID)
+					continue
+				}
+				// Force a dummy update just to trigger persistence and sync
+				err = ydocSvc.ApplyNodeMutation(reqCtx, noteID, crdt.EncodeStateAsUpdateV1(dummyDoc, nil))
+				if err != nil {
+					log.Error().Err(err).Msgf("admin migrate: ApplyNodeMutation failed for %s", noteID)
+					continue
+				}
+				migrated = append(migrated, noteID)
+			}
+		}
+		return c.JSON(200, map[string]interface{}{"migrated": migrated})
+	})
 	protected.POST("/memories", memoriesH.Create)
 	protected.DELETE("/memories/:id", memoriesH.Delete)
 

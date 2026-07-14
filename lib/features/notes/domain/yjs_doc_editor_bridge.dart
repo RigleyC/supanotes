@@ -132,6 +132,7 @@ class YjsDocEditorBridge {
     } finally {
       _isFlushingLocal = false;
     }
+    _onDocChanged?.call();
     dev.log('[YjsBridge] onLocalFlush DONE elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
   }
 
@@ -296,6 +297,7 @@ class YjsDocEditorBridge {
     });
     final update = encodeStateAsUpdate(_doc);
     _sendUpdate(update);
+    _onDocChanged?.call();
   }
 
   void updateTaskMetadataInYDoc(
@@ -321,6 +323,7 @@ class YjsDocEditorBridge {
 
     final update = encodeStateAsUpdate(_doc);
     _sendUpdate(update);
+    _onDocChanged?.call();
   }
 
   void _setTaskField(String nodeId, bool completed, String title) {

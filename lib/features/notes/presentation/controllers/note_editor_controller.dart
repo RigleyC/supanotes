@@ -154,9 +154,9 @@ class NoteEditorController extends ChangeNotifier {
 
   @override
   Future<void> dispose() async {
+    await _coordinator?.dispose();
     _bridge?.dispose();
     _bridge = null;
-    await _coordinator?.dispose();
     editor?.dispose();
     document?.dispose();
     composer?.dispose();

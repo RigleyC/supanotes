@@ -171,6 +171,8 @@ class NodeSyncManager {
       if (span.isStart) {
         String attributionName;
         final attribution = span.attribution;
+        if (attribution.id == 'composing') continue;
+        
         if (attribution == boldAttribution) {
           attributionName = 'bold';
         } else if (attribution == italicsAttribution) {
@@ -193,6 +195,8 @@ class NodeSyncManager {
       } else {
         String attributionName;
         final attribution = span.attribution;
+        if (attribution.id == 'composing') continue;
+        
         if (attribution == boldAttribution) {
           attributionName = 'bold';
         } else if (attribution == italicsAttribution) {
@@ -224,7 +228,6 @@ class NodeSyncManager {
     if (node is TaskNode) {
       return jsonEncode({
         ..._serializeAttributedText(node.text),
-        'completed': node.isComplete,
         'indent': node.indent,
       });
     }
@@ -408,8 +411,9 @@ class NodeSyncManager {
       final start = spanMap['start'] as int?;
       final end = spanMap['end'] as int?;
 
-      if (attributionName == null || start == null || end == null || end == -1)
+      if (attributionName == null || start == null || end == null || end == -1) {
         continue;
+      }
 
       Attribution attribution;
       if (attributionName == 'bold') {

@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:mocktail/mocktail.dart';
 
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';

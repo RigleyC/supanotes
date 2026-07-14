@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
 import '../../../features/tasks/domain/task_recurrence.dart';
-import '../../../features/notes/domain/note_strings.dart';
 import '../database.dart';
 import '../tables/notes.dart';
 import '../tables/user_note_preferences.dart';

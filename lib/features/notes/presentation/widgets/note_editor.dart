@@ -153,12 +153,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       setState(() {});
     }
 
-    if (widget.taskMetadata != oldWidget.taskMetadata) {
-      _controller?.syncTaskStates(
-        widget.taskMetadata.map((k, v) => MapEntry(k, v.isCompleted)),
-      );
-    }
-
     // NOTE: nodes prop is reserved for future incremental sync;
     // currently always const [] in production.
   }
@@ -168,13 +162,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     setState(() {
       if (!widget.isReadOnly && _controller!.hasDocument) {
         _controller!.document!.addListener(_onDocumentChanged);
-        _controller!.syncTaskStates(
-          widget.taskMetadata.map((k, v) => MapEntry(k, v.isCompleted)),
-        );
       }
     });
   }
 
+  @override
   void dispose() {
     _controller?.removeListener(_onControllerReady);
     if (!widget.isReadOnly) {

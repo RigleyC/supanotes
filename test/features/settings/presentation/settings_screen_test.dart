@@ -50,18 +50,18 @@ Widget buildApp(Widget child, {required ProviderContainer container}) {
   final router = GoRouter(
     initialLocation: AppRoutes.settings,
     routes: [
-      GoRoute(path: AppRoutes.settings, builder: (_, __) => child),
+      GoRoute(path: AppRoutes.settings, builder: (_, _) => child),
       GoRoute(
         path: AppRoutes.soul,
-        builder: (_, __) => const Scaffold(body: Text('soul-stub')),
+        builder: (_, _) => const Scaffold(body: Text('soul-stub')),
       ),
       GoRoute(
         path: AppRoutes.contexts,
-        builder: (_, __) => const Scaffold(body: Text('contexts-stub')),
+        builder: (_, _) => const Scaffold(body: Text('contexts-stub')),
       ),
       GoRoute(
         path: AppRoutes.telegram,
-        builder: (_, __) => const Scaffold(body: Text('telegram-stub')),
+        builder: (_, _) => const Scaffold(body: Text('telegram-stub')),
       ),
     ],
   );

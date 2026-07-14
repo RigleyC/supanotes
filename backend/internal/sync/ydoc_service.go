@@ -125,7 +125,7 @@ func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, err
 	slog.Info("DocFor: ApplyUpdateV1 done", "note_id", noteID, "elapsed_ms", time.Since(startApply).Milliseconds())
 
 	// P4 migration: upgrade legacy docs where task data is inline in node `data`.
-	migrateLegacyDoc(doc)
+	MigrateLegacyDoc(doc)
 
 	s.mu.Lock()
 	// Double-check in case another goroutine loaded concurrently.
@@ -153,11 +153,11 @@ type legacyNode struct {
 	Data json.RawMessage `json:"data"`
 }
 
-// migrateLegacyDoc upgrades a legacy YDoc where task fields (completed, dueDate,
+// MigrateLegacyDoc upgrades a legacy YDoc where task fields (completed, dueDate,
 // recurrence, lastCompletedAt) are stored inline in the node `data` map.
 // It moves these fields into YMap("tasks") entries and removes them from node data.
 // Idempotent: skips if YMap("tasks") already has entries.
-func migrateLegacyDoc(doc *crdt.Doc) {
+func MigrateLegacyDoc(doc *crdt.Doc) {
 	tasksMap := doc.GetMap("tasks")
 	if tasksMap != nil && len(tasksMap.Keys()) > 0 {
 		return
@@ -180,7 +180,7 @@ func migrateLegacyDoc(doc *crdt.Doc) {
 		}
 		var nd legacyNode
 		if err := json.Unmarshal([]byte(rawStr), &nd); err != nil {
-			slog.Warn("migrateLegacyDoc: decode error", "key", key, "error", err)
+			slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
 			continue
 		}
 		if nd.Type != "task" {
@@ -188,7 +188,7 @@ func migrateLegacyDoc(doc *crdt.Doc) {
 		}
 		var dataMap map[string]interface{}
 		if err := json.Unmarshal(nd.Data, &dataMap); err != nil {
-			slog.Warn("migrateLegacyDoc: decode error", "key", key, "error", err)
+			slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
 			continue
 		}
 		if _, ok := dataMap["completed"]; ok {
@@ -201,11 +201,14 @@ func migrateLegacyDoc(doc *crdt.Doc) {
 		return
 	}
 
-	slog.Info("migrateLegacyDoc: migrating doc to P4 schema")
+	slog.Info("MigrateLegacyDoc: migrating doc to P4 schema")
 	if tasksMap == nil {
 		tasksMap = doc.GetMap("tasks")
 	}
 	doc.Transact(func(txn *crdt.Transaction) {
+		taskUpdates := make(map[string]string)
+		nodeUpdates := make(map[string]string)
+
 		for _, key := range nodesMap.Keys() {
 			raw, ok := nodesMap.Get(key)
 			if !ok {
@@ -217,7 +220,7 @@ func migrateLegacyDoc(doc *crdt.Doc) {
 			}
 			var nd legacyNode
 			if err := json.Unmarshal([]byte(rawStr), &nd); err != nil {
-				slog.Warn("migrateLegacyDoc: decode error", "key", key, "error", err)
+				slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
 				continue
 			}
 			if nd.Type != "task" {
@@ -225,7 +228,7 @@ func migrateLegacyDoc(doc *crdt.Doc) {
 			}
 			var dataMap map[string]interface{}
 			if err := json.Unmarshal(nd.Data, &dataMap); err != nil {
-				slog.Warn("migrateLegacyDoc: decode error", "key", key, "error", err)
+				slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
 				continue
 			}
 			completedVal, hasCompleted := dataMap["completed"]
@@ -253,10 +256,10 @@ func migrateLegacyDoc(doc *crdt.Doc) {
 
 			entryJSON, err := json.Marshal(entry)
 			if err != nil {
-				slog.Warn("migrateLegacyDoc: marshal taskEntry error", "key", key, "error", err)
+				slog.Warn("MigrateLegacyDoc: marshal taskEntry error", "key", key, "error", err)
 				continue
 			}
-			tasksMap.Set(txn, nd.ID, string(entryJSON))
+			taskUpdates[nd.ID] = string(entryJSON)
 
 			delete(dataMap, "completed")
 			delete(dataMap, "dueDate")
@@ -264,25 +267,32 @@ func migrateLegacyDoc(doc *crdt.Doc) {
 			delete(dataMap, "lastCompletedAt")
 			cleanedData, err := json.Marshal(dataMap)
 			if err != nil {
-				slog.Warn("migrateLegacyDoc: marshal cleanedData error", "key", key, "error", err)
+				slog.Warn("MigrateLegacyDoc: marshal cleanedData error", "key", key, "error", err)
 				continue
 			}
 
 			var updatedNode map[string]interface{}
 			if err := json.Unmarshal([]byte(rawStr), &updatedNode); err != nil {
-				slog.Warn("migrateLegacyDoc: unmarshal updatedNode error", "key", key, "error", err)
+				slog.Warn("MigrateLegacyDoc: unmarshal updatedNode error", "key", key, "error", err)
 				continue
 			}
 			updatedNode["data"] = string(cleanedData)
 			updatedJSON, err := json.Marshal(updatedNode)
 			if err != nil {
-				slog.Warn("migrateLegacyDoc: marshal updatedNode error", "key", key, "error", err)
+				slog.Warn("MigrateLegacyDoc: marshal updatedNode error", "key", key, "error", err)
 				continue
 			}
-			nodesMap.Set(txn, key, string(updatedJSON))
+			nodeUpdates[key] = string(updatedJSON)
+		}
+
+		for k, v := range taskUpdates {
+			tasksMap.Set(txn, k, v)
+		}
+		for k, v := range nodeUpdates {
+			nodesMap.Set(txn, k, v)
 		}
 	})
-	slog.Info("migrateLegacyDoc: migration complete")
+	slog.Info("MigrateLegacyDoc: migration complete")
 }
 
 func (s *YDocService) ApplyNodeMutation(ctx context.Context, noteID string, update []byte) error {

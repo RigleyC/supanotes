@@ -101,6 +101,12 @@ class SyncService {
   StreamSubscription<bool>? _connectivitySub;
   Timer? _syncTimer;
 
+  /// Checks if a note is currently open and managed by the real-time WebSocket connection.
+  /// If true, we should skip REST sync (push/pull) for its YDoc state to avoid races.
+  bool isNoteUnderActiveWsManagement(String noteId) {
+    return _activeNoteId != null && _activeNoteId == noteId;
+  }
+
   /// Connect real-time Yjs sync for [noteId] when it becomes active.
   Future<void> connectNote(
     String noteId, {
@@ -281,7 +287,7 @@ class SyncService {
     final allYjsStates = await (_db.select(_db.localYjsStates)).get();
     final yjsStates = <LocalYjsState>[];
     for (final s in allYjsStates) {
-      if (s.noteId == _activeNoteId) continue;
+      if (isNoteUnderActiveWsManagement(s.noteId)) continue;
       final lastSync = _lastYjsSyncAt[s.noteId];
       if (lastSync == null || s.updatedAt.isAfter(lastSync)) {
         // Migration: decode and re-encode to strip out buggy formatting
@@ -444,8 +450,8 @@ class SyncService {
       final remoteState = _mapper.localYjsStateFromJson(
         raw as Map<String, dynamic>,
       );
-      if (_activeNoteId != null && remoteState.noteId == _activeNoteId) {
-        debugPrint('[SyncService] pull: skipping note_yjs_state for active note=$_activeNoteId');
+      if (isNoteUnderActiveWsManagement(remoteState.noteId)) {
+        debugPrint('[SyncService] pull: skipping note_yjs_state for active note=${remoteState.noteId}');
         continue;
       }
 

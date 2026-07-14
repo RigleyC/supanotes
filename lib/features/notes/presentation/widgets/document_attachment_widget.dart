@@ -80,7 +80,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
       },
       loading: () =>
           AttachmentUploadingCapsule(fileName: '...', onCancel: onDelete),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
 
     return SelectableBox(

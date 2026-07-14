@@ -37,12 +37,12 @@ Widget _wrap(Widget child, {required ProviderContainer container}) {
     routes: [
       GoRoute(
         path: AppRoutes.login,
-        builder: (_, __) => const Scaffold(body: Text('login-stub')),
+        builder: (_, _) => const Scaffold(body: Text('login-stub')),
       ),
-      GoRoute(path: AppRoutes.register, builder: (_, __) => child),
+      GoRoute(path: AppRoutes.register, builder: (_, _) => child),
       GoRoute(
         path: AppRoutes.home,
-        builder: (_, __) => const Scaffold(body: Text('home-stub')),
+        builder: (_, _) => const Scaffold(body: Text('home-stub')),
       ),
     ],
   );

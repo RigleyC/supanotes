@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dart_crdt/dart_crdt.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';

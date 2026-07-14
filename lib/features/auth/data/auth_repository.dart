@@ -9,6 +9,7 @@
 /// The repository does **not** know about Riverpod or widget state — the
 /// [AuthController] is responsible for translating these results into
 /// application state.
+library;
 import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
