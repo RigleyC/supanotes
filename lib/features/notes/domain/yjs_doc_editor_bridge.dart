@@ -60,23 +60,12 @@ class YjsDocEditorBridge {
       return;
     }
     final sw = Stopwatch()..start();
-    if (changedKeys != null && changedKeys.length < _incrementalUpdateThreshold) {
-      final nodes = <NoteNode>[];
-      for (final key in changedKeys) {
-        final node = noteNodeFromYDoc(_doc, key);
-        if (node != null) nodes.add(node);
-      }
-      if (nodes.isNotEmpty) {
-        _coordinator.updateNodesIncrementally(nodes);
-        dev.log('[YjsBridge] _onNodesChanged: incremental update ${nodes.length} nodes, elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
-        _onDocChanged?.call();
-        return;
-      }
-    }
     final nodes = noteNodesFromDoc(_doc);
-    dev.log('[YjsBridge] _onNodesChanged: full rebuild ${nodes.length} nodes, elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
-    _coordinator.updateNodesIncrementally(nodes);
+    if (nodes.isNotEmpty) {
+      _coordinator.updateNodesIncrementally(nodes);
+    }
     _onDocChanged?.call();
+    dev.log('[YjsBridge] _onNodesChanged: apply ${nodes.length} nodes elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
   }
 
   void _onTasksChanged(Set<String>? changedKeys) {

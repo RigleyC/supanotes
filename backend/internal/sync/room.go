@@ -37,6 +37,7 @@ func (w *wsConn) ReadMessage() (int, []byte, error) {
 func (w *wsConn) writeBinary(data []byte) error {
 	w.wmu.Lock()
 	defer w.wmu.Unlock()
+	_ = w.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return w.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
@@ -205,6 +206,7 @@ func (r *Room) HandleIncomingUpdate(framedMsg []byte, sender *wsConn) {
 	}
 	slog.Debug("HandleIncomingUpdate: message read", "note_id", r.NoteID, "msg_type", msgType, "payload_bytes", len(payload))
 
+	var step2Reply []byte
 	err = r.ydocSvc.WithDoc(context.Background(), r.NoteID, func(doc *crdt.Doc) error {
 		switch msgType {
 		case ygsync.MsgSyncStep1:
@@ -214,8 +216,8 @@ func (r *Room) HandleIncomingUpdate(framedMsg []byte, sender *wsConn) {
 				slog.Error("HandleIncomingUpdate: EncodeSyncStep2 failed", "note_id", r.NoteID, "error", err)
 				return err
 			}
-			_ = sender.writeBinary(reply)
-			slog.Info("HandleIncomingUpdate: SyncStep2 reply sent", "note_id", r.NoteID, "elapsed_ms", time.Since(startStep2).Milliseconds())
+			step2Reply = reply
+			slog.Info("HandleIncomingUpdate: SyncStep2 reply generated", "note_id", r.NoteID, "elapsed_ms", time.Since(startStep2).Milliseconds())
 			return nil
 		case ygsync.MsgSyncStep2, ygsync.MsgUpdate:
 		default:
@@ -238,6 +240,11 @@ func (r *Room) HandleIncomingUpdate(framedMsg []byte, sender *wsConn) {
 	})
 	if err != nil {
 		slog.Error("HandleIncomingUpdate: WithDoc failed", "note_id", r.NoteID, "error", err, "total_elapsed_ms", time.Since(startTotal).Milliseconds())
+		return
+	}
+
+	if step2Reply != nil {
+		_ = sender.writeBinary(step2Reply)
 		return
 	}
 
