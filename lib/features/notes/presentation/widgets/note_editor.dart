@@ -163,6 +163,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       if (!widget.isReadOnly && _controller!.hasDocument) {
         _controller!.document!.addListener(_onDocumentChanged);
       }
+      _taskComponentBuilder.editor = _controller?.editor;
     });
   }
 

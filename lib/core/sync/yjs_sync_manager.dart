@@ -1,12 +1,32 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
+import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/notes/domain/yjs_task_entry.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import '../database/database.dart';
+
+/// Safely applies an update by pre-registering known root types.
+/// yjs_dart has a bug where unknown root types are instantiated as YMap<dynamic>
+/// upon decoding. This causes casting errors (e.g. to YText or YMap<String>) later.
+void applyUpdateSafe(Doc doc, Uint8List update) {
+  // Pre-register standard maps
+  doc.getMap<Object>('nodes');
+  doc.getMap<String>('tasks');
+
+  // Find all content/* keys in the binary update and pre-register them as YText
+  final str = String.fromCharCodes(update);
+  final matches = RegExp(r'content/[a-zA-Z0-9-]+').allMatches(str);
+  for (final match in matches) {
+    doc.getText(match.group(0)!);
+  }
+
+  applyUpdate(doc, update);
+}
 
 /// Manages a local Yjs [Doc] instance per note and persists binary
 /// state snapshots to the [LocalYjsStates] Drift table.
@@ -34,7 +54,7 @@ class YjsSyncManager {
     if (stateRow != null) {
       final doc = Doc();
       try {
-        applyUpdate(doc, stateRow.state);
+        applyUpdateSafe(doc, stateRow.state);
         _migrateLegacyDoc(doc);
         _docs[noteId] = doc;
         dev.log('[YjsSyncManager] Loaded snapshot for note=$noteId', name: 'YjsSync');
@@ -72,13 +92,13 @@ class YjsSyncManager {
   ///
   /// Idempotent: skips if `YMap("tasks")` already has entries.
   void _migrateLegacyDoc(Doc doc) {
-    final tasksMap = doc.getMap('tasks');
-    if (tasksMap.attrKeys.isNotEmpty) return;
+    final tasksMap = doc.getMap<String>('tasks')!;
+    if (tasksMap.keys.isNotEmpty) return;
 
-    final nodesMap = doc.getMap('nodes');
+    final nodesMap = doc.getMap<Object>('nodes')!;
     bool needsMigration = false;
-    for (final key in nodesMap.attrKeys) {
-      final raw = nodesMap.getAttr(key);
+    for (final key in nodesMap.keys) {
+      final raw = nodesMap.get(key);
       if (raw is! String) continue;
       try {
         final meta = jsonDecode(raw) as Map<String, dynamic>;
@@ -97,8 +117,8 @@ class YjsSyncManager {
 
     dev.log('[YjsSyncManager] Migrating legacy doc schema to P4', name: 'YjsSync');
     doc.transact((txn) {
-      for (final key in nodesMap.attrKeys) {
-        final raw = nodesMap.getAttr(key);
+      for (final key in nodesMap.keys) {
+        final raw = nodesMap.get(key);
         if (raw is! String) continue;
         try {
           final meta = jsonDecode(raw) as Map<String, dynamic>;
@@ -111,9 +131,9 @@ class YjsSyncManager {
           final dueDate = data['dueDate'] as String?;
           final recurrence = data['recurrence'] as String?;
           final lastCompletedAt = data['lastCompletedAt'] as String?;
-          final title = doc.getText('content/$nodeId').toPlainText();
+          final title = doc.getText('content/$nodeId')!.toString();
 
-          tasksMap.setAttr(nodeId, jsonEncode(_buildTaskEntry(
+          tasksMap.set(nodeId, jsonEncode(_buildTaskEntry(
             nodeId,
             completed,
             title: title,
@@ -127,7 +147,7 @@ class YjsSyncManager {
           data.remove('recurrence');
           data.remove('lastCompletedAt');
           meta['data'] = data;
-          nodesMap.setAttr(key, jsonEncode(meta));
+          nodesMap.set(key, jsonEncode(meta));
         } catch (e, st) {
             dev.log('[YjsSyncManager] migration error for key=$key', name: 'YjsSync', error: e, stackTrace: st);
           }
@@ -159,26 +179,28 @@ class YjsSyncManager {
   }
 
   /// Project YMap("nodes") to local SQLite tables.
-  /// Currently projects task nodes to the tasks table.
+  /// Projects task nodes to the tasks table and derives the note's
+  /// content/excerpt so list views reflect edits without waiting for a
+  /// sync round-trip.
   Future<void> projectNodes(String noteId) async {
     final doc = _docs[noteId];
     if (doc == null) return;
 
-    final nodesMap = doc.getMap('nodes');
+    final nodesMap = doc.getMap<Object>('nodes')!;
 
     final tasks = <TasksCompanion>[];
-    for (final key in nodesMap.attrKeys) {
-      final raw = nodesMap.getAttr(key);
+    for (final key in nodesMap.keys) {
+      final raw = nodesMap.get(key);
       if (raw == null) continue;
       try {
         final meta = jsonDecode(raw as String) as Map<String, dynamic>;
         if (meta['type'] != 'task') continue;
         final data = meta['data'] as Map<String, dynamic>? ?? {};
         final nodeId = meta['id'] as String;
-        final text = doc.getText('content/$nodeId').toPlainText();
+        final text = doc.getText('content/$nodeId')!.toString();
 
         final isComplete = data['completed'] == true;
-        final taskEntry = YjsTaskEntry.decode(doc.getMap('tasks').getAttr(nodeId) as String?);
+        final taskEntry = YjsTaskEntry.decode(doc.getMap<String>('tasks')!.get(nodeId));
         final resolvedComplete = taskEntry?.completed == true || isComplete;
 
         final now = DateTime.now();
@@ -212,10 +234,22 @@ class YjsSyncManager {
       }
     }
 
-    if (tasks.isEmpty) return;
-
     final projectedIds = tasks.map((t) => t.id.value).toSet();
+    final content = _deriveMarkdownFromDoc(doc);
+    final excerpt = _excerptFrom(content);
+    final now = DateTime.now();
+
     await _db.transaction(() async {
+      await _db.notesDao.updateNote(
+        NotesCompanion(
+          id: Value(noteId),
+          content: Value(content),
+          excerpt: Value(excerpt),
+          updatedAt: Value(now),
+          isDirty: const Value(true),
+        ),
+      );
+
       for (final task in tasks) {
         await _db.into(_db.tasks).insert(task, mode: InsertMode.insertOrReplace);
       }
@@ -227,6 +261,67 @@ class YjsSyncManager {
         await (_db.delete(_db.tasks)..where((t) => t.id.equals(row.id))).go();
       }
     });
+  }
+
+  String _deriveMarkdownFromDoc(Doc doc) {
+    final nodes = noteNodesFromDoc(doc);
+    if (nodes.isEmpty) return '';
+
+    final lines = <String>[];
+    for (final node in nodes) {
+      final text = doc.getText('content/${node.id}')!.toString();
+      switch (node.type) {
+        case 'header':
+          lines.add('# $text');
+        case 'task':
+          final completed = _isTaskCompleted(doc, node.id);
+          lines.add('- [${completed ? 'x' : ' '}] $text');
+        case 'list_item':
+          lines.add('- $text');
+        case 'divider':
+          lines.add('---');
+        case 'image':
+          lines.add('[image]');
+        default:
+          lines.add(text);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  bool _isTaskCompleted(Doc doc, String nodeId) {
+    final taskEntry = YjsTaskEntry.decode(
+      doc.getMap<String>('tasks')!.get(nodeId),
+    );
+    if (taskEntry != null) return taskEntry.completed;
+
+    final raw = doc.getMap<Object>('nodes')!.get(nodeId);
+    if (raw is! String) return false;
+    try {
+      final meta = jsonDecode(raw) as Map<String, dynamic>;
+      final data = meta['data'] as Map<String, dynamic>? ?? {};
+      return data['completed'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String? _excerptFrom(String content) {
+    if (content.isEmpty) return null;
+    final lines = content.split('\n');
+    int firstNonEmptyIdx = -1;
+    for (int i = 0; i < lines.length; i++) {
+      if (lines[i].trim().isNotEmpty) {
+        firstNonEmptyIdx = i;
+        break;
+      }
+    }
+    if (firstNonEmptyIdx == -1) return null;
+    final restOfLines = lines.skip(firstNonEmptyIdx + 1).join('\n');
+    final flat = restOfLines.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (flat.isEmpty) return null;
+    if (flat.length <= 120) return flat;
+    return '${flat.substring(0, 120)}…';
   }
 
   Map<String, dynamic> _buildTaskEntry(String nodeId, bool completed, {String? title, String? dueDate, String? recurrence, String? lastCompletedAt}) {

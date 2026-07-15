@@ -84,4 +84,24 @@ void main() {
     final doc2 = await mgr.loadDoc('note-1');
     expect(identical(doc1, doc2), isTrue);
   });
+
+  test('projectNodes updates note content and excerpt from YDoc', () async {
+    final mgr = YjsSyncManager(db: db, userId: 'user-1');
+    final doc = await mgr.loadDoc('note-1');
+
+    doc.transact((txn) {
+      doc.getText('content/node-2').insertText(0, 'Second line');
+      doc.getMap('nodes').setAttr(
+          'node-2',
+          '{"id":"node-2","position":"b0","type":"paragraph","data":{"text":"Second line"}}');
+    });
+
+    await mgr.projectNodes('note-1');
+
+    final note = await db.notesDao.getNoteById('note-1');
+    expect(note, isNotNull);
+    expect(note!.content, contains('hi'));
+    expect(note.content, contains('Second line'));
+    expect(note.excerpt, contains('Second line'));
+  });
 }

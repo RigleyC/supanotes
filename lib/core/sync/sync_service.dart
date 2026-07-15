@@ -18,7 +18,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/io.dart';
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/current_user.dart';
@@ -191,6 +191,10 @@ class SyncService {
   Future<void> disconnectNote() async {
     final sw = Stopwatch()..start();
     debugPrint('[SyncService] disconnectNote START noteId=$_activeNoteId');
+    final noteId = _activeNoteId;
+    if (noteId != null) {
+      await _yjsMgr.persist(noteId);
+    }
     await _yjsUpdateSub?.cancel();
     _yjsUpdateSub = null;
     _activeNoteId = null;
@@ -294,7 +298,7 @@ class SyncService {
         // from older dart_crdt versions before sending to Go backend.
         try {
           final tmpDoc = Doc();
-          applyUpdate(tmpDoc, s.state);
+          applyUpdateSafe(tmpDoc, s.state);
           final cleanState = encodeStateAsUpdate(tmpDoc);
           yjsStates.add(s.copyWith(state: cleanState));
         } catch (e, st) {
@@ -463,9 +467,9 @@ class SyncService {
           .getSingleOrNull();
 
         if (localStateRow != null) {
-          applyUpdate(tmpDoc, localStateRow.state);
+          applyUpdateSafe(tmpDoc, localStateRow.state);
         }
-        applyUpdate(tmpDoc, remoteState.state);
+        applyUpdateSafe(tmpDoc, remoteState.state);
 
         final mergedState = encodeStateAsUpdate(tmpDoc);
         await _db.into(_db.localYjsStates).insertOnConflictUpdate(

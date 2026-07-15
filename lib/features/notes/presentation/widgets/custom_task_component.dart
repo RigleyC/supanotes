@@ -40,7 +40,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   /// completion here would have `NodeSyncManager` overwrite that with
   /// `status='done'`. For those, we rely on the `completingTaskIds`
   /// transient flag instead.
-  final Editor? editor;
+  Editor? editor;
 
   final MutableDocumentComposer? composer;
   Map<String, TaskModel> taskMetadataById;

@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
 (int, int) _readVarUint(Uint8List data, int offset) {
   int value = 0;
@@ -51,11 +51,11 @@ class YjsSyncProtocolCodec {
   static const int messageYjsUpdate = 2;
 
   static Uint8List encodeStep1(Doc doc) {
-    final sv = encodeDocumentStateVector(doc);
+    final sv = encodeStateVector(doc);
     return _encodeMessage(messageSyncStep1, sv);
   }
 
-  static Uint8List encodeStep2(Doc doc, List<int> targetStateVector) {
+  static Uint8List encodeStep2(Doc doc, Uint8List targetStateVector) {
     final missing = encodeStateAsUpdate(doc, targetStateVector);
     return _encodeMessage(messageSyncStep2, missing);
   }

@@ -43,8 +43,7 @@ final noteEditorControllerProvider = Provider.autoDispose
 
       ref.onDispose(() {
         disposed = true;
-        controller.dispose();
-        syncService?.disconnectNote();
+        unawaited(controller.dispose().then((_) => syncService?.disconnectNote()));
       });
       return controller;
     });

@@ -72,6 +72,7 @@ dependencies:
 
   # CRDT collaborative editing
   dart_crdt: ^0.3.0
+  yjs_dart: ^1.1.15
   web_socket_channel: ^3.0.0
 
   # UI

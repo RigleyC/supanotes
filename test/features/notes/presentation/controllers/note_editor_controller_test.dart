@@ -344,5 +344,43 @@ void main() {
       expect(docNode, isA<ImageNode>());
       expect((docNode as ImageNode).imageUrl, 'localurl');
     });
+
+    test('initFromDoc restores document from a populated YDoc', () async {
+      final db = _createDb();
+      await db.into(db.notes).insert(NotesCompanion.insert(
+            id: 'test-note',
+            userId: 'test-user',
+            content: '',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ));
+
+      final doc = Doc();
+      doc.transact((txn) {
+        doc.getMap('nodes').setAttr(
+          'p1',
+          jsonEncode({
+            'id': 'p1',
+            'position': 'a0',
+            'type': 'paragraph',
+            'data': {'text': 'Hello from YDoc', 'spans': []},
+          }),
+        );
+        doc.getText('content/p1').insertText(0, 'Hello from YDoc');
+      });
+
+      final controller = NoteEditorController(userId: 'test-user');
+      controller.bind('test-note');
+      controller.initFromDoc(
+        doc: doc,
+        noteId: 'test-note',
+        sendUpdate: (_) {},
+      );
+
+      expect(controller.hasDocument, isTrue);
+      final node = controller.document!.getNodeById('p1');
+      expect(node, isNotNull);
+      expect((node as TextNode).text.toPlainText(), 'Hello from YDoc');
+    });
   });
 }

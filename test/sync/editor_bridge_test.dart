@@ -174,5 +174,65 @@ void main() {
       // Crucial: The node completion status must be successfully synced.
       expect(updatedNode.isComplete, isTrue);
     });
+
+    test('completeRecurringTask preserves recurrence in YMap tasks entry', () async {
+      final doc = Doc();
+      final mutableDoc = MutableDocument.empty();
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: mutableDoc,
+        composer: composer,
+      )..reactionPipeline.clear();
+
+      final coordinator = NoteSyncCoordinator(
+        document: mutableDoc,
+        editor: editor,
+      );
+
+      final bridge = YjsDocEditorBridge(
+        doc: doc,
+        coordinator: coordinator,
+        sendUpdate: (_) {},
+      );
+
+      // Seed a recurring task in the YDoc.
+      doc.transact((txn) {
+        doc.getMap('nodes').setAttr(
+          't1',
+          jsonEncode({
+            'id': 't1',
+            'position': 'a0',
+            'type': 'task',
+            'data': {
+              'text': 'Daily task',
+              'completed': false,
+              'recurrence': 'daily',
+            },
+          }),
+        );
+        doc.getText('content/t1').insertText(0, 'Daily task');
+        doc.getMap('tasks').setAttr(
+          't1',
+          jsonEncode({
+            'nodeId': 't1',
+            'completed': false,
+            'title': 'Daily task',
+            'dueDate': '2026-07-14',
+            'recurrence': 'daily',
+          }),
+        );
+      });
+
+      final nextDue = DateTime(2026, 7, 15);
+      bridge.completeRecurringTask('t1', nextDue);
+
+      final tasksMap = doc.getMap('tasks');
+      final entry = jsonDecode(tasksMap.getAttr('t1') as String) as Map<String, dynamic>;
+      expect(entry['completed'], isFalse);
+      expect(entry['dueDate'], '2026-07-15');
+      expect(entry['recurrence'], 'daily');
+
+      bridge.dispose();
+    });
   });
 }

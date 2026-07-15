@@ -2,12 +2,13 @@ import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:flutter/foundation.dart';
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'sync_state.dart';
 import 'yjs_sync_protocol_codec.dart';
+import 'yjs_sync_manager.dart' show applyUpdateSafe;
 
 const int _kMaxPendingUpdates = 1000;
 const Duration _kIdleTimeout = Duration(minutes: 5);
@@ -88,7 +89,7 @@ class YjsWebSocketClient {
     final sw = Stopwatch()..start();
     try {
       final (msgType, payload) = YjsSyncProtocolCodec.decode(data);
-      debugPrint('[YjsWS] _handleMessage msgType=$msgType dataLen=${data.length} elapsed=${sw.elapsedMilliseconds}ms');
+      debugPrint('[YjsWS] _handleMessage msgType=$msgType dataLen=${data.length} payloadLen=${payload.length} payloadHex=${payload.map((b) => b.toRadixString(16).padLeft(2, '0')).join()} elapsed=${sw.elapsedMilliseconds}ms');
       switch (msgType) {
         case YjsSyncProtocolCodec.messageSyncStep1:
           final step2 = YjsSyncProtocolCodec.encodeStep2(_doc, payload);
@@ -100,7 +101,7 @@ class YjsWebSocketClient {
             _flushPending();
           }
         case YjsSyncProtocolCodec.messageSyncStep2:
-          applyUpdate(_doc, payload);
+          applyUpdateSafe(_doc, payload);
           if (!_handshakeDone) {
             _handshakeDone = true;
             debugPrint('[YjsWS] HANDSHAKE DONE (via Step2) elapsed=${sw.elapsedMilliseconds}ms');
@@ -109,7 +110,7 @@ class YjsWebSocketClient {
           }
           _onUpdateController.add(data);
         case YjsSyncProtocolCodec.messageYjsUpdate:
-          applyUpdate(_doc, payload);
+          applyUpdateSafe(_doc, payload);
           _onUpdateController.add(data);
         default:
           dev.log('[YjsWS] Unknown sync message type: $msgType', name: 'YjsWS');

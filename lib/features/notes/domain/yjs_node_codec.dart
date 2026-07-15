@@ -1,18 +1,18 @@
 import 'dart:convert';
 
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
 import 'note_node.dart';
 
 NoteNode? noteNodeFromYDoc(Doc doc, String key, {String? noteIdOverride}) {
-  final nodesMap = doc.getMap('nodes');
-  final raw = nodesMap.getAttr(key);
+  final nodesMap = doc.getMap<Object>('nodes')!;
+  final raw = nodesMap.get(key);
   if (raw is! String) return null;
   try {
     final meta = jsonDecode(raw) as Map<String, dynamic>;
     final nodeId = meta['id'] as String;
-    final ytext = doc.getText('content/$nodeId');
-    final textContent = ytext.toPlainText();
+    final ytext = doc.getText('content/$nodeId')!;
+    final textContent = ytext.toString();
     final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
     if (textContent.isNotEmpty) {
       data['text'] = textContent;
@@ -41,8 +41,8 @@ NoteNode? noteNodeFromYDoc(Doc doc, String key, {String? noteIdOverride}) {
 
 List<NoteNode> noteNodesFromDoc(Doc doc, {String? noteIdOverride}) {
   final nodes = <NoteNode>[];
-  final nodesMap = doc.getMap('nodes');
-  for (final key in nodesMap.attrKeys) {
+  final nodesMap = doc.getMap<Object>('nodes')!;
+  for (final key in nodesMap.keys) {
     final node = noteNodeFromYDoc(doc, key, noteIdOverride: noteIdOverride);
     if (node != null) nodes.add(node);
   }
