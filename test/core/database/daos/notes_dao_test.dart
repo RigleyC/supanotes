@@ -11,7 +11,7 @@ void main() {
           NotesCompanion.insert(
             id: 'note-title-1',
             userId: 'user-1',
-            content: 'irrelevant snapshot',
+            content: 'My Trip\n\nsome details',
             createdAt: now,
             updatedAt: now,
           ),

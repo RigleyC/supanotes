@@ -130,12 +130,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     final nodeId = componentViewModel.nodeId;
 
-    if (hideCompleted &&
-        componentViewModel.isComplete &&
-        !animatingNodeIds.contains(nodeId)) {
-      return SizedBox(key: componentContext.componentKey, height: 0);
-    }
-
     return CustomTaskComponent(
       key: componentContext.componentKey,
       viewModel: componentViewModel,
@@ -206,6 +200,22 @@ class CustomTaskComponent extends StatefulWidget {
 class _CustomTaskComponentState extends State<CustomTaskComponent>
     with ProxyDocumentComponent<CustomTaskComponent>, ProxyTextComposable {
   final _textKey = GlobalKey();
+  
+  late bool _isComplete;
+
+  @override
+  void initState() {
+    super.initState();
+    _isComplete = widget.viewModel.isComplete;
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomTaskComponent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
+      _isComplete = widget.viewModel.isComplete;
+    }
+  }
 
   @override
   GlobalKey<State<StatefulWidget>> get childDocumentComponentKey => _textKey;
@@ -232,9 +242,10 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
               behavior: HitTestBehavior.opaque,
               onTap: widget.viewModel.setComplete == null
                   ? null
-                  : () => widget.viewModel.setComplete!(
-                      !widget.viewModel.isComplete,
-                    ),
+                  : () {
+                      setState(() => _isComplete = !_isComplete);
+                      widget.viewModel.setComplete!(_isComplete);
+                    },
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -245,7 +256,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                     ),
                   ),
                   AppTaskCheckbox(
-                    value: widget.viewModel.isComplete,
+                    value: _isComplete,
                     accentColor: taskColor,
                     inactiveColor: colorScheme.outline,
                     shape: AppTaskCheckboxShape.rounded,
@@ -269,7 +280,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                     textStyleBuilder: (attributions) => resolveTaskTextStyle(
                       widget.viewModel.textStyleBuilder(attributions),
                       Theme.of(context).colorScheme.onSurface,
-                      widget.viewModel.isComplete,
+                      _isComplete,
                     ),
                     inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
                     textSelection: widget.viewModel.selection,
@@ -283,7 +294,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                     TaskMetadataBadges(
                       dueDate: widget.taskMetadata?.dueDate,
                       recurrence: widget.taskMetadata?.recurrence,
-                      isCompleted: widget.viewModel.isComplete,
+                      isCompleted: _isComplete,
                     ),
                     const SizedBox(height: 4),
                   ],
@@ -297,7 +308,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
     return TaskExitAnimator(
       hideCompleted: widget.hideCompleted,
-      isComplete: widget.viewModel.isComplete,
+      isComplete: _isComplete,
       onAnimationComplete: widget.onAnimationComplete,
       child: content,
     );

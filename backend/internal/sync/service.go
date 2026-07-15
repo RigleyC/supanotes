@@ -155,6 +155,16 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	var tx pgx.Tx
 
 	if s.pool != nil {
+		if s.ydoc != nil {
+			for _, ys := range payload.NoteYjsStates {
+				_, err := s.ydoc.DocFor(ctx, ys.NoteID)
+				if err != nil {
+					slog.Error("sync push: pre-load DocFor failed", "note_id", ys.NoteID, "error", err)
+					return err
+				}
+			}
+		}
+
 		startTx := time.Now()
 		var err error
 		tx, err = s.pool.Begin(ctx)
@@ -169,6 +179,9 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 
 	// Track note IDs the authenticated user can edit (owned or shared with edit).
 	editableNotes := make(map[pgtype.UUID]bool)
+
+	// Collect note IDs that need to be flushed after the transaction commits
+	var toFlush []string
 
 	for _, n := range payload.Notes {
 		canEdit, err := s.canEditNote(ctx, r, n.ID, userID, editableNotes)
@@ -312,10 +325,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				slog.Error("sync push: ApplyNodeMutation failed", "note_id", ys.NoteID, "error", err)
 				return err
 			}
-			if err := s.ydoc.FlushUpdates(ctx, ys.NoteID); err != nil {
-				slog.Error("sync push: FlushUpdates failed", "note_id", ys.NoteID, "error", err)
-				return err
-			}
+			toFlush = append(toFlush, ys.NoteID)
 			continue
 		}
 
@@ -366,6 +376,13 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			return err
 		}
 		slog.Info("PUSH TX COMMIT", "elapsed", time.Since(startCommit))
+	}
+
+	for _, noteID := range toFlush {
+		if err := s.ydoc.FlushUpdates(ctx, noteID); err != nil {
+			slog.Error("sync push: FlushUpdates failed after commit", "note_id", noteID, "error", err)
+			return err
+		}
 	}
 
 	slog.Info("PUSH DONE", "total", time.Since(startTotal))

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../../../features/notes/domain/note_strings.dart';
 import '../../../features/tasks/domain/task_recurrence.dart';
 import '../database.dart';
 import '../tables/notes.dart';
@@ -21,9 +22,10 @@ String deriveNoteTitle(String content) {
   for (final line in lines) {
     final trimmed = line.trim();
     if (trimmed.isEmpty) continue;
-    return trimmed.replaceFirst(RegExp(r'^#+\s*'), '');
+    final title = trimmed.replaceFirst(RegExp(r'^#+\s*'), '');
+    return title.isEmpty ? NoteStrings.fallbackTitle : title;
   }
-  return '';
+  return NoteStrings.fallbackTitle;
 }
 
 const _noteSelectColumns = 'SELECT n.*, '

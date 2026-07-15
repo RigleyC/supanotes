@@ -58,7 +58,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   RichSuperEditorIosControlsController? _iosController;
   SuperEditorAndroidControlsController? _androidController;
   RichCommonEditorOperations? _richOps;
-  late CustomTaskComponentBuilder _taskComponentBuilder;
   Set<String> _animatingNodeIds = const {};
   Set<String> _completingTaskIds = const {};
   Stylesheet? _cachedStylesheet;
@@ -73,31 +72,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (!widget.isReadOnly && _controller!.hasDocument) {
       _controller!.document!.addListener(_onDocumentChanged);
     }
-
-    _taskComponentBuilder = CustomTaskComponentBuilder(
-      editor: _controller!.editor,
-      composer: _controller!.composer,
-      taskMetadataById: widget.taskMetadata,
-      hideCompleted: widget.hideCompleted,
-      onTaskLongPress: widget.isReadOnly
-          ? null
-          : (taskId) => widget.delegate.onTaskLongPress?.call(
-              widget.taskMetadata[taskId],
-              () async {},
-            ),
-      onTaskComplete: widget.delegate.onTaskComplete,
-      onTaskReopen: widget.delegate.onTaskReopen,
-      onRecurringTaskComplete: (taskId, nextDue) {
-        _controller?.completeRecurringTask(taskId, nextDue);
-        widget.delegate.onRecurringTaskComplete?.call(taskId, nextDue);
-      },
-      animatingNodeIds: _animatingNodeIds,
-      completingTaskIds: _completingTaskIds,
-      onAnimationStart: _onAnimationStart,
-      onAnimationEnd: _onAnimationEnd,
-      onCompletingStart: _onCompletingStart,
-      onCompletingEnd: _onCompletingEnd,
-    );
   }
 
   void _setupControls(BuildContext context) {
@@ -140,15 +114,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _taskComponentBuilder.taskMetadataById = widget.taskMetadata;
-    _taskComponentBuilder.hideCompleted = widget.hideCompleted;
-    _taskComponentBuilder.onTaskLongPress = widget.isReadOnly
-        ? null
-        : (taskId) => widget.delegate.onTaskLongPress?.call(
-            widget.taskMetadata[taskId],
-            () async {},
-          );
-
     if (widget.hideCompleted != oldWidget.hideCompleted) {
       setState(() {});
     }
@@ -163,7 +128,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       if (!widget.isReadOnly && _controller!.hasDocument) {
         _controller!.document!.addListener(_onDocumentChanged);
       }
-      _taskComponentBuilder.editor = _controller?.editor;
     });
   }
 
@@ -315,7 +279,30 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                   ),
                   componentBuilders: [
                     const CustomDividerComponentBuilder(),
-                    _taskComponentBuilder,
+                    CustomTaskComponentBuilder(
+                      editor: controller.editor,
+                      composer: controller.composer,
+                      taskMetadataById: widget.taskMetadata,
+                      hideCompleted: widget.hideCompleted,
+                      onTaskLongPress: widget.isReadOnly
+                          ? null
+                          : (taskId) => widget.delegate.onTaskLongPress?.call(
+                                widget.taskMetadata[taskId],
+                                () async {},
+                              ),
+                      onTaskComplete: widget.delegate.onTaskComplete,
+                      onTaskReopen: widget.delegate.onTaskReopen,
+                      onRecurringTaskComplete: (taskId, nextDue) {
+                        _controller?.completeRecurringTask(taskId, nextDue);
+                        widget.delegate.onRecurringTaskComplete?.call(taskId, nextDue);
+                      },
+                      animatingNodeIds: _animatingNodeIds,
+                      completingTaskIds: _completingTaskIds,
+                      onAnimationStart: _onAnimationStart,
+                      onAnimationEnd: _onAnimationEnd,
+                      onCompletingStart: _onCompletingStart,
+                      onCompletingEnd: _onCompletingEnd,
+                    ),
                     AttachmentComponentBuilder(
                       editor: controller.editor!,
                       collapseImages: widget.collapseImages,
