@@ -169,6 +169,9 @@ func MigrateLegacyDoc(doc *crdt.Doc) {
 	}
 
 	needsMigration := false
+	taskUpdates := make(map[string]string)
+	nodeUpdates := make(map[string]string)
+
 	for _, key := range nodesMap.Keys() {
 		raw, ok := nodesMap.Get(key)
 		if !ok {
@@ -191,10 +194,60 @@ func MigrateLegacyDoc(doc *crdt.Doc) {
 			slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
 			continue
 		}
-		if _, ok := dataMap["completed"]; ok {
-			needsMigration = true
-			break
+		completedVal, hasCompleted := dataMap["completed"]
+		if !hasCompleted {
+			continue
 		}
+		
+		needsMigration = true
+		completed, _ := completedVal.(bool)
+
+		entry := taskDataEntry{
+			NodeID:    nd.ID,
+			Completed: completed,
+		}
+		if titleType := doc.GetText("content/" + nd.ID); titleType != nil {
+			entry.Title = titleType.ToString()
+		}
+		if dueDate, ok := dataMap["dueDate"].(string); ok {
+			entry.DueDate = dueDate
+		}
+		if recurrence, ok := dataMap["recurrence"].(string); ok {
+			entry.Recurrence = recurrence
+		}
+		if lastCompletedAt, ok := dataMap["lastCompletedAt"].(string); ok {
+			entry.LastCompleted = lastCompletedAt
+		}
+
+		entryJSON, err := json.Marshal(entry)
+		if err != nil {
+			slog.Warn("MigrateLegacyDoc: marshal taskEntry error", "key", key, "error", err)
+			continue
+		}
+		taskUpdates[nd.ID] = string(entryJSON)
+
+		delete(dataMap, "completed")
+		delete(dataMap, "dueDate")
+		delete(dataMap, "recurrence")
+		delete(dataMap, "lastCompletedAt")
+		cleanedData, err := json.Marshal(dataMap)
+		if err != nil {
+			slog.Warn("MigrateLegacyDoc: marshal cleanedData error", "key", key, "error", err)
+			continue
+		}
+
+		var updatedNode map[string]interface{}
+		if err := json.Unmarshal([]byte(rawStr), &updatedNode); err != nil {
+			slog.Warn("MigrateLegacyDoc: unmarshal updatedNode error", "key", key, "error", err)
+			continue
+		}
+		updatedNode["data"] = string(cleanedData)
+		updatedJSON, err := json.Marshal(updatedNode)
+		if err != nil {
+			slog.Warn("MigrateLegacyDoc: marshal updatedNode error", "key", key, "error", err)
+			continue
+		}
+		nodeUpdates[key] = string(updatedJSON)
 	}
 
 	if !needsMigration {
@@ -206,85 +259,6 @@ func MigrateLegacyDoc(doc *crdt.Doc) {
 		tasksMap = doc.GetMap("tasks")
 	}
 	doc.Transact(func(txn *crdt.Transaction) {
-		taskUpdates := make(map[string]string)
-		nodeUpdates := make(map[string]string)
-
-		for _, key := range nodesMap.Keys() {
-			raw, ok := nodesMap.Get(key)
-			if !ok {
-				continue
-			}
-			rawStr, ok := raw.(string)
-			if !ok {
-				continue
-			}
-			var nd legacyNode
-			if err := json.Unmarshal([]byte(rawStr), &nd); err != nil {
-				slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
-				continue
-			}
-			if nd.Type != "task" {
-				continue
-			}
-			var dataMap map[string]interface{}
-			if err := json.Unmarshal(nd.Data, &dataMap); err != nil {
-				slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
-				continue
-			}
-			completedVal, hasCompleted := dataMap["completed"]
-			if !hasCompleted {
-				continue
-			}
-			completed, _ := completedVal.(bool)
-
-			entry := taskDataEntry{
-				NodeID:    nd.ID,
-				Completed: completed,
-			}
-			if titleType := doc.GetText("content/" + nd.ID); titleType != nil {
-				entry.Title = titleType.ToString()
-			}
-			if dueDate, ok := dataMap["dueDate"].(string); ok {
-				entry.DueDate = dueDate
-			}
-			if recurrence, ok := dataMap["recurrence"].(string); ok {
-				entry.Recurrence = recurrence
-			}
-			if lastCompletedAt, ok := dataMap["lastCompletedAt"].(string); ok {
-				entry.LastCompleted = lastCompletedAt
-			}
-
-			entryJSON, err := json.Marshal(entry)
-			if err != nil {
-				slog.Warn("MigrateLegacyDoc: marshal taskEntry error", "key", key, "error", err)
-				continue
-			}
-			taskUpdates[nd.ID] = string(entryJSON)
-
-			delete(dataMap, "completed")
-			delete(dataMap, "dueDate")
-			delete(dataMap, "recurrence")
-			delete(dataMap, "lastCompletedAt")
-			cleanedData, err := json.Marshal(dataMap)
-			if err != nil {
-				slog.Warn("MigrateLegacyDoc: marshal cleanedData error", "key", key, "error", err)
-				continue
-			}
-
-			var updatedNode map[string]interface{}
-			if err := json.Unmarshal([]byte(rawStr), &updatedNode); err != nil {
-				slog.Warn("MigrateLegacyDoc: unmarshal updatedNode error", "key", key, "error", err)
-				continue
-			}
-			updatedNode["data"] = string(cleanedData)
-			updatedJSON, err := json.Marshal(updatedNode)
-			if err != nil {
-				slog.Warn("MigrateLegacyDoc: marshal updatedNode error", "key", key, "error", err)
-				continue
-			}
-			nodeUpdates[key] = string(updatedJSON)
-		}
-
 		for k, v := range taskUpdates {
 			tasksMap.Set(txn, k, v)
 		}

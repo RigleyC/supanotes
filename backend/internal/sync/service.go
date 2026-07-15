@@ -154,14 +154,44 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	r := s.repo
 	var tx pgx.Tx
 
+	var toFlush []string
+	editableNotes := make(map[pgtype.UUID]bool)
+
 	if s.pool != nil {
 		if s.ydoc != nil {
 			for _, ys := range payload.NoteYjsStates {
-				_, err := s.ydoc.DocFor(ctx, ys.NoteID)
+				noteUUID, err := parseUUIDStr(ys.NoteID)
+				if err != nil {
+					slog.Error("sync push: invalid note UUID in Yjs state", "note_id", ys.NoteID, "error", err)
+					return err
+				}
+
+				canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes)
+				if err != nil {
+					slog.Error("sync push: Yjs state permission check failed", "note_id", ys.NoteID, "user_id", userID, "error", err)
+					return ErrSyncConflict
+				}
+				if !canEdit {
+					slog.Error("sync push: Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
+					return ErrSyncConflict
+				}
+
+				_, err = s.ydoc.DocFor(ctx, ys.NoteID)
 				if err != nil {
 					slog.Error("sync push: pre-load DocFor failed", "note_id", ys.NoteID, "error", err)
 					return err
 				}
+
+				if s.roomMgr != nil && s.roomMgr.HasActiveRoom(ys.NoteID) {
+					slog.Warn("sync push: skipping Yjs state for note with active WS room", "note_id", ys.NoteID)
+					continue
+				}
+
+				if err := s.ydoc.ApplyNodeMutation(ctx, ys.NoteID, ys.State); err != nil {
+					slog.Error("sync push: ApplyNodeMutation failed", "note_id", ys.NoteID, "error", err)
+					return err
+				}
+				toFlush = append(toFlush, ys.NoteID)
 			}
 		}
 
@@ -177,14 +207,9 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		r = s.repo.WithQuerier(sqlcgen.New(tx))
 	}
 
-	// Track note IDs the authenticated user can edit (owned or shared with edit).
-	editableNotes := make(map[pgtype.UUID]bool)
-
-	// Collect note IDs that need to be flushed after the transaction commits
-	var toFlush []string
-
 	for _, n := range payload.Notes {
-		canEdit, err := s.canEditNote(ctx, r, n.ID, userID, editableNotes)
+		noteID := n.ID
+		canEdit, err := s.canEditNote(ctx, r, noteID, userID, editableNotes)
 		if err != nil {
 			slog.Error("sync push conflict: note permission check failed", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID, "error", err)
 			return ErrSyncConflict
@@ -208,7 +233,7 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		if embStatus == "" {
 			embStatus = "pending"
 		}
-		noteID := n.ID
+		noteID = n.ID
 
 		editableNotes[noteID] = canEdit
 
@@ -313,19 +338,9 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			return ErrSyncConflict
 		}
 
-		// If there's an active WS room, skip — WS is canonical.
-		if s.roomMgr.HasActiveRoom(ys.NoteID) {
-			slog.Warn("sync push: skipping Yjs state for note with active WS room", "note_id", ys.NoteID)
-			continue
-		}
-
 		// No active room — apply via YDocService (merge + persistence)
 		if s.ydoc != nil {
-			if err := s.ydoc.ApplyNodeMutation(ctx, ys.NoteID, ys.State); err != nil {
-				slog.Error("sync push: ApplyNodeMutation failed", "note_id", ys.NoteID, "error", err)
-				return err
-			}
-			toFlush = append(toFlush, ys.NoteID)
+			// Already handled before the transaction
 			continue
 		}
 
@@ -379,10 +394,11 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	}
 
 	for _, noteID := range toFlush {
-		if err := s.ydoc.FlushUpdates(ctx, noteID); err != nil {
-			slog.Error("sync push: FlushUpdates failed after commit", "note_id", noteID, "error", err)
-			return err
-		}
+		go func(id string) {
+			if err := s.ydoc.FlushUpdates(context.Background(), id); err != nil {
+				slog.Error("sync push: FlushUpdates failed after commit", "note_id", id, "error", err)
+			}
+		}(noteID)
 	}
 
 	slog.Info("PUSH DONE", "total", time.Since(startTotal))
