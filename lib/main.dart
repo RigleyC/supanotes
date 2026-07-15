@@ -1,5 +1,4 @@
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:cue/cue.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -11,7 +10,6 @@ import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import 'core/api/backend_connectivity_hint.dart';
-import 'core/router/last_route_store.dart';
 import 'firebase_options.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
@@ -122,9 +120,6 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
           );
         }
         result = SnackOverlay(child: result);
-        if (kDebugMode) {
-          result = CueDebugTools(child: result);
-        }
         return result;
       },
     );

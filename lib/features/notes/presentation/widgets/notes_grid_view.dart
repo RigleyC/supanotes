@@ -1,4 +1,3 @@
-import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
@@ -54,16 +53,12 @@ class NotesGridView extends StatelessWidget {
             childCount: notes.length,
             itemBuilder: (context, index) {
               final note = notes[index];
-              return Cue.onMount(
-                motion: .smooth(),
-                acts: [.fadeIn(), .scale(from: 0.96), .slideY(from: 0.08)],
-                child: NoteCard(
+              return NoteCard(
                   note: note,
-                  onTap: () => onTap(note),
-                  onDelete: () => onDelete(note),
-                  onToggleFavorite: () => onToggleFavorite(note),
-                ),
-              );
+                   onTap: () => onTap(note),
+                   onDelete: () => onDelete(note),
+                   onToggleFavorite: () => onToggleFavorite(note),
+                 );
             },
           ),
         ),

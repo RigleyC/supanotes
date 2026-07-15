@@ -1,4 +1,3 @@
-import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_spacing.dart';
@@ -50,16 +49,12 @@ class NotesListView extends StatelessWidget {
             itemCount: notes.length,
             itemBuilder: (context, index) {
               final note = notes[index];
-              return Cue.onMount(
-                motion: .smooth(),
-                acts: [.fadeIn()],
-                child: NoteListRow(
+              return NoteListRow(
                   note: note,
-                  onTap: () => onTap(note),
-                  onDelete: () => onDelete(note),
-                  onToggleFavorite: () => onToggleFavorite(note),
-                ),
-              );
+                   onTap: () => onTap(note),
+                   onDelete: () => onDelete(note),
+                   onToggleFavorite: () => onToggleFavorite(note),
+                 );
             },
           ),
         ),

@@ -59,17 +59,6 @@ void main() {
       );
     });
 
-    test('redirects from /splash to persisted route when authenticated', () {
-      final auth = AsyncValue<User?>.data(
-        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
-      );
-      expect(
-        authGuardRedirect(
-            currentLocation: AppRoutes.splash, authState: auth, persistedLocation: '/notes/note-1'),
-        '/notes/note-1',
-      );
-    });
-
     test('lets an authenticated user stay on a protected route', () {
       final auth = AsyncValue<User?>.data(
         const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
@@ -89,17 +78,6 @@ void main() {
         authGuardRedirect(
             currentLocation: AppRoutes.login, authState: auth),
         AppRoutes.home,
-      );
-    });
-
-    test('redirects to persisted route when an authenticated user revisits /login', () {
-      final auth = AsyncValue<User?>.data(
-        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
-      );
-      expect(
-        authGuardRedirect(
-            currentLocation: AppRoutes.login, authState: auth, persistedLocation: '/notes/note-1'),
-        '/notes/note-1',
       );
     });
 
@@ -191,9 +169,4 @@ void main() {
   });
 }
 
-String? redirectFor(String currentLocation, AsyncValue<User?> authState) {
-  return authGuardRedirect(
-    currentLocation: currentLocation,
-    authState: authState,
-  );
-}
+

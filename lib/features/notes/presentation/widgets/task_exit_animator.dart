@@ -53,14 +53,21 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
   @override
   void didUpdateWidget(covariant TaskExitAnimator oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!widget.hideCompleted) return;
 
     final becameComplete =
         widget.isComplete && !oldWidget.isComplete;
     final becameIncomplete =
         !widget.isComplete && oldWidget.isComplete;
+    final hideToggledOn =
+        widget.hideCompleted && !oldWidget.hideCompleted;
 
-    if (becameComplete) {
+    if (hideToggledOn && widget.isComplete && !becameComplete) {
+      Future.delayed(_exitAnimationDelay, () {
+        if (mounted && widget.isComplete && widget.hideCompleted) {
+          _controller.forward();
+        }
+      });
+    } else if (becameComplete) {
       Future.delayed(_exitAnimationDelay, () {
         if (mounted && widget.isComplete) _controller.forward();
       });

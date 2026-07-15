@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/current_user.dart';
@@ -98,4 +99,12 @@ final yjsSyncManagerProvider = Provider<YjsSyncManager>((ref) {
   final mgr = YjsSyncManager(db: db, userId: userId);
   ref.onDispose(mgr.dispose);
   return mgr;
+});
+
+// ---------------------------------------------------------------------------
+// Shared preferences
+// ---------------------------------------------------------------------------
+
+final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
+  throw UnimplementedError('sharedPreferencesProvider must be overridden');
 });

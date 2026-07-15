@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/core/router/last_route_store.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/data/session_cache.dart';
@@ -115,8 +114,6 @@ class AuthController extends AsyncNotifier<User?> {
     } catch (e) {
       debugPrint('logout error: $e');
     }
-    // On explicit logout, clear the saved route so the user starts fresh.
-    await ref.read(lastRouteStoreProvider).clear();
     await _clearSession();
 
     ref.read(sessionResetProvider.notifier).update((state) => state + 1);

@@ -7,7 +7,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/router/app_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
-import 'package:supanotes/core/router/last_route_store.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
@@ -271,49 +270,4 @@ void main() {
     );
   });
 
-  testWidgets('authenticated startup opens the persisted note route', (tester) async {
-    final container = await _makeContainer(
-      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
-      prefs: {'last_route': '/notes/note-1'},
-    );
-
-    await tester.pumpWidget(_wrapRouter(container));
-    await settleRedirect(tester);
-
-    final router = container.read(goRouterProvider);
-    expect(
-      router.routerDelegate.currentConfiguration.uri.toString(),
-      '/notes/note-1',
-    );
-  });
-
-  testWidgets('router persists protected route navigation', (tester) async {
-    final container = await _makeContainer(
-      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
-    );
-
-    await tester.pumpWidget(_wrapRouter(container));
-    await settleRedirect(tester);
-
-    final router = container.read(goRouterProvider);
-    router.go(AppRoutes.settings);
-    await settleRedirect(tester);
-
-    final store = container.read(lastRouteStoreProvider);
-    expect(store.initialLocation(), AppRoutes.settings);
-  });
-
-  testWidgets('router does not persist login or register routes', (tester) async {
-    final container = await _makeContainer(null);
-
-    await tester.pumpWidget(_wrapRouter(container));
-    await settleRedirect(tester);
-
-    final router = container.read(goRouterProvider);
-    router.go(AppRoutes.register);
-    await settleRedirect(tester);
-
-    final store = container.read(lastRouteStoreProvider);
-    expect(store.initialLocation(), AppRoutes.splash);
-  });
 }
