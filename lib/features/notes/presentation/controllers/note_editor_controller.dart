@@ -11,6 +11,7 @@ import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
 import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
+import 'package:supanotes/features/notes/domain/node_codec.dart';
 import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
 import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
@@ -47,7 +48,7 @@ class NoteEditorController extends ChangeNotifier {
       name: 'NoteEditor',
     );
     final nodes = noteNodesFromDoc(doc);
-    document = EditorDocumentSyncManager.documentFromNodes(nodes);
+    document = NodeCodec.documentFromNodes(nodes);
     _noteId = noteId;
     _setupEditor();
     _coordinator = EditorDocumentSyncManager(

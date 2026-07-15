@@ -7,6 +7,7 @@ import 'package:yjs_dart/yjs_dart.dart';
 
 import 'attachment_nodes.dart';
 import 'editor_document_sync_manager.dart';
+import 'node_codec.dart';
 import 'yjs_node_codec.dart';
 import 'yjs_task_entry.dart';
 
@@ -135,7 +136,7 @@ class YjsDocEditorBridge {
     String id,
     YMap<Object> nodesMap,
   ) {
-    final dataStr = EditorDocumentSyncManager.nodeData(node);
+    final dataStr = NodeCodec.nodeData(node);
     final data = jsonDecode(dataStr) as Map<String, dynamic>;
 
     if (position == null) {
