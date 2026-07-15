@@ -6,12 +6,11 @@ import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'attachment_nodes.dart';
-import 'node_sync_manager.dart';
-import 'note_sync_coordinator.dart';
+import 'editor_document_sync_manager.dart';
 import 'yjs_node_codec.dart';
 import 'yjs_task_entry.dart';
 
-/// Wires a [Doc] to a [MutableDocument] via [NoteSyncCoordinator].
+/// Wires a [Doc] to a [MutableDocument] via [EditorDocumentSyncManager].
 ///
 /// Observes YMap("nodes") and YMap("tasks") for remote changes and applies
 /// them to the editor document through the coordinator. The widget layer
@@ -19,12 +18,12 @@ import 'yjs_task_entry.dart';
 /// This indirection is intentional: the bridge is the sole mediator of
 /// YMap→document sync, keeping widget rendering decoupled from CRDT internals.
 ///
-/// For local→remote: [NodeSyncManager] flush callbacks trigger YDoc mutations
+/// For local→remote: [EditorDocumentSyncManager] flush callbacks trigger YDoc mutations
 /// which are then sent via [sendUpdate] (WS or REST).
 class YjsDocEditorBridge {
   YjsDocEditorBridge({
     required Doc doc,
-    required NoteSyncCoordinator coordinator,
+    required EditorDocumentSyncManager coordinator,
     required void Function(Uint8List update) sendUpdate,
     void Function()? onDocChanged,
   })  : _doc = doc,
@@ -46,7 +45,7 @@ class YjsDocEditorBridge {
   }
 
   final Doc _doc;
-  final NoteSyncCoordinator _coordinator;
+  final EditorDocumentSyncManager _coordinator;
   final void Function(Uint8List update) _sendUpdate;
   final void Function()? _onDocChanged;
   late final void Function(dynamic, Transaction) _onNodesChangedHandler;
@@ -93,7 +92,7 @@ class YjsDocEditorBridge {
     }
   }
 
-  /// Called by [NoteSyncCoordinator] when local edits are flushed to SQLite.
+  /// Called by [EditorDocumentSyncManager] when local edits are flushed to SQLite.
   void onLocalFlush(List<NodeOperation> ops) {
     if (ops.isEmpty) return;
     final sw = Stopwatch()..start();
@@ -136,7 +135,7 @@ class YjsDocEditorBridge {
     String id,
     YMap<Object> nodesMap,
   ) {
-    final dataStr = NodeSyncManager.nodeData(node);
+    final dataStr = EditorDocumentSyncManager.nodeData(node);
     final data = jsonDecode(dataStr) as Map<String, dynamic>;
 
     if (position == null) {

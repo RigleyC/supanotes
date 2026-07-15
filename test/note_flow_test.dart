@@ -1,9 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
+import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
-import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
-import 'package:supanotes/features/notes/domain/note_sync_coordinator.dart';
 
 void main() {
   test('Local flush and reload', () async {
@@ -19,7 +18,7 @@ void main() {
       composer: composer,
     )..reactionPipeline.clear();
     
-    final coordinator = NoteSyncCoordinator(document: document, editor: editor);
+    final coordinator = EditorDocumentSyncManager(document: document, editor: editor);
     final bridge = YjsDocEditorBridge(
       doc: doc,
       coordinator: coordinator,

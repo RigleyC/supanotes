@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'dart:convert';
+import 'dart:developer' as dev;
 
-import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'note_node.dart';
@@ -35,23 +34,28 @@ class DeleteOp extends NodeOperation {
   DeleteOp(this.id);
 }
 
-class NodeSyncManager {
-  NodeSyncManager({
+/// Coordinates remote-to-local sync and local dirty tracking for a single note.
+///
+/// Merges the former [NoteSyncCoordinator] (remote→local application) and
+/// [NodeSyncManager] (local→remote dirty tracking & serialization) into one
+/// class to eliminate delegation indirection.
+class EditorDocumentSyncManager {
+  EditorDocumentSyncManager({
     required MutableDocument document,
-    this.onFlush,
-  }) : _document = document {
+    required Editor editor,
+    this.onNodeFlush,
+  })  : _document = document,
+        _editor = editor {
     _document.addListener(_onDocumentChanged);
   }
 
   final MutableDocument _document;
-  void Function(List<NodeOperation> ops)? onFlush;
+  final Editor _editor;
+  void Function(List<NodeOperation> ops)? onNodeFlush;
 
   final List<NodeOperation> _pendingOps = [];
   Timer? _debounceTimer;
 
-  /// IDs of nodes that have local changes not yet confirmed by the DB stream.
-  /// Used by the editor controller to skip reactive updates for these nodes,
-  /// preventing stale DB data from overwriting in-flight edits.
   final Set<String> locallyDirtyNodeIds = {};
 
   int _opSequence = 0;
@@ -64,15 +68,16 @@ class NodeSyncManager {
       try {
         await action();
       } catch (e, stackTrace) {
-        dev.log('SQLite write error: $e', name: 'NodeSyncManager', error: e, stackTrace: stackTrace, level: 1000);
+        dev.log('SQLite write error: $e', name: 'EditorDocumentSyncManager', error: e, stackTrace: stackTrace, level: 1000);
       }
     });
   }
 
-
+  // ---------------------------------------------------------------------------
+  // Local document observation
+  // ---------------------------------------------------------------------------
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
-    debugPrint('[DEBUG-DIAG-EDIT] _onDocumentChanged: changes=${changeLog.changes.length} types=${changeLog.changes.map((c) => c.runtimeType).join(',')}');
     _opSequence++;
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
@@ -107,14 +112,12 @@ class NodeSyncManager {
   }
 
   Future<void> _drainQueue() async {
-    debugPrint('[DEBUG-DIAG-EDIT] _drainQueue: pending=${_pendingOps.length}');
     if (_pendingOps.isEmpty) return;
 
     final opsToProcess = List<NodeOperation>.from(_pendingOps);
     _pendingOps.clear();
     final snapshotSeq = _opSequence;
 
-    // Clear dirty flags for flushed nodes only if no new ops arrived
     final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
     for (final id in flushedIds) {
       final seq = _dirtyNodeSequences[id];
@@ -125,8 +128,7 @@ class NodeSyncManager {
     }
 
     if (opsToProcess.isNotEmpty) {
-      debugPrint('[DEBUG-DIAG-EDIT] _drainQueue: calling onFlush with ${opsToProcess.length} ops');
-      onFlush?.call(opsToProcess);
+      onNodeFlush?.call(opsToProcess);
     }
   }
 
@@ -150,7 +152,7 @@ class NodeSyncManager {
     });
 
     if (opsToProcess.isNotEmpty) {
-      onFlush?.call(opsToProcess);
+      onNodeFlush?.call(opsToProcess);
     }
 
     return _writeLock;
@@ -163,7 +165,244 @@ class NodeSyncManager {
     DeleteOp(:final id) => id,
   };
 
+  // ---------------------------------------------------------------------------
+  // Remote-change application
+  // ---------------------------------------------------------------------------
 
+  void updateNodesIncrementally(List<NoteNode> incomingNodes) {
+    _applyRemote(() => _applyIncomingNodes(incomingNodes));
+  }
+
+  void syncTaskStates(Map<String, bool> taskCompletionMap) {
+    _applyRemote(() => _applyTaskCompletionStates(taskCompletionMap));
+  }
+
+  void _applyRemote(void Function() fn) {
+    suspendSync();
+    try {
+      fn();
+    } finally {
+      resumeSync();
+    }
+  }
+
+  void _applyIncomingNodes(List<NoteNode> incomingNodes) {
+    if (incomingNodes.isEmpty) {
+      return;
+    }
+
+    final dirtyIds = locallyDirtyNodeIds;
+    final requests = <EditRequest>[];
+    final incomingIds = incomingNodes.map((n) => n.id).toSet();
+
+    for (int i = 0; i < incomingNodes.length; i++) {
+      final incoming = incomingNodes[i];
+      final existingNode = _document.getNodeById(incoming.id);
+
+      if (existingNode == null) {
+        final newNode = createNodeFromSchema(incoming);
+        requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
+      } else {
+        if (dirtyIds.contains(incoming.id)) continue;
+
+        if (existingNode is TaskNode && incoming.type == 'task') {
+          try {
+            final existingData = jsonDecode(nodeData(existingNode)) as Map<String, dynamic>;
+            final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
+
+            final existingWithoutCompleted = Map.from(existingData)..remove('completed');
+            final incomingWithoutCompleted = Map.from(incomingData)..remove('completed');
+
+            if (_isMapEqual(existingWithoutCompleted, incomingWithoutCompleted)) {
+              final isDbCompleted = incomingData['completed'] as bool? ?? false;
+              if (existingNode.isComplete != isDbCompleted) {
+                requests.add(ChangeTaskCompletionRequest(
+                  nodeId: incoming.id,
+                  isComplete: isDbCompleted,
+                ));
+              }
+              continue;
+            }
+          } catch (_) {}
+        }
+
+        if (_isNodeEquivalent(existingNode, incoming)) continue;
+        final newNode = createNodeFromSchema(incoming);
+        requests.add(
+          ReplaceNodeRequest(
+            existingNodeId: incoming.id,
+            newNode: newNode,
+          ),
+        );
+      }
+    }
+
+    for (final node in _document.toList()) {
+      if (!incomingIds.contains(node.id)) {
+        if (dirtyIds.contains(node.id)) continue;
+        requests.add(DeleteNodeRequest(nodeId: node.id));
+      }
+    }
+
+    if (requests.isNotEmpty) {
+      _executeAndPreserveSelection(requests);
+    }
+  }
+
+  void _applyTaskCompletionStates(Map<String, bool> taskCompletionMap) {
+    final requests = <EditRequest>[];
+    for (final node in _document) {
+      if (node is TaskNode) {
+        final isDbCompleted = taskCompletionMap[node.id] ?? false;
+        if (node.isComplete != isDbCompleted) {
+          requests.add(ChangeTaskCompletionRequest(
+            nodeId: node.id,
+            isComplete: isDbCompleted,
+          ));
+        }
+      }
+    }
+    if (requests.isNotEmpty) {
+      _executeAndPreserveSelection(requests);
+    }
+  }
+
+  void _executeAndPreserveSelection(List<EditRequest> requests) {
+    if (requests.isEmpty) return;
+
+    final composer = _editor.context.composer;
+    final oldSelection = composer.selection;
+
+    _editor.execute(requests);
+
+    if (oldSelection != null) {
+      final baseNodeExists = _document.getNodeById(oldSelection.base.nodeId) != null;
+      final extentNodeExists = _document.getNodeById(oldSelection.extent.nodeId) != null;
+      if (baseNodeExists && extentNodeExists) {
+        DocumentSelection finalSelection = oldSelection;
+        final baseNode = _document.getNodeById(oldSelection.base.nodeId);
+        final extentNode = _document.getNodeById(oldSelection.extent.nodeId);
+
+        DocumentPosition? newBase = oldSelection.base;
+        DocumentPosition? newExtent = oldSelection.extent;
+
+        if (baseNode is TextNode && oldSelection.base.nodePosition is TextNodePosition) {
+          final maxLen = baseNode.text.toPlainText().length;
+          final offset = (oldSelection.base.nodePosition as TextNodePosition).offset;
+          if (offset > maxLen) {
+            newBase = DocumentPosition(
+              nodeId: oldSelection.base.nodeId,
+              nodePosition: TextNodePosition(offset: maxLen),
+            );
+          }
+        }
+        if (extentNode is TextNode && oldSelection.extent.nodePosition is TextNodePosition) {
+          final maxLen = extentNode.text.toPlainText().length;
+          final offset = (oldSelection.extent.nodePosition as TextNodePosition).offset;
+          if (offset > maxLen) {
+            newExtent = DocumentPosition(
+              nodeId: oldSelection.extent.nodeId,
+              nodePosition: TextNodePosition(offset: maxLen),
+            );
+          }
+        }
+
+        finalSelection = DocumentSelection(base: newBase, extent: newExtent);
+
+        if (finalSelection != composer.selection) {
+          _editor.execute([
+            ChangeSelectionRequest(
+              finalSelection,
+              SelectionChangeType.placeCaret,
+              SelectionReason.contentChange,
+            ),
+          ]);
+        }
+      }
+    }
+  }
+
+  bool _isNodeEquivalent(DocumentNode existingNode, NoteNode incoming) {
+    final existingAttribution = _existingAttribution(existingNode);
+    if (existingAttribution != incoming.type) return false;
+
+    if (existingNode is TextNode &&
+        incoming.type != 'image' &&
+        incoming.type != 'divider') {
+      final data = jsonDecode(incoming.data) as Map<String, dynamic>;
+      if (existingNode.text.toPlainText() != (data['text'] as String? ?? '')) {
+        return false;
+      }
+    }
+
+    final existingDataStr = nodeData(existingNode);
+    try {
+      final existingData = jsonDecode(existingDataStr) as Map<String, dynamic>;
+      final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
+      final isEq = _isMapEqual(existingData, incomingData);
+      if (!isEq) {
+        dev.log(
+          '[EditorDocumentSyncManager] NODE NOT EQUIVALENT ID=${incoming.id} TYPE=${incoming.type}\n'
+          'Existing: $existingData\n'
+          'Incoming: $incomingData',
+          name: 'SyncService',
+        );
+      }
+      return isEq;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _isMapEqual(Map<dynamic, dynamic> a, Map<dynamic, dynamic> b) {
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key)) return false;
+      final valA = a[key];
+      final valB = b[key];
+      if (valA is Map && valB is Map) {
+        if (!_isMapEqual(valA, valB)) return false;
+      } else if (valA is List && valB is List) {
+        if (!_isListEqual(valA, valB)) return false;
+      } else {
+        if (valA != valB) return false;
+      }
+    }
+    return true;
+  }
+
+  bool _isListEqual(List<dynamic> a, List<dynamic> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      final valA = a[i];
+      final valB = b[i];
+      if (valA is Map && valB is Map) {
+        if (!_isMapEqual(valA, valB)) return false;
+      } else if (valA is List && valB is List) {
+        if (!_isListEqual(valA, valB)) return false;
+      } else {
+        if (valA != valB) return false;
+      }
+    }
+    return true;
+  }
+
+  String? _existingAttribution(DocumentNode node) {
+    if (node is ParagraphNode) {
+      final blockType = node.getMetadataValue('blockType') as Attribution?;
+      if (blockType == null) return 'paragraph';
+      if (blockType == blockquoteAttribution) return 'blockquote';
+      return 'header';
+    }
+    if (node is TaskNode) return 'task';
+    if (node is ListItemNode) return 'list_item';
+    if (node is HorizontalRuleNode) return 'divider';
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Serialization
+  // ---------------------------------------------------------------------------
 
   static Map<String, dynamic> _serializeAttributedText(AttributedText text) {
     final spansList = <Map<String, dynamic>>[];
@@ -172,7 +411,7 @@ class NodeSyncManager {
         String attributionName;
         final attribution = span.attribution;
         if (attribution.id == 'composing') continue;
-        
+
         if (attribution == boldAttribution) {
           attributionName = 'bold';
         } else if (attribution == italicsAttribution) {
@@ -190,13 +429,13 @@ class NodeSyncManager {
         spansList.add({
           'attribution': attributionName,
           'start': span.offset,
-          'end': -1, // Will be filled when we find the end marker
+          'end': -1,
         });
       } else {
         String attributionName;
         final attribution = span.attribution;
         if (attribution.id == 'composing') continue;
-        
+
         if (attribution == boldAttribution) {
           attributionName = 'bold';
         } else if (attribution == italicsAttribution) {
@@ -211,7 +450,6 @@ class NodeSyncManager {
           attributionName = attribution.id;
         }
 
-        // Find the last opened span of this type that hasn't been closed
         for (int i = spansList.length - 1; i >= 0; i--) {
           if (spansList[i]['attribution'] == attributionName &&
               spansList[i]['end'] == -1) {
@@ -431,7 +669,6 @@ class NodeSyncManager {
         attribution = NamedAttribution(attributionName);
       }
 
-      // Ensure bounds are valid
       final safeStart = start.clamp(0, text.length);
       final safeEnd = end.clamp(safeStart, text.length);
       if (safeEnd > safeStart) {
@@ -522,6 +759,10 @@ class NodeSyncManager {
         );
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
 
   void suspendSync() {
     _document.removeListener(_onDocumentChanged);

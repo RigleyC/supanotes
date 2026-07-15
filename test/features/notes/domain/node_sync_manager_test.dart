@@ -23,7 +23,7 @@ Future<void> seedNote(AppDatabase db) async {
 const _debounce = Duration(milliseconds: 600);
 
 void main() {
-  group('NodeSyncManager flush round-trip', () {
+  group('EditorDocumentSyncManager flush round-trip', () {
     test('Insert', () async {
       final db = createTestDatabase();
       await seedNote(db);

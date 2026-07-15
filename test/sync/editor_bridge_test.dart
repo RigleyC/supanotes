@@ -6,9 +6,8 @@ import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
+import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/note_node.dart';
-import 'package:supanotes/features/notes/domain/note_sync_coordinator.dart';
 import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
 
 void main() {
@@ -32,7 +31,7 @@ void main() {
         composer: composer,
       )..reactionPipeline.clear();
 
-      final coordinator = NoteSyncCoordinator(
+      final coordinator = EditorDocumentSyncManager(
         document: mutableDoc,
         editor: editor,
       );
@@ -90,7 +89,7 @@ void main() {
         composer: composer,
       );
 
-      final coordinator = NoteSyncCoordinator(
+      final coordinator = EditorDocumentSyncManager(
         document: mutableDoc,
         editor: editor,
       );
@@ -143,7 +142,7 @@ void main() {
         composer: composer,
       );
 
-      final coordinator = NoteSyncCoordinator(
+      final coordinator = EditorDocumentSyncManager(
         document: mutableDoc,
         editor: editor,
       );
@@ -184,7 +183,7 @@ void main() {
         composer: composer,
       )..reactionPipeline.clear();
 
-      final coordinator = NoteSyncCoordinator(
+      final coordinator = EditorDocumentSyncManager(
         document: mutableDoc,
         editor: editor,
       );
