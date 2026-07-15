@@ -3,13 +3,15 @@ import 'snack_view.dart';
 
 class Snack {
   Snack({
-    required this.message,
+    required this.title,
+    this.subtitle,
     required this.icon,
     required this.duration,
     this.action,
   });
 
-  final String message;
+  final String title;
+  final String? subtitle;
   final IconData? icon;
   final Duration duration;
   final SnackBarAction? action;

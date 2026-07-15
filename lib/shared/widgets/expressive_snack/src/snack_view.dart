@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
-import 'package:material_shapes/material_shapes.dart';
 import 'package:motor/motor.dart';
 
 import 'snack.dart';
@@ -200,77 +197,86 @@ class SnackViewState extends State<SnackView> with TickerProviderStateMixin {
   }
 }
 
-/// The pill itself: an inverse surface stadium with an optional arch
-/// shaped icon chip and the message text.
+/// The pill itself: a surface container stadium with a colored dot
+/// indicator (matching the old snackbar design) and the message text.
 class _Pill extends StatelessWidget {
   const _Pill({required this.snack, required this.onTap});
 
   final Snack snack;
   final VoidCallback onTap;
 
-  /// [MaterialShapes.arch] turned so its dome points to the text start
-  /// side, matching the stadium curve of the pill's end. One per text
-  /// direction: the chip sits on the left in LTR and on the right in RTL.
-  static final RoundedPolygon _archLtr = _arch(-math.pi / 2);
-  static final RoundedPolygon _archRtl = _arch(math.pi / 2);
-
-  static RoundedPolygon _arch(double rotation) {
-    return MaterialShapes.arch
-        .transformed(
-          (Matrix4.identity()..rotateZ(rotation)).asPointTransformer(),
-        )
-        .normalized();
+  Color _dotColor(ColorScheme cs) {
+    return switch (snack.icon) {
+      Icons.check_circle || Icons.task_alt => Colors.green,
+      Icons.error => Colors.red,
+      _ => cs.primary,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final TextTheme tt = Theme.of(context).textTheme;
-    final IconData? icon = snack.icon;
-    final bool ltr = Directionality.of(context) == TextDirection.ltr;
+    final Color dotColor = _dotColor(cs);
 
     return Material(
-      color: cs.inverseSurface,
+      color: cs.surfaceContainerHighest,
       shape: const StadiumBorder(),
       clipBehavior: Clip.antiAlias,
       elevation: 6,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          // Both paddings land on the spec's 48dp single line container
-          // height: 8dp around the 32dp chip, or 14dp around the 20dp
-          // body medium line when there is no chip.
-          padding: icon != null
-              ? const EdgeInsetsDirectional.fromSTEB(8, 8, 20, 8)
-              : const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (icon != null) ...[
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: ShapeDecoration(
-                    color: cs.inversePrimary,
-                    shape: MaterialShapeBorder(
-                      shape: ltr ? _archLtr : _archRtl,
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: dotColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: dotColor,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                  child: Icon(icon, size: 18, color: cs.inverseSurface),
                 ),
-                const SizedBox(width: 12),
-              ],
+              ),
+              const SizedBox(width: 10),
               Flexible(
                 child: Semantics(
                   liveRegion: true,
-                  child: Text(
-                    snack.message,
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: snack.title,
+                          style: TextStyle(
+                            color: cs.onSurface,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (snack.subtitle != null) ...[
+                          const TextSpan(text: '  '),
+                          TextSpan(
+                            text: snack.subtitle,
+                            style: TextStyle(
+                              color: cs.onSurfaceVariant,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: tt.bodyMedium?.copyWith(
-                      color: cs.onInverseSurface,
-                      fontWeight: FontWeight.w500,
-                    ),
                   ),
                 ),
               ),
@@ -288,7 +294,7 @@ class _Pill extends StatelessWidget {
                   ),
                   child: Text(
                     snack.action!.label,
-                    style: TextStyle(color: cs.inversePrimary),
+                    style: TextStyle(color: cs.primary),
                   ),
                 ),
               ],

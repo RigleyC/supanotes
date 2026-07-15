@@ -13,12 +13,11 @@ class SnackOverlay extends StatefulWidget {
     final state = _key.currentState;
     if (state == null) return snack;
 
-    final duplicate = state._snacks.cast<Snack?>().firstWhere(
-      (s) => s != null && s.message == snack.message && s.icon == snack.icon,
-      orElse: () => null,
+    final index = state._snacks.indexWhere(
+      (s) => s.title == snack.title && s.subtitle == snack.subtitle && s.icon == snack.icon,
     );
 
-    if (duplicate != null) return duplicate;
+    if (index != -1) return state._snacks[index];
 
     state._add(snack);
     return snack;

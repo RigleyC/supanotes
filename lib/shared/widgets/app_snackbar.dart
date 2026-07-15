@@ -14,7 +14,8 @@ class AppMessenger {
     Duration? duration,
   }) {
     showExpressiveSnack(
-      message: subtitle != null ? '$title\n$subtitle' : title,
+      title: title,
+      subtitle: subtitle,
       icon: Icons.check_circle,
       action: action,
       duration: duration ?? const Duration(seconds: 4),
@@ -28,7 +29,8 @@ class AppMessenger {
     Duration? duration,
   }) {
     showExpressiveSnack(
-      message: subtitle != null ? '$title\n$subtitle' : title,
+      title: title,
+      subtitle: subtitle,
       icon: Icons.error,
       action: action,
       duration: duration ?? const Duration(seconds: 4),
@@ -42,7 +44,8 @@ class AppMessenger {
     Duration? duration,
   }) {
     showExpressiveSnack(
-      message: subtitle != null ? '$title\n$subtitle' : title,
+      title: title,
+      subtitle: subtitle,
       icon: Icons.info,
       action: action,
       duration: duration ?? const Duration(seconds: 4),
@@ -56,7 +59,8 @@ class AppMessenger {
     Duration? duration,
   }) {
     showExpressiveSnack(
-      message: subtitle != null ? '$title\n$subtitle' : title,
+      title: title,
+      subtitle: subtitle,
       icon: Icons.task_alt,
       action: action,
       duration: duration ?? const Duration(seconds: 4),
