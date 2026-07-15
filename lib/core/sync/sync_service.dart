@@ -479,6 +479,7 @@ class SyncService {
             updatedAt: Value(DateTime.now()),
           ),
         );
+        await _yjsMgr.projectState(remoteState.noteId, mergedState);
         _yjsMgr.evictDoc(remoteState.noteId);
       } catch (e, _) {
         debugPrint('[SyncService] pull: merge failed for ${remoteState.noteId}, falling back to remote: $e');
@@ -489,6 +490,8 @@ class SyncService {
             updatedAt: Value(remoteState.updatedAt),
           ),
         );
+        await _yjsMgr.projectState(remoteState.noteId, remoteState.state);
+        _yjsMgr.evictDoc(remoteState.noteId);
       }
     }
 

@@ -288,7 +288,23 @@ func LoadYDocState(ctx context.Context, pool *pgxpool.Pool, noteID string) ([]by
 	}
 
 	startMerge := time.Now()
-	all := append([][]byte{state}, pending...)
+	var all [][]byte
+	if len(state) > 0 {
+		all = append(all, state)
+	}
+	for _, u := range pending {
+		if len(u) > 0 {
+			all = append(all, u)
+		}
+	}
+	if len(all) == 0 {
+		slog.Info("LoadYDocState: done (no valid updates to merge)", "note_id", noteID, "total_ms", time.Since(startTotal).Milliseconds())
+		return nil, nil
+	}
+	if len(all) == 1 {
+		slog.Info("LoadYDocState: done (single valid update)", "note_id", noteID, "total_ms", time.Since(startTotal).Milliseconds())
+		return all[0], nil
+	}
 	merged, err := crdt.MergeUpdatesV1(all...)
 	if err != nil {
 		slog.Error("LoadYDocState: merge failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startMerge).Milliseconds())

@@ -178,6 +178,27 @@ class YjsSyncManager {
     await _persistLock;
   }
 
+  /// Projects a raw Yjs state into local SQLite tables.
+  /// Used by SyncService to project the state after a pull without
+  /// affecting the active editor document.
+  Future<void> projectState(String noteId, Uint8List state) async {
+    final doc = Doc();
+    applyUpdateSafe(doc, state);
+    _migrateLegacyDoc(doc);
+    
+    final previousDoc = _docs[noteId];
+    _docs[noteId] = doc;
+    try {
+      await projectNodes(noteId);
+    } finally {
+      if (previousDoc != null) {
+        _docs[noteId] = previousDoc;
+      } else {
+        _docs.remove(noteId);
+      }
+    }
+  }
+
   /// Project YMap("nodes") to local SQLite tables.
   /// Projects task nodes to the tasks table and derives the note's
   /// content/excerpt so list views reflect edits without waiting for a
