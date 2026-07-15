@@ -1,4 +1,5 @@
-import 'package:dart_crdt/dart_crdt.dart';
+import 'dart:typed_data';
+import 'package:yjs_dart/yjs_dart.dart';
 
 void main() {
   final doc = Doc();
@@ -12,7 +13,7 @@ void main() {
   ];
   for (final payload in payloads) {
     try {
-      applyUpdate(doc, payload);
+      applyUpdate(doc, Uint8List.fromList(payload));
       print('OK: ${payload.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}');
     } catch (e) {
       print('ERR ${payload.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}: $e');

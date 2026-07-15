@@ -71,7 +71,6 @@ dependencies:
   markdown: ^7.3.1
 
   # CRDT collaborative editing
-  dart_crdt: ^0.3.0
   yjs_dart: ^1.1.15
   web_socket_channel: ^3.0.0
 
@@ -138,8 +137,6 @@ dependency_overrides:
       ref: main
       path: super_editor_clipboard
   device_info_plus: ^12.0.0
-  dart_crdt:
-    path: packages/dart_crdt
 
 flutter:
   uses-material-design: true

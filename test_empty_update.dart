@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
 void main() {
   final doc = Doc();

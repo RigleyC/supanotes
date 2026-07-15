@@ -1,17 +1,19 @@
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 
-import '../_helpers/test_note_database.dart';
+AppDatabase createTestDatabase() {
+  final db = AppDatabase.test();
+  return db;
+}
 
-Future<void> seedNote(AppDatabase db,
-    {String id = 'test-note', String userId = 'test-user'}) async {
+Future<void> seedNote(AppDatabase db) async {
   await db.into(db.notes).insert(NotesCompanion.insert(
-        id: id,
-        userId: userId,
+        id: 'test-note',
+        userId: 'test-user',
         content: '',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -49,8 +51,8 @@ void main() {
       expect(p1, isNotNull);
       expect((p1 as TextNode).text.toPlainText(), 'Hello');
 
-      final ytext = doc.getText('content/p1');
-      expect(ytext.toPlainText(), 'Hello');
+      final ytext = doc.getText('content/p1')!;
+      expect(ytext.toString(), 'Hello');
     });
 
     test('Update', () async {
@@ -90,8 +92,8 @@ void main() {
       expect(p1, isNotNull);
       expect((p1 as TextNode).text.toPlainText(), 'Updated');
 
-      final ytext = doc.getText('content/p1');
-      expect(ytext.toPlainText(), 'Updated');
+      final ytext = doc.getText('content/p1')!;
+      expect(ytext.toString(), 'Updated');
     });
 
     test('Move', () async {
@@ -271,7 +273,7 @@ void main() {
 
       expect(controller.document!.getNodeById('p1'), isNotNull);
       // With sync suspended, the flush does not update Yjs
-      expect(doc.getText('content/p1').toPlainText(), isEmpty);
+      expect(doc.getText('content/p1')!.toString(), isEmpty);
 
       controller.resumeSync();
 

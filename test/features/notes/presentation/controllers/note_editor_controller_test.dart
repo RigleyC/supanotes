@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -357,7 +357,7 @@ void main() {
 
       final doc = Doc();
       doc.transact((txn) {
-        doc.getMap('nodes').setAttr(
+        doc.getMap<Object>('nodes')!.set(
           'p1',
           jsonEncode({
             'id': 'p1',
@@ -366,7 +366,7 @@ void main() {
             'data': {'text': 'Hello from YDoc', 'spans': []},
           }),
         );
-        doc.getText('content/p1').insertText(0, 'Hello from YDoc');
+        doc.getText('content/p1')!.insert(0, 'Hello from YDoc');
       });
 
       final controller = NoteEditorController(userId: 'test-user');

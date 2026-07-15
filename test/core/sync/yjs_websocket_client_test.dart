@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:stream_channel/stream_channel.dart';
 
@@ -35,15 +35,15 @@ void main() {
   test('client applies incoming SyncStep2 and completes handshake', () async {
     final serverDoc = Doc();
     // Pre-create YText before transact to work around yjs_dart type bug.
-    serverDoc.getText('content_x');
+    serverDoc.getText('content_x')!;
     serverDoc.transact((txn) {
-      serverDoc.getText('content_x').insertText(0, 'server text');
+      serverDoc.getText('content_x')!.insert(0, 'server text');
     });
 
     final channelPair = _FakeChannelPair();
     final clientDoc = Doc();
     // Pre-create matching YText so applyUpdate can populate it.
-    clientDoc.getText('content_x');
+    clientDoc.getText('content_x')!;
 
     final client = YjsWebSocketClient(
       channelBuilder: () async => _FakeWebSocketChannel(
@@ -68,7 +68,7 @@ void main() {
 
     await Future<void>.delayed(Duration.zero);
 
-    expect(clientDoc.getText('content_x').toPlainText(), 'server text');
+    expect(clientDoc.getText('content_x')!.toString(), 'server text');
   });
 }
 

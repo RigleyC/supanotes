@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:dart_crdt/dart_crdt.dart';
+import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/node_sync_manager.dart';
@@ -59,15 +59,15 @@ void main() {
       }).toList());
 
       // Verify that YDoc map got the node serialized and the text updated
-      final nodesMap = doc.getMap('nodes');
-      expect(nodesMap.attrKeys, contains('p1'));
+      final nodesMap = doc.getMap<Object>('nodes')!;
+      expect(nodesMap.keys, contains('p1'));
 
-      final meta = jsonDecode(nodesMap.getAttr('p1') as String) as Map<String, dynamic>;
+      final meta = jsonDecode(nodesMap.get('p1') as String) as Map<String, dynamic>;
       expect(meta['id'], 'p1');
       expect(meta['type'], 'paragraph');
 
-      final ytext = doc.getText('content/p1');
-      expect(ytext.toPlainText(), 'Hello World');
+      final ytext = doc.getText('content/p1')!;
+      expect(ytext.toString(), 'Hello World');
       expect(updates, isNotEmpty);
 
       bridge.dispose();
@@ -197,7 +197,7 @@ void main() {
 
       // Seed a recurring task in the YDoc.
       doc.transact((txn) {
-        doc.getMap('nodes').setAttr(
+        doc.getMap<Object>('nodes')!.set(
           't1',
           jsonEncode({
             'id': 't1',
@@ -210,8 +210,8 @@ void main() {
             },
           }),
         );
-        doc.getText('content/t1').insertText(0, 'Daily task');
-        doc.getMap('tasks').setAttr(
+        doc.getText('content/t1')!.insert(0, 'Daily task');
+        doc.getMap<Object>('tasks')!.set(
           't1',
           jsonEncode({
             'nodeId': 't1',
@@ -226,8 +226,8 @@ void main() {
       final nextDue = DateTime(2026, 7, 15);
       bridge.completeRecurringTask('t1', nextDue);
 
-      final tasksMap = doc.getMap('tasks');
-      final entry = jsonDecode(tasksMap.getAttr('t1') as String) as Map<String, dynamic>;
+      final tasksMap = doc.getMap<Object>('tasks')!;
+      final entry = jsonDecode(tasksMap.get('t1') as String) as Map<String, dynamic>;
       expect(entry['completed'], isFalse);
       expect(entry['dueDate'], '2026-07-15');
       expect(entry['recurrence'], 'daily');
