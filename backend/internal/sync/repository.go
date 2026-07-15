@@ -25,6 +25,11 @@ type Repository interface {
 	GetSyncUserNotePreferences(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.UserNotePreference, error)
 	UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error)
 	GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error)
+	UpsertNotesBatch(ctx context.Context, arg sqlcgen.UpsertNotesBatchParams) error
+	UpsertContextsBatch(ctx context.Context, arg sqlcgen.UpsertContextsBatchParams) error
+	UpsertTagsBatch(ctx context.Context, arg sqlcgen.UpsertTagsBatchParams) error
+	UpsertNoteTagsBatch(ctx context.Context, arg sqlcgen.UpsertNoteTagsBatchParams) error
+	UpsertNoteLinksBatch(ctx context.Context, arg sqlcgen.UpsertNoteLinksBatchParams) error
 	UpsertNoteYjsState(ctx context.Context, arg sqlcgen.UpsertNoteYjsStateParams) error
 	WithQuerier(q sqlcgen.Querier) Repository
 }
@@ -115,6 +120,26 @@ func (r *repo) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertU
 
 func (r *repo) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
 	return r.q.GetNoteByID(ctx, arg)
+}
+
+func (r *repo) UpsertNotesBatch(ctx context.Context, arg sqlcgen.UpsertNotesBatchParams) error {
+	return r.q.UpsertNotesBatch(ctx, arg)
+}
+
+func (r *repo) UpsertContextsBatch(ctx context.Context, arg sqlcgen.UpsertContextsBatchParams) error {
+	return r.q.UpsertContextsBatch(ctx, arg)
+}
+
+func (r *repo) UpsertTagsBatch(ctx context.Context, arg sqlcgen.UpsertTagsBatchParams) error {
+	return r.q.UpsertTagsBatch(ctx, arg)
+}
+
+func (r *repo) UpsertNoteTagsBatch(ctx context.Context, arg sqlcgen.UpsertNoteTagsBatchParams) error {
+	return r.q.UpsertNoteTagsBatch(ctx, arg)
+}
+
+func (r *repo) UpsertNoteLinksBatch(ctx context.Context, arg sqlcgen.UpsertNoteLinksBatchParams) error {
+	return r.q.UpsertNoteLinksBatch(ctx, arg)
 }
 
 func (r *repo) UpsertNoteYjsState(ctx context.Context, arg sqlcgen.UpsertNoteYjsStateParams) error {

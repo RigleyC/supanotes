@@ -84,6 +84,10 @@ ApiException fromDioError(DioException error) {
       return NetworkException(
         message: parsed ?? _fallbackMessage(error, 'Invalid TLS certificate'),
       );
+    case DioExceptionType.transformTimeout:
+      return NetworkException(
+        message: parsed ?? _fallbackMessage(error, 'Transform timeout'),
+      );
     case DioExceptionType.cancel:
       return ApiException(
         message: parsed ?? _fallbackMessage(error, 'Request cancelled'),

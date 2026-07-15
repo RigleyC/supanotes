@@ -43,11 +43,12 @@ SET deleted_at = NOW()
 WHERE id = $1 AND user_id = $2;
 
 -- name: GetNotes :many
-SELECT n.*,
-  COALESCE(
-    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
-    'Untitled'
-  )::text AS title,
+SELECT
+  n.id, n.user_id, n.context_id,
+  n.excerpt, n.search_vector,
+  n.created_at, n.updated_at, n.deleted_at,
+  n.embedding_status, n.collapse_images,
+  NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -89,11 +90,12 @@ DELETE FROM note_tags
 WHERE note_id = $1 AND tag_id = $2;
 
 -- name: GetRecentNotes :many
-SELECT n.*,
-  COALESCE(
-    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
-    'Untitled'
-  )::text AS title,
+SELECT
+  n.id, n.user_id, n.context_id,
+  n.excerpt, n.search_vector,
+  n.created_at, n.updated_at, n.deleted_at,
+  n.embedding_status, n.collapse_images,
+  NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n

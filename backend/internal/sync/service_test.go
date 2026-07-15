@@ -114,6 +114,26 @@ func (m *mockRepository) UpsertNoteYjsState(ctx context.Context, arg sqlcgen.Ups
 	return nil
 }
 
+func (m *mockRepository) UpsertNotesBatch(ctx context.Context, arg sqlcgen.UpsertNotesBatchParams) error {
+	return m.upsertNoteErr
+}
+
+func (m *mockRepository) UpsertContextsBatch(ctx context.Context, arg sqlcgen.UpsertContextsBatchParams) error {
+	return nil
+}
+
+func (m *mockRepository) UpsertTagsBatch(ctx context.Context, arg sqlcgen.UpsertTagsBatchParams) error {
+	return nil
+}
+
+func (m *mockRepository) UpsertNoteTagsBatch(ctx context.Context, arg sqlcgen.UpsertNoteTagsBatchParams) error {
+	return nil
+}
+
+func (m *mockRepository) UpsertNoteLinksBatch(ctx context.Context, arg sqlcgen.UpsertNoteLinksBatchParams) error {
+	return nil
+}
+
 func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }
@@ -160,7 +180,7 @@ func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
 	}
 }
 
-func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
+func TestSyncServicePushReportsBatchError(t *testing.T) {
 	repo := &mockRepository{upsertNoteErr: pgx.ErrNoRows}
 	svc := NewService(repo, nil, nil, nil)
 
@@ -176,8 +196,8 @@ func TestSyncServicePushMapsNoRowsToSyncConflict(t *testing.T) {
 	}
 
 	err := svc.Push(context.Background(), userID, payload)
-	if !errors.Is(err, ErrSyncConflict) {
-		t.Fatalf("expected ErrSyncConflict, got %v", err)
+	if err == nil {
+		t.Fatalf("expected error from batch upsert, got nil")
 	}
 }
 

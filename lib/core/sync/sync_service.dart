@@ -136,6 +136,9 @@ class SyncService {
       debugPrint('[SyncService] connectNote loading doc elapsed=${sw.elapsedMilliseconds}ms');
       final doc = await _yjsMgr.loadDoc(noteId);
       debugPrint('[SyncService] connectNote doc loaded elapsed=${sw.elapsedMilliseconds}ms');
+      // Fire onReady immediately after loading local YDoc (non-blocking).
+      // WS connection and push() happen asynchronously after.
+      onReady?.call(doc, (update) => _yjsWsClient?.sendUpdate(update));
       String wsUrl = ApiConstants.baseUrl
           .replaceFirst('https://', 'wss://')
           .replaceFirst('http://', 'ws://');
@@ -169,7 +172,6 @@ class SyncService {
       await _yjsWsClient!.connect(noteId);
       debugPrint('[SyncService] connectNote WS connected elapsed=${sw.elapsedMilliseconds}ms');
       _yjsUpdateSub = _yjsWsClient!.onUpdate.listen(_handleIncomingUpdate);
-      onReady?.call(doc, (update) => _yjsWsClient?.sendUpdate(update));
       debugPrint('[SyncService] connectNote DONE elapsed=${sw.elapsedMilliseconds}ms');
     } catch (e, stackTrace) {
       debugPrint('[SyncService] connectNote FAIL: $e\n$stackTrace');
@@ -287,10 +289,14 @@ class SyncService {
     final contexts = await _db.contextsDao.getDirtyContexts();
     final tags = await _db.tagsDao.getDirtyTags();
 
-    // Collect dirty Yjs states (skip the currently active note — it syncs via WS).
-    final allYjsStates = await (_db.select(_db.localYjsStates)).get();
+    // Collect Yjs states for relevant notes only (filter at DB level).
+    final relevantStates = allowedNoteIds.isEmpty
+        ? <LocalYjsState>[]
+        : await (_db.select(_db.localYjsStates)
+            ..where((t) => t.noteId.isIn(allowedNoteIds.toList()))
+          ).get();
     final yjsStates = <LocalYjsState>[];
-    for (final s in allYjsStates) {
+    for (final s in relevantStates) {
       if (isNoteUnderActiveWsManagement(s.noteId)) continue;
       final lastSync = _lastYjsSyncAt[s.noteId];
       if (lastSync == null || s.updatedAt.isAfter(lastSync)) {

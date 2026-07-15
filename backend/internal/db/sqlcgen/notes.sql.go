@@ -352,11 +352,12 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 }
 
 const getNotes = `-- name: GetNotes :many
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
-  COALESCE(
-    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
-    'Untitled'
-  )::text AS title,
+SELECT
+  n.id, n.user_id, n.context_id,
+  n.excerpt, n.search_vector,
+  n.created_at, n.updated_at, n.deleted_at,
+  n.embedding_status, n.collapse_images,
+  NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -383,7 +384,6 @@ type GetNotesRow struct {
 	ID              pgtype.UUID        `json:"id"`
 	UserID          pgtype.UUID        `json:"user_id"`
 	ContextID       pgtype.UUID        `json:"context_id"`
-	Content         string             `json:"content"`
 	Excerpt         pgtype.Text        `json:"excerpt"`
 	SearchVector    pgtype.Text        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
@@ -416,7 +416,6 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 			&i.ID,
 			&i.UserID,
 			&i.ContextID,
-			&i.Content,
 			&i.Excerpt,
 			&i.SearchVector,
 			&i.CreatedAt,
@@ -439,11 +438,12 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 }
 
 const getRecentNotes = `-- name: GetRecentNotes :many
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
-  COALESCE(
-    NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''),
-    'Untitled'
-  )::text AS title,
+SELECT
+  n.id, n.user_id, n.context_id,
+  n.excerpt, n.search_vector,
+  n.created_at, n.updated_at, n.deleted_at,
+  n.embedding_status, n.collapse_images,
+  NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -459,7 +459,6 @@ type GetRecentNotesRow struct {
 	ID              pgtype.UUID        `json:"id"`
 	UserID          pgtype.UUID        `json:"user_id"`
 	ContextID       pgtype.UUID        `json:"context_id"`
-	Content         string             `json:"content"`
 	Excerpt         pgtype.Text        `json:"excerpt"`
 	SearchVector    pgtype.Text        `json:"search_vector"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
@@ -485,7 +484,6 @@ func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Get
 			&i.ID,
 			&i.UserID,
 			&i.ContextID,
-			&i.Content,
 			&i.Excerpt,
 			&i.SearchVector,
 			&i.CreatedAt,

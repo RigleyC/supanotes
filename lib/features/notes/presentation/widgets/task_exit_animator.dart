@@ -34,20 +34,21 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
       vsync: this,
       duration: _exitAnimationDuration,
     );
+    if (widget.hideCompleted && widget.isComplete) {
+      _controller.value = 1.0;
+    }
+
+    final curve = Curves.easeInOutCubic;
     _fade = Tween<double>(begin: 1.0, end: 0.0)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+        .animate(CurvedAnimation(parent: _controller, curve: curve));
     _size = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+      CurvedAnimation(parent: _controller, curve: curve),
     );
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         widget.onAnimationComplete?.call();
       }
     });
-
-    if (widget.hideCompleted && widget.isComplete) {
-      _controller.value = 1.0;
-    }
   }
 
   @override
@@ -60,6 +61,8 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
         !widget.isComplete && oldWidget.isComplete;
     final hideToggledOn =
         widget.hideCompleted && !oldWidget.hideCompleted;
+    final hideToggledOff =
+        !widget.hideCompleted && oldWidget.hideCompleted;
 
     if (hideToggledOn && widget.isComplete && !becameComplete) {
       Future.delayed(_exitAnimationDelay, () {
@@ -67,7 +70,9 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
           _controller.forward();
         }
       });
-    } else if (becameComplete) {
+    } else if (hideToggledOff) {
+      _controller.reverse();
+    } else if (becameComplete && widget.hideCompleted) {
       Future.delayed(_exitAnimationDelay, () {
         if (mounted && widget.isComplete) _controller.forward();
       });

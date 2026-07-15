@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'dart:developer' as dev;
 
-import 'package:collection/collection.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'attachment_nodes.dart';
 import 'note_node.dart';
+import 'yjs_task_entry.dart';
 
 class NodeCodec {
   NodeCodec._();
@@ -139,15 +138,20 @@ class NodeCodec {
   }
 
   static DocumentNode createNodeFromSchema(NoteNode schema) {
-    final type = schema.type;
     final data = jsonDecode(schema.data) as Map<String, dynamic>;
-    final text = data['text'] as String? ?? '';
-    final spans = data['spans'] as List? ?? [];
-    final attributedText = AttributedText(text, deserializeSpans(spans));
+    return _createNode(id: schema.id, type: schema.type, data: data);
+  }
+
+  static DocumentNode _createNode({
+    required String id,
+    required String type,
+    required Map<String, dynamic> data,
+  }) {
+    final attributedText = _deserializeAttributedText(data);
 
     if (type == 'task') {
       return TaskNode(
-        id: schema.id,
+        id: id,
         text: attributedText,
         isComplete: data['completed'] as bool? ?? false,
         indent: data['indent'] as int? ?? 0,
@@ -155,7 +159,7 @@ class NodeCodec {
     }
     if (type == 'list_item') {
       return ListItemNode(
-        id: schema.id,
+        id: id,
         itemType: (data['type'] as String?) == 'ordered'
             ? ListItemType.ordered
             : ListItemType.unordered,
@@ -164,7 +168,7 @@ class NodeCodec {
       );
     }
     if (type == 'divider') {
-      return HorizontalRuleNode(id: schema.id);
+      return HorizontalRuleNode(id: id);
     }
     if (type == 'header') {
       final level = data['level'] as int? ?? 1;
@@ -177,19 +181,19 @@ class NodeCodec {
         _ => header6Attribution,
       };
       return ParagraphNode(
-        id: schema.id,
+        id: id,
         text: attributedText,
         metadata: {'blockType': blockType},
       );
     }
     if (type == 'image') {
       return ImageNode(
-        id: schema.id,
+        id: id,
         imageUrl: data['url'] as String? ?? '',
         altText: data['alt'] as String? ?? '',
       );
     }
-    return ParagraphNode(id: schema.id, text: attributedText);
+    return ParagraphNode(id: id, text: attributedText);
   }
 
   static SpanMarker parseSpan(Map<String, dynamic> spanMap) {
@@ -262,69 +266,10 @@ class NodeCodec {
         data = <String, dynamic>{};
       }
     }
-
-    switch (node.type) {
-      case 'header':
-        final level = data['level'] as int? ?? 1;
-        NamedAttribution blockType = header1Attribution;
-        if (level == 2) blockType = header2Attribution;
-        if (level == 3) blockType = header3Attribution;
-        if (level == 4) blockType = header4Attribution;
-        if (level == 5) blockType = header5Attribution;
-        if (level == 6) blockType = header6Attribution;
-        return ParagraphNode(
-          id: node.id,
-          text: _deserializeAttributedText(data),
-          metadata: {'blockType': blockType},
-        );
-      case 'blockquote':
-        return ParagraphNode(
-          id: node.id,
-          text: _deserializeAttributedText(data),
-          metadata: {'blockType': blockquoteAttribution},
-        );
-      case 'list_item':
-        final typeStr = data['type'] as String? ?? 'unordered';
-        return ListItemNode(
-          id: node.id,
-          itemType: typeStr == 'ordered'
-              ? ListItemType.ordered
-              : ListItemType.unordered,
-          text: _deserializeAttributedText(data),
-          indent: data['indent'] as int? ?? 0,
-        );
-      case 'paragraph':
-        return ParagraphNode(
-          id: node.id,
-          text: _deserializeAttributedText(data),
-        );
-      case 'task':
-        return TaskNode(
-          id: node.id,
-          text: _deserializeAttributedText(data),
-          isComplete: data['completed'] == true || data['isComplete'] == true,
-          indent: data['indent'] as int? ?? 0,
-        );
-      case 'divider':
-        return HorizontalRuleNode(id: node.id);
-      case 'attachment':
-        final attachmentId = data['id'] as String? ?? node.id;
-        return DocumentAttachmentNode(id: attachmentId);
-      case 'image':
-        return ImageNode(
-          id: node.id,
-          imageUrl: data['url'] as String? ?? '',
-          altText: data['alt'] as String? ?? '',
-        );
-      default:
-        return ParagraphNode(
-          id: node.id,
-          text: _deserializeAttributedText(data),
-        );
-    }
+    return _createNode(id: node.id, type: node.type, data: data);
   }
 
-  static String? _existingAttribution(DocumentNode node) {
+  static String? nodeType(DocumentNode node) {
     if (node is ParagraphNode) {
       final blockType = node.getMetadataValue('blockType') as Attribution?;
       if (blockType == null) return 'paragraph';
@@ -334,11 +279,13 @@ class NodeCodec {
     if (node is TaskNode) return 'task';
     if (node is ListItemNode) return 'list_item';
     if (node is HorizontalRuleNode) return 'divider';
+    if (node is ImageNode) return 'image';
+    if (node is DocumentAttachmentNode) return 'attachment';
     return null;
   }
 
   static bool isNodeEquivalent(DocumentNode existingNode, NoteNode incoming) {
-    final existingAttribution = _existingAttribution(existingNode);
+    final existingAttribution = nodeType(existingNode);
     if (existingAttribution != incoming.type) return false;
 
     if (existingNode is TextNode &&
@@ -352,18 +299,14 @@ class NodeCodec {
 
     final existingDataStr = nodeData(existingNode);
     try {
-      final existingData = jsonDecode(existingDataStr) as Map<String, dynamic>;
-      final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
-      final isEq = const DeepCollectionEquality().equals(existingData, incomingData);
-      if (!isEq) {
-        dev.log(
-          '[NodeCodec] NODE NOT EQUIVALENT ID=${incoming.id} TYPE=${incoming.type}\n'
-          'Existing: $existingData\n'
-          'Incoming: $incomingData',
-          name: 'SyncService',
-        );
+      if (existingNode is TaskNode && incoming.type == 'task') {
+        final existingEntry = YjsTaskEntry.decode(existingDataStr);
+        final incomingEntry = YjsTaskEntry.decode(incoming.data);
+        if (existingEntry != null && incomingEntry != null) {
+          return existingEntry == incomingEntry;
+        }
       }
-      return isEq;
+      return existingDataStr == incoming.data;
     } catch (_) {
       return false;
     }

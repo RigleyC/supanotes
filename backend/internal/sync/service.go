@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -207,117 +208,135 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		r = s.repo.WithQuerier(sqlcgen.New(tx))
 	}
 
-	for _, n := range payload.Notes {
-		noteID := n.ID
-		canEdit, err := s.canEditNote(ctx, r, noteID, userID, editableNotes)
-		if err != nil {
-			slog.Error("sync push conflict: note permission check failed", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID, "error", err)
-			return ErrSyncConflict
-		}
-		if !canEdit && n.UserID == userID {
-			canEdit = true
-			editableNotes[n.ID] = true
-		}
-		if !canEdit {
-			share, shareErr := s.repo.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
-				NoteID: n.ID, UserID: userID,
-			})
-			if shareErr == nil && share.Permission == "view" {
-				continue
-			}
-			slog.Error("sync push conflict: note edit permission denied", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID)
-			return ErrSyncConflict
-		}
-
-		embStatus := n.EmbeddingStatus
-		if embStatus == "" {
-			embStatus = "pending"
-		}
-		noteID = n.ID
-
-		editableNotes[noteID] = canEdit
-
-		// Preserve the original owner ID for UpsertNote so the
-		// WHERE notes.user_id = EXCLUDED.user_id check passes.
-		upsertUserID := userID
-		if n.UserID != userID {
-			upsertUserID = n.UserID
-		}
-
-		_, err = r.UpsertNote(ctx, sqlcgen.UpsertNoteParams{
-			ID:              noteID,
-			UserID:          upsertUserID,
-			ContextID:       n.ContextID,
-			Content:         "", // Derived by projection (ProjectNoteContentFromYDoc)
-			EmbeddingStatus: embStatus,
-			CollapseImages:  n.CollapseImages,
-			CreatedAt:       n.CreatedAt,
-			DeletedAt:       n.DeletedAt,
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				slog.Error("sync push conflict: UpsertNote returned ErrNoRows", "note_id", noteID, "user_id", upsertUserID, "error", err)
+	// Batch upsert all notes
+	{
+		var ids, userIDs, contextIDs []pgtype.UUID
+		var contents, embStatuses []string
+		var collapseImages []bool
+		var createdAts, deletedAts []pgtype.Timestamptz
+		for _, n := range payload.Notes {
+			canEdit, err := s.canEditNote(ctx, r, n.ID, userID, editableNotes)
+			if err != nil {
+				slog.Error("sync push conflict: note permission check failed", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID, "error", err)
 				return ErrSyncConflict
 			}
-			return err
-		}
-	}
-
-	for _, c := range payload.Contexts {
-		_, err := r.UpsertContext(ctx, sqlcgen.UpsertContextParams{
-			ID:        c.ID,
-			UserID:    userID,
-			Slug:      c.Slug,
-			Name:      c.Name,
-			CreatedAt: c.CreatedAt,
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				slog.Error("sync push conflict: UpsertContext returned ErrNoRows", "context_id", c.ID, "error", err)
+			if !canEdit && n.UserID == userID {
+				canEdit = true
+				editableNotes[n.ID] = true
+			}
+			if !canEdit {
+				share, shareErr := s.repo.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{NoteID: n.ID, UserID: userID})
+				if shareErr == nil && share.Permission == "view" {
+					continue
+				}
+				slog.Error("sync push conflict: note edit permission denied", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID)
 				return ErrSyncConflict
 			}
-			return err
-		}
-	}
-
-	for _, t := range payload.Tags {
-		_, err := r.UpsertTag(ctx, sqlcgen.UpsertTagParams{
-			ID:        t.ID,
-			UserID:    userID,
-			Name:      t.Name,
-			CreatedAt: t.CreatedAt,
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				slog.Error("sync push conflict: UpsertTag returned ErrNoRows", "tag_id", t.ID, "error", err)
-				return ErrSyncConflict
+			editableNotes[n.ID] = canEdit
+			embStatus := n.EmbeddingStatus
+			if embStatus == "" {
+				embStatus = "pending"
 			}
-			return err
+			upsertUserID := userID
+			if n.UserID != userID {
+				upsertUserID = n.UserID
+			}
+			ids = append(ids, n.ID)
+			userIDs = append(userIDs, upsertUserID)
+			contextIDs = append(contextIDs, n.ContextID)
+			contents = append(contents, "")
+			embStatuses = append(embStatuses, embStatus)
+			collapseImages = append(collapseImages, n.CollapseImages)
+			createdAts = append(createdAts, n.CreatedAt)
+			deletedAts = append(deletedAts, n.DeletedAt)
+		}
+		if len(ids) > 0 {
+			if err := r.UpsertNotesBatch(ctx, sqlcgen.UpsertNotesBatchParams{
+				Column1: ids, Column2: userIDs, Column3: contextIDs,
+				Column4: contents, Column5: embStatuses, Column6: collapseImages,
+				Column7: createdAts, Column8: deletedAts,
+			}); err != nil {
+				return fmt.Errorf("batch upsert notes: %w", err)
+			}
 		}
 	}
 
-	for _, nt := range payload.NoteTags {
-		err := r.UpsertNoteTag(ctx, sqlcgen.UpsertNoteTagParams{
-			NoteID: nt.NoteID,
-			TagID:  nt.TagID,
-			UserID: userID,
-		})
-		if err != nil {
-			return err
+	// Batch upsert all contexts
+	{
+		var ids, userIDs []pgtype.UUID
+		var slugs, names []string
+		var createdAts []pgtype.Timestamptz
+		for _, c := range payload.Contexts {
+			ids = append(ids, c.ID)
+			userIDs = append(userIDs, userID)
+			slugs = append(slugs, c.Slug)
+			names = append(names, c.Name)
+			createdAts = append(createdAts, c.CreatedAt)
+		}
+		if len(ids) > 0 {
+			if err := r.UpsertContextsBatch(ctx, sqlcgen.UpsertContextsBatchParams{
+				Column1: ids, Column2: userIDs, Column3: slugs, Column4: names, Column5: createdAts,
+			}); err != nil {
+				return fmt.Errorf("batch upsert contexts: %w", err)
+			}
 		}
 	}
 
-	for _, nl := range payload.NoteLinks {
-		err := r.UpsertNoteLink(ctx, sqlcgen.UpsertNoteLinkParams{
-			ID:        nl.ID,
-			SourceID:  nl.SourceID,
-			TargetID:  nl.TargetID,
-			Relation:  nl.Relation,
-			CreatedAt: nl.CreatedAt,
-			UserID:    userID,
-		})
-		if err != nil {
-			return err
+	// Batch upsert all tags
+	{
+		var ids, userIDs []pgtype.UUID
+		var names []string
+		var createdAts []pgtype.Timestamptz
+		for _, t := range payload.Tags {
+			ids = append(ids, t.ID)
+			userIDs = append(userIDs, userID)
+			names = append(names, t.Name)
+			createdAts = append(createdAts, t.CreatedAt)
+		}
+		if len(ids) > 0 {
+			if err := r.UpsertTagsBatch(ctx, sqlcgen.UpsertTagsBatchParams{
+				Column1: ids, Column2: userIDs, Column3: names, Column4: createdAts,
+			}); err != nil {
+				return fmt.Errorf("batch upsert tags: %w", err)
+			}
+		}
+	}
+
+	// Batch upsert all note tags
+	{
+		var noteIDs, tagIDs []pgtype.UUID
+		for _, nt := range payload.NoteTags {
+			noteIDs = append(noteIDs, nt.NoteID)
+			tagIDs = append(tagIDs, nt.TagID)
+		}
+		if len(noteIDs) > 0 {
+			if err := r.UpsertNoteTagsBatch(ctx, sqlcgen.UpsertNoteTagsBatchParams{
+				Column1: noteIDs, Column2: tagIDs,
+			}); err != nil {
+				return fmt.Errorf("batch upsert note tags: %w", err)
+			}
+		}
+	}
+
+	// Batch upsert all note links
+	{
+		var ids, sourceIDs, targetIDs []pgtype.UUID
+		var relations []string
+		var createdAts []pgtype.Timestamptz
+		for _, nl := range payload.NoteLinks {
+			ids = append(ids, nl.ID)
+			sourceIDs = append(sourceIDs, nl.SourceID)
+			targetIDs = append(targetIDs, nl.TargetID)
+			relations = append(relations, nl.Relation)
+			createdAts = append(createdAts, nl.CreatedAt)
+		}
+		if len(ids) > 0 {
+			if err := r.UpsertNoteLinksBatch(ctx, sqlcgen.UpsertNoteLinksBatchParams{
+				Column1: ids, Column2: sourceIDs, Column3: targetIDs,
+				Column4: relations, Column5: createdAts,
+			}); err != nil {
+				return fmt.Errorf("batch upsert note links: %w", err)
+			}
 		}
 	}
 

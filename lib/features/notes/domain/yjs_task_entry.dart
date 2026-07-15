@@ -65,4 +65,18 @@ class YjsTaskEntry {
       return null;
     }
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is YjsTaskEntry &&
+        other.nodeId == nodeId &&
+        other.title == title &&
+        other.dueDate == dueDate &&
+        other.recurrence == recurrence &&
+        other.lastCompletedAt == lastCompletedAt;
+  }
+
+  @override
+  int get hashCode => Object.hash(nodeId, title, dueDate, recurrence, lastCompletedAt);
 }

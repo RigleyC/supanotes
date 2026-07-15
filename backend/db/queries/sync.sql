@@ -175,5 +175,49 @@ SET hide_completed = EXCLUDED.hide_completed,
     updated_at = NOW()
 RETURNING *;
 
+-- name: UpsertNotesBatch :exec
+INSERT INTO notes (id, user_id, context_id, content, embedding_status, collapse_images, created_at, updated_at, deleted_at)
+SELECT
+  unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::uuid[]),
+  unnest($4::text[]), unnest($5::text[]), unnest($6::bool[]),
+  unnest($7::timestamptz[]), NOW(), unnest($8::timestamptz[])
+ON CONFLICT (id) DO UPDATE SET
+  context_id = EXCLUDED.context_id,
+  content = CASE WHEN EXCLUDED.content <> '' THEN EXCLUDED.content ELSE notes.content END,
+  embedding_status = EXCLUDED.embedding_status,
+  collapse_images = EXCLUDED.collapse_images,
+  updated_at = NOW(),
+  deleted_at = EXCLUDED.deleted_at;
 
+-- name: UpsertContextsBatch :exec
+INSERT INTO contexts (id, user_id, slug, name, created_at, updated_at)
+SELECT
+  unnest($1::uuid[]), unnest($2::uuid[]),
+  unnest($3::text[]), unnest($4::text[]),
+  unnest($5::timestamptz[]), NOW()
+ON CONFLICT (id) DO UPDATE SET
+  slug = EXCLUDED.slug,
+  name = EXCLUDED.name,
+  updated_at = NOW();
 
+-- name: UpsertTagsBatch :exec
+INSERT INTO tags (id, user_id, name, created_at)
+SELECT
+  unnest($1::uuid[]), unnest($2::uuid[]),
+  unnest($3::text[]), unnest($4::timestamptz[])
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name;
+
+-- name: UpsertNoteTagsBatch :exec
+INSERT INTO note_tags (note_id, tag_id)
+SELECT unnest($1::uuid[]), unnest($2::uuid[])
+ON CONFLICT (note_id, tag_id) DO NOTHING;
+
+-- name: UpsertNoteLinksBatch :exec
+INSERT INTO note_links (id, source_id, target_id, relation, created_at, updated_at)
+SELECT
+  unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::uuid[]),
+  unnest($4::varchar[]), unnest($5::timestamptz[]), NOW()
+ON CONFLICT (id) DO UPDATE SET
+  relation = EXCLUDED.relation,
+  updated_at = NOW();

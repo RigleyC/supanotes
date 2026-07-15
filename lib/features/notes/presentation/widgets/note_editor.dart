@@ -1,11 +1,13 @@
 library;
 
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/domain/note_node.dart';
@@ -25,8 +27,6 @@ import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
@@ -74,6 +74,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     }
   }
 
+
+//Precisa disso?
   void _setupControls(BuildContext context) {
     if (_richOps != null) return;
     final controller = _controller!;
@@ -110,7 +112,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           ),
     );
   }
-
+// Esse monte de metodo aqui tambem, precisa? Isso ta feito da melhor forma?
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -118,8 +120,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       setState(() {});
     }
 
-    // NOTE: nodes prop is reserved for future incremental sync;
-    // currently always const [] in production.
+
   }
 
   void _onControllerReady() {
@@ -175,6 +176,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     });
   }
 
+//Esse monte de codigo aqui, precisa? Não deveria ta em outro lugar?
   Future<void> _onAttach({bool imageOnly = false}) async {
     final uploader = widget.delegate.onUploadFile;
     if (uploader == null || _controller?.editor == null) return;
@@ -218,22 +220,33 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _setupControls(context);
 
     final theme = Theme.of(context);
+    final topPadding = Scaffold.maybeOf(context)?.appBarMaxHeight ??
+        (MediaQuery.paddingOf(context).top +
+            (PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 56.0));
+    final docPadding = EdgeInsets.only(
+      left: 24,
+      right: 24,
+      top: topPadding,
+      bottom: 24,
+    );
+
     if (_cachedStylesheet == null ||
         _cachedHideCompleted != widget.hideCompleted ||
-        !identical(_cachedColorScheme, theme.colorScheme)) {
+        !identical(_cachedColorScheme, theme.colorScheme) ||
+        _cachedStylesheet!.documentPadding != docPadding) {
       _cachedHideCompleted = widget.hideCompleted;
       _cachedColorScheme = theme.colorScheme;
       _cachedStylesheet = noteStylesheet(
         context,
         hideCompleted: widget.hideCompleted,
+        documentPadding: docPadding,
       );
     }
-
+//Pra que esse animatedPadding? O editor nao resolve automaticamente o padding quando o teclado aparece?
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(
-        top: PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 0.0,
         bottom: MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: Column(
@@ -250,6 +263,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                       : controller.focusNode,
                   documentLayoutKey: _docLayoutKey,
                   stylesheet: _cachedStylesheet!,
+                  //Isso aqui nao pode ser movido pro styleSheet ou outro lugar?
                   selectionStyle: SelectionStyles(
                     selectionColor:
                         Theme.of(
@@ -270,6 +284,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                           ),
                           superEditorLaunchLinkTapHandlerFactory,
                         ],
+                        //Precisa disso? O editor nao resolve automaticamente?
                   keyboardActions: buildRichKeyboardActions(
                     baseActions:
                         defaultTargetPlatform == TargetPlatform.iOS ||
@@ -279,6 +294,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                   ),
                   componentBuilders: [
                     const CustomDividerComponentBuilder(),
+                    //Esse componente precisa desse tanto de parametros? Tem algo que a gente pode simplificar?
                     CustomTaskComponentBuilder(
                       editor: controller.editor,
                       composer: controller.composer,

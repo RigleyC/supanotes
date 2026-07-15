@@ -2,6 +2,7 @@ package memories
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -34,7 +35,20 @@ func (h *Handler) List(c echo.Context) error {
 		return err
 	}
 
-	memories, err := h.svc.GetMemories(c.Request().Context(), userID, 50, 0)
+	limit := int32(50)
+	if l := c.QueryParam("limit"); l != "" {
+		if parsed, err := strconv.ParseInt(l, 10, 32); err == nil && parsed > 0 && parsed <= 100 {
+			limit = int32(parsed)
+		}
+	}
+	offset := int32(0)
+	if o := c.QueryParam("offset"); o != "" {
+		if parsed, err := strconv.ParseInt(o, 10, 32); err == nil && parsed >= 0 {
+			offset = int32(parsed)
+		}
+	}
+
+	memories, err := h.svc.GetMemories(c.Request().Context(), userID, limit, offset)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to list memories")

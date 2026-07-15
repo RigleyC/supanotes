@@ -25,6 +25,7 @@ STOP conditions, and update your row when done.
 | 059  | Presence em memória + notificações event-driven (P6 do 058)     | P3 | M | 058 | TODO |
 | 060  | Agente como executor de operações declarativas (P5 do 058)       | P3 | L | 058 | TODO |
 | 061  | Fix Task Sync Data Loss & Metadata Propagation | P0 | S | 058 | DONE |
+| 062  | Implement Local Push Notifications for Tasks | P1 | M | — | TODO |
 
 ## Dependency notes
 
@@ -56,6 +57,7 @@ STOP conditions, and update your row when done.
 
 ## Findings considered and rejected
 
+- **014 (FCM Push Toggle)**: REJECTED because we decided to drop server-side FCM entirely in favor of local push notifications (see ADR 0001 and Plan 062).
 - (None rejected in this round. Plans 044 and 045 from the prior audit mostly
   already landed in code; their remaining open items are folded into the new
   plan set as 051 / 052 respectively.)

@@ -359,6 +359,37 @@ func (q *Queries) UpsertContext(ctx context.Context, arg UpsertContextParams) (C
 	return i, err
 }
 
+const upsertContextsBatch = `-- name: UpsertContextsBatch :exec
+INSERT INTO contexts (id, user_id, slug, name, created_at, updated_at)
+SELECT
+  unnest($1::uuid[]), unnest($2::uuid[]),
+  unnest($3::text[]), unnest($4::text[]),
+  unnest($5::timestamptz[]), NOW()
+ON CONFLICT (id) DO UPDATE SET
+  slug = EXCLUDED.slug,
+  name = EXCLUDED.name,
+  updated_at = NOW()
+`
+
+type UpsertContextsBatchParams struct {
+	Column1 []pgtype.UUID        `json:"column_1"`
+	Column2 []pgtype.UUID        `json:"column_2"`
+	Column3 []string             `json:"column_3"`
+	Column4 []string             `json:"column_4"`
+	Column5 []pgtype.Timestamptz `json:"column_5"`
+}
+
+func (q *Queries) UpsertContextsBatch(ctx context.Context, arg UpsertContextsBatchParams) error {
+	_, err := q.db.Exec(ctx, upsertContextsBatch,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+	)
+	return err
+}
+
 const upsertNote = `-- name: UpsertNote :one
 INSERT INTO notes (id, user_id, context_id, content, embedding_status, collapse_images, created_at, updated_at, deleted_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
@@ -454,6 +485,35 @@ func (q *Queries) UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) 
 	return err
 }
 
+const upsertNoteLinksBatch = `-- name: UpsertNoteLinksBatch :exec
+INSERT INTO note_links (id, source_id, target_id, relation, created_at, updated_at)
+SELECT
+  unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::uuid[]),
+  unnest($4::varchar[]), unnest($5::timestamptz[]), NOW()
+ON CONFLICT (id) DO UPDATE SET
+  relation = EXCLUDED.relation,
+  updated_at = NOW()
+`
+
+type UpsertNoteLinksBatchParams struct {
+	Column1 []pgtype.UUID        `json:"column_1"`
+	Column2 []pgtype.UUID        `json:"column_2"`
+	Column3 []pgtype.UUID        `json:"column_3"`
+	Column4 []string             `json:"column_4"`
+	Column5 []pgtype.Timestamptz `json:"column_5"`
+}
+
+func (q *Queries) UpsertNoteLinksBatch(ctx context.Context, arg UpsertNoteLinksBatchParams) error {
+	_, err := q.db.Exec(ctx, upsertNoteLinksBatch,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+	)
+	return err
+}
+
 const upsertNoteTag = `-- name: UpsertNoteTag :exec
 INSERT INTO note_tags (note_id, tag_id)
 SELECT $1::uuid, $2::uuid
@@ -479,6 +539,22 @@ func (q *Queries) UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) er
 	return err
 }
 
+const upsertNoteTagsBatch = `-- name: UpsertNoteTagsBatch :exec
+INSERT INTO note_tags (note_id, tag_id)
+SELECT unnest($1::uuid[]), unnest($2::uuid[])
+ON CONFLICT (note_id, tag_id) DO NOTHING
+`
+
+type UpsertNoteTagsBatchParams struct {
+	Column1 []pgtype.UUID `json:"column_1"`
+	Column2 []pgtype.UUID `json:"column_2"`
+}
+
+func (q *Queries) UpsertNoteTagsBatch(ctx context.Context, arg UpsertNoteTagsBatchParams) error {
+	_, err := q.db.Exec(ctx, upsertNoteTagsBatch, arg.Column1, arg.Column2)
+	return err
+}
+
 const upsertNoteYjsState = `-- name: UpsertNoteYjsState :exec
 INSERT INTO note_yjs_states (note_id, state, updated_at)
 VALUES ($1, $2, $3)
@@ -494,6 +570,46 @@ type UpsertNoteYjsStateParams struct {
 
 func (q *Queries) UpsertNoteYjsState(ctx context.Context, arg UpsertNoteYjsStateParams) error {
 	_, err := q.db.Exec(ctx, upsertNoteYjsState, arg.NoteID, arg.State, arg.UpdatedAt)
+	return err
+}
+
+const upsertNotesBatch = `-- name: UpsertNotesBatch :exec
+INSERT INTO notes (id, user_id, context_id, content, embedding_status, collapse_images, created_at, updated_at, deleted_at)
+SELECT
+  unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::uuid[]),
+  unnest($4::text[]), unnest($5::text[]), unnest($6::bool[]),
+  unnest($7::timestamptz[]), NOW(), unnest($8::timestamptz[])
+ON CONFLICT (id) DO UPDATE SET
+  context_id = EXCLUDED.context_id,
+  content = CASE WHEN EXCLUDED.content <> '' THEN EXCLUDED.content ELSE notes.content END,
+  embedding_status = EXCLUDED.embedding_status,
+  collapse_images = EXCLUDED.collapse_images,
+  updated_at = NOW(),
+  deleted_at = EXCLUDED.deleted_at
+`
+
+type UpsertNotesBatchParams struct {
+	Column1 []pgtype.UUID        `json:"column_1"`
+	Column2 []pgtype.UUID        `json:"column_2"`
+	Column3 []pgtype.UUID        `json:"column_3"`
+	Column4 []string             `json:"column_4"`
+	Column5 []string             `json:"column_5"`
+	Column6 []bool               `json:"column_6"`
+	Column7 []pgtype.Timestamptz `json:"column_7"`
+	Column8 []pgtype.Timestamptz `json:"column_8"`
+}
+
+func (q *Queries) UpsertNotesBatch(ctx context.Context, arg UpsertNotesBatchParams) error {
+	_, err := q.db.Exec(ctx, upsertNotesBatch,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
+		arg.Column8,
+	)
 	return err
 }
 
@@ -528,6 +644,32 @@ func (q *Queries) UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, erro
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const upsertTagsBatch = `-- name: UpsertTagsBatch :exec
+INSERT INTO tags (id, user_id, name, created_at)
+SELECT
+  unnest($1::uuid[]), unnest($2::uuid[]),
+  unnest($3::text[]), unnest($4::timestamptz[])
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name
+`
+
+type UpsertTagsBatchParams struct {
+	Column1 []pgtype.UUID        `json:"column_1"`
+	Column2 []pgtype.UUID        `json:"column_2"`
+	Column3 []string             `json:"column_3"`
+	Column4 []pgtype.Timestamptz `json:"column_4"`
+}
+
+func (q *Queries) UpsertTagsBatch(ctx context.Context, arg UpsertTagsBatchParams) error {
+	_, err := q.db.Exec(ctx, upsertTagsBatch,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+	)
+	return err
 }
 
 const upsertTask = `-- name: UpsertTask :one

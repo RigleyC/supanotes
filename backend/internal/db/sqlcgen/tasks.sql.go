@@ -549,3 +549,59 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 	)
 	return i, err
 }
+
+const upsertTasksBatch = `-- name: UpsertTasksBatch :exec
+INSERT INTO tasks (id, note_id, user_id, title, status, due_date, recurrence, position, completed_at, created_at, deleted_at)
+SELECT
+  unnest($1::uuid[]),
+  unnest($2::uuid[]),
+  unnest($3::uuid[]),
+  unnest($4::text[]),
+  unnest($5::text[]),
+  unnest($6::date[]),
+  unnest($7::text[]),
+  unnest($8::text[]),
+  unnest($9::timestamptz[]),
+  unnest($10::timestamptz[]),
+  unnest($11::timestamptz[])
+ON CONFLICT (id) DO UPDATE SET
+  title        = EXCLUDED.title,
+  status       = EXCLUDED.status,
+  due_date     = EXCLUDED.due_date,
+  recurrence   = EXCLUDED.recurrence,
+  position     = EXCLUDED.position,
+  completed_at = EXCLUDED.completed_at,
+  deleted_at   = EXCLUDED.deleted_at,
+  updated_at   = NOW()
+`
+
+type UpsertTasksBatchParams struct {
+	Column1  []pgtype.UUID        `json:"column_1"`
+	Column2  []pgtype.UUID        `json:"column_2"`
+	Column3  []pgtype.UUID        `json:"column_3"`
+	Column4  []string             `json:"column_4"`
+	Column5  []string             `json:"column_5"`
+	Column6  []pgtype.Date        `json:"column_6"`
+	Column7  []string             `json:"column_7"`
+	Column8  []string             `json:"column_8"`
+	Column9  []pgtype.Timestamptz `json:"column_9"`
+	Column10 []pgtype.Timestamptz `json:"column_10"`
+	Column11 []pgtype.Timestamptz `json:"column_11"`
+}
+
+func (q *Queries) UpsertTasksBatch(ctx context.Context, arg UpsertTasksBatchParams) error {
+	_, err := q.db.Exec(ctx, upsertTasksBatch,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
+		arg.Column8,
+		arg.Column9,
+		arg.Column10,
+		arg.Column11,
+	)
+	return err
+}

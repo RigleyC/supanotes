@@ -11,9 +11,11 @@ import (
 )
 
 const (
-	maxConns        = 30
-	minConns        = 5
-	maxConnLifetime = time.Hour
+	maxConns         = 30
+	minConns         = 5
+	maxConnLifetime  = time.Hour
+	maxConnIdleTime  = 30 * time.Minute
+	healthCheckPeriod = 30 * time.Second
 )
 
 // Connect parses the URL, configures a pool, and pings the DB once
@@ -26,6 +28,8 @@ func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	cfg.MaxConns = maxConns
 	cfg.MinConns = minConns
 	cfg.MaxConnLifetime = maxConnLifetime
+	cfg.MaxConnIdleTime = maxConnIdleTime
+	cfg.HealthCheckPeriod = healthCheckPeriod
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

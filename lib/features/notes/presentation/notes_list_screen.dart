@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,12 +35,14 @@ class NotesListScreen extends ConsumerStatefulWidget {
 class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   bool _isSearching = false;
   String _searchQuery = '';
+  Timer? _searchDebounce;
 
   void _openSearch() {
     setState(() => _isSearching = true);
   }
 
   void _closeSearch() {
+    _searchDebounce?.cancel();
     setState(() {
       _isSearching = false;
       _searchQuery = '';
@@ -46,7 +50,16 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   }
 
   void _onSearchQueryChanged(String query) {
-    setState(() => _searchQuery = query.trim());
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) setState(() => _searchQuery = query.trim());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 
   @override
@@ -99,35 +112,31 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          trimmedSearchQuery.isEmpty
-              ? notesAsync.when(
-                  loading: () =>
-                      _NotesLoadingView(headerSlivers: headerSlivers),
-                  error: (e, _) => AppErrorView(
-                    title: 'Erro ao carregar as notas',
-                    subtitle: e.toString(),
-                  ),
-                  data: (notes) =>
-                      _buildNotesBody(notes, headerSlivers, isGridView),
-                )
-              : searchAsync!.when(
-                  loading: () =>
-                      SearchLoadingView(headerSlivers: headerSlivers),
-                  error: (e, _) => SearchErrorView(
-                    headerSlivers: headerSlivers,
-                    error: e.toString(),
-                  ),
-                  data: (results) => SearchResultsView(
-                    headerSlivers: headerSlivers,
-                    query: trimmedSearchQuery,
-                    results: results,
-                    onTap: (result) => context.push(AppRoutes.note(result.id)),
-                  ),
-                ),
-        ],
-      ),
+      body: trimmedSearchQuery.isEmpty
+          ? notesAsync.when(
+              loading: () =>
+                  _NotesLoadingView(headerSlivers: headerSlivers),
+              error: (e, _) => AppErrorView(
+                title: 'Erro ao carregar as notas',
+                subtitle: e.toString(),
+              ),
+              data: (notes) =>
+                  _buildNotesBody(notes, headerSlivers, isGridView),
+            )
+          : searchAsync!.when(
+              loading: () =>
+                  SearchLoadingView(headerSlivers: headerSlivers),
+              error: (e, _) => SearchErrorView(
+                headerSlivers: headerSlivers,
+                error: e.toString(),
+              ),
+              data: (results) => SearchResultsView(
+                headerSlivers: headerSlivers,
+                query: trimmedSearchQuery,
+                results: results,
+                onTap: (result) => context.push(AppRoutes.note(result.id)),
+              ),
+            ),
       floatingActionButton: QuickActionFabs(
         smallFabKey: const ValueKey('home-chat-fab'),
         smallHeroTag: 'home-chat-fab',

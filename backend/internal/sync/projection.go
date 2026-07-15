@@ -186,26 +186,52 @@ func ProjectNoteContentFromYDoc(ctx context.Context, pool *pgxpool.Pool, noteID 
 		return fmt.Errorf("delete orphaned tasks: %w", err)
 	}
 
+	// Batch upsert all derived tasks in a single query
+	var (
+		ids          []pgtype.UUID
+		noteIDs      []pgtype.UUID
+		userIDs      []pgtype.UUID
+		titles       []string
+		statuses     []string
+		dueDates     []pgtype.Date
+		recurrences  []string
+		positions    []string
+		completedAts []pgtype.Timestamptz
+		createdAts   []pgtype.Timestamptz
+		deletedAts   []pgtype.Timestamptz
+	)
 	for _, t := range tasks {
-		params := sqlcgen.UpsertTaskParams{
-			ID:          t.ID,
-			UserID:      defaultUserID,
-			NoteID:      noteUUID,
-			Title:       t.Title,
-			Status:      t.Status,
-			Position:    t.Position,
-			Recurrence:  t.Recurrence,
-			DueDate:     t.DueDate,
-			CompletedAt: t.CompletedAt,
-			CreatedAt:   t.CreatedAt,
-			DeletedAt:   pgtype.Timestamptz{Valid: false},
-		}
-		if _, err := q.UpsertTask(ctx, params); err != nil {
-			return fmt.Errorf("upsert task %s: %w", uuid.UUID(t.ID.Bytes).String(), err)
-		}
+		ids = append(ids, t.ID)
+		noteIDs = append(noteIDs, noteUUID)
+		userIDs = append(userIDs, defaultUserID)
+		titles = append(titles, t.Title)
+		statuses = append(statuses, t.Status)
+		dueDates = append(dueDates, t.DueDate)
+		recurrences = append(recurrences, t.Recurrence.String)
+		positions = append(positions, t.Position)
+		completedAts = append(completedAts, t.CompletedAt)
+		createdAts = append(createdAts, t.CreatedAt)
+		deletedAts = append(deletedAts, pgtype.Timestamptz{Valid: false})
+	}
+	if err := q.UpsertTasksBatch(ctx, sqlcgen.UpsertTasksBatchParams{
+		Column1:  ids,
+		Column2:  noteIDs,
+		Column3:  userIDs,
+		Column4:  titles,
+		Column5:  statuses,
+		Column6:  dueDates,
+		Column7:  recurrences,
+		Column8:  positions,
+		Column9:  completedAts,
+		Column10: createdAts,
+		Column11: deletedAts,
+	}); err != nil {
+		return fmt.Errorf("batch upsert tasks: %w", err)
+	}
 
-		// Insert task_completion when completed transitions from nil → value
-		// Uses deterministic UUID v5 from task_id + completed_at for idempotency
+	// Insert task_completion when completed transitions from nil → value
+	// Uses deterministic UUID v5 from task_id + completed_at for idempotency
+	for _, t := range tasks {
 		oldCompleted := existingCompleted[t.ID.Bytes]
 		if t.CompletedAt.Valid && !oldCompleted.Valid {
 			completionUUID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(uuid.UUID(t.ID.Bytes).String()+t.CompletedAt.Time.Format(time.RFC3339Nano)))

@@ -3,6 +3,7 @@ package notes
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -97,11 +98,25 @@ func (h *Handler) List(c echo.Context) error {
 	}
 
 	limit := int32(50)
+	if l := c.QueryParam("limit"); l != "" {
+		if parsed, err := parseInt32(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
 
 	var cursorUpdatedAt *time.Time
+	if cu := c.QueryParam("cursor_updated_at"); cu != "" {
+		if parsed, err := time.Parse(time.RFC3339, cu); err == nil {
+			cursorUpdatedAt = &parsed
+		}
+	}
 	var cursorID *pgtype.UUID
-
-	// Note: Parse limits and cursors if provided in query param in a real production app.
+	if ci := c.QueryParam("cursor_id"); ci != "" {
+		cursorID, err = web.OptUUID(&ci)
+		if err != nil {
+			cursorID = nil
+		}
+	}
 
 	notes, err := h.svc.GetNotes(c.Request().Context(), userID, ctxID, fav, limit, cursorUpdatedAt, cursorID)
 	if err != nil {
@@ -112,7 +127,8 @@ func (h *Handler) List(c echo.Context) error {
 	res := make([]NoteResponse, 0, len(notes))
 	for _, n := range notes {
 		res = append(res, mapToNoteResponse(NoteResponseFields{
-			ID: n.ID, ContextID: n.ContextID, Content: n.Content, Excerpt: n.Excerpt,
+			ID: n.ID, ContextID: n.ContextID, Content: "",
+			Excerpt: n.Excerpt,
 			Favorite: n.Favorite, Archived: n.Archived,
 			CollapseImages: n.CollapseImages, CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
 		}))
@@ -209,6 +225,11 @@ func (h *Handler) Delete(c echo.Context) error {
 }
 
 func ptr(s string) *string { return &s }
+
+func parseInt32(s string) (int32, error) {
+	n, err := strconv.ParseInt(s, 10, 32)
+	return int32(n), err
+}
 
 // NoteResponseFields carries the fields needed to build a NoteResponse.
 // It eliminates the long parameter list that was previously passed to a

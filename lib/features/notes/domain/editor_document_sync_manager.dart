@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' as dev;
 
-import 'package:collection/collection.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'node_codec.dart';
 import 'note_node.dart';
+import 'yjs_task_entry.dart';
 
 sealed class NodeOperation {}
 
@@ -208,18 +207,14 @@ class EditorDocumentSyncManager {
 
         if (existingNode is TaskNode && incoming.type == 'task') {
           try {
-            final existingData = jsonDecode(NodeCodec.nodeData(existingNode)) as Map<String, dynamic>;
-            final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
+            final existingEntry = YjsTaskEntry.decode(NodeCodec.nodeData(existingNode));
+            final incomingEntry = YjsTaskEntry.decode(incoming.data);
 
-            final existingWithoutCompleted = Map.from(existingData)..remove('completed');
-            final incomingWithoutCompleted = Map.from(incomingData)..remove('completed');
-
-            if (const DeepCollectionEquality().equals(existingWithoutCompleted, incomingWithoutCompleted)) {
-              final isDbCompleted = incomingData['completed'] as bool? ?? false;
-              if (existingNode.isComplete != isDbCompleted) {
+            if (existingEntry != null && incomingEntry != null && existingEntry == incomingEntry) {
+              if (existingNode.isComplete != incomingEntry.completed) {
                 requests.add(ChangeTaskCompletionRequest(
                   nodeId: incoming.id,
-                  isComplete: isDbCompleted,
+                  isComplete: incomingEntry.completed,
                 ));
               }
               continue;
@@ -301,35 +296,9 @@ extension EditorSelectionPreservation on Editor {
       final baseNodeExists = document.getNodeById(oldSelection.base.nodeId) != null;
       final extentNodeExists = document.getNodeById(oldSelection.extent.nodeId) != null;
       if (baseNodeExists && extentNodeExists) {
-        DocumentSelection finalSelection = oldSelection;
-        final baseNode = document.getNodeById(oldSelection.base.nodeId);
-        final extentNode = document.getNodeById(oldSelection.extent.nodeId);
-
-        DocumentPosition? newBase = oldSelection.base;
-        DocumentPosition? newExtent = oldSelection.extent;
-
-        if (baseNode is TextNode && oldSelection.base.nodePosition is TextNodePosition) {
-          final maxLen = baseNode.text.toPlainText().length;
-          final offset = (oldSelection.base.nodePosition as TextNodePosition).offset;
-          if (offset > maxLen) {
-            newBase = DocumentPosition(
-              nodeId: oldSelection.base.nodeId,
-              nodePosition: TextNodePosition(offset: maxLen),
-            );
-          }
-        }
-        if (extentNode is TextNode && oldSelection.extent.nodePosition is TextNodePosition) {
-          final maxLen = extentNode.text.toPlainText().length;
-          final offset = (oldSelection.extent.nodePosition as TextNodePosition).offset;
-          if (offset > maxLen) {
-            newExtent = DocumentPosition(
-              nodeId: oldSelection.extent.nodeId,
-              nodePosition: TextNodePosition(offset: maxLen),
-            );
-          }
-        }
-
-        finalSelection = DocumentSelection(base: newBase, extent: newExtent);
+        final newBase = _clampPosition(document, oldSelection.base);
+        final newExtent = _clampPosition(document, oldSelection.extent);
+        final finalSelection = DocumentSelection(base: newBase, extent: newExtent);
 
         if (finalSelection != composer.selection) {
           execute([
@@ -342,5 +311,20 @@ extension EditorSelectionPreservation on Editor {
         }
       }
     }
+  }
+
+  DocumentPosition _clampPosition(Document document, DocumentPosition pos) {
+    final node = document.getNodeById(pos.nodeId);
+    if (node is TextNode && pos.nodePosition is TextNodePosition) {
+      final maxLen = node.text.toPlainText().length;
+      final offset = (pos.nodePosition as TextNodePosition).offset;
+      if (offset > maxLen) {
+        return DocumentPosition(
+          nodeId: pos.nodeId,
+          nodePosition: TextNodePosition(offset: maxLen),
+        );
+      }
+    }
+    return pos;
   }
 }

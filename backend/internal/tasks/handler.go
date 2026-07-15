@@ -3,6 +3,7 @@ package tasks
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -115,8 +116,19 @@ func (h *Handler) List(c echo.Context) error {
 	}
 
 	limit := int32(50)
+	if l := c.QueryParam("limit"); l != "" {
+		if parsed, err := strconv.ParseInt(l, 10, 32); err == nil && parsed > 0 && parsed <= 100 {
+			limit = int32(parsed)
+		}
+	}
+	offset := int32(0)
+	if o := c.QueryParam("offset"); o != "" {
+		if parsed, err := strconv.ParseInt(o, 10, 32); err == nil && parsed >= 0 {
+			offset = int32(parsed)
+		}
+	}
 
-	tasks, err := h.svc.GetTasks(c.Request().Context(), userID, noteID, status, nil, nil, limit, 0)
+	tasks, err := h.svc.GetTasks(c.Request().Context(), userID, noteID, status, nil, nil, limit, offset)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get tasks")

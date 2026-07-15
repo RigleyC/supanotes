@@ -1,8 +1,8 @@
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../constants/platform_info.dart';
 
 /// Warns at startup when running on an Android physical device that
 /// probably can't reach the backend.
@@ -14,7 +14,7 @@ import '../constants/platform_info.dart';
 /// parsing output on device, which Flutter apps can't do); it just reminds
 /// the developer on the first run of a debug session.
 void warnIfAndroidBackendUnreachable({int port = 8080}) {
-  if (kIsWeb || kDebugMode == false || !isAndroid) {
+  if (kIsWeb || kDebugMode == false || !Platform.isAndroid) {
     return;
   }
   developer.log(

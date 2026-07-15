@@ -114,15 +114,21 @@ type Querier interface {
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error)
 	UpsertContext(ctx context.Context, arg UpsertContextParams) (Context, error)
+	UpsertContextsBatch(ctx context.Context, arg UpsertContextsBatchParams) error
 	UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, error)
 	UpsertNoteEmbedding(ctx context.Context, arg UpsertNoteEmbeddingParams) error
 	UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error
+	UpsertNoteLinksBatch(ctx context.Context, arg UpsertNoteLinksBatchParams) error
 	UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error
+	UpsertNoteTagsBatch(ctx context.Context, arg UpsertNoteTagsBatchParams) error
 	UpsertNoteYjsState(ctx context.Context, arg UpsertNoteYjsStateParams) error
+	UpsertNotesBatch(ctx context.Context, arg UpsertNotesBatchParams) error
 	UpsertSoul(ctx context.Context, arg UpsertSoulParams) (Soul, error)
 	UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, error)
+	UpsertTagsBatch(ctx context.Context, arg UpsertTagsBatchParams) error
 	UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, error)
 	UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error
+	UpsertTasksBatch(ctx context.Context, arg UpsertTasksBatchParams) error
 	UpsertUserNotePreference(ctx context.Context, arg UpsertUserNotePreferenceParams) (UserNotePreference, error)
 }
 

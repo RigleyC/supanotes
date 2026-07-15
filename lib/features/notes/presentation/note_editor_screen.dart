@@ -8,23 +8,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:super_editor/super_editor.dart';
+
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_popup_menu.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
-
 import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
+import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
-import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
+import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
@@ -156,8 +159,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 ),
             ],
           ), */ AdaptiveAppBar(
-            useNativeToolbar:
-                false, // Evita conflitos de foco nativo com o SuperEditor
             title: isReadOnly
                 ? '${NoteStrings.sharedByPrefix} ${note.sharedByEmail}'
                 : null,
@@ -180,6 +181,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             ],
           ),
           body: SafeArea(
+            top: false,
             bottom: false,
             child: NoteEditor(
               noteId: widget.noteId,
@@ -198,9 +200,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       onComplete: () => ref
                           .read(tasksRepositoryProvider)
                           .completeTask(taskId),
-                      onUndo: (previousDue) => ref
-                          .read(tasksRepositoryProvider)
-                          .reopenTask(taskId, originalDueDate: previousDue),
+                      onUndo: (previousDue) {
+                        final controller = ref.read(
+                          noteEditorControllerProvider(widget.noteId),
+                        );
+                        if (previousDue != null) {
+                          controller.updateTaskMetadataInYDoc(
+                            taskId,
+                            dueDate: previousDue,
+                          );
+                        }
+                        controller.editor?.execute([
+                          ChangeTaskCompletionRequest(
+                            nodeId: taskId,
+                            isComplete: false,
+                          ),
+                        ]);
+                        ref
+                            .read(appDatabaseProvider)
+                            .taskCompletionsDao
+                            .undoLastCompletion(taskId);
+                      },
                     ),
                 onTaskReopen: (taskId) =>
                     ref.read(tasksRepositoryProvider).reopenTask(taskId),

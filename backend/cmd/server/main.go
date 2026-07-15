@@ -159,7 +159,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	})
 
 	api := e.Group("/api/v1")
-	api.GET("/health", handler.Health)
+	api.GET("/health", handler.Health(pool))
 
 	if pool == nil {
 		log.Warn().Msg("skipping /auth routes (no DB)")

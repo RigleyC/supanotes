@@ -5,7 +5,6 @@ import 'package:supanotes/core/utils/fractional_indexing.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
-import 'attachment_nodes.dart';
 import 'editor_document_sync_manager.dart';
 import 'node_codec.dart';
 import 'yjs_node_codec.dart';
@@ -52,7 +51,6 @@ class YjsDocEditorBridge {
   late final void Function(dynamic, Transaction) _onNodesChangedHandler;
   late final void Function(dynamic, Transaction) _onTasksChangedHandler;
 
-  static const int _incrementalUpdateThreshold = 5;
 
   // Re-entrancy guard: prevents YMap observation during local flush.
   // Without this, onLocalFlush → YDoc mutation → onNodesChanged → coordinator
@@ -363,19 +361,7 @@ class YjsDocEditorBridge {
   }
 
   String _attributionFor(DocumentNode node) {
-    if (node is ParagraphNode) {
-      final blockType = node.getMetadataValue('blockType') as Attribution?;
-      if (blockType == null) return 'paragraph';
-      if (blockType == blockquoteAttribution) return 'blockquote';
-      if (blockType.id.startsWith('header')) return 'header';
-      return 'paragraph';
-    }
-    if (node is TaskNode) return 'task';
-    if (node is ListItemNode) return 'list_item';
-    if (node is HorizontalRuleNode) return 'divider';
-    if (node is ImageNode) return 'image';
-    if (node is DocumentAttachmentNode) return 'attachment';
-    return 'paragraph';
+    return NodeCodec.nodeType(node) ?? 'paragraph';
   }
 
   Set<String>? _extractKeys(dynamic event) {

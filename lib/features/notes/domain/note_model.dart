@@ -4,7 +4,7 @@ class NoteModel {
   const NoteModel({
     required this.id,
     required this.userId,
-    required this.content,
+    this.content,
     required this.title,
     this.excerpt,
     required this.favorite,
@@ -21,7 +21,7 @@ class NoteModel {
 
   final String id;
   final String userId;
-  final String content;
+  final String? content;
   final String title;
   final String? excerpt;
   final bool favorite;

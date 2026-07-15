@@ -95,3 +95,27 @@ WHERE user_id = $1
   AND status = 'done'
   AND completed_at >= NOW() - (sqlc.arg('days')::int || ' days')::interval
 ORDER BY completed_at DESC;
+
+-- name: UpsertTasksBatch :exec
+INSERT INTO tasks (id, note_id, user_id, title, status, due_date, recurrence, position, completed_at, created_at, deleted_at)
+SELECT
+  unnest($1::uuid[]),
+  unnest($2::uuid[]),
+  unnest($3::uuid[]),
+  unnest($4::text[]),
+  unnest($5::text[]),
+  unnest($6::date[]),
+  unnest($7::text[]),
+  unnest($8::text[]),
+  unnest($9::timestamptz[]),
+  unnest($10::timestamptz[]),
+  unnest($11::timestamptz[])
+ON CONFLICT (id) DO UPDATE SET
+  title        = EXCLUDED.title,
+  status       = EXCLUDED.status,
+  due_date     = EXCLUDED.due_date,
+  recurrence   = EXCLUDED.recurrence,
+  position     = EXCLUDED.position,
+  completed_at = EXCLUDED.completed_at,
+  deleted_at   = EXCLUDED.deleted_at,
+  updated_at   = NOW();

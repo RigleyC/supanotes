@@ -4,13 +4,17 @@ import 'package:super_editor/super_editor.dart';
 /// Returns a [Stylesheet] that inherits from [defaultStylesheet] and only
 /// overrides what's needed: theme-adaptive colours, tighter list spacing,
 /// and the `task` block type.
-Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
+Stylesheet noteStylesheet(
+  BuildContext context, {
+  bool hideCompleted = false,
+  EdgeInsets documentPadding = const EdgeInsets.symmetric(horizontal: 24),
+}) {
   final colorScheme = Theme.of(context).colorScheme;
   final onSurface = colorScheme.onSurface;
   final onSurfaceVariant = colorScheme.onSurfaceVariant;
 
   return defaultStylesheet.copyWith(
-    documentPadding: EdgeInsets.symmetric(horizontal: 24),
+    documentPadding: documentPadding,
     inlineTextStyler: (attributions, existingStyle) {
       for (final attribution in attributions) {
         if (attribution is LinkAttribution &&
@@ -106,10 +110,7 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
       StyleRule(
         const BlockSelector('task'),
         (doc, docNode) => {
-          Styles.padding:
-              hideCompleted && docNode is TaskNode && docNode.isComplete
-              ? const CascadingPadding.all(0)
-              : const CascadingPadding.only(top: 14),
+          Styles.padding: const CascadingPadding.only(top: 14),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: 18,
@@ -120,10 +121,14 @@ Stylesheet noteStylesheet(BuildContext context, {bool hideCompleted = false}) {
       StyleRule(
         const BlockSelector('task').last(),
         (doc, docNode) => {
-          Styles.padding:
-              hideCompleted && docNode is TaskNode && docNode.isComplete
-              ? const CascadingPadding.all(0)
-              : const CascadingPadding.only(bottom: 14),
+          Styles.padding: const CascadingPadding.only(bottom: 14),
+        },
+      ),
+      // Paragraph spacing.
+      StyleRule(
+        const BlockSelector('paragraph'),
+        (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(top: 24),
         },
       ),
     ],
