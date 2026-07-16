@@ -19,7 +19,6 @@ type Querier interface {
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
-	CreateDeviceToken(ctx context.Context, arg CreateDeviceTokenParams) (DeviceToken, error)
 	CreateMemory(ctx context.Context, arg CreateMemoryParams) (Memory, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error)
@@ -36,8 +35,6 @@ type Querier interface {
 	CreateUserSettings(ctx context.Context, arg CreateUserSettingsParams) (UserSetting, error)
 	DeleteAttachment(ctx context.Context, id pgtype.UUID) error
 	DeleteContext(ctx context.Context, arg DeleteContextParams) error
-	DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error
-	DeleteDeviceTokenByToken(ctx context.Context, arg DeleteDeviceTokenByTokenParams) error
 	DeleteMemory(ctx context.Context, arg DeleteMemoryParams) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
@@ -91,7 +88,6 @@ type Querier interface {
 	HardDeleteExpiredTasks(ctx context.Context) error
 	InsertAttachment(ctx context.Context, arg InsertAttachmentParams) (Attachment, error)
 	ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]Attachment, error)
-	ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]DeviceToken, error)
 	RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error
 	ResolvePendingToolConfirmation(ctx context.Context, arg ResolvePendingToolConfirmationParams) (PendingToolConfirmation, error)
 	RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error

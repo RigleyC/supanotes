@@ -11,32 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createDeviceToken = `-- name: CreateDeviceToken :one
-INSERT INTO device_tokens (user_id, token, platform)
-VALUES ($1, $2, $3)
-ON CONFLICT (user_id, token) DO UPDATE
-   SET token = EXCLUDED.token
-RETURNING id, user_id, token, platform, created_at
-`
-
-type CreateDeviceTokenParams struct {
-	UserID   pgtype.UUID `json:"user_id"`
-	Token    string      `json:"token"`
-	Platform string      `json:"platform"`
-}
-
-func (q *Queries) CreateDeviceToken(ctx context.Context, arg CreateDeviceTokenParams) (DeviceToken, error) {
-	row := q.db.QueryRow(ctx, createDeviceToken, arg.UserID, arg.Token, arg.Platform)
-	var i DeviceToken
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Token,
-		&i.Platform,
-		&i.CreatedAt,
-	)
-	return i, err
-}
+// Types kept for backward compatibility (referenced by test mocks).
+type (
+	CreateDeviceTokenParams struct {
+		UserID   pgtype.UUID `json:"user_id"`
+		Token    string      `json:"token"`
+		Platform string      `json:"platform"`
+	}
+	DeleteDeviceTokenParams struct {
+		ID     pgtype.UUID `json:"id"`
+		UserID pgtype.UUID `json:"user_id"`
+	}
+	DeleteDeviceTokenByTokenParams struct {
+		Token  string      `json:"token"`
+		UserID pgtype.UUID `json:"user_id"`
+	}
+)
 
 const createRefreshToken = `-- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
@@ -114,37 +104,8 @@ func (q *Queries) CreateUserSettings(ctx context.Context, arg CreateUserSettings
 	return i, err
 }
 
-const deleteDeviceToken = `-- name: DeleteDeviceToken :exec
-DELETE FROM device_tokens
-WHERE id = $1 AND user_id = $2
-`
 
-type DeleteDeviceTokenParams struct {
-	ID     pgtype.UUID `json:"id"`
-	UserID pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error {
-	_, err := q.db.Exec(ctx, deleteDeviceToken, arg.ID, arg.UserID)
-	return err
-}
-
-const deleteDeviceTokenByToken = `-- name: DeleteDeviceTokenByToken :exec
-DELETE FROM device_tokens
-WHERE token = $1 AND user_id = $2
-`
-
-type DeleteDeviceTokenByTokenParams struct {
-	Token  string      `json:"token"`
-	UserID pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) DeleteDeviceTokenByToken(ctx context.Context, arg DeleteDeviceTokenByTokenParams) error {
-	_, err := q.db.Exec(ctx, deleteDeviceTokenByToken, arg.Token, arg.UserID)
-	return err
-}
-
-const getRefreshToken = `-- name: GetRefreshToken :one
+	const getRefreshToken = `-- name: GetRefreshToken :one
 SELECT id, user_id, token_hash, expires_at, created_at, revoked_at FROM refresh_tokens
 WHERE token_hash = $1
   AND revoked_at IS NULL
@@ -221,36 +182,6 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID pgtype.UUID) (User
 	return i, err
 }
 
-const listDeviceTokensByUser = `-- name: ListDeviceTokensByUser :many
-SELECT id, user_id, token, platform, created_at FROM device_tokens
-WHERE user_id = $1
-`
-
-func (q *Queries) ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]DeviceToken, error) {
-	rows, err := q.db.Query(ctx, listDeviceTokensByUser, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []DeviceToken
-	for rows.Next() {
-		var i DeviceToken
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Token,
-			&i.Platform,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
 
 const revokeAllUserRefreshTokens = `-- name: RevokeAllUserRefreshTokens :exec
 UPDATE refresh_tokens

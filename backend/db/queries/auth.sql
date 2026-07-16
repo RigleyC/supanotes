@@ -51,21 +51,4 @@ SET revoked_at = NOW()
 WHERE user_id = $1
   AND revoked_at IS NULL;
 
--- name: CreateDeviceToken :one
-INSERT INTO device_tokens (user_id, token, platform)
-VALUES ($1, $2, $3)
-ON CONFLICT (user_id, token) DO UPDATE
-   SET token = EXCLUDED.token
-RETURNING *;
 
--- name: DeleteDeviceToken :exec
-DELETE FROM device_tokens
-WHERE id = $1 AND user_id = $2;
-
--- name: DeleteDeviceTokenByToken :exec
-DELETE FROM device_tokens
-WHERE token = $1 AND user_id = $2;
-
--- name: ListDeviceTokensByUser :many
-SELECT id, user_id, token, platform, created_at FROM device_tokens
-WHERE user_id = $1;

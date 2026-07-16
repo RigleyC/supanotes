@@ -16,13 +16,13 @@ final openTasksStreamProvider = StreamProvider.autoDispose<List<TaskData>>(
 );
 
 final taskNotificationSchedulerProvider =
-    NotifierProvider<TaskNotificationScheduler, Set<String>>(
+    NotifierProvider<TaskNotificationScheduler, Map<String, DateTime>>(
   TaskNotificationScheduler.new,
 );
 
-class TaskNotificationScheduler extends Notifier<Set<String>> {
+class TaskNotificationScheduler extends Notifier<Map<String, DateTime>> {
   @override
-  Set<String> build() {
+  Map<String, DateTime> build() {
     ref.listen(openTasksStreamProvider, (_, next) {
       next.whenOrNull(data: _reschedule);
     });
@@ -31,25 +31,33 @@ class TaskNotificationScheduler extends Notifier<Set<String>> {
 
   void _reschedule(List<TaskData> tasks) {
     final service = ref.read(localNotificationServiceProvider);
+    final now = DateTime.now();
 
-    final dueTasks =
-        tasks.where((t) => t.dueDate != null).toList();
-    final newIds = dueTasks.map((t) => t.id).toSet();
-
-    for (final id in state.difference(newIds)) {
-      service.cancel(id.hashCode);
-    }
-
-    for (final task in dueTasks) {
-      final due = task.dueDate!;
+    final newSchedule = <String, DateTime>{};
+    for (final task in tasks) {
+      final due = task.dueDate;
+      if (due == null) continue;
       final scheduledDate = task.hasTime
           ? due
           : DateTime(due.year, due.month, due.day, 9, 0);
-      if (scheduledDate.isAfter(DateTime.now())) {
-        service.scheduleTaskNotification(task.id, task.title, scheduledDate);
+      if (scheduledDate.isAfter(now)) {
+        newSchedule[task.id] = scheduledDate;
       }
     }
 
-    state = newIds;
+    for (final id in state.keys) {
+      if (!newSchedule.containsKey(id)) {
+        service.cancel(id.hashCode);
+      }
+    }
+
+    for (final MapEntry(:key, :value) in newSchedule.entries) {
+      if (state[key] != value) {
+        final task = tasks.firstWhere((t) => t.id == key);
+        service.scheduleTaskNotification(key, task.title, value);
+      }
+    }
+
+    state = newSchedule;
   }
 }

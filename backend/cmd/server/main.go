@@ -33,7 +33,6 @@ import (
 	mcpapp "github.com/RigleyC/supanotes/internal/mcp"
 	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/notes"
-	"github.com/RigleyC/supanotes/internal/notifications"
 	"github.com/RigleyC/supanotes/internal/routines"
 	"github.com/RigleyC/supanotes/internal/search"
 	"github.com/RigleyC/supanotes/internal/settings"
@@ -121,6 +120,12 @@ type CustomValidator struct {
 
 func (cv *CustomValidator) Validate(i any) error {
 	return cv.validator.Struct(i)
+}
+
+type noopNotifier struct{}
+
+func (noopNotifier) Send(_ context.Context, _, _, _ string) error {
+	return nil
 }
 
 func setupLogger(cfg *config.Config) {
@@ -409,18 +414,13 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.GET("/agent/traces/:id", agentH.GetSessionTraces)
 
 
-	// FCM push + Telegram sender — feed both into the routines runner
-	// so a fired brief triggers real notifications.
-	pushSender, err := notifications.NewMultiDeviceSender(cfg.FCMCredentialsFile, queries)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to build FCM sender")
-	}
-
+	// Telegram sender — feed into the routines runner so a fired
+	// brief can notify the user.
 	gatewayRepo := gateway.NewRepository(pool)
 	gatewayBot := gateway.NewTelegramClient(cfg.TelegramBotToken)
 	gatewayBot.AttachRepo(gatewayRepo)
 
-	routinesRunner := routines.NewRunner(cronCtx, routinesRepo, agentCtxBldr, llmFactory, pushSender, gatewayBot)
+	routinesRunner := routines.NewRunner(cronCtx, routinesRepo, agentCtxBldr, llmFactory, noopNotifier{}, gatewayBot)
 	routinesRunner.Start()
 	// MCP Server
 	mcpServer := mcpapp.NewServer(notesSvc, tasksSvc, memoriesSvc, tagsSvc, soulSvc)
@@ -438,12 +438,6 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	settingsH := settings.NewHandler(settingsSvc)
 	protected.GET("/settings", settingsH.Get)
 	protected.PUT("/settings", settingsH.Update)
-
-	// Device tokens (FCM push registration)
-	notificationsSvc := notifications.NewService(queries)
-	notificationsH := notifications.NewHandler(notificationsSvc)
-	protected.POST("/device-tokens", notificationsH.RegisterToken)
-	protected.DELETE("/device-tokens", notificationsH.DeleteToken)
 
 	// Telegram gateway (uses the agent loop as a bridge for free-form
 	// messages; the public webhook is mounted on the unauthenticated

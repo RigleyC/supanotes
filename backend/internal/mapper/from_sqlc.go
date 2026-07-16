@@ -50,11 +50,4 @@ func SoulFromSQLC(s sqlcgen.Soul) dto.SoulResponse {
 	}
 }
 
-func DeviceTokenFromSQLC(t sqlcgen.DeviceToken) dto.DeviceTokenResponse {
-	return dto.DeviceTokenResponse{
-		ID:        UUID(t.ID),
-		Token:     t.Token,
-		Platform:  t.Platform,
-		CreatedAt: Time(t.CreatedAt),
-	}
-}
+
