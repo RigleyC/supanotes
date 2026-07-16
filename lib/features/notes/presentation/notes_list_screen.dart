@@ -21,9 +21,10 @@ import 'package:supanotes/features/search/presentation/widgets/search_results_vi
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:supanotes/shared/widgets/app_popup_menu.dart';
 import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
+import 'package:supanotes/features/notes/presentation/widgets/notes_more_menu.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:soft_edge_blur/soft_edge_blur.dart';
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
@@ -74,7 +75,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final headerSlivers = [
       SliverToBoxAdapter(
         child: SizedBox(
-          height: AppSpacing.lg +
+          height: kToolbarHeight + AppSpacing.lg +
               (PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 0.0),
         ),
       ),
@@ -97,46 +98,65 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         ),
     ];
 
-    return AdaptiveScaffold(
-      appBar: AdaptiveAppBar(
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
         actions: [
-          AdaptiveAppBarAction(
-            icon: _isSearching ? Icons.close : Icons.search,
-            iosSymbol: _isSearching ? 'xmark' : 'magnifyingglass',
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
             onPressed: _isSearching ? _closeSearch : _openSearch,
           ),
-          AdaptiveAppBarAction(
-            icon: Icons.more_vert,
-            iosSymbol: 'ellipsis',
-            onPressed: () => _showMoreMenu(context),
+          NotesMoreMenu(
+            isListView: !isGridView,
+            onToggleViewMode: _toggleViewMode,
+            onLogout: () =>
+                ref.read(authControllerProvider.notifier).logout(),
+            onOpenSettings: () => context.push(AppRoutes.settings),
           ),
         ],
       ),
-      body: trimmedSearchQuery.isEmpty
-          ? notesAsync.when(
-              loading: () =>
-                  _NotesLoadingView(headerSlivers: headerSlivers),
-              error: (e, _) => AppErrorView(
-                title: 'Erro ao carregar as notas',
-                subtitle: e.toString(),
+      body: SoftEdgeBlur(
+        edges: [
+          EdgeBlur(
+            type: EdgeType.topEdge,
+            size: 32,
+            sigma: 12,
+            controlPoints: [
+              ControlPoint(position: 0, type: ControlPointType.transparent),
+              ControlPoint(position: 1, type: ControlPointType.visible),
+            ],
+          ),
+        ],
+        child: trimmedSearchQuery.isEmpty
+            ? notesAsync.when(
+                loading: () =>
+                    _NotesLoadingView(headerSlivers: headerSlivers),
+                error: (e, _) => AppErrorView(
+                  title: 'Erro ao carregar as notas',
+                  subtitle: e.toString(),
+                ),
+                data: (notes) => CustomScrollView(
+                  slivers: [
+                    ...headerSlivers,
+                    _buildNotesBody(notes, isGridView),
+                  ],
+                ),
+              )
+            : searchAsync!.when(
+                loading: () =>
+                    SearchLoadingView(headerSlivers: headerSlivers),
+                error: (e, _) => SearchErrorView(
+                  headerSlivers: headerSlivers,
+                  error: e.toString(),
+                ),
+                data: (results) => SearchResultsView(
+                  headerSlivers: headerSlivers,
+                  query: trimmedSearchQuery,
+                  results: results,
+                  onTap: (result) => context.push(AppRoutes.note(result.id)),
+                ),
               ),
-              data: (notes) =>
-                  _buildNotesBody(notes, headerSlivers, isGridView),
-            )
-          : searchAsync!.when(
-              loading: () =>
-                  SearchLoadingView(headerSlivers: headerSlivers),
-              error: (e, _) => SearchErrorView(
-                headerSlivers: headerSlivers,
-                error: e.toString(),
-              ),
-              data: (results) => SearchResultsView(
-                headerSlivers: headerSlivers,
-                query: trimmedSearchQuery,
-                results: results,
-                onTap: (result) => context.push(AppRoutes.note(result.id)),
-              ),
-            ),
+      ),
       floatingActionButton: QuickActionFabs(
         smallFabKey: const ValueKey('home-chat-fab'),
         smallHeroTag: 'home-chat-fab',
@@ -182,54 +202,11 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     }
   }
 
-  Future<void> _showMoreMenu(BuildContext context) async {
-    final isGridView = ref.read(isGridViewProvider);
-    final val = await showAdaptivePopupMenu<String>(
-      context: context,
-      items: [
-        AdaptivePopupMenuItem<String>(
-          label: isGridView ? 'Ver como lista' : 'Ver como galeria',
-          icon: isGridView ? Icons.list_rounded : Icons.grid_view_rounded,
-          value: 'toggleView',
-        ),
-        AdaptivePopupMenuItem<String>(
-          label: 'Configurações',
-          icon: Icons.settings_outlined,
-          value: 'settings',
-        ),
-        AdaptivePopupMenuItem<String>(
-          label: 'Sair',
-          icon: Icons.logout,
-          value: 'logout',
-        ),
-      ],
-    );
-    if (val != null && context.mounted) {
-      _handleMenuValue(val);
-    }
-  }
-
-  void _handleMenuValue(String value) {
-    switch (value) {
-      case 'toggleView':
-        _toggleViewMode();
-      case 'settings':
-        context.push(AppRoutes.settings);
-      case 'logout':
-        ref.read(authControllerProvider.notifier).logout();
-    }
-  }
-
-  Widget _buildNotesBody(
-    List<NoteModel> notes,
-    List<Widget> headerSlivers,
-    bool isGridView,
-  ) {
+  Widget _buildNotesBody(List<NoteModel> notes, bool isGridView) {
     return isGridView
         ? NotesGridView(
             key: const ValueKey('grid'),
             notes: notes.toList(),
-            headerSlivers: headerSlivers,
             onTap: _openNote,
             onDelete: _deleteNote,
             onToggleFavorite: _toggleFavorite,
@@ -237,7 +214,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         : NotesListView(
             key: const ValueKey('list'),
             notes: notes.toList(),
-            headerSlivers: headerSlivers,
             onTap: _openNote,
             onDelete: _deleteNote,
             onToggleFavorite: _toggleFavorite,

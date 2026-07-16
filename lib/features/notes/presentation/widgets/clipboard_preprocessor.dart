@@ -18,7 +18,19 @@ String preprocessClipboardText(String text) {
     result = result.replaceAll('$bullet ', '- ');
     result = result.replaceAll(bullet, '- ');
   }
+
+  // Convert plain "[ ]" or "[x]" at the start of a line to "- [ ]"
+  result = result.replaceAll(RegExp(r'^\[\s\] ', multiLine: true), '- [ ] ');
+  result = result.replaceAll(RegExp(r'^\[[xX]\] ', multiLine: true), '- [x] ');
+
   return result;
+}
+
+bool _isMarkdown(String text) {
+  return RegExp(
+    r'^(?:-|\*|\d+\.) |^#+ |^> |^```',
+    multiLine: true,
+  ).hasMatch(text);
 }
 
 Future<void> pasteWithPreprocessing(Editor editor) async {
@@ -66,6 +78,14 @@ Future<void> pasteWithPreprocessing(Editor editor) async {
         final text = await reader.readValue(Formats.plainText);
         if (text != null) {
           final preprocessedText = preprocessClipboardText(text);
+          
+          final isLikelyMarkdown = _isMarkdown(preprocessedText);
+
+          if (isLikelyMarkdown) {
+            editor.pasteMarkdown(editor, preprocessedText);
+            return true;
+          }
+
           final selection = editor.composer.selection;
           if (selection != null) {
             DocumentPosition? pastePosition = selection.extent;

@@ -74,6 +74,7 @@ class YjsTaskEntry {
         other.title == title &&
         other.dueDate == dueDate &&
         other.recurrence == recurrence &&
+        other.completed == completed &&
         other.lastCompletedAt == lastCompletedAt;
   }
 

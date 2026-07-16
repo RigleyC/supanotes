@@ -11,7 +11,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
-import 'package:supanotes/shared/widgets/app_popup_menu.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
@@ -49,45 +48,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (!mounted || task == null) return;
 
     await TaskMetadataSheet.show(context, noteId: task.noteId, task: task);
-  }
-
-  Future<void> _showMoreMenu(
-    BuildContext context,
-    WidgetRef ref,
-    NoteModel note,
-    bool hideCompleted,
-    INotesRepository repo,
-  ) async {
-    final isOwner = note.isOwner;
-    final val = await showAdaptivePopupMenu<String>(
-      context: context,
-      items: [
-        if (isOwner)
-          AdaptivePopupMenuItem<String>(
-            label: NoteStrings.shareLabel,
-            icon: Icons.share_outlined,
-            value: 'share',
-          ),
-        AdaptivePopupMenuItem<String>(
-          label: hideCompleted
-              ? NoteStrings.showCompleted
-              : NoteStrings.hideCompleted,
-          icon: hideCompleted ? Icons.visibility : Icons.visibility_off,
-          value: 'hide_completed',
-        ),
-        if (isOwner)
-          AdaptivePopupMenuItem<String>(
-            label: note.collapseImages
-                ? 'Expandir imagens'
-                : 'Colapsar imagens',
-            icon: note.collapseImages ? Icons.image : Icons.image_outlined,
-            value: 'collapse_images',
-          ),
-      ],
-    );
-    if (val != null && context.mounted) {
-      _handleMenuValue(context, ref, val, note, hideCompleted, repo);
-    }
   }
 
   Future<void> _handleMenuValue(
@@ -138,39 +98,49 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         final isReadOnly = note.isReadOnly;
         final hideCompleted = note.hideCompleted;
 
-        return AdaptiveScaffold(
-          appBar: /* AppBar(
+        return Scaffold(
+          appBar: AppBar(
+            title: isReadOnly
+                ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}')
+                : null,
             actions: [
-              IconButton(
-                onPressed: () {
-                  _showMoreMenu(context, ref, note, hideCompleted, repo);
+              AdaptivePopupMenuButton.icon<String>(
+                icon: Icons.more_vert,
+                items: [
+                  if (note.isOwner)
+                    const AdaptivePopupMenuItem<String>(
+                      label: NoteStrings.shareLabel,
+                      icon: Icons.share_outlined,
+                      value: 'share',
+                    ),
+                  AdaptivePopupMenuItem<String>(
+                    label: hideCompleted
+                        ? NoteStrings.showCompleted
+                        : NoteStrings.hideCompleted,
+                    icon: hideCompleted ? Icons.visibility : Icons.visibility_off,
+                    value: 'hide_completed',
+                  ),
+                  if (note.isOwner)
+                    AdaptivePopupMenuItem<String>(
+                      label: note.collapseImages
+                          ? 'Expandir imagens'
+                          : 'Colapsar imagens',
+                      icon: note.collapseImages ? Icons.image : Icons.image_outlined,
+                      value: 'collapse_images',
+                    ),
+                ],
+                onSelected: (index, entry) {
+                  final value = entry.value;
+                  if (value != null) {
+                    _handleMenuValue(
+                      context, ref, value, note, hideCompleted, repo,
+                    );
+                  }
                 },
-                icon: Icon(Icons.more_vert),
               ),
               if (!isReadOnly)
                 IconButton(
-                  icon: Icon(Icons.check),
-                  onPressed: () {
-                    FocusManager.instance.primaryFocus?.unfocus();
-                    SystemChannels.textInput.invokeMethod('TextInput.hide');
-                  },
-                ),
-            ],
-          ), */ AdaptiveAppBar(
-            title: isReadOnly
-                ? '${NoteStrings.sharedByPrefix} ${note.sharedByEmail}'
-                : null,
-            actions: [
-              AdaptiveAppBarAction(
-                icon: Icons.more_vert,
-                iosSymbol: 'ellipsis',
-                onPressed: () =>
-                    _showMoreMenu(context, ref, note, hideCompleted, repo),
-              ),
-              if (!isReadOnly)
-                AdaptiveAppBarAction(
-                  icon: Icons.check,
-                  iosSymbol: 'checkmark',
+                  icon: const Icon(Icons.check),
                   onPressed: () {
                     FocusManager.instance.primaryFocus?.unfocus();
                     SystemChannels.textInput.invokeMethod('TextInput.hide');

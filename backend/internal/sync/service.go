@@ -158,6 +158,13 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	var toFlush []string
 	editableNotes := make(map[pgtype.UUID]bool)
 
+	// Pre-populate ownership for notes in this payload so new notes bypass DB checks
+	for _, n := range payload.Notes {
+		if n.UserID == userID {
+			editableNotes[n.ID] = true
+		}
+	}
+
 	if s.pool != nil {
 		if s.ydoc != nil {
 			for _, ys := range payload.NoteYjsStates {
@@ -173,8 +180,11 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 					return ErrSyncConflict
 				}
 				if !canEdit {
-					slog.Error("sync push: Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
-					return ErrSyncConflict
+					// Note doesn't exist on server yet or user lacks permission.
+					// Skip instead of aborting — the note header may be upserted
+					// later in this push, and the Yjs state will sync next cycle.
+					slog.Warn("sync push: skipping Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
+					continue
 				}
 
 				_, err = s.ydoc.DocFor(ctx, ys.NoteID)
@@ -353,8 +363,8 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			return ErrSyncConflict
 		}
 		if !canEdit {
-			slog.Error("sync push: Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
-			return ErrSyncConflict
+			slog.Warn("sync push: skipping Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
+			continue
 		}
 
 		// No active room — apply via YDocService (merge + persistence)

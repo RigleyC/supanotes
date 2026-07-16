@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:super_editor/super_editor.dart';
@@ -207,8 +208,10 @@ class EditorDocumentSyncManager {
 
         if (existingNode is TaskNode && incoming.type == 'task') {
           try {
-            final existingEntry = YjsTaskEntry.decode(NodeCodec.nodeData(existingNode));
-            final incomingEntry = YjsTaskEntry.decode(incoming.data);
+            final existingEntryStr = NodeCodec.nodeData(existingNode);
+            final incomingEntryStr = jsonEncode(incoming.data);
+            final existingEntry = YjsTaskEntry.decode(existingEntryStr);
+            final incomingEntry = YjsTaskEntry.decode(incomingEntryStr);
 
             if (existingEntry != null && incomingEntry != null && existingEntry == incomingEntry) {
               if (existingNode.isComplete != incomingEntry.completed) {
@@ -249,8 +252,8 @@ class EditorDocumentSyncManager {
     final requests = <EditRequest>[];
     for (final node in _document) {
       if (node is TaskNode) {
-        final isDbCompleted = taskCompletionMap[node.id] ?? false;
-        if (node.isComplete != isDbCompleted) {
+        final isDbCompleted = taskCompletionMap[node.id];
+        if (isDbCompleted != null && node.isComplete != isDbCompleted) {
           requests.add(ChangeTaskCompletionRequest(
             nodeId: node.id,
             isComplete: isDbCompleted,

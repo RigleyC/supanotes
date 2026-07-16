@@ -1,10 +1,8 @@
 library;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/domain/note_node.dart';
@@ -116,13 +114,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _initControls();
 
     final theme = Theme.of(context);
-    final topPadding = Scaffold.maybeOf(context)?.appBarMaxHeight ??
-        (MediaQuery.paddingOf(context).top +
-            (PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 56.0));
+
     final docPadding = EdgeInsets.only(
       left: 24,
       right: 24,
-      top: topPadding,
       bottom: 24,
     );
 
@@ -142,9 +137,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Column(
         children: [
           Expanded(
@@ -154,9 +147,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                 controller: _controls!.iosController,
                 child: SuperEditor(
                   editor: controller.editor!,
-                  focusNode: widget.isReadOnly
-                      ? null
-                      : controller.focusNode,
+                  focusNode: widget.isReadOnly ? null : controller.focusNode,
                   documentLayoutKey: _docLayoutKey,
                   stylesheet: _cachedStylesheet!,
                   selectionStyle: editorSelectionStyle(theme.colorScheme),
@@ -182,14 +173,17 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                       onTaskLongPress: widget.isReadOnly
                           ? null
                           : (taskId) => widget.delegate.onTaskLongPress?.call(
-                                widget.taskMetadata[taskId],
-                                () async {},
-                              ),
+                              widget.taskMetadata[taskId],
+                              () async {},
+                            ),
                       onTaskComplete: widget.delegate.onTaskComplete,
                       onTaskReopen: widget.delegate.onTaskReopen,
                       onRecurringTaskComplete: (taskId, nextDue) {
                         controller.completeRecurringTask(taskId, nextDue);
-                        widget.delegate.onRecurringTaskComplete?.call(taskId, nextDue);
+                        widget.delegate.onRecurringTaskComplete?.call(
+                          taskId,
+                          nextDue,
+                        );
                       },
                     ),
                     AttachmentComponentBuilder(
@@ -213,8 +207,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             NoteToolbar(
               editor: controller.editor!,
               composer: controller.composer!,
-              onAttachFile: () => controller.pickAndAttachFile(imageOnly: false),
-              onAttachImage: () => controller.pickAndAttachFile(imageOnly: true),
+              onAttachFile: () =>
+                  controller.pickAndAttachFile(imageOnly: false),
+              onAttachImage: () =>
+                  controller.pickAndAttachFile(imageOnly: true),
             ),
         ],
       ),
