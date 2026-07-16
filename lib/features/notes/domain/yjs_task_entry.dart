@@ -5,6 +5,7 @@ class YjsTaskEntry {
   final bool completed;
   final String? title;
   final String? dueDate;
+  final bool? hasTime;
   final String? recurrence;
   final String? lastCompletedAt;
 
@@ -13,6 +14,7 @@ class YjsTaskEntry {
     required this.completed,
     this.title,
     this.dueDate,
+    this.hasTime,
     this.recurrence,
     this.lastCompletedAt,
   });
@@ -23,6 +25,7 @@ class YjsTaskEntry {
       completed: json['completed'] == true,
       title: json['title'] as String?,
       dueDate: json['dueDate'] as String?,
+      hasTime: json['hasTime'] as bool?,
       recurrence: json['recurrence'] as String?,
       lastCompletedAt: json['lastCompletedAt'] as String?,
     );
@@ -32,6 +35,7 @@ class YjsTaskEntry {
     final map = <String, dynamic>{'nodeId': nodeId, 'completed': completed};
     if (title != null) map['title'] = title;
     if (dueDate != null) map['dueDate'] = dueDate;
+    if (hasTime != null) map['hasTime'] = hasTime;
     if (recurrence != null) map['recurrence'] = recurrence;
     if (lastCompletedAt != null) map['lastCompletedAt'] = lastCompletedAt;
     return map;
@@ -42,6 +46,7 @@ class YjsTaskEntry {
     bool? completed,
     String? title,
     String? dueDate,
+    bool? hasTime,
     String? recurrence,
     String? lastCompletedAt,
   }) {
@@ -50,6 +55,7 @@ class YjsTaskEntry {
       completed: completed ?? this.completed,
       title: title ?? this.title,
       dueDate: dueDate ?? this.dueDate,
+      hasTime: hasTime ?? this.hasTime,
       recurrence: recurrence ?? this.recurrence,
       lastCompletedAt: lastCompletedAt ?? this.lastCompletedAt,
     );
@@ -73,10 +79,11 @@ class YjsTaskEntry {
         other.nodeId == nodeId &&
         other.title == title &&
         other.dueDate == dueDate &&
+        other.hasTime == hasTime &&
         other.recurrence == recurrence &&
         other.lastCompletedAt == lastCompletedAt;
   }
 
   @override
-  int get hashCode => Object.hash(nodeId, title, dueDate, recurrence, lastCompletedAt);
+  int get hashCode => Object.hash(nodeId, title, dueDate, hasTime, recurrence, lastCompletedAt);
 }

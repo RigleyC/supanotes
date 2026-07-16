@@ -25,17 +25,7 @@ class TaskMetadataSheet extends ConsumerStatefulWidget {
   final String noteId;
   final TaskModel task;
 
-//pra que esse metodo? porque a gente nao passa isso aqui pro mostrador de sheet global?
-  static Future<void> show(
-    BuildContext context, {
-    required String noteId,
-    required TaskModel task,
-  }) {
-    return showAppBottomSheet(
-      context: context,
-      builder: (_) => TaskMetadataSheet(noteId: noteId, task: task),
-    );
-  }
+
 
   @override
   ConsumerState<TaskMetadataSheet> createState() => _TaskMetadataSheetState();
@@ -44,6 +34,7 @@ class TaskMetadataSheet extends ConsumerStatefulWidget {
 class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
   late DateTime? _dueDate;
   late TaskRecurrence? _recurrence;
+  late bool _hasTime;
 
   @override
   void initState() {
@@ -51,6 +42,7 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
     final t = widget.task;
     _dueDate = t.dueDate;
     _recurrence = t.recurrence;
+    _hasTime = t.hasTime;
   }
 
   void _onSave() {
@@ -63,6 +55,7 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
       clearDueDate: _dueDate == null,
       recurrence: _recurrence?.name,
       clearRecurrence: _recurrence == null,
+      hasTime: _hasTime,
     );
 
     if (mounted) Navigator.pop(context);
@@ -82,8 +75,10 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
           const SizedBox(height: AppSpacing.md),
           DueDatePicker(
             initialDate: _dueDate,
-            onChanged: (d) => setState(() {
+            initialHasTime: _hasTime,
+            onChanged: (d, {bool hasTime = false}) => setState(() {
               _dueDate = d;
+              _hasTime = hasTime;
               if (d == null) _recurrence = null;
             }),
           ),

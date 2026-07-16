@@ -16,7 +16,7 @@ Future<T?> showAppBottomSheet<T>({
     isScrollControlled: isScrollControlled,
     useSafeArea: true,
     showDragHandle: true,
-    backgroundColor: isIOS ? CupertinoColors.systemBackground : null,
+    backgroundColor: isIOS ? CupertinoColors.systemBackground.resolveFrom(context) : null,
     shape: isIOS
         ? RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(

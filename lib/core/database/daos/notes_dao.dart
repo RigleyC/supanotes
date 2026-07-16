@@ -108,6 +108,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       't.title AS task_title, t.status AS task_status, '
       't.position AS task_position, '
       't.due_date AS task_due_date, t.recurrence AS task_recurrence, '
+      't.has_time AS task_has_time, '
       't.completed_at AS task_completed_at, '
       't.created_at AS task_created_at, '
       't.updated_at AS task_updated_at, '
@@ -205,6 +206,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       status: row.read<String>('task_status'),
       position: row.read<String>('task_position'),
       dueDate: row.read<DateTime?>('task_due_date'),
+      hasTime: row.read<bool>('task_has_time'),
       recurrence: recurrenceRaw != null
           ? TaskRecurrence.values.byName(recurrenceRaw)
           : null,

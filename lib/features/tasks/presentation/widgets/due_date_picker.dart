@@ -8,10 +8,12 @@ class DueDatePicker extends StatefulWidget {
     super.key,
     required this.initialDate,
     required this.onChanged,
+    this.initialHasTime = false,
   });
 
   final DateTime? initialDate;
-  final ValueChanged<DateTime?> onChanged;
+  final void Function(DateTime? date, {bool hasTime}) onChanged;
+  final bool initialHasTime;
 
   @override
   State<DueDatePicker> createState() => _DueDatePickerState();
@@ -46,7 +48,7 @@ class _DueDatePickerState extends State<DueDatePicker> {
           isSelected: _isSelected(today),
           onTap: () {
             setState(() => _isCalendarExpanded = false);
-            widget.onChanged(today);
+            widget.onChanged(today, hasTime: false);
           },
         ),
         AppSelectionTile(
@@ -55,7 +57,7 @@ class _DueDatePickerState extends State<DueDatePicker> {
           isSelected: _isSelected(tomorrow),
           onTap: () {
             setState(() => _isCalendarExpanded = false);
-            widget.onChanged(tomorrow);
+            widget.onChanged(tomorrow, hasTime: false);
           },
         ),
         AppSelectionTile(
@@ -64,7 +66,7 @@ class _DueDatePickerState extends State<DueDatePicker> {
           isSelected: _isSelected(nextWeek),
           onTap: () {
             setState(() => _isCalendarExpanded = false);
-            widget.onChanged(nextWeek);
+            widget.onChanged(nextWeek, hasTime: false);
           },
         ),
         AppSelectionTile(
@@ -88,19 +90,43 @@ class _DueDatePickerState extends State<DueDatePicker> {
                     lastDate: DateTime(now.year + 5),
                     onDateChanged: (date) {
                       setState(() => _isCalendarExpanded = false);
-                      widget.onChanged(date);
+                      widget.onChanged(date, hasTime: false);
                     },
                   ),
                 )
               : const SizedBox.shrink(),
         ),
+        if (widget.initialDate != null)
+          AppSelectionTile(
+            label: 'Adicionar hora',
+            icon: Icons.access_time_rounded,
+            isSelected: widget.initialHasTime,
+            onTap: () async {
+              final time = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              if (time != null) {
+                final date = widget.initialDate!;
+                final newDate = DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
+                  time.hour,
+                  time.minute,
+                );
+                setState(() => _isCalendarExpanded = false);
+                widget.onChanged(newDate, hasTime: true);
+              }
+            },
+          ),
         AppSelectionTile(
           label: 'Sem data',
           icon: Icons.block,
           isSelected: widget.initialDate == null,
           onTap: () {
             setState(() => _isCalendarExpanded = false);
-            widget.onChanged(null);
+            widget.onChanged(null, hasTime: false);
           },
         ),
       ],

@@ -11,8 +11,17 @@ NoteNode? noteNodeFromYDoc(Doc doc, String key, {String? noteIdOverride}) {
   try {
     final meta = jsonDecode(raw) as Map<String, dynamic>;
     final nodeId = meta['id'] as String;
-    final ytext = doc.getText('content/$nodeId')!;
-    final textContent = ytext.toString();
+    String textContent = '';
+    try {
+      final ytext = doc.getText('content/$nodeId');
+      if (ytext != null) {
+        textContent = ytext.toString();
+      }
+    } catch (e) {
+      // Fallback if the type was corrupted (e.g. instantiated as YMap).
+      // We must not skip the node entirely, otherwise fractional indexing desyncs!
+      textContent = '';
+    }
     final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
     if (textContent.isNotEmpty) {
       data['text'] = textContent;

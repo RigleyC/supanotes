@@ -23,6 +23,7 @@ void main() {
       dueDate: now,
       completedAt: null,
       recurrence: TaskRecurrence.daily,
+      hasTime: false,
       createdAt: now,
       updatedAt: now,
     );
@@ -67,6 +68,7 @@ void main() {
       dueDate: thursday,
       completedAt: null,
       recurrence: TaskRecurrence.weekly,
+      hasTime: false,
       createdAt: thursday,
       updatedAt: thursday,
     );
@@ -89,6 +91,7 @@ void main() {
       dueDate: fifteenth,
       completedAt: null,
       recurrence: TaskRecurrence.monthly,
+      hasTime: false,
       createdAt: fifteenth,
       updatedAt: fifteenth,
     );

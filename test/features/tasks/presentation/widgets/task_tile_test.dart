@@ -29,6 +29,7 @@ void main() {
       recurrence: recurrence,
       dueDate: dueDate,
       completedAt: null,
+      hasTime: false,
       createdAt: now,
       updatedAt: now,
     );

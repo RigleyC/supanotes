@@ -169,8 +169,14 @@ class YjsDocEditorBridge {
     }
 
     final text = data['text'] as String?;
-    final ytext = _doc.getText('content/$id')!;
-    _updateYTextIncrementally(ytext, text ?? '');
+    try {
+      final ytext = _doc.getText('content/$id');
+      if (ytext != null) {
+        _updateYTextIncrementally(ytext, text ?? '');
+      }
+    } catch (e) {
+      dev.log('[YjsBridge] _serializeNode: failed to get ytext for $id (corrupted type)', name: 'YjsBridge', error: e);
+    }
     dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
   }
 
@@ -300,6 +306,7 @@ class YjsDocEditorBridge {
     String? recurrence,
     bool clearDueDate = false,
     bool clearRecurrence = false,
+    bool? hasTime,
   }) {
     _doc.transact((txn) {
       final tasksMap = _doc.getMap<String>('tasks')!;
@@ -309,8 +316,9 @@ class YjsDocEditorBridge {
       tasksMap.set(
         nodeId,
         existing.copyWith(
-          dueDate: clearDueDate ? null : (dueDate != null ? _formatDueDate(dueDate) : existing.dueDate),
+          dueDate: clearDueDate ? null : (dueDate != null ? _formatDueDate(dueDate, hasTime: hasTime ?? false) : existing.dueDate),
           recurrence: clearRecurrence ? null : (recurrence ?? existing.recurrence),
+          hasTime: clearDueDate ? false : (hasTime ?? existing.hasTime),
         ).encode(),
       );
     });
@@ -356,7 +364,12 @@ class YjsDocEditorBridge {
     }
   }
 
-  String _formatDueDate(DateTime date) {
+  String _formatDueDate(DateTime date, {bool hasTime = false}) {
+    if (hasTime) {
+      final h = date.hour.toString().padLeft(2, '0');
+      final m = date.minute.toString().padLeft(2, '0');
+      return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}T$h:$m';
+    }
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 

@@ -41,15 +41,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     body: SafeArea(child: Center(child: child)),
   );
 
-  Future<void> _openTaskActions(
-    TaskModel? task,
-    Future<void> Function() flushSnapshot,
-  ) async {
-    await flushSnapshot();
-    if (!mounted || task == null) return;
 
-    await TaskMetadataSheet.show(context, noteId: task.noteId, task: task);
-  }
 
   Future<void> _handleMenuValue(
     BuildContext context,
@@ -174,10 +166,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               collapseImages: note.collapseImages,
               isReadOnly: isReadOnly,
               delegate: NoteEditorDelegate(
-                onTaskLongPress: isReadOnly
-                    ? null
-                    : (task, flushSnapshot) =>
-                          _openTaskActions(task, flushSnapshot),
+                  onTaskLongPress: isReadOnly
+                      ? null
+                      : (task, flushSnapshot) async {
+                          await flushSnapshot();
+                          if (!mounted || task == null) return;
+                          await showAppBottomSheet(
+                            context: context,
+                            builder: (_) => TaskMetadataSheet(noteId: task.noteId, task: task),
+                          );
+                        },
                 onTaskComplete: (taskId) =>
                     TaskSnackBarHelper.completeTaskWithFeedback(
                       onComplete: () => ref

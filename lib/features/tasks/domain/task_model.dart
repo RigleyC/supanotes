@@ -21,6 +21,7 @@ class TaskModel {
     required this.status,
     required this.position,
     required this.dueDate,
+    required this.hasTime,
     required this.completedAt,
     required this.recurrence,
     required this.createdAt,
@@ -34,6 +35,7 @@ class TaskModel {
   final String status;
   final String position;
   final DateTime? dueDate;
+  final bool hasTime;
   final DateTime? completedAt;
   final TaskRecurrence? recurrence;
   final DateTime createdAt;
@@ -50,6 +52,7 @@ class TaskModel {
       status: d.status,
       position: d.position,
       dueDate: d.dueDate,
+      hasTime: d.hasTime,
       completedAt: d.completedAt,
       recurrence: d.recurrence,
       createdAt: d.createdAt,
@@ -64,6 +67,7 @@ class TaskModel {
 
   bool get isOverdue {
     if (isCompleted || dueDate == null) return false;
+    if (hasTime) return dueDate!.isBefore(DateTime.now());
     return dueDate!.isBefore(DateTime.now().startOfDay);
   }
 

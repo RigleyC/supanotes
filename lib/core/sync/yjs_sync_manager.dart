@@ -132,7 +132,15 @@ class YjsSyncManager {
           final dueDate = data['dueDate'] as String?;
           final recurrence = data['recurrence'] as String?;
           final lastCompletedAt = data['lastCompletedAt'] as String?;
-          final title = doc.getText('content/$nodeId')!.toString();
+          String title = '';
+          try {
+            final ytext = doc.getText('content/$nodeId');
+            if (ytext != null) {
+              title = ytext.toString();
+            }
+          } catch (e) {
+            // Fallback for corrupted type
+          }
 
           tasksMap.set(nodeId, jsonEncode(_buildTaskEntry(
             nodeId,
@@ -219,7 +227,15 @@ class YjsSyncManager {
         if (meta['type'] != 'task') continue;
         final data = meta['data'] as Map<String, dynamic>? ?? {};
         final nodeId = meta['id'] as String;
-        final text = doc.getText('content/$nodeId')!.toString();
+        String text = '';
+        try {
+          final ytext = doc.getText('content/$nodeId');
+          if (ytext != null) {
+            text = ytext.toString();
+          }
+        } catch (e) {
+          // Fallback if type is corrupted
+        }
 
         final isComplete = data['completed'] == true;
         final taskEntry = YjsTaskEntry.decode(doc.getMap<String>('tasks')!.get(nodeId));
@@ -291,7 +307,15 @@ class YjsSyncManager {
 
     final lines = <String>[];
     for (final node in nodes) {
-      final text = doc.getText('content/${node.id}')!.toString();
+      String text = '';
+      try {
+        final ytext = doc.getText('content/${node.id}');
+        if (ytext != null) {
+          text = ytext.toString();
+        }
+      } catch (e) {
+        // Fallback for corrupted type
+      }
       switch (node.type) {
         case 'header':
           lines.add('# $text');

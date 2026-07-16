@@ -12,6 +12,7 @@ TaskModel _task({DateTime? dueDate, bool completed = false, DateTime? createdAt}
       dueDate: dueDate,
       completedAt: completed ? DateTime.now() : null,
       recurrence: null,
+      hasTime: false,
       createdAt: createdAt ?? DateTime(2026, 6, 15),
       updatedAt: DateTime(2026, 6, 15),
     );

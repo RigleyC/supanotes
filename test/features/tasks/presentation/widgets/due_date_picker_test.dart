@@ -6,7 +6,7 @@ import 'package:supanotes/shared/widgets/app_selection_tile.dart';
 
 void main() {
   group('DueDatePicker', () {
-    Widget buildWidget({DateTime? initialDate, required ValueChanged<DateTime?> onChanged}) {
+    Widget buildWidget({DateTime? initialDate, required void Function(DateTime? date, {bool hasTime}) onChanged}) {
       return MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
@@ -20,7 +20,7 @@ void main() {
     }
 
     testWidgets('renders all 5 quick-pick tiles', (tester) async {
-      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (_) {}));
+      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (_, {bool hasTime = false}) {}));
 
       expect(find.text('Hoje'), findsOneWidget);
       expect(find.text('Amanhã'), findsOneWidget);
@@ -32,7 +32,7 @@ void main() {
 
     testWidgets('tapping Hoje emits today startOfDay', (tester) async {
       DateTime? result;
-      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (d) => result = d));
+      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (d, {bool hasTime = false}) => result = d));
 
       await tester.tap(find.text('Hoje'));
       await tester.pump();
@@ -46,7 +46,7 @@ void main() {
 
     testWidgets('tapping Amanhã emits tomorrow', (tester) async {
       DateTime? result;
-      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (d) => result = d));
+      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (d, {bool hasTime = false}) => result = d));
 
       await tester.tap(find.text('Amanhã'));
       await tester.pump();
@@ -57,7 +57,7 @@ void main() {
     });
 
     testWidgets('tapping Escolher data expands the calendar', (tester) async {
-      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (_) {}));
+      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (_, {bool hasTime = false}) {}));
 
       expect(find.byType(CalendarDatePicker), findsNothing);
 
@@ -69,7 +69,7 @@ void main() {
 
     testWidgets('tapping Sem data emits null', (tester) async {
       DateTime? result = DateTime.now();
-      await tester.pumpWidget(buildWidget(initialDate: DateTime.now(), onChanged: (d) => result = d));
+      await tester.pumpWidget(buildWidget(initialDate: DateTime.now(), onChanged: (d, {bool hasTime = false}) => result = d));
 
       await tester.tap(find.text('Sem data'));
       await tester.pump();
@@ -79,7 +79,7 @@ void main() {
 
     testWidgets('calendar collapses after picking a date', (tester) async {
       DateTime? result;
-      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (d) => result = d));
+      await tester.pumpWidget(buildWidget(initialDate: null, onChanged: (d, {bool hasTime = false}) => result = d));
 
       // Open calendar
       await tester.tap(find.text('Escolher data'));
@@ -99,7 +99,7 @@ void main() {
     testWidgets('custom date tile shows formatted date label', (tester) async {
       // A date guaranteed not to be today/tomorrow/next-monday
       final customDate = DateTime(2030, 3, 15);
-      await tester.pumpWidget(buildWidget(initialDate: customDate, onChanged: (_) {}));
+      await tester.pumpWidget(buildWidget(initialDate: customDate, onChanged: (_, {bool hasTime = false}) {}));
       await tester.pump();
 
       expect(find.text('15 Mar'), findsOneWidget);
@@ -107,7 +107,7 @@ void main() {
 
     testWidgets('tile matching initialDate is selected', (tester) async {
       final today = DateTime.now().startOfDay;
-      await tester.pumpWidget(buildWidget(initialDate: today, onChanged: (_) {}));
+      await tester.pumpWidget(buildWidget(initialDate: today, onChanged: (_, {bool hasTime = false}) {}));
 
       final tiles = tester.widgetList<AppSelectionTile>(find.byType(AppSelectionTile)).toList();
       final todayTile = tiles.firstWhere((t) => t.label == 'Hoje');

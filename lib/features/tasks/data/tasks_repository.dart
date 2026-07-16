@@ -149,6 +149,7 @@ class TasksRepository implements ITasksRepository {
       dueDate: dueDate,
       completedAt: null,
       recurrence: recurrence,
+      hasTime: false,
       createdAt: DateTime.now().toUtc(),
       updatedAt: DateTime.now().toUtc(),
     );

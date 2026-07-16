@@ -62,6 +62,7 @@ class TasksLocalRepository {
         position: position,
         recurrence: recurrence,
         dueDate: dueDate,
+        hasTime: false,
         createdAt: now,
         updatedAt: now,
         deletedAt: null,

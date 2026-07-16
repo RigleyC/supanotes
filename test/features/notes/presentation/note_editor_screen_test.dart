@@ -374,6 +374,7 @@ void main() {
           dueDate: DateTime.now().add(const Duration(days: 1)),
           completedAt: null,
           recurrence: null,
+          hasTime: false,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
@@ -439,16 +440,17 @@ void main() {
             title: 'buy milk',
             status: 'done',
             position: '0',
-            dueDate: DateTime.now().add(const Duration(days: 1)),
-            completedAt: DateTime.now(),
-            recurrence: null,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        ]),
-      );
-      when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null));
-      when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
+          dueDate: DateTime.now().add(const Duration(days: 1)),
+          completedAt: DateTime.now(),
+          recurrence: null,
+          hasTime: false,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ]),
+    );
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null));
+    when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
 
       const noteContent =
           '# Test note\n\n- [x] buy milk <!-- task:task-1 -->\n';

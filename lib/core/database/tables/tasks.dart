@@ -13,6 +13,7 @@ class Tasks extends Table {
   TextColumn get recurrence =>
       text().map(const EnumNameConverter(TaskRecurrence.values)).nullable()();
   DateTimeColumn get dueDate => dateTime().nullable()();
+  BoolColumn get hasTime => boolean().withDefault(const Constant(false))();
   DateTimeColumn get completedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

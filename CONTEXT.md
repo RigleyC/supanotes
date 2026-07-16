@@ -13,7 +13,7 @@ The Yjs CRDT document instance for a single note. Source of truth for all note c
 _Avoid_: Yjs state, CRDT, document state
 
 **Task**:
-A node within a note that has a checkbox and optional metadata (due date, recurrence). Not an independent entity — it exists only inside a note.
+A node within a note that has a checkbox and optional metadata (due date with optional time, recurrence). Not an independent entity — it exists only inside a note.
 _Avoid_: Todo, action item, checklist item
 
 **Task Completion**:
