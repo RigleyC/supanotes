@@ -4,12 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"regexp"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/reearth/ygo/crdt"
 )
+
+var contentRegex = regexp.MustCompile(`content/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`)
+
+func preRegisterYText(doc *crdt.Doc, state []byte) {
+	matches := contentRegex.FindAll(state, -1)
+	for _, match := range matches {
+		doc.GetText(string(match))
+	}
+}
 
 type projectionRunner interface {
 	RunDebouncedProjection(ctx context.Context, noteID string)
@@ -117,6 +127,7 @@ func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, err
 	startApply := time.Now()
 	doc := crdt.New(crdt.WithGC(false))
 	if len(state) > 0 {
+		preRegisterYText(doc, state)
 		if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
 			slog.Error("DocFor: ApplyUpdateV1 failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startApply).Milliseconds())
 			return nil, err
@@ -291,6 +302,7 @@ func (s *YDocService) ApplyNodeMutation(ctx context.Context, noteID string, upda
 
 func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc, noteID string, update []byte) error {
 	startApply := time.Now()
+	preRegisterYText(doc, update)
 	if err := crdt.ApplyUpdateV1(doc, update, "local"); err != nil {
 		slog.Error("ApplyNodeMutationLocked: ApplyUpdateV1 failed", "note_id", noteID, "error", err)
 		return err

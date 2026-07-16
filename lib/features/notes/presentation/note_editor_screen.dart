@@ -1,6 +1,7 @@
 library;
 
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
@@ -82,9 +83,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(notesRepositoryProvider);
-    final noteWithTasksAsync = ref.watch(
-      noteWithTasksProvider(widget.noteId),
-    );
+    final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
 
     return noteWithTasksAsync.when(
       data: (noteWithTasks) {
@@ -99,7 +98,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         final hideCompleted = note.hideCompleted;
 
         return Scaffold(
+          extendBodyBehindAppBar: true,
           appBar: AppBar(
+            flexibleSpace: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                child: Container(color: Colors.transparent),
+              ),
+            ),
             title: isReadOnly
                 ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}')
                 : null,
@@ -117,7 +123,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     label: hideCompleted
                         ? NoteStrings.showCompleted
                         : NoteStrings.hideCompleted,
-                    icon: hideCompleted ? Icons.visibility : Icons.visibility_off,
+                    icon: hideCompleted
+                        ? Icons.visibility
+                        : Icons.visibility_off,
                     value: 'hide_completed',
                   ),
                   if (note.isOwner)
@@ -125,7 +133,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       label: note.collapseImages
                           ? 'Expandir imagens'
                           : 'Colapsar imagens',
-                      icon: note.collapseImages ? Icons.image : Icons.image_outlined,
+                      icon: note.collapseImages
+                          ? Icons.image
+                          : Icons.image_outlined,
                       value: 'collapse_images',
                     ),
                 ],
@@ -133,7 +143,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   final value = entry.value;
                   if (value != null) {
                     _handleMenuValue(
-                      context, ref, value, note, hideCompleted, repo,
+                      context,
+                      ref,
+                      value,
+                      note,
+                      hideCompleted,
+                      repo,
                     );
                   }
                 },
@@ -149,8 +164,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             ],
           ),
           body: SafeArea(
-            top: false,
-            bottom: false,
+              top: false,
+              bottom: false,
             child: NoteEditor(
               noteId: widget.noteId,
               nodes: const [],
@@ -192,7 +207,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     ),
                 onTaskReopen: (taskId) =>
                     ref.read(tasksRepositoryProvider).reopenTask(taskId),
-          ),
+              ),
             ),
           ),
         );

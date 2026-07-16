@@ -121,19 +121,27 @@ Stylesheet noteStylesheet(
       // Task block (not in default stylesheet).
       StyleRule(
         const BlockSelector('task'),
-        (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 14),
-          Styles.textStyle: TextStyle(
-            color: onSurface,
-            fontSize: 18,
-            height: 1.4,
-          ),
+        (doc, docNode) {
+          final taskNode = docNode as TaskNode;
+          final isHidden = hideCompleted && taskNode.isComplete;
+          return {
+            Styles.padding: CascadingPadding.only(top: isHidden ? 0 : 14),
+            Styles.textStyle: TextStyle(
+              color: onSurface,
+              fontSize: 18,
+              height: 1.4,
+            ),
+          };
         },
       ),
       StyleRule(
         const BlockSelector('task').last(),
-        (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(bottom: 14),
+        (doc, docNode) {
+          final taskNode = docNode as TaskNode;
+          final isHidden = hideCompleted && taskNode.isComplete;
+          return {
+            Styles.padding: CascadingPadding.only(bottom: isHidden ? 0 : 14),
+          };
         },
       ),
       // Paragraph spacing.

@@ -209,18 +209,22 @@ class EditorDocumentSyncManager {
         if (existingNode is TaskNode && incoming.type == 'task') {
           try {
             final existingEntryStr = NodeCodec.nodeData(existingNode);
-            final incomingEntryStr = jsonEncode(incoming.data);
+            final incomingEntryStr = incoming.data;
             final existingEntry = YjsTaskEntry.decode(existingEntryStr);
             final incomingEntry = YjsTaskEntry.decode(incomingEntryStr);
 
-            if (existingEntry != null && incomingEntry != null && existingEntry == incomingEntry) {
-              if (existingNode.isComplete != incomingEntry.completed) {
-                requests.add(ChangeTaskCompletionRequest(
-                  nodeId: incoming.id,
-                  isComplete: incomingEntry.completed,
-                ));
+            if (existingEntry != null && incomingEntry != null) {
+              final isEquivalent = existingEntry.copyWith(completed: false, lastCompletedAt: null) ==
+                  incomingEntry.copyWith(completed: false, lastCompletedAt: null);
+              if (isEquivalent) {
+                if (existingNode.isComplete != incomingEntry.completed) {
+                  requests.add(ChangeTaskCompletionRequest(
+                    nodeId: incoming.id,
+                    isComplete: incomingEntry.completed,
+                  ));
+                }
+                continue;
               }
-              continue;
             }
           } catch (_) {}
         }

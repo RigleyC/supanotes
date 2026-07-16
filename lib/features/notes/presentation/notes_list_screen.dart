@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,7 +25,6 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_more_menu.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:soft_edge_blur/soft_edge_blur.dart';
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
@@ -75,8 +75,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final headerSlivers = [
       SliverToBoxAdapter(
         child: SizedBox(
-          height: kToolbarHeight + AppSpacing.lg +
-              (PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 0.0),
+          height:
+              kToolbarHeight +
+              AppSpacing.lg +
+              (PlatformInfo.isIOS26OrHigher()
+                  ? AppSpacing.ios26ToolbarHeight
+                  : 0.0),
         ),
       ),
       if (_isSearching)
@@ -101,6 +105,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
@@ -109,54 +119,36 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           NotesMoreMenu(
             isListView: !isGridView,
             onToggleViewMode: _toggleViewMode,
-            onLogout: () =>
-                ref.read(authControllerProvider.notifier).logout(),
+            onLogout: () => ref.read(authControllerProvider.notifier).logout(),
             onOpenSettings: () => context.push(AppRoutes.settings),
           ),
         ],
       ),
-      body: SoftEdgeBlur(
-        edges: [
-          EdgeBlur(
-            type: EdgeType.topEdge,
-            size: 32,
-            sigma: 12,
-            controlPoints: [
-              ControlPoint(position: 0, type: ControlPointType.transparent),
-              ControlPoint(position: 1, type: ControlPointType.visible),
-            ],
-          ),
-        ],
-        child: trimmedSearchQuery.isEmpty
-            ? notesAsync.when(
-                loading: () =>
-                    _NotesLoadingView(headerSlivers: headerSlivers),
-                error: (e, _) => AppErrorView(
-                  title: 'Erro ao carregar as notas',
-                  subtitle: e.toString(),
-                ),
-                data: (notes) => CustomScrollView(
-                  slivers: [
-                    ...headerSlivers,
-                    _buildNotesBody(notes, isGridView),
-                  ],
-                ),
-              )
-            : searchAsync!.when(
-                loading: () =>
-                    SearchLoadingView(headerSlivers: headerSlivers),
-                error: (e, _) => SearchErrorView(
-                  headerSlivers: headerSlivers,
-                  error: e.toString(),
-                ),
-                data: (results) => SearchResultsView(
-                  headerSlivers: headerSlivers,
-                  query: trimmedSearchQuery,
-                  results: results,
-                  onTap: (result) => context.push(AppRoutes.note(result.id)),
-                ),
+      body: trimmedSearchQuery.isEmpty
+          ? notesAsync.when(
+              loading: () => _NotesLoadingView(headerSlivers: headerSlivers),
+              error: (e, _) => AppErrorView(
+                title: 'Erro ao carregar as notas',
+                subtitle: e.toString(),
               ),
-      ),
+              data: (notes) => CustomScrollView(
+                slivers: [...headerSlivers, _buildNotesBody(notes, isGridView)],
+              ),
+            )
+          : searchAsync!.when(
+              loading: () => SearchLoadingView(headerSlivers: headerSlivers),
+              error: (e, _) => SearchErrorView(
+                headerSlivers: headerSlivers,
+                error: e.toString(),
+              ),
+              data: (results) => SearchResultsView(
+                headerSlivers: headerSlivers,
+                query: trimmedSearchQuery,
+                results: results,
+                onTap: (result) => context.push(AppRoutes.note(result.id)),
+              ),
+            ),
+
       floatingActionButton: QuickActionFabs(
         smallFabKey: const ValueKey('home-chat-fab'),
         smallHeroTag: 'home-chat-fab',

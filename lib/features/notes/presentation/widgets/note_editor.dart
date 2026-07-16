@@ -115,9 +115,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
     final theme = Theme.of(context);
 
+    final topPadding = Scaffold.maybeOf(context)?.appBarMaxHeight ??
+        (MediaQuery.paddingOf(context).top + kToolbarHeight);
+
     final docPadding = EdgeInsets.only(
       left: 24,
       right: 24,
+      top: topPadding,
       bottom: 24,
     );
 
