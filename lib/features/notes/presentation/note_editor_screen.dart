@@ -24,7 +24,6 @@ import 'package:supanotes/features/notes/presentation/controllers/notes_provider
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -205,6 +204,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     ),
                 onTaskReopen: (taskId) =>
                     ref.read(tasksRepositoryProvider).reopenTask(taskId),
+                onRecurringTaskComplete: (taskId, nextDue) {
+                  ref.read(noteEditorControllerProvider(widget.noteId))
+                      .completeRecurringTask(taskId, nextDue);
+                },
               ),
             ),
           ),

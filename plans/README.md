@@ -25,7 +25,7 @@ STOP conditions, and update your row when done.
 | 059  | Presence em memória + notificações event-driven (P6 do 058)     | P3 | M | 058 | TODO |
 | 060  | Agente como executor de operações declarativas (P5 do 058)       | P3 | L | 058 | TODO |
 | 061  | Fix Task Sync Data Loss & Metadata Propagation | P0 | S | 058 | DONE |
-| 062  | Implement Local Push Notifications for Tasks | P1 | M | — | TODO |
+| 062  | Implement Local Push Notifications for Tasks | P1 | M | — | DONE |
 
 ## Dependency notes
 

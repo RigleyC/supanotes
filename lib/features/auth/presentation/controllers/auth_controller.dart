@@ -1,6 +1,5 @@
 library;
 
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -33,19 +32,7 @@ class AuthController extends AsyncNotifier<User?> {
       return null;
     }
 
-    await _registerFcmToken();
     return user;
-  }
-
-  Future<void> _registerFcmToken() async {
-    try {
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) {
-        await _repository.registerDeviceToken(token);
-      }
-    } catch (e) {
-      debugPrint('push notification registration failed: $e');
-    }
   }
 
   Future<AuthResult> _authenticate(
@@ -61,7 +48,6 @@ class AuthController extends AsyncNotifier<User?> {
         'routines': result.session.routines,
       });
       state = AsyncValue.data(result.user);
-      await _registerFcmToken();
       return result;
     } catch (e, st) {
       state = AsyncValue.error(e, st);

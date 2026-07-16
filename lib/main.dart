@@ -1,7 +1,4 @@
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,27 +7,21 @@ import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import 'core/api/backend_connectivity_hint.dart';
-import 'firebase_options.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
 import 'shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
-import 'core/notifications/fcm_message_listeners.dart';
 import 'core/router/app_router.dart';
 import 'core/sync/sync_service.dart';
 import 'features/auth/domain/user.dart';
 
 import 'package:intl/date_symbol_data_local.dart';
-
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-}
+import 'package:timezone/data/latest.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  initializeTimeZones();
 
   final sharedPreferences = await SharedPreferences.getInstance();
 
@@ -47,35 +38,13 @@ void main() async {
   );
 }
 
-class SupaNotesApp extends ConsumerStatefulWidget {
+class SupaNotesApp extends ConsumerWidget {
   const SupaNotesApp({super.key});
 
   @override
-  ConsumerState<SupaNotesApp> createState() => _SupaNotesAppState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.read(taskNotificationSchedulerProvider);
 
-class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
-  FcmMessageListeners? _fcmMessageListeners;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _setupFcmListeners());
-  }
-
-  void _setupFcmListeners() {
-    if (!mounted) return;
-    _fcmMessageListeners = FcmMessageListeners(context: context)..start();
-  }
-
-  @override
-  void dispose() {
-    _fcmMessageListeners?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
     ref.listen<AsyncValue<User?>>(authControllerProvider, (prev, next) {
       next.when(
         data: (user) {

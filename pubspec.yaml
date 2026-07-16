@@ -17,9 +17,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   fractional_indexing_dart: ^1.0.7
 
-  # Firebase
-  firebase_core: ^4.10.0
-  firebase_messaging: ^16.3.0
 
   # Super Editor and clipboard.
   super_editor:
@@ -95,6 +92,8 @@ dependencies:
       url: https://github.com/kamranbekirovyz/bunpod.git
       ref: main
       path: packages/material_shapes
+  flutter_local_notifications: ^22.0.1
+  timezone: ^0.11.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

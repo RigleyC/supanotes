@@ -24,7 +24,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final account = ref.watch(authControllerProvider).value;
-    final pushEnabled = ref.watch(pushServiceProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Configurações')),
@@ -50,16 +49,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Sair da conta',
             onTap: () => _confirmLogout(context, ref),
             enabled: account != null,
-          ),
-
-          const SettingsSectionHeader(title: 'Notificações'),
-          SettingsTile.toggle(
-            icon: Icons.notifications_outlined,
-            title: 'Receber push',
-            subtitle: 'Notificações de briefs e lembretes (em breve).',
-            value: pushEnabled,
-            onChanged: (v) =>
-                ref.read(pushServiceProvider.notifier).toggle(v),
           ),
 
           const SettingsSectionHeader(title: 'Avançado'),

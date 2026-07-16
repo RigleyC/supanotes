@@ -14,7 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/core/notifications/push_service.dart';
+import 'package:supanotes/core/notifications/local_notification_service.dart';
 import 'package:supanotes/core/sync/yjs_sync_manager.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
@@ -82,12 +82,13 @@ final tagsDaoProvider = Provider.autoDispose(
 );
 
 // ---------------------------------------------------------------------------
-// Push notification service
+// Local notification service
 // ---------------------------------------------------------------------------
 
-final pushServiceProvider = NotifierProvider<PushService, bool>(
-  PushService.new,
-);
+final localNotificationServiceProvider =
+    Provider<LocalNotificationService>((ref) {
+  return LocalNotificationService();
+});
 
 // ---------------------------------------------------------------------------
 // Yjs sync manager (local Yjs docs per note)
