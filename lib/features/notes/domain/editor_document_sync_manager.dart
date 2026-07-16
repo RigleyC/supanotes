@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:super_editor/super_editor.dart';
@@ -208,23 +207,17 @@ class EditorDocumentSyncManager {
 
         if (existingNode is TaskNode && incoming.type == 'task') {
           try {
-            final existingEntryStr = NodeCodec.nodeData(existingNode);
-            final incomingEntryStr = incoming.data;
-            final existingEntry = YjsTaskEntry.decode(existingEntryStr);
-            final incomingEntry = YjsTaskEntry.decode(incomingEntryStr);
+            final existingEntry = YjsTaskEntry.decode(NodeCodec.nodeData(existingNode));
+            final incomingEntry = YjsTaskEntry.decode(incoming.data);
 
-            if (existingEntry != null && incomingEntry != null) {
-              final isEquivalent = existingEntry.copyWith(completed: false, lastCompletedAt: null) ==
-                  incomingEntry.copyWith(completed: false, lastCompletedAt: null);
-              if (isEquivalent) {
-                if (existingNode.isComplete != incomingEntry.completed) {
-                  requests.add(ChangeTaskCompletionRequest(
-                    nodeId: incoming.id,
-                    isComplete: incomingEntry.completed,
-                  ));
-                }
-                continue;
+            if (existingEntry != null && incomingEntry != null && existingEntry == incomingEntry) {
+              if (existingNode.isComplete != incomingEntry.completed) {
+                requests.add(ChangeTaskCompletionRequest(
+                  nodeId: incoming.id,
+                  isComplete: incomingEntry.completed,
+                ));
               }
+              continue;
             }
           } catch (_) {}
         }
@@ -256,8 +249,8 @@ class EditorDocumentSyncManager {
     final requests = <EditRequest>[];
     for (final node in _document) {
       if (node is TaskNode) {
-        final isDbCompleted = taskCompletionMap[node.id];
-        if (isDbCompleted != null && node.isComplete != isDbCompleted) {
+        final isDbCompleted = taskCompletionMap[node.id] ?? false;
+        if (node.isComplete != isDbCompleted) {
           requests.add(ChangeTaskCompletionRequest(
             nodeId: node.id,
             isComplete: isDbCompleted,
