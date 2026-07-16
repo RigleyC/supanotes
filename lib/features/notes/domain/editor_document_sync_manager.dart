@@ -194,17 +194,44 @@ class EditorDocumentSyncManager {
     final dirtyIds = locallyDirtyNodeIds;
     final requests = <EditRequest>[];
     final incomingIds = incomingNodes.map((n) => n.id).toSet();
+    final currentIds = _document.toList().map((n) => n.id).toList();
 
+    // 1. Delete nodes that are not in incoming (and not dirty locally)
+    for (int i = currentIds.length - 1; i >= 0; i--) {
+      final id = currentIds[i];
+      if (!incomingIds.contains(id)) {
+        if (!dirtyIds.contains(id)) {
+          requests.add(DeleteNodeRequest(nodeId: id));
+          currentIds.removeAt(i);
+        }
+      }
+    }
+
+    // 2. Process incoming nodes in order
     for (int i = 0; i < incomingNodes.length; i++) {
       final incoming = incomingNodes[i];
       final existingNode = _document.getNodeById(incoming.id);
+      
+      // If it exists in the YDoc but is dirty locally, we keep local state (skip replacement).
+      // However, its POSITION in YDoc might still be different from local document.
+      // For now, if it's dirty locally, we also skip moving it, to avoid fighting the user's cursor.
+      if (dirtyIds.contains(incoming.id)) continue;
 
       if (existingNode == null) {
+        // Insert
         final newNode = NodeCodec.createNodeFromSchema(incoming);
         requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
+        currentIds.insert(i, incoming.id);
       } else {
-        if (dirtyIds.contains(incoming.id)) continue;
+        // Check position
+        final oldIndex = currentIds.indexOf(incoming.id);
+        if (oldIndex != i && oldIndex != -1) {
+          requests.add(MoveNodeRequest(nodeId: incoming.id, newIndex: i));
+          currentIds.removeAt(oldIndex);
+          currentIds.insert(i, incoming.id);
+        }
 
+        // Check content changes
         if (existingNode is TaskNode && incoming.type == 'task') {
           try {
             final existingEntry = YjsTaskEntry.decode(NodeCodec.nodeData(existingNode));
@@ -217,12 +244,13 @@ class EditorDocumentSyncManager {
                   isComplete: incomingEntry.completed,
                 ));
               }
-              continue;
+              continue; // Content is equivalent, skip replacement
             }
           } catch (_) {}
         }
 
         if (NodeCodec.isNodeEquivalent(existingNode, incoming)) continue;
+        
         final newNode = NodeCodec.createNodeFromSchema(incoming);
         requests.add(
           ReplaceNodeRequest(
@@ -230,13 +258,6 @@ class EditorDocumentSyncManager {
             newNode: newNode,
           ),
         );
-      }
-    }
-
-    for (final node in _document.toList()) {
-      if (!incomingIds.contains(node.id)) {
-        if (dirtyIds.contains(node.id)) continue;
-        requests.add(DeleteNodeRequest(nodeId: node.id));
       }
     }
 

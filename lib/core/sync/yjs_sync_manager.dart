@@ -20,7 +20,8 @@ void applyUpdateSafe(Doc doc, Uint8List update) {
 
   // Find all content/* keys in the binary update and pre-register them as YText
   final str = String.fromCharCodes(update);
-  final matches = RegExp(r'content/[a-zA-Z0-9-]+').allMatches(str);
+  // Match content/ followed by any word characters (including dashes)
+  final matches = RegExp(r'content/[a-zA-Z0-9-_]+').allMatches(str);
   for (final match in matches) {
     doc.getText(match.group(0)!);
   }
