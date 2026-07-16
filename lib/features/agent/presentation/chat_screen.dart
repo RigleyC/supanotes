@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/agent/presentation/controllers/chat_controller.dart';
 import 'package:supanotes/features/agent/presentation/widgets/agent_chat_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 import 'package:supanotes/features/agent/data/chat_repository.dart';
 import 'package:supanotes/features/agent/domain/session_manager.dart';
@@ -51,13 +50,12 @@ class ChatScreen extends ConsumerWidget {
     void onSend(String text) =>
         ref.read(chatControllerProvider.notifier).sendMessage(text);
 
-    return AdaptiveScaffold(
-      appBar: AdaptiveAppBar(
-        title: 'Assistente',
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Assistente'),
         actions: [
-          AdaptiveAppBarAction(
-            icon: Icons.add_comment_outlined,
-            iosSymbol: 'plus.bubble',
+          IconButton(
+            icon: const Icon(Icons.add_comment_outlined),
             onPressed: () => _handleNewSession(context, ref),
           ),
         ],

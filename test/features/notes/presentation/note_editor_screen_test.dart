@@ -14,7 +14,6 @@ import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
-import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
@@ -310,41 +309,6 @@ void main() {
       ),
       findsOneWidget,
     );
-  });
-
-  testWidgets('hideCompleted removes task stylesheet spacing', (tester) async {
-    late EdgeInsets padding;
-    final document = MutableDocument(
-      nodes: [
-        TaskNode(
-          id: 'task-1',
-          text: AttributedText('tarefa concluida'),
-          isComplete: true,
-        ),
-      ],
-    );
-    final task = document.first;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
-          builder: (context) {
-            final stylesheet = noteStylesheet(context, hideCompleted: true);
-            var styles = <String, dynamic>{};
-            for (final rule in stylesheet.rules) {
-              if (!rule.selector.matches(document, task)) continue;
-              styles = {...styles, ...rule.styler(document, task)};
-            }
-            padding = (styles[Styles.padding] as CascadingPadding)
-                .toEdgeInsets();
-
-            return const SizedBox.shrink();
-          },
-        ),
-      ),
-    );
-
-    expect(padding, EdgeInsets.zero);
   });
 
   testWidgets('owner actions put share inside the more menu', (tester) async {

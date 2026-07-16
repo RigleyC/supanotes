@@ -251,6 +251,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  //Porque isso aqui não é apenas um Text()?
                   TextComponent(
                     key: _textKey,
                     text: widget.viewModel.text,
@@ -293,7 +294,10 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       onAnimationComplete: _isAnimating
           ? () => setState(() => _isAnimating = false)
           : null,
-      child: content,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: content,
+      ),
     );
   }
 }

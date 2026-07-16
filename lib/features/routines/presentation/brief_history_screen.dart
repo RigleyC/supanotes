@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/theme/app_spacing.dart';
 import '../../../shared/widgets/app_error_view.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../domain/routine_log_model.dart';
 import 'controllers/brief_history_controller.dart';
 import 'widgets/brief_log_tile.dart';
@@ -20,8 +19,8 @@ class BriefHistoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final logsAsync = ref.watch(briefHistoryProvider);
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: _appBarTitle),
+    return Scaffold(
+      appBar: AppBar(title: const Text(_appBarTitle)),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(briefHistoryProvider),
         child: logsAsync.when(

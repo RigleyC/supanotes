@@ -6,7 +6,6 @@ import '../../../core/router/app_routes.dart';
 import '../../../shared/theme/app_spacing.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_error_view.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../domain/routine_model.dart';
 import 'controllers/routines_controller.dart';
 import 'widgets/brief_schedule_card.dart';
@@ -21,8 +20,8 @@ class RoutinesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final routinesAsync = ref.watch(routinesProvider);
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: _appBarTitle),
+    return Scaffold(
+      appBar: AppBar(title: const Text(_appBarTitle)),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(routinesProvider),
         child: routinesAsync.when(

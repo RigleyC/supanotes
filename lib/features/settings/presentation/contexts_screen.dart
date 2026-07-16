@@ -21,8 +21,8 @@ class ContextsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(contextsProvider);
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: 'Contextos'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Contextos')),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Novo contexto',
         onPressed: () => _showCreateSheet(context, ref),

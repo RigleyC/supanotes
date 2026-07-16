@@ -11,8 +11,6 @@ import 'package:supanotes/features/telegram/presentation/widgets/telegram_unlink
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-
 class TelegramLinkScreen extends ConsumerStatefulWidget {
   const TelegramLinkScreen({super.key});
 
@@ -39,8 +37,8 @@ class _TelegramLinkScreenState extends ConsumerState<TelegramLinkScreen> {
 
     final statusAsync = ref.watch(telegramStatusProvider);
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: 'Telegram'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Telegram')),
       body: statusAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => AppErrorView(

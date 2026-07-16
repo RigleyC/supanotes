@@ -7,7 +7,6 @@ import 'package:supanotes/features/memories/domain/memory_model.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-
 import 'memories_controller.dart';
 
 class MemoriesScreen extends ConsumerWidget {
@@ -30,8 +29,8 @@ class MemoriesScreen extends ConsumerWidget {
       );
     });
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: 'Memórias'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Memórias')),
       body: asyncValue.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),

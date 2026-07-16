@@ -26,8 +26,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final account = ref.watch(authControllerProvider).value;
     final pushEnabled = ref.watch(pushServiceProvider);
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: 'Configurações'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Configurações')),
       body: ListView(
         padding: EdgeInsets.only(
           top: PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 0.0,

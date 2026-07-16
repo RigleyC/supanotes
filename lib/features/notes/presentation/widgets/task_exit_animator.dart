@@ -26,6 +26,7 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
   late final AnimationController _controller;
   late final Animation<double> _fade;
   late final Animation<double> _size;
+  bool _fullyHidden = false;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
     );
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
+        setState(() => _fullyHidden = true);
         widget.onAnimationComplete?.call();
       }
     });
@@ -65,18 +67,22 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
         !widget.hideCompleted && oldWidget.hideCompleted;
 
     if (hideToggledOn && widget.isComplete && !becameComplete) {
+      _fullyHidden = false;
       Future.delayed(_exitAnimationDelay, () {
         if (mounted && widget.isComplete && widget.hideCompleted) {
           _controller.forward();
         }
       });
     } else if (hideToggledOff) {
+      _fullyHidden = false;
       _controller.reverse();
     } else if (becameComplete && widget.hideCompleted) {
+      _fullyHidden = false;
       Future.delayed(_exitAnimationDelay, () {
         if (mounted && widget.isComplete) _controller.forward();
       });
     } else if (becameIncomplete) {
+      _fullyHidden = false;
       _controller.reverse();
     }
   }
@@ -89,6 +95,8 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
 
   @override
   Widget build(BuildContext context) {
+    if (_fullyHidden) return const SizedBox(width: 0, height: 0);
+
     return SizeTransition(
       sizeFactor: _size,
       alignment: Alignment.topLeft,

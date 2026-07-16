@@ -50,7 +50,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   EditorControls? _controls;
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
-  bool? _cachedHideCompleted;
 
   @override
   void initState() {
@@ -126,14 +125,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
 
     if (_cachedStylesheet == null ||
-        _cachedHideCompleted != widget.hideCompleted ||
         !identical(_cachedColorScheme, theme.colorScheme) ||
         _cachedStylesheet!.documentPadding != docPadding) {
-      _cachedHideCompleted = widget.hideCompleted;
       _cachedColorScheme = theme.colorScheme;
       _cachedStylesheet = noteStylesheet(
         context,
-        hideCompleted: widget.hideCompleted,
         documentPadding: docPadding,
       );
     }

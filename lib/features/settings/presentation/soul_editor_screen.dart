@@ -12,8 +12,6 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-
 class SoulEditorScreen extends ConsumerStatefulWidget {
   const SoulEditorScreen({super.key});
 
@@ -77,8 +75,8 @@ class _SoulEditorScreenState extends ConsumerState<SoulEditorScreen> {
     final soulAsync = ref.watch(soulProvider);
     final isSaving = soulAsync.value?.isSaving ?? false;
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: SettingsStrings.title),
+    return Scaffold(
+      appBar: AppBar(title: const Text(SettingsStrings.title)),
       body: Column(
         children: [
           Expanded(

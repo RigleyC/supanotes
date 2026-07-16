@@ -6,7 +6,6 @@ import 'package:super_editor/super_editor.dart';
 /// and the `task` block type.
 Stylesheet noteStylesheet(
   BuildContext context, {
-  bool hideCompleted = false,
   EdgeInsets documentPadding = const EdgeInsets.symmetric(horizontal: 24),
 }) {
   final colorScheme = Theme.of(context).colorScheme;
@@ -118,29 +117,17 @@ Stylesheet noteStylesheet(
           Styles.padding: const CascadingPadding.only(top: 12, bottom: 12),
         },
       ),
-      // Task block (not in default stylesheet).
+      // Task block — padding is managed inside CustomTaskComponent so the
+      // TaskExitAnimator can collapse it fully when hiding completed tasks.
       StyleRule(
         const BlockSelector('task'),
         (doc, docNode) {
-          final taskNode = docNode as TaskNode;
-          final isHidden = hideCompleted && taskNode.isComplete;
           return {
-            Styles.padding: CascadingPadding.only(top: isHidden ? 0 : 14),
             Styles.textStyle: TextStyle(
               color: onSurface,
               fontSize: 18,
               height: 1.4,
             ),
-          };
-        },
-      ),
-      StyleRule(
-        const BlockSelector('task').last(),
-        (doc, docNode) {
-          final taskNode = docNode as TaskNode;
-          final isHidden = hideCompleted && taskNode.isComplete;
-          return {
-            Styles.padding: CascadingPadding.only(bottom: isHidden ? 0 : 14),
           };
         },
       ),

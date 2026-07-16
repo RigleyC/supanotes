@@ -25,6 +25,7 @@ class TaskMetadataSheet extends ConsumerStatefulWidget {
   final String noteId;
   final TaskModel task;
 
+//pra que esse metodo? porque a gente nao passa isso aqui pro mostrador de sheet global?
   static Future<void> show(
     BuildContext context, {
     required String noteId,

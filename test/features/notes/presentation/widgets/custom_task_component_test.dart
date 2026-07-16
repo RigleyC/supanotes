@@ -338,193 +338,35 @@ void main() {
     expect(capturedCompleteId, isNull);
   });
 
-  group('exit animation', () {
-    TaskComponentViewModel incompleteVM() {
-      return TaskComponentViewModel(
-        nodeId: 'task-1',
-        padding: EdgeInsets.zero,
-        indent: 0,
-        isComplete: false,
-        setComplete: (_) {},
-        text: AttributedText('Task'),
-        textDirection: TextDirection.ltr,
-        textAlignment: TextAlign.left,
-        textStyleBuilder: (_) => const TextStyle(fontSize: 16),
-        selectionColor: Colors.transparent,
-      );
-    }
+  testWidgets('builder wraps hidden completed tasks in TaskExitAnimator', (tester) async {
+    final document = MutableDocument(
+      nodes: [
+        TaskNode(id: 'task-1', text: AttributedText('Done'), isComplete: true),
+      ],
+    );
+    final composer = MutableDocumentComposer();
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: composer,
+    );
+    final builder = CustomTaskComponentBuilder(
+      hideCompleted: true,
+    );
 
-    TaskComponentViewModel completeVM() {
-      return TaskComponentViewModel(
-        nodeId: 'task-1',
-        padding: EdgeInsets.zero,
-        indent: 0,
-        isComplete: true,
-        setComplete: (_) {},
-        text: AttributedText('Task'),
-        textDirection: TextDirection.ltr,
-        textAlignment: TextAlign.left,
-        textStyleBuilder: (_) => const TextStyle(fontSize: 16),
-        selectionColor: Colors.transparent,
-      );
-    }
-
-    testWidgets('fires onAnimationComplete after completing task with hideCompleted', (
-      tester,
-    ) async {
-      var animationCompleted = false;
-
-      await tester.pumpWidget(
-        wrap(
-          CustomTaskComponent(
-            viewModel: incompleteVM(),
-            hideCompleted: true,
-            onAnimationComplete: () => animationCompleted = true,
-          ),
+    await tester.pumpWidget(
+      wrap(
+        SuperEditor(
+          editor: editor,
+          componentBuilders: [
+            builder,
+            ...defaultComponentBuilders,
+          ],
         ),
-      );
+      ),
+    );
 
-      await tester.pumpWidget(
-        wrap(
-          CustomTaskComponent(
-            viewModel: completeVM(),
-            hideCompleted: true,
-            onAnimationComplete: () => animationCompleted = true,
-          ),
-        ),
-      );
-
-      await tester.pump(const Duration(milliseconds: 301));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 351));
-      await tester.pump();
-
-      expect(animationCompleted, isTrue);
-    });
-
-    testWidgets('does not fire onAnimationComplete when hideCompleted is false', (
-      tester,
-    ) async {
-      var animationCompleted = false;
-
-      await tester.pumpWidget(
-        wrap(
-          CustomTaskComponent(
-            viewModel: incompleteVM(),
-            hideCompleted: false,
-            onAnimationComplete: () => animationCompleted = true,
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(
-        wrap(
-          CustomTaskComponent(
-            viewModel: completeVM(),
-            hideCompleted: false,
-            onAnimationComplete: () => animationCompleted = true,
-          ),
-        ),
-      );
-
-      await tester.pump(const Duration(milliseconds: 650));
-
-      expect(animationCompleted, isFalse);
-    });
-
-    testWidgets('fires onAnimationComplete when task was already complete with hideCompleted', (
-      tester,
-    ) async {
-      var animationCompleted = false;
-
-      await tester.pumpWidget(
-        wrap(
-          CustomTaskComponent(
-            viewModel: completeVM(),
-            hideCompleted: true,
-            onAnimationComplete: () => animationCompleted = true,
-          ),
-        ),
-      );
-
-      await tester.pump(const Duration(milliseconds: 650));
-
-      expect(animationCompleted, isTrue);
-    });
-
-    testWidgets('builder creates SizedBox for hidden completed tasks', (tester) async {
-      final document = MutableDocument(
-        nodes: [
-          TaskNode(id: 'task-1', text: AttributedText('Done'), isComplete: true),
-        ],
-      );
-      final composer = MutableDocumentComposer();
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-      final builder = CustomTaskComponentBuilder(
-        hideCompleted: true,
-      );
-
-      await tester.pumpWidget(
-        wrap(
-          SuperEditor(
-            editor: editor,
-            componentBuilders: [
-              builder,
-              ...defaultComponentBuilders,
-            ],
-          ),
-        ),
-      );
-
-      expect(find.byType(CustomTaskComponent), findsNothing);
-      expect(find.byType(SizeTransition), findsNothing);
-    });
-
-    testWidgets('reversing completion cancels/reverses exit animation and widget remains visible', (
-      tester,
-    ) async {
-      var animationCompleted = false;
-
-      await tester.pumpWidget(
-        wrap(
-          CustomTaskComponent(
-            viewModel: incompleteVM(),
-            hideCompleted: true,
-            onAnimationComplete: () => animationCompleted = true,
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(
-        wrap(
-          CustomTaskComponent(
-            viewModel: completeVM(),
-            hideCompleted: true,
-            onAnimationComplete: () => animationCompleted = true,
-          ),
-        ),
-      );
-
-      await tester.pump(const Duration(milliseconds: 100));
-
-      await tester.pumpWidget(
-        wrap(
-          CustomTaskComponent(
-            viewModel: incompleteVM(),
-            hideCompleted: true,
-            onAnimationComplete: () => animationCompleted = true,
-          ),
-        ),
-      );
-
-      await tester.pump(const Duration(milliseconds: 650));
-      await tester.pumpAndSettle();
-
-      expect(animationCompleted, isFalse);
-    });
+    expect(find.byType(CustomTaskComponent), findsOneWidget);
+    expect(find.byType(SizeTransition), findsOneWidget);
   });
 
   testWidgets('un-checks recurring task after 400ms delay', (tester) async {

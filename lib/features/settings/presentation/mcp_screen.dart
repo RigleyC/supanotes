@@ -67,8 +67,8 @@ class _McpScreenState extends ConsumerState<McpScreen> {
   Widget build(BuildContext context) {
     final token = _tokenAsync.asData?.value;
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: 'MCP'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('MCP')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,

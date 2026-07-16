@@ -6,7 +6,6 @@
 /// rethrown and we surface it as a snackbar.
 library;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -60,8 +59,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final scheme = Theme.of(context).colorScheme;
     final isLoading = ref.watch(authControllerProvider).isLoading;
 
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(title: 'Entrar'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Entrar')),
       body: SafeArea(
         bottom: false,
         child: Center(

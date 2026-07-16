@@ -90,7 +90,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
 
     final router = ref.watch(goRouterProvider);
 
-    return AdaptiveApp.router(
+    return MaterialApp.router(
       title: AppConstants.appName,
       routerConfig: router,
       scaffoldMessengerKey: AppMessenger.key,
@@ -103,10 +103,8 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp> {
         Locale('pt', 'BR'),
         Locale('en', 'US'),
       ],
-      materialLightTheme: AppTheme.lightTheme,
-      materialDarkTheme: AppTheme.darkTheme,
-      cupertinoLightTheme: AppTheme.cupertinoLightTheme,
-      cupertinoDarkTheme: AppTheme.cupertinoDarkTheme,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
       builder: (context, child) {
         Widget result = child!;
         if (PlatformInfo.isIOS) {

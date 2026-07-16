@@ -249,8 +249,8 @@ class EditorDocumentSyncManager {
     final requests = <EditRequest>[];
     for (final node in _document) {
       if (node is TaskNode) {
-        final isDbCompleted = taskCompletionMap[node.id] ?? false;
-        if (node.isComplete != isDbCompleted) {
+        final isDbCompleted = taskCompletionMap[node.id];
+        if (isDbCompleted != null && node.isComplete != isDbCompleted) {
           requests.add(ChangeTaskCompletionRequest(
             nodeId: node.id,
             isComplete: isDbCompleted,
