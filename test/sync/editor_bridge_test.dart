@@ -54,16 +54,16 @@ void main() {
       // Flush local coordinator state manually to trigger bridge sync
       bridge.onLocalFlush(coordinator.locallyDirtyNodeIds.map((id) {
         final node = mutableDoc.getNodeById(id)!;
-        return InsertOp(id, node, 0);
+        return InsertOp(id, node, null, null);
       }).toList());
 
       // Verify that YDoc map got the node serialized and the text updated
       final nodesMap = doc.getMap<Object>('nodes')!;
       expect(nodesMap.keys, contains('p1'));
 
-      final meta = jsonDecode(nodesMap.get('p1') as String) as Map<String, dynamic>;
-      expect(meta['id'], 'p1');
-      expect(meta['type'], 'paragraph');
+      final nodeMap = nodesMap.get('p1') as YMap;
+      expect(nodeMap.get('id'), 'p1');
+      expect(nodeMap.get('type'), 'paragraph');
 
       final ytext = doc.getText('content/p1')!;
       expect(ytext.toString(), 'Hello World');

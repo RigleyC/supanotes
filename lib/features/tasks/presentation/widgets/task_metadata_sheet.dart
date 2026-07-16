@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 
 import '../../domain/task_model.dart';

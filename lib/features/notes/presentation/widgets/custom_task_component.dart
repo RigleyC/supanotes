@@ -209,6 +209,30 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       childDocumentComponentKey.currentState as TextComposable;
 
   @override
+  Rect getRectForPosition(dynamic nodePosition) {
+    try {
+      if (!mounted) return Rect.zero;
+      final renderObj = _textKey.currentContext?.findRenderObject();
+      if (renderObj == null || !renderObj.attached) return Rect.zero;
+      return super.getRectForPosition(nodePosition);
+    } catch (_) {
+      return Rect.zero;
+    }
+  }
+
+  @override
+  Offset getOffsetForPosition(dynamic nodePosition) {
+    try {
+      if (!mounted) return Offset.zero;
+      final renderObj = _textKey.currentContext?.findRenderObject();
+      if (renderObj == null || !renderObj.attached) return Offset.zero;
+      return super.getOffsetForPosition(nodePosition);
+    } catch (_) {
+      return Offset.zero;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final semantics = Theme.of(context).extension<AppSemanticColors>();

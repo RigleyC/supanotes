@@ -17,7 +17,7 @@ func deriveMarkdownFromDoc(doc *crdt.Doc) string {
 		case "header":
 			lines = append(lines, "# "+nd.Text)
 		case "task":
-			completed := readTaskCompleted(doc, nd.ID)
+			completed, _ := nd.Metadata["completed"].(bool)
 			checkbox := " "
 			if completed {
 				checkbox = "x"

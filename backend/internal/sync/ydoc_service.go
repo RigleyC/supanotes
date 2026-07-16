@@ -152,129 +152,102 @@ func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, err
 }
 
 // WARNING: This function has a twin in lib/core/sync/yjs_sync_manager.dart.
-// Both must be kept in sync. The migration:
-//  1. Detects legacy schema (completed field in node data)
-//  2. Moves completed/dueDate/recurrence/lastCompletedAt to YMap("tasks")
-//  3. Removes these fields from node data
-// Schema is: YMap("nodes") -> {...} with data:{taskId?} and YMap("tasks") -> {taskId: JSON{nodeId,completed,title,dueDate,recurrence,lastCompletedAt}}
-
-type legacyNode struct {
-	ID   string          `json:"id"`
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}
-
-// MigrateLegacyDoc upgrades a legacy YDoc where task fields (completed, dueDate,
-// recurrence, lastCompletedAt) are stored inline in the node `data` map.
-// It moves these fields into YMap("tasks") entries and removes them from node data.
-// Idempotent: skips if YMap("tasks") already has entries.
+// Both must be kept in sync.
+//
+// Migrates a legacy doc where nodes are stored as JSON strings into nested
+// YMap entries. Task fields (completed, dueDate, recurrence, lastCompletedAt)
+// are promoted to top-level keys on the node's YMap.
+//
+// Idempotent: skips if any node is already a YMap.
 func MigrateLegacyDoc(doc *crdt.Doc) {
-	tasksMap := doc.GetMap("tasks")
-	if tasksMap != nil && len(tasksMap.Keys()) > 0 {
-		return
-	}
-
 	nodesMap := doc.GetMap("nodes")
 	if nodesMap == nil {
 		return
 	}
 
+	// Check if migration is needed: any node is still a string
 	needsMigration := false
-	taskUpdates := make(map[string]string)
-	nodeUpdates := make(map[string]string)
-
 	for _, key := range nodesMap.Keys() {
 		raw, ok := nodesMap.Get(key)
 		if !ok {
 			continue
 		}
-		rawStr, ok := raw.(string)
-		if !ok {
+		switch raw.(type) {
+		case *crdt.YMap:
+			// Already migrated, skip
 			continue
+		case string:
+			needsMigration = true
+			break
 		}
-		var nd legacyNode
-		if err := json.Unmarshal([]byte(rawStr), &nd); err != nil {
-			slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
-			continue
-		}
-		if nd.Type != "task" {
-			continue
-		}
-		var dataMap map[string]interface{}
-		if err := json.Unmarshal(nd.Data, &dataMap); err != nil {
-			slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
-			continue
-		}
-		completedVal, hasCompleted := dataMap["completed"]
-		if !hasCompleted {
-			continue
-		}
-		
-		needsMigration = true
-		completed, _ := completedVal.(bool)
-
-		entry := taskDataEntry{
-			NodeID:    nd.ID,
-			Completed: completed,
-		}
-		if titleType := doc.GetText("content/" + nd.ID); titleType != nil {
-			entry.Title = titleType.ToString()
-		}
-		if dueDate, ok := dataMap["dueDate"].(string); ok {
-			entry.DueDate = dueDate
-		}
-		if recurrence, ok := dataMap["recurrence"].(string); ok {
-			entry.Recurrence = recurrence
-		}
-		if lastCompletedAt, ok := dataMap["lastCompletedAt"].(string); ok {
-			entry.LastCompleted = lastCompletedAt
-		}
-
-		entryJSON, err := json.Marshal(entry)
-		if err != nil {
-			slog.Warn("MigrateLegacyDoc: marshal taskEntry error", "key", key, "error", err)
-			continue
-		}
-		taskUpdates[nd.ID] = string(entryJSON)
-
-		delete(dataMap, "completed")
-		delete(dataMap, "dueDate")
-		delete(dataMap, "recurrence")
-		delete(dataMap, "lastCompletedAt")
-		cleanedData, err := json.Marshal(dataMap)
-		if err != nil {
-			slog.Warn("MigrateLegacyDoc: marshal cleanedData error", "key", key, "error", err)
-			continue
-		}
-
-		var updatedNode map[string]interface{}
-		if err := json.Unmarshal([]byte(rawStr), &updatedNode); err != nil {
-			slog.Warn("MigrateLegacyDoc: unmarshal updatedNode error", "key", key, "error", err)
-			continue
-		}
-		updatedNode["data"] = string(cleanedData)
-		updatedJSON, err := json.Marshal(updatedNode)
-		if err != nil {
-			slog.Warn("MigrateLegacyDoc: marshal updatedNode error", "key", key, "error", err)
-			continue
-		}
-		nodeUpdates[key] = string(updatedJSON)
 	}
-
 	if !needsMigration {
 		return
 	}
 
-	slog.Info("MigrateLegacyDoc: migrating doc to P4 schema")
-	if tasksMap == nil {
-		tasksMap = doc.GetMap("tasks")
-	}
+	slog.Info("MigrateLegacyDoc: migrating doc to nested YMap schema")
 	doc.Transact(func(txn *crdt.Transaction) {
-		for k, v := range taskUpdates {
-			tasksMap.Set(txn, k, v)
-		}
-		for k, v := range nodeUpdates {
-			nodesMap.Set(txn, k, v)
+		for _, key := range nodesMap.Keys() {
+			raw, ok := nodesMap.Get(key)
+			if !ok {
+				continue
+			}
+			rawStr, ok := raw.(string)
+			if !ok {
+				continue
+			}
+			var meta map[string]interface{}
+			if err := json.Unmarshal([]byte(rawStr), &meta); err != nil {
+				slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
+				continue
+			}
+
+			nodeMap := &crdt.YMap{}
+			nodeMap.Set(txn, "id", meta["id"])
+			nodeMap.Set(txn, "parentId", meta["parentId"])
+			nodeMap.Set(txn, "position", meta["position"])
+			nodeMap.Set(txn, "type", meta["type"])
+
+			if typeStr, _ := meta["type"].(string); typeStr == "task" {
+				if data, ok := meta["data"].(map[string]interface{}); ok {
+					if completed, exists := data["completed"]; exists {
+						nodeMap.Set(txn, "completed", completed)
+						delete(data, "completed")
+					}
+					if dueDate, exists := data["dueDate"]; exists {
+						nodeMap.Set(txn, "dueDate", dueDate)
+						delete(data, "dueDate")
+					}
+					if recurrence, exists := data["recurrence"]; exists {
+						nodeMap.Set(txn, "recurrence", recurrence)
+						delete(data, "recurrence")
+					}
+					if lastCompletedAt, exists := data["lastCompletedAt"]; exists {
+						nodeMap.Set(txn, "lastCompletedAt", lastCompletedAt)
+						delete(data, "lastCompletedAt")
+					}
+					cleanedData, _ := json.Marshal(data)
+					nodeMap.Set(txn, "data", string(cleanedData))
+				}
+			} else {
+				if data, ok := meta["data"]; ok {
+					switch d := data.(type) {
+					case string:
+						nodeMap.Set(txn, "data", d)
+					case map[string]interface{}, []interface{}:
+						b, _ := json.Marshal(d)
+						nodeMap.Set(txn, "data", string(b))
+					default:
+						nodeMap.Set(txn, "data", d)
+					}
+				}
+			}
+
+			if createdAt, ok := meta["createdAt"]; ok {
+				nodeMap.Set(txn, "createdAt", createdAt)
+			}
+
+			nodesMap.Set(txn, key, nodeMap)
 		}
 	})
 	slog.Info("MigrateLegacyDoc: migration complete")

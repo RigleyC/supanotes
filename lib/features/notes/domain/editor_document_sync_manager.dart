@@ -1,19 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:super_editor/super_editor.dart';
 
 import 'node_codec.dart';
 import 'note_node.dart';
-import 'yjs_task_entry.dart';
 
 sealed class NodeOperation {}
 
 class InsertOp extends NodeOperation {
   final String id;
   final DocumentNode node;
-  final int index;
-  InsertOp(this.id, this.node, this.index);
+  final String? prevNodeId;
+  final String? nextNodeId;
+  InsertOp(this.id, this.node, this.prevNodeId, this.nextNodeId);
 }
 
 class UpdateOp extends NodeOperation {
@@ -24,9 +25,9 @@ class UpdateOp extends NodeOperation {
 
 class MoveOp extends NodeOperation {
   final String id;
-  final int from;
-  final int to;
-  MoveOp(this.id, this.from, this.to);
+  final String? prevNodeId;
+  final String? nextNodeId;
+  MoveOp(this.id, this.prevNodeId, this.nextNodeId);
 }
 
 class DeleteOp extends NodeOperation {
@@ -83,7 +84,14 @@ class EditorDocumentSyncManager {
       if (change is NodeInsertedEvent) {
         final node = _document.getNodeById(change.nodeId);
         if (node != null) {
-          _pendingOps.add(InsertOp(change.nodeId, node, change.insertionIndex));
+          final currentIndex = _document.getNodeIndexById(change.nodeId);
+          final prevNodeId = currentIndex > 0 
+              ? _document.getNodeAt(currentIndex - 1)?.id 
+              : null;
+          final nextNodeId = currentIndex + 1 < _document.nodeCount 
+              ? _document.getNodeAt(currentIndex + 1)?.id 
+              : null;
+          _pendingOps.add(InsertOp(change.nodeId, node, prevNodeId, nextNodeId));
           locallyDirtyNodeIds.add(change.nodeId);
           _dirtyNodeSequences[change.nodeId] = _opSequence;
         }
@@ -92,7 +100,14 @@ class EditorDocumentSyncManager {
         locallyDirtyNodeIds.add(change.nodeId);
         _dirtyNodeSequences[change.nodeId] = _opSequence;
       } else if (change is NodeMovedEvent) {
-        _pendingOps.add(MoveOp(change.nodeId, change.from, change.to));
+        final currentIndex = _document.getNodeIndexById(change.nodeId);
+        final prevNodeId = currentIndex > 0 
+            ? _document.getNodeAt(currentIndex - 1)?.id 
+            : null;
+        final nextNodeId = currentIndex + 1 < _document.nodeCount 
+            ? _document.getNodeAt(currentIndex + 1)?.id 
+            : null;
+        _pendingOps.add(MoveOp(change.nodeId, prevNodeId, nextNodeId));
         locallyDirtyNodeIds.add(change.nodeId);
         _dirtyNodeSequences[change.nodeId] = _opSequence;
       } else if (change is NodeChangeEvent) {
@@ -234,18 +249,20 @@ class EditorDocumentSyncManager {
         // Check content changes
         if (existingNode is TaskNode && incoming.type == 'task') {
           try {
-            final existingEntry = YjsTaskEntry.decode(NodeCodec.nodeData(existingNode));
-            final incomingEntry = YjsTaskEntry.decode(incoming.data);
+            final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
+            final incomingCompleted = incomingData['completed'] == true;
 
-            if (existingEntry != null && incomingEntry != null && existingEntry == incomingEntry) {
-              if (existingNode.isComplete != incomingEntry.completed) {
-                requests.add(ChangeTaskCompletionRequest(
-                  nodeId: incoming.id,
-                  isComplete: incomingEntry.completed,
-                ));
-              }
-              continue; // Content is equivalent, skip replacement
+            if (existingNode.isComplete != incomingCompleted) {
+              requests.add(ChangeTaskCompletionRequest(
+                nodeId: incoming.id,
+                isComplete: incomingCompleted,
+              ));
             }
+
+            // Check if only task state changed — skip full node replacement
+            final existingData = jsonDecode(NodeCodec.nodeData(existingNode)) as Map<String, dynamic>;
+            existingData['completed'] = incomingCompleted;
+            if (jsonEncode(existingData) == incoming.data) continue;
           } catch (_) {}
         }
 

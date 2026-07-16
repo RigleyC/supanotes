@@ -25,6 +25,42 @@ type nodeEntry struct {
 	Position string
 	Text     string
 	Data     json.RawMessage
+	// Metadata holds task-specific fields (completed, dueDate, recurrence, etc.)
+	// normalized from either nested YMap keys (new schema) or the "data" sub-object
+	// in the legacy JSON string. Consumers of nodeEntry should read from Metadata
+	// instead of re-parsing raw YMap or JSON types.
+	Metadata map[string]any
+}
+
+// normalizeNodeMetadata extracts task metadata from a raw YMap entry, supporting
+// both the new nested YMap schema and the legacy JSON string schema.
+// For YMap entries, it returns all keys except id/type/position/data.
+// For string entries, it returns the contents of the legacy "data" sub-object.
+func normalizeNodeMetadata(raw any) map[string]any {
+	switch v := raw.(type) {
+	case *crdt.YMap:
+		meta := make(map[string]any)
+		for _, key := range v.Keys() {
+			switch key {
+			case "id", "type", "position", "data":
+				continue
+			}
+			val, ok := v.Get(key)
+			if ok {
+				meta[key] = val
+			}
+		}
+		return meta
+	case string:
+		var legacy struct {
+			Data map[string]any `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(v), &legacy); err != nil {
+			return nil
+		}
+		return legacy.Data
+	}
+	return nil
 }
 
 func posToString(pos any) string {
@@ -43,6 +79,7 @@ func posToString(pos any) string {
 }
 
 // nodesFromDoc reads all nodes from the YMap and returns them sorted by position.
+// Supports both nested YMap entries (new schema) and JSON string entries (legacy).
 func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
 	nodesMap := doc.GetMap("nodes")
 	if nodesMap == nil {
@@ -54,38 +91,74 @@ func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
 		if !ok || raw == nil {
 			continue
 		}
-		nodeStr, ok := raw.(string)
-		if !ok {
-			continue
-		}
-		var nd struct {
-			ID       string          `json:"id"`
-			Type     string          `json:"type"`
-			Position any             `json:"position"`
-			Data     json.RawMessage `json:"data"`
-		}
-		if err := json.Unmarshal([]byte(nodeStr), &nd); err != nil {
-			continue
-		}
-		posStr := posToString(nd.Position)
-		text := ""
-		if textType := doc.GetText("content/" + nd.ID); textType != nil {
-			text = textType.ToString()
-		} else {
-			var dataMap map[string]interface{}
-			if json.Unmarshal(nd.Data, &dataMap) == nil {
-				if t, ok := dataMap["text"].(string); ok {
-					text = t
+		switch v := raw.(type) {
+		case *crdt.YMap:
+			id, _ := v.Get("id")
+			idStr, _ := id.(string)
+			if idStr == "" {
+				idStr = key
+			}
+			typeName, _ := v.Get("type")
+			typeStr, _ := typeName.(string)
+			pos, _ := v.Get("position")
+			posStr := posToString(pos)
+			text := ""
+			if textType := doc.GetText("content/" + idStr); textType != nil {
+				text = textType.ToString()
+			}
+			// Serialize YMap data to JSON for backward compat
+			var dataRaw json.RawMessage
+			if d, exists := v.Get("data"); exists {
+				switch d2 := d.(type) {
+				case string:
+					dataRaw = json.RawMessage(d2)
+				case []byte:
+					dataRaw = json.RawMessage(d2)
+				default:
+					if b, err := json.Marshal(d2); err == nil {
+						dataRaw = b
+					}
 				}
 			}
+			entries = append(entries, nodeEntry{
+				ID:       idStr,
+				Type:     typeStr,
+				Position: posStr,
+				Data:     dataRaw,
+				Text:     text,
+				Metadata: normalizeNodeMetadata(v),
+			})
+		case string:
+			var nd struct {
+				ID       string          `json:"id"`
+				Type     string          `json:"type"`
+				Position any             `json:"position"`
+				Data     json.RawMessage `json:"data"`
+			}
+			if err := json.Unmarshal([]byte(v), &nd); err != nil {
+				continue
+			}
+			posStr := posToString(nd.Position)
+			text := ""
+			if textType := doc.GetText("content/" + nd.ID); textType != nil {
+				text = textType.ToString()
+			} else {
+				var dataMap map[string]interface{}
+				if json.Unmarshal(nd.Data, &dataMap) == nil {
+					if t, ok := dataMap["text"].(string); ok {
+						text = t
+					}
+				}
+			}
+			entries = append(entries, nodeEntry{
+				ID:       nd.ID,
+				Type:     nd.Type,
+				Position: posStr,
+				Data:     nd.Data,
+				Text:     text,
+				Metadata: normalizeNodeMetadata(v),
+			})
 		}
-		entries = append(entries, nodeEntry{
-			ID:       nd.ID,
-			Type:     nd.Type,
-			Position: posStr,
-			Data:     nd.Data,
-			Text:     text,
-		})
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Position < entries[j].Position
