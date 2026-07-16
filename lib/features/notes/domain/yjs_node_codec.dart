@@ -9,10 +9,21 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap, {String? noteIdOv
   if (nodeId == null) return null;
 
   String textContent = '';
+  String derivedType = nodeMap.get('type') as String? ?? 'paragraph';
+
   try {
-    final ytext = doc.getText('content/$nodeId');
-    if (ytext != null) {
-      textContent = ytext.toString();
+    final sharedType = doc.get('content/$nodeId');
+    if (sharedType is YText) {
+      textContent = sharedType.toString();
+      if (derivedType == 'task') {
+        // CORRUPTION: The metadata says it's a task, but the payload is a text block
+        derivedType = 'corrupted';
+      }
+    } else if (sharedType is YMap) {
+      if (derivedType == 'paragraph') {
+        // CORRUPTION: The metadata says it's a paragraph, but the payload is a YMap (likely due to yjs_dart decoder bug on missing type)
+        derivedType = 'corrupted';
+      }
     }
   } catch (e) {
     textContent = '';
@@ -27,17 +38,23 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap, {String? noteIdOv
     data['text'] = textContent;
   }
 
-  // Promote task fields from YMap top-level into data dict for backward compat
-  final type = nodeMap.get('type') as String? ?? 'paragraph';
-  if (type == 'task') {
-    final completed = nodeMap.get('completed');
+  // Promote task fields from YMap top-level or composite keys into data dict
+  if (derivedType == 'task') {
+    final nodesMap = doc.getMap<Object>('nodes');
+    final completed = nodesMap?.get('$nodeId:completed') ?? nodeMap.get('completed');
     if (completed is bool) data['completed'] = completed;
-    final dueDate = nodeMap.get('dueDate');
+    
+    final dueDate = nodesMap?.get('$nodeId:dueDate') ?? nodeMap.get('dueDate');
     if (dueDate is String) data['dueDate'] = dueDate;
-    final recurrence = nodeMap.get('recurrence');
+    
+    final recurrence = nodesMap?.get('$nodeId:recurrence') ?? nodeMap.get('recurrence');
     if (recurrence is String) data['recurrence'] = recurrence;
-    final lastCompletedAt = nodeMap.get('lastCompletedAt');
+    
+    final lastCompletedAt = nodesMap?.get('$nodeId:lastCompletedAt') ?? nodeMap.get('lastCompletedAt');
     if (lastCompletedAt is String) data['lastCompletedAt'] = lastCompletedAt;
+    
+    final hasTime = nodesMap?.get('$nodeId:hasTime') ?? nodeMap.get('hasTime');
+    if (hasTime is bool) data['hasTime'] = hasTime;
   }
 
   final rawParentId = nodeMap.get('parentId') as String?;
@@ -48,7 +65,7 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap, {String? noteIdOv
     noteId: noteIdOverride ?? '',
     parentId: resolvedParentId,
     position: nodeMap.get('position')?.toString() ?? 'a0',
-    type: type,
+    type: derivedType,
     data: jsonEncode(data),
     createdAt: DateTime.fromMillisecondsSinceEpoch(
       (nodeMap.get('createdAt') as num?)?.toInt() ?? 0,
@@ -64,15 +81,44 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
     final meta = jsonDecode(raw) as Map<String, dynamic>;
     final nodeId = meta['id'] as String;
     String textContent = '';
+    String derivedType = meta['type'] as String? ?? 'paragraph';
+
     try {
-      final ytext = doc.getText('content/$nodeId');
-      if (ytext != null) {
-        textContent = ytext.toString();
+      final sharedType = doc.get('content/$nodeId');
+      if (sharedType is YText) {
+        textContent = sharedType.toString();
+        if (derivedType == 'task') {
+          derivedType = 'corrupted';
+        }
+      } else if (sharedType is YMap) {
+        if (derivedType == 'paragraph') {
+          derivedType = 'corrupted';
+        }
       }
     } catch (e) {
       textContent = '';
     }
     final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
+    
+    if (derivedType == 'task') {
+      final nodesMap = doc.getMap<Object>('nodes');
+      
+      final completed = nodesMap?.get('$nodeId:completed') ?? data['completed'];
+      if (completed is bool) data['completed'] = completed;
+      
+      final dueDate = nodesMap?.get('$nodeId:dueDate') ?? data['dueDate'];
+      if (dueDate is String) data['dueDate'] = dueDate;
+      
+      final recurrence = nodesMap?.get('$nodeId:recurrence') ?? data['recurrence'];
+      if (recurrence is String) data['recurrence'] = recurrence;
+      
+      final lastCompletedAt = nodesMap?.get('$nodeId:lastCompletedAt') ?? data['lastCompletedAt'];
+      if (lastCompletedAt is String) data['lastCompletedAt'] = lastCompletedAt;
+      
+      final hasTime = nodesMap?.get('$nodeId:hasTime') ?? data['hasTime'];
+      if (hasTime is bool) data['hasTime'] = hasTime;
+    }
+
     if (textContent.isNotEmpty) {
       data['text'] = textContent;
     }
@@ -84,7 +130,7 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
       noteId: noteIdOverride ?? meta['noteId'] as String? ?? '',
       parentId: resolvedParentId,
       position: meta['position']?.toString() ?? 'a0',
-      type: meta['type'] as String? ?? 'paragraph',
+      type: derivedType,
       data: jsonEncode(data),
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         (meta['createdAt'] as num?)?.toInt() ?? 0,

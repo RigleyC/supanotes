@@ -190,6 +190,7 @@ void main() {
 
       final bridge = YjsDocEditorBridge(
         doc: doc,
+        userId: 'test-user',
         coordinator: coordinator,
         sendUpdate: (_) {},
       );

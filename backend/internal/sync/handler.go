@@ -66,6 +66,9 @@ func (h *Handler) Push(c echo.Context) error {
 	}
 
 	if err := h.service.Push(c.Request().Context(), userID, &payload); err != nil {
+		if errors.Is(err, ErrNoteDeleted) {
+			return web.JSONError(c, http.StatusConflict, "NOTE_DELETED")
+		}
 		if errors.Is(err, ErrSyncConflict) {
 			return web.JSONError(c, http.StatusConflict, "sync conflict")
 		}

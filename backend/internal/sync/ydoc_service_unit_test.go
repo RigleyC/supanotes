@@ -3,6 +3,7 @@
 package sync
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/reearth/ygo/crdt"
@@ -45,4 +46,49 @@ func TestMergeYjsUpdates_Multiple(t *testing.T) {
 	merged, err := mergeYjsUpdates([][]byte{update1, update2})
 	require.NoError(t, err)
 	require.NotEmpty(t, merged)
+}
+
+func TestMigrateLegacyDoc(t *testing.T) {
+	doc := crdt.New(crdt.WithGC(false))
+	nodesMap := doc.GetMap("nodes")
+	
+	// Create a legacy node (JSON string)
+	legacyNode := map[string]interface{}{
+		"id":       "123",
+		"type":     "task",
+		"position": 1.0,
+		"data": map[string]interface{}{
+			"text":      "legacy task",
+			"completed": true,
+			"dueDate":   "2023-01-01",
+		},
+	}
+	b, _ := json.Marshal(legacyNode)
+	doc.Transact(func(txn *crdt.Transaction) {
+		nodesMap.Set(txn, "123", string(b))
+	})
+
+	// Run migration
+	MigrateLegacyDoc(doc)
+
+	// Verify it was converted to YMap and fields extracted
+	rawNode, ok := nodesMap.Get("123")
+	require.True(t, ok)
+	
+	nodeMap, ok := rawNode.(*crdt.YMap)
+	require.True(t, ok, "Legacy node should be converted to YMap")
+	
+	completed, ok := nodeMap.Get("completed")
+	require.True(t, ok)
+	assert.Equal(t, true, completed)
+	
+	dueDate, ok := nodeMap.Get("dueDate")
+	require.True(t, ok)
+	assert.Equal(t, "2023-01-01", dueDate)
+	
+	// Data should now be a stringified JSON without the top level fields
+	dataStr, ok := nodeMap.Get("data")
+	require.True(t, ok)
+	assert.Contains(t, dataStr, "legacy task")
+	assert.NotContains(t, dataStr, "completed")
 }

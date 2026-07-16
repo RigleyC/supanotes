@@ -41,7 +41,11 @@ type Service interface {
 	Push(ctx context.Context, userID pgtype.UUID, payload *SyncPayload) error
 }
 
-var ErrSyncConflict = errors.New("sync conflict")
+var (
+	// ErrSyncConflict indicates a conflict that prevents merging safely, requiring client reconciliation.
+	ErrSyncConflict = errors.New("sync conflict")
+	ErrNoteDeleted  = errors.New("NOTE_DELETED")
+)
 
 type service struct {
 	repo    Repository
@@ -174,8 +178,12 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 					return err
 				}
 
-				canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes)
+				canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes, false)
 				if err != nil {
+					if errors.Is(err, ErrNoteDeleted) {
+						slog.Error("sync push: Yjs state rejected because note is deleted", "note_id", ys.NoteID, "user_id", userID)
+						return ErrNoteDeleted
+					}
 					slog.Error("sync push: Yjs state permission check failed", "note_id", ys.NoteID, "user_id", userID, "error", err)
 					return ErrSyncConflict
 				}
@@ -225,8 +233,12 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		var collapseImages []bool
 		var createdAts, deletedAts []pgtype.Timestamptz
 		for _, n := range payload.Notes {
-			canEdit, err := s.canEditNote(ctx, r, n.ID, userID, editableNotes)
+			canEdit, err := s.canEditNote(ctx, r, n.ID, userID, editableNotes, n.DeletedAt.Valid)
 			if err != nil {
+				if errors.Is(err, ErrNoteDeleted) {
+					slog.Error("sync push conflict: note is already deleted", "note_id", n.ID, "user_id", userID)
+					return ErrNoteDeleted
+				}
 				slog.Error("sync push conflict: note permission check failed", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID, "error", err)
 				return ErrSyncConflict
 			}
@@ -357,8 +369,12 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			return err
 		}
 
-		canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes)
+		canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes, false)
 		if err != nil {
+			if errors.Is(err, ErrNoteDeleted) {
+				slog.Error("sync push: Yjs state rejected because note is deleted", "note_id", ys.NoteID, "user_id", userID)
+				return ErrNoteDeleted
+			}
 			slog.Error("sync push: Yjs state permission check failed", "note_id", ys.NoteID, "user_id", userID, "error", err)
 			return ErrSyncConflict
 		}
@@ -434,11 +450,11 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	return nil
 }
 
-func (s *service) canEditNote(ctx context.Context, r Repository, noteID pgtype.UUID, userID pgtype.UUID, editableNotes map[pgtype.UUID]bool) (bool, error) {
+func (s *service) canEditNote(ctx context.Context, r Repository, noteID pgtype.UUID, userID pgtype.UUID, editableNotes map[pgtype.UUID]bool, isClientDelete bool) (bool, error) {
 	if canEdit, exists := editableNotes[noteID]; exists {
 		return canEdit, nil
 	}
-	ownerID, err := r.GetNoteOwnerID(ctx, noteID)
+	meta, err := r.GetNoteMeta(ctx, noteID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
@@ -456,6 +472,12 @@ func (s *service) canEditNote(ctx context.Context, r Repository, noteID pgtype.U
 		}
 		return false, err
 	}
+	
+	if meta.DeletedAt.Valid && !isClientDelete {
+		return false, ErrNoteDeleted
+	}
+	
+	ownerID := meta.UserID
 	canEdit := ownerID == userID
 	if !canEdit {
 		share, shareErr := r.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{

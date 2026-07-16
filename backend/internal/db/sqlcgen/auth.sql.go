@@ -11,23 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Types kept for backward compatibility (referenced by test mocks).
-type (
-	CreateDeviceTokenParams struct {
-		UserID   pgtype.UUID `json:"user_id"`
-		Token    string      `json:"token"`
-		Platform string      `json:"platform"`
-	}
-	DeleteDeviceTokenParams struct {
-		ID     pgtype.UUID `json:"id"`
-		UserID pgtype.UUID `json:"user_id"`
-	}
-	DeleteDeviceTokenByTokenParams struct {
-		Token  string      `json:"token"`
-		UserID pgtype.UUID `json:"user_id"`
-	}
-)
-
 const createRefreshToken = `-- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
 VALUES ($1, $2, $3)
@@ -104,8 +87,7 @@ func (q *Queries) CreateUserSettings(ctx context.Context, arg CreateUserSettings
 	return i, err
 }
 
-
-	const getRefreshToken = `-- name: GetRefreshToken :one
+const getRefreshToken = `-- name: GetRefreshToken :one
 SELECT id, user_id, token_hash, expires_at, created_at, revoked_at FROM refresh_tokens
 WHERE token_hash = $1
   AND revoked_at IS NULL
@@ -181,7 +163,6 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID pgtype.UUID) (User
 	)
 	return i, err
 }
-
 
 const revokeAllUserRefreshTokens = `-- name: RevokeAllUserRefreshTokens :exec
 UPDATE refresh_tokens

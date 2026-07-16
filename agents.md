@@ -173,6 +173,13 @@ See `backend/.env.example` for all required variables.
 
 ## Known Tech Debt
 
+### yjs_dart Local Fork (A2 Fix)
+
+The `packages/yjs_dart` dependency is a local fork, not the `^1.1.15` pub.dev version.
+This is because the `yjs_dart` protocol decoder has a bug where unknown root shared types (e.g., `YText` nodes that haven't been proactively requested yet) are silently decoded as `YMap`. 
+If we didn't use this fork, the Flutter app would experience silent data loss (turning paragraphs into empty tasks) or crash with type cast errors (`YMap is not a subtype of YText`).
+**Do not** remove the local path override in `pubspec.yaml` until the upstream `yjs_dart` package correctly infers binary root types without relying on `.getText()` or `.getMap()` pre-registration.
+
 ### Dual-write avoidance document (061)
 
 The YDoc is the single source of truth for task metadata (dueDate, recurrence).

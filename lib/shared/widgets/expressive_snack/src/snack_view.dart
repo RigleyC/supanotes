@@ -95,6 +95,8 @@ class SnackViewState extends State<SnackView> with TickerProviderStateMixin {
   void shake() {
     if (_removing) return;
 
+    if (mounted) setState(() {});
+
     _timer?.cancel();
     _timer = Timer(widget.snack.duration, dismiss);
 

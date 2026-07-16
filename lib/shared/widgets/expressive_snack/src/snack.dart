@@ -14,7 +14,7 @@ class Snack {
   final String? subtitle;
   final IconData? icon;
   final Duration duration;
-  final SnackBarAction? action;
+  SnackBarAction? action;
 
   final GlobalKey<SnackViewState> key = GlobalKey();
 }

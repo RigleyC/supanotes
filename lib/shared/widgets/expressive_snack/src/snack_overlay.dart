@@ -17,7 +17,11 @@ class SnackOverlay extends StatefulWidget {
       (s) => s.title == snack.title && s.subtitle == snack.subtitle && s.icon == snack.icon,
     );
 
-    if (index != -1) return state._snacks[index];
+    if (index != -1) {
+      final existing = state._snacks[index];
+      existing.action = snack.action;
+      return existing;
+    }
 
     state._add(snack);
     return snack;

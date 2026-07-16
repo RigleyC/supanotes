@@ -8,7 +8,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'sync_state.dart';
 import 'yjs_sync_protocol_codec.dart';
-import 'yjs_sync_manager.dart' show applyUpdateSafe;
+// No longer importing yjs_sync_manager.dart
 
 const int _kMaxPendingUpdates = 1000;
 const Duration _kIdleTimeout = Duration(minutes: 5);
@@ -101,7 +101,7 @@ class YjsWebSocketClient {
             _flushPending();
           }
         case YjsSyncProtocolCodec.messageSyncStep2:
-          applyUpdateSafe(_doc, payload);
+          applyUpdate(_doc, payload);
           if (!_handshakeDone) {
             _handshakeDone = true;
             debugPrint('[YjsWS] HANDSHAKE DONE (via Step2) elapsed=${sw.elapsedMilliseconds}ms');
@@ -110,7 +110,7 @@ class YjsWebSocketClient {
           }
           _onUpdateController.add(data);
         case YjsSyncProtocolCodec.messageYjsUpdate:
-          applyUpdateSafe(_doc, payload);
+          applyUpdate(_doc, payload);
           _onUpdateController.add(data);
         default:
           dev.log('[YjsWS] Unknown sync message type: $msgType', name: 'YjsWS');

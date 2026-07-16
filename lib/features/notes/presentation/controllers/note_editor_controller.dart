@@ -63,6 +63,7 @@ class NoteEditorController extends ChangeNotifier {
     );
     _bridge = YjsDocEditorBridge(
       doc: doc,
+      userId: userId,
       coordinator: _coordinator!,
       sendUpdate: sendUpdate,
       onDocChanged: onDocChanged,

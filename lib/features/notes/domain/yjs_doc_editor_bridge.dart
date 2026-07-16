@@ -20,10 +20,12 @@ import 'yjs_node_codec.dart';
 class YjsDocEditorBridge {
   YjsDocEditorBridge({
     required Doc doc,
+    required String userId,
     required EditorDocumentSyncManager coordinator,
     required void Function(Uint8List update) sendUpdate,
     void Function()? onDocChanged,
   })  : _doc = doc,
+        _userId = userId,
         _coordinator = coordinator,
         _sendUpdate = sendUpdate,
         _onDocChanged = onDocChanged {
@@ -37,6 +39,7 @@ class YjsDocEditorBridge {
   }
 
   final Doc _doc;
+  final String _userId;
   final EditorDocumentSyncManager _coordinator;
   final void Function(Uint8List update) _sendUpdate;
   final void Function()? _onDocChanged;
@@ -132,22 +135,26 @@ class YjsDocEditorBridge {
     nodeMap.set('data', jsonEncode(data));
     nodeMap.set('createdAt', createdAt);
 
-    // For task nodes, promote task fields to top-level
+    // For task nodes, write task fields to composite keys
     if (node is TaskNode) {
-      nodeMap.set('completed', node.isComplete);
-      _copyTaskField(nodeMap, existingRaw, 'dueDate');
-      _copyTaskField(nodeMap, existingRaw, 'recurrence');
-      _copyTaskField(nodeMap, existingRaw, 'lastCompletedAt');
+      nodesMap.set('$id:completed', node.isComplete);
+      _copyTaskFieldComposite(nodesMap, existingRaw, id, 'dueDate');
+      _copyTaskFieldComposite(nodesMap, existingRaw, id, 'recurrence');
+      _copyTaskFieldComposite(nodesMap, existingRaw, id, 'lastCompletedAt');
+      _copyTaskFieldComposite(nodesMap, existingRaw, id, 'hasTime');
     }
 
     final text = data['text'] as String?;
     try {
-      final ytext = _doc.getText('content/$id');
-      if (ytext != null) {
-        _updateYTextIncrementally(ytext, text ?? '');
+      final sharedType = _doc.get('content/$id');
+      if (sharedType is YText) {
+        _updateYTextIncrementally(sharedType, text ?? '');
+      } else if (sharedType is YMap) {
+        // Log mismatch, cannot apply text updates to a map
+        dev.log('[YjsBridge] _serializeNode: content/$id is a YMap, skipping text update', name: 'YjsBridge');
       }
     } catch (e) {
-      dev.log('[YjsBridge] _serializeNode: failed to get ytext for $id (corrupted type)', name: 'YjsBridge', error: e);
+      dev.log('[YjsBridge] _serializeNode: failed to get content for $id (corrupted type)', name: 'YjsBridge', error: e);
     }
     dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
   }
@@ -155,6 +162,16 @@ class YjsDocEditorBridge {
   void _copyTaskField(YMap<Object> nodeMap, dynamic existingRaw, String key) {
     if (existingRaw is YMap && existingRaw.has(key)) {
       nodeMap.set(key, existingRaw.get(key));
+    }
+  }
+
+  void _copyTaskFieldComposite(YMap<Object> nodesMap, dynamic existingRaw, String id, String key) {
+    if (existingRaw is YMap && existingRaw.has(key)) {
+      if (!nodesMap.has('$id:$key')) {
+        nodesMap.set('$id:$key', existingRaw.get(key));
+      }
+      // Clean up the legacy key
+      existingRaw.delete(key);
     }
   }
 
@@ -197,7 +214,7 @@ class YjsDocEditorBridge {
       nextPos = _readPosition(nextNodeId, nodesMap);
     }
 
-    return FractionalIndex.between(prevPos, nextPos);
+    return FractionalIndex.between(prevPos, nextPos, _userId);
   }
 
   num? _readCreatedAt(dynamic raw) {
@@ -223,9 +240,9 @@ class YjsDocEditorBridge {
       if (raw == null) return;
       if (raw is! YMap) return;
 
-      raw.set('completed', false);
-      raw.set('dueDate', _formatDueDate(nextDue));
-      raw.set('lastCompletedAt', DateTime.now().toUtc().toIso8601String());
+      nodesMap.set('$nodeId:completed', false);
+      nodesMap.set('$nodeId:dueDate', _formatDueDate(nextDue));
+      nodesMap.set('$nodeId:lastCompletedAt', DateTime.now().toUtc().toIso8601String());
     });
 
     final update = encodeStateAsUpdate(_doc);
@@ -247,19 +264,19 @@ class YjsDocEditorBridge {
       if (raw == null || raw is! YMap) return;
 
       if (clearDueDate) {
-        raw.delete('dueDate');
-        raw.delete('hasTime');
+        nodesMap.delete('$nodeId:dueDate');
+        nodesMap.delete('$nodeId:hasTime');
       } else if (dueDate != null) {
-        raw.set('dueDate', _formatDueDate(dueDate, hasTime: hasTime ?? false));
+        nodesMap.set('$nodeId:dueDate', _formatDueDate(dueDate, hasTime: hasTime ?? false));
         if (hasTime != null) {
-          raw.set('hasTime', hasTime);
+          nodesMap.set('$nodeId:hasTime', hasTime);
         }
       }
 
       if (clearRecurrence) {
-        raw.delete('recurrence');
+        nodesMap.delete('$nodeId:recurrence');
       } else if (recurrence != null) {
-        raw.set('recurrence', recurrence);
+        nodesMap.set('$nodeId:recurrence', recurrence);
       }
     });
 

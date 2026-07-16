@@ -13,6 +13,7 @@ library;
 
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -252,16 +253,20 @@ class SyncService {
       debugPrint('[SyncService] sync: push DONE, pull START elapsed=${sw.elapsedMilliseconds}ms');
       await pull();
       debugPrint('[SyncService] sync: pull DONE elapsed=${sw.elapsedMilliseconds}ms');
-      final syncedAt = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _kLastSyncedAtPref,
-        syncedAt.toUtc().toIso8601String(),
-      );
+      final lastSyncedStr = prefs.getString(_kLastSyncedAtPref);
+      final syncedAt = lastSyncedStr != null ? DateTime.parse(lastSyncedStr) : DateTime.now();
       _notifier.markSynced(syncedAt);
       debugPrint('[SyncService] sync DONE elapsed=${sw.elapsedMilliseconds}ms');
     } catch (e, stackTrace) {
       debugPrint('[SyncService] sync FAIL: $e\n$stackTrace');
+      if (e is DioException && e.response?.statusCode == 409) {
+        final data = e.response?.data;
+        if (data is Map && data['error'] == 'NOTE_DELETED') {
+          _notifier.markError('Aviso: Uma nota sendo editada foi deletada remotamente. Salve uma cópia local se necessário.');
+          return;
+        }
+      }
       _notifier.markError(e.toString());
     } finally {
       _isSyncing = false;
@@ -304,7 +309,7 @@ class SyncService {
         // from older dart_crdt versions before sending to Go backend.
         try {
           final tmpDoc = Doc();
-          applyUpdateSafe(tmpDoc, s.state);
+          applyUpdate(tmpDoc, s.state);
           final cleanState = encodeStateAsUpdate(tmpDoc);
           yjsStates.add(s.copyWith(state: cleanState));
         } catch (e, st) {
@@ -473,9 +478,9 @@ class SyncService {
           .getSingleOrNull();
 
         if (localStateRow != null) {
-          applyUpdateSafe(tmpDoc, localStateRow.state);
+          applyUpdate(tmpDoc, localStateRow.state);
         }
-        applyUpdateSafe(tmpDoc, remoteState.state);
+        applyUpdate(tmpDoc, remoteState.state);
 
         final mergedState = encodeStateAsUpdate(tmpDoc);
         await _db.into(_db.localYjsStates).insertOnConflictUpdate(
@@ -504,11 +509,6 @@ class SyncService {
     final nextSyncedAtStr = data['synced_at'] as String?;
     if (nextSyncedAtStr != null) {
       await prefs.setString(_kLastSyncedAtPref, nextSyncedAtStr);
-    } else {
-      await prefs.setString(
-        _kLastSyncedAtPref,
-        DateTime.now().toUtc().toIso8601String(),
-      );
     }
     debugPrint('[SyncService] pull DONE elapsed=${sw.elapsedMilliseconds}ms');
   }

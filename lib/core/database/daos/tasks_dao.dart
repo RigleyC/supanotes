@@ -299,11 +299,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     await into(tasks).insertOnConflictUpdate(task);
   }
 
-  Future<void> reorderTasksBatch(List<String> orderedIds) async {
+  Future<void> reorderTasksBatch(List<String> orderedIds, String clientId) async {
     await batch((b) {
       var prev = '';
       for (var i = 0; i < orderedIds.length; i++) {
-        final pos = FractionalIndex.between(prev, '');
+        final pos = FractionalIndex.between(prev, '', clientId);
         b.update(
           tasks,
           TasksCompanion(position: Value(pos)),

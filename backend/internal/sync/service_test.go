@@ -36,6 +36,7 @@ type mockRepository struct {
 	upsertNoteErr       error
 	lastUpsertNoteArg   sqlcgen.UpsertNoteParams
 	getNoteShareForUser func(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error)
+	getNoteMeta         func(ctx context.Context, noteID pgtype.UUID) (sqlcgen.GetNoteMetaRow, error)
 	getNoteOwnerID      func(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error)
 }
 
@@ -104,6 +105,17 @@ func (m *mockRepository) GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID)
 		return m.getNoteOwnerID(ctx, noteID)
 	}
 	return pgtype.UUID{}, nil
+}
+
+func (m *mockRepository) GetNoteMeta(ctx context.Context, noteID pgtype.UUID) (sqlcgen.GetNoteMetaRow, error) {
+	if m.getNoteMeta != nil {
+		return m.getNoteMeta(ctx, noteID)
+	}
+	if m.getNoteOwnerID != nil {
+		ownerID, err := m.getNoteOwnerID(ctx, noteID)
+		return sqlcgen.GetNoteMetaRow{UserID: ownerID}, err
+	}
+	return sqlcgen.GetNoteMetaRow{}, nil
 }
 
 func (m *mockRepository) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {

@@ -328,6 +328,17 @@ extension EditorSelectionPreservation on Editor {
     final composer = context.composer;
     final oldSelection = composer.selection;
 
+    if (oldSelection != null) {
+      // Clear selection temporarily to avoid crash during document mutation
+      execute([
+        const ChangeSelectionRequest(
+          null,
+          SelectionChangeType.clearSelection,
+          SelectionReason.contentChange,
+        ),
+      ]);
+    }
+
     execute(requests);
 
     if (oldSelection != null) {
@@ -338,15 +349,13 @@ extension EditorSelectionPreservation on Editor {
         final newExtent = _clampPosition(document, oldSelection.extent);
         final finalSelection = DocumentSelection(base: newBase, extent: newExtent);
 
-        if (finalSelection != composer.selection) {
-          execute([
-            ChangeSelectionRequest(
-              finalSelection,
-              SelectionChangeType.placeCaret,
-              SelectionReason.contentChange,
-            ),
-          ]);
-        }
+        execute([
+          ChangeSelectionRequest(
+            finalSelection,
+            SelectionChangeType.placeCaret,
+            SelectionReason.contentChange,
+          ),
+        ]);
       }
     }
   }

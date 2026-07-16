@@ -38,14 +38,6 @@ type Context struct {
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
-type DeviceToken struct {
-	ID        pgtype.UUID        `json:"id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	Token     string             `json:"token"`
-	Platform  string             `json:"platform"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
 type Memory struct {
 	ID        pgtype.UUID        `json:"id"`
 	UserID    pgtype.UUID        `json:"user_id"`

@@ -71,7 +71,11 @@ We are pivoting from server-side FCM push notifications to client-side local pus
 1. Run `flutter pub add flutter_local_notifications timezone`.
 2. Create `lib/core/notifications/local_notification_service.dart`. It should initialize `FlutterLocalNotificationsPlugin`, configure Android/iOS init settings, and expose a method `scheduleTaskNotification(String id, String title, DateTime scheduledDate)`.
    *Note: Use timezone `tz.local` and `tz.TZDateTime.from(scheduledDate, tz.local)` for scheduling.*
-3. Create `lib/features/tasks/domain/task_notification_scheduler.dart` as an `@Riverpod(keepAlive: true)` class. It should `ref.listen` to `tasksLocalRepositoryProvider`'s `watchOpenTasks()`, filtering for tasks with `dueDate != null` and `dueDate > now`. For each task, call the `scheduleTaskNotification` on the service. Maintain a set of currently scheduled IDs so you know which ones to cancel when a task is completed/deleted.
+3. Create `lib/features/tasks/domain/task_notification_scheduler.dart` as an `@Riverpod(keepAlive: true)` class. It should `ref.listen` to `tasksLocalRepositoryProvider`'s `watchOpenTasks()`, filtering for tasks with `dueDate != null`. For each task, calculate the notification time:
+   - If `hasTime` is true, schedule exactly at `dueDate`.
+   - If `hasTime` is false, schedule at 09:00 AM on the day of the `dueDate`.
+   - Only schedule if the calculated time is > `DateTime.now()`.
+   Call `scheduleTaskNotification` on the service for these tasks. Maintain a set of currently scheduled IDs so you know which ones to cancel when a task is completed/deleted.
 
 **Verify**: `flutter analyze` exits 0.
 

@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getNoteMeta = `-- name: GetNoteMeta :one
+SELECT user_id, deleted_at FROM notes WHERE id = $1
+`
+
+type GetNoteMetaRow struct {
+	UserID    pgtype.UUID        `json:"user_id"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+func (q *Queries) GetNoteMeta(ctx context.Context, id pgtype.UUID) (GetNoteMetaRow, error) {
+	row := q.db.QueryRow(ctx, getNoteMeta, id)
+	var i GetNoteMetaRow
+	err := row.Scan(&i.UserID, &i.DeletedAt)
+	return i, err
+}
+
 const getNoteOwnerID = `-- name: GetNoteOwnerID :one
 SELECT user_id FROM notes WHERE id = $1
 `

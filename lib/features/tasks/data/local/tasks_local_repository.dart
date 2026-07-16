@@ -87,7 +87,7 @@ class TasksLocalRepository {
   }
 
   Future<void> reorderTasksBatch(List<String> orderedIds) async {
-    await _dao.reorderTasksBatch(orderedIds);
+    await _dao.reorderTasksBatch(orderedIds, _userId);
   }
 
   Future<void> deleteTask(String id) async {

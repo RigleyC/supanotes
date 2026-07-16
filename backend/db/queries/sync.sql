@@ -158,6 +158,9 @@ LIMIT sqlc.arg('limit');
 -- name: GetNoteOwnerID :one
 SELECT user_id FROM notes WHERE id = $1;
 
+-- name: GetNoteMeta :one
+SELECT user_id, deleted_at FROM notes WHERE id = $1;
+
 -- name: UpsertNoteYjsState :exec
 INSERT INTO note_yjs_states (note_id, state, updated_at)
 VALUES ($1, $2, $3)

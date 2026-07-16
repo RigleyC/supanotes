@@ -186,8 +186,9 @@ func MigrateLegacyDoc(doc *crdt.Doc) {
 	}
 
 	slog.Info("MigrateLegacyDoc: migrating doc to nested YMap schema")
+	keys := nodesMap.Keys()
 	doc.Transact(func(txn *crdt.Transaction) {
-		for _, key := range nodesMap.Keys() {
+		for _, key := range keys {
 			raw, ok := nodesMap.Get(key)
 			if !ok {
 				continue
@@ -292,7 +293,9 @@ func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc
 		s.projection.RunDebouncedProjection(ctx, noteID)
 	}
 
-	go s.roomMgr.BroadcastIfActive(noteID, update)
+	if s.roomMgr != nil {
+		go s.roomMgr.BroadcastIfActive(noteID, update)
+	}
 
 	return nil
 }

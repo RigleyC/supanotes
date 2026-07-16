@@ -6,6 +6,11 @@ import 'attachment_nodes.dart';
 import 'note_node.dart';
 import 'yjs_task_entry.dart';
 
+const header4Attribution = NamedAttribution('header4');
+const header5Attribution = NamedAttribution('header5');
+const header6Attribution = NamedAttribution('header6');
+const corruptedAttribution = NamedAttribution('corrupted');
+
 class NodeCodec {
   NodeCodec._();
 
@@ -170,6 +175,21 @@ class NodeCodec {
     if (type == 'divider') {
       return HorizontalRuleNode(id: id);
     }
+    if (type == 'corrupted') {
+      return ParagraphNode(
+        id: id,
+        text: AttributedText(
+          'Conteúdo indisponível — Erro de Sincronização',
+          AttributedSpans(
+            attributions: [
+              const SpanMarker(attribution: corruptedAttribution, offset: 0, markerType: SpanMarkerType.start),
+              const SpanMarker(attribution: corruptedAttribution, offset: 44, markerType: SpanMarkerType.end),
+            ],
+          ),
+        ),
+        metadata: {'blockType': corruptedAttribution},
+      );
+    }
     if (type == 'header') {
       final level = data['level'] as int? ?? 1;
       final blockType = switch (level) {
@@ -272,6 +292,7 @@ class NodeCodec {
   static String? nodeType(DocumentNode node) {
     if (node is ParagraphNode) {
       final blockType = node.getMetadataValue('blockType') as Attribution?;
+      if (blockType == corruptedAttribution) return 'corrupted';
       if (blockType == null) return 'paragraph';
       if (blockType == blockquoteAttribution) return 'blockquote';
       return 'header';

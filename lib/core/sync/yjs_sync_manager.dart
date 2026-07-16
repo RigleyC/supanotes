@@ -8,23 +8,7 @@ import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import '../database/database.dart';
 
-/// Safely applies an update by pre-registering known root types.
-/// yjs_dart has a bug where unknown root types are instantiated as YMap<dynamic>
-/// upon decoding. This causes casting errors (e.g. to YText or YMap<String>) later.
-void applyUpdateSafe(Doc doc, Uint8List update) {
-  // Pre-register standard maps
-  doc.getMap<Object>('nodes');
-
-  // Find all content/* keys in the binary update and pre-register them as YText
-  final str = String.fromCharCodes(update);
-  // Match content/ followed by any word characters (including dashes)
-  final matches = RegExp(r'content/[a-zA-Z0-9-_]+').allMatches(str);
-  for (final match in matches) {
-    doc.getText(match.group(0)!);
-  }
-
-  applyUpdate(doc, update);
-}
+// Removed applyUpdateSafe since we will fix yjs_dart directly
 
 /// Manages a local Yjs [Doc] instance per note and persists binary
 /// state snapshots to the [LocalYjsStates] Drift table.
@@ -52,7 +36,7 @@ class YjsSyncManager {
     if (stateRow != null) {
       final doc = Doc();
       try {
-        applyUpdateSafe(doc, stateRow.state);
+        applyUpdate(doc, stateRow.state);
         _migrateLegacyDoc(doc);
         _docs[noteId] = doc;
         dev.log('[YjsSyncManager] Loaded snapshot for note=$noteId', name: 'YjsSync');
@@ -181,7 +165,7 @@ class YjsSyncManager {
   /// affecting the active editor document.
   Future<void> projectState(String noteId, Uint8List state) async {
     final doc = Doc();
-    applyUpdateSafe(doc, state);
+    applyUpdate(doc, state);
     _migrateLegacyDoc(doc);
     
     final previousDoc = _docs[noteId];
@@ -248,9 +232,9 @@ class YjsSyncManager {
 
       String text = '';
       try {
-        final ytext = doc.getText('content/$nodeId');
-        if (ytext != null) {
-          text = ytext.toString();
+        final sharedType = doc.get('content/$nodeId');
+        if (sharedType is YText) {
+          text = sharedType.toString();
         }
       } catch (e) {
         // Fallback if type is corrupted
@@ -318,9 +302,9 @@ class YjsSyncManager {
     for (final node in nodes) {
       String text = '';
       try {
-        final ytext = doc.getText('content/${node.id}');
-        if (ytext != null) {
-          text = ytext.toString();
+        final sharedType = doc.get('content/${node.id}');
+        if (sharedType is YText) {
+          text = sharedType.toString();
         }
       } catch (e) {
         // Fallback for corrupted type
