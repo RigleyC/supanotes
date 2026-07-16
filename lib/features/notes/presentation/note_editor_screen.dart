@@ -1,7 +1,6 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +14,6 @@ import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_popup_menu.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
@@ -224,17 +222,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     ),
                 onTaskReopen: (taskId) =>
                     ref.read(tasksRepositoryProvider).reopenTask(taskId),
-                onUploadFile: isReadOnly
-                    ? null
-                    : (id, noteId, filePath, mimeType) => ref
-                          .read(attachmentsRepositoryProvider)
-                          .upload(
-                            id: id,
-                            noteId: noteId,
-                            file: File(filePath),
-                            mimeType: mimeType,
-                          ),
-              ),
+          ),
             ),
           ),
         );

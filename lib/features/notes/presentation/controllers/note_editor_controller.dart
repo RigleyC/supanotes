@@ -3,7 +3,9 @@ library;
 import 'dart:developer' as dev;
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
@@ -16,20 +18,24 @@ import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
 import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 const int _dividerCount = 35;
 
 class NoteEditorController extends ChangeNotifier {
   NoteEditorController({
     required this.userId,
-  });
+    Future<void> Function(String id, String filePath, String mimeType)? onUploadFile,
+  }) : _onUploadFile = onUploadFile;
 
   final String userId;
+  final Future<void> Function(String id, String filePath, String mimeType)? _onUploadFile;
 
   MutableDocument? document;
   Editor? editor;
   MutableDocumentComposer? composer;
   final FocusNode focusNode = FocusNode();
+  void Function(bool)? onHasContentChanged;
 
   EditorDocumentSyncManager? _coordinator;
   YjsDocEditorBridge? _bridge;
@@ -61,11 +67,16 @@ class NoteEditorController extends ChangeNotifier {
       sendUpdate: sendUpdate,
       onDocChanged: onDocChanged,
     );
+    document!.addListener(_onDocChanged);
     dev.log(
       '[NoteEditorController.initFromDoc] done nodes=${nodes.length}',
       name: 'NoteEditor',
     );
     notifyListeners();
+  }
+
+  void _onDocChanged(DocumentChangeLog _) {
+    onHasContentChanged?.call(document != null && document!.isNotEmpty);
   }
 
   void completeRecurringTask(String nodeId, DateTime nextDue) {
@@ -111,6 +122,28 @@ class NoteEditorController extends ChangeNotifier {
     _noteId = noteId;
   }
 
+  Future<void> pickAndAttachFile({bool imageOnly = false}) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: imageOnly ? FileType.image : FileType.any,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final picked = result.files.single;
+    final path = picked.path;
+    if (path == null) return;
+
+    final mimeType = lookupMimeType(path) ?? 'application/octet-stream';
+    final uploader = _onUploadFile;
+    if (uploader == null) return;
+
+    attachFileFromPath(
+      filePath: path,
+      mimeType: mimeType,
+      onUploadFile: (id, _, filePath, mimeType) => uploader(id, filePath, mimeType),
+      onError: () => AppMessenger.showError('Falha ao enviar anexo'),
+    );
+  }
+
   void attachFileFromPath({
     required String filePath,
     required String mimeType,
@@ -154,6 +187,8 @@ class NoteEditorController extends ChangeNotifier {
 
   @override
   Future<void> dispose() async {
+    document?.removeListener(_onDocChanged);
+    onHasContentChanged = null;
     await _coordinator?.dispose();
     _bridge?.dispose();
     _bridge = null;

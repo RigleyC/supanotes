@@ -1,12 +1,9 @@
 library;
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mime/mime.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -19,14 +16,11 @@ import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/presentation/widgets/note_editor_config.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
-import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
-import 'package:supanotes/features/notes/presentation/widgets/rich_ios_controls_controller.dart';
-import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
@@ -55,11 +49,7 @@ class NoteEditor extends ConsumerStatefulWidget {
 class _NoteEditorState extends ConsumerState<NoteEditor> {
   NoteEditorController? _controller;
   final _docLayoutKey = GlobalKey();
-  RichSuperEditorIosControlsController? _iosController;
-  SuperEditorAndroidControlsController? _androidController;
-  RichCommonEditorOperations? _richOps;
-  Set<String> _animatingNodeIds = const {};
-  Set<String> _completingTaskIds = const {};
+  EditorControls? _controls;
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
   bool? _cachedHideCompleted;
@@ -69,139 +59,45 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     super.initState();
     _controller = ref.read(noteEditorControllerProvider(widget.noteId));
     _controller!.addListener(_onControllerReady);
-    if (!widget.isReadOnly && _controller!.hasDocument) {
-      _controller!.document!.addListener(_onDocumentChanged);
-    }
+    _controller!.onHasContentChanged = (hasContent) {
+      widget.delegate.onHasContentChanged?.call(hasContent);
+    };
   }
 
-
-//Precisa disso?
-  void _setupControls(BuildContext context) {
-    if (_richOps != null) return;
+  void _initControls() {
+    if (_controls != null) return;
     final controller = _controller!;
     if (controller.editor == null || controller.composer == null) return;
 
     final editorControlsColor = Theme.of(context).colorScheme.primary;
-
-    _richOps = RichCommonEditorOperations(
+    _controls = createEditorControls(
       editor: controller.editor!,
-      document: controller.editor!.document,
       composer: controller.composer!,
       documentLayoutResolver: () =>
           _docLayoutKey.currentState as DocumentLayout,
-    );
-
-    _iosController = RichSuperEditorIosControlsController(
-      editor: controller.editor!,
-      documentLayoutResolver: () =>
-          _docLayoutKey.currentState as DocumentLayout,
-      operations: _richOps!,
       handleColor: editorControlsColor,
     );
-
-    _androidController = SuperEditorAndroidControlsController(
-      controlsColor: editorControlsColor,
-      toolbarBuilder: (overlayContext, mobileToolbarKey, focalPoint) =>
-          defaultAndroidEditorToolbarBuilder(
-            overlayContext,
-            mobileToolbarKey,
-            _richOps!,
-            SuperEditorAndroidControlsScope.rootOf(overlayContext),
-            controller.composer!.selectionNotifier,
-            focalPoint,
-          ),
-    );
   }
-// Esse monte de metodo aqui tambem, precisa? Isso ta feito da melhor forma?
+
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.hideCompleted != oldWidget.hideCompleted) {
       setState(() {});
     }
-
-
   }
 
   void _onControllerReady() {
     if (!mounted) return;
-    setState(() {
-      if (!widget.isReadOnly && _controller!.hasDocument) {
-        _controller!.document!.addListener(_onDocumentChanged);
-      }
-    });
+    setState(() {});
   }
 
   @override
   void dispose() {
     _controller?.removeListener(_onControllerReady);
-    if (!widget.isReadOnly) {
-      _controller?.document?.removeListener(_onDocumentChanged);
-    }
-    _iosController?.dispose();
-    _androidController?.dispose();
+    _controller!.onHasContentChanged = null;
+    _controls?.dispose();
     super.dispose();
-  }
-
-  void _onDocumentChanged(DocumentChangeLog _) {
-    _notifyContentChanged();
-  }
-
-  void _notifyContentChanged() {
-    final doc = _controller?.document;
-    widget.delegate.onHasContentChanged?.call(doc != null && doc.isNotEmpty);
-  }
-
-  void _onAnimationStart(String nodeId) {
-    setState(() {
-      _animatingNodeIds = {..._animatingNodeIds, nodeId};
-    });
-  }
-
-  void _onAnimationEnd(String nodeId) {
-    setState(() {
-      _animatingNodeIds = _animatingNodeIds.where((id) => id != nodeId).toSet();
-    });
-  }
-
-  void _onCompletingStart(String nodeId) {
-    setState(() {
-      _completingTaskIds = {..._completingTaskIds, nodeId};
-    });
-  }
-
-  void _onCompletingEnd(String nodeId) {
-    setState(() {
-      _completingTaskIds = _completingTaskIds.where((id) => id != nodeId).toSet();
-    });
-  }
-
-//Esse monte de codigo aqui, precisa? Não deveria ta em outro lugar?
-  Future<void> _onAttach({bool imageOnly = false}) async {
-    final uploader = widget.delegate.onUploadFile;
-    if (uploader == null || _controller?.editor == null) return;
-
-    final result = await FilePicker.platform.pickFiles(
-      type: imageOnly ? FileType.image : FileType.any,
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    final picked = result.files.single;
-    final path = picked.path;
-    if (path == null) return;
-
-    final mimeType = lookupMimeType(path) ?? 'application/octet-stream';
-
-    _controller!.attachFileFromPath(
-      filePath: path,
-      mimeType: mimeType,
-      onUploadFile: uploader,
-      onError: () {
-        if (mounted) {
-          AppMessenger.showError('Falha ao enviar anexo');
-        }
-      },
-    );
   }
 
   @override
@@ -217,7 +113,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    _setupControls(context);
+    _initControls();
 
     final theme = Theme.of(context);
     final topPadding = Scaffold.maybeOf(context)?.appBarMaxHeight ??
@@ -242,7 +138,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         documentPadding: docPadding,
       );
     }
-//Pra que esse animatedPadding? O editor nao resolve automaticamente o padding quando o teclado aparece?
+
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -253,9 +149,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         children: [
           Expanded(
             child: SuperEditorAndroidControlsScope(
-              controller: _androidController!,
+              controller: _controls!.androidController,
               child: SuperEditorIosControlsScope(
-                controller: _iosController!,
+                controller: _controls!.iosController,
                 child: SuperEditor(
                   editor: controller.editor!,
                   focusNode: widget.isReadOnly
@@ -263,16 +159,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                       : controller.focusNode,
                   documentLayoutKey: _docLayoutKey,
                   stylesheet: _cachedStylesheet!,
-                  //Isso aqui nao pode ser movido pro styleSheet ou outro lugar?
-                  selectionStyle: SelectionStyles(
-                    selectionColor:
-                        Theme.of(
-                          context,
-                        ).textSelectionTheme.selectionColor ??
-                        Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.4),
-                  ),
+                  selectionStyle: editorSelectionStyle(theme.colorScheme),
                   contentTapDelegateFactories: widget.isReadOnly
                       ? null
                       : [
@@ -284,17 +171,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                           ),
                           superEditorLaunchLinkTapHandlerFactory,
                         ],
-                        //Precisa disso? O editor nao resolve automaticamente?
-                  keyboardActions: buildRichKeyboardActions(
-                    baseActions:
-                        defaultTargetPlatform == TargetPlatform.iOS ||
-                            defaultTargetPlatform == TargetPlatform.android
-                        ? defaultImeKeyboardActions
-                        : defaultKeyboardActions,
-                  ),
+                  keyboardActions: editorKeyboardActions(),
                   componentBuilders: [
                     const CustomDividerComponentBuilder(),
-                    //Esse componente precisa desse tanto de parametros? Tem algo que a gente pode simplificar?
                     CustomTaskComponentBuilder(
                       editor: controller.editor,
                       composer: controller.composer,
@@ -309,15 +188,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                       onTaskComplete: widget.delegate.onTaskComplete,
                       onTaskReopen: widget.delegate.onTaskReopen,
                       onRecurringTaskComplete: (taskId, nextDue) {
-                        _controller?.completeRecurringTask(taskId, nextDue);
+                        controller.completeRecurringTask(taskId, nextDue);
                         widget.delegate.onRecurringTaskComplete?.call(taskId, nextDue);
                       },
-                      animatingNodeIds: _animatingNodeIds,
-                      completingTaskIds: _completingTaskIds,
-                      onAnimationStart: _onAnimationStart,
-                      onAnimationEnd: _onAnimationEnd,
-                      onCompletingStart: _onCompletingStart,
-                      onCompletingEnd: _onCompletingEnd,
                     ),
                     AttachmentComponentBuilder(
                       editor: controller.editor!,
@@ -340,8 +213,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             NoteToolbar(
               editor: controller.editor!,
               composer: controller.composer!,
-              onAttachFile: () => _onAttach(imageOnly: false),
-              onAttachImage: () => _onAttach(imageOnly: true),
+              onAttachFile: () => controller.pickAndAttachFile(imageOnly: false),
+              onAttachImage: () => controller.pickAndAttachFile(imageOnly: true),
             ),
         ],
       ),

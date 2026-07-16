@@ -306,9 +306,35 @@ class NodeCodec {
           return existingEntry == incomingEntry;
         }
       }
-      return existingDataStr == incoming.data;
+      final existingMap = jsonDecode(existingDataStr) as Map<String, dynamic>;
+      final incomingMap = jsonDecode(incoming.data) as Map<String, dynamic>;
+      if (existingMap.length != incomingMap.length) return false;
+      for (final key in existingMap.keys) {
+        if (!incomingMap.containsKey(key)) return false;
+        if (!_deepEquals(existingMap[key], incomingMap[key])) return false;
+      }
+      return true;
     } catch (_) {
       return false;
     }
+  }
+
+  static bool _deepEquals(dynamic a, dynamic b) {
+    if (a is List && b is List) {
+      if (a.length != b.length) return false;
+      for (int i = 0; i < a.length; i++) {
+        if (!_deepEquals(a[i], b[i])) return false;
+      }
+      return true;
+    }
+    if (a is Map && b is Map) {
+      if (a.length != b.length) return false;
+      for (final key in a.keys) {
+        if (!b.containsKey(key)) return false;
+        if (!_deepEquals(a[key], b[key])) return false;
+      }
+      return true;
+    }
+    return a == b;
   }
 }

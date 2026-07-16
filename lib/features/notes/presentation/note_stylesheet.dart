@@ -42,6 +42,18 @@ Stylesheet noteStylesheet(
         },
       ),
       // Override headers: theme colour + top/bottom spacing.
+      // First header1 has no top padding — documentPadding accounts for it.
+      StyleRule(
+        const BlockSelector('header1').first(),
+        (doc, docNode) => {
+          Styles.padding: const CascadingPadding.only(bottom: 12),
+          Styles.textStyle: TextStyle(
+            color: onSurface,
+            fontSize: 38,
+            fontWeight: FontWeight.bold,
+          ),
+        },
+      ),
       StyleRule(
         const BlockSelector('header1'),
         (doc, docNode) => {

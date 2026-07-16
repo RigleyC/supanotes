@@ -7,13 +7,6 @@ class NoteEditorDelegate {
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
   final void Function(String taskId, DateTime nextDue)? onRecurringTaskComplete;
-  final Future<void> Function(
-    String id,
-    String noteId,
-    String filePath,
-    String mimeType,
-  )?
-  onUploadFile;
 
   const NoteEditorDelegate({
     this.onHasContentChanged,
@@ -21,6 +14,5 @@ class NoteEditorDelegate {
     this.onTaskComplete,
     this.onTaskReopen,
     this.onRecurringTaskComplete,
-    this.onUploadFile,
   });
 }

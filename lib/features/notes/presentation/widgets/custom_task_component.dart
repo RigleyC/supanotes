@@ -20,26 +20,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskComplete,
     this.onTaskReopen,
     this.onRecurringTaskComplete,
-    this.animatingNodeIds = const {},
-    this.completingTaskIds = const {},
-    this.onAnimationStart,
-    this.onAnimationEnd,
-    this.onCompletingStart,
-    this.onCompletingEnd,
   });
 
-  /// The editor used to issue local [ChangeTaskCompletionRequest]s whenever
-  /// the user toggles the checkbox. This is required so the local
-  /// [TaskNode] reflects the user's intent immediately, which lets the
-  /// [NodeSyncManager] serialize the change to `noteNodes.data` (the
-  /// `completed` field) and mark the node as locally dirty so subsequent
-  /// streamed (and possibly stale) snapshots don't overwrite it.
-  ///
-  /// Recurring tasks are exempt: their `completeTask` repo call re-opens
-  /// the row with a new `dueDate` (`status='open'`), so emitting a local
-  /// completion here would have `NodeSyncManager` overwrite that with
-  /// `status='done'`. For those, we rely on the `completingTaskIds`
-  /// transient flag instead.
   Editor? editor;
 
   final MutableDocumentComposer? composer;
@@ -49,12 +31,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
   final void Function(String taskId, DateTime nextDue)? onRecurringTaskComplete;
-  final Set<String> animatingNodeIds;
-  final Set<String> completingTaskIds;
-  final ValueChanged<String>? onAnimationStart;
-  final ValueChanged<String>? onAnimationEnd;
-  final ValueChanged<String>? onCompletingStart;
-  final ValueChanged<String>? onCompletingEnd;
+
+  final Set<String> _completingIds = {};
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -70,7 +48,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt],
       padding: EdgeInsets.zero,
       indent: node.indent,
-      isComplete: completingTaskIds.contains(node.id) || node.isComplete,
+      isComplete: _completingIds.contains(node.id) || node.isComplete,
       setComplete: (bool isComplete) async {
         final isRecurring = taskMetadataById[node.id]?.recurrence != null;
 
@@ -87,11 +65,10 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
         if (isComplete) {
           if (isRecurring) {
-            onCompletingStart?.call(node.id);
+            _completingIds.add(node.id);
           }
 
           if (hideCompleted) {
-            onAnimationStart?.call(node.id);
             FocusManager.instance.primaryFocus?.unfocus();
             composer?.clearSelection();
           }
@@ -104,7 +81,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
             }
           } finally {
             if (isRecurring) {
-              onCompletingEnd?.call(node.id);
+              _completingIds.remove(node.id);
             }
           }
         } else {
@@ -138,9 +115,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       onLongPress: onTaskLongPress == null
           ? null
           : () => onTaskLongPress!(nodeId),
-      onAnimationComplete: () {
-        onAnimationEnd?.call(componentViewModel.nodeId);
-      },
     );
   }
 }
@@ -184,14 +158,12 @@ class CustomTaskComponent extends StatefulWidget {
     this.taskMetadata,
     this.hideCompleted = false,
     this.onLongPress,
-    this.onAnimationComplete,
   });
 
   final TaskComponentViewModel viewModel;
   final TaskModel? taskMetadata;
   final bool hideCompleted;
   final VoidCallback? onLongPress;
-  final VoidCallback? onAnimationComplete;
 
   @override
   State<CustomTaskComponent> createState() => _CustomTaskComponentState();
@@ -202,6 +174,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   final _textKey = GlobalKey();
   
   late bool _isComplete;
+  bool _isAnimating = false;
 
   @override
   void initState() {
@@ -215,6 +188,17 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
       _isComplete = widget.viewModel.isComplete;
     }
+  }
+
+  void _onCheckboxTap() {
+    final newComplete = !_isComplete;
+    setState(() {
+      _isComplete = newComplete;
+      if (widget.hideCompleted && newComplete) {
+        _isAnimating = true;
+      }
+    });
+    widget.viewModel.setComplete!(newComplete);
   }
 
   @override
@@ -242,10 +226,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
               behavior: HitTestBehavior.opaque,
               onTap: widget.viewModel.setComplete == null
                   ? null
-                  : () {
-                      setState(() => _isComplete = !_isComplete);
-                      widget.viewModel.setComplete!(_isComplete);
-                    },
+                  : _onCheckboxTap,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -309,7 +290,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     return TaskExitAnimator(
       hideCompleted: widget.hideCompleted,
       isComplete: _isComplete,
-      onAnimationComplete: widget.onAnimationComplete,
+      onAnimationComplete: _isAnimating
+          ? () => setState(() => _isAnimating = false)
+          : null,
       child: content,
     );
   }

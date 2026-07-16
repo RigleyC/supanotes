@@ -14,7 +14,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_typography.dart';
@@ -241,44 +240,19 @@ class NoteToolbar extends StatelessWidget {
     return null;
   }
 
-  void _updateTitleDismissal(String? activeNodeId, {bool wasPromotedToH1 = false}) {
-    if (activeNodeId == null) return;
-    if (wasPromotedToH1) {
-      clearTitlePromotionDismissed(activeNodeId);
-      return;
-    }
-    final document = editor.context.document;
-    if (document.isEmpty) return;
-    if (document.first.id != activeNodeId) return;
-    final firstNode = document.first;
-    if (firstNode is! ParagraphNode) return;
-    final currentBlock = firstNode.getMetadataValue('blockType');
-    if (currentBlock != header1Attribution) return;
-    markTitlePromotionDismissed(firstNode.id);
-  }
-
   void _toggleInline(Attribution attribution) =>
       NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
 
   void _setBlockType(Attribution? blockType) {
-    final activeNodeId = _activeNodeId(composer.selection);
     NoteEditorCommands.setBlockType(editor, composer, blockType);
-    _updateTitleDismissal(
-      activeNodeId,
-      wasPromotedToH1: blockType == header1Attribution,
-    );
   }
 
   void _convertToListItem(ListItemType type) {
-    final activeNodeId = _activeNodeId(composer.selection);
     NoteEditorCommands.convertToListItem(editor, composer, type);
-    _updateTitleDismissal(activeNodeId);
   }
 
   void _convertToTask() {
-    final activeNodeId = _activeNodeId(composer.selection);
     NoteEditorCommands.convertToTask(editor, composer);
-    _updateTitleDismissal(activeNodeId);
   }
 
   void _indentListItem() =>
