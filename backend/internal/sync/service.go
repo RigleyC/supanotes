@@ -179,8 +179,8 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes, false)
 				if err != nil {
 					if errors.Is(err, ErrNoteDeleted) {
-						slog.Error("sync push: Yjs state rejected because note is deleted", "note_id", ys.NoteID, "user_id", userID)
-						return ErrNoteDeleted
+						slog.Warn("sync push: skipping Yjs state for deleted note", "note_id", ys.NoteID, "user_id", userID)
+						continue
 					}
 					slog.Error("sync push: Yjs state permission check failed", "note_id", ys.NoteID, "user_id", userID, "error", err)
 					return ErrSyncConflict
@@ -228,8 +228,8 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			canEdit, err := s.canEditNote(ctx, r, n.ID, userID, editableNotes, n.DeletedAt.Valid)
 			if err != nil {
 				if errors.Is(err, ErrNoteDeleted) {
-					slog.Error("sync push conflict: note is already deleted", "note_id", n.ID, "user_id", userID)
-					return ErrNoteDeleted
+					slog.Warn("sync push conflict: skipping already deleted note", "note_id", n.ID, "user_id", userID)
+					continue
 				}
 				slog.Error("sync push conflict: note permission check failed", "note_id", n.ID, "user_id", userID, "note_owner_id", n.UserID, "error", err)
 				return ErrSyncConflict

@@ -156,11 +156,12 @@ class SyncService {
 
       final response = await _api.post<List<int>>(
         '/sync/note/$noteId',
-        data: localUpdate.toList(),
+        data: Stream.fromIterable([localUpdate]),
         options: Options(
           headers: {
             'X-State-Vector': base64Encode(stateVector),
           },
+          contentType: 'application/octet-stream',
           responseType: ResponseType.bytes,
         ),
       );
