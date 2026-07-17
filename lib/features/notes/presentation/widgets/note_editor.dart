@@ -131,11 +131,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       );
     }
 
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: Column(
+    return Column(
         children: [
           Expanded(
             child: SuperEditorAndroidControlsScope(
@@ -210,7 +206,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                   controller.pickAndAttachFile(imageOnly: true),
             ),
         ],
-      ),
-    );
+      );
   }
 }

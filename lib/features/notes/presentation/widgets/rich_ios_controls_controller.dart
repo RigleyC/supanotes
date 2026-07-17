@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
@@ -14,24 +14,14 @@ class RichSuperEditorIosControlsController
     required super.documentLayoutResolver,
     required this.operations,
     super.handleColor,
+    this.toolbarBuilder,
   });
 
   /// The operations used for rich copy, paste, and cut.
   final RichCommonEditorOperations operations;
 
   @override
-  DocumentFloatingToolbarBuilder? get toolbarBuilder =>
-      (context, mobileToolbarKey, focalPoint) {
-        if (editor.composer.selection == null) {
-          return const SizedBox();
-        }
+  final DocumentFloatingToolbarBuilder? toolbarBuilder;
 
-        return iOSSystemPopoverEditorToolbarWithFallbackBuilder(
-          context,
-          mobileToolbarKey,
-          focalPoint,
-          operations,
-          SuperEditorIosControlsScope.rootOf(context),
-        );
-      };
+
 }

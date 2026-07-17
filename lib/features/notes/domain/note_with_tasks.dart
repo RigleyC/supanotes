@@ -1,6 +1,8 @@
 import '../domain/note_model.dart';
 import '../../tasks/domain/task_model.dart';
 
+
+
 /// Container that pairs a [NoteModel] with its associated [TaskModel]s.
 /// Used by the editor screen so widgets can watch a single stream instead
 /// of coordinating two independent providers.

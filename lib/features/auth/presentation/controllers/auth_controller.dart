@@ -45,7 +45,6 @@ class AuthController extends AsyncNotifier<User?> {
         'settings': result.session.settings,
         'soul': result.session.soul,
         'contexts': result.session.contexts,
-        'routines': result.session.routines,
       });
       state = AsyncValue.data(result.user);
       return result;

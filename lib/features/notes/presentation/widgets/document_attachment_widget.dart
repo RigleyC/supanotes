@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/utils/format_utils.dart';
 import '../../data/attachments_repository.dart';
 import '../../domain/attachment_model.dart';
 import 'attachment_renderers.dart';
@@ -24,13 +25,6 @@ class DocumentAttachmentWidget extends ConsumerWidget {
   final bool collapseImages;
   final UpstreamDownstreamNodeSelection? selection;
   final Color selectionColor;
-
-  String _formatBytes(int? bytes) {
-    if (bytes == null || bytes == 0) return '';
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,7 +64,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
 
             return AttachmentFilePill(
               fileName: model.fileName,
-              subtitle: _formatBytes(model.fileSize),
+              subtitle: formatBytes(model.fileSize),
               icon: model.type == AttachmentType.video
                   ? Icons.play_circle_outline
                   : Icons.insert_drive_file,

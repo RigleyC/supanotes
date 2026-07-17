@@ -19,24 +19,18 @@ class RecurrencePicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: AppSelectionTile(
-            label: 'Nenhuma',
-            icon: Icons.do_not_disturb_on_outlined,
-            isSelected: initialRecurrence == null,
-            onTap: () => onChanged(null),
-          ),
+        AppSelectionTile(
+          label: 'Nenhuma',
+          icon: Icons.do_not_disturb_on_outlined,
+          isSelected: initialRecurrence == null,
+          onTap: () => onChanged(null),
         ),
         for (final option in TaskRecurrence.values)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppSelectionTile(
-              label: option.getLocalizedLabel(dueDate),
-              icon: option.icon,
-              isSelected: option == initialRecurrence,
-              onTap: () => onChanged(option),
-            ),
+          AppSelectionTile(
+            label: option.getLocalizedLabel(dueDate),
+            icon: option.icon,
+            isSelected: option == initialRecurrence,
+            onTap: () => onChanged(option),
           ),
       ],
     );

@@ -80,7 +80,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
               AppSpacing.lg +
               (PlatformInfo.isIOS26OrHigher()
                   ? AppSpacing.ios26ToolbarHeight
-                  : 0.0),
+                  : 8),
         ),
       ),
       if (_isSearching)
@@ -126,7 +126,14 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       ),
       body: trimmedSearchQuery.isEmpty
           ? notesAsync.when(
-              loading: () => _NotesLoadingView(headerSlivers: headerSlivers),
+              loading: () => CustomScrollView(
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ],
+              ),
               error: (e, _) => AppErrorView(
                 title: 'Erro ao carregar as notas',
                 subtitle: e.toString(),
@@ -210,24 +217,5 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
             onDelete: _deleteNote,
             onToggleFavorite: _toggleFavorite,
           );
-  }
-}
-
-class _NotesLoadingView extends StatelessWidget {
-  const _NotesLoadingView({required this.headerSlivers});
-
-  final List<Widget> headerSlivers;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        ...headerSlivers,
-        const SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      ],
-    );
   }
 }

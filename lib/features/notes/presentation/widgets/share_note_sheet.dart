@@ -59,7 +59,7 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
       children: [
         Text(
           'Compartilhar Nota',
-          style: Theme.of(context).textTheme.titleLarge,
+          style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: AppSpacing.md),
         AppInput(
@@ -70,11 +70,13 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
         ),
         const SizedBox(height: AppSpacing.md),
         InputDecorator(
-          decoration: const InputDecoration(labelText: 'Permissão'),
+          decoration: const InputDecoration(),
           child: DropdownButton<SharePermission>(
             value: _permission,
             isExpanded: true,
             underline: const SizedBox.shrink(),
+            isDense: true,
+
             items: const [
               DropdownMenuItem(
                 value: SharePermission.view,
@@ -103,29 +105,14 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
             ),
           ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Expanded(
-              child: AppButton(
-                text: 'Fechar',
-                variant: AppButtonVariant.secondary,
-                onPressed: shareState.isLoading
-                    ? null
-                    : () => Navigator.pop(context),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: AppButton(
-                text: 'Adicionar',
-                isLoading: shareState.isLoading,
-                onPressed: shareState.isLoading ? null : _submit,
-              ),
-            ),
-          ],
+
+        AppButton(
+          text: 'Adicionar',
+          isLoading: shareState.isLoading,
+          onPressed: shareState.isLoading ? null : _submit,
         ),
-        const SizedBox(height: AppSpacing.lg),
-        const Divider(height: 32),
+        const SizedBox(height: AppSpacing.xxl),
+
         ShareListSection(noteId: widget.noteId),
       ],
     );

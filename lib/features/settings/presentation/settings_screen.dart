@@ -65,12 +65,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.push(AppRoutes.contexts),
           ),
           SettingsTile.navigation(
-            icon: Icons.send_outlined,
-            title: 'Telegram',
-            subtitle: 'Conecte sua conta do Telegram.',
-            onTap: () => context.push(AppRoutes.telegram),
-          ),
-          SettingsTile.navigation(
             icon: Icons.developer_mode_outlined,
             title: 'Protocolo de Contexto (MCP)',
             subtitle: 'Token de acesso e configuração.',

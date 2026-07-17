@@ -1,14 +1,3 @@
-/// Auth-related HTTP calls.
-///
-/// Each public method is a thin wrapper around a single endpoint that:
-///   1. Issues the HTTP call via [ApiClient.dio].
-///   2. Translates a [DioException] into the typed [ApiException] hierarchy
-///      so callers can `try`/`catch` against a single failure type.
-///   3. Persists the JWT pair via [AuthLocalStorage] on success.
-///
-/// The repository does **not** know about Riverpod or widget state — the
-/// [AuthController] is responsible for translating these results into
-/// application state.
 library;
 import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
@@ -41,7 +30,6 @@ class AuthRepository implements IAuthRepository {
   final ApiClient _api;
   final AuthLocalStorage _storage;
 
-  /// `POST /auth/register` → persist tokens, return the [AuthResult].
   @override
   Future<AuthResult> register({
     required String email,
@@ -70,7 +58,6 @@ class AuthRepository implements IAuthRepository {
         'settings': result.session.settings,
         'soul': result.session.soul,
         'contexts': result.session.contexts,
-        'routines': result.session.routines,
       });
       return result;
     } on DioException catch (e) {
@@ -78,7 +65,6 @@ class AuthRepository implements IAuthRepository {
     }
   }
 
-  /// `POST /auth/login` → persist tokens, return the [AuthResult].
   @override
   Future<AuthResult> login({
     required String email,
@@ -106,7 +92,6 @@ class AuthRepository implements IAuthRepository {
         'settings': result.session.settings,
         'soul': result.session.soul,
         'contexts': result.session.contexts,
-        'routines': result.session.routines,
       });
       return result;
     } on DioException catch (e) {
@@ -114,10 +99,6 @@ class AuthRepository implements IAuthRepository {
     }
   }
 
-  /// `POST /auth/logout` → wipe local tokens.
-  ///
-  /// Best-effort: if the network call fails the local tokens are still
-  /// cleared so the user is signed out from the device's perspective.
   @override
   Future<void> logout() async {
     final refreshToken = await _storage.getRefreshToken();
@@ -129,25 +110,17 @@ class AuthRepository implements IAuthRepository {
         );
       }
     } on DioException {
-      // Swallow: we are logging out anyway.
     } finally {
       await _storage.clear();
     }
   }
 
-  /// Whether the device currently holds a (possibly stale) access token.
-  ///
-  /// This is the answer to "do we have a session on disk?" — it does not
-  /// tell you whether the backend still accepts the token. Use the
-  /// [AuthInterceptor] for that: any 401 on a real call will surface as a
-  /// refresh attempt, and a failed refresh will clear the tokens.
   @override
   Future<bool> isAuthenticated() async {
     final token = await _storage.getAccessToken();
     return token != null && token.isNotEmpty;
   }
 
-  /// Registers the device's FCM push token with the backend.
   @override
   Future<void> registerDeviceToken(String token) async {
     try {
@@ -156,7 +129,6 @@ class AuthRepository implements IAuthRepository {
         data: {'token': token, 'platform': _getPlatformName()},
       );
     } on DioException {
-      // Non-fatal — push will simply not work until the next registration.
     }
   }
 }

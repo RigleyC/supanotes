@@ -27,7 +27,6 @@ class AppSelectionTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return ListTile(
-      minVerticalPadding: 0,
       dense: true,
       selected: isSelected,
       onTap: onTap,

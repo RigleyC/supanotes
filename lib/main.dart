@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-import 'core/api/backend_connectivity_hint.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
 import 'shared/widgets/app_snackbar.dart';
@@ -35,7 +34,6 @@ void main() async {
 
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
   await initializeDateFormatting('pt_BR', null);
-  warnIfAndroidBackendUnreachable();
   runApp(
     UncontrolledProviderScope(
       container: container,

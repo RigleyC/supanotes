@@ -303,19 +303,23 @@ extension EditorSelectionPreservation on Editor {
     if (requests.isEmpty) return;
 
     final document = context.document;
-    final composer = context.composer;
-    final oldSelection = composer.selection;
+    DocumentComposer? composer;
+    try {
+      composer = context.composer;
+    } catch (_) {}
+    final oldSelection = composer?.selection;
 
-    if (oldSelection != null) {
-      // Clear selection temporarily to avoid crash during document mutation
-      execute([
-        const ChangeSelectionRequest(
-          null,
-          SelectionChangeType.clearSelection,
-          SelectionReason.contentChange,
-        ),
-      ]);
-    }
+    // Commented out temporary selection clearing to prevent keyboard from closing
+    // during remote sync node replacement.
+    // if (oldSelection != null) {
+    //   execute([
+    //     const ChangeSelectionRequest(
+    //       null,
+    //       SelectionChangeType.clearSelection,
+    //       SelectionReason.contentChange,
+    //     ),
+    //   ]);
+    // }
 
     execute(requests);
 

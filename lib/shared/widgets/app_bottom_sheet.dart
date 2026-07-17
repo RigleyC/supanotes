@@ -16,14 +16,14 @@ Future<T?> showAppBottomSheet<T>({
     isScrollControlled: isScrollControlled,
     useSafeArea: true,
     showDragHandle: true,
-    backgroundColor: isIOS ? CupertinoColors.systemBackground.resolveFrom(context) : null,
-    shape: isIOS
-        ? RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(AppSpacing.radiusXl),
-            ),
-          )
+    backgroundColor: isIOS
+        ? CupertinoColors.systemBackground.resolveFrom(context)
         : null,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(AppSpacing.radiusXl),
+      ),
+    ),
     builder: (ctx) {
       return Padding(
         padding: EdgeInsets.only(
@@ -31,12 +31,7 @@ Future<T?> showAppBottomSheet<T>({
           right: AppSpacing.lg,
           bottom: AppSpacing.lg + MediaQuery.of(ctx).viewInsets.bottom,
         ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * maxHeightFactor,
-          ),
-          child: builder(ctx),
-        ),
+        child: builder(ctx),
       );
     },
   );

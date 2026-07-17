@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
@@ -36,12 +37,6 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
-  Widget _fallbackScaffold(Widget child) => AdaptiveScaffold(
-    body: SafeArea(child: Center(child: child)),
-  );
-
-
-
   Future<void> _handleMenuValue(
     BuildContext context,
     WidgetRef ref,
@@ -75,105 +70,108 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Widget build(BuildContext context) {
     final repo = ref.read(notesRepositoryProvider);
     final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
+    final note = noteWithTasksAsync.asData?.value.note;
 
-    return noteWithTasksAsync.when(
-      data: (noteWithTasks) {
-        final note = noteWithTasks.note;
-        if (note == null) {
-          return _fallbackScaffold(Text(NoteStrings.errorNotFound));
-        }
-
-        final tasksMap = noteWithTasks.taskById;
-
-        final isReadOnly = note.isReadOnly;
-        final hideCompleted = note.hideCompleted;
-
-        return Scaffold(
-          extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-            title: isReadOnly
-                ? Text('${NoteStrings.sharedByPrefix} ${note.sharedByEmail}')
-                : null,
-            actions: [
-              AdaptivePopupMenuButton.icon<String>(
-                icon: Icons.more_vert,
-                items: [
-                  if (note.isOwner)
-                    const AdaptivePopupMenuItem<String>(
-                      label: NoteStrings.shareLabel,
-                      icon: Icons.share_outlined,
-                      value: 'share',
-                    ),
-                  AdaptivePopupMenuItem<String>(
-                    label: hideCompleted
-                        ? NoteStrings.showCompleted
-                        : NoteStrings.hideCompleted,
-                    icon: hideCompleted
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                    value: 'hide_completed',
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+        title: note?.isReadOnly == true
+            ? Text('${NoteStrings.sharedByPrefix} ${note!.sharedByEmail}')
+            : null,
+        actions: [
+          if (note != null) ...[
+            AdaptivePopupMenuButton.icon<String>(
+              icon: Icons.more_vert,
+              items: [
+                if (note.isOwner)
+                  const AdaptivePopupMenuItem<String>(
+                    label: NoteStrings.shareLabel,
+                    icon: CupertinoIcons.share,
+                    value: 'share',
                   ),
-                  if (note.isOwner)
-                    AdaptivePopupMenuItem<String>(
-                      label: note.collapseImages
-                          ? 'Expandir imagens'
-                          : 'Colapsar imagens',
-                      icon: note.collapseImages
-                          ? Icons.image
-                          : Icons.image_outlined,
-                      value: 'collapse_images',
-                    ),
-                ],
-                onSelected: (index, entry) {
-                  final value = entry.value;
-                  if (value != null) {
-                    _handleMenuValue(
-                      context,
-                      ref,
-                      value,
-                      note,
-                      hideCompleted,
-                      repo,
-                    );
-                  }
+                AdaptivePopupMenuItem<String>(
+                  label: note.hideCompleted
+                      ? NoteStrings.showCompleted
+                      : NoteStrings.hideCompleted,
+                  icon: note.hideCompleted
+                      ? CupertinoIcons.eye_solid
+                      : CupertinoIcons.eye_slash_fill,
+                  value: 'hide_completed',
+                ),
+                if (note.isOwner)
+                  AdaptivePopupMenuItem<String>(
+                    label: note.collapseImages
+                        ? 'Expandir imagens'
+                        : 'Colapsar imagens',
+                    icon: note.collapseImages
+                        ? Icons.image
+                        : Icons.image_outlined,
+                    value: 'collapse_images',
+                  ),
+              ],
+              onSelected: (index, entry) {
+                final value = entry.value;
+                if (value != null) {
+                  _handleMenuValue(
+                    context,
+                    ref,
+                    value,
+                    note,
+                    note.hideCompleted,
+                    repo,
+                  );
+                }
+              },
+            ),
+            if (!note.isReadOnly && FocusManager.instance.primaryFocus != null)
+              IconButton(
+                icon: const Icon(Icons.check),
+                onPressed: () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  SystemChannels.textInput.invokeMethod('TextInput.hide');
                 },
               ),
-              if (!isReadOnly)
-                IconButton(
-                  icon: const Icon(Icons.check),
-                  onPressed: () {
-                    FocusManager.instance.primaryFocus?.unfocus();
-                    SystemChannels.textInput.invokeMethod('TextInput.hide');
-                  },
-                ),
-            ],
-          ),
-          body: SafeArea(
-              top: false,
-              bottom: false,
-            child: NoteEditor(
+          ],
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: noteWithTasksAsync.when(
+          data: (noteWithTasks) {
+            final tasksMap = noteWithTasks.taskById;
+            final noteData = noteWithTasks.note;
+            if (noteData == null) {
+              return Center(child: Text(NoteStrings.errorNotFound));
+            }
+
+            final isReadOnly = noteData.isReadOnly;
+            return NoteEditor(
               noteId: widget.noteId,
               taskMetadata: tasksMap,
-              hideCompleted: hideCompleted,
-              collapseImages: note.collapseImages,
+              hideCompleted: noteData.hideCompleted,
+              collapseImages: noteData.collapseImages,
               isReadOnly: isReadOnly,
               delegate: NoteEditorDelegate(
-                  onTaskLongPress: isReadOnly
-                      ? null
-                      : (task, flushSnapshot) async {
-                          await flushSnapshot();
-                          if (!mounted || task == null) return;
-                          await showAppBottomSheet(
-                            context: context,
-                            builder: (_) => TaskMetadataSheet(noteId: task.noteId, task: task),
-                          );
-                        },
+                onTaskLongPress: isReadOnly
+                    ? null
+                    : (task, flushSnapshot) async {
+                        await flushSnapshot();
+                        if (!mounted || task == null) return;
+                        await showAppBottomSheet(
+                          context: context,
+                          builder: (_) => TaskMetadataSheet(
+                            noteId: task.noteId,
+                            task: task,
+                          ),
+                        );
+                      },
                 onTaskComplete: (taskId) =>
                     TaskSnackBarHelper.completeTaskWithFeedback(
                       onComplete: () => ref
@@ -204,16 +202,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 onTaskReopen: (taskId) =>
                     ref.read(tasksRepositoryProvider).reopenTask(taskId),
                 onRecurringTaskComplete: (taskId, nextDue) {
-                  ref.read(noteEditorControllerProvider(widget.noteId))
+                  ref
+                      .read(noteEditorControllerProvider(widget.noteId))
                       .completeRecurringTask(taskId, nextDue);
                 },
               ),
-            ),
-          ),
-        );
-      },
-      loading: () => _fallbackScaffold(const CircularProgressIndicator()),
-      error: (error, _) => _fallbackScaffold(Text('Error: $error')),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(child: Text('Error: $error')),
+        ),
+      ),
     );
   }
 }

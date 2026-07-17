@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
@@ -24,8 +25,6 @@ class TaskMetadataSheet extends ConsumerStatefulWidget {
   final String noteId;
   final TaskModel task;
 
-
-
   @override
   ConsumerState<TaskMetadataSheet> createState() => _TaskMetadataSheetState();
 }
@@ -48,16 +47,18 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
     final noteId = widget.noteId;
     final taskId = widget.task.id;
 
-    ref.read(noteEditorControllerProvider(noteId)).updateTaskMetadataInYDoc(
-      taskId,
-      dueDate: _dueDate,
-      clearDueDate: _dueDate == null,
-      recurrence: _recurrence?.name,
-      clearRecurrence: _recurrence == null,
-      hasTime: _hasTime,
-    );
+    ref
+        .read(noteEditorControllerProvider(noteId))
+        .updateTaskMetadataInYDoc(
+          taskId,
+          dueDate: _dueDate,
+          clearDueDate: _dueDate == null,
+          recurrence: _recurrence?.name,
+          clearRecurrence: _recurrence == null,
+          hasTime: _hasTime,
+        );
 
-    if (mounted) Navigator.pop(context);
+    if (mounted) context.pop();
   }
 
   @override
@@ -66,12 +67,12 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
+        spacing: AppSpacing.sm,
         children: [
           Text(
             'Data de vencimento',
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: AppSpacing.md),
           DueDatePicker(
             initialDate: _dueDate,
             initialHasTime: _hasTime,
@@ -81,9 +82,7 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
               if (d == null) _recurrence = null;
             }),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Text('Repetição', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.md),
+          Text('Repetição', style: Theme.of(context).textTheme.titleMedium),
           RecurrencePicker(
             initialRecurrence: _recurrence,
             dueDate: _dueDate,
@@ -94,25 +93,7 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
               }
             }),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  text: 'Cancelar',
-                  onPressed: () => Navigator.of(context).pop(),
-                  variant: AppButtonVariant.secondary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: AppButton(
-                  text: 'Salvar',
-                  onPressed: _onSave,
-                ),
-              ),
-            ],
-          ),
+          AppButton(text: 'Salvar', onPressed: _onSave),
         ],
       ),
     );

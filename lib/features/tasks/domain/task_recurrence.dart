@@ -34,16 +34,23 @@ extension TaskRecurrenceUI on TaskRecurrence {
     if (dueDate == null) return label;
     switch (this) {
       case TaskRecurrence.daily:
+        return 'Diariamente';
       case TaskRecurrence.weekdays:
-        return label;
+        return 'Nos dias úteis';
       case TaskRecurrence.weekly:
         final weekday = DateFormat.EEEE('pt_BR').format(dueDate);
-        return 'Semanalmente ($weekday)';
+        final feminine = {'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'};
+        if (feminine.contains(weekday)) {
+          return 'Semanalmente, às $weekday';
+        }
+        return 'Semanalmente, aos $weekday';
       case TaskRecurrence.monthly:
         final day = DateFormat('d').format(dueDate);
-        return 'Mensalmente (dia $day)';
+        return 'Mensalmente, no dia $day';
     }
   }
+
+  
 
   IconData get icon {
     switch (this) {

@@ -3,7 +3,7 @@
 ///
 /// The cache is populated by the [AuthController] after a successful auth
 /// flow and persisted to disk via [AuthLocalStorage] so it survives app
-/// restarts. UI controllers (settings, soul, contexts, routines) read from
+/// restarts. UI controllers (settings, soul, contexts) read from
 /// this cache for their initial state, eliminating the cold-start GETs.
 library;
 
@@ -18,23 +18,20 @@ class SessionCache {
     this.settings = const {},
     this.soul = const {},
     this.contexts = const [],
-    this.routines = const [],
   });
 
   final Map<String, dynamic> settings;
   final Map<String, dynamic> soul;
   final List<dynamic> contexts;
-  final List<dynamic> routines;
 
   bool get isEmpty =>
-      settings.isEmpty && soul.isEmpty && contexts.isEmpty && routines.isEmpty;
+      settings.isEmpty && soul.isEmpty && contexts.isEmpty;
 
   factory SessionCache.fromJson(Map<String, dynamic> json) {
     return SessionCache(
       settings: json['settings'] as Map<String, dynamic>? ?? const {},
       soul: json['soul'] as Map<String, dynamic>? ?? const {},
       contexts: json['contexts'] as List<dynamic>? ?? const [],
-      routines: json['routines'] as List<dynamic>? ?? const [],
     );
   }
 
@@ -42,7 +39,6 @@ class SessionCache {
     'settings': settings,
     'soul': soul,
     'contexts': contexts,
-    'routines': routines,
   };
 }
 
@@ -74,7 +70,6 @@ class SessionCacheNotifier extends Notifier<SessionCache> {
       'settings': settings,
       'soul': state.soul,
       'contexts': state.contexts,
-      'routines': state.routines,
     };
     state = SessionCache.fromJson(data);
     await _storage.saveSessionData(data);
@@ -85,7 +80,6 @@ class SessionCacheNotifier extends Notifier<SessionCache> {
       'settings': state.settings,
       'soul': soul,
       'contexts': state.contexts,
-      'routines': state.routines,
     };
     state = SessionCache.fromJson(data);
     await _storage.saveSessionData(data);

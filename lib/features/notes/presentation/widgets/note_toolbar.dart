@@ -72,34 +72,6 @@ class NoteToolbar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _ToolbarButton(
-                  icon: Icons.format_bold,
-                  tooltip: 'Negrito',
-                  isActive: _selectionHasAttribution(
-                    selection,
-                    boldAttribution,
-                  ),
-                  onPressed: () => _toggleInline(boldAttribution),
-                ),
-                _ToolbarButton(
-                  icon: Icons.format_italic,
-                  tooltip: 'Itálico',
-                  isActive: _selectionHasAttribution(
-                    selection,
-                    italicsAttribution,
-                  ),
-                  onPressed: () => _toggleInline(italicsAttribution),
-                ),
-                _ToolbarButton(
-                  icon: Icons.format_strikethrough,
-                  tooltip: 'Tachado',
-                  isActive: _selectionHasAttribution(
-                    selection,
-                    strikethroughAttribution,
-                  ),
-                  onPressed: () => _toggleInline(strikethroughAttribution),
-                ),
-                const _ToolbarDivider(),
                 _LabeledToolbarButton(
                   label: 'H1',
                   isActive: blockType == header1Attribution,
@@ -201,33 +173,7 @@ class NoteToolbar extends StatelessWidget {
     return null;
   }
 
-  bool _selectionHasAttribution(
-    DocumentSelection? selection,
-    Attribution attribution,
-  ) {
-    if (selection == null) return false;
-    final nodes = editor.context.document
-        .getNodesInside(selection.start, selection.end)
-        .whereType<TextNode>();
-    for (final node in nodes) {
-      final start = (selection.start.nodeId == node.id)
-          ? (selection.start.nodePosition as TextNodePosition).offset
-          : 0;
-      final end = (selection.end.nodeId == node.id)
-          ? (selection.end.nodePosition as TextNodePosition).offset
-          : node.text.length;
-      if (start >= end) continue;
-      if (node.text
-          .getAttributionSpansInRange(
-            attributionFilter: (a) => a == attribution,
-            range: SpanRange(start, end),
-          )
-          .isNotEmpty) {
-        return true;
-      }
-    }
-    return false;
-  }
+
 
   ListItemType? _selectedListType(DocumentSelection? selection) {
     if (selection == null) return null;
@@ -240,8 +186,7 @@ class NoteToolbar extends StatelessWidget {
     return null;
   }
 
-  void _toggleInline(Attribution attribution) =>
-      NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
+
 
   void _setBlockType(Attribution? blockType) {
     NoteEditorCommands.setBlockType(editor, composer, blockType);

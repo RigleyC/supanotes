@@ -139,15 +139,7 @@ class YjsSyncManager {
         continue;
       }
 
-      String text = '';
-      try {
-        final sharedType = doc.get('content/$nodeId');
-        if (sharedType is YText) {
-          text = sharedType.toString();
-        }
-      } catch (e) {
-        // Fallback if type is corrupted
-      }
+      final text = _readNodeTextContent(doc, nodeId);
 
       final now = DateTime.now();
 
@@ -214,15 +206,7 @@ class YjsSyncManager {
 
     final lines = <String>[];
     for (final node in nodes) {
-      String text = '';
-      try {
-        final sharedType = doc.get('content/${node.id}');
-        if (sharedType is YText) {
-          text = sharedType.toString();
-        }
-      } catch (e) {
-        // Fallback for corrupted type
-      }
+      final text = _readNodeTextContent(doc, node.id);
       switch (node.type) {
         case 'header':
           int level = 1;
@@ -272,6 +256,24 @@ class YjsSyncManager {
     if (flat.isEmpty) return null;
     if (flat.length <= 120) return flat;
     return '${flat.substring(0, 120)}…';
+  }
+
+  String _readNodeTextContent(Doc doc, String nodeId) {
+    try {
+      final fixedType = doc.getText('content_fixed/$nodeId');
+      if (fixedType != null) {
+        final text = fixedType.toString();
+        if (text.isNotEmpty) return text;
+      }
+    } catch (_) {}
+
+    try {
+      final sharedType = doc.getText('content/$nodeId');
+      if (sharedType != null) {
+        return sharedType.toString();
+      }
+    } catch (_) {}
+    return '';
   }
 
   /// Evict the in-memory Doc for [noteId] so the next [loadDoc] re-reads from DB.
