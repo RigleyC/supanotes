@@ -19,13 +19,26 @@ Future<void> showTaskMetadataSheet({
   required String noteId,
   required TaskModel task,
 }) {
+  final stateHolder = TaskMetadataSheetState(task);
   return FamilyModalSheet.show<void>(
     context: context,
     isDismissible: true,
     enableDrag: true,
     contentBackgroundColor: Color(0XFF333333),
-    builder: (ctx) => TaskMetadataSheet(noteId: noteId, task: task),
+    builder: (ctx) =>
+        TaskMetadataSheet(noteId: noteId, task: task, stateHolder: stateHolder),
   );
+}
+
+class TaskMetadataSheetState {
+  TaskMetadataSheetState(TaskModel task)
+    : dueDate = task.dueDate,
+      recurrence = task.recurrence,
+      hasTime = task.hasTime;
+
+  DateTime? dueDate;
+  TaskRecurrence? recurrence;
+  bool hasTime;
 }
 
 class TaskMetadataSheet extends ConsumerStatefulWidget {
@@ -33,39 +46,30 @@ class TaskMetadataSheet extends ConsumerStatefulWidget {
     super.key,
     required this.noteId,
     required this.task,
+    required this.stateHolder,
   });
 
   final String noteId;
   final TaskModel task;
+  final TaskMetadataSheetState stateHolder;
 
   @override
   ConsumerState<TaskMetadataSheet> createState() => _TaskMetadataSheetState();
 }
 
 class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
-  late DateTime? _dueDate;
-  late TaskRecurrence? _recurrence;
-  late bool _hasTime;
-
-  @override
-  void initState() {
-    super.initState();
-    final t = widget.task;
-    _dueDate = t.dueDate;
-    _recurrence = t.recurrence;
-    _hasTime = t.hasTime;
-  }
+  TaskMetadataSheetState get _s => widget.stateHolder;
 
   void _onClose() {
     ref
         .read(noteEditorControllerProvider(widget.noteId))
         .updateTaskMetadataInYDoc(
           widget.task.id,
-          dueDate: _dueDate,
-          clearDueDate: _dueDate == null,
-          recurrence: _recurrence?.name,
-          clearRecurrence: _recurrence == null,
-          hasTime: _hasTime,
+          dueDate: _s.dueDate,
+          clearDueDate: _s.dueDate == null,
+          recurrence: _s.recurrence?.name,
+          clearRecurrence: _s.recurrence == null,
+          hasTime: _s.hasTime,
         );
   }
 
@@ -77,72 +81,72 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
 
   void _onClearDate() {
     setState(() {
-      _dueDate = null;
-      _hasTime = false;
-      _recurrence = null;
+      _s.dueDate = null;
+      _s.hasTime = false;
+      _s.recurrence = null;
     });
   }
 
   void _onClearTime() {
-    setState(() => _hasTime = false);
+    setState(() => _s.hasTime = false);
   }
 
   void _onClearRecurrence() {
-    setState(() => _recurrence = null);
+    setState(() => _s.recurrence = null);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 24, horizontal: 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        cro
+        crossAxisAlignment: .start,
         children: [
           Text(
             'Editar horário e frequência',
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           _DateTile(
-            dueDate: _dueDate,
-            hasTime: _hasTime,
+            dueDate: _s.dueDate,
+            hasTime: _s.hasTime,
             onTap: () => FamilyModalSheet.of(context).pushPage(
               _TaskDatePage(
-                selected: _dueDate,
+                selected: _s.dueDate,
                 onSelected: (date) => setState(() {
-                  _dueDate = date;
-                  _hasTime = false;
+                  _s.dueDate = date;
+                  _s.hasTime = false;
                 }),
               ),
             ),
             onClear: _onClearDate,
           ),
           _TimeTile(
-            dueDate: _dueDate,
-            hasTime: _hasTime,
+            dueDate: _s.dueDate,
+            hasTime: _s.hasTime,
             onTap: () => FamilyModalSheet.of(context).pushPage(
               _TaskTimePage(
-                currentDueDate: _dueDate!,
+                currentDueDate: _s.dueDate!,
                 onSelected: (date, {hasTime = false}) => setState(() {
-                  _dueDate = date;
-                  _hasTime = hasTime;
+                  _s.dueDate = date;
+                  _s.hasTime = hasTime;
                 }),
               ),
             ),
             onClear: _onClearTime,
           ),
           _RecurrenceTile(
-            recurrence: _recurrence,
-            dueDate: _dueDate,
+            recurrence: _s.recurrence,
+            dueDate: _s.dueDate,
             onTap: () => FamilyModalSheet.of(context).pushPage(
               _TaskRecurrencePage(
-                selected: _recurrence,
-                dueDate: _dueDate,
+                selected: _s.recurrence,
+                dueDate: _s.dueDate,
                 onSelected: (r) => setState(() {
-                  _recurrence = r;
-                  if (r != null && _dueDate == null) {
-                    _dueDate = DateTime.now().startOfDay;
+                  _s.recurrence = r;
+                  if (r != null && _s.dueDate == null) {
+                    _s.dueDate = DateTime.now().startOfDay;
                   }
                 }),
               ),
@@ -171,6 +175,7 @@ class _DateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      contentPadding: EdgeInsets.zero,
       dense: true,
       leading: const Icon(Icons.calendar_today_rounded, size: 20),
       title: Text(
@@ -211,6 +216,7 @@ class _TimeTile extends StatelessWidget {
         : Theme.of(context).colorScheme.onSurfaceVariant;
 
     return ListTile(
+      contentPadding: EdgeInsets.zero,
       dense: true,
       leading: Icon(Icons.access_time_rounded, color: color, size: 20),
       title: Text(
@@ -249,6 +255,7 @@ class _RecurrenceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      contentPadding: EdgeInsets.zero,
       dense: true,
       leading: Icon(Icons.refresh_rounded, size: 20),
       title: Text(
@@ -282,25 +289,30 @@ class _TaskDatePage extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        Container(
+          margin: EdgeInsets.symmetric(vertical: 24, horizontal: 24),
           child: Text(
             'Escolher data',
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
-        ...QuickDueDate.values.map((option) {
-          final date = option.compute(now);
-          return AppSelectionTile(
-            label: option.label,
-            icon: option.icon,
-            isSelected: selected != null && selected!.isSameDayAs(date),
-            onTap: () {
-              onSelected(date);
-              FamilyModalSheet.of(context).popPage();
-            },
-          );
-        }),
+        ListView.builder(
+          shrinkWrap: true,
+          itemCount: QuickDueDate.values.length,
+          itemBuilder: (context, index) {
+            final option = QuickDueDate.values[index];
+            final date = option.compute(now);
+            return AppSelectionTile(
+              label: option.label,
+              icon: option.icon,
+              isSelected: selected != null && selected!.isSameDayAs(date),
+              onTap: () {
+                onSelected(date);
+                FamilyModalSheet.of(context).popPage();
+              },
+            );
+          },
+        ),
         const SizedBox(height: 12),
         CalendarDatePicker(
           initialDate: selected ?? now.startOfDay,
@@ -344,8 +356,8 @@ class _TaskTimePageState extends State<_TaskTimePage> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        Container(
+          margin: EdgeInsets.symmetric(vertical: 24, horizontal: 24),
           child: Text(
             'Escolher horário',
             style: Theme.of(context).textTheme.titleMedium,
