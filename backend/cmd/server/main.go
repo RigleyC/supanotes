@@ -208,11 +208,12 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	compactor := syncpkg.NewCompactor(pool)
 	// Circular dependency: YDocService ↔ RoomManager.
 	// Construct YDocService without RoomManager first, then wire it.
-	ydocSvc := syncpkg.NewYDocService(pool, compactor, nil)
+	ydocSvc := syncpkg.NewYDocService(pool, compactor, nil, machineID)
 	roomMgr := syncpkg.NewRoomManager(leaseMgr, ydocSvc, pool)
 	ydocSvc.SetRoomManager(roomMgr)
 	compactor.SetFlushFunc(ydocSvc.FlushUpdates)
 	ydocSvc.StartFlusher(cronCtx, 500*time.Millisecond)
+	ydocSvc.StartListener(cronCtx)
 	compactor.StartScheduler(cronCtx, 5*time.Minute)
 	// Notes
 	notesRepo := notes.NewRepository(queries)
@@ -238,6 +239,34 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	cronJob := cron.New(cron.WithSeconds())
 	cronJob.AddFunc(cfg.EmbeddingsCronInterval, func() {
 		embeddingsSvc.ProcessPending(cronCtx)
+	})
+	cronJob.AddFunc("0 0 * * * *", func() {
+		tx, err := pool.Begin(cronCtx)
+		if err != nil {
+			log.Error().Err(err).Msg("cron: failed to begin tx for GC")
+			return
+		}
+		defer tx.Rollback(cronCtx)
+		
+		qtx := queries.WithTx(tx)
+		acquired, err := qtx.TryAcquireGCLock(cronCtx)
+		if err != nil {
+			log.Error().Err(err).Msg("cron: failed to acquire GC lock")
+			return
+		}
+		
+		if acquired {
+			log.Info().Msg("cron: acquired GC lock, running hard delete")
+			if err := qtx.HardDeleteOldNotes(cronCtx); err != nil {
+				log.Error().Err(err).Msg("cron: failed to hard delete old notes")
+				return
+			}
+			if err := tx.Commit(cronCtx); err != nil {
+				log.Error().Err(err).Msg("cron: failed to commit GC tx")
+			}
+		} else {
+			log.Debug().Msg("cron: GC lock already held, skipping")
+		}
 	})
 	cronJob.Start()
 

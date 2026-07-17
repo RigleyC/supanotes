@@ -42,6 +42,13 @@ UPDATE notes
 SET deleted_at = NOW()
 WHERE id = $1 AND user_id = $2;
 
+-- name: HardDeleteOldNotes :exec
+DELETE FROM notes
+WHERE deleted_at < NOW() - INTERVAL '30 days';
+
+-- name: TryAcquireGCLock :one
+SELECT pg_try_advisory_xact_lock(hashtext('gc_notes_lock')) AS acquired;
+
 -- name: GetNotes :many
 SELECT
   n.id, n.user_id, n.context_id,

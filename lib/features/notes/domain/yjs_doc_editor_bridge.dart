@@ -149,12 +149,9 @@ class YjsDocEditorBridge {
 
     final text = data['text'] as String?;
     try {
-      final sharedType = _doc.get('content/$id');
-      if (sharedType is YText) {
+      final sharedType = _doc.getText('content/$id');
+      if (sharedType != null) {
         _updateYTextIncrementally(sharedType, text ?? '');
-      } else if (sharedType is YMap) {
-        // Log mismatch, cannot apply text updates to a map
-        dev.log('[YjsBridge] _serializeNode: content/$id is a YMap, skipping text update', name: 'YjsBridge');
       }
     } catch (e) {
       dev.log('[YjsBridge] _serializeNode: failed to get content for $id (corrupted type)', name: 'YjsBridge', error: e);
@@ -162,11 +159,6 @@ class YjsDocEditorBridge {
     dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
   }
 
-  void _copyTaskField(YMap<Object> nodeMap, dynamic existingRaw, String key) {
-    if (existingRaw is YMap && existingRaw.has(key)) {
-      nodeMap.set(key, existingRaw.get(key));
-    }
-  }
 
   void _copyTaskFieldComposite(YMap<Object> nodesMap, dynamic existingRaw, String id, String key) {
     if (existingRaw is YMap && existingRaw.has(key)) {

@@ -77,7 +77,7 @@ func TestMergeYjsUpdates_Single(t *testing.T) {
 
 func TestYDocServiceFlush(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool, nil)
+	svc := NewYDocService(pool, nil, nil, "test")
 	ctx := context.Background()
 
 	noteID := uuid.New().String()
@@ -129,7 +129,7 @@ func TestYDocServiceFlush(t *testing.T) {
 
 func TestYDocServiceFlush_EmptyBuffer(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool, nil)
+	svc := NewYDocService(pool, nil, nil, "test")
 	ctx := context.Background()
 
 	err := svc.FlushUpdates(ctx, "nonexistent-note")
@@ -138,7 +138,7 @@ func TestYDocServiceFlush_EmptyBuffer(t *testing.T) {
 
 func TestYDocServiceFlusher(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool, nil)
+	svc := NewYDocService(pool, nil, nil, "test")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -174,7 +174,7 @@ func TestYDocServiceFlusher(t *testing.T) {
 
 func TestYDocServiceRetainsCanonicalDoc(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool, nil)
+	svc := NewYDocService(pool, nil, nil, "test")
 	ctx := context.Background()
 
 	noteID := uuid.New().String()

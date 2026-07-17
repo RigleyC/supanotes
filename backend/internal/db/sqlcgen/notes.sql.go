@@ -567,6 +567,16 @@ func (q *Queries) GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]Tag
 	return items, nil
 }
 
+const hardDeleteOldNotes = `-- name: HardDeleteOldNotes :exec
+DELETE FROM notes
+WHERE deleted_at < NOW() - INTERVAL '30 days'
+`
+
+func (q *Queries) HardDeleteOldNotes(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, hardDeleteOldNotes)
+	return err
+}
+
 const removeTagFromNote = `-- name: RemoveTagFromNote :exec
 DELETE FROM note_tags
 WHERE note_id = $1 AND tag_id = $2
@@ -580,6 +590,17 @@ type RemoveTagFromNoteParams struct {
 func (q *Queries) RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error {
 	_, err := q.db.Exec(ctx, removeTagFromNote, arg.NoteID, arg.TagID)
 	return err
+}
+
+const tryAcquireGCLock = `-- name: TryAcquireGCLock :one
+SELECT pg_try_advisory_xact_lock(hashtext('gc_notes_lock')) AS acquired
+`
+
+func (q *Queries) TryAcquireGCLock(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, tryAcquireGCLock)
+	var acquired bool
+	err := row.Scan(&acquired)
+	return acquired, err
 }
 
 const updateNote = `-- name: UpdateNote :one

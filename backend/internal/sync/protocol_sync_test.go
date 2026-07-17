@@ -67,7 +67,7 @@ func TestProtocolSync_HandshakeVectors(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil, nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil, "test"),
 	}
 
 	// Add previous content to Room's YDoc
@@ -139,7 +139,7 @@ func TestProtocolSync_UnexpectedMessageType(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil, nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil, "test"),
 	}
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -189,7 +189,7 @@ func TestProtocolSync_MalformedUpdate(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil, nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil, "test"),
 	}
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)

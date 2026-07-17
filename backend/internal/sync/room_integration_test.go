@@ -64,7 +64,7 @@ func newTestWSPair(t *testing.T) (*websocket.Conn, *websocket.Conn) {
 func TestRoomManagerGetOrCreateRoom(t *testing.T) {
 	mgr := NewRoomManager(
 		newMockLeaseManager(),
-		NewYDocService(nil, nil),
+		NewYDocService(nil, nil, nil, "test"),
 		nil,
 	)
 
@@ -82,7 +82,7 @@ func TestRoomManagerGetOrCreateRoom(t *testing.T) {
 func TestRoomManagerGetOrCreateRoomDifferentNotes(t *testing.T) {
 	mgr := NewRoomManager(
 		newMockLeaseManager(),
-		NewYDocService(nil, nil),
+		NewYDocService(nil, nil, nil, "test"),
 		nil,
 	)
 
@@ -101,8 +101,8 @@ func TestRoomAddRemoveClient(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		manager:   NewRoomManager(newMockLeaseManager(), NewYDocService(nil, nil), nil),
-		ydocSvc:   NewYDocService(nil, nil),
+		manager:   NewRoomManager(newMockLeaseManager(), NewYDocService(nil, nil), nil, "test"),
+		ydocSvc:   NewYDocService(nil, nil, nil, "test"),
 	}
 
 	conn1 := newTestWSConn(t)
@@ -139,7 +139,7 @@ func TestRoomAddRemoveClient(t *testing.T) {
 
 func TestRoomRemoveClientLastReleasesLease(t *testing.T) {
 	leaseMgr := newMockLeaseManager()
-	rm := NewRoomManager(leaseMgr, NewYDocService(nil, nil), nil)
+	rm := NewRoomManager(leaseMgr, NewYDocService(nil, nil), nil, "test")
 
 	room, err := rm.GetOrCreateRoom(context.Background(), "note-lease", "machine-a")
 	require.NoError(t, err)
@@ -207,7 +207,7 @@ func TestRoomHandleIncomingUpdateBroadcasts(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil, "test"),
 	}
 
 	wsSender := &wsConn{conn: sender}
@@ -278,7 +278,7 @@ func TestRoomHandleIncomingUpdateSkipsSender(t *testing.T) {
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
 		leaseMgr:  newMockLeaseManager(),
-		ydocSvc:   NewYDocService(nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil, "test"),
 	}
 
 	wsSender := &wsConn{conn: sender}
@@ -353,7 +353,7 @@ func TestRoomHandleHandshake(t *testing.T) {
 		NoteID:    "note-handshake",
 		clients:   make(map[*wsConn]struct{}),
 		stopHeart: make(chan struct{}),
-		ydocSvc:   NewYDocService(nil, nil),
+		ydocSvc:   NewYDocService(nil, nil, nil, "test"),
 	}
 
 	err = room.HandleHandshake(&wsConn{conn: conn})

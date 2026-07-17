@@ -12,21 +12,23 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap, {String? noteIdOv
   String derivedType = nodeMap.get('type') as String? ?? 'paragraph';
 
   try {
-    final sharedType = doc.get('content/$nodeId');
-    if (sharedType is YText) {
-      textContent = sharedType.toString();
-      if (derivedType == 'task') {
-        // CORRUPTION: The metadata says it's a task, but the payload is a text block
-        derivedType = 'corrupted';
-      }
-    } else if (sharedType is YMap) {
-      if (derivedType == 'paragraph') {
-        // CORRUPTION: The metadata says it's a paragraph, but the payload is a YMap (likely due to yjs_dart decoder bug on missing type)
-        derivedType = 'corrupted';
-      }
+    final sharedType = doc.getText('content/$nodeId');
+    textContent = sharedType.toString();
+    if (derivedType == 'task' || derivedType == 'corrupted') {
+      // Validated
     }
   } catch (e) {
     textContent = '';
+    // If it threw, it might be a YMap or missing.
+    // Try to check if it's a YMap by using get()
+    try {
+      final fallbackType = doc.get('content/$nodeId');
+      if (fallbackType is YMap) {
+        if (derivedType == 'paragraph') {
+          derivedType = 'corrupted';
+        }
+      }
+    } catch (_) {}
   }
 
   final rawData = nodeMap.get('data');
@@ -84,19 +86,21 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
     String derivedType = meta['type'] as String? ?? 'paragraph';
 
     try {
-      final sharedType = doc.get('content/$nodeId');
-      if (sharedType is YText) {
-        textContent = sharedType.toString();
-        if (derivedType == 'task') {
-          derivedType = 'corrupted';
-        }
-      } else if (sharedType is YMap) {
-        if (derivedType == 'paragraph') {
-          derivedType = 'corrupted';
-        }
+      final sharedType = doc.getText('content/$nodeId');
+      textContent = sharedType.toString();
+      if (derivedType == 'task' || derivedType == 'corrupted') {
+        // Validated
       }
     } catch (e) {
       textContent = '';
+      try {
+        final fallbackType = doc.get('content/$nodeId');
+        if (fallbackType is YMap) {
+          if (derivedType == 'paragraph') {
+            derivedType = 'corrupted';
+          }
+        }
+      } catch (_) {}
     }
     final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
     

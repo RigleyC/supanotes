@@ -70,6 +70,7 @@ func (m *RoomManager) GetOrCreateRoom(ctx context.Context, noteID string, machin
 	m.mu.Unlock()
 
 	result, err, _ := m.sg.Do(noteID, func() (interface{}, error) {
+
 		startLease := time.Now()
 		m.mu.Lock()
 		if r, ok := m.rooms[noteID]; ok {

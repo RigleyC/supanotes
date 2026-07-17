@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/features/notes/domain/node_codec.dart';
-
 /// Returns a [Stylesheet] that inherits from [defaultStylesheet] and only
 /// overrides what's needed: theme-adaptive colours, tighter list spacing,
 /// and the `task` block type.

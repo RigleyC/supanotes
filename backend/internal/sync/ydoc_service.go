@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 	"regexp"
@@ -31,6 +32,7 @@ type YDocService struct {
 	pool         *pgxpool.Pool
 	projection   projectionRunner
 	roomMgr      *RoomManager
+	machineID    string
 	mu           sync.Mutex
 	docs         map[string]*crdt.Doc
 	buffers      map[string][][]byte
@@ -39,11 +41,12 @@ type YDocService struct {
 	locksMu      sync.Mutex
 }
 
-func NewYDocService(pool *pgxpool.Pool, projection projectionRunner, roomMgr *RoomManager) *YDocService {
+func NewYDocService(pool *pgxpool.Pool, projection projectionRunner, roomMgr *RoomManager, machineID string) *YDocService {
 	return &YDocService{
 		pool:         pool,
 		projection:   projection,
 		roomMgr:      roomMgr,
+		machineID:    machineID,
 		docs:         make(map[string]*crdt.Doc),
 		buffers:      make(map[string][][]byte),
 		failureCount: make(map[string]int),
@@ -302,6 +305,30 @@ func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc
 
 	if s.roomMgr != nil {
 		go s.roomMgr.BroadcastIfActive(noteID, update)
+		
+		// Broadcast to other instances via Postgres NOTIFY
+		go func() {
+			bgCtx := context.Background()
+			
+			b64Update := ""
+			if len(update) < 6000 {
+				b64Update = base64.StdEncoding.EncodeToString(update)
+			} else {
+				// Too big for NOTIFY payload. Flush it to DB immediately, then NOTIFY without update payload.
+				_ = s.flushNoteToDB(bgCtx, noteID, [][]byte{update})
+			}
+			
+			payloadBytes, _ := json.Marshal(map[string]string{
+				"note_id": noteID,
+				"update": b64Update,
+				"machine_id": s.machineID,
+			})
+			
+			_, err := s.pool.Exec(bgCtx, "SELECT pg_notify('yjs_room_updates', $1)", string(payloadBytes))
+			if err != nil {
+				slog.Error("ApplyNodeMutationLocked: notify failed", "error", err)
+			}
+		}()
 	}
 
 	return nil
@@ -431,4 +458,94 @@ func (s *YDocService) flushAll(ctx context.Context) {
 		}()
 	}
 	wg.Wait()
+}
+
+func (s *YDocService) StartListener(ctx context.Context) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			conn, err := s.pool.Acquire(ctx)
+			if err != nil {
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			_, err = conn.Exec(ctx, "LISTEN yjs_room_updates")
+			if err != nil {
+				conn.Release()
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			for {
+				notification, err := conn.Conn().WaitForNotification(ctx)
+				if err != nil {
+					conn.Release()
+					break
+				}
+				s.handleNotification(ctx, notification.Payload)
+			}
+		}
+	}()
+}
+
+func (s *YDocService) handleNotification(ctx context.Context, payload string) {
+	var data map[string]string
+	if err := json.Unmarshal([]byte(payload), &data); err != nil {
+		slog.Error("handleNotification: invalid payload", "error", err)
+		return
+	}
+	noteID := data["note_id"]
+	if noteID == "" {
+		return
+	}
+	if data["machine_id"] == s.machineID {
+		return // Ignore our own broadcast
+	}
+	
+	if s.roomMgr != nil && !s.roomMgr.HasActiveRoom(noteID) {
+		return // Instance does not care about this note right now
+	}
+
+	var update []byte
+	var err error
+	if b64, ok := data["update"]; ok && b64 != "" {
+		update, err = base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			slog.Error("handleNotification: base64 decode failed", "error", err)
+			return
+		}
+	} else {
+		// Too large, fetch from DB
+		update, err = LoadYDocState(ctx, s.pool, noteID)
+		if err != nil {
+			slog.Error("handleNotification: LoadYDocState failed", "error", err)
+			return
+		}
+	}
+
+	doc, err := s.DocFor(ctx, noteID)
+	if err != nil {
+		return
+	}
+	
+	lock := s.getDocLock(noteID)
+	lock.Lock()
+	defer lock.Unlock()
+	
+	if err := crdt.ApplyUpdateV1(doc, update, "remote"); err != nil {
+		slog.Error("handleNotification: ApplyUpdateV1 failed", "error", err)
+		return
+	}
+	
+	if s.projection != nil {
+		s.projection.RunDebouncedProjection(ctx, noteID)
+	}
+	
+	if s.roomMgr != nil {
+		go s.roomMgr.BroadcastIfActive(noteID, update)
+	}
 }

@@ -87,6 +87,7 @@ type Querier interface {
 	HardDeleteExpiredContexts(ctx context.Context) error
 	HardDeleteExpiredNotes(ctx context.Context) error
 	HardDeleteExpiredTasks(ctx context.Context) error
+	HardDeleteOldNotes(ctx context.Context) error
 	InsertAttachment(ctx context.Context, arg InsertAttachmentParams) (Attachment, error)
 	ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]Attachment, error)
 	RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error
@@ -100,6 +101,7 @@ type Querier interface {
 	SearchNotesSemantic(ctx context.Context, arg SearchNotesSemanticParams) ([]SearchNotesSemanticRow, error)
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Task, error)
 	SetWorkingMemoryValue(ctx context.Context, arg SetWorkingMemoryValueParams) (AgentWorkingMemory, error)
+	TryAcquireGCLock(ctx context.Context) (bool, error)
 	UpdateMemory(ctx context.Context, arg UpdateMemoryParams) (Memory, error)
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteContent(ctx context.Context, arg UpdateNoteContentParams) error

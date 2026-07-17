@@ -40,7 +40,7 @@ func TestWSHandler_FlyReplay(t *testing.T) {
 	// Set authorized user context
 	c.Set("user_id", "00000000-0000-0000-0000-000000000000")
 
-	roomMgr := NewRoomManager(newMockLeaseManager(), NewYDocService(pool, nil), pool)
+	roomMgr := NewRoomManager(newMockLeaseManager(), NewYDocService(pool, nil, nil, "test"), pool)
 	handler := NewWSHandler(ctx, roomMgr, pool, "machine-local")
 
 	err = handler.HandleConnect(c)
@@ -87,7 +87,7 @@ func TestWSHandler_AccessDenied(t *testing.T) {
 	// User trying to access has ID 0000-0000, but note belongs to 0000-0009
 	c.Set("user_id", "00000000-0000-0000-0000-000000000000")
 
-	roomMgr := NewRoomManager(newMockLeaseManager(), NewYDocService(pool, nil), pool)
+	roomMgr := NewRoomManager(newMockLeaseManager(), NewYDocService(pool, nil, nil, "test"), pool)
 	handler := NewWSHandler(ctx, roomMgr, pool, "machine-local")
 
 	err = handler.HandleConnect(c)
