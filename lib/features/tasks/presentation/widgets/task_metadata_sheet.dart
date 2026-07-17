@@ -14,73 +14,77 @@ import 'package:supanotes/shared/widgets/app_selection_tile.dart';
 
 import 'due_date_picker.dart' show QuickDueDate;
 
-class TaskMetadataController extends ChangeNotifier {
-  TaskMetadataController(TaskModel task)
-    : _dueDate = task.dueDate,
-      _hasTime = task.hasTime,
-      _recurrence = task.recurrence;
+@immutable
+class TaskMetadataState {
+  final DateTime? dueDate;
+  final bool hasTime;
+  final TaskRecurrence? recurrence;
 
-  DateTime? _dueDate;
-  bool _hasTime = false;
-  TaskRecurrence? _recurrence;
+  const TaskMetadataState({this.dueDate, this.hasTime = false, this.recurrence});
+}
 
-  DateTime? get dueDate => _dueDate;
-  bool get hasTime => _hasTime;
-  TaskRecurrence? get recurrence => _recurrence;
+final _taskModelProvider = Provider.autoDispose<TaskModel>((ref) {
+  throw UnimplementedError('Override me');
+});
+
+class TaskMetadataController extends Notifier<TaskMetadataState> {
+  @override
+  TaskMetadataState build() {
+    final task = ref.watch(_taskModelProvider);
+    return TaskMetadataState(
+      dueDate: task.dueDate,
+      hasTime: task.hasTime,
+      recurrence: task.recurrence,
+    );
+  }
 
   void setDate(DateTime date) {
-    _dueDate = date;
-    _hasTime = false;
-    notifyListeners();
+    state = TaskMetadataState(dueDate: date);
   }
 
   void setTime(DateTime date, {required bool hasTime}) {
-    _dueDate = date;
-    _hasTime = hasTime;
-    notifyListeners();
+    state = TaskMetadataState(dueDate: date, hasTime: hasTime);
   }
 
   void setRecurrence(TaskRecurrence? r) {
-    _recurrence = r;
-    if (r != null && _dueDate == null) {
-      _dueDate = DateTime.now().startOfDay;
-    }
-    notifyListeners();
+    final dueDate = state.dueDate ??
+        (r != null ? DateTime.now().startOfDay : null);
+    state = TaskMetadataState(dueDate: dueDate, recurrence: r);
   }
 
   void clearDate() {
-    _dueDate = null;
-    _hasTime = false;
-    _recurrence = null;
-    notifyListeners();
+    state = const TaskMetadataState();
   }
 
   void clearTime() {
-    _hasTime = false;
-    notifyListeners();
+    state = TaskMetadataState(dueDate: state.dueDate);
   }
 
   void clearRecurrence() {
-    _recurrence = null;
-    notifyListeners();
+    state = TaskMetadataState(dueDate: state.dueDate, hasTime: state.hasTime);
   }
 }
+
+final taskMetadataControllerProvider =
+    NotifierProvider<TaskMetadataController, TaskMetadataState>(
+  TaskMetadataController.new,
+);
 
 Future<void> showTaskMetadataSheet({
   required BuildContext context,
   required String noteId,
   required TaskModel task,
 }) {
-  final controller = TaskMetadataController(task);
   return FamilyModalSheet.show<void>(
     context: context,
     isDismissible: true,
     enableDrag: true,
     contentBackgroundColor: const Color(0XFF333333),
-    builder: (ctx) => _TaskMetadataSheetBody(
-      noteId: noteId,
-      task: task,
-      controller: controller,
+    builder: (ctx) => ProviderScope(
+      overrides: [
+        _taskModelProvider.overrideWithValue(task),
+      ],
+      child: _TaskMetadataSheetBody(noteId: noteId, taskId: task.id),
     ),
   );
 }
@@ -88,13 +92,11 @@ Future<void> showTaskMetadataSheet({
 class _TaskMetadataSheetBody extends ConsumerStatefulWidget {
   const _TaskMetadataSheetBody({
     required this.noteId,
-    required this.task,
-    required this.controller,
+    required this.taskId,
   });
 
   final String noteId;
-  final TaskModel task;
-  final TaskMetadataController controller;
+  final String taskId;
 
   @override
   ConsumerState<_TaskMetadataSheetBody> createState() =>
@@ -105,75 +107,71 @@ class _TaskMetadataSheetBodyState
     extends ConsumerState<_TaskMetadataSheetBody> {
   @override
   void dispose() {
-    final ctrl = widget.controller;
+    final state = ref.read(taskMetadataControllerProvider);
     ref
         .read(noteEditorControllerProvider(widget.noteId))
         .updateTaskMetadataInYDoc(
-          widget.task.id,
-          dueDate: ctrl.dueDate,
-          clearDueDate: ctrl.dueDate == null,
-          recurrence: ctrl.recurrence?.name,
-          clearRecurrence: ctrl.recurrence == null,
-          hasTime: ctrl.hasTime,
+          widget.taskId,
+          dueDate: state.dueDate,
+          clearDueDate: state.dueDate == null,
+          recurrence: state.recurrence?.name,
+          clearRecurrence: state.recurrence == null,
+          hasTime: state.hasTime,
         );
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = widget.controller;
-    return ListenableBuilder(
-      listenable: ctrl,
-      builder: (context, _) {
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Editar horário e frequência',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 16),
-              _DateTile(
-                dueDate: ctrl.dueDate,
-                hasTime: ctrl.hasTime,
-                onTap: () => FamilyModalSheet.of(context).pushPage(
-                  _TaskDatePage(
-                    selected: ctrl.dueDate,
-                    onSelected: ctrl.setDate,
-                  ),
-                ),
-                onClear: ctrl.clearDate,
-              ),
-              _TimeTile(
-                dueDate: ctrl.dueDate,
-                hasTime: ctrl.hasTime,
-                onTap: () => FamilyModalSheet.of(context).pushPage(
-                  _TaskTimePage(
-                    currentDueDate: ctrl.dueDate!,
-                    onSelected: ctrl.setTime,
-                  ),
-                ),
-                onClear: ctrl.clearTime,
-              ),
-              _RecurrenceTile(
-                recurrence: ctrl.recurrence,
-                dueDate: ctrl.dueDate,
-                onTap: () => FamilyModalSheet.of(context).pushPage(
-                  _TaskRecurrencePage(
-                    selected: ctrl.recurrence,
-                    dueDate: ctrl.dueDate,
-                    onSelected: ctrl.setRecurrence,
-                  ),
-                ),
-                onClear: ctrl.clearRecurrence,
-              ),
-            ],
+    final ctrl = ref.watch(taskMetadataControllerProvider);
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Editar horário e frequência',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          _DateTile(
+            dueDate: ctrl.dueDate,
+            hasTime: ctrl.hasTime,
+            onTap: () => FamilyModalSheet.of(context).pushPage(
+              _TaskDatePage(
+                selected: ctrl.dueDate,
+                onSelected: ref.read(taskMetadataControllerProvider.notifier).setDate,
+              ),
+            ),
+            onClear: ref.read(taskMetadataControllerProvider.notifier).clearDate,
+          ),
+          _TimeTile(
+            dueDate: ctrl.dueDate,
+            hasTime: ctrl.hasTime,
+            onTap: () => FamilyModalSheet.of(context).pushPage(
+              _TaskTimePage(
+                currentDueDate: ctrl.dueDate!,
+                onSelected: ref.read(taskMetadataControllerProvider.notifier).setTime,
+              ),
+            ),
+            onClear: ref.read(taskMetadataControllerProvider.notifier).clearTime,
+          ),
+          _RecurrenceTile(
+            recurrence: ctrl.recurrence,
+            dueDate: ctrl.dueDate,
+            onTap: () => FamilyModalSheet.of(context).pushPage(
+              _TaskRecurrencePage(
+                selected: ctrl.recurrence,
+                dueDate: ctrl.dueDate,
+                onSelected: ref.read(taskMetadataControllerProvider.notifier).setRecurrence,
+              ),
+            ),
+            onClear:
+                ref.read(taskMetadataControllerProvider.notifier).clearRecurrence,
+          ),
+        ],
+      ),
     );
   }
 }
