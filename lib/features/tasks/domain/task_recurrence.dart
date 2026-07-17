@@ -39,7 +39,7 @@ extension TaskRecurrenceUI on TaskRecurrence {
         return 'Nos dias úteis';
       case TaskRecurrence.weekly:
         final weekday = DateFormat.EEEE('pt_BR').format(dueDate);
-        final feminine = {'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'};
+        final feminine = {'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira'};
         if (feminine.contains(weekday)) {
           return 'Semanalmente, às $weekday';
         }
