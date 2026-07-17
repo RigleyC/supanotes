@@ -50,18 +50,6 @@ func normalizeNodeMetadata(nodesMap *crdt.YMap, nodeID string, raw any) map[stri
 				meta[key] = val
 			}
 		}
-	case string:
-		var legacy struct {
-			Data map[string]any `json:"data"`
-		}
-		if err := json.Unmarshal([]byte(v), &legacy); err == nil {
-			for k, v := range legacy.Data {
-				switch k {
-				case "completed", "dueDate", "recurrence", "lastCompletedAt":
-					meta[k] = v
-				}
-			}
-		}
 	}
 
 	// Override with composite keys from nodesMap if present
@@ -147,36 +135,6 @@ func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
 				Data:     dataRaw,
 				Text:     text,
 				Metadata: normalizeNodeMetadata(nodesMap, idStr, v),
-			})
-		case string:
-			var nd struct {
-				ID       string          `json:"id"`
-				Type     string          `json:"type"`
-				Position any             `json:"position"`
-				Data     json.RawMessage `json:"data"`
-			}
-			if err := json.Unmarshal([]byte(v), &nd); err != nil {
-				continue
-			}
-			posStr := posToString(nd.Position)
-			text := ""
-			if textType := doc.GetText("content/" + nd.ID); textType != nil {
-				text = textType.ToString()
-			} else {
-				var dataMap map[string]interface{}
-				if json.Unmarshal(nd.Data, &dataMap) == nil {
-					if t, ok := dataMap["text"].(string); ok {
-						text = t
-					}
-				}
-			}
-			entries = append(entries, nodeEntry{
-				ID:       nd.ID,
-				Type:     nd.Type,
-				Position: posStr,
-				Data:     nd.Data,
-				Text:     text,
-				Metadata: normalizeNodeMetadata(nodesMap, nd.ID, v),
 			})
 		}
 	}

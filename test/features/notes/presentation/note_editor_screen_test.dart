@@ -10,7 +10,6 @@ import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
@@ -194,26 +193,6 @@ void main() {
           home: Scaffold(
             body: NoteEditor(
               noteId: 'note-1',
-              nodes: [
-                NoteNode(
-                  id: 'task-1',
-                  noteId: 'note-1',
-                  position: '0',
-                  type: 'task',
-                  data: '{"text":"tarefa concluida","completed":true}',
-                  createdAt: DateTime.now(),
-                  updatedAt: DateTime.now(),
-                ),
-                NoteNode(
-                  id: 'node-2',
-                  noteId: 'note-1',
-                  position: '1',
-                  type: 'paragraph',
-                  data: '{"text":"texto visivel"}',
-                  createdAt: DateTime.now(),
-                  updatedAt: DateTime.now(),
-                ),
-              ],
               taskMetadata: const {},
               hideCompleted: true,
               delegate: const NoteEditorDelegate(),
@@ -259,26 +238,6 @@ void main() {
                     Expanded(
                       child: NoteEditor(
                         noteId: 'note-1',
-                        nodes: [
-                          NoteNode(
-                            id: 'task-1',
-                            noteId: 'note-1',
-                            position: '0',
-                            type: 'task',
-                            data: '{"text":"tarefa concluida","completed":true}',
-                            createdAt: DateTime.now(),
-                            updatedAt: DateTime.now(),
-                          ),
-                          NoteNode(
-                            id: 'node-2',
-                            noteId: 'note-1',
-                            position: '1',
-                            type: 'paragraph',
-                            data: '{"text":"texto visivel"}',
-                            createdAt: DateTime.now(),
-                            updatedAt: DateTime.now(),
-                          ),
-                        ],
                         taskMetadata: const {},
                         hideCompleted: hideCompleted,
                         delegate: const NoteEditorDelegate(),

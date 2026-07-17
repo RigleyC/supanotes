@@ -278,13 +278,7 @@ class NodeCodec {
           ? jsonDecode(node.data) as Map<String, dynamic>
           : <String, dynamic>{};
     } catch (_) {
-      try {
-        data =
-            jsonDecode(utf8.decode(base64Decode(node.data)))
-                as Map<String, dynamic>;
-      } catch (_) {
-        data = <String, dynamic>{};
-      }
+      data = <String, dynamic>{};
     }
     return _createNode(id: node.id, type: node.type, data: data);
   }

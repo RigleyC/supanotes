@@ -44,45 +44,20 @@ func (m *mockRepository) GetSyncNotes(ctx context.Context, userID pgtype.UUID, l
 	return nil, nil
 }
 
-func (m *mockRepository) UpsertNote(ctx context.Context, arg sqlcgen.UpsertNoteParams) (sqlcgen.Note, error) {
-	m.lastUpsertNoteArg = arg
-	return sqlcgen.Note{}, m.upsertNoteErr
-}
-
-func (m *mockRepository) UpsertTask(ctx context.Context, arg sqlcgen.UpsertTaskParams) (sqlcgen.Task, error) {
-	return sqlcgen.Task{}, nil
-}
-
 func (m *mockRepository) GetSyncContexts(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Context, error) {
 	return nil, nil
-}
-
-func (m *mockRepository) UpsertContext(ctx context.Context, arg sqlcgen.UpsertContextParams) (sqlcgen.Context, error) {
-	return sqlcgen.Context{}, nil
 }
 
 func (m *mockRepository) GetSyncTags(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) ([]sqlcgen.Tag, error) {
 	return nil, nil
 }
 
-func (m *mockRepository) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {
-	return sqlcgen.Tag{}, nil
-}
-
 func (m *mockRepository) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
 	return nil, nil
 }
 
-func (m *mockRepository) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error {
-	return nil
-}
-
 func (m *mockRepository) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error) {
 	return nil, nil
-}
-
-func (m *mockRepository) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
-	return nil
 }
 
 func (m *mockRepository) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
@@ -120,10 +95,6 @@ func (m *mockRepository) GetNoteMeta(ctx context.Context, noteID pgtype.UUID) (s
 
 func (m *mockRepository) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
 	return sqlcgen.GetNoteByIDRow{ID: arg.ID, UserID: arg.UserID}, nil
-}
-
-func (m *mockRepository) UpsertNoteYjsState(ctx context.Context, arg sqlcgen.UpsertNoteYjsStateParams) error {
-	return nil
 }
 
 func (m *mockRepository) UpsertNotesBatch(ctx context.Context, arg sqlcgen.UpsertNotesBatchParams) error {

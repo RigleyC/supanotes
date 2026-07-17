@@ -23,7 +23,7 @@ String _readNodeTextContent(Doc doc, String nodeId) {
   return '';
 }
 
-NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap, {String? noteIdOverride}) {
+NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
   final nodeId = nodeMap.get('id') as String?;
   if (nodeId == null) return null;
 
@@ -74,7 +74,7 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap, {String? noteIdOv
       (rawParentId == null || rawParentId.isEmpty) ? null : rawParentId;
   return NoteNode(
     id: nodeId,
-    noteId: noteIdOverride ?? '',
+    noteId: '',
     parentId: resolvedParentId,
     position: nodeMap.get('position')?.toString() ?? 'a0',
     type: derivedType,
@@ -151,20 +151,20 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
   }
 }
 
-NoteNode? noteNodeFromYDoc(Doc doc, String key, {String? noteIdOverride}) {
+NoteNode? noteNodeFromYDoc(Doc doc, String key) {
   final nodesMap = doc.getMap<Object>('nodes')!;
   final raw = nodesMap.get(key);
   if (raw == null) return null;
-  if (raw is YMap) return _readNodeFromYMap(doc, key, raw, noteIdOverride: noteIdOverride);
-  if (raw is String) return _readNodeFromJsonString(doc, key, raw, noteIdOverride: noteIdOverride);
+  if (raw is YMap) return _readNodeFromYMap(doc, key, raw);
+  if (raw is String) return _readNodeFromJsonString(doc, key, raw);
   return null;
 }
 
-List<NoteNode> noteNodesFromDoc(Doc doc, {String? noteIdOverride}) {
+List<NoteNode> noteNodesFromDoc(Doc doc) {
   final nodes = <NoteNode>[];
   final nodesMap = doc.getMap<Object>('nodes')!;
   for (final key in nodesMap.keys) {
-    final node = noteNodeFromYDoc(doc, key, noteIdOverride: noteIdOverride);
+    final node = noteNodeFromYDoc(doc, key);
     if (node != null) nodes.add(node);
   }
 

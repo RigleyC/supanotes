@@ -36,12 +36,6 @@ func (m *mockRepo) DeleteNote(ctx context.Context, id pgtype.UUID, userID pgtype
 func (m *mockRepo) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	return nil, nil
 }
-func (m *mockRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	return 0, nil
-}
-func (m *mockRepo) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
 func (m *mockRepo) WithQuerier(q sqlcgen.Querier) Repository {
 	return m
 }

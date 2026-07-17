@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -127,9 +126,6 @@ func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, err
 	}
 	slog.Info("DocFor: ApplyUpdateV1 done", "note_id", noteID, "elapsed_ms", time.Since(startApply).Milliseconds())
 
-	// P4 migration: upgrade legacy docs where task data is inline in node `data`.
-	MigrateLegacyDoc(doc)
-
 	s.mu.Lock()
 	// Double-check in case another goroutine loaded concurrently.
 	if existing, ok := s.docs[noteID]; ok {
@@ -141,115 +137,6 @@ func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, err
 	s.mu.Unlock()
 	slog.Info("DocFor: doc cached", "note_id", noteID, "total_elapsed_ms", time.Since(startLoad).Milliseconds())
 	return doc, nil
-}
-
-// WARNING: This function has a twin in lib/core/sync/yjs_sync_manager.dart.
-// Both must be kept in sync.
-//
-// Migrates a legacy doc where nodes are stored as JSON strings into nested
-// YMap entries. Task fields (completed, dueDate, recurrence, lastCompletedAt)
-// are promoted to top-level keys on the node's YMap.
-//
-// Idempotent: skips if any node is already a YMap.
-func MigrateLegacyDoc(doc *crdt.Doc) {
-	nodesMap := doc.GetMap("nodes")
-	if nodesMap == nil {
-		return
-	}
-
-	// Check if migration is needed: any node is still a string
-	needsMigration := false
-	for _, key := range nodesMap.Keys() {
-		if strings.Contains(key, ":") {
-			continue
-		}
-		raw, ok := nodesMap.Get(key)
-		if !ok {
-			continue
-		}
-		switch raw.(type) {
-		case *crdt.YMap:
-			// Already migrated, skip
-			continue
-		case string:
-			needsMigration = true
-			break
-		}
-	}
-	if !needsMigration {
-		return
-	}
-
-	slog.Info("MigrateLegacyDoc: migrating doc to nested YMap schema")
-	keys := nodesMap.Keys()
-	doc.Transact(func(txn *crdt.Transaction) {
-		for _, key := range keys {
-			if strings.Contains(key, ":") {
-				continue
-			}
-			raw, ok := nodesMap.Get(key)
-			if !ok {
-				continue
-			}
-			rawStr, ok := raw.(string)
-			if !ok {
-				continue
-			}
-			var meta map[string]interface{}
-			if err := json.Unmarshal([]byte(rawStr), &meta); err != nil {
-				slog.Warn("MigrateLegacyDoc: decode error", "key", key, "error", err)
-				continue
-			}
-
-			nodeMap := &crdt.YMap{}
-			nodeMap.Set(txn, "id", meta["id"])
-			nodeMap.Set(txn, "parentId", meta["parentId"])
-			nodeMap.Set(txn, "position", meta["position"])
-			nodeMap.Set(txn, "type", meta["type"])
-
-			if typeStr, _ := meta["type"].(string); typeStr == "task" {
-				if data, ok := meta["data"].(map[string]interface{}); ok {
-					if completed, exists := data["completed"]; exists {
-						nodeMap.Set(txn, "completed", completed)
-						delete(data, "completed")
-					}
-					if dueDate, exists := data["dueDate"]; exists {
-						nodeMap.Set(txn, "dueDate", dueDate)
-						delete(data, "dueDate")
-					}
-					if recurrence, exists := data["recurrence"]; exists {
-						nodeMap.Set(txn, "recurrence", recurrence)
-						delete(data, "recurrence")
-					}
-					if lastCompletedAt, exists := data["lastCompletedAt"]; exists {
-						nodeMap.Set(txn, "lastCompletedAt", lastCompletedAt)
-						delete(data, "lastCompletedAt")
-					}
-					cleanedData, _ := json.Marshal(data)
-					nodeMap.Set(txn, "data", string(cleanedData))
-				}
-			} else {
-				if data, ok := meta["data"]; ok {
-					switch d := data.(type) {
-					case string:
-						nodeMap.Set(txn, "data", d)
-					case map[string]interface{}, []interface{}:
-						b, _ := json.Marshal(d)
-						nodeMap.Set(txn, "data", string(b))
-					default:
-						nodeMap.Set(txn, "data", d)
-					}
-				}
-			}
-
-			if createdAt, ok := meta["createdAt"]; ok {
-				nodeMap.Set(txn, "createdAt", createdAt)
-			}
-
-			nodesMap.Set(txn, key, nodeMap)
-		}
-	})
-	slog.Info("MigrateLegacyDoc: migration complete")
 }
 
 func (s *YDocService) ApplyNodeMutation(ctx context.Context, noteID string, update []byte) error {

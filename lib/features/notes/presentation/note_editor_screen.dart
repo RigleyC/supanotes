@@ -159,7 +159,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               bottom: false,
             child: NoteEditor(
               noteId: widget.noteId,
-              nodes: const [],
               taskMetadata: tasksMap,
               hideCompleted: hideCompleted,
               collapseImages: note.collapseImages,

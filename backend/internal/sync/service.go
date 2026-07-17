@@ -354,43 +354,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		}
 	}
 
-	for _, ys := range payload.NoteYjsStates {
-		noteUUID, err := parseUUIDStr(ys.NoteID)
-		if err != nil {
-			slog.Error("sync push: invalid note UUID in Yjs state", "note_id", ys.NoteID, "error", err)
-			return err
-		}
-
-		canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes, false)
-		if err != nil {
-			if errors.Is(err, ErrNoteDeleted) {
-				slog.Error("sync push: Yjs state rejected because note is deleted", "note_id", ys.NoteID, "user_id", userID)
-				return ErrNoteDeleted
-			}
-			slog.Error("sync push: Yjs state permission check failed", "note_id", ys.NoteID, "user_id", userID, "error", err)
-			return ErrSyncConflict
-		}
-		if !canEdit {
-			slog.Warn("sync push: skipping Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
-			continue
-		}
-
-		if s.ydoc != nil {
-			// Already handled before the transaction
-			continue
-		}
-
-		// No YDoc service - direct upsert (legacy/fallback)
-		if err := r.UpsertNoteYjsState(ctx, sqlcgen.UpsertNoteYjsStateParams{
-			NoteID:    noteUUID,
-			State:     ys.State,
-			UpdatedAt: pgtype.Timestamptz{Time: ys.UpdatedAt, Valid: true},
-		}); err != nil {
-			slog.Error("sync push: upsert Yjs state failed", "note_id", ys.NoteID, "error", err)
-			return err
-		}
-	}
-
 	for _, p := range payload.UserNotePreferences {
 		ownerID, err := r.GetNoteOwnerID(ctx, p.NoteID)
 		if err != nil {

@@ -133,10 +133,6 @@ class YjsDocEditorBridge {
     // For task nodes, write task fields to composite keys
     if (node is TaskNode) {
       nodesMap.set('$id:completed', node.isComplete);
-      _copyTaskFieldComposite(nodesMap, existingRaw, id, 'dueDate');
-      _copyTaskFieldComposite(nodesMap, existingRaw, id, 'recurrence');
-      _copyTaskFieldComposite(nodesMap, existingRaw, id, 'lastCompletedAt');
-      _copyTaskFieldComposite(nodesMap, existingRaw, id, 'hasTime');
     }
 
     final text = data['text'] as String?;
@@ -165,16 +161,6 @@ class YjsDocEditorBridge {
     }
   }
 
-
-  void _copyTaskFieldComposite(YMap<Object> nodesMap, dynamic existingRaw, String id, String key) {
-    if (existingRaw is YMap && existingRaw.has(key)) {
-      if (!nodesMap.has('$id:$key')) {
-        nodesMap.set('$id:$key', existingRaw.get(key));
-      }
-      // Clean up the legacy key
-      existingRaw.delete(key);
-    }
-  }
 
   void _updateYTextIncrementally(YText ytext, String newText) {
     final oldText = ytext.toString();

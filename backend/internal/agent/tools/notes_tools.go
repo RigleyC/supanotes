@@ -68,18 +68,23 @@ func (t *AddNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 			}
 			prev = pos
 
-			nodeData := nd.Data
+			dataStr := string(nd.Data)
 			if nd.IsTask {
 				var dm map[string]interface{}
 				json.Unmarshal(nd.Data, &dm)
 				dm["completed"] = nd.Complete
-				nodeData, _ = json.Marshal(dm)
+				cleanedData, _ := json.Marshal(dm)
+				dataStr = string(cleanedData)
 			}
 
-			ndJSON := serializeNoteNode(nodeID, nd.Type, nodeData, pos, now)
-			nodesMap.Set(txn, nodeID, string(ndJSON))
+			nodeYMap := &crdt.YMap{}
+			nodeYMap.Set(txn, "id", nodeID)
+			nodeYMap.Set(txn, "type", nd.Type)
+			nodeYMap.Set(txn, "data", dataStr)
+			nodeYMap.Set(txn, "position", pos)
+			nodeYMap.Set(txn, "createdAt", now)
+			nodesMap.Set(txn, nodeID, nodeYMap)
 
-			// Create YText for character-level CRDT on text content
 			if nd.Text != "" {
 				textType := doc.GetText("content/" + nodeID)
 				textType.Insert(txn, 0, nd.Text, nil)
@@ -286,18 +291,23 @@ func (t *AppendToNoteTool) Execute(ctx context.Context, userID pgtype.UUID, sess
 			}
 			prev = pos
 
-			nodeData := nd.Data
+			dataStr := string(nd.Data)
 			if nd.IsTask {
 				var dm map[string]interface{}
 				json.Unmarshal(nd.Data, &dm)
 				dm["completed"] = nd.Complete
-				nodeData, _ = json.Marshal(dm)
+				cleanedData, _ := json.Marshal(dm)
+				dataStr = string(cleanedData)
 			}
 
-			ndJSON := serializeNoteNode(nodeID, nd.Type, nodeData, pos, now)
-			nodesMap.Set(txn, nodeID, string(ndJSON))
+			nodeYMap := &crdt.YMap{}
+			nodeYMap.Set(txn, "id", nodeID)
+			nodeYMap.Set(txn, "type", nd.Type)
+			nodeYMap.Set(txn, "data", dataStr)
+			nodeYMap.Set(txn, "position", pos)
+			nodeYMap.Set(txn, "createdAt", now)
+			nodesMap.Set(txn, nodeID, nodeYMap)
 
-			// Create YText for character-level CRDT on text content
 			if nd.Text != "" {
 				textType := doc.GetText("content/" + nodeID)
 				textType.Insert(txn, 0, nd.Text, nil)
@@ -361,22 +371,6 @@ func (t *LinkNotesTool) Execute(ctx context.Context, userID pgtype.UUID, session
 	return fmt.Sprintf("Bi-directional link created between [%s] and [%s]", args.SourceID, args.TargetID), nil
 }
 
-type noteNodeJSON struct {
-	ID        string          `json:"id"`
-	ParentID  string          `json:"parentId,omitempty"`
-	Position  string          `json:"position"`
-	Type      string          `json:"type"`
-	Data      json.RawMessage `json:"data"`
-	CreatedAt float64         `json:"createdAt,omitempty"`
-	UpdatedAt float64         `json:"updatedAt,omitempty"`
-}
-
-func serializeNoteNode(id, typ string, data []byte, position string, createdAt float64) []byte {
-	j := noteNodeJSON{ID: id, Type: typ, Data: data, Position: position, CreatedAt: createdAt}
-	b, _ := json.Marshal(j)
-	return b
-}
-
 type GetVaultContextTool struct {
 	q sqlcgen.Querier
 }
@@ -432,26 +426,22 @@ func lastNodePosition(doc *crdt.Doc) string {
 		if !ok {
 			continue
 		}
-		nodeStr, ok := raw.(string)
+		nodeMap, ok := raw.(*crdt.YMap)
 		if !ok {
 			continue
 		}
-		var nd struct {
-			Position any `json:"position"`
-		}
-		if json.Unmarshal([]byte(nodeStr), &nd) != nil {
+		posRaw, ok := nodeMap.Get("position")
+		if !ok || posRaw == nil {
 			continue
 		}
 		var posStr string
-		if nd.Position != nil {
-			switch v := nd.Position.(type) {
-			case string:
-				posStr = v
-			case float64:
-				posStr = fmt.Sprintf("%g", v)
-			default:
-				posStr = fmt.Sprintf("%v", nd.Position)
-			}
+		switch v := posRaw.(type) {
+		case string:
+			posStr = v
+		case float64:
+			posStr = fmt.Sprintf("%g", v)
+		default:
+			posStr = fmt.Sprintf("%v", posRaw)
 		}
 		if posStr > maxPos {
 			maxPos = posStr

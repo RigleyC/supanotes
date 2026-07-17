@@ -37,7 +37,6 @@ class YjsSyncManager {
       final doc = Doc();
       try {
         applyUpdate(doc, stateRow.state);
-        _migrateLegacyDoc(doc);
         _docs[noteId] = doc;
         dev.log('[YjsSyncManager] Loaded snapshot for note=$noteId', name: 'YjsSync');
         return doc;
@@ -46,7 +45,6 @@ class YjsSyncManager {
             name: 'YjsSync', error: e, stackTrace: stackTrace);
         await (_db.delete(_db.localYjsStates)..where((t) => t.noteId.equals(noteId))).go();
         final doc = Doc();
-        _migrateLegacyDoc(doc);
         _docs[noteId] = doc;
         dev.log('[YjsSyncManager] Initialized empty doc for note=$noteId after clearing corrupted snapshot. Waiting for server sync.', name: 'YjsSync');
         return doc;
@@ -54,91 +52,12 @@ class YjsSyncManager {
     }
 
     final doc = Doc();
-    _migrateLegacyDoc(doc);
     _docs[noteId] = doc;
     dev.log('[YjsSyncManager] Initialized empty doc for note=$noteId. Waiting for server sync.', name: 'YjsSync');
     return doc;
   }
 
   Future<void> _persistLock = Future.value();
-
-  /// WARNING: This function has a twin in backend/internal/sync/ydoc_service.go.
-  /// Both must be kept in sync.
-  ///
-  /// Migrates a legacy doc where nodes are stored as JSON strings in the
-  /// YMap("nodes") map into nested YMap entries. Task fields (completed,
-  /// dueDate, recurrence, lastCompletedAt) are promoted to top-level YMap keys.
-  ///
-  /// Idempotent: skips if any node is already a YMap.
-  void _migrateLegacyDoc(Doc doc) {
-    final nodesMap = doc.getMap<Object>('nodes')!;
-
-    bool needsMigration = false;
-    for (final key in nodesMap.keys) {
-      if (key.contains(':')) continue;
-      final raw = nodesMap.get(key);
-      if (raw is YMap) continue;
-      if (raw is String) {
-        needsMigration = true;
-        break;
-      }
-    }
-
-    if (!needsMigration) return;
-
-    dev.log('[YjsSyncManager] Migrating legacy doc to nested YMap schema', name: 'YjsSync');
-    doc.transact((txn) {
-      for (final key in nodesMap.keys) {
-        if (key.contains(':')) continue;
-        final raw = nodesMap.get(key);
-        if (raw is! String) continue;
-        try {
-          final meta = jsonDecode(raw) as Map<String, dynamic>;
-
-          final nodeMap = YMap<Object>();
-          nodeMap.set('id', meta['id'] as String? ?? key);
-          nodeMap.set('parentId', meta['parentId'] as String? ?? '');
-          nodeMap.set('position', meta['position']?.toString() ?? 'a0');
-          nodeMap.set('type', meta['type'] as String? ?? 'paragraph');
-
-          if (meta['type'] == 'task') {
-            final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
-            if (data.containsKey('completed')) {
-              nodeMap.set('completed', data['completed'] == true);
-            }
-            if (data.containsKey('dueDate')) {
-              nodeMap.set('dueDate', data['dueDate'] as String);
-            }
-            if (data.containsKey('recurrence')) {
-              nodeMap.set('recurrence', data['recurrence'] as String);
-            }
-            if (data.containsKey('lastCompletedAt')) {
-              nodeMap.set('lastCompletedAt', data['lastCompletedAt'] as String);
-            }
-            // Remove task fields from data before storing
-            data.remove('completed');
-            data.remove('dueDate');
-            data.remove('recurrence');
-            data.remove('lastCompletedAt');
-            nodeMap.set('data', jsonEncode(data));
-          } else {
-            final dataRaw = meta['data'];
-            if (dataRaw is String || dataRaw is num || dataRaw is bool) {
-              nodeMap.set('data', dataRaw);
-            } else {
-              nodeMap.set('data', jsonEncode(dataRaw ?? {}));
-            }
-          }
-
-          nodeMap.set('createdAt', meta['createdAt'] as num? ?? 0);
-          nodesMap.set(key, nodeMap);
-        } catch (e, st) {
-          dev.log('[YjsSyncManager] migration error for key=$key', name: 'YjsSync', error: e, stackTrace: st);
-        }
-      }
-    });
-    dev.log('[YjsSyncManager] Legacy doc migration complete', name: 'YjsSync');
-  }
 
   /// Persist the current in-memory Doc state for [noteId] to the database.
   Future<void> persist(String noteId) async {
@@ -168,7 +87,6 @@ class YjsSyncManager {
   Future<void> projectState(String noteId, Uint8List state) async {
     final doc = Doc();
     applyUpdate(doc, state);
-    _migrateLegacyDoc(doc);
     
     final previousDoc = _docs[noteId];
     _docs[noteId] = doc;
@@ -217,22 +135,6 @@ class YjsSyncManager {
         dueDate = (nodesMap.get('$nodeId:dueDate') as String?) ?? (raw.get('dueDate') as String?);
         hasTime = nodesMap.get('$nodeId:hasTime') == true || raw.get('hasTime') == true;
         recurrence = (nodesMap.get('$nodeId:recurrence') as String?) ?? (raw.get('recurrence') as String?);
-      } else if (raw is String) {
-        // Legacy fallback for un-migrated nodes
-        try {
-          final meta = jsonDecode(raw) as Map<String, dynamic>;
-          if (meta['type'] != 'task') continue;
-          nodeId = meta['id'] as String;
-          position = meta['position']?.toString();
-          final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
-          completed = nodesMap.get('$nodeId:completed') == true || data['completed'] == true;
-          dueDate = (nodesMap.get('$nodeId:dueDate') as String?) ?? (data['dueDate'] as String?);
-          hasTime = nodesMap.get('$nodeId:hasTime') == true || data['hasTime'] == true;
-          recurrence = (nodesMap.get('$nodeId:recurrence') as String?) ?? (data['recurrence'] as String?);
-        } catch (e) {
-          dev.log('[YjsSyncManager] projectNodes: failed to parse legacy node $key', name: 'YjsSync', error: e);
-          continue;
-        }
       } else {
         continue;
       }
@@ -351,14 +253,7 @@ class YjsSyncManager {
     if (raw is YMap) {
       return raw.get('completed') == true;
     }
-    if (raw is! String) return false;
-    try {
-      final meta = jsonDecode(raw) as Map<String, dynamic>;
-      final data = meta['data'] as Map<String, dynamic>? ?? {};
-      return data['completed'] == true;
-    } catch (_) {
-      return false;
-    }
+    return false;
   }
 
   String? _excerptFrom(String content) {

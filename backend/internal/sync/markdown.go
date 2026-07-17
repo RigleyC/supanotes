@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/reearth/ygo/crdt"
@@ -15,7 +16,19 @@ func deriveMarkdownFromDoc(doc *crdt.Doc) string {
 	for _, nd := range entries {
 		switch nd.Type {
 		case "header":
-			lines = append(lines, "# "+nd.Text)
+			level := 1
+			var data struct {
+				Level int `json:"level"`
+			}
+			if nd.Data != nil {
+				json.Unmarshal(nd.Data, &data)
+				level = data.Level
+				if level < 1 {
+					level = 1
+				}
+			}
+			prefix := strings.Repeat("#", level)
+			lines = append(lines, prefix+" "+nd.Text)
 		case "task":
 			completed, _ := nd.Metadata["completed"].(bool)
 			checkbox := " "

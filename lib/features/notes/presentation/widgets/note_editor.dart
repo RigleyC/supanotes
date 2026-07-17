@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
@@ -22,7 +21,6 @@ import 'package:supanotes/features/tasks/domain/task_model.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
-  final List<NoteNode> nodes;
   final Map<String, TaskModel> taskMetadata;
   final bool hideCompleted;
   final bool collapseImages;
@@ -32,7 +30,6 @@ class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({
     super.key,
     required this.noteId,
-    required this.nodes,
     required this.taskMetadata,
     this.hideCompleted = false,
     this.collapseImages = false,

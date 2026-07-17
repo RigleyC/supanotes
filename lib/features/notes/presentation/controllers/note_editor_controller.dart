@@ -8,7 +8,6 @@ import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
-import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 
 import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
@@ -99,10 +98,6 @@ class NoteEditorController extends ChangeNotifier {
     );
   }
 
-  void syncTaskStates(Map<String, bool> taskCompletionMap) {
-    _coordinator?.syncTaskStates(taskCompletionMap);
-  }
-
   void _setupEditor() {
     composer = MutableDocumentComposer();
     editor = createDefaultDocumentEditor(
@@ -178,10 +173,6 @@ class NoteEditorController extends ChangeNotifier {
 
   void resumeSync() {
     _coordinator?.resumeSync();
-  }
-
-  void updateNodesIncrementally(List<NoteNode> incomingNodes) {
-    _coordinator?.updateNodesIncrementally(incomingNodes);
   }
 
   @override

@@ -528,19 +528,12 @@ func (m *mockNotesRepo) DeleteNote(ctx context.Context, id pgtype.UUID, userID p
 func (m *mockNotesRepo) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	panic("unimplemented")
 }
-func (m *mockNotesRepo) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	panic("unimplemented")
-}
 func (m *mockNotesRepo) CreateTask(ctx context.Context, arg sqlcgen.CreateTaskParams) (sqlcgen.Task, error) {
 	return m.q.CreateTask(ctx, arg)
 }
 func (m *mockNotesRepo) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
 	return m.q.DeleteTaskByNodeID(ctx, sqlcgen.DeleteTaskByNodeIDParams(arg))
 }
-func (m *mockNotesRepo) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error) {
-	return m.q.GetTasksByNoteID(ctx, sqlcgen.GetTasksByNoteIDParams{UserID: userID, NoteID: noteID})
-}
-
 func TestGetNoteTool_Execute(t *testing.T) {
 	q := &stubQuerier{
 		getNoteByID: func(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {

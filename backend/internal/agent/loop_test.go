@@ -148,9 +148,6 @@ func (s *stubLoopTasksRepo) GetTodayTasks(ctx context.Context, userID pgtype.UUI
 func (s *stubLoopTasksRepo) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error) {
 	panic("unimplemented")
 }
-func (s *stubLoopTasksRepo) CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, dueDate pgtype.Date) (sqlcgen.TaskCompletion, error) {
-	panic("unimplemented")
-}
 func (s *stubLoopTasksRepo) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	panic("unimplemented")
 }

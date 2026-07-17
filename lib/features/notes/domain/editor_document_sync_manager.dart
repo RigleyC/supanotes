@@ -188,10 +188,6 @@ class EditorDocumentSyncManager {
     _applyRemote(() => _applyIncomingNodes(incomingNodes));
   }
 
-  void syncTaskStates(Map<String, bool> taskCompletionMap) {
-    _applyRemote(() => _applyTaskCompletionStates(taskCompletionMap));
-  }
-
   void _applyRemote(void Function() fn) {
     suspendSync();
     try {
@@ -278,24 +274,6 @@ class EditorDocumentSyncManager {
       }
     }
 
-    if (requests.isNotEmpty) {
-      _editor.executePreservingSelection(requests);
-    }
-  }
-
-  void _applyTaskCompletionStates(Map<String, bool> taskCompletionMap) {
-    final requests = <EditRequest>[];
-    for (final node in _document) {
-      if (node is TaskNode) {
-        final isDbCompleted = taskCompletionMap[node.id];
-        if (isDbCompleted != null && node.isComplete != isDbCompleted) {
-          requests.add(ChangeTaskCompletionRequest(
-            nodeId: node.id,
-            isComplete: isDbCompleted,
-          ));
-        }
-      }
-    }
     if (requests.isNotEmpty) {
       _editor.executePreservingSelection(requests);
     }

@@ -16,7 +16,6 @@ type Repository interface {
 	GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) ([]sqlcgen.Task, error)
 	GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo pgtype.Date) ([]sqlcgen.Task, error)
 	GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error)
-	CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, dueDate pgtype.Date) (sqlcgen.TaskCompletion, error)
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
@@ -58,10 +57,6 @@ func (r *repository) GetTodayTasks(ctx context.Context, userID pgtype.UUID, upTo
 
 func (r *repository) GetTasksByNoteID(ctx context.Context, userID pgtype.UUID, noteID pgtype.UUID) ([]sqlcgen.Task, error) {
 	return r.q.GetTasksByNoteID(ctx, sqlcgen.GetTasksByNoteIDParams{UserID: userID, NoteID: noteID})
-}
-
-func (r *repository) CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, dueDate pgtype.Date) (sqlcgen.TaskCompletion, error) {
-	return r.q.CreateTaskCompletion(ctx, sqlcgen.CreateTaskCompletionParams{TaskID: taskID, DueDate: dueDate})
 }
 
 func (r *repository) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {

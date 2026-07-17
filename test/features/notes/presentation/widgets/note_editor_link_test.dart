@@ -24,7 +24,6 @@ void main() {
             home: Scaffold(
               body: NoteEditor(
                 noteId: 'test-note',
-                nodes: const [],
                 taskMetadata: const {},
                 delegate: const NoteEditorDelegate(),
               ),

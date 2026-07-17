@@ -10,9 +10,8 @@ import (
 
 type mockRepository struct {
 	Repository
-	getTaskByID          func(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Task, error)
-	createTaskCompletion func(ctx context.Context, taskID pgtype.UUID, dueDate pgtype.Date) (sqlcgen.TaskCompletion, error)
-	updateTask           func(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error)
+	getTaskByID func(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Task, error)
+	updateTask  func(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error)
 }
 
 func (m *mockRepository) GetTaskByID(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.Task, error) {
@@ -20,13 +19,6 @@ func (m *mockRepository) GetTaskByID(ctx context.Context, id pgtype.UUID, userID
 		return m.getTaskByID(ctx, id, userID)
 	}
 	return sqlcgen.Task{}, nil
-}
-
-func (m *mockRepository) CreateTaskCompletion(ctx context.Context, taskID pgtype.UUID, dueDate pgtype.Date) (sqlcgen.TaskCompletion, error) {
-	if m.createTaskCompletion != nil {
-		return m.createTaskCompletion(ctx, taskID, dueDate)
-	}
-	return sqlcgen.TaskCompletion{}, nil
 }
 
 func (m *mockRepository) UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
