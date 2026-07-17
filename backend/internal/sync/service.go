@@ -168,44 +168,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	}
 
 	if s.pool != nil {
-		if s.ydoc != nil {
-			for _, ys := range payload.NoteYjsStates {
-				noteUUID, err := parseUUIDStr(ys.NoteID)
-				if err != nil {
-					slog.Error("sync push: invalid note UUID in Yjs state", "note_id", ys.NoteID, "error", err)
-					return err
-				}
-
-				canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes, false)
-				if err != nil {
-					if errors.Is(err, ErrNoteDeleted) {
-						slog.Warn("sync push: skipping Yjs state for deleted note", "note_id", ys.NoteID, "user_id", userID)
-						continue
-					}
-					slog.Error("sync push: Yjs state permission check failed", "note_id", ys.NoteID, "user_id", userID, "error", err)
-					return ErrSyncConflict
-				}
-				if !canEdit {
-					// Note doesn't exist on server yet or user lacks permission.
-					// Skip instead of aborting — the note header may be upserted
-					// later in this push, and the Yjs state will sync next cycle.
-					slog.Warn("sync push: skipping Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
-					continue
-				}
-
-				_, err = s.ydoc.DocFor(ctx, ys.NoteID)
-				if err != nil {
-					slog.Error("sync push: pre-load DocFor failed", "note_id", ys.NoteID, "error", err)
-					return err
-				}
-
-				if err := s.ydoc.ApplyNodeMutation(ctx, ys.NoteID, ys.State); err != nil {
-					slog.Error("sync push: ApplyNodeMutation failed", "note_id", ys.NoteID, "error", err)
-					return err
-				}
-			}
-		}
-
 		startTx := time.Now()
 		var err error
 		tx, err = s.pool.Begin(ctx)
@@ -271,6 +233,46 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 				Column7: createdAts, Column8: deletedAts,
 			}); err != nil {
 				return fmt.Errorf("batch upsert notes: %w", err)
+			}
+		}
+	}
+
+	// Apply Yjs states AFTER the note upsert so the note row is guaranteed to
+	// exist before we write to note_yjs_updates (which has a FK on notes.id).
+	// This also fixes new-note sync: previously the Yjs block ran before the
+	// upsert, so canEditNote would find nothing in the DB for a brand-new note
+	// even though editableNotes was pre-populated correctly.
+	if s.pool != nil && s.ydoc != nil {
+		for _, ys := range payload.NoteYjsStates {
+			noteUUID, err := parseUUIDStr(ys.NoteID)
+			if err != nil {
+				slog.Error("sync push: invalid note UUID in Yjs state", "note_id", ys.NoteID, "error", err)
+				return err
+			}
+
+			canEdit, err := s.canEditNote(ctx, r, noteUUID, userID, editableNotes, false)
+			if err != nil {
+				if errors.Is(err, ErrNoteDeleted) {
+					slog.Warn("sync push: skipping Yjs state for deleted note", "note_id", ys.NoteID, "user_id", userID)
+					continue
+				}
+				slog.Error("sync push: Yjs state permission check failed", "note_id", ys.NoteID, "user_id", userID, "error", err)
+				return ErrSyncConflict
+			}
+			if !canEdit {
+				slog.Warn("sync push: skipping Yjs state for non-editable note", "note_id", ys.NoteID, "user_id", userID)
+				continue
+			}
+
+			_, err = s.ydoc.DocFor(ctx, ys.NoteID)
+			if err != nil {
+				slog.Error("sync push: pre-load DocFor failed", "note_id", ys.NoteID, "error", err)
+				return err
+			}
+
+			if err := s.ydoc.ApplyNodeMutation(ctx, ys.NoteID, ys.State); err != nil {
+				slog.Error("sync push: ApplyNodeMutation failed", "note_id", ys.NoteID, "error", err)
+				return err
 			}
 		}
 	}

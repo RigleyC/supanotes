@@ -16,11 +16,20 @@ import 'features/auth/domain/user.dart';
 
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:timezone/data/latest.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:timezone/timezone.dart' as tz;
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initializeTimeZones();
+  
+  try {
+    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
+  } catch (e) {
+    debugPrint('Failed to get local timezone: $e');
+  }
 
   final sharedPreferences = await SharedPreferences.getInstance();
 

@@ -99,15 +99,21 @@ class SyncService {
     await disconnectNote();
     debugPrint('[SyncService] connectNote disconnected previous elapsed=${sw.elapsedMilliseconds}ms');
 
-    _activeNoteId = noteId;
     _lastSyncedStateVector = null;
 
     try {
       final noteData = await _db.notesDao.getNoteById(noteId);
       if (noteData != null && !noteData.hasRemoteCopy) {
+        // Push BEFORE marking the note as active so the Yjs state is not
+        // filtered out by _isActiveNote() inside push().
         debugPrint('[SyncService] connectNote: note missing on server, pushing first...');
         await push();
+        // Clear the Yjs sync timestamp so the next batch sync re-sends the
+        // state if the server silently dropped it (e.g. race on note insert).
+        _lastYjsSyncAt.remove(noteId);
       }
+
+      _activeNoteId = noteId;
       debugPrint('[SyncService] connectNote loading doc elapsed=${sw.elapsedMilliseconds}ms');
       final doc = await _yjsMgr.loadDoc(noteId);
       debugPrint('[SyncService] connectNote doc loaded elapsed=${sw.elapsedMilliseconds}ms');
