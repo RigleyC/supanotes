@@ -71,7 +71,6 @@ dependencies:
   # CRDT collaborative editing
   yjs_dart:
     path: packages/yjs_dart
-  web_socket_channel: ^3.0.0
 
   # UI
   adaptive_platform_ui: ^0.1.107
@@ -111,7 +110,6 @@ dev_dependencies:
   # Mocking
   mocktail: ^1.0.4
   postgres: ^3.5.12
-  crdt_lf: ^3.2.1
 
 # Force the git-sourced super_editor to satisfy super_editor_clipboard's
 # transitive dependency on the hosted package. This is the standard pattern

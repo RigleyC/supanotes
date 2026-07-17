@@ -204,15 +204,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	if machineID == "" {
 		machineID = "default"
 	}
-	leaseMgr := syncpkg.NewLeaseManager(pool)
 	compactor := syncpkg.NewCompactor(pool)
-	// Circular dependency: YDocService ↔ RoomManager.
-	// Construct YDocService without RoomManager first, then wire it.
-	ydocSvc := syncpkg.NewYDocService(pool, compactor, nil, machineID)
-	roomMgr := syncpkg.NewRoomManager(leaseMgr, ydocSvc, pool)
-	ydocSvc.SetRoomManager(roomMgr)
-	compactor.SetFlushFunc(ydocSvc.FlushUpdates)
-	ydocSvc.StartFlusher(cronCtx, 500*time.Millisecond)
+	ydocSvc := syncpkg.NewYDocService(pool, compactor, machineID)
 	ydocSvc.StartListener(cronCtx)
 	compactor.StartScheduler(cronCtx, 5*time.Minute)
 	// Notes
@@ -424,9 +417,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	routinesH := routines.NewHandler(routinesSvc)
 	routines.RegisterRoutes(protected, routinesH)
 
-	// WebSocket sync handler
-	wsH := syncpkg.NewWSHandler(cronCtx, roomMgr, pool, machineID)
-	protected.GET("/sync/ws/:note_id", wsH.HandleConnect)
+	// REST sync handler
+	protected.POST("/sync/note/:id", syncpkg.PostSyncHandler(ydocSvc))
 
 	// Agent Loop (built before the runner so the runner and the
 	// gateway can both depend on it).
@@ -477,7 +469,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	// Sync (push/pull)
 	syncRepo := syncpkg.NewRepository(queries)
-	syncSvc := syncpkg.NewService(syncRepo, pool, ydocSvc, roomMgr)
+	syncSvc := syncpkg.NewService(syncRepo, pool, ydocSvc)
 	syncH := syncpkg.NewHandler(syncSvc)
 	protected.POST("/sync/push", syncH.Push)
 	protected.POST("/sync/pull", syncH.Pull)

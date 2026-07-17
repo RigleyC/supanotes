@@ -171,7 +171,7 @@ func TestCompactorRunDebouncedProjectionProjects(t *testing.T) {
 	ctx := context.Background()
 	pool := setupTestDB(t)
 	compactor := NewCompactor(pool)
-	ydocSvc := NewYDocService(pool, compactor, nil, "test")
+	ydocSvc := NewYDocService(pool, compactor, "test")
 	noteID := uuid.New().String()
 	insertNoteForCompactor(t, ctx, pool, noteID)
 	t.Cleanup(func() {

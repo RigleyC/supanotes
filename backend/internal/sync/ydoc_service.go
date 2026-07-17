@@ -29,35 +29,23 @@ type projectionRunner interface {
 }
 
 type YDocService struct {
-	pool         *pgxpool.Pool
-	projection   projectionRunner
-	roomMgr      *RoomManager
-	machineID    string
-	mu           sync.Mutex
-	docs         map[string]*crdt.Doc
-	buffers      map[string][][]byte
-	failureCount map[string]int
-	docLocks     map[string]*sync.Mutex
-	locksMu      sync.Mutex
+	pool       *pgxpool.Pool
+	projection projectionRunner
+	machineID  string
+	mu         sync.Mutex
+	docs       map[string]*crdt.Doc
+	docLocks   map[string]*sync.Mutex
+	locksMu    sync.Mutex
 }
 
-func NewYDocService(pool *pgxpool.Pool, projection projectionRunner, roomMgr *RoomManager, machineID string) *YDocService {
+func NewYDocService(pool *pgxpool.Pool, projection projectionRunner, machineID string) *YDocService {
 	return &YDocService{
-		pool:         pool,
-		projection:   projection,
-		roomMgr:      roomMgr,
-		machineID:    machineID,
-		docs:         make(map[string]*crdt.Doc),
-		buffers:      make(map[string][][]byte),
-		failureCount: make(map[string]int),
-		docLocks:     make(map[string]*sync.Mutex),
+		pool:       pool,
+		projection: projection,
+		machineID:  machineID,
+		docs:       make(map[string]*crdt.Doc),
+		docLocks:   make(map[string]*sync.Mutex),
 	}
-}
-
-// SetRoomManager sets the RoomManager after construction to break the
-// circular dependency: YDocService ↔ RoomManager. Call once before use.
-func (s *YDocService) SetRoomManager(mgr *RoomManager) {
-	s.roomMgr = mgr
 }
 
 func (s *YDocService) getDocLock(noteID string) *sync.Mutex {
@@ -293,84 +281,61 @@ func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc
 	}
 	slog.Debug("ApplyNodeMutationLocked: ApplyUpdateV1 done", "note_id", noteID, "update_bytes", len(update), "elapsed_ms", time.Since(startApply).Milliseconds())
 
-	s.mu.Lock()
-	s.buffers[noteID] = append(s.buffers[noteID], update)
-	bufLen := len(s.buffers[noteID])
-	s.mu.Unlock()
-	slog.Debug("ApplyNodeMutationLocked: buffered", "note_id", noteID, "buffer_len", bufLen)
+	// Persist synchronously to DB
+	if err := s.persistNoteToDB(ctx, noteID, update); err != nil {
+		slog.Error("ApplyNodeMutationLocked: persist failed", "note_id", noteID, "error", err)
+		return err
+	}
 
 	if s.projection != nil {
 		s.projection.RunDebouncedProjection(ctx, noteID)
 	}
 
-	if s.roomMgr != nil {
-		go s.roomMgr.BroadcastIfActive(noteID, update)
-		
-		// Broadcast to other instances via Postgres NOTIFY
-		go func() {
-			bgCtx := context.Background()
-			
-			b64Update := ""
-			if len(update) < 6000 {
-				b64Update = base64.StdEncoding.EncodeToString(update)
-			} else {
-				// Too big for NOTIFY payload. Flush it to DB immediately, then NOTIFY without update payload.
-				_ = s.flushNoteToDB(bgCtx, noteID, [][]byte{update})
-			}
-			
-			payloadBytes, _ := json.Marshal(map[string]string{
-				"note_id": noteID,
-				"update": b64Update,
-				"machine_id": s.machineID,
-			})
-			
-			_, err := s.pool.Exec(bgCtx, "SELECT pg_notify('yjs_room_updates', $1)", string(payloadBytes))
-			if err != nil {
-				slog.Error("ApplyNodeMutationLocked: notify failed", "error", err)
-			}
-		}()
-	}
+	// Broadcast to other instances via Postgres NOTIFY
+	go func() {
+		bgCtx := context.Background()
+
+		b64Update := ""
+		if len(update) < 6000 {
+			b64Update = base64.StdEncoding.EncodeToString(update)
+		} else {
+			_ = s.persistNoteToDB(bgCtx, noteID, update)
+		}
+
+		payloadBytes, _ := json.Marshal(map[string]string{
+			"note_id":    noteID,
+			"update":     b64Update,
+			"machine_id": s.machineID,
+		})
+
+		_, err := s.pool.Exec(bgCtx, "SELECT pg_notify('yjs_room_updates', $1)", string(payloadBytes))
+		if err != nil {
+			slog.Error("ApplyNodeMutationLocked: notify failed", "error", err)
+		}
+	}()
 
 	return nil
 }
 
-func (s *YDocService) flushNoteToDB(ctx context.Context, noteID string, updates [][]byte) error {
-	startMerge := time.Now()
-	merged, err := mergeYjsUpdates(updates)
-	if err != nil {
-		slog.Error("flushNoteToDB: merge failed", "note_id", noteID, "error", err)
-		return err
-	}
-	slog.Info("flushNoteToDB: merged", "note_id", noteID, "updates", len(updates), "merged_bytes", len(merged), "elapsed_ms", time.Since(startMerge).Milliseconds())
-
-	startTx := time.Now()
+func (s *YDocService) persistNoteToDB(ctx context.Context, noteID string, update []byte) error {
+	startInsert := time.Now()
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		slog.Error("flushNoteToDB: begin tx failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startTx).Milliseconds())
+		slog.Error("persistNoteToDB: begin tx failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startInsert).Milliseconds())
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	startLock := time.Now()
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext('nodes'))", noteID); err != nil {
-		slog.Error("flushNoteToDB: advisory lock failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startLock).Milliseconds())
+	if _, err := tx.Exec(ctx, "INSERT INTO note_yjs_updates (note_id, update_data) VALUES ($1, $2)", noteID, update); err != nil {
+		slog.Error("persistNoteToDB: insert failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startInsert).Milliseconds())
 		return err
 	}
-	slog.Info("flushNoteToDB: advisory lock acquired", "note_id", noteID, "elapsed_ms", time.Since(startLock).Milliseconds())
 
-	startInsert := time.Now()
-	if _, err := tx.Exec(ctx, "INSERT INTO note_yjs_updates (note_id, update_data) VALUES ($1, $2)", noteID, merged); err != nil {
-		slog.Error("flushNoteToDB: insert failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startInsert).Milliseconds())
-		return err
-	}
-	slog.Info("flushNoteToDB: insert done", "note_id", noteID, "elapsed_ms", time.Since(startInsert).Milliseconds())
-
-	startCommit := time.Now()
 	if err := tx.Commit(ctx); err != nil {
-		slog.Error("flushNoteToDB: commit failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startCommit).Milliseconds())
+		slog.Error("persistNoteToDB: commit failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startInsert).Milliseconds())
 		return err
 	}
-	slog.Info("flushNoteToDB: committed", "note_id", noteID, "elapsed_ms", time.Since(startCommit).Milliseconds(), "total_elapsed_ms", time.Since(startTx).Milliseconds())
+	slog.Debug("persistNoteToDB: committed", "note_id", noteID, "elapsed_ms", time.Since(startInsert).Milliseconds())
 	return nil
 }
 
@@ -379,85 +344,6 @@ func (s *YDocService) ProjectCanonicalDoc(ctx context.Context, noteID string) er
 		return nil
 	}
 	return s.projection.ProjectCanonicalDoc(ctx, noteID)
-}
-
-func (s *YDocService) FlushUpdates(ctx context.Context, noteID string) error {
-	startSwap := time.Now()
-	s.mu.Lock()
-	updates := s.buffers[noteID]
-	delete(s.buffers, noteID)
-	s.mu.Unlock()
-
-	if len(updates) == 0 {
-		return nil
-	}
-	slog.Info("FlushUpdates: starting", "note_id", noteID, "updates", len(updates), "swap_ms", time.Since(startSwap).Milliseconds())
-
-	startFlush := time.Now()
-	if err := s.flushNoteToDB(ctx, noteID, updates); err != nil {
-		s.mu.Lock()
-		s.buffers[noteID] = append(updates, s.buffers[noteID]...)
-		s.failureCount[noteID]++
-		fc := s.failureCount[noteID]
-		s.mu.Unlock()
-		if fc == 3 || fc%20 == 0 {
-			slog.Error("ydoc flush repeatedly failing",
-				"note_id", noteID,
-				"failure_count", fc,
-				"error", err,
-				"elapsed_ms", time.Since(startFlush).Milliseconds())
-		}
-		return err
-	}
-	s.mu.Lock()
-	delete(s.failureCount, noteID)
-	s.mu.Unlock()
-	slog.Info("FlushUpdates: done", "note_id", noteID, "elapsed_ms", time.Since(startFlush).Milliseconds())
-	return nil
-}
-
-func (s *YDocService) StartFlusher(ctx context.Context, interval time.Duration) {
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				s.flushAll(ctx)
-			}
-		}
-	}()
-}
-
-const maxConcurrentFlushes = 16
-
-func (s *YDocService) flushAll(ctx context.Context) {
-	s.mu.Lock()
-	noteIDs := make([]string, 0, len(s.buffers))
-	for id := range s.buffers {
-		noteIDs = append(noteIDs, id)
-	}
-	s.mu.Unlock()
-
-	sem := make(chan struct{}, maxConcurrentFlushes)
-	var wg sync.WaitGroup
-	for _, id := range noteIDs {
-		wg.Add(1)
-		id := id
-		go func() {
-			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
-				return
-			}
-			_ = s.FlushUpdates(ctx, id)
-		}()
-	}
-	wg.Wait()
 }
 
 func (s *YDocService) StartListener(ctx context.Context) {
@@ -505,10 +391,6 @@ func (s *YDocService) handleNotification(ctx context.Context, payload string) {
 	if data["machine_id"] == s.machineID {
 		return // Ignore our own broadcast
 	}
-	
-	if s.roomMgr != nil && !s.roomMgr.HasActiveRoom(noteID) {
-		return // Instance does not care about this note right now
-	}
 
 	var update []byte
 	var err error
@@ -543,9 +425,5 @@ func (s *YDocService) handleNotification(ctx context.Context, payload string) {
 	
 	if s.projection != nil {
 		s.projection.RunDebouncedProjection(ctx, noteID)
-	}
-	
-	if s.roomMgr != nil {
-		go s.roomMgr.BroadcastIfActive(noteID, update)
 	}
 }

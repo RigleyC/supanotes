@@ -1,7 +1,6 @@
 library;
 
 import 'dart:developer' as dev;
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -46,7 +45,6 @@ class NoteEditorController extends ChangeNotifier {
   void initFromDoc({
     required Doc doc,
     required String noteId,
-    required void Function(Uint8List update) sendUpdate,
     void Function()? onDocChanged,
   }) {
     dev.log(
@@ -65,7 +63,6 @@ class NoteEditorController extends ChangeNotifier {
       doc: doc,
       userId: userId,
       coordinator: _coordinator!,
-      sendUpdate: sendUpdate,
       onDocChanged: onDocChanged,
     );
     document!.addListener(_onDocChanged);

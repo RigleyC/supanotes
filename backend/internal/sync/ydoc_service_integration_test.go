@@ -75,9 +75,9 @@ func TestMergeYjsUpdates_Single(t *testing.T) {
 	assert.Equal(t, update, merged)
 }
 
-func TestYDocServiceFlush(t *testing.T) {
+func TestYDocServiceSyncPersistence(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool, nil, nil, "test")
+	svc := NewYDocService(pool, nil, "test")
 	ctx := context.Background()
 
 	noteID := uuid.New().String()
@@ -103,18 +103,17 @@ func TestYDocServiceFlush(t *testing.T) {
 	})
 	update2 := crdt.EncodeStateAsUpdateV1(doc2, nil)
 
+	// Apply mutations — persistence is now synchronous
 	err = svc.ApplyNodeMutation(ctx, noteID, update1)
 	require.NoError(t, err)
 	err = svc.ApplyNodeMutation(ctx, noteID, update2)
 	require.NoError(t, err)
 
-	err = svc.FlushUpdates(ctx, noteID)
-	require.NoError(t, err)
-
+	// Data should be persisted immediately (no FlushUpdates needed)
 	var count int
 	err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM note_yjs_updates WHERE note_id = $1", noteID).Scan(&count)
 	require.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 2, count)
 
 	var storedUpdate []byte
 	err = pool.QueryRow(ctx, "SELECT update_data FROM note_yjs_updates WHERE note_id = $1 ORDER BY created_at DESC LIMIT 1", noteID).Scan(&storedUpdate)
@@ -127,54 +126,9 @@ func TestYDocServiceFlush(t *testing.T) {
 	assert.Equal(t, "hello world", doc3.GetText("content").ToString())
 }
 
-func TestYDocServiceFlush_EmptyBuffer(t *testing.T) {
-	pool := setupTestDB(t)
-	svc := NewYDocService(pool, nil, nil, "test")
-	ctx := context.Background()
-
-	err := svc.FlushUpdates(ctx, "nonexistent-note")
-	require.NoError(t, err)
-}
-
-func TestYDocServiceFlusher(t *testing.T) {
-	pool := setupTestDB(t)
-	svc := NewYDocService(pool, nil, nil, "test")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	noteID := uuid.New().String()
-	_, err := pool.Exec(ctx, "INSERT INTO notes (id, user_id, content, created_at) VALUES ($1, '00000000-0000-0000-0000-000000000000', '', NOW())", noteID)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		pool.Exec(ctx, "DELETE FROM notes WHERE id = $1", noteID)
-	})
-
-	doc := crdt.New()
-	textNode := doc.GetText("content")
-	doc.Transact(func(txn *crdt.Transaction) {
-		textNode.Insert(txn, 0, "flusher test", nil)
-	})
-	update := crdt.EncodeStateAsUpdateV1(doc, nil)
-	require.NotEmpty(t, update)
-
-	svc.StartFlusher(ctx, 50*time.Millisecond)
-
-	err = svc.ApplyNodeMutation(ctx, noteID, update)
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		var count int
-		err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM note_yjs_updates WHERE note_id = $1", noteID).Scan(&count)
-		if err != nil {
-			return false
-		}
-		return count == 1
-	}, 2*time.Second, 50*time.Millisecond, "expected flusher to persist update within 2s")
-}
-
 func TestYDocServiceRetainsCanonicalDoc(t *testing.T) {
 	pool := setupTestDB(t)
-	svc := NewYDocService(pool, nil, nil, "test")
+	svc := NewYDocService(pool, nil, "test")
 	ctx := context.Background()
 
 	noteID := uuid.New().String()

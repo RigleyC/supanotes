@@ -22,7 +22,6 @@ type Compactor struct {
 	pool       *pgxpool.Pool
 	debounce   map[string]*debounceState
 	debounceMu sync.Mutex
-	flushFn    func(context.Context, string) error
 }
 
 func NewCompactor(pool *pgxpool.Pool) *Compactor {
@@ -30,10 +29,6 @@ func NewCompactor(pool *pgxpool.Pool) *Compactor {
 		pool:     pool,
 		debounce: make(map[string]*debounceState),
 	}
-}
-
-func (c *Compactor) SetFlushFunc(fn func(context.Context, string) error) {
-	c.flushFn = fn
 }
 
 func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
@@ -56,11 +51,6 @@ func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
 			return
 		}
 		c.debounceMu.Unlock()
-		if c.flushFn != nil {
-			if err := c.flushFn(context.Background(), noteID); err != nil {
-				slog.Error("RunDebouncedProjection: flushFn failed", "note_id", noteID, "error", err)
-			}
-		}
 		_ = ProjectNoteContentFromYDoc(context.Background(), c.pool, noteID)
 	})
 }
@@ -71,9 +61,6 @@ func (c *Compactor) ProjectCanonicalDoc(ctx context.Context, noteID string) erro
 
 func (c *Compactor) RunDebouncedProjectionForTest(ctx context.Context, svc *YDocService, noteID string, update []byte) error {
 	if err := svc.ApplyNodeMutation(ctx, noteID, update); err != nil {
-		return err
-	}
-	if err := svc.FlushUpdates(ctx, noteID); err != nil {
 		return err
 	}
 	return ProjectNoteContentFromYDoc(ctx, c.pool, noteID)

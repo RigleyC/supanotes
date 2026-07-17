@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
-import 'package:flutter/foundation.dart';
 import 'package:supanotes/core/utils/fractional_indexing.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
@@ -15,19 +14,17 @@ import 'yjs_node_codec.dart';
 /// editor document through the coordinator. Each node is stored as a
 /// nested [YMap] inside the nodes map, avoiding JSON blobs.
 ///
-/// For local→remote: [EditorDocumentSyncManager] flush callbacks trigger
-/// YDoc mutations which are then sent via [sendUpdate] (WS or REST).
+/// Local mutations are written directly to the YDoc. The sync layer
+/// (SyncService polling) captures state changes independently.
 class YjsDocEditorBridge {
   YjsDocEditorBridge({
     required Doc doc,
     required String userId,
     required EditorDocumentSyncManager coordinator,
-    required void Function(Uint8List update) sendUpdate,
     void Function()? onDocChanged,
   })  : _doc = doc,
         _userId = userId,
         _coordinator = coordinator,
-        _sendUpdate = sendUpdate,
         _onDocChanged = onDocChanged {
     final nodesMap = doc.getMap<Object>('nodes')!;
     _onNodesChangedHandler = nodesMap.observe((e, _) {
@@ -41,7 +38,6 @@ class YjsDocEditorBridge {
   final Doc _doc;
   final String _userId;
   final EditorDocumentSyncManager _coordinator;
-  final void Function(Uint8List update) _sendUpdate;
   final void Function()? _onDocChanged;
   late final void Function(dynamic, Transaction) _onNodesChangedHandler;
 
@@ -88,10 +84,6 @@ class YjsDocEditorBridge {
           }
         }
       });
-
-      final update = encodeStateAsUpdate(_doc);
-      dev.log('[YjsBridge] onLocalFlush: sending update updateLen=${update.length} elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
-      _sendUpdate(update);
     } finally {
       _isFlushingLocal = false;
     }
@@ -240,8 +232,6 @@ class YjsDocEditorBridge {
       nodesMap.set('$nodeId:lastCompletedAt', DateTime.now().toUtc().toIso8601String());
     });
 
-    final update = encodeStateAsUpdate(_doc);
-    _sendUpdate(update);
     _onDocChanged?.call();
   }
 
@@ -275,8 +265,6 @@ class YjsDocEditorBridge {
       }
     });
 
-    final update = encodeStateAsUpdate(_doc);
-    _sendUpdate(update);
     _onDocChanged?.call();
   }
 

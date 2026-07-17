@@ -152,7 +152,7 @@ func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
 
 func TestSyncServicePushRejectsSharedNoteWithoutEditPermission(t *testing.T) {
 	repo := &mockRepository{}
-	svc := NewService(repo, nil, nil, nil)
+	svc := NewService(repo, nil, nil)
 
 	payload := &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
@@ -175,7 +175,7 @@ func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
 			return sqlcgen.NoteShare{Permission: "edit"}, nil
 		},
 	}
-	svc := NewService(repo, nil, nil, nil)
+	svc := NewService(repo, nil, nil)
 
 	payload := &SyncPayload{
 		Notes: []sqlcgen.GetSyncNotesRow{
@@ -194,7 +194,7 @@ func TestSyncServicePushAllowsSharedNoteWithEditPermission(t *testing.T) {
 
 func TestSyncServicePushReportsBatchError(t *testing.T) {
 	repo := &mockRepository{upsertNoteErr: pgx.ErrNoRows}
-	svc := NewService(repo, nil, nil, nil)
+	svc := NewService(repo, nil, nil)
 
 	userID := testUserID()
 

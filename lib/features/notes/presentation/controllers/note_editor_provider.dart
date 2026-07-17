@@ -28,25 +28,21 @@ final noteEditorControllerProvider = Provider.autoDispose
 
       final yjsMgr = ref.read(yjsSyncManagerProvider);
 
-      syncService?.connectNote(
-        noteId,
-        onReady: (doc, sendUpdate) {
-          if (disposed) return;
-          controller.initFromDoc(
-            doc: doc,
-            noteId: noteId,
-            sendUpdate: sendUpdate,
-            onDocChanged: () {
-              yjsMgr.projectNodes(noteId);
-              // Fire-and-forget: persist is async and serialized internally via
-              // _persistLock. The YDoc state is already consistent at this
-              // point; this write is a safety net so offline closures don't
-              // lose edits. Riverpod's onDispose is sync and cannot await it.
-              unawaited(yjsMgr.persist(noteId));
-            },
-          );
-        },
-      ).catchError((_) {
+      syncService?.connectNote(noteId).then((doc) {
+        if (disposed || doc == null) return;
+        controller.initFromDoc(
+          doc: doc,
+          noteId: noteId,
+          onDocChanged: () {
+            yjsMgr.projectNodes(noteId);
+            // Fire-and-forget: persist is async and serialized internally via
+            // _persistLock. The YDoc state is already consistent at this
+            // point; this write is a safety net so offline closures don't
+            // lose edits. Riverpod's onDispose is sync and cannot await it.
+            unawaited(yjsMgr.persist(noteId));
+          },
+        );
+      }).catchError((_) {
         // connectNote errored (e.g., WS failure) — ignore if disposed.
       });
 

@@ -56,7 +56,7 @@ class YjsSyncManager {
     final doc = Doc();
     _migrateLegacyDoc(doc);
     _docs[noteId] = doc;
-    dev.log('[YjsSyncManager] Initialized empty doc for note=$noteId. Waiting for WebSocket sync.', name: 'YjsSync');
+    dev.log('[YjsSyncManager] Initialized empty doc for note=$noteId. Waiting for server sync.', name: 'YjsSync');
     return doc;
   }
 

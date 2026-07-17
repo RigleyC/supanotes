@@ -48,14 +48,13 @@ var (
 )
 
 type service struct {
-	repo    Repository
-	pool    *pgxpool.Pool
-	ydoc    *YDocService
-	roomMgr *RoomManager
+	repo Repository
+	pool *pgxpool.Pool
+	ydoc *YDocService
 }
 
-func NewService(repo Repository, pool *pgxpool.Pool, ydoc *YDocService, roomMgr *RoomManager) Service {
-	return &service{repo: repo, pool: pool, ydoc: ydoc, roomMgr: roomMgr}
+func NewService(repo Repository, pool *pgxpool.Pool, ydoc *YDocService) Service {
+	return &service{repo: repo, pool: pool, ydoc: ydoc}
 }
 
 func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgtype.Timestamptz, limit int32) (*SyncPayload, error) {
@@ -159,7 +158,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 	r := s.repo
 	var tx pgx.Tx
 
-	var toFlush []string
 	editableNotes := make(map[pgtype.UUID]bool)
 
 	// Pre-populate ownership for notes in this payload so new notes bypass DB checks
@@ -201,16 +199,10 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 					return err
 				}
 
-				if s.roomMgr != nil && s.roomMgr.HasActiveRoom(ys.NoteID) {
-					slog.Warn("sync push: skipping Yjs state for note with active WS room", "note_id", ys.NoteID)
-					continue
-				}
-
 				if err := s.ydoc.ApplyNodeMutation(ctx, ys.NoteID, ys.State); err != nil {
 					slog.Error("sync push: ApplyNodeMutation failed", "note_id", ys.NoteID, "error", err)
 					return err
 				}
-				toFlush = append(toFlush, ys.NoteID)
 			}
 		}
 
@@ -383,7 +375,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			continue
 		}
 
-		// No active room — apply via YDocService (merge + persistence)
 		if s.ydoc != nil {
 			// Already handled before the transaction
 			continue
@@ -436,14 +427,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			return err
 		}
 		slog.Info("PUSH TX COMMIT", "elapsed", time.Since(startCommit))
-	}
-
-	for _, noteID := range toFlush {
-		go func(id string) {
-			if err := s.ydoc.FlushUpdates(context.Background(), id); err != nil {
-				slog.Error("sync push: FlushUpdates failed after commit", "note_id", id, "error", err)
-			}
-		}(noteID)
 	}
 
 	slog.Info("PUSH DONE", "total", time.Since(startTotal))

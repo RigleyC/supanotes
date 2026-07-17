@@ -1,41 +1,26 @@
-/// Push / pull loop for the local-first notes database.
-///
-/// `SyncService` is a long-lived object whose lifetime is tied to the
-/// authenticated session — see `main.dart`, which calls [start] when the
-/// auth controller emits `AuthAuthenticated` and [dispose] when it emits
-/// `AuthUnauthenticated`. The service does not auto-start in its
-/// constructor; that is intentional so the periodic [Timer] only runs
-/// while the user is signed in.
-///
-/// State is exposed to the UI through [syncStateProvider]; the service
-/// just updates the notifier and lets widgets react.
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:web_socket_channel/io.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 
 import 'connectivity_monitor.dart';
 import 'sync_mapper.dart';
 import 'sync_state.dart';
 import 'yjs_sync_manager.dart';
-import 'yjs_websocket_client.dart';
 
-/// SharedPreferences key under which the last successful sync
-/// timestamp is persisted across app launches.
 const String _kLastSyncedAtPref = 'last_synced_at';
 
 final syncServiceProvider = Provider<SyncService?>((ref) {
@@ -46,7 +31,6 @@ final syncServiceProvider = Provider<SyncService?>((ref) {
   final connectivity = ref.watch(connectivityMonitorProvider);
   final notifier = ref.watch(syncStateProvider.notifier);
   final yjsMgr = ref.watch(yjsSyncManagerProvider);
-  final authStorage = ref.watch(authLocalStorageProvider);
 
   final mapper = SyncMapper();
 
@@ -57,7 +41,6 @@ final syncServiceProvider = Provider<SyncService?>((ref) {
     connectivity: connectivity,
     notifier: notifier,
     yjsMgr: yjsMgr,
-    authStorage: authStorage,
   );
   ref.onDispose(service.dispose);
   return service;
@@ -71,14 +54,12 @@ class SyncService {
     required ConnectivityMonitor connectivity,
     required SyncStateNotifier notifier,
     required YjsSyncManager yjsMgr,
-    required AuthLocalStorage authStorage,
   }) : _db = db,
        _api = apiClient,
        _mapper = mapper,
        _connectivity = connectivity,
        _notifier = notifier,
-       _yjsMgr = yjsMgr,
-       _authStorage = authStorage;
+       _yjsMgr = yjsMgr;
 
   final AppDatabase _db;
   final ApiClient _api;
@@ -86,12 +67,11 @@ class SyncService {
   final ConnectivityMonitor _connectivity;
   final SyncStateNotifier _notifier;
   final YjsSyncManager _yjsMgr;
-  final AuthLocalStorage _authStorage;
 
-  YjsWebSocketClient? _yjsWsClient;
   String? _activeNoteId;
-  StreamSubscription<Uint8List>? _yjsUpdateSub;
-  Timer? _persistDebounce;
+  Timer? _syncTimer;
+  Uint8List? _lastSyncedStateVector;
+  AppLifecycleListener? _lifecycleListener;
 
   bool _isSyncing = false;
 
@@ -100,35 +80,29 @@ class SyncService {
   final Map<String, DateTime> _lastYjsSyncAt = {};
 
   StreamSubscription<bool>? _connectivitySub;
-  Timer? _syncTimer;
+  Timer? _periodicSyncTimer;
 
-  /// Checks if a note is currently open and managed by the real-time WebSocket connection.
-  /// If true, we should skip REST sync (push/pull) for its YDoc state to avoid races.
-  bool isNoteUnderActiveWsManagement(String noteId) {
+  /// Whether a note with the given [noteId] is currently being synced via
+  /// the polling timer. The active note is excluded from batch push/pull
+  /// because the per-note polling handles it with finer granularity.
+  bool _isActiveNote(String noteId) {
     return _activeNoteId != null && _activeNoteId == noteId;
   }
 
-  /// Connect real-time Yjs sync for [noteId] when it becomes active.
-  Future<void> connectNote(
-    String noteId, {
-    void Function(Doc doc, void Function(Uint8List) sendUpdate)? onReady,
-  }) async {
+  Future<Doc?> connectNote(String noteId) async {
     final sw = Stopwatch()..start();
     debugPrint('[SyncService] connectNote START noteId=$noteId currentActive=$_activeNoteId');
-    if (noteId == _activeNoteId && _yjsWsClient != null) {
+    if (noteId == _activeNoteId && _syncTimer != null) {
       debugPrint('[SyncService] connectNote SKIP (already active) elapsed=${sw.elapsedMilliseconds}ms');
-      return;
+      return null;
     }
     await disconnectNote();
     debugPrint('[SyncService] connectNote disconnected previous elapsed=${sw.elapsedMilliseconds}ms');
-    final accessToken = await _authStorage.getAccessToken();
-    if (accessToken == null) {
-      debugPrint('[SyncService] connectNote FAIL: no access token elapsed=${sw.elapsedMilliseconds}ms');
-      _notifier.markError('Access token is missing');
-      return;
-    }
+
+    _activeNoteId = noteId;
+    _lastSyncedStateVector = null;
+
     try {
-      _activeNoteId = noteId;
       final noteData = await _db.notesDao.getNoteById(noteId);
       if (noteData != null && !noteData.hasRemoteCopy) {
         debugPrint('[SyncService] connectNote: note missing on server, pushing first...');
@@ -137,43 +111,27 @@ class SyncService {
       debugPrint('[SyncService] connectNote loading doc elapsed=${sw.elapsedMilliseconds}ms');
       final doc = await _yjsMgr.loadDoc(noteId);
       debugPrint('[SyncService] connectNote doc loaded elapsed=${sw.elapsedMilliseconds}ms');
-      // Fire onReady immediately after loading local YDoc (non-blocking).
-      // WS connection and push() happen asynchronously after.
-      onReady?.call(doc, (update) => _yjsWsClient?.sendUpdate(update));
-      String wsUrl = ApiConstants.baseUrl
-          .replaceFirst('https://', 'wss://')
-          .replaceFirst('http://', 'ws://');
-      if (wsUrl.endsWith('/api/v1')) {
-        wsUrl = '$wsUrl/sync/ws/$noteId';
-      } else {
-        wsUrl = '$wsUrl/api/v1/sync/ws/$noteId';
-      }
-      final uri = Uri.parse(wsUrl);
-      debugPrint('[SyncService] connectNote connecting WS url=$wsUrl elapsed=${sw.elapsedMilliseconds}ms');
-      _yjsWsClient = YjsWebSocketClient(
-        channelBuilder: () async {
-          final token = await _authStorage.getAccessToken();
-          if (token == null) throw Exception('No access token');
-          // IOWebSocketChannel.connect() ignores custom headers on Android/iOS,
-          // so we pass the token as a query param instead.
-          final uriWithToken = uri.replace(
-            queryParameters: {'token': token},
-          );
-          return IOWebSocketChannel.connect(uriWithToken);
+
+      // Start periodic polling every 5 seconds; first tick handles initial sync
+      _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        _syncNote();
+      });
+      debugPrint('[SyncService] connectNote polling timer started elapsed=${sw.elapsedMilliseconds}ms');
+
+      // Register lifecycle listener for app pause/inactive
+      _lifecycleListener = AppLifecycleListener(
+        onPause: () {
+          debugPrint('[SyncService] lifecycle: onPause — triggering sync');
+          _syncNote();
         },
-        doc: doc,
-        notifier: _notifier,
-        onIdleDisconnect: () {
-          _activeNoteId = null;
-          _lastYjsSyncAt.clear();
-          debugPrint('[SyncService] WS idle disconnect for noteId=$noteId');
+        onInactive: () {
+          debugPrint('[SyncService] lifecycle: onInactive — triggering sync');
+          _syncNote();
         },
       );
-      debugPrint('[SyncService] connectNote calling WS connect elapsed=${sw.elapsedMilliseconds}ms');
-      await _yjsWsClient!.connect(noteId);
-      debugPrint('[SyncService] connectNote WS connected elapsed=${sw.elapsedMilliseconds}ms');
-      _yjsUpdateSub = _yjsWsClient!.onUpdate.listen(_handleIncomingUpdate);
+
       debugPrint('[SyncService] connectNote DONE elapsed=${sw.elapsedMilliseconds}ms');
+      return doc;
     } catch (e, stackTrace) {
       debugPrint('[SyncService] connectNote FAIL: $e\n$stackTrace');
       _notifier.markError(e.toString());
@@ -181,31 +139,62 @@ class SyncService {
     }
   }
 
-  void _handleIncomingUpdate(Uint8List _) {
+  Future<void> _syncNote() async {
     final noteId = _activeNoteId;
     if (noteId == null) return;
-    _persistDebounce?.cancel();
-    _persistDebounce = Timer(const Duration(milliseconds: 500), () {
-      _yjsMgr.persist(noteId);
-    });
+
+    try {
+      final doc = await _yjsMgr.loadDoc(noteId);
+
+      // Generate local changes since last sync
+      final localUpdate = encodeStateAsUpdate(doc, _lastSyncedStateVector);
+      if (localUpdate.isEmpty) return;
+
+      final stateVector = encodeStateVector(doc);
+
+      debugPrint('[SyncService] _syncNote: sending ${localUpdate.length} bytes to $noteId');
+
+      final response = await _api.post<List<int>>(
+        '/sync/note/$noteId',
+        data: localUpdate.toList(),
+        options: Options(
+          headers: {
+            'X-State-Vector': base64Encode(stateVector),
+          },
+          responseType: ResponseType.bytes,
+        ),
+      );
+
+      final responseData = response.data;
+      if (responseData != null && responseData.isNotEmpty) {
+        final serverUpdate = Uint8List.fromList(responseData);
+        applyUpdate(doc, serverUpdate);
+        await _yjsMgr.persist(noteId);
+        debugPrint('[SyncService] _syncNote: applied ${serverUpdate.length} bytes from server');
+      }
+
+      _lastSyncedStateVector = stateVector;
+    } catch (e, stackTrace) {
+      debugPrint('[SyncService] _syncNote FAIL: $e\n$stackTrace');
+    }
   }
 
-  /// Disconnect real-time sync for the active note.
   Future<void> disconnectNote() async {
     final sw = Stopwatch()..start();
     debugPrint('[SyncService] disconnectNote START noteId=$_activeNoteId');
     final noteId = _activeNoteId;
+
     if (noteId != null) {
       await _yjsMgr.persist(noteId);
     }
-    await _yjsUpdateSub?.cancel();
-    _yjsUpdateSub = null;
+
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    _lifecycleListener?.dispose();
+    _lifecycleListener = null;
     _activeNoteId = null;
-    if (_yjsWsClient != null) {
-      await _yjsWsClient!.disconnect();
-      await _yjsWsClient!.dispose();
-      _yjsWsClient = null;
-    }
+    _lastSyncedStateVector = null;
+
     debugPrint('[SyncService] disconnectNote DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
 
@@ -213,7 +202,7 @@ class SyncService {
     _connectivitySub ??= _connectivity.onConnected.listen((_) {
       sync();
     });
-    _syncTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
+    _periodicSyncTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
       if (_connectivity.isConnected) {
         sync();
       }
@@ -221,16 +210,14 @@ class SyncService {
   }
 
   void dispose() {
-    _syncTimer?.cancel();
-    _syncTimer = null;
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
-    _persistDebounce?.cancel();
-    _persistDebounce = null;
-    _yjsUpdateSub?.cancel();
-    _yjsUpdateSub = null;
-    _yjsWsClient?.dispose();
-    _yjsWsClient = null;
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    _lifecycleListener?.dispose();
+    _lifecycleListener = null;
   }
 
   Future<void> sync() async {
@@ -302,7 +289,7 @@ class SyncService {
           ).get();
     final yjsStates = <LocalYjsState>[];
     for (final s in relevantStates) {
-      if (isNoteUnderActiveWsManagement(s.noteId)) continue;
+      if (_isActiveNote(s.noteId)) continue;
       final lastSync = _lastYjsSyncAt[s.noteId];
       if (lastSync == null || s.updatedAt.isAfter(lastSync)) {
         // Migration: decode and re-encode to strip out buggy formatting
@@ -465,7 +452,8 @@ class SyncService {
       final remoteState = _mapper.localYjsStateFromJson(
         raw as Map<String, dynamic>,
       );
-      if (isNoteUnderActiveWsManagement(remoteState.noteId)) {
+      // Never evict or merge the active note's YDoc — polling owns it.
+      if (_isActiveNote(remoteState.noteId)) {
         debugPrint('[SyncService] pull: skipping note_yjs_state for active note=${remoteState.noteId}');
         continue;
       }
