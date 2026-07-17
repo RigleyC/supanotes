@@ -27,6 +27,7 @@ final noteEditorControllerProvider = Provider.autoDispose
       var disposed = false;
 
       final yjsMgr = ref.read(yjsSyncManagerProvider);
+      Future<void>? lastProjection;
 
       syncService?.connectNote(
         noteId,
@@ -37,7 +38,7 @@ final noteEditorControllerProvider = Provider.autoDispose
             noteId: noteId,
             sendUpdate: sendUpdate,
             onDocChanged: () {
-              yjsMgr.projectNodes(noteId);
+              lastProjection = yjsMgr.projectNodes(noteId);
               // Fire-and-forget: persist is async and serialized internally via
               // _persistLock. The YDoc state is already consistent at this
               // point; this write is a safety net so offline closures don't
@@ -52,7 +53,15 @@ final noteEditorControllerProvider = Provider.autoDispose
 
       ref.onDispose(() {
         disposed = true;
-        unawaited(controller.dispose().then((_) => syncService?.disconnectNote()));
+        unawaited(
+          controller.dispose()
+            .then((_) async {
+              if (lastProjection != null) {
+                await lastProjection;
+              }
+              await syncService?.disconnectNote();
+            })
+        );
       });
       return controller;
     });

@@ -148,15 +148,29 @@ class YjsDocEditorBridge {
     }
 
     final text = data['text'] as String?;
+    _writeNodeTextContent(id, text ?? '');
+    dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
+  }
+
+  void _writeNodeTextContent(String id, String text) {
     try {
       final sharedType = _doc.getText('content/$id');
       if (sharedType != null) {
-        _updateYTextIncrementally(sharedType, text ?? '');
+        _updateYTextIncrementally(sharedType, text);
+        return;
       }
     } catch (e) {
-      dev.log('[YjsBridge] _serializeNode: failed to get content for $id (corrupted type)', name: 'YjsBridge', error: e);
+      dev.log('[YjsBridge] _serializeNode: content/$id is corrupted, falling back to content_fixed/$id', name: 'YjsBridge', error: e);
     }
-    dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
+
+    try {
+      final fallbackType = _doc.getText('content_fixed/$id');
+      if (fallbackType != null) {
+        _updateYTextIncrementally(fallbackType, text);
+      }
+    } catch (e) {
+      dev.log('[YjsBridge] _serializeNode: failed to write fallback content for $id', name: 'YjsBridge', error: e);
+    }
   }
 
 
