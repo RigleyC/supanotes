@@ -30,16 +30,7 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
   String derivedType = nodeMap.get('type') as String? ?? 'paragraph';
   final textContent = _readNodeTextContent(doc, nodeId);
 
-  if (textContent.isEmpty) {
-    try {
-      final fallbackType = doc.get('content/$nodeId');
-      if (fallbackType is YMap) {
-        if (derivedType == 'paragraph') {
-          derivedType = 'corrupted';
-        }
-      }
-    } catch (_) {}
-  }
+
 
   final rawData = nodeMap.get('data');
   final data = rawData is String
@@ -95,16 +86,7 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
     String derivedType = meta['type'] as String? ?? 'paragraph';
     final textContent = _readNodeTextContent(doc, nodeId);
 
-    if (textContent.isEmpty) {
-      try {
-        final fallbackType = doc.get('content/$nodeId');
-        if (fallbackType is YMap) {
-          if (derivedType == 'paragraph') {
-            derivedType = 'corrupted';
-          }
-        }
-      } catch (_) {}
-    }
+
     final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
     
     if (derivedType == 'task') {

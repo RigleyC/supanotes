@@ -112,20 +112,36 @@ class SyncService {
       final doc = await _yjsMgr.loadDoc(noteId);
       debugPrint('[SyncService] connectNote doc loaded elapsed=${sw.elapsedMilliseconds}ms');
 
-      // Start periodic polling every 5 seconds; first tick handles initial sync
-      _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-        _syncNote();
-      });
+      void startTimer() {
+        _syncTimer?.cancel();
+        _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+          _syncNote();
+        });
+      }
+
+      void stopTimer() {
+        _syncTimer?.cancel();
+        _syncTimer = null;
+      }
+
+      startTimer();
       debugPrint('[SyncService] connectNote polling timer started elapsed=${sw.elapsedMilliseconds}ms');
 
-      // Register lifecycle listener for app pause/inactive
+      // Register lifecycle listener for app pause/inactive/resume
       _lifecycleListener = AppLifecycleListener(
         onPause: () {
-          debugPrint('[SyncService] lifecycle: onPause — triggering sync');
+          debugPrint('[SyncService] lifecycle: onPause — triggering sync and stopping timer');
           _syncNote();
+          stopTimer();
         },
         onInactive: () {
-          debugPrint('[SyncService] lifecycle: onInactive — triggering sync');
+          debugPrint('[SyncService] lifecycle: onInactive — triggering sync and stopping timer');
+          _syncNote();
+          stopTimer();
+        },
+        onResume: () {
+          debugPrint('[SyncService] lifecycle: onResume — restarting timer');
+          startTimer();
           _syncNote();
         },
       );

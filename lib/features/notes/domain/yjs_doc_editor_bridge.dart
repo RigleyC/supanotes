@@ -30,6 +30,10 @@ class YjsDocEditorBridge {
     _onNodesChangedHandler = nodesMap.observe((e, _) {
       _onNodesChanged(_extractKeys(e));
     });
+    _onAfterTransactionHandler = (tr, d) {
+      _onNodesChanged(null);
+    };
+    _doc.on('afterTransaction', _onAfterTransactionHandler);
     coordinator.onNodeFlush = onLocalFlush;
     // Apply initial YDoc state (observer only fires on changes).
     _onNodesChanged(null);
@@ -40,6 +44,7 @@ class YjsDocEditorBridge {
   final EditorDocumentSyncManager _coordinator;
   final void Function()? _onDocChanged;
   late final void Function(dynamic, Transaction) _onNodesChangedHandler;
+  late final void Function(Transaction, Doc) _onAfterTransactionHandler;
 
   // Re-entrancy guard: prevents YMap observation during local flush.
   bool _isFlushingLocal = false;
@@ -307,6 +312,7 @@ class YjsDocEditorBridge {
   void dispose() {
     final nodesMap = _doc.getMap<Object>('nodes');
     nodesMap?.unobserve(_onNodesChangedHandler);
+    _doc.off('afterTransaction', _onAfterTransactionHandler);
     _coordinator.onNodeFlush = null;
   }
 }

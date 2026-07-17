@@ -36,11 +36,10 @@ void main() {
         editor: editor,
       );
 
-      final updates = <Uint8List>[];
       final bridge = YjsDocEditorBridge(
         doc: doc,
+        userId: 'test-user',
         coordinator: coordinator,
-        sendUpdate: (u) => updates.add(u),
       );
 
       // Simulate inserting a node locally via editor
@@ -67,7 +66,6 @@ void main() {
 
       final ytext = doc.getText('content/p1')!;
       expect(ytext.toString(), 'Hello World');
-      expect(updates, isNotEmpty);
 
       bridge.dispose();
     });
@@ -192,45 +190,29 @@ void main() {
         doc: doc,
         userId: 'test-user',
         coordinator: coordinator,
-        sendUpdate: (_) {},
       );
 
       // Seed a recurring task in the YDoc.
       doc.transact((txn) {
-        doc.getMap<Object>('nodes')!.set(
-          't1',
-          jsonEncode({
-            'id': 't1',
-            'position': 'a0',
-            'type': 'task',
-            'data': {
-              'text': 'Daily task',
-              'completed': false,
-              'recurrence': 'daily',
-            },
-          }),
-        );
+        final nodeMap = YMap<Object>();
+        nodeMap.set('id', 't1');
+        nodeMap.set('position', 'a0');
+        nodeMap.set('type', 'task');
+        nodeMap.set('data', jsonEncode({
+          'text': 'Daily task',
+          'completed': false,
+          'recurrence': 'daily',
+        }));
+        doc.getMap<Object>('nodes')!.set('t1', nodeMap);
         doc.getText('content/t1')!.insert(0, 'Daily task');
-        doc.getMap<Object>('tasks')!.set(
-          't1',
-          jsonEncode({
-            'nodeId': 't1',
-            'completed': false,
-            'title': 'Daily task',
-            'dueDate': '2026-07-14',
-            'recurrence': 'daily',
-          }),
-        );
       });
 
       final nextDue = DateTime(2026, 7, 15);
       bridge.completeRecurringTask('t1', nextDue);
 
-      final tasksMap = doc.getMap<Object>('tasks')!;
-      final entry = jsonDecode(tasksMap.get('t1') as String) as Map<String, dynamic>;
-      expect(entry['completed'], isFalse);
-      expect(entry['dueDate'], '2026-07-15');
-      expect(entry['recurrence'], 'daily');
+      final nodesMap = doc.getMap<Object>('nodes')!;
+      expect(nodesMap.get('t1:completed'), isFalse);
+      expect(nodesMap.get('t1:dueDate'), '2026-07-15');
 
       bridge.dispose();
     });

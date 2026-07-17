@@ -15,8 +15,8 @@ void main() {
     final update = encodeStateAsUpdate(doc1);
 
     final doc2 = Doc();
-    // Use applyUpdateSafe which tries to pre-register the type
-    applyUpdateSafe(doc2, update);
+    // Use applyUpdate which triggers Dynamic Root Type Migration
+    applyUpdate(doc2, update);
 
     // If applyUpdateSafe fails to pre-register, calling getText will throw a CastError 
     // because it was already instantiated as a YMap.

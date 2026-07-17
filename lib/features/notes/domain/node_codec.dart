@@ -287,7 +287,7 @@ class NodeCodec {
     if (node is ParagraphNode) {
       final blockType = node.getMetadataValue('blockType') as Attribution?;
       if (blockType == corruptedAttribution) return 'corrupted';
-      if (blockType == null) return 'paragraph';
+      if (blockType == null || blockType.id == 'paragraph') return 'paragraph';
       if (blockType == blockquoteAttribution) return 'blockquote';
       return 'header';
     }

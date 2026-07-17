@@ -25,7 +25,6 @@ void main() {
     final bridge1 = YjsDocEditorBridge(
       doc: doc1,
       coordinator: coord1,
-      sendUpdate: (_) {},
       onDocChanged: () {},
     );
     await coord1.flushNow();
@@ -35,7 +34,7 @@ void main() {
 
     // 2. Load on Device 2
     final doc2 = Doc();
-    applyUpdateSafe(doc2, update1);
+    applyUpdate(doc2, update1);
     final document2 = MutableDocument(nodes: [
       TaskNode(id: 't1', text: AttributedText('Task 1'), isComplete: false),
     ]);
@@ -46,7 +45,6 @@ void main() {
     final bridge2 = YjsDocEditorBridge(
       doc: doc2,
       coordinator: coord2,
-      sendUpdate: (_) {},
       onDocChanged: () {},
     );
 
