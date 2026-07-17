@@ -4,23 +4,33 @@ import 'package:yjs_dart/yjs_dart.dart';
 
 import 'note_node.dart';
 
+String _readNodeTextContent(Doc doc, String nodeId) {
+  try {
+    final fallbackType = doc.getText('content_fixed/$nodeId');
+    if (fallbackType != null) {
+      final text = fallbackType.toString();
+      if (text.isNotEmpty) return text;
+    }
+  } catch (_) {}
+
+  try {
+    final legacyType = doc.getText('content/$nodeId');
+    if (legacyType != null) {
+      return legacyType.toString();
+    }
+  } catch (_) {}
+
+  return '';
+}
+
 NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap, {String? noteIdOverride}) {
   final nodeId = nodeMap.get('id') as String?;
   if (nodeId == null) return null;
 
-  String textContent = '';
   String derivedType = nodeMap.get('type') as String? ?? 'paragraph';
+  final textContent = _readNodeTextContent(doc, nodeId);
 
-  try {
-    final sharedType = doc.getText('content/$nodeId');
-    textContent = sharedType.toString();
-    if (derivedType == 'task' || derivedType == 'corrupted') {
-      // Validated
-    }
-  } catch (e) {
-    textContent = '';
-    // If it threw, it might be a YMap or missing.
-    // Try to check if it's a YMap by using get()
+  if (textContent.isEmpty) {
     try {
       final fallbackType = doc.get('content/$nodeId');
       if (fallbackType is YMap) {
@@ -82,17 +92,10 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
   try {
     final meta = jsonDecode(raw) as Map<String, dynamic>;
     final nodeId = meta['id'] as String;
-    String textContent = '';
     String derivedType = meta['type'] as String? ?? 'paragraph';
+    final textContent = _readNodeTextContent(doc, nodeId);
 
-    try {
-      final sharedType = doc.getText('content/$nodeId');
-      textContent = sharedType.toString();
-      if (derivedType == 'task' || derivedType == 'corrupted') {
-        // Validated
-      }
-    } catch (e) {
-      textContent = '';
+    if (textContent.isEmpty) {
       try {
         final fallbackType = doc.get('content/$nodeId');
         if (fallbackType is YMap) {
