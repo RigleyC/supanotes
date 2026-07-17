@@ -75,6 +75,7 @@ class YjsSyncManager {
 
     bool needsMigration = false;
     for (final key in nodesMap.keys) {
+      if (key.contains(':')) continue;
       final raw = nodesMap.get(key);
       if (raw is YMap) continue;
       if (raw is String) {
@@ -88,6 +89,7 @@ class YjsSyncManager {
     dev.log('[YjsSyncManager] Migrating legacy doc to nested YMap schema', name: 'YjsSync');
     doc.transact((txn) {
       for (final key in nodesMap.keys) {
+        if (key.contains(':')) continue;
         final raw = nodesMap.get(key);
         if (raw is! String) continue;
         try {
@@ -193,14 +195,16 @@ class YjsSyncManager {
 
     final tasks = <TasksCompanion>[];
     for (final key in nodesMap.keys) {
+      if (key.contains(':')) continue;
       final raw = nodesMap.get(key);
       if (raw == null) continue;
 
-      String type;
-      String nodeId;
+      String type = '';
+      String nodeId = '';
       String? position;
       bool completed = false;
       String? dueDate;
+      bool hasTime = false;
       String? recurrence;
 
       if (raw is YMap) {
@@ -208,9 +212,11 @@ class YjsSyncManager {
         if (type != 'task') continue;
         nodeId = raw.get('id') as String? ?? key;
         position = raw.get('position')?.toString();
-        completed = raw.get('completed') == true;
-        dueDate = raw.get('dueDate') as String?;
-        recurrence = raw.get('recurrence') as String?;
+        
+        completed = nodesMap.get('$nodeId:completed') == true || raw.get('completed') == true;
+        dueDate = (nodesMap.get('$nodeId:dueDate') as String?) ?? (raw.get('dueDate') as String?);
+        hasTime = nodesMap.get('$nodeId:hasTime') == true || raw.get('hasTime') == true;
+        recurrence = (nodesMap.get('$nodeId:recurrence') as String?) ?? (raw.get('recurrence') as String?);
       } else if (raw is String) {
         // Legacy fallback for un-migrated nodes
         try {
@@ -219,9 +225,10 @@ class YjsSyncManager {
           nodeId = meta['id'] as String;
           position = meta['position']?.toString();
           final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
-          completed = data['completed'] == true;
-          dueDate = data['dueDate'] as String?;
-          recurrence = data['recurrence'] as String?;
+          completed = nodesMap.get('$nodeId:completed') == true || data['completed'] == true;
+          dueDate = (nodesMap.get('$nodeId:dueDate') as String?) ?? (data['dueDate'] as String?);
+          hasTime = nodesMap.get('$nodeId:hasTime') == true || data['hasTime'] == true;
+          recurrence = (nodesMap.get('$nodeId:recurrence') as String?) ?? (data['recurrence'] as String?);
         } catch (e) {
           dev.log('[YjsSyncManager] projectNodes: failed to parse legacy node $key', name: 'YjsSync', error: e);
           continue;
@@ -245,7 +252,11 @@ class YjsSyncManager {
       DateTime? resolvedDueDate;
       TaskRecurrence? resolvedRecurrence;
       if (dueDate != null) {
-        resolvedDueDate = DateTime.tryParse('${dueDate}T00:00:00');
+        if (dueDate.contains('T')) {
+          resolvedDueDate = DateTime.tryParse(dueDate);
+        } else {
+          resolvedDueDate = DateTime.tryParse('${dueDate}T00:00:00');
+        }
       }
       if (recurrence != null) {
         resolvedRecurrence = TaskRecurrence.parse(recurrence);
@@ -259,6 +270,7 @@ class YjsSyncManager {
         status: completed ? 'done' : 'open',
         position: Value(position ?? ''),
         dueDate: Value(resolvedDueDate),
+        hasTime: Value(hasTime),
         recurrence: Value(resolvedRecurrence),
         createdAt: now,
         updatedAt: now,

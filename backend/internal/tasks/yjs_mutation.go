@@ -15,18 +15,12 @@ type yDocIngest interface {
 	WithDoc(ctx context.Context, noteID string, fn func(doc *crdt.Doc) error) error
 }
 
-// CompleteTaskYjs completes a task by writing to both YMap("tasks") and YMap("nodes").
-// Under the P4 two-level CRDT schema, task completion state lives in YMap("tasks"),
-// not in the node data. The projection pipeline reads from YMap("tasks") and syncs
-// to the tasks and task_completions tables.
-//
-// For legacy (pre-P4) docs that lack a YMap("tasks") entry, this function creates one,
-// effectively migrating the doc on completion.
+// CompleteTaskYjs completes a task by writing to the `nodes` YMap directly using
+// composite keys (`$nodeId:completed`, `$nodeId:lastCompletedAt`), which avoids
+// a separate `tasks` map. This simplifies the projection pipeline and aligns with
+// the dual-write avoidance rule.
 func CompleteTaskYjs(ctx context.Context, ydoc yDocIngest, noteID string, nodeID string) error {
 	var rawNodeJSON string
-	var title string
-	var existingTaskData map[string]interface{}
-	var hasTask bool
 
 	err := ydoc.WithDoc(ctx, noteID, func(doc *crdt.Doc) error {
 		nodesMap := doc.GetMap("nodes")
@@ -42,58 +36,13 @@ func CompleteTaskYjs(ctx context.Context, ydoc yDocIngest, noteID string, nodeID
 			return fmt.Errorf("node %s is not a string", nodeID)
 		}
 		rawNodeJSON = nodeStr
-
-		// Read title from YText (outside Transact, safe)
-		if textType := doc.GetText("content/" + nodeID); textType != nil {
-			title = textType.ToString()
-		}
-
-		// Read existing task entry from YMap("tasks") if present (P4 schema)
-		if tasksMap := doc.GetMap("tasks"); tasksMap != nil {
-			if rawTask, ok := tasksMap.Get(nodeID); ok {
-				if taskStr, ok := rawTask.(string); ok {
-					if err := json.Unmarshal([]byte(taskStr), &existingTaskData); err == nil {
-						hasTask = true
-					}
-				}
-			}
-		}
-
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	// Build task entry for YMap("tasks")
-	now := time.Now().UTC()
-	taskEntry := map[string]interface{}{
-		"nodeId":          nodeID,
-		"title":           title,
-		"completed":       true,
-		"dueDate":         "",
-		"recurrence":      "",
-		"lastCompletedAt": now.Format(time.RFC3339),
-	}
-
-	// Preserve existing dueDate and recurrence if the task entry already exists
-	if hasTask {
-		if dueDate, ok := existingTaskData["dueDate"]; ok {
-			if ds, ok := dueDate.(string); ok && ds != "" {
-				taskEntry["dueDate"] = ds
-			}
-		}
-		if recurrence, ok := existingTaskData["recurrence"]; ok {
-			if rs, ok := recurrence.(string); ok && rs != "" {
-				taskEntry["recurrence"] = rs
-			}
-		}
-	}
-
-	taskJSON, err := json.Marshal(taskEntry)
-	if err != nil {
-		return fmt.Errorf("marshal task entry: %w", err)
-	}
+	nowStr := time.Now().UTC().Format(time.RFC3339)
 
 	// Build updated node JSON with taskId pointing to the task entry
 	var fullNode map[string]interface{}
@@ -114,11 +63,16 @@ func CompleteTaskYjs(ctx context.Context, ydoc yDocIngest, noteID string, nodeID
 		return fmt.Errorf("marshal updated node: %w", err)
 	}
 
-	// Create a mutation doc with both the task entry and updated node
+	// Create a mutation doc to update the JSON payload and composite keys
 	mutDoc := crdt.New(crdt.WithGC(false))
+	nodesMap := mutDoc.GetMap("nodes")
 	mutDoc.Transact(func(txn *crdt.Transaction) {
-		mutDoc.GetMap("tasks").Set(txn, nodeID, string(taskJSON))
-		mutDoc.GetMap("nodes").Set(txn, nodeID, string(updatedNodeJSON))
+		nodesMap.Set(txn, nodeID, string(updatedNodeJSON))
+		nodesMap.Set(txn, nodeID+":completed", true)
+		nodesMap.Set(txn, nodeID+":lastCompletedAt", nowStr)
+		// Clean up old tasks map entry if it existed?
+		// We could do `mutDoc.GetMap("tasks").Delete(txn, nodeID)` but the migration
+		// script will handle dropping the tasks map anyway.
 	})
 	update := crdt.EncodeStateAsUpdateV1(mutDoc, nil)
 

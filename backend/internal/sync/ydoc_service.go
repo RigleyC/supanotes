@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -168,6 +169,9 @@ func MigrateLegacyDoc(doc *crdt.Doc) {
 	// Check if migration is needed: any node is still a string
 	needsMigration := false
 	for _, key := range nodesMap.Keys() {
+		if strings.Contains(key, ":") {
+			continue
+		}
 		raw, ok := nodesMap.Get(key)
 		if !ok {
 			continue
@@ -189,6 +193,9 @@ func MigrateLegacyDoc(doc *crdt.Doc) {
 	keys := nodesMap.Keys()
 	doc.Transact(func(txn *crdt.Transaction) {
 		for _, key := range keys {
+			if strings.Contains(key, ":") {
+				continue
+			}
 			raw, ok := nodesMap.Get(key)
 			if !ok {
 				continue

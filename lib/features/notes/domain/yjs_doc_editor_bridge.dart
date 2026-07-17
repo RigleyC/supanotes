@@ -118,11 +118,14 @@ class YjsDocEditorBridge {
         DateTime.now().millisecondsSinceEpoch.toDouble();
     final parentId = _readParentId(existingRaw) ?? '';
 
-    YMap<Object> nodeMap;
+    // nodesMap.get() returns YMap<dynamic>, not YMap<Object>.
+    // Dart generics are invariant at runtime, so `as YMap<Object>` throws.
+    // Use an untyped YMap variable to avoid the cast.
+    // ignore: prefer_typing_uninitialized_variables
+    YMap nodeMap;
     if (existingRaw is YMap) {
-      // Cast the existing raw value to a YMap so we can update it in place.
-      // This preserves the CRDT identity and avoids dropping concurrent edits.
-      nodeMap = existingRaw as YMap<Object>;
+      // Reuse the existing YMap in-place to preserve CRDT identity.
+      nodeMap = existingRaw;
     } else {
       nodeMap = YMap<Object>();
       nodesMap.set(id, nodeMap);

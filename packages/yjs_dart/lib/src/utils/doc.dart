@@ -158,13 +158,40 @@ class Doc extends Observable<String> implements YStructure {
     final existing = share[name];
     if (existing != null) {
       if (existing is T) return existing;
+      
+      // Dynamic Root Type Migration (A2 Fix):
+      // The decoder lazy-creates unknown roots as YMap. If the app later binds them
+      // to a different type (e.g., YText) or a different generic type (e.g. YMap<Object>),
+      // we coerce the wrapper object and fix parent pointers.
+      if (existing is YMap && typeConstructor != null) {
+        final newType = typeConstructor();
+        newType.doc = this;
+        newType.yItem = null; // Root types have no parent item
+        newType.yMap.addAll(existing.yMap);
+        newType.yStart = existing.yStart;
+        newType.yLength = existing.yLength;
+        newType.searchMarker = existing.searchMarker;
+        
+        // Update parent pointers of ALL children in the struct store to point to the new wrapper
+        for (final client in this.store.clients.values) {
+          for (final struct in client) {
+            if (struct is Item && struct.parent == existing) {
+              struct.parent = newType;
+            }
+          }
+        }
+        
+        share[name] = newType;
+        return newType;
+      }
+      
       // If a generic AbstractType is requested, return the existing one
-      // This cast might fail if T is specific and existing is different
+      // This cast might fail if T is specific and existing is different and we didn't migrate it
       return existing as T;
     }
     
     if (typeConstructor == null) {
-        return null; // Return null if not found and no constructor provided
+      return null; // Return null if not found and no constructor provided
     }
     
     final type = typeConstructor();

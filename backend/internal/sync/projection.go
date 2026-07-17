@@ -34,12 +34,12 @@ type nodeEntry struct {
 
 // normalizeNodeMetadata extracts task metadata from a raw YMap entry, supporting
 // both the new nested YMap schema and the legacy JSON string schema.
-// For YMap entries, it returns all keys except id/type/position/data.
-// For string entries, it returns the contents of the legacy "data" sub-object.
-func normalizeNodeMetadata(raw any) map[string]any {
+// It also reads composite keys from the parent nodesMap.
+func normalizeNodeMetadata(nodesMap *crdt.YMap, nodeID string, raw any) map[string]any {
+	meta := make(map[string]any)
+
 	switch v := raw.(type) {
 	case *crdt.YMap:
-		meta := make(map[string]any)
 		for _, key := range v.Keys() {
 			switch key {
 			case "id", "type", "position", "data":
@@ -50,17 +50,37 @@ func normalizeNodeMetadata(raw any) map[string]any {
 				meta[key] = val
 			}
 		}
-		return meta
 	case string:
 		var legacy struct {
 			Data map[string]any `json:"data"`
 		}
-		if err := json.Unmarshal([]byte(v), &legacy); err != nil {
-			return nil
+		if err := json.Unmarshal([]byte(v), &legacy); err == nil {
+			for k, v := range legacy.Data {
+				switch k {
+				case "completed", "dueDate", "recurrence", "lastCompletedAt":
+					meta[k] = v
+				}
+			}
 		}
-		return legacy.Data
 	}
-	return nil
+
+	// Override with composite keys from nodesMap if present
+	if nodesMap != nil {
+		if val, ok := nodesMap.Get(nodeID + ":completed"); ok {
+			meta["completed"] = val
+		}
+		if val, ok := nodesMap.Get(nodeID + ":dueDate"); ok {
+			meta["dueDate"] = val
+		}
+		if val, ok := nodesMap.Get(nodeID + ":recurrence"); ok {
+			meta["recurrence"] = val
+		}
+		if val, ok := nodesMap.Get(nodeID + ":lastCompletedAt"); ok {
+			meta["lastCompletedAt"] = val
+		}
+	}
+
+	return meta
 }
 
 func posToString(pos any) string {
@@ -126,7 +146,7 @@ func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
 				Position: posStr,
 				Data:     dataRaw,
 				Text:     text,
-				Metadata: normalizeNodeMetadata(v),
+				Metadata: normalizeNodeMetadata(nodesMap, idStr, v),
 			})
 		case string:
 			var nd struct {
@@ -156,7 +176,7 @@ func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
 				Position: posStr,
 				Data:     nd.Data,
 				Text:     text,
-				Metadata: normalizeNodeMetadata(v),
+				Metadata: normalizeNodeMetadata(nodesMap, nd.ID, v),
 			})
 		}
 	}
@@ -200,6 +220,7 @@ func ProjectNoteContentFromYDoc(ctx context.Context, pool *pgxpool.Pool, noteID 
 	}
 
 	doc := crdt.New(crdt.WithGC(false))
+	preRegisterYText(doc, state)
 	if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
 		return fmt.Errorf("apply ydoc state: %w", err)
 	}

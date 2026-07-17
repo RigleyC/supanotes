@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -37,8 +38,14 @@ func deriveTasksFromDoc(doc *crdt.Doc) []projectedTask {
 
 		var dueDate pgtype.Date
 		if dd, ok := nd.Metadata["dueDate"].(string); ok && dd != "" {
-			if t, err := time.Parse("2006-01-02", dd); err == nil {
-				dueDate = pgtype.Date{Time: t, Valid: true}
+			if strings.Contains(dd, "T") {
+				if t, err := time.Parse("2006-01-02T15:04", dd); err == nil {
+					dueDate = pgtype.Date{Time: t, Valid: true}
+				}
+			} else {
+				if t, err := time.Parse("2006-01-02", dd); err == nil {
+					dueDate = pgtype.Date{Time: t, Valid: true}
+				}
 			}
 		}
 

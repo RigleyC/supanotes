@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/current_user.dart';
 import '../../../core/database/database.dart';
 import '../../../core/database/daos/note_links_dao.dart';
 import '../../../core/database/daos/notes_dao.dart';
@@ -274,13 +275,18 @@ class NotesRepository implements INotesRepository {
   }
 }
 
-/// Riverpod entry point for the feature-level [NotesRepository]. Reads
-/// [notesLocalRepositoryProvider] which already gates on the signed-in
-/// user, so this provider is itself safe to read only when authenticated.
+/// Riverpod entry point for the feature-level [NotesRepository].
+///
+/// Reads [currentUserIdProvider] and [appDatabaseProvider] directly instead
+/// of chaining through [notesLocalRepositoryProvider]. This avoids the
+/// 3-level autoDispose cascade that triggers setState() during build when
+/// [NotesListScreen] first mounts and the intermediate provider is dirty.
 final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
-  final local = ref.watch(notesLocalRepositoryProvider);
-  final tasksLocal = ref.watch(tasksLocalRepositoryProvider);
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) throw StateError('notesRepositoryProvider: unauthenticated');
   final db = ref.watch(appDatabaseProvider);
+  final local = NotesLocalRepository(db.notesDao, userId);
+  final tasksLocal = TasksLocalRepository(db.tasksDao, userId);
   return NotesRepository(
     local,
     tasksLocal,
