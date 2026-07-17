@@ -73,6 +73,7 @@ dependencies:
 
   # UI
   adaptive_platform_ui: ^0.1.107
+  family_bottom_sheet: ^0.1.0
   flutter_staggered_grid_view: ^0.7.0
   flutter_svg: ^2.0.17
   flutter_gen_ai_chat_ui: ^2.14.0

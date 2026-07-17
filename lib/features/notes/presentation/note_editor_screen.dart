@@ -173,12 +173,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     : (task, flushSnapshot) async {
                         await flushSnapshot();
                         if (!mounted || task == null) return;
-                        await showAppBottomSheet(
+                        await showTaskMetadataSheet(
                           context: context,
-                          builder: (_) => TaskMetadataSheet(
-                            noteId: task.noteId,
-                            task: task,
-                          ),
+                          noteId: task.noteId,
+                          task: task,
                         );
                       },
                 onTaskComplete: (taskId) =>

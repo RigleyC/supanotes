@@ -1,20 +1,34 @@
+import 'package:family_bottom_sheet/family_bottom_sheet.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/app_button.dart';
+import 'package:intl/intl.dart';
 
-import '../../domain/task_model.dart';
-import '../../domain/task_recurrence.dart';
-import 'due_date_picker.dart';
-import 'recurrence_picker.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
+import 'package:supanotes/features/tasks/domain/task_date_format.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
+import 'package:supanotes/shared/widgets/app_selection_tile.dart';
 
-/// Bottom-sheet for editing a task's metadata (date and recurrence).
-///
-/// Must be called with an existing [TaskModel].
-/// Pops when the user taps **Salvar**.
+import 'due_date_picker.dart' show QuickDueDate;
+
+Future<void> showTaskMetadataSheet({
+  required BuildContext context,
+  required String noteId,
+  required TaskModel task,
+}) {
+  return FamilyModalSheet.show<void>(
+    context: context,
+    showDragHandle: true,
+    isDismissible: true,
+    enableDrag: true,
+    contentBackgroundColor: Theme.of(context).colorScheme.surface,
+    builder: (ctx) => TaskMetadataSheet(noteId: noteId, task: task),
+  );
+}
+
 class TaskMetadataSheet extends ConsumerStatefulWidget {
   const TaskMetadataSheet({
     super.key,
@@ -43,59 +57,359 @@ class _TaskMetadataSheetState extends ConsumerState<TaskMetadataSheet> {
     _hasTime = t.hasTime;
   }
 
-  void _onSave() {
-    final noteId = widget.noteId;
-    final taskId = widget.task.id;
+  void _onClose() {
+    ref.read(noteEditorControllerProvider(widget.noteId)).updateTaskMetadataInYDoc(
+      widget.task.id,
+      dueDate: _dueDate,
+      clearDueDate: _dueDate == null,
+      recurrence: _recurrence?.name,
+      clearRecurrence: _recurrence == null,
+      hasTime: _hasTime,
+    );
+  }
 
-    ref
-        .read(noteEditorControllerProvider(noteId))
-        .updateTaskMetadataInYDoc(
-          taskId,
-          dueDate: _dueDate,
-          clearDueDate: _dueDate == null,
-          recurrence: _recurrence?.name,
-          clearRecurrence: _recurrence == null,
-          hasTime: _hasTime,
-        );
+  @override
+  void dispose() {
+    _onClose();
+    super.dispose();
+  }
 
-    if (mounted) context.pop();
+  void _onClearDate() {
+    setState(() {
+      _dueDate = null;
+      _hasTime = false;
+      _recurrence = null;
+    });
+  }
+
+  void _onClearTime() {
+    setState(() => _hasTime = false);
+  }
+
+  void _onClearRecurrence() {
+    setState(() => _recurrence = null);
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        spacing: AppSpacing.sm,
-        children: [
-          Text(
-            'Data de vencimento',
-            style: Theme.of(context).textTheme.titleMedium,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _DateTile(
+          dueDate: _dueDate,
+          hasTime: _hasTime,
+          onTap: () => FamilyModalSheet.of(context).pushPage(
+            _TaskDatePage(
+              selected: _dueDate,
+              onSelected: (date) => setState(() {
+                _dueDate = date;
+                _hasTime = false;
+              }),
+            ),
           ),
-          DueDatePicker(
-            initialDate: _dueDate,
-            initialHasTime: _hasTime,
-            onChanged: (d, {bool hasTime = false}) => setState(() {
-              _dueDate = d;
-              _hasTime = hasTime;
-              if (d == null) _recurrence = null;
-            }),
+          onClear: _onClearDate,
+        ),
+        _TimeTile(
+          dueDate: _dueDate,
+          hasTime: _hasTime,
+          onTap: () => FamilyModalSheet.of(context).pushPage(
+            _TaskTimePage(
+              currentDueDate: _dueDate!,
+              onSelected: (date, {hasTime = false}) => setState(() {
+                _dueDate = date;
+                _hasTime = hasTime;
+              }),
+            ),
           ),
-          Text('Repetição', style: Theme.of(context).textTheme.titleMedium),
-          RecurrencePicker(
-            initialRecurrence: _recurrence,
-            dueDate: _dueDate,
-            onChanged: (r) => setState(() {
-              _recurrence = r;
-              if (r != null && _dueDate == null) {
-                _dueDate = DateTime.now().startOfDay;
-              }
-            }),
+          onClear: _onClearTime,
+        ),
+        _RecurrenceTile(
+          recurrence: _recurrence,
+          dueDate: _dueDate,
+          onTap: () => FamilyModalSheet.of(context).pushPage(
+            _TaskRecurrencePage(
+              selected: _recurrence,
+              dueDate: _dueDate,
+              onSelected: (r) => setState(() {
+                _recurrence = r;
+                if (r != null && _dueDate == null) {
+                  _dueDate = DateTime.now().startOfDay;
+                }
+              }),
+            ),
           ),
-          AppButton(text: 'Salvar', onPressed: _onSave),
-        ],
+          onClear: _onClearRecurrence,
+        ),
+      ],
+    );
+  }
+}
+
+class _DateTile extends StatelessWidget {
+  const _DateTile({
+    required this.dueDate,
+    required this.hasTime,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final DateTime? dueDate;
+  final bool hasTime;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    if (dueDate != null) {
+      return ListTile(
+        leading: const Icon(Icons.calendar_today_rounded),
+        title: Text(formatDueDate(dueDate!, hasTime: hasTime)),
+        trailing: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: onClear,
+        ),
+        onTap: onTap,
+      );
+    }
+    return ListTile(
+      leading: Icon(Icons.calendar_today_rounded,
+          color: Theme.of(context).colorScheme.onSurfaceVariant),
+      title: Text('Adicionar data',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      onTap: onTap,
+    );
+  }
+}
+
+class _TimeTile extends StatelessWidget {
+  const _TimeTile({
+    required this.dueDate,
+    required this.hasTime,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final DateTime? dueDate;
+  final bool hasTime;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = dueDate != null;
+    final color = enabled
+        ? null
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return ListTile(
+      leading: Icon(Icons.access_time_rounded, color: color),
+      title: Text(
+        hasTime ? DateFormat('HH:mm').format(dueDate!) : 'Adicionar horário',
+        style: color != null ? TextStyle(color: color) : null,
       ),
+      trailing: hasTime
+          ? IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: onClear,
+            )
+          : null,
+      enabled: enabled,
+      onTap: enabled ? onTap : null,
+    );
+  }
+}
+
+class _RecurrenceTile extends StatelessWidget {
+  const _RecurrenceTile({
+    required this.recurrence,
+    required this.dueDate,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final TaskRecurrence? recurrence;
+  final DateTime? dueDate;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    if (recurrence != null) {
+      return ListTile(
+        leading: Icon(recurrence!.icon),
+        title: Text(recurrence!.getLocalizedLabel(dueDate)),
+        trailing: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: onClear,
+        ),
+        onTap: onTap,
+      );
+    }
+    return ListTile(
+      leading: Icon(Icons.repeat_rounded,
+          color: Theme.of(context).colorScheme.onSurfaceVariant),
+      title: Text('Adicionar recorrência',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      onTap: onTap,
+    );
+  }
+}
+
+class _TaskDatePage extends StatelessWidget {
+  const _TaskDatePage({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final DateTime? selected;
+  final ValueChanged<DateTime> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text('Escolher data',
+              style: Theme.of(context).textTheme.titleMedium),
+        ),
+        ...QuickDueDate.values.map((option) {
+          final date = option.compute(now);
+          return AppSelectionTile(
+            label: option.label,
+            icon: option.icon,
+            isSelected: selected != null && selected!.isSameDayAs(date),
+            onTap: () {
+              onSelected(date);
+              FamilyModalSheet.of(context).popPage();
+            },
+          );
+        }),
+        const SizedBox(height: 12),
+        CalendarDatePicker(
+          initialDate: selected ?? now.startOfDay,
+          firstDate: DateTime(now.year - 1),
+          lastDate: DateTime(now.year + 5),
+          onDateChanged: (date) {
+            onSelected(date);
+            FamilyModalSheet.of(context).popPage();
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _TaskTimePage extends StatefulWidget {
+  const _TaskTimePage({
+    required this.currentDueDate,
+    required this.onSelected,
+  });
+
+  final DateTime currentDueDate;
+  final void Function(DateTime date, {bool hasTime}) onSelected;
+
+  @override
+  State<_TaskTimePage> createState() => _TaskTimePageState();
+}
+
+class _TaskTimePageState extends State<_TaskTimePage> {
+  late Duration _duration;
+
+  @override
+  void initState() {
+    super.initState();
+    _duration = Duration(
+      hours: widget.currentDueDate.hour,
+      minutes: widget.currentDueDate.minute,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text('Escolher horário',
+              style: Theme.of(context).textTheme.titleMedium),
+        ),
+        SizedBox(
+          height: 200,
+          child: CupertinoTimerPicker(
+            mode: CupertinoTimerPickerMode.hm,
+            initialTimerDuration: _duration,
+            onTimerDurationChanged: (d) => setState(() => _duration = d),
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppButton(
+          text: 'Confirmar',
+          onPressed: () {
+            final d = widget.currentDueDate;
+            final newDate = DateTime(
+              d.year,
+              d.month,
+              d.day,
+              _duration.inHours,
+              _duration.inMinutes.remainder(60),
+            );
+            widget.onSelected(newDate, hasTime: true);
+            FamilyModalSheet.of(context).popPage();
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _TaskRecurrencePage extends StatelessWidget {
+  const _TaskRecurrencePage({
+    required this.selected,
+    required this.dueDate,
+    required this.onSelected,
+  });
+
+  final TaskRecurrence? selected;
+  final DateTime? dueDate;
+  final ValueChanged<TaskRecurrence?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child:
+              Text('Repetição', style: Theme.of(context).textTheme.titleMedium),
+        ),
+        AppSelectionTile(
+          label: 'Nenhuma',
+          icon: Icons.do_not_disturb_on_outlined,
+          isSelected: selected == null,
+          onTap: () {
+            onSelected(null);
+            FamilyModalSheet.of(context).popPage();
+          },
+        ),
+        for (final option in TaskRecurrence.values)
+          AppSelectionTile(
+            label: option.getLocalizedLabel(dueDate),
+            icon: option.icon,
+            isSelected: option == selected,
+            onTap: () {
+              onSelected(option);
+              FamilyModalSheet.of(context).popPage();
+            },
+          ),
+      ],
     );
   }
 }
