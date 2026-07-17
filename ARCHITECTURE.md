@@ -106,25 +106,28 @@ on the server) because:
    not array indices. Inserting a node doesn't change the position of
    existing nodes, so concurrent inserts don't conflict.
 
-### 2.2 YDoc Schema (Two-Level CRDT)
+### 2.2 YDoc Schema (Flat Keys & Composite Properties)
 
 Each note is a Yjs document (`YDoc`) with this structure:
 
 ```
 YDoc
-├── YMap("nodes")        → { nodeId → JSON{ id, type, position, parentId, data{...}, createdAt } }
-│                            where data NO LONGER contains task fields
-│                            (migrated to YMap("tasks") via P4 schema)
-├── YMap("tasks")        → { nodeId → JSON{ nodeId, completed, title, dueDate, recurrence, lastCompletedAt } }
+├── YMap("nodes")        
+│    ├── { nodeId → JSON{ id, type, position, parentId, data{...}, createdAt } }
+│    │       where `data` NO LONGER contains task fields.
+│    ├── { nodeId:completed → boolean }
+│    ├── { nodeId:dueDate → string }
+│    └── { nodeId:recurrence → string }
 └── YText("content/<id>")  per node, holds the text content
 ```
 
-**Why JSON strings instead of nested YMaps?** The `dart_crdt` library
+**Why composite keys instead of nested YMaps or JSON strings?** The `dart_crdt` library
 (which wraps `lib0`/`y-crdt` internals for Dart) does not fully support
-nested `Y.Map` instances as children of another `Y.Map`. The JSON-stringin-a-YMap
-approach gives us the same eventual-consistency properties at the entry
-level (each task entry is atomically replaced) while being compatible with
-the library's API.
+nested `Y.Map` instances. Previously, task fields were serialized as a giant JSON
+string, which caused "last-writer-wins" collisions at the task level. By migrating
+to flat composite keys (`$nodeId:completed`), we regain true field-level CRDT 
+merging semantics. Each property can be updated independently by different clients
+without overwriting each other.
 
 ### 2.3 Task State Migration (P4)
 
@@ -135,26 +138,24 @@ Originally, task fields (`completed`, `dueDate`, `recurrence`,
 { "id": "abc", "type": "task", "data": { "text": "Buy milk", "completed": true, "dueDate": "2026-07-15" } }
 ```
 
-This was migrated to a **two-level schema** where `YMap("tasks")` holds
-task metadata and node `data` only keeps `text`/`indent`:
+This was migrated to a **flat keys schema** where `YMap("nodes")` holds
+task metadata under composite keys and node `data` only keeps `text`/`indent`:
 
 ```json
-// YMap("nodes")
-{ "id": "abc", "type": "task", "data": { "text": "Buy milk" } }
-// YMap("tasks")
-{ "nodeId": "abc", "completed": true, "dueDate": "2026-07-15" }
+// YMap("nodes") entries
+"abc" -> { "id": "abc", "type": "task", "data": { "text": "Buy milk" } }
+"abc:completed" -> true
+"abc:dueDate" -> "2026-07-15"
 ```
 
-**Why migrate?** Two-level CRDT means toggling a task's completed status
-only updates `YMap("tasks")`, not `YMap("nodes")`. No full-document
-rebuild needed. The server projection and client widget read from
-`YMap("tasks")` for task state.
+**Why migrate?** Moving task metadata out of the JSON string blob ensures
+granular merging in the CRDT (toggling a task's completed status doesn't
+overwrite a concurrent dueDate edit). The server projection and client widget 
+read from these composite keys for task state.
 
-**Migration strategy:** Both Flutter (`YjsSyncManager._migrateLegacyDoc`)
-and Go (`migrateLegacyDoc` in `ydoc_service.go`) detect legacy docs on
-load (presence of `data.completed` + empty `YMap("tasks")`) and migrate
-them in place within a `doc.transact()`. Idempotent guards prevent
-double-migration.
+**Migration strategy:** Both Flutter and Go previously maintained a dual-write 
+compatibility layer, but that transition is complete. The YDoc is now the single
+source of truth for task metadata, and SQLite relies purely on the projection.
 
 ### 2.4 Two Representations: YDoc Nodes vs. Markdown Content
 
@@ -288,14 +289,15 @@ User taps checkbox → CustomTaskComponent → setComplete()
 → onRecurringTaskComplete() → YjsDocEditorBridge.completeRecurringTask()
     → doc.transact():
         1. Sets completed=false, dueDate=next, lastCompletedAt=now
-           in YMap("nodes").data AND YMap("tasks")
+           using composite keys ($nodeId:completed) in YMap("nodes")
         2. Encodes update → sends via WS/REST
 ```
 
-**Why both `YMap("nodes")` and `YMap("tasks")`?** During the P4 migration
-transition, both are written for backwards compatibility. The projection
-reads from `YMap("tasks")` first with fallback to node `data`. Once all
-clients are migrated, the node `data` writes can be removed.
+**Dual-Write eliminated:** Previously, during the P4 migration transition, 
+both the JSON `data` and dedicated `YMap("tasks")` were written for backwards 
+compatibility. This technical debt has been removed. The UI writes ONLY to 
+the YDoc via `NoteEditorController.updateTaskMetadataInYDoc`. The projection 
+handles SQLite automatically, ensuring no silent task dual-writes occur.
 
 ### 3.6 Note Creation Flow
 
@@ -457,10 +459,11 @@ is the same protocol used by y-websocket, y-sync, and the Yjs ecosystem.
 
 ```
 Client opens WS → server creates/joins Room for noteId
-→ Client sends SyncStep1 (compressed state vector)
-→ Server: DocFor(noteId) → merge client vector with server state
-→ Server sends SyncStep2 (updates client is missing)
-→ Client: applyUpdate() → YDoc converges to server state
+→ Server sends SyncStep1 (server state vector) to client
+→ Client receives Server SyncStep1, sends SyncStep2 (updates server needs)
+→ Client sends SyncStep1 (client state vector) to server
+→ Server receives Client SyncStep1, sends SyncStep2 (updates client needs)
+→ Both sides converge to the same state
 → Both sides: handshakeDone = true
 → Client sends Update on every local mutation
 → Server broadcasts Update to all other clients in room
@@ -470,12 +473,13 @@ Step by step:
 
 1. **Connection:** Client opens a WS to `ws://host/ws?noteId=X&token=Y`.
    Server validates the token and resolves the note ID.
-2. **SyncStep1:** Client serializes its state vector (a compact
-   representation of all known clock values per client ID) and sends it.
-   An empty/blank client sends an empty vector.
+2. **Bidirectional SyncStep1:** 
+   - Server serializes its state vector and immediately pushes it to the client.
+   - Client replies with a SyncStep2 to bring the server up to date.
+   - Simultaneously, Client sends its own SyncStep1.
 3. **SyncStep2:** Server computes the diff between the client's vector
-   and the server's canonical state. This is the set of Yjs updates the
-   client is missing. Server sends them as a single SyncStep2 message.
+   and the server's canonical state. Server sends them as a single SyncStep2 message.
+   This bidirectional handshake avoids silent data loss if one peer falls behind.
 4. **Handshake complete:** Both sides set `handshakeDone=true`. From now
    on, only incremental `Update` messages are exchanged.
 5. **Updates:** Every local mutation is encoded as a binary Yjs update

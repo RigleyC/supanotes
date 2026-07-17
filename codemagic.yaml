@@ -5,8 +5,10 @@ workflows:
     instance_type: mac_mini_m1
     cache:
       cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
         - $HOME/.pub-cache
         - $HOME/Library/Caches/CocoaPods
+        - DerivedData
     environment:
       groups:
         - api_config
@@ -51,7 +53,7 @@ workflows:
             COMPILER_INDEX_STORE_ENABLE=NO \
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS="--dart-define=API_BASE_URL=$API_BASE_URL" \
-            clean build
+            build
       - name: Package Unsigned IPA
         script: |
           APP_PATH=$(find DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -1)
@@ -73,8 +75,10 @@ workflows:
     instance_type: mac_mini_m1
     cache:
       cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
         - $HOME/.pub-cache
         - $HOME/Library/Caches/CocoaPods
+        - $HOME/Library/Developer/Xcode/DerivedData
     environment:
       groups:
         - api_config

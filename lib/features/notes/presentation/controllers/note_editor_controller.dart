@@ -11,7 +11,7 @@ import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/features/notes/domain/note_node.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
-import 'package:supanotes/features/notes/domain/keep_first_line_as_title_reaction.dart';
+
 import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/node_codec.dart';
 import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
@@ -118,7 +118,6 @@ class NoteEditorController extends ChangeNotifier {
     editor!.reactionPipeline.add(
       const RandomDividerConversionReaction(dividerCount: _dividerCount),
     );
-    editor!.reactionPipeline.add(const KeepFirstLineAsTitleReaction());
   }
 
   void bind(String noteId) {
