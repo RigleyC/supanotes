@@ -1,18 +1,42 @@
+import 'dart:io';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 class LocalNotificationService {
   final FlutterLocalNotificationsPlugin _plugin;
+  bool _initialized = false;
 
   LocalNotificationService()
     : _plugin = FlutterLocalNotificationsPlugin();
 
   Future<void> initialize() async {
+    if (_initialized) return;
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(),
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
     );
     await _plugin.initialize(settings: settings);
+    _initialized = true;
+  }
+
+  Future<void> requestPermissions() async {
+    await initialize();
+    if (Platform.isIOS) {
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(alert: true, badge: true, sound: true);
+    } else if (Platform.isAndroid) {
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    }
   }
 
   Future<void> scheduleTaskNotification(
@@ -20,6 +44,7 @@ class LocalNotificationService {
     String title,
     DateTime date,
   ) async {
+    await initialize();
     final tzDate = tz.TZDateTime.from(date, tz.local);
     await _plugin.zonedSchedule(
       id: id.hashCode,

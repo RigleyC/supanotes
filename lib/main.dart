@@ -25,14 +25,20 @@ void main() async {
 
   final sharedPreferences = await SharedPreferences.getInstance();
 
+  final container = ProviderContainer(
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+    ],
+  );
+
+  await container.read(localNotificationServiceProvider).requestPermissions();
+
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
   await initializeDateFormatting('pt_BR', null);
   warnIfAndroidBackendUnreachable();
   runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const SupaNotesApp(),
     ),
   );
