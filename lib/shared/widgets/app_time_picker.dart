@@ -21,70 +21,76 @@ Future<TimeOfDay?> _showCupertinoTimePicker(
 ) async {
   return showCupertinoModalPopup<TimeOfDay>(
     context: context,
-    builder: (_) {
+    builder: (ctx) {
       final hourController = FixedExtentScrollController(
         initialItem: initial.hour,
       );
       final minuteController = FixedExtentScrollController(
         initialItem: initial.minute,
       );
-      return Container(
-        height: 260,
-        color: CupertinoColors.systemBackground,
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                CupertinoButton(
-                  child: const Text('Cancelar'),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                CupertinoButton(
-                  child: const Text('OK'),
-                  onPressed: () {
-                    Navigator.of(context).pop(
-                      TimeOfDay(
-                        hour: hourController.selectedItem,
-                        minute: minuteController.selectedItem,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-            Expanded(
-              child: Row(
+      // Mirror Material brightness so Cupertino colors (systemBackground,
+      // label, etc.) resolve correctly in dark mode.
+      final brightness = Theme.of(context).brightness;
+      return CupertinoTheme(
+        data: CupertinoThemeData(brightness: brightness),
+        child: Container(
+          height: 260,
+          color: CupertinoColors.systemBackground.resolveFrom(ctx),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: CupertinoPicker(
-                      scrollController: hourController,
-                      itemExtent: 32,
-                      onSelectedItemChanged: (_) {},
-                      children: List.generate(
-                        24,
-                        (i) =>
-                            Center(child: Text(i.toString().padLeft(2, '0'))),
-                      ),
-                    ),
+                  CupertinoButton(
+                    child: const Text('Cancelar'),
+                    onPressed: () => Navigator.of(ctx).pop(),
                   ),
-                  const Text(':'),
-                  Expanded(
-                    child: CupertinoPicker(
-                      scrollController: minuteController,
-                      itemExtent: 32,
-                      onSelectedItemChanged: (_) {},
-                      children: List.generate(
-                        60,
-                        (i) =>
-                            Center(child: Text(i.toString().padLeft(2, '0'))),
-                      ),
-                    ),
+                  CupertinoButton(
+                    child: const Text('OK'),
+                    onPressed: () {
+                      Navigator.of(ctx).pop(
+                        TimeOfDay(
+                          hour: hourController.selectedItem,
+                          minute: minuteController.selectedItem,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
-            ),
-          ],
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CupertinoPicker(
+                        scrollController: hourController,
+                        itemExtent: 32,
+                        onSelectedItemChanged: (_) {},
+                        children: List.generate(
+                          24,
+                          (i) =>
+                              Center(child: Text(i.toString().padLeft(2, '0'))),
+                        ),
+                      ),
+                    ),
+                    const Text(':'),
+                    Expanded(
+                      child: CupertinoPicker(
+                        scrollController: minuteController,
+                        itemExtent: 32,
+                        onSelectedItemChanged: (_) {},
+                        children: List.generate(
+                          60,
+                          (i) =>
+                              Center(child: Text(i.toString().padLeft(2, '0'))),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       );
     },

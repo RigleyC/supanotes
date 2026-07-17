@@ -1,3 +1,4 @@
+import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -27,29 +28,33 @@ class LocalNotificationService {
   Future<void> requestPermissions() async {
     await initialize();
     if (Platform.isIOS) {
-      await _plugin
+      final granted = await _plugin
           .resolvePlatformSpecificImplementation<
               IOSFlutterLocalNotificationsPlugin>()
           ?.requestPermissions(alert: true, badge: true, sound: true);
+      dev.log('[Notifications] iOS permission granted: $granted');
     } else if (Platform.isAndroid) {
-      await _plugin
+      final granted = await _plugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
+      dev.log('[Notifications] Android permission granted: $granted');
     }
   }
 
   Future<void> scheduleTaskNotification(
     String id,
     String title,
+    String body,
     DateTime date,
   ) async {
     await initialize();
     final tzDate = tz.TZDateTime.from(date, tz.local);
+    dev.log('[Notifications] Scheduling "$title" at $tzDate (local=${tz.local.name})');
     await _plugin.zonedSchedule(
       id: id.hashCode,
       title: title,
-      body: 'Tarefa vence hoje',
+      body: body,
       scheduledDate: tzDate,
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
@@ -65,6 +70,7 @@ class LocalNotificationService {
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
+    dev.log('[Notifications] Scheduled OK id=${id.hashCode}');
   }
 
   Future<void> cancel(int id) async {

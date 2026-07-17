@@ -416,81 +416,18 @@ class SyncService {
         note.id,
     };
 
-    // ---- Caminho 3: Process Yjs states FIRST ----
-    // Content is always derived from the local YDoc (the source of truth),
-    // not from the server's potentially-stale `content` field. The server
-    // derives content asynchronously, so pull payloads may contain content=''.
-    // By projecting from the merged YDoc first, we guarantee the notes table
-    // always has the correct content.
-    final yjsNoteIds = <String>{};
-    for (final raw in (data['note_yjs_states'] as List? ?? [])) {
-      final remoteState = _mapper.localYjsStateFromJson(
-        raw as Map<String, dynamic>,
-      );
-      yjsNoteIds.add(remoteState.noteId);
-      if (_isActiveNote(remoteState.noteId)) {
-        debugPrint('[SyncService] pull: skipping note_yjs_state for active note=${remoteState.noteId}');
-        continue;
-      }
-
-      final tmpDoc = Doc();
-      try {
-        final localStateRow = await (_db.select(_db.localYjsStates)
-          ..where((t) => t.noteId.equals(remoteState.noteId)))
-          .getSingleOrNull();
-
-        if (localStateRow != null) {
-          applyUpdate(tmpDoc, localStateRow.state);
-        }
-        applyUpdate(tmpDoc, remoteState.state);
-
-        final mergedState = encodeStateAsUpdate(tmpDoc);
-        await _db.into(_db.localYjsStates).insertOnConflictUpdate(
-          LocalYjsStatesCompanion(
-            noteId: Value(remoteState.noteId),
-            state: Value(mergedState),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
-        await _yjsMgr.projectState(remoteState.noteId, mergedState);
-        _yjsMgr.evictDoc(remoteState.noteId);
-      } catch (e, _) {
-        debugPrint('[SyncService] pull: merge failed for ${remoteState.noteId}, falling back to remote: $e');
-        await _db.into(_db.localYjsStates).insertOnConflictUpdate(
-          LocalYjsStatesCompanion(
-            noteId: Value(remoteState.noteId),
-            state: Value(remoteState.state),
-            updatedAt: Value(remoteState.updatedAt),
-          ),
-        );
-        await _yjsMgr.projectState(remoteState.noteId, remoteState.state);
-        _yjsMgr.evictDoc(remoteState.noteId);
-      }
-    }
-
-    // After projection, read the content derived from YDoc for notes that
-    // had Yjs states. This is authoritative — it comes from the YDoc itself.
-    final projectedContentById = <String, String>{};
-    if (yjsNoteIds.isNotEmpty) {
-      final rows = await (_db.select(_db.notes)
-            ..where((t) => t.id.isIn(yjsNoteIds.toList())))
-          .get();
-      for (final row in rows) {
-        if (row.content.trim().isNotEmpty) {
-          projectedContentById[row.id] = row.content;
-        }
-      }
-    }
-
-    // Collect local content for notes WITHOUT Yjs states (server-only notes).
+    // Collect existing local content for all pulled notes so we don't
+    // overwrite non-empty local content with a stale/empty server payload.
+    // The server derives content asynchronously from the YDoc, so pull
+    // payloads may contain content=''. Yjs state processing (below) will
+    // update notes.content with the correct derived content via projectNodes.
     final pulledNoteIds = (data['notes'] as List? ?? [])
         .map((raw) => (raw as Map<String, dynamic>)['id'] as String)
         .toSet();
-    final nonProjectedIds = pulledNoteIds.difference(yjsNoteIds);
     final localContentById = <String, String>{};
-    if (nonProjectedIds.isNotEmpty) {
+    if (pulledNoteIds.isNotEmpty) {
       final rows = await (_db.select(_db.notes)
-            ..where((t) => t.id.isIn(nonProjectedIds.toList())))
+            ..where((t) => t.id.isIn(pulledNoteIds.toList())))
           .get();
       for (final row in rows) {
         if (row.content.trim().isNotEmpty) {
@@ -499,16 +436,18 @@ class SyncService {
       }
     }
 
+    // Insert notes BEFORE processing Yjs states so the FK constraint on
+    // local_yjs_states(note_id → notes.id) is satisfied. projectNodes()
+    // will update notes.content with the correct content after the Yjs merge.
     debugPrint('[SyncService] pull: applying batch elapsed=${sw.elapsedMilliseconds}ms notes=${(data['notes'] as List?)?.length ?? 0}');
     await _db.batch((batch) {
       for (final raw in (data['notes'] as List? ?? [])) {
         final json = raw as Map<String, dynamic>;
         final noteId = json['id'] as String;
 
-        // Priority: projected content (from YDoc) > local content > server content.
-        if (projectedContentById.containsKey(noteId)) {
-          json['content'] = projectedContentById[noteId];
-        } else if (localContentById.containsKey(noteId)) {
+        // Preserve non-empty local content; Yjs state processing below will
+        // overwrite it with the authoritative YDoc-derived content.
+        if (localContentById.containsKey(noteId)) {
           json['content'] = localContentById[noteId];
         }
 
@@ -563,6 +502,53 @@ class SyncService {
         );
       }
     });
+
+    // Process Yjs states AFTER the notes batch so the FK constraint is
+    // satisfied. projectNodes() updates notes.content with content derived
+    // from the merged YDoc — this is the authoritative content source.
+    for (final raw in (data['note_yjs_states'] as List? ?? [])) {
+      final remoteState = _mapper.localYjsStateFromJson(
+        raw as Map<String, dynamic>,
+      );
+      if (_isActiveNote(remoteState.noteId)) {
+        debugPrint('[SyncService] pull: skipping note_yjs_state for active note=${remoteState.noteId}');
+        continue;
+      }
+
+      final tmpDoc = Doc();
+      try {
+        final localStateRow = await (_db.select(_db.localYjsStates)
+          ..where((t) => t.noteId.equals(remoteState.noteId)))
+          .getSingleOrNull();
+
+        if (localStateRow != null) {
+          applyUpdate(tmpDoc, localStateRow.state);
+        }
+        applyUpdate(tmpDoc, remoteState.state);
+
+        final mergedState = encodeStateAsUpdate(tmpDoc);
+        await _db.into(_db.localYjsStates).insertOnConflictUpdate(
+          LocalYjsStatesCompanion(
+            noteId: Value(remoteState.noteId),
+            state: Value(mergedState),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+        await _yjsMgr.projectState(remoteState.noteId, mergedState);
+        _yjsMgr.evictDoc(remoteState.noteId);
+      } catch (e, _) {
+        debugPrint('[SyncService] pull: merge failed for ${remoteState.noteId}, falling back to remote: $e');
+        await _db.into(_db.localYjsStates).insertOnConflictUpdate(
+          LocalYjsStatesCompanion(
+            noteId: Value(remoteState.noteId),
+            state: Value(remoteState.state),
+            updatedAt: Value(remoteState.updatedAt),
+          ),
+        );
+        await _yjsMgr.projectState(remoteState.noteId, remoteState.state);
+        _yjsMgr.evictDoc(remoteState.noteId);
+      }
+    }
 
     final nextSyncedAtStr = data['synced_at'] as String?;
     if (nextSyncedAtStr != null) {

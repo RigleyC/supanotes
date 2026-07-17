@@ -64,11 +64,20 @@ class TaskMetadataBadges extends StatelessWidget {
       return Theme.of(context).colorScheme.onSurfaceVariant;
     }
 
-    final today = (now ?? DateTime.now()).startOfDay;
+    final effectiveNow = now ?? DateTime.now();
+    final today = effectiveNow.startOfDay;
     final date = dueDate.startOfDay;
 
     if (date.isBefore(today)) return Theme.of(context).colorScheme.error;
-    if (date.isSameDayAs(today)) return AppColors.success;
+
+    if (date.isSameDayAs(today)) {
+      // If the task has a specific time and it has already passed, show as overdue
+      if (hasTime && dueDate.isBefore(effectiveNow)) {
+        return Theme.of(context).colorScheme.error;
+      }
+      return AppColors.success;
+    }
+
     return Theme.of(context).colorScheme.onSurfaceVariant;
   }
 }

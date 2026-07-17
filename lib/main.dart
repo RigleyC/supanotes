@@ -39,8 +39,6 @@ void main() async {
     ],
   );
 
-  await container.read(localNotificationServiceProvider).requestPermissions();
-
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
   await initializeDateFormatting('pt_BR', null);
   runApp(
@@ -49,6 +47,12 @@ void main() async {
       child: const SupaNotesApp(),
     ),
   );
+
+  // Must be called after runApp so the Flutter engine has registered
+  // native plugins and method channels are ready.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    container.read(localNotificationServiceProvider).requestPermissions();
+  });
 }
 
 class SupaNotesApp extends ConsumerWidget {
@@ -56,7 +60,9 @@ class SupaNotesApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.read(taskNotificationSchedulerProvider);
+    // We must listen to it (not just read) so Riverpod keeps it active and
+    // forces it to rebuild when its internal dependencies (like auth) change.
+    ref.listen(taskNotificationSchedulerProvider, (_, __) {});
 
     ref.listen<AsyncValue<User?>>(authControllerProvider, (prev, next) {
       next.when(
