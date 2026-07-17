@@ -7,8 +7,8 @@ class LocalNotificationService {
   final FlutterLocalNotificationsPlugin _plugin;
   bool _initialized = false;
 
-  LocalNotificationService()
-    : _plugin = FlutterLocalNotificationsPlugin();
+  LocalNotificationService({FlutterLocalNotificationsPlugin? plugin})
+    : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
   Future<void> initialize() async {
     if (_initialized) return;

@@ -129,14 +129,23 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 }
               },
             ),
-            if (!note.isReadOnly && FocusManager.instance.primaryFocus != null)
-              IconButton(
-                icon: const Icon(Icons.check),
-                onPressed: () {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  SystemChannels.textInput.invokeMethod('TextInput.hide');
-                },
-              ),
+            if (!note.isReadOnly)
+              Consumer(builder: (context, ref, child) {
+                final controller = ref.watch(noteEditorControllerProvider(widget.noteId));
+                return AnimatedBuilder(
+                  animation: controller.focusNode,
+                  builder: (context, _) {
+                    if (!controller.focusNode.hasFocus) return const SizedBox.shrink();
+                    return IconButton(
+                      icon: const Icon(Icons.check),
+                      onPressed: () {
+                        controller.focusNode.unfocus();
+                        SystemChannels.textInput.invokeMethod('TextInput.hide');
+                      },
+                    );
+                  },
+                );
+              }),
           ],
         ],
       ),
@@ -209,7 +218,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               ),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const SizedBox.shrink(),
           error: (error, _) => Center(child: Text('Error: $error')),
         ),
       ),

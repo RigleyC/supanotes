@@ -1,9 +1,8 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
+import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/shared/widgets/app_selection_tile.dart';
+import 'package:supanotes/shared/widgets/app_time_picker.dart';
 
 enum QuickDueDate {
   today,
@@ -74,7 +73,9 @@ class _DueDatePickerState extends State<DueDatePicker> {
       children: [
         for (final option in QuickDueDate.values)
           AppSelectionTile(
-            label: option.label,
+            label: _isSelected(option.compute(now))
+                ? formatDueDate(widget.initialDate!, hasTime: widget.initialHasTime, now: now)
+                : option.label,
             icon: option.icon,
             isSelected: _isSelected(option.compute(now)),
             onTap: () {
@@ -84,7 +85,11 @@ class _DueDatePickerState extends State<DueDatePicker> {
           ),
         AppSelectionTile(
           label: _isCustomDate()
-              ? DateFormat('d MMM').format(widget.initialDate!)
+              ? formatDueDate(
+                  widget.initialDate!,
+                  hasTime: widget.initialHasTime,
+                  now: now,
+                )
               : 'Escolher data',
           icon: Icons.calendar_month_rounded,
           isSelected: _isCustomDate(),
@@ -115,9 +120,10 @@ class _DueDatePickerState extends State<DueDatePicker> {
             icon: Icons.access_time_rounded,
             isSelected: widget.initialHasTime,
             onTap: () async {
-              final time = defaultTargetPlatform == TargetPlatform.iOS
-                  ? await _showCupertinoTimePicker(context)
-                  : await _showMaterialTimePicker(context);
+              final time = await showAppTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
               if (time != null) {
                 final date = widget.initialDate!;
                 final newDate = DateTime(
@@ -142,81 +148,6 @@ class _DueDatePickerState extends State<DueDatePicker> {
           },
         ),
       ],
-    );
-  }
-
-  Future<TimeOfDay?> _showMaterialTimePicker(BuildContext context) {
-    return showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-  }
-
-  Future<TimeOfDay?> _showCupertinoTimePicker(BuildContext context) async {
-    final initial = TimeOfDay.now();
-    return showCupertinoModalPopup<TimeOfDay>(
-      context: context,
-      builder: (_) {
-        final hourController = FixedExtentScrollController(
-          initialItem: initial.hour,
-        );
-        final minuteController = FixedExtentScrollController(
-          initialItem: initial.minute,
-        );
-        return Container(
-          height: 260,
-          color: CupertinoColors.systemBackground,
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  CupertinoButton(
-                    child: const Text('Cancelar'),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  CupertinoButton(
-                    child: const Text('OK'),
-                    onPressed: () {
-                      Navigator.of(context).pop(TimeOfDay(
-                        hour: hourController.selectedItem,
-                        minute: minuteController.selectedItem,
-                      ));
-                    },
-                  ),
-                ],
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CupertinoPicker(
-                        scrollController: hourController,
-                        itemExtent: 32,
-                        onSelectedItemChanged: (_) {},
-                        children: List.generate(24, (i) => Center(
-                          child: Text(i.toString().padLeft(2, '0')),
-                        )),
-                      ),
-                    ),
-                    const Text(':'),
-                    Expanded(
-                      child: CupertinoPicker(
-                        scrollController: minuteController,
-                        itemExtent: 32,
-                        onSelectedItemChanged: (_) {},
-                        children: List.generate(60, (i) => Center(
-                          child: Text(i.toString().padLeft(2, '0')),
-                        )),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

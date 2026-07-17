@@ -118,7 +118,7 @@ StackItem? _popStackItem(
 
     // Destroy search markers for changed types
     transaction.changed.forEach((type, subProps) {
-      if (subProps.contains(null) as bool) {
+      if (subProps.contains(null)) {
         // ignore: avoid_dynamic_calls
         final searchMarker = (type as dynamic).searchMarker;
         if (searchMarker != null) {

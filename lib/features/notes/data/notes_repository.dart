@@ -51,14 +51,13 @@ class NotesRepository implements INotesRepository {
     this._local,
     this._tasksLocal,
     this._prefsDao,
-    this._db, [
+    [
     this._noteLinksDao,
   ]);
 
   final NotesLocalRepository _local;
   final TasksLocalRepository _tasksLocal;
   final UserNotePreferencesDao _prefsDao;
-  final AppDatabase _db;
   final NoteLinksDao? _noteLinksDao;
 
   /// Streams active (non-archived, non-deleted, non-inbox) notes, mapped
@@ -291,7 +290,6 @@ final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
     local,
     tasksLocal,
     db.userNotePreferencesDao,
-    db,
-    db.noteLinksDao,
+  
   );
 });

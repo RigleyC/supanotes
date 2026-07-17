@@ -16,14 +16,25 @@ typedef NoteQueryResult = ({
 });
 
 /// Derives a display title from note content by extracting the first non-empty
-/// line and stripping markdown heading markers.
+/// line and stripping markdown heading, task and list markers.
 String deriveNoteTitle(String content) {
   final lines = content.split('\n');
   for (final line in lines) {
-    final trimmed = line.trim();
+    var trimmed = line.trim();
     if (trimmed.isEmpty) continue;
-    final title = trimmed.replaceFirst(RegExp(r'^#+\s*'), '');
-    return title.isEmpty ? NoteStrings.fallbackTitle : title;
+
+    // Strip heading markers (# ## ###)
+    trimmed = trimmed.replaceFirst(RegExp(r'^#+\s*'), '');
+    // Strip task checkboxes (- [ ] - [x] * [ ] * [x])
+    trimmed = trimmed.replaceFirst(RegExp(r'^[-*]\s*\[[ xX]\]\s*'), '');
+    // Strip bullet list markers (- item * item)
+    trimmed = trimmed.replaceFirst(RegExp(r'^[-*]\s*'), '');
+    // Strip ordered list markers (1. item)
+    trimmed = trimmed.replaceFirst(RegExp(r'^\d+\.\s*'), '');
+
+    trimmed = trimmed.trim();
+    if (trimmed.isEmpty) continue;
+    return trimmed;
   }
   return NoteStrings.fallbackTitle;
 }

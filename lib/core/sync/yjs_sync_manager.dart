@@ -139,7 +139,8 @@ class YjsSyncManager {
         continue;
       }
 
-      final text = _readNodeTextContent(doc, nodeId);
+      final nodeData = _extractNodeData(raw);
+      final text = _readNodeTextContent(doc, nodeId, nodeData: nodeData);
 
       final now = DateTime.now();
 
@@ -206,7 +207,8 @@ class YjsSyncManager {
 
     final lines = <String>[];
     for (final node in nodes) {
-      final text = _readNodeTextContent(doc, node.id);
+      final nodeData = _jsonMapFromString(node.data);
+      final text = _readNodeTextContent(doc, node.id, nodeData: nodeData);
       switch (node.type) {
         case 'header':
           int level = 1;
@@ -258,22 +260,66 @@ class YjsSyncManager {
     return '${flat.substring(0, 120)}…';
   }
 
-  String _readNodeTextContent(Doc doc, String nodeId) {
-    try {
-      final fixedType = doc.getText('content_fixed/$nodeId');
-      if (fixedType != null) {
-        final text = fixedType.toString();
-        if (text.isNotEmpty) return text;
-      }
-    } catch (_) {}
+  String _readNodeTextContent(
+    Doc doc,
+    String nodeId, {
+    Map<String, dynamic>? nodeData,
+  }) {
+    // Mirror the backend projection logic: prefer the first non-empty YText
+    // shared type, then fall back to the embedded text in the node data.
+    // We guard calls to doc.getText with doc.share because getText creates an
+    // empty type on demand, which would otherwise hide the data.text fallback.
+    final fixedKey = 'content_fixed/$nodeId';
+    if (doc.share.containsKey(fixedKey)) {
+      try {
+        final fixedType = doc.getText(fixedKey);
+        if (fixedType != null) {
+          final text = fixedType.toString();
+          if (text.isNotEmpty) return text;
+        }
+      } catch (_) {}
+    }
 
+    final contentKey = 'content/$nodeId';
+    if (doc.share.containsKey(contentKey)) {
+      try {
+        final sharedType = doc.getText(contentKey);
+        if (sharedType != null) {
+          final text = sharedType.toString();
+          if (text.isNotEmpty) return text;
+        }
+      } catch (_) {}
+    }
+
+    // Fallback to the embedded text in the node data when the YText shared
+    // types are absent or empty. This prevents "Sem título" / empty task
+    // titles for docs created by older clients or received through sync before
+    // the shared types are materialized.
+    final dataText = nodeData?['text'] as String?;
+    if (dataText != null && dataText.isNotEmpty) return dataText;
+
+    return '';
+  }
+
+  Map<String, dynamic>? _extractNodeData(dynamic raw) {
+    if (raw is YMap) {
+      final dataRaw = raw.get('data');
+      if (dataRaw is String) {
+        return _jsonMapFromString(dataRaw);
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _jsonMapFromString(String raw) {
     try {
-      final sharedType = doc.getText('content/$nodeId');
-      if (sharedType != null) {
-        return sharedType.toString();
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.cast<String, dynamic>();
       }
     } catch (_) {}
-    return '';
+    return null;
   }
 
   /// Evict the in-memory Doc for [noteId] so the next [loadDoc] re-reads from DB.

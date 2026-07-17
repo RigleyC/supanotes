@@ -9,7 +9,6 @@ import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
-import 'package:supanotes/core/notifications/push_service.dart';
 
 class _TestAuthController extends AuthController {
   _TestAuthController(this._user);
@@ -22,16 +21,7 @@ class _TestAuthController extends AuthController {
   Future<void> logout() async {}
 }
 
-class _TestPushService extends PushService {
-  _TestPushService(this._initial);
-  final bool _initial;
 
-  @override
-  bool build() => _initial;
-
-  @override
-  Future<void> toggle(bool v) async => state = v;
-}
 
 ProviderContainer createContainer({
   User? user,
@@ -40,7 +30,6 @@ ProviderContainer createContainer({
   return ProviderContainer(
     overrides: [
       authControllerProvider.overrideWith(() => _TestAuthController(user)),
-      pushServiceProvider.overrideWith(() => _TestPushService(pushEnabled)),
       syncStateProvider.overrideWith(() => SyncStateNotifier()),
     ],
   );
@@ -58,10 +47,6 @@ Widget buildApp(Widget child, {required ProviderContainer container}) {
       GoRoute(
         path: AppRoutes.contexts,
         builder: (_, _) => const Scaffold(body: Text('contexts-stub')),
-      ),
-      GoRoute(
-        path: AppRoutes.telegram,
-        builder: (_, _) => const Scaffold(body: Text('telegram-stub')),
       ),
     ],
   );
@@ -145,7 +130,6 @@ void main() {
 
       expect(find.text('Personalidade do agent'), findsOneWidget);
       expect(find.text('Contextos'), findsOneWidget);
-      expect(find.text('Telegram'), findsOneWidget);
       expect(find.text('Dados'), findsOneWidget);
     });
 

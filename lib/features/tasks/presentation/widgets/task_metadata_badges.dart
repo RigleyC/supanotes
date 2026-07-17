@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
+import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
@@ -12,12 +12,14 @@ class TaskMetadataBadges extends StatelessWidget {
     this.dueDate,
     this.recurrence,
     this.isCompleted = false,
+    this.hasTime = false,
     this.now,
   });
 
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
   final bool isCompleted;
+  final bool hasTime;
   final DateTime? now;
 
   bool get _hasRecurrence => recurrence != null;
@@ -40,33 +42,23 @@ class TaskMetadataBadges extends StatelessWidget {
         if (_hasDueDate)
           _MetadataPill(
             icon: Icons.event_outlined,
-            label: _dueDateLabel(dueDate!),
+            label: formatDueDate(
+              dueDate!,
+              hasTime: hasTime,
+              isCompleted: isCompleted,
+              now: now,
+            ),
             color: _dueDateColor(context, dueDate!),
           ),
         if (_hasRecurrence)
           _MetadataPill(
             icon: Icons.refresh,
-            label: recurrence!.getLocalizedLabel(dueDate),
+            label: recurrence!.shortLabel,
             color: scheme.onSurfaceVariant,
           ),
       ],
     );
   }
-
-  String _dueDateLabel(DateTime dueDate) {
-    final today = (now ?? DateTime.now()).startOfDay;
-    final date = dueDate.startOfDay;
-
-    if (date.isSameDayAs(today)) return 'Hoje';
-    if (date.isBefore(today)) {
-      if (isCompleted) {
-        return DateFormat('d MMM').format(dueDate);
-      }
-      return 'Atrasada \u00b7 ${DateFormat('d MMM').format(dueDate)}';
-    }
-    return DateFormat('d MMM').format(dueDate);
-  }
-
   Color _dueDateColor(BuildContext context, DateTime dueDate) {
     if (isCompleted) {
       return Theme.of(context).colorScheme.onSurfaceVariant;

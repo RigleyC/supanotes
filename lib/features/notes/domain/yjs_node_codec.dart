@@ -4,21 +4,39 @@ import 'package:yjs_dart/yjs_dart.dart';
 
 import 'note_node.dart';
 
-String _readNodeTextContent(Doc doc, String nodeId) {
-  try {
-    final fallbackType = doc.getText('content_fixed/$nodeId');
-    if (fallbackType != null) {
-      final text = fallbackType.toString();
-      if (text.isNotEmpty) return text;
-    }
-  } catch (_) {}
+String _readNodeTextContent(
+  Doc doc,
+  String nodeId, {
+  Map<String, dynamic>? nodeData,
+}) {
+  // Mirror the backend projection logic: prefer the first non-empty YText
+  // shared type, then fall back to the embedded text in the node data.
+  // We guard calls to doc.getText with doc.share because getText creates an
+  // empty type on demand, which would otherwise hide the data.text fallback.
+  final fixedKey = 'content_fixed/$nodeId';
+  if (doc.share.containsKey(fixedKey)) {
+    try {
+      final fallbackType = doc.getText(fixedKey);
+      if (fallbackType != null) {
+        final text = fallbackType.toString();
+        if (text.isNotEmpty) return text;
+      }
+    } catch (_) {}
+  }
 
-  try {
-    final legacyType = doc.getText('content/$nodeId');
-    if (legacyType != null) {
-      return legacyType.toString();
-    }
-  } catch (_) {}
+  final contentKey = 'content/$nodeId';
+  if (doc.share.containsKey(contentKey)) {
+    try {
+      final legacyType = doc.getText(contentKey);
+      if (legacyType != null) {
+        final text = legacyType.toString();
+        if (text.isNotEmpty) return text;
+      }
+    } catch (_) {}
+  }
+
+  final dataText = nodeData?['text'] as String?;
+  if (dataText != null && dataText.isNotEmpty) return dataText;
 
   return '';
 }
@@ -28,15 +46,14 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
   if (nodeId == null) return null;
 
   String derivedType = nodeMap.get('type') as String? ?? 'paragraph';
-  final textContent = _readNodeTextContent(doc, nodeId);
-
-
 
   final rawData = nodeMap.get('data');
   final data = rawData is String
       ? Map<String, dynamic>.from(jsonDecode(rawData) as Map)
       : <String, dynamic>{};
-  
+
+  final textContent = _readNodeTextContent(doc, nodeId, nodeData: data);
+
   if (textContent.isNotEmpty) {
     data['text'] = textContent;
   }
@@ -84,11 +101,11 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
     final meta = jsonDecode(raw) as Map<String, dynamic>;
     final nodeId = meta['id'] as String;
     String derivedType = meta['type'] as String? ?? 'paragraph';
-    final textContent = _readNodeTextContent(doc, nodeId);
-
 
     final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
-    
+
+    final textContent = _readNodeTextContent(doc, nodeId, nodeData: data);
+
     if (derivedType == 'task') {
       final nodesMap = doc.getMap<Object>('nodes');
       

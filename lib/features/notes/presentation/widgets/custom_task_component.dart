@@ -300,6 +300,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                     TaskMetadataBadges(
                       dueDate: widget.taskMetadata?.dueDate,
                       recurrence: widget.taskMetadata?.recurrence,
+                      hasTime: widget.taskMetadata?.hasTime ?? false,
                       isCompleted: _isComplete,
                     ),
                     const SizedBox(height: 4),

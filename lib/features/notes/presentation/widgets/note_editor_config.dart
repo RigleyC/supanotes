@@ -1,9 +1,6 @@
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:follow_the_leader/follow_the_leader.dart';
 import 'package:super_editor/super_editor.dart';
-
-import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
 
 import 'rich_common_editor_operations.dart';
 import 'rich_ios_controls_controller.dart';
@@ -44,27 +41,18 @@ EditorControls createEditorControls({
     documentLayoutResolver: documentLayoutResolver,
     operations: richOps,
     handleColor: handleColor,
-    toolbarBuilder: (overlayContext, mobileToolbarKey, focalPoint) =>
-        buildCustomSelectionToolbar(
-          overlayContext,
-          focalPoint,
-          richOps,
-          editor,
-          composer,
-          documentLayoutResolver,
-        ),
   );
 
   final androidController = SuperEditorAndroidControlsController(
     controlsColor: handleColor,
     toolbarBuilder: (overlayContext, mobileToolbarKey, focalPoint) =>
-        buildCustomSelectionToolbar(
+        defaultAndroidEditorToolbarBuilder(
           overlayContext,
-          focalPoint,
+          mobileToolbarKey,
           richOps,
-          editor,
-          composer,
-          documentLayoutResolver,
+          SuperEditorAndroidControlsScope.rootOf(overlayContext),
+          composer.selectionNotifier,
+          focalPoint,
         ),
   );
 
@@ -92,78 +80,3 @@ List<SuperEditorKeyboardAction> editorKeyboardActions() {
   );
 }
 
-Widget buildCustomSelectionToolbar(
-  BuildContext context,
-  LeaderLink focalPoint,
-  RichCommonEditorOperations operations,
-  Editor editor,
-  MutableDocumentComposer composer,
-  DocumentLayout Function() documentLayoutResolver,
-) {
-  final selection = composer.selection;
-  if (selection == null || selection.isCollapsed) return const SizedBox.shrink();
-
-  final buttonItems = [
-    ContextMenuButtonItem(
-      label: 'Cortar',
-      onPressed: () {
-        operations.cut();
-      },
-      type: ContextMenuButtonType.cut,
-    ),
-    ContextMenuButtonItem(
-      label: 'Copiar',
-      onPressed: () {
-        operations.copy();
-        composer.clearSelection();
-      },
-      type: ContextMenuButtonType.copy,
-    ),
-    ContextMenuButtonItem(
-      label: 'Colar',
-      onPressed: () {
-        operations.paste();
-      },
-      type: ContextMenuButtonType.paste,
-    ),
-    ContextMenuButtonItem(
-      label: 'Selecionar tudo',
-      onPressed: () {
-        operations.selectAll();
-      },
-      type: ContextMenuButtonType.selectAll,
-    ),
-    ContextMenuButtonItem(
-      label: 'Negrito',
-      onPressed: () => NoteEditorCommands.toggleInlineAttribution(editor, composer, boldAttribution),
-    ),
-    ContextMenuButtonItem(
-      label: 'Itálico',
-      onPressed: () => NoteEditorCommands.toggleInlineAttribution(editor, composer, italicsAttribution),
-    ),
-    ContextMenuButtonItem(
-      label: 'Riscado',
-      onPressed: () => NoteEditorCommands.toggleInlineAttribution(editor, composer, strikethroughAttribution),
-    ),
-  ];
-
-  final documentLayout = documentLayoutResolver();
-  final selectionRect = documentLayout.getRectForSelection(selection.base, selection.extent);
-  Offset primaryAnchor = Offset.zero;
-  if (selectionRect != null) {
-    primaryAnchor = documentLayout.getGlobalOffsetFromDocumentOffset(selectionRect.topCenter);
-  }
-
-  return Positioned(
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    child: AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: TextSelectionToolbarAnchors(
-        primaryAnchor: primaryAnchor,
-      ),
-      buttonItems: buttonItems,
-    ),
-  );
-}
