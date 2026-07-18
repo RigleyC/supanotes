@@ -210,13 +210,17 @@ void main() {
       bridge.completeRecurringTask('t1', nextDue);
 
       final nodesMap = doc.getMap<Object>('nodes')!;
-      expect(nodesMap.get('t1:completed'), isFalse);
-      expect(nodesMap.get('t1:dueDate'), '2026-07-15');
+      final t1Map = nodesMap.get('t1') as YMap;
+      expect(t1Map.get('completed'), isFalse);
+      expect(t1Map.get('dueDate'), '2026-07-15');
+      // Composite keys should NOT be written
+      expect(nodesMap.get('t1:completed'), isNull);
+      expect(nodesMap.get('t1:dueDate'), isNull);
 
       bridge.dispose();
     });
 
-    test('updateTaskMetadataInYDoc writes composite keys for dueDate, recurrence, and reminder',
+    test('updateTaskMetadataInYDoc writes task metadata inside node YMap',
         () async {
       final doc = Doc();
       final mutableDoc = MutableDocument.empty();
@@ -255,9 +259,14 @@ void main() {
       );
 
       final nodesMap = doc.getMap<Object>('nodes')!;
-      expect(nodesMap.get('t1:dueDate'), '2026-08-15');
-      expect(nodesMap.get('t1:recurrence'), 'weekly');
-      expect(nodesMap.get('t1:reminder'), '9am');
+      final t1Map = nodesMap.get('t1') as YMap;
+      expect(t1Map.get('dueDate'), '2026-08-15');
+      expect(t1Map.get('recurrence'), 'weekly');
+      expect(t1Map.get('reminder'), '9am');
+      // Composite keys should NOT be written
+      expect(nodesMap.get('t1:dueDate'), isNull);
+      expect(nodesMap.get('t1:recurrence'), isNull);
+      expect(nodesMap.get('t1:reminder'), isNull);
 
       bridge.dispose();
     });

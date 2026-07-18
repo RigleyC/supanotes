@@ -53,7 +53,7 @@ class EditorDocumentSyncManager {
   final Editor _editor;
   void Function(List<NodeOperation> ops)? onNodeFlush;
 
-  final List<NodeOperation> _pendingOps = [];
+  final Map<String, NodeOperation> _pendingOps = {};
   Timer? _debounceTimer;
 
   final Set<String> locallyDirtyNodeIds = {};
@@ -90,12 +90,12 @@ class EditorDocumentSyncManager {
           final nextNodeId = currentIndex + 1 < _document.nodeCount 
               ? _document.getNodeAt(currentIndex + 1)?.id 
               : null;
-          _pendingOps.add(InsertOp(change.nodeId, node, prevNodeId, nextNodeId));
+          _pendingOps[change.nodeId] = InsertOp(change.nodeId, node, prevNodeId, nextNodeId);
           locallyDirtyNodeIds.add(change.nodeId);
           _dirtyNodeSequences[change.nodeId] = _opSequence;
         }
       } else if (change is NodeRemovedEvent) {
-        _pendingOps.add(DeleteOp(change.nodeId));
+        _pendingOps[change.nodeId] = DeleteOp(change.nodeId);
         locallyDirtyNodeIds.add(change.nodeId);
         _dirtyNodeSequences[change.nodeId] = _opSequence;
       } else if (change is NodeMovedEvent) {
@@ -106,13 +106,13 @@ class EditorDocumentSyncManager {
         final nextNodeId = currentIndex + 1 < _document.nodeCount 
             ? _document.getNodeAt(currentIndex + 1)?.id 
             : null;
-        _pendingOps.add(MoveOp(change.nodeId, prevNodeId, nextNodeId));
+        _pendingOps[change.nodeId] = MoveOp(change.nodeId, prevNodeId, nextNodeId);
         locallyDirtyNodeIds.add(change.nodeId);
         _dirtyNodeSequences[change.nodeId] = _opSequence;
       } else if (change is NodeChangeEvent) {
         final node = _document.getNodeById(change.nodeId);
         if (node != null) {
-          _pendingOps.add(UpdateOp(change.nodeId, node));
+          _pendingOps[change.nodeId] = UpdateOp(change.nodeId, node);
           locallyDirtyNodeIds.add(change.nodeId);
           _dirtyNodeSequences[change.nodeId] = _opSequence;
         }
@@ -128,7 +128,7 @@ class EditorDocumentSyncManager {
   Future<void> _drainQueue() async {
     if (_pendingOps.isEmpty) return;
 
-    final opsToProcess = List<NodeOperation>.from(_pendingOps);
+    final opsToProcess = List<NodeOperation>.from(_pendingOps.values);
     _pendingOps.clear();
     final snapshotSeq = _opSequence;
 
@@ -150,7 +150,7 @@ class EditorDocumentSyncManager {
     _debounceTimer?.cancel();
     if (_pendingOps.isEmpty) return _writeLock;
 
-    final opsToProcess = List<NodeOperation>.from(_pendingOps);
+    final opsToProcess = List<NodeOperation>.from(_pendingOps.values);
     _pendingOps.clear();
     final snapshotSeq = _opSequence;
 

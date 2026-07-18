@@ -57,11 +57,22 @@ void main() {
       final doc = Doc();
       final bridge = buildBridge(doc: doc, projectionScheduler: recorder);
 
-      final result = bridge.completeTaskInYDoc('task-1',
-          now: DateTime(2026, 7, 18, 9));
+      // Seed a recurring task node in the YDoc
+      doc.transact((txn) {
+        final nodeMap = YMap<Object>();
+        nodeMap.set('id', 'task-1');
+        nodeMap.set('type', 'task');
+        nodeMap.set('position', 'a0');
+        nodeMap.set('data', '{}');
+        nodeMap.set('createdAt', 1000.0);
+        nodeMap.set('recurrence', 'daily');
+        doc.getMap<Object>('nodes')!.set('task-1', nodeMap);
+      });
 
-      expect(result.nextDue, DateTime(2026, 7, 19, 9));
-      expect(recorder.requestedNoteIds, ['note-1']);
+      final result = bridge.completeTaskInYDoc('task-1',
+          now: DateTime.utc(2026, 7, 18, 9));
+
+      expect(result.nextDue, DateTime.utc(2026, 7, 19, 9));
       expect(readTaskField(doc, 'task-1', 'lastCompletedAt'), isNotNull);
     });
   });

@@ -5,7 +5,7 @@ import 'package:yjs_dart/yjs_dart.dart';
 void main() {
   test('Does Yjs cache strings across multiple updates?', () {
     final doc1 = Doc();
-    final ytext = doc1.getText('content/1234-abcd');
+    final ytext = doc1.getText('content/1234-abcd')!;
     ytext.insert(0, 'A');
     final sv0 = encodeStateVector(doc1);
     

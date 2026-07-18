@@ -21,6 +21,7 @@ void main() {
     final coordinator = EditorDocumentSyncManager(document: document, editor: editor);
     final bridge = YjsDocEditorBridge(
       doc: doc,
+      userId: 'test-user',
       coordinator: coordinator,
       sendUpdate: (_) {},
       onDocChanged: () {},

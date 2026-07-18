@@ -1,5 +1,6 @@
-import 'dart:convert';
+import 'dart:async';
 import 'dart:developer' as dev;
+import 'dart:typed_data';
 import 'package:supanotes/core/utils/fractional_indexing.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
@@ -7,7 +8,8 @@ import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'editor_document_sync_manager.dart';
-import 'node_codec.dart';
+import 'note_node.dart';
+import 'yjs_note_schema.dart';
 import 'yjs_node_codec.dart';
 
 /// Wires a [Doc] to a [MutableDocument] via [EditorDocumentSyncManager].
@@ -18,58 +20,136 @@ import 'yjs_node_codec.dart';
 ///
 /// Local mutations are written directly to the YDoc. The sync layer
 /// (SyncService polling) captures state changes independently.
+///
+/// Remote changes are coalesced via [scheduleMicrotask] to batch multiple
+/// observer callbacks from the same transaction.
 class YjsDocEditorBridge {
   YjsDocEditorBridge({
     required Doc doc,
     required String userId,
     required EditorDocumentSyncManager coordinator,
     void Function()? onDocChanged,
+    void Function(Uint8List)? sendUpdate,
+    void Function(Set<String> nodeIds)? onDocCommitted,
   })  : _doc = doc,
         _userId = userId,
         _coordinator = coordinator,
-        _onDocChanged = onDocChanged {
+        _onDocChanged = onDocChanged,
+        _sendUpdate = sendUpdate,
+        _onDocCommitted = onDocCommitted {
     final nodesMap = doc.getMap<Object>('nodes')!;
     _onNodesChangedHandler = nodesMap.observe((e, _) {
-      _onNodesChanged(_extractKeys(e));
+      if (_isFlushingLocal) return;
+      if (e.keysChanged.isNotEmpty) {
+        _scheduleRemoteApply(e.keysChanged.cast<String>());
+      }
     });
-    _onAfterTransactionHandler = (tr, d) {
-      _onNodesChanged(null);
+    _onAfterTransactionHandler = (Transaction tr, Doc d) {
+      if (_isFlushingLocal) return;
+      _onAfterTransaction(tr, d);
     };
     _doc.on('afterTransaction', _onAfterTransactionHandler);
+
     coordinator.onNodeFlush = onLocalFlush;
+
     // Apply initial YDoc state (observer only fires on changes).
-    _onNodesChanged(null);
+    final initialIds = Set<String>.from(nodesMap.keys.where(
+      (k) => !k.contains(':'),
+    ));
+    if (initialIds.isNotEmpty) {
+      _scheduleRemoteApply(initialIds);
+    }
   }
 
   final Doc _doc;
   final String _userId;
   final EditorDocumentSyncManager _coordinator;
   final void Function()? _onDocChanged;
+  final void Function(Uint8List)? _sendUpdate;
+  final void Function(Set<String> nodeIds)? _onDocCommitted;
   late final void Function(dynamic, Transaction) _onNodesChangedHandler;
   late final void Function(Transaction, Doc) _onAfterTransactionHandler;
 
-  // Re-entrancy guard: prevents YMap observation during local flush.
   bool _isFlushingLocal = false;
 
-  void _onNodesChanged(Set<String>? changedKeys) {
-    if (_isFlushingLocal) {
-      dev.log('[YjsBridge] _onNodesChanged: SKIP (local flush)', name: 'YjsBridge');
-      return;
-    }
+  // ---------------------------------------------------------------------------
+  // Coalesced remote-apply batching
+  // ---------------------------------------------------------------------------
+
+  final Set<String> _pendingRemoteIds = {};
+  bool _remoteApplyQueued = false;
+
+  void _scheduleRemoteApply(Set<String> changedIds) {
+    _pendingRemoteIds.addAll(changedIds);
+    if (_remoteApplyQueued) return;
+    _remoteApplyQueued = true;
+    scheduleMicrotask(() {
+      _remoteApplyQueued = false;
+      final ids = {..._pendingRemoteIds};
+      _pendingRemoteIds.clear();
+      _applyChangedNodes(ids);
+    });
+  }
+
+  void _applyChangedNodes(Set<String> ids) {
+    if (_isFlushingLocal || ids.isEmpty) return;
     final sw = Stopwatch()..start();
-    final nodes = noteNodesFromDoc(_doc);
+    final nodes = <NoteNode>[];
+    for (final id in ids) {
+      // Skip composite keys
+      if (id.contains(':')) continue;
+      final node = noteNodeFromYDoc(_doc, id);
+      if (node != null) nodes.add(node);
+    }
     if (nodes.isNotEmpty) {
+      nodes.sort((a, b) => a.position.compareTo(b.position));
       _coordinator.updateNodesIncrementally(nodes);
     }
     _onDocChanged?.call();
-    dev.log('[YjsBridge] _onNodesChanged: apply ${nodes.length} nodes elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
+    dev.log('[YjsBridge] _applyChangedNodes: apply ${nodes.length} nodes elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
   }
 
-  /// Called by [EditorDocumentSyncManager] when local edits are flushed to SQLite.
+  void _onAfterTransaction(Transaction tr, Doc d) {
+    final changedIds = <String>{};
+    for (final type in tr.changed.keys) {
+      if (type is YText) {
+        final nodeId = _extractNodeIdFromYText(type);
+        if (nodeId != null) {
+          changedIds.add(nodeId);
+        }
+      }
+    }
+    if (changedIds.isNotEmpty) {
+      _scheduleRemoteApply(changedIds);
+    }
+  }
+
+  String? _extractNodeIdFromYText(YText ytext) {
+    for (final entry in _doc.share.entries) {
+      if (entry.value == ytext) {
+        const prefix = 'content/';
+        const fixedPrefix = 'content_fixed/';
+        if (entry.key.startsWith(prefix)) {
+          return entry.key.substring(prefix.length);
+        }
+        if (entry.key.startsWith(fixedPrefix)) {
+          return entry.key.substring(fixedPrefix.length);
+        }
+      }
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Local flush
+  // ---------------------------------------------------------------------------
+
   void onLocalFlush(List<NodeOperation> ops) {
     if (ops.isEmpty) return;
     final sw = Stopwatch()..start();
     dev.log('[YjsBridge] onLocalFlush START ops=${ops.length}', name: 'YjsBridge');
+
+    final changedIds = <String>{};
 
     _isFlushingLocal = true;
     try {
@@ -80,154 +160,53 @@ class YjsDocEditorBridge {
           switch (op) {
             case InsertOp(:final id, :final node, :final prevNodeId, :final nextNodeId):
               final pos = _calcPosition(prevNodeId, nextNodeId, id, nodesMap);
-              _serializeNode(node, pos, id, nodesMap);
+              _writeCanonicalNode(node, pos, id, nodesMap);
+              changedIds.add(id);
             case DeleteOp(:final id):
               nodesMap.delete(id);
+              changedIds.add(id);
             case UpdateOp(:final id, :final node):
-              _serializeNode(node, null, id, nodesMap);
+              _writeCanonicalNode(node, null, id, nodesMap);
+              changedIds.add(id);
             case MoveOp(:final id, :final prevNodeId, :final nextNodeId):
               final pos = _calcPosition(prevNodeId, nextNodeId, id, nodesMap);
               _repositionNode(id, pos, nodesMap);
+              changedIds.add(id);
           }
         }
       });
     } finally {
       _isFlushingLocal = false;
     }
+
     _onDocChanged?.call();
+    _onDocCommitted?.call(changedIds);
+
+    if (_sendUpdate != null) {
+      final updateBytes = encodeStateAsUpdate(_doc);
+      _sendUpdate(updateBytes);
+    }
+
     dev.log('[YjsBridge] onLocalFlush DONE elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
   }
 
-  void _serializeNode(
+  void _writeCanonicalNode(
     DocumentNode node,
     String? position,
     String id,
     YMap<Object> nodesMap,
   ) {
-    final data = NodeCodec.nodeData(node);
-
     if (position == null) {
       final existing = _readPosition(id, nodesMap);
       position = existing ?? 'a0';
     }
 
-    final existingRaw = nodesMap.get(id);
-    final createdAt = _readCreatedAt(existingRaw) ??
-        DateTime.now().millisecondsSinceEpoch.toDouble();
-    final parentId = _readParentId(existingRaw) ?? '';
-
-    // nodesMap.get() returns YMap<dynamic>, not YMap<Object>.
-    // Dart generics are invariant at runtime, so `as YMap<Object>` throws.
-    // Use an untyped YMap variable to avoid the cast.
-    // ignore: prefer_typing_uninitialized_variables
-    YMap nodeMap;
-    if (existingRaw is YMap) {
-      // Reuse the existing YMap in-place to preserve CRDT identity.
-      nodeMap = existingRaw;
-    } else {
-      nodeMap = YMap<Object>();
-      nodesMap.set(id, nodeMap);
-    }
-
-    nodeMap.set('id', id);
-    nodeMap.set('parentId', parentId);
-    nodeMap.set('position', position);
-    nodeMap.set('type', _attributionFor(node));
-    nodeMap.set('data', jsonEncode(data));
-    nodeMap.set('createdAt', createdAt);
-
-    // For task nodes, write task fields to composite keys
-    if (node is TaskNode) {
-      nodesMap.set('$id:completed', node.isComplete);
-    }
-
-    String text = '';
-    if (node is TextNode) {
-      text = node.text.toPlainText();
-    }
-    _writeNodeTextContent(id, text);
-    dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text.length}', name: 'YjsBridge');
+    YjsNoteSchema.writeNode(_doc, node, position: position);
   }
 
-  void _writeNodeTextContent(String id, String text) {
-    try {
-      final sharedType = _doc.getText('content/$id');
-      if (sharedType != null) {
-        _updateYTextIncrementally(sharedType, text);
-        return;
-      }
-    } catch (e) {
-      dev.log('[YjsBridge] _serializeNode: content/$id is corrupted, falling back to content_fixed/$id', name: 'YjsBridge', error: e);
-    }
-
-    try {
-      final fallbackType = _doc.getText('content_fixed/$id');
-      if (fallbackType != null) {
-        _updateYTextIncrementally(fallbackType, text);
-      }
-    } catch (e) {
-      dev.log('[YjsBridge] _serializeNode: failed to write fallback content for $id', name: 'YjsBridge', error: e);
-    }
-  }
-
-
-  void _updateYTextIncrementally(YText ytext, String newText) {
-    final oldText = ytext.toString();
-    if (oldText == newText) return;
-
-    int start = 0;
-    int oldEnd = oldText.length;
-    int newEnd = newText.length;
-
-    while (start < oldEnd && start < newEnd && oldText.codeUnitAt(start) == newText.codeUnitAt(start)) {
-      start++;
-    }
-
-    while (oldEnd > start && newEnd > start && oldText.codeUnitAt(oldEnd - 1) == newText.codeUnitAt(newEnd - 1)) {
-      oldEnd--;
-      newEnd--;
-    }
-
-    final deleteLen = oldEnd - start;
-    if (deleteLen > 0) {
-      ytext.delete(start, deleteLen);
-    }
-
-    if (newEnd > start) {
-      final insertText = newText.substring(start, newEnd);
-      ytext.insert(start, insertText);
-    }
-  }
-
-  String _calcPosition(String? prevNodeId, String? nextNodeId, String? ignoreId, YMap<Object> nodesMap) {
-    String? prevPos;
-    String? nextPos;
-
-    if (prevNodeId != null) {
-      prevPos = _readPosition(prevNodeId, nodesMap);
-    }
-    if (nextNodeId != null) {
-      nextPos = _readPosition(nextNodeId, nodesMap);
-    }
-
-    return FractionalIndex.between(prevPos, nextPos, _userId);
-  }
-
-  num? _readCreatedAt(dynamic raw) {
-    if (raw is YMap) {
-      final val = raw.get('createdAt');
-      if (val is num) return val;
-    }
-    return null;
-  }
-
-  String? _readParentId(dynamic raw) {
-    if (raw is YMap) {
-      final val = raw.get('parentId');
-      if (val is String) return val;
-    }
-    return null;
-  }
+  // ---------------------------------------------------------------------------
+  // Task operations (canonical — fields inside node YMap)
+  // ---------------------------------------------------------------------------
 
   YMap _requireTaskNode(String nodeId) {
     final nodesMap = _doc.getMap<Object>('nodes')!;
@@ -268,6 +247,16 @@ class YjsDocEditorBridge {
     return result;
   }
 
+  void completeRecurringTask(String nodeId, DateTime nextDue) {
+    final nodeMap = _requireTaskNode(nodeId);
+    _doc.transact((txn) {
+      nodeMap.set('completed', false);
+      nodeMap.set('dueDate', _formatDueDate(nextDue));
+      nodeMap.set('lastCompletedAt', DateTime.now().toIso8601String());
+    });
+    _onDocChanged?.call();
+  }
+
   void reopenTaskInYDoc(String nodeId, {DateTime? previousDue}) {
     final nodeMap = _requireTaskNode(nodeId);
     _doc.transact((txn) {
@@ -297,35 +286,38 @@ class YjsDocEditorBridge {
       if (raw == null || raw is! YMap) return;
 
       if (clearDueDate) {
-        nodesMap.delete('$nodeId:dueDate');
-        nodesMap.delete('$nodeId:hasTime');
+        raw.delete('dueDate');
+        raw.delete('hasTime');
       } else if (dueDate != null) {
-        nodesMap.set('$nodeId:dueDate', _formatDueDate(dueDate, hasTime: hasTime ?? false));
+        raw.set('dueDate', _formatDueDate(dueDate, hasTime: hasTime ?? false));
         if (hasTime != null) {
-          nodesMap.set('$nodeId:hasTime', hasTime);
+          raw.set('hasTime', hasTime);
         }
       }
 
       if (clearRecurrence) {
-        nodesMap.delete('$nodeId:recurrence');
+        raw.delete('recurrence');
       } else if (recurrence != null) {
-        nodesMap.set('$nodeId:recurrence', recurrence);
+        raw.set('recurrence', recurrence);
       }
 
       if (clearReminder) {
-        nodesMap.delete('$nodeId:reminder');
+        raw.delete('reminder');
       } else if (reminder != null) {
-        nodesMap.set('$nodeId:reminder', reminder);
+        raw.set('reminder', reminder);
       }
     });
 
     _onDocChanged?.call();
   }
 
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
   void _repositionNode(String id, String position, YMap<Object> nodesMap) {
     final raw = nodesMap.get(id);
-    if (raw == null) return;
-    if (raw is! YMap) return;
+    if (raw == null || raw is! YMap) return;
     raw.set('position', position);
   }
 
@@ -338,6 +330,20 @@ class YjsDocEditorBridge {
     return null;
   }
 
+  String _calcPosition(String? prevNodeId, String? nextNodeId, String? ignoreId, YMap<Object> nodesMap) {
+    String? prevPos;
+    String? nextPos;
+
+    if (prevNodeId != null) {
+      prevPos = _readPosition(prevNodeId, nodesMap);
+    }
+    if (nextNodeId != null) {
+      nextPos = _readPosition(nextNodeId, nodesMap);
+    }
+
+    return FractionalIndex.between(prevPos, nextPos, _userId);
+  }
+
   String _formatDueDate(DateTime date, {bool hasTime = false}) {
     if (hasTime) {
       final h = date.hour.toString().padLeft(2, '0');
@@ -347,16 +353,9 @@ class YjsDocEditorBridge {
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
-  String _attributionFor(DocumentNode node) {
-    return NodeCodec.nodeType(node) ?? 'paragraph';
-  }
-
-  Set<String>? _extractKeys(dynamic event) {
-    if (event is YEvent) {
-      return event.keysChanged.isNotEmpty ? event.keysChanged : null;
-    }
-    return null;
-  }
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
 
   void dispose() {
     final nodesMap = _doc.getMap<Object>('nodes');

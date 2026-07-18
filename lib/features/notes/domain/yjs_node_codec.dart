@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'note_node.dart';
+import 'yjs_note_schema.dart';
 
 String _readNodeTextContent(
   Doc doc,
@@ -42,6 +43,13 @@ String _readNodeTextContent(
 }
 
 NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
+  // Attempt canonical read first via schema.
+  try {
+    return YjsNoteSchema.readNode(doc, key);
+  } catch (_) {
+    // Fall through to legacy reader
+  }
+
   final nodeId = nodeMap.get('id') as String?;
   if (nodeId == null) return null;
 
@@ -58,7 +66,7 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
     data['text'] = textContent;
   }
 
-  // Promote task fields from YMap top-level or composite keys into data dict
+  // Promote task fields from composite keys as legacy fallback
   if (derivedType == 'task') {
     final nodesMap = doc.getMap<Object>('nodes');
     final completed = nodesMap?.get('$nodeId:completed') ?? nodeMap.get('completed');

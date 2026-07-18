@@ -19,35 +19,17 @@ void main() {
     final document = MutableDocument(nodes: [
       ParagraphNode(id: 'p1', text: AttributedText('Initial text')),
     ]);
-    
-    final editor = Editor(
-      editables: {
-        Editor.documentKey: document,
-      },
-      requestHandlers: [
-        (editor, request) {
-          if (request is ChangeTaskCompletionRequest) {
-            final taskNode = document.getNodeById(request.nodeId) as TaskNode;
-            document.replaceNodeById(
-              taskNode.id, 
-              taskNode.copyTaskWith(isComplete: request.isComplete)
-            );
-            return ChangeTaskCompletionCommand(nodeId: request.nodeId, isComplete: request.isComplete);
-          }
-          return null;
-        }
-      ],
-    );
-    
-    int updatesSent = 0;
+    final composer = MutableDocumentComposer();
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: composer,
+    )..reactionPipeline.clear();
     
     final coord = EditorDocumentSyncManager(document: document, editor: editor);
     final bridge = YjsDocEditorBridge(
       doc: doc,
+      userId: 'test-user',
       coordinator: coord,
-      sendUpdate: (_) {
-        updatesSent++;
-      },
       onDocChanged: () {},
     );
     
@@ -84,23 +66,29 @@ void main() {
           break;
           
         case 1: // Local toggle task
-          final taskNodes = document.nodes.whereType<TaskNode>().toList();
+          final taskNodes = document.toList().whereType<TaskNode>().toList();
           if (taskNodes.isNotEmpty) {
             final target = taskNodes[random.nextInt(taskNodes.length)];
             editor.execute([
-              ChangeTaskCompletionRequest(
-                nodeId: target.id,
-                isComplete: !target.isComplete,
+              ReplaceNodeRequest(
+                existingNodeId: target.id,
+                newNode: target.copyTaskWith(isComplete: !target.isComplete),
               ),
             ]);
           }
           break;
           
         case 2: // Local edit text
-          final pNodes = document.nodes.whereType<TextNode>().toList();
+          final pNodes = document.toList().whereType<TextNode>().toList();
           if (pNodes.isNotEmpty) {
             final target = pNodes[random.nextInt(pNodes.length)];
-            target.text = target.text.copyAndAppend(AttributedText(' appended'));
+            final newText = AttributedText('${target.text.toPlainText()} appended');
+            editor.execute([
+              ReplaceNodeRequest(
+                existingNodeId: target.id,
+                newNode: ParagraphNode(id: target.id, text: newText),
+              ),
+            ]);
           }
           break;
           
@@ -119,8 +107,7 @@ void main() {
             rNodes.set(rId, rMap);
             
             // create YText
-            final ytext = remoteDoc.getText('content/$rId');
-            ytext.insert(0, 'Remote generated node');
+            remoteDoc.getText('content/$rId')!.insert(0, 'Remote generated node');
           });
           
           final updateBytes = encodeStateAsUpdate(remoteDoc);
@@ -142,7 +129,7 @@ void main() {
     // Every node in MutableDocument should exist in YDoc and match text/status
     final nodesMap = doc.getMap<Object>('nodes')!;
     
-    for (final node in document.nodes) {
+    for (final node in document.toList()) {
       final yRaw = nodesMap.get(node.id);
       expect(yRaw, isNotNull, reason: 'Node ${node.id} missing from YDoc');
       expect(yRaw is YMap, isTrue, reason: 'Node ${node.id} is not a YMap');
@@ -153,7 +140,7 @@ void main() {
         expect(yText.toString(), node.text.toPlainText(), reason: 'Text mismatch for ${node.id}');
       }
       if (node is TaskNode) {
-        final yCompleted = nodesMap.get('${node.id}:completed') as bool?;
+        final yCompleted = yMap.get('completed') as bool?;
         expect(yCompleted, node.isComplete, reason: 'Task status mismatch for ${node.id}');
       }
     }
