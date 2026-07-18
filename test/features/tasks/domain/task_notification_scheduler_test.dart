@@ -15,6 +15,12 @@ class FakeFlutterLocalNotificationsPlugin extends Fake
   int initializedCount = 0;
   List<Map<String, dynamic>> schedules = [];
   List<int> cancelled = [];
+  bool cancelAllCalled = false;
+
+  @override
+  Future<void> cancelAll() async {
+    cancelAllCalled = true;
+  }
 
   @override
   Future<bool?> initialize({

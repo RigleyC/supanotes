@@ -48,6 +48,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
 
+  CustomTaskComponentBuilder? _taskComponentBuilder;
+  List<ComponentBuilder>? _componentBuilders;
+  List<SuperEditorContentTapDelegateFactory>? _contentTapDelegateFactories;
+
   @override
   void initState() {
     super.initState();
@@ -71,13 +75,71 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           _docLayoutKey.currentState as DocumentLayout,
       handleColor: editorControlsColor,
     );
+
+    _initStableBuilders();
+  }
+
+  void _initStableBuilders() {
+    if (_componentBuilders != null) return;
+    final controller = _controller!;
+    if (controller.editor == null || controller.composer == null) return;
+
+    _contentTapDelegateFactories = widget.isReadOnly
+        ? null
+        : [
+            (editContext) => NoteLinkTapHandler(
+              editContext.document,
+              editContext.composer,
+              onNoteTap: (targetId) =>
+                  context.push(AppRoutes.note(targetId)),
+            ),
+            superEditorLaunchLinkTapHandlerFactory,
+          ];
+
+    _taskComponentBuilder = CustomTaskComponentBuilder(
+      editor: controller.editor,
+      composer: controller.composer,
+      taskMetadataById: widget.taskMetadata,
+      hideCompleted: widget.hideCompleted,
+      onTaskLongPress: widget.isReadOnly
+          ? null
+          : (taskId) => widget.delegate.onTaskLongPress?.call(
+                _taskComponentBuilder?.taskMetadataById[taskId],
+                () async {},
+              ),
+      onTaskComplete: widget.delegate.onTaskComplete,
+      onTaskReopen: widget.delegate.onTaskReopen,
+      onRecurringTaskComplete: (taskId, nextDue) {
+        controller.completeRecurringTask(taskId, nextDue);
+        widget.delegate.onRecurringTaskComplete?.call(
+          taskId,
+          nextDue,
+        );
+      },
+    );
+
+    _componentBuilders = [
+      const CustomDividerComponentBuilder(),
+      _taskComponentBuilder!,
+      AttachmentComponentBuilder(
+        editor: controller.editor!,
+        collapseImages: widget.collapseImages,
+      ),
+      ...defaultComponentBuilders,
+    ];
   }
 
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.hideCompleted != oldWidget.hideCompleted) {
-      setState(() {});
+
+    if (widget.hideCompleted != oldWidget.hideCompleted ||
+        widget.isReadOnly != oldWidget.isReadOnly) {
+      _componentBuilders = null;
+      _contentTapDelegateFactories = null;
+      _taskComponentBuilder = null;
+    } else if (widget.taskMetadata != oldWidget.taskMetadata) {
+      _taskComponentBuilder?.taskMetadataById = widget.taskMetadata;
     }
   }
 
@@ -108,6 +170,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     }
 
     _initControls();
+    _initStableBuilders();
 
     final theme = Theme.of(context);
 
@@ -144,47 +207,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                   documentLayoutKey: _docLayoutKey,
                   stylesheet: _cachedStylesheet!,
                   selectionStyle: editorSelectionStyle(theme.colorScheme),
-                  contentTapDelegateFactories: widget.isReadOnly
-                      ? null
-                      : [
-                          (editContext) => NoteLinkTapHandler(
-                            editContext.document,
-                            editContext.composer,
-                            onNoteTap: (targetId) =>
-                                context.push(AppRoutes.note(targetId)),
-                          ),
-                          superEditorLaunchLinkTapHandlerFactory,
-                        ],
+                  contentTapDelegateFactories: _contentTapDelegateFactories,
                   keyboardActions: editorKeyboardActions(),
-                  componentBuilders: [
-                    const CustomDividerComponentBuilder(),
-                    CustomTaskComponentBuilder(
-                      editor: controller.editor,
-                      composer: controller.composer,
-                      taskMetadataById: widget.taskMetadata,
-                      hideCompleted: widget.hideCompleted,
-                      onTaskLongPress: widget.isReadOnly
-                          ? null
-                          : (taskId) => widget.delegate.onTaskLongPress?.call(
-                              widget.taskMetadata[taskId],
-                              () async {},
-                            ),
-                      onTaskComplete: widget.delegate.onTaskComplete,
-                      onTaskReopen: widget.delegate.onTaskReopen,
-                      onRecurringTaskComplete: (taskId, nextDue) {
-                        controller.completeRecurringTask(taskId, nextDue);
-                        widget.delegate.onRecurringTaskComplete?.call(
-                          taskId,
-                          nextDue,
-                        );
-                      },
-                    ),
-                    AttachmentComponentBuilder(
-                      editor: controller.editor!,
-                      collapseImages: widget.collapseImages,
-                    ),
-                    ...defaultComponentBuilders,
-                  ],
+                  componentBuilders: _componentBuilders!,
                 ),
               ),
             ),

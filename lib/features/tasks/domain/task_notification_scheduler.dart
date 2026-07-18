@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,7 +40,15 @@ class TaskNotificationScheduler extends Notifier<Map<String, DateTime>> {
       return {};
     }
 
-    dev.log('[Scheduler] Authenticated, setting up task listener');
+    dev.log('[Scheduler] Authenticated, canceling stale notifications');
+    final bootstrapService = ref.read(localNotificationServiceProvider);
+    unawaited(
+      bootstrapService.cancelAll().catchError((e, st) {
+        dev.log('[Scheduler] cancelAll failed: $e');
+      }),
+    );
+
+    dev.log('[Scheduler] Setting up task listener');
     
     // ref.listen keeps the stream provider alive and reacts to data changes
     ref.listen(openTasksStreamProvider, (_, next) {

@@ -30,6 +30,7 @@ final noteEditorControllerProvider = Provider.autoDispose
       final yjsMgr = ref.read(yjsSyncManagerProvider);
       final db = ref.read(appDatabaseProvider);
       Future<void>? lastProjection;
+      Timer? projectionDebounce;
 
       syncService?.connectNote(noteId).then((doc) async {
         if (disposed || doc == null) return;
@@ -48,12 +49,15 @@ final noteEditorControllerProvider = Provider.autoDispose
           doc: doc,
           noteId: noteId,
           onDocChanged: () {
-            lastProjection = yjsMgr.projectNodes(noteId);
-            // Fire-and-forget: persist is async and serialized internally via
-            // _persistLock. The YDoc state is already consistent at this
-            // point; this write is a safety net so offline closures don't
-            // lose edits. Riverpod's onDispose is sync and cannot await it.
-            unawaited(yjsMgr.persist(noteId));
+            projectionDebounce?.cancel();
+            projectionDebounce = Timer(
+              const Duration(milliseconds: 500),
+              () {
+                if (disposed) return;
+                lastProjection = yjsMgr.projectNodes(noteId);
+                unawaited(yjsMgr.persist(noteId));
+              },
+            );
           },
         );
       }).catchError((_) {
@@ -62,6 +66,12 @@ final noteEditorControllerProvider = Provider.autoDispose
 
       ref.onDispose(() {
         disposed = true;
+        final hadPendingDebounce = projectionDebounce?.isActive ?? false;
+        projectionDebounce?.cancel();
+        if (hadPendingDebounce) {
+          lastProjection = yjsMgr.projectNodes(noteId);
+          unawaited(yjsMgr.persist(noteId));
+        }
         unawaited(
           controller.dispose()
             .then((_) async {
