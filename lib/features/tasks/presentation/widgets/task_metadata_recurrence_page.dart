@@ -19,10 +19,10 @@ class TaskMetadataRecurrencePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
           child: Text(
             'Repetição',
             style: Theme.of(context).textTheme.titleMedium,
@@ -37,16 +37,24 @@ class TaskMetadataRecurrencePage extends StatelessWidget {
             FamilyModalSheet.of(context).popPage();
           },
         ),
-        for (final option in TaskRecurrence.values)
-          AppSelectionTile(
-            label: option.getLocalizedLabel(dueDate),
-            icon: option.icon,
-            isSelected: option == selected,
-            onTap: () {
-              onSelected(option);
-              FamilyModalSheet.of(context).popPage();
-            },
-          ),
+        ListView.builder(
+          shrinkWrap: true,
+          itemBuilder: (context, index) {
+            final recurrence = TaskRecurrence.values[index];
+
+            return AppSelectionTile(
+              label: recurrence.label,
+              icon: recurrence.icon,
+              isSelected: selected == recurrence,
+              onTap: () {
+                onSelected(recurrence);
+                FamilyModalSheet.of(context).popPage();
+              },
+            );
+          },
+          itemCount: TaskRecurrence.values.length,
+        ),
+        SizedBox(height: 24),
       ],
     );
   }

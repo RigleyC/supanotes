@@ -175,7 +175,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         if (!mounted || task == null) return;
                         await showTaskMetadataSheet(
                           context: context,
-                          noteId: task.noteId,
+                          ref: ref,
+                          noteId: noteData.id,
                           task: task,
                         );
                       },

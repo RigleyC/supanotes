@@ -9,28 +9,40 @@ import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
-import 'task_metadata_controller.dart';
+import '../controllers/task_metadata_controller.dart';
 import 'task_metadata_date_page.dart';
 import 'task_metadata_recurrence_page.dart';
 import 'task_metadata_time_page.dart';
 
 Future<void> showTaskMetadataSheet({
   required BuildContext context,
+  required WidgetRef ref,
   required String noteId,
   required TaskModel task,
-}) {
-  return FamilyModalSheet.show<void>(
+}) async {
+  // Inicializa o state no controller global para sobreviver às reconstruções do modal
+  ref.read(taskMetadataControllerProvider.notifier).init(task);
+
+  await FamilyModalSheet.show<void>(
     context: context,
     isDismissible: true,
     enableDrag: true,
-    contentBackgroundColor: const Color(0XFF333333),
-    builder: (ctx) => ProviderScope(
-      overrides: [
-        taskMetadataTaskProvider.overrideWithValue(task),
-      ],
-      child: TaskMetadataSheetBody(noteId: noteId, taskId: task.id),
-    ),
+    contentBackgroundColor: Theme.of(context).colorScheme.surface,
+    builder: (ctx) => TaskMetadataSheetBody(noteId: noteId, taskId: task.id),
   );
+
+  // Quando o modal fechar (Future completar), salvamos no YDoc
+  final state = ref.read(taskMetadataControllerProvider);
+  ref
+      .read(noteEditorControllerProvider(noteId))
+      .updateTaskMetadataInYDoc(
+        task.id,
+        dueDate: state.dueDate,
+        clearDueDate: state.dueDate == null,
+        recurrence: state.recurrence?.name,
+        clearRecurrence: state.recurrence == null,
+        hasTime: state.hasTime,
+      );
 }
 
 class TaskMetadataSheetBody extends ConsumerStatefulWidget {
@@ -48,24 +60,7 @@ class TaskMetadataSheetBody extends ConsumerStatefulWidget {
       _TaskMetadataSheetBodyState();
 }
 
-class _TaskMetadataSheetBodyState
-    extends ConsumerState<TaskMetadataSheetBody> {
-  @override
-  void dispose() {
-    final state = ref.read(taskMetadataControllerProvider);
-    ref
-        .read(noteEditorControllerProvider(widget.noteId))
-        .updateTaskMetadataInYDoc(
-          widget.taskId,
-          dueDate: state.dueDate,
-          clearDueDate: state.dueDate == null,
-          recurrence: state.recurrence?.name,
-          clearRecurrence: state.recurrence == null,
-          hasTime: state.hasTime,
-        );
-    super.dispose();
-  }
-
+class _TaskMetadataSheetBodyState extends ConsumerState<TaskMetadataSheetBody> {
   @override
   Widget build(BuildContext context) {
     final ctrl = ref.watch(taskMetadataControllerProvider);
@@ -86,12 +81,14 @@ class _TaskMetadataSheetBodyState
             onTap: () => FamilyModalSheet.of(context).pushPage(
               TaskMetadataDatePage(
                 selected: ctrl.dueDate,
-                onSelected:
-                    ref.read(taskMetadataControllerProvider.notifier).setDate,
+                onSelected: ref
+                    .read(taskMetadataControllerProvider.notifier)
+                    .setDate,
               ),
             ),
-            onClear:
-                ref.read(taskMetadataControllerProvider.notifier).clearDate,
+            onClear: ref
+                .read(taskMetadataControllerProvider.notifier)
+                .clearDate,
           ),
           _TimeTile(
             dueDate: ctrl.dueDate,
@@ -99,12 +96,14 @@ class _TaskMetadataSheetBodyState
             onTap: () => FamilyModalSheet.of(context).pushPage(
               TaskMetadataTimePage(
                 currentDueDate: ctrl.dueDate!,
-                onSelected:
-                    ref.read(taskMetadataControllerProvider.notifier).setTime,
+                onSelected: ref
+                    .read(taskMetadataControllerProvider.notifier)
+                    .setTime,
               ),
             ),
-            onClear:
-                ref.read(taskMetadataControllerProvider.notifier).clearTime,
+            onClear: ref
+                .read(taskMetadataControllerProvider.notifier)
+                .clearTime,
           ),
           _RecurrenceTile(
             recurrence: ctrl.recurrence,
@@ -113,8 +112,9 @@ class _TaskMetadataSheetBodyState
               TaskMetadataRecurrencePage(
                 selected: ctrl.recurrence,
                 dueDate: ctrl.dueDate,
-                onSelected:
-                    ref.read(taskMetadataControllerProvider.notifier).setRecurrence,
+                onSelected: ref
+                    .read(taskMetadataControllerProvider.notifier)
+                    .setRecurrence,
               ),
             ),
             onClear: ref
@@ -191,7 +191,7 @@ class _TimeTile extends StatelessWidget {
       leading: Icon(Icons.access_time_rounded, color: color, size: 20),
       title: Text(
         hasTime && dueDate != null
-            ? DateFormat('HH:mm').format(dueDate!)
+            ? DateFormat('h:mm a').format(dueDate!)
             : 'Adicionar horário',
         style: color != null
             ? Theme.of(context).textTheme.bodyMedium?.copyWith(color: color)

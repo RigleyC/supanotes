@@ -28,13 +28,14 @@ class AppSelectionTile extends StatelessWidget {
 
     return ListTile(
       dense: true,
+
       selected: isSelected,
       onTap: onTap,
       tileColor: Colors.transparent,
       leading: icon != null
           ? Icon(
               icon,
-              size: AppSpacing.iconMd,
+              size: 20,
               color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
             )
           : null,
@@ -46,11 +47,7 @@ class AppSelectionTile extends StatelessWidget {
         ),
       ),
       trailing: isSelected
-          ? Icon(
-              Icons.check_rounded,
-              size: AppSpacing.iconSm,
-              color: scheme.primary,
-            )
+          ? Icon(Icons.check_rounded, size: 20, color: scheme.primary)
           : trailing,
     );
   }

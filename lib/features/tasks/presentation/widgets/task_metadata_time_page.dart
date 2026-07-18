@@ -19,15 +19,12 @@ class TaskMetadataTimePage extends StatefulWidget {
 }
 
 class _TaskMetadataTimePageState extends State<TaskMetadataTimePage> {
-  late Duration _duration;
+  late DateTime _selectedTime;
 
   @override
   void initState() {
     super.initState();
-    _duration = Duration(
-      hours: widget.currentDueDate.hour,
-      minutes: widget.currentDueDate.minute,
-    );
+    _selectedTime = widget.currentDueDate;
   }
 
   @override
@@ -45,27 +42,31 @@ class _TaskMetadataTimePageState extends State<TaskMetadataTimePage> {
         ),
         SizedBox(
           height: 200,
-          child: CupertinoTimerPicker(
-            mode: CupertinoTimerPickerMode.hm,
-            initialTimerDuration: _duration,
-            onTimerDurationChanged: (d) => setState(() => _duration = d),
+          child: CupertinoDatePicker(
+            mode: CupertinoDatePickerMode.time,
+            use24hFormat: false,
+            initialDateTime: _selectedTime,
+            onDateTimeChanged: (d) => setState(() => _selectedTime = d),
           ),
         ),
-        const SizedBox(height: 16),
-        AppButton(
-          text: 'Confirmar',
-          onPressed: () {
-            final d = widget.currentDueDate;
-            final newDate = DateTime(
-              d.year,
-              d.month,
-              d.day,
-              _duration.inHours,
-              _duration.inMinutes.remainder(60),
-            );
-            widget.onSelected(newDate, hasTime: true);
-            FamilyModalSheet.of(context).popPage();
-          },
+
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: AppButton(
+            text: 'Confirmar',
+            onPressed: () {
+              final d = widget.currentDueDate;
+              final newDate = DateTime(
+                d.year,
+                d.month,
+                d.day,
+                _selectedTime.hour,
+                _selectedTime.minute,
+              );
+              widget.onSelected(newDate, hasTime: true);
+              FamilyModalSheet.of(context).popPage();
+            },
+          ),
         ),
       ],
     );

@@ -274,17 +274,15 @@ class _ToolbarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: tooltip,
-      child: IconButton(
-        icon: Icon(icon),
-        iconSize: 26,
-        visualDensity: VisualDensity.comfortable,
-        isSelected: isActive,
-        color: colorScheme.onSurface,
-        selectedIcon: Icon(icon, color: colorScheme.primary),
-        onPressed: onPressed,
-      ),
+    return IconButton(
+      icon: Icon(icon),
+      tooltip: tooltip,
+      iconSize: 26,
+      visualDensity: VisualDensity.comfortable,
+      isSelected: isActive,
+      color: colorScheme.onSurface,
+      selectedIcon: Icon(icon, color: colorScheme.primary),
+      onPressed: onPressed,
     );
   }
 }
