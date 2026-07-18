@@ -10,27 +10,25 @@ String _readNodeTextContent(
   String nodeId, {
   Map<String, dynamic>? nodeData,
 }) {
-  // Mirror the backend projection logic: prefer the first non-empty YText
-  // shared type, then fall back to the embedded text in the node data.
-  // We guard calls to doc.getText with doc.share because getText creates an
-  // empty type on demand, which would otherwise hide the data.text fallback.
+  // Canonical reads prefer content/$id (canonical) over content_fixed/$id (legacy).
+  // This mirrors YjsNoteSchema._readNodeTextContent priority.
+  final contentKey = 'content/$nodeId';
+  if (doc.share.containsKey(contentKey)) {
+    try {
+      final sharedType = doc.getText(contentKey);
+      if (sharedType != null) {
+        final text = sharedType.toString();
+        if (text.isNotEmpty) return text;
+      }
+    } catch (_) {}
+  }
+
   final fixedKey = 'content_fixed/$nodeId';
   if (doc.share.containsKey(fixedKey)) {
     try {
       final fallbackType = doc.getText(fixedKey);
       if (fallbackType != null) {
         final text = fallbackType.toString();
-        if (text.isNotEmpty) return text;
-      }
-    } catch (_) {}
-  }
-
-  final contentKey = 'content/$nodeId';
-  if (doc.share.containsKey(contentKey)) {
-    try {
-      final legacyType = doc.getText(contentKey);
-      if (legacyType != null) {
-        final text = legacyType.toString();
         if (text.isNotEmpty) return text;
       }
     } catch (_) {}
