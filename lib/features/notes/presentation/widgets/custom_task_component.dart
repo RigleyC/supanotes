@@ -19,7 +19,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
-    this.onRecurringTaskComplete,
   });
 
   Editor? editor;
@@ -30,7 +29,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ValueChanged<String>? onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
-  final void Function(String taskId, DateTime nextDue)? onRecurringTaskComplete;
 
   final Set<String> _completingIds = {};
 

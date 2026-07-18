@@ -6,13 +6,11 @@ class NoteEditorDelegate {
   onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
-  final void Function(String taskId, DateTime nextDue)? onRecurringTaskComplete;
 
   const NoteEditorDelegate({
     this.onHasContentChanged,
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
-    this.onRecurringTaskComplete,
   });
 }
