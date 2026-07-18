@@ -79,6 +79,9 @@ class SyncService {
   /// states that changed since then.
   final Map<String, DateTime> _lastYjsSyncAt = {};
 
+  /// Per-note sync queue to serialize exchanges per note.
+  final Map<String, Future<void>> _noteSyncChains = {};
+
   StreamSubscription<bool>? _connectivitySub;
   Timer? _periodicSyncTimer;
 
@@ -121,7 +124,7 @@ class SyncService {
       void startTimer() {
         _syncTimer?.cancel();
         _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-          _syncNote();
+          _syncActiveNote();
         });
       }
 
@@ -137,18 +140,18 @@ class SyncService {
       _lifecycleListener = AppLifecycleListener(
         onPause: () {
           debugPrint('[SyncService] lifecycle: onPause — triggering sync and stopping timer');
-          _syncNote();
+          _syncActiveNote();
           stopTimer();
         },
         onInactive: () {
           debugPrint('[SyncService] lifecycle: onInactive — triggering sync and stopping timer');
-          _syncNote();
+          _syncActiveNote();
           stopTimer();
         },
         onResume: () {
           debugPrint('[SyncService] lifecycle: onResume — restarting timer');
           startTimer();
-          _syncNote();
+          _syncActiveNote();
         },
       );
 
@@ -161,7 +164,7 @@ class SyncService {
     }
   }
 
-  Future<void> _syncNote() async {
+  Future<void> _syncActiveNote() async {
     final noteId = _activeNoteId;
     if (noteId == null) return;
 
@@ -174,7 +177,7 @@ class SyncService {
 
       final stateVector = encodeStateVector(doc);
 
-      debugPrint('[SyncService] _syncNote: sending ${localUpdate.length} bytes to $noteId');
+      debugPrint('[SyncService] _syncActiveNote: sending ${localUpdate.length} bytes to $noteId');
 
       final response = await _api.post<List<int>>(
         '/sync/note/$noteId',
@@ -193,12 +196,12 @@ class SyncService {
         final serverUpdate = Uint8List.fromList(responseData);
         applyUpdate(doc, serverUpdate);
         await _yjsMgr.persist(noteId);
-        debugPrint('[SyncService] _syncNote: applied ${serverUpdate.length} bytes from server');
+        debugPrint('[SyncService] _syncActiveNote: applied ${serverUpdate.length} bytes from server');
       }
 
       _lastSyncedStateVector = stateVector;
     } catch (e, stackTrace) {
-      debugPrint('[SyncService] _syncNote FAIL: $e\n$stackTrace');
+      debugPrint('[SyncService] _syncActiveNote FAIL: $e\n$stackTrace');
     }
   }
 
@@ -219,6 +222,63 @@ class SyncService {
     _lastSyncedStateVector = null;
 
     debugPrint('[SyncService] disconnectNote DONE elapsed=${sw.elapsedMilliseconds}ms');
+  }
+
+  /// Serializes per-note Yjs exchanges so concurrent calls for the same note
+  /// are queued sequentially.
+  Future<void> syncDirtyNote(String noteId) {
+    if (!_noteSyncChains.containsKey(noteId)) {
+      _noteSyncChains[noteId] = Future.value();
+    }
+    _noteSyncChains[noteId] =
+        _noteSyncChains[noteId]!.then((_) => _syncNote(noteId));
+    return _noteSyncChains[noteId]!;
+  }
+
+  Future<void> _syncNote(String noteId) async {
+    try {
+      final doc = await _yjsMgr.loadDoc(noteId);
+      final localState = await _getLocalState(noteId);
+      final sv = localState?.syncedStateVector;
+
+      final localUpdate = encodeStateAsUpdate(doc, sv);
+      if (localUpdate.isEmpty) return;
+
+      final stateVector = encodeStateVector(doc);
+
+      debugPrint('[SyncService] _syncNote: sending ${localUpdate.length} bytes for note $noteId');
+
+      final response = await _api.post<List<int>>(
+        '/sync/note/$noteId',
+        data: Stream.fromIterable([localUpdate]),
+        options: Options(
+          headers: {
+            'X-State-Vector': base64Encode(stateVector),
+          },
+          contentType: 'application/octet-stream',
+          responseType: ResponseType.bytes,
+        ),
+      );
+
+      final responseData = response.data;
+      if (responseData != null && responseData.isNotEmpty) {
+        final serverUpdate = Uint8List.fromList(responseData);
+        applyUpdate(doc, serverUpdate);
+        debugPrint('[SyncService] _syncNote: applied ${serverUpdate.length} bytes from server for note $noteId');
+      }
+
+      await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
+    } catch (e, stackTrace) {
+      debugPrint('[SyncService] _syncNote FAIL noteId=$noteId: $e\n$stackTrace');
+    } finally {
+      _noteSyncChains.remove(noteId);
+    }
+  }
+
+  Future<LocalYjsState?> _getLocalState(String noteId) async {
+    final states = await (_db.select(_db.localYjsStates)
+      ..where((t) => t.noteId.equals(noteId))).get();
+    return states.isNotEmpty ? states.first : null;
   }
 
   void start() {

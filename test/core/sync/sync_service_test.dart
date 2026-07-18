@@ -12,7 +12,6 @@ import 'package:supanotes/core/sync/sync_mapper.dart';
 import 'package:supanotes/core/sync/sync_service.dart';
 import 'package:supanotes/core/sync/sync_state.dart';
 import 'package:supanotes/core/sync/yjs_sync_manager.dart';
-import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 
 class FakeApiClient extends ApiClient {
   bool pushCalled = false;
@@ -118,7 +117,6 @@ void main() {
           connectivity: connectivity,
           notifier: notifier,
           yjsMgr: YjsSyncManager(db: db, userId: 'test-user'),
-          authStorage: AuthLocalStorage(),
         );
 
         await service.push();
@@ -185,7 +183,6 @@ void main() {
           connectivity: FakeConnectivityMonitor(),
           notifier: SyncStateNotifier(),
           yjsMgr: YjsSyncManager(db: db, userId: 'test-user'),
-          authStorage: AuthLocalStorage(),
         );
 
         await service.pull();

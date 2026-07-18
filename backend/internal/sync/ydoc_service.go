@@ -185,8 +185,6 @@ func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc
 		b64Update := ""
 		if len(update) < 6000 {
 			b64Update = base64.StdEncoding.EncodeToString(update)
-		} else {
-			_ = s.persistNoteToDB(bgCtx, noteID, update)
 		}
 
 		payloadBytes, _ := json.Marshal(map[string]string{

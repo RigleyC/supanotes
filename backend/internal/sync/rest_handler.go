@@ -1,15 +1,49 @@
 package sync
 
 import (
+	"context"
 	"encoding/base64"
 	"io"
 	"net/http"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/ygo/crdt"
 
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
 )
+
+// NoteAuthorizer checks whether the given user can edit the given note.
+type NoteAuthorizer interface {
+	CanEditNote(ctx context.Context, noteID, userID pgtype.UUID) (bool, error)
+}
+
+type repoAuthorizer struct {
+	repo Repository
+}
+
+// NewNoteAuthorizer wraps a Repository as a NoteAuthorizer.
+func NewNoteAuthorizer(repo Repository) NoteAuthorizer {
+	return &repoAuthorizer{repo: repo}
+}
+
+func (a *repoAuthorizer) CanEditNote(ctx context.Context, noteID, userID pgtype.UUID) (bool, error) {
+	meta, err := a.repo.GetNoteMeta(ctx, noteID)
+	if err != nil {
+		return false, err
+	}
+	if meta.DeletedAt.Valid {
+		return false, nil
+	}
+	if meta.UserID == userID {
+		return true, nil
+	}
+	share, shareErr := a.repo.GetNoteShareForUser(ctx, sqlcgen.GetNoteShareForUserParams{
+		NoteID: noteID, UserID: userID,
+	})
+	return shareErr == nil && share.Permission == "edit", nil
+}
 
 // PostSyncHandler handles POST /api/v1/sync/note/:id
 //
@@ -17,9 +51,26 @@ import (
 // state vector as the base64-encoded X-State-Vector header. The server
 // applies the client's update, computes the diff from the client's state
 // vector, and returns the missing updates as the binary response body.
-func PostSyncHandler(ydocSvc *YDocService) echo.HandlerFunc {
+func PostSyncHandler(ydocSvc *YDocService, authorizer NoteAuthorizer) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		userID, err := web.UserID(c)
+		if err != nil {
+			return web.JSONError(c, http.StatusUnauthorized, "unauthorized")
+		}
+
 		noteID := c.Param("id")
+		noteUUID, err := parseUUIDStr(noteID)
+		if err != nil {
+			return web.JSONError(c, http.StatusBadRequest, "invalid note id")
+		}
+
+		allowed, err := authorizer.CanEditNote(c.Request().Context(), noteUUID, userID)
+		if err != nil {
+			return web.JSONError(c, http.StatusInternalServerError, "authorization failed")
+		}
+		if !allowed {
+			return web.JSONError(c, http.StatusForbidden, "note is not editable")
+		}
 
 		body, err := io.ReadAll(c.Request().Body)
 		if err != nil {

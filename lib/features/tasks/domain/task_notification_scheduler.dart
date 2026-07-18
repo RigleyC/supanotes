@@ -9,6 +9,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
 
 final openTasksStreamProvider = StreamProvider.autoDispose<List<TaskData>>(
   (ref) {
@@ -30,6 +31,12 @@ final taskNotificationSchedulerProvider =
 
 class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
   static const _kPrefKey = 'task_notification_schedule_cache';
+
+  /// Tracks the latest pending tasks for superseding coalescing.
+  List<TaskData>? _pendingTasks;
+
+  /// Serialization chain: only one reconcile runs at a time per provider.
+  Future<void> _reconcileChain = Future.value();
 
   @override
   Future<Map<String, DateTime>> build() async {
@@ -65,13 +72,34 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     // ref.listen keeps the stream provider alive and reacts to data changes
     ref.listen(openTasksStreamProvider, (_, next) {
       next.when(
-        data: _reschedule,
+        data: _onTasksChanged,
         loading: () => dev.log('[Scheduler] Stream loading...'),
         error: (e, st) => dev.log('[Scheduler] Stream error: $e'),
       );
     });
 
     return cachedSchedule;
+  }
+
+  /// Public entry point for programmatic reconciliation (e.g., on auth switch).
+  ///
+  /// Serialized via [_reconcileChain] so concurrent calls execute sequentially.
+  /// Only the latest [tasks] set is processed if calls are queued.
+  /// The [userId] for notification IDs is read from the current auth state
+  /// via [_currentUserId], so this method does not accept it as a parameter.
+  Future<void> reconcile({required List<TaskData> tasks}) {
+    _onTasksChanged(tasks);
+    return _reconcileChain;
+  }
+
+  void _onTasksChanged(List<TaskData> tasks) {
+    _pendingTasks = tasks;
+    _reconcileChain = _reconcileChain.then((_) {
+      final latest = _pendingTasks;
+      if (latest == null) return Future.value();
+      _pendingTasks = null;
+      return _reschedule(latest);
+    });
   }
 
   Future<void> _reschedule(List<TaskData> tasks) async {
@@ -100,13 +128,17 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
 
     final currentState = state.asData?.value ?? <String, DateTime>{};
     
+    // Cancel removed notifications using deterministic IDs
+    final currentUserId = _currentUserId();
     for (final id in currentState.keys) {
       if (!limitedSchedule.containsKey(id)) {
-        dev.log('[Scheduler] Cancelling notification for task id=$id');
-        await service.cancel(id.hashCode);
+        final nid = notificationIdForTask(currentUserId, id);
+        dev.log('[Scheduler] Cancelling notification for task id=$id nid=$nid');
+        await service.cancel(nid);
       }
     }
 
+    // Schedule new or changed notifications
     for (final MapEntry(:key, :value) in limitedSchedule.entries) {
       final cachedTime = currentState[key];
       if (cachedTime == null || cachedTime.millisecondsSinceEpoch != value.millisecondsSinceEpoch) {
@@ -115,10 +147,9 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
           task.dueDate!,
           hasTime: task.hasTime,
         );
-        dev.log('[Scheduler] Scheduling notification for "${task.title}" at $value');
-        await service.scheduleTaskNotification(key, task.title, body, value);
-        // Small delay to prevent flooding the platform channel and blocking Android Main Thread
-        await Future.delayed(const Duration(milliseconds: 100));
+        final nid = notificationIdForTask(currentUserId, key);
+        dev.log('[Scheduler] Scheduling notification for "${task.title}" at $value nid=$nid');
+        await service.scheduleTaskNotification(nid, task.title, body, value);
       } else {
         dev.log('[Scheduler] Task "${tasks.firstWhere((t) => t.id == key).title}" already scheduled');
       }
@@ -137,6 +168,11 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     } catch (e) {
       dev.log('[Scheduler] Failed to cache schedule state: $e');
     }
+  }
+
+  String _currentUserId() {
+    final authState = ref.read(authControllerProvider);
+    return authState.asData?.value?.id ?? '';
   }
 
   DateTime _computeNotificationTime(DateTime due, bool hasTime, String? reminder) {

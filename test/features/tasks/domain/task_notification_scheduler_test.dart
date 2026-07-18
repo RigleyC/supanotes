@@ -1,14 +1,28 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 import 'package:timezone/data/latest.dart' as tzData;
 import 'package:timezone/timezone.dart' as tz;
+
+/// Mock auth controller that returns a fixed user without storage/network deps.
+class _MockAuthController extends AuthController {
+  @override
+  Future<User?> build() async => const User(
+    id: 'test-user',
+    email: 'test@example.com',
+    name: 'Test User',
+  );
+}
 
 class FakeFlutterLocalNotificationsPlugin extends Fake
     implements FlutterLocalNotificationsPlugin {
@@ -59,6 +73,8 @@ class FakeFlutterLocalNotificationsPlugin extends Fake
 
 class MockTasksLocalRepository extends Mock implements TasksLocalRepository {}
 
+
+
 void main() {
   late FakeFlutterLocalNotificationsPlugin fakePlugin;
   late MockTasksLocalRepository mockTasksRepo;
@@ -66,6 +82,7 @@ void main() {
 
   setUp(() {
     tzData.initializeTimeZones();
+    SharedPreferences.setMockInitialValues({});
     fakePlugin = FakeFlutterLocalNotificationsPlugin();
     mockTasksRepo = MockTasksLocalRepository();
 
@@ -75,6 +92,9 @@ void main() {
           LocalNotificationService(plugin: fakePlugin),
         ),
         tasksLocalRepositoryProvider.overrideWithValue(mockTasksRepo),
+        authControllerProvider.overrideWith(
+          () => _MockAuthController(),
+        ),
       ],
     );
   });
@@ -129,17 +149,21 @@ void main() {
     when(() => mockTasksRepo.watchOpenTasks())
         .thenAnswer((_) => Stream.value(openTasks));
         
-    // Listen to scheduler to keep it alive
     final sub = container.listen(taskNotificationSchedulerProvider, (_, __) {});
     
-    // Wait for async stream handling
-    await Future.delayed(const Duration(milliseconds: 200));
+    // Wait for the scheduler to build and the stream to emit
+    await Future.delayed(const Duration(milliseconds: 500));
     
     expect(fakePlugin.initializedCount, greaterThan(0));
     expect(fakePlugin.schedules, hasLength(2));
     
+    // Use deterministic notification IDs matching the scheduler
+    final t1Nid = notificationIdForTask('test-user', 'task-1');
+    final t2Nid = notificationIdForTask('test-user', 'task-2');
+    final t3Nid = notificationIdForTask('test-user', 'task-3');
+    
     // Task 1: Has time, should schedule at the exact time
-    final schedule1 = fakePlugin.schedules.firstWhere((s) => s['id'] == 'task-1'.hashCode);
+    final schedule1 = fakePlugin.schedules.firstWhere((s) => s['id'] == t1Nid);
     expect(schedule1['title'], 'Has Time');
     expect(
       schedule1['scheduledDate'],
@@ -147,7 +171,7 @@ void main() {
     );
     
     // Task 2: No time, should schedule at 9:00 AM
-    final schedule2 = fakePlugin.schedules.firstWhere((s) => s['id'] == 'task-2'.hashCode);
+    final schedule2 = fakePlugin.schedules.firstWhere((s) => s['id'] == t2Nid);
     expect(schedule2['title'], 'No Time');
     expect(
       schedule2['scheduledDate'],
@@ -155,7 +179,7 @@ void main() {
     );
     
     // Task 3 should not be scheduled
-    final hasTask3 = fakePlugin.schedules.any((s) => s['id'] == 'task-3'.hashCode);
+    final hasTask3 = fakePlugin.schedules.any((s) => s['id'] == t3Nid);
     expect(hasTask3, isFalse);
     
     sub.close();
@@ -186,10 +210,10 @@ void main() {
             
     final sub = container.listen(taskNotificationSchedulerProvider, (_, __) {});
     
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 500));
     
     expect(fakePlugin.schedules, hasLength(1));
-    expect(fakePlugin.cancelled, contains('task-1'.hashCode));
+    expect(fakePlugin.cancelled, contains(notificationIdForTask('test-user', 'task-1')));
     
     sub.close();
   });

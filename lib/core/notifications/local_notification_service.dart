@@ -43,7 +43,7 @@ class LocalNotificationService {
   }
 
   Future<void> scheduleTaskNotification(
-    String id,
+    int notificationId,
     String title,
     String body,
     DateTime date,
@@ -52,7 +52,7 @@ class LocalNotificationService {
     final tzDate = tz.TZDateTime.from(date, tz.local);
     dev.log('[Notifications] Scheduling "$title" at $tzDate (local=${tz.local.name})');
     await _plugin.zonedSchedule(
-      id: id.hashCode,
+      id: notificationId,
       title: title,
       body: body,
       scheduledDate: tzDate,
@@ -70,7 +70,7 @@ class LocalNotificationService {
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
-    dev.log('[Notifications] Scheduled OK id=${id.hashCode}');
+    dev.log('[Notifications] Scheduled OK id=$notificationId');
   }
 
   Future<void> cancel(int id) async {

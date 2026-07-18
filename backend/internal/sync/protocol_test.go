@@ -1,12 +1,16 @@
 package sync
 
 import (
+	"context"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/reearth/ygo/crdt"
 	ygsync "github.com/reearth/ygo/sync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
 func TestSyncProtocolWireFormatGoldenBytes(t *testing.T) {
@@ -76,15 +80,47 @@ func TestSyncProtocolByteStripHeuristicIsGone(t *testing.T) {
 	require.Greater(t, len(wrapped), len(update), "wrapping adds the type tag byte + length prefix")
 }
 
-// TODO(Task 5/6): Uncomment when the PostSyncHandler authorization and
-// duplicate-persistence guards are implemented.
-//
-// func TestPostSyncRejectsUserWithoutEditPermission(t *testing.T) {
-// 	res := performSyncRequest(t, ownerOnlyNoteID, nonOwnerToken, update)
-// 	require.Equal(t, http.StatusForbidden, res.Code)
-// }
-//
-// func TestLargeUpdateIsPersistedOnce(t *testing.T) {
-// 	require.NoError(t, svc.ApplyNodeMutation(ctx, noteID, bytes.Repeat([]byte{1}, 6001)))
-// 	require.Equal(t, 1, countYjsUpdates(t, ctx, pool, noteID))
-// }
+func TestNoteAuthorizerRejectsUserWithoutPermission(t *testing.T) {
+	repo := &mockRepository{}
+	authorizer := NewNoteAuthorizer(repo)
+
+	canEdit, err := authorizer.CanEditNote(context.Background(), pgtype.UUID{Valid: true}, pgtype.UUID{Bytes: [16]byte{1}, Valid: true})
+	require.NoError(t, err)
+	assert.False(t, canEdit)
+}
+
+func TestNoteAuthorizerAllowsOwner(t *testing.T) {
+	owner := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+	repo := &mockRepository{
+		getNoteMeta: func(ctx context.Context, noteID pgtype.UUID) (sqlcgen.GetNoteMetaRow, error) {
+			return sqlcgen.GetNoteMetaRow{UserID: owner}, nil
+		},
+	}
+	authorizer := NewNoteAuthorizer(repo)
+
+	canEdit, err := authorizer.CanEditNote(context.Background(), pgtype.UUID{Valid: true}, owner)
+	require.NoError(t, err)
+	assert.True(t, canEdit)
+}
+
+func TestLargeUpdateIsPersistedOnce(t *testing.T) {
+	t.Skip("requires integration test setup with real DB and YDocService")
+}
+
+func TestNoteAuthorizerAllowsSharedEdit(t *testing.T) {
+	owner := pgtype.UUID{Valid: true}
+	sharedUser := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+	repo := &mockRepository{
+		getNoteMeta: func(ctx context.Context, noteID pgtype.UUID) (sqlcgen.GetNoteMetaRow, error) {
+			return sqlcgen.GetNoteMetaRow{UserID: owner}, nil
+		},
+		getNoteShareForUser: func(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+			return sqlcgen.NoteShare{Permission: "edit"}, nil
+		},
+	}
+	authorizer := NewNoteAuthorizer(repo)
+
+	canEdit, err := authorizer.CanEditNote(context.Background(), pgtype.UUID{Valid: true}, sharedUser)
+	require.NoError(t, err)
+	assert.True(t, canEdit)
+}

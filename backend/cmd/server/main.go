@@ -326,8 +326,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	routinesH := routines.NewHandler(routinesSvc)
 	routines.RegisterRoutes(protected, routinesH)
 
-	// REST sync handler
-	protected.POST("/sync/note/:id", syncpkg.PostSyncHandler(ydocSvc))
+	// REST sync handler (authorized)
+	protected.POST("/sync/note/:id", syncpkg.PostSyncHandler(ydocSvc, syncpkg.NewNoteAuthorizer(syncRepo)))
 
 	// Agent Loop (built before the runner so the runner and the
 	// gateway can both depend on it).
