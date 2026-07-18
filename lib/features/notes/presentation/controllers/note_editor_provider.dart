@@ -59,6 +59,11 @@ final noteEditorControllerProvider = Provider.autoDispose
               },
             );
           },
+          onDocCommitted: (_) {
+            projectionDebounce?.cancel();
+            lastProjection = yjsMgr.projectNodes(noteId);
+            unawaited(yjsMgr.persistWithSyncedVector(noteId, null));
+          },
         );
       }).catchError((_) {
         // connectNote errored (e.g., WS failure) — ignore if disposed.

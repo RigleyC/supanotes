@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
@@ -100,24 +99,32 @@ class YjsSyncManager {
     }
   }
 
+  /// Per-note serial write chains to avoid concurrent projection for the same note.
+  final Map<String, Future<void>> _noteWriteChains = {};
+
   /// Project YMap("nodes") to local SQLite tables.
   /// Projects task nodes to the tasks table and derives the note's
   /// content/excerpt so list views reflect edits without waiting for a
   /// sync round-trip.
   Future<void> projectNodes(String noteId, {bool markDirty = true}) async {
+    if (!_noteWriteChains.containsKey(noteId)) {
+      _noteWriteChains[noteId] = Future.value();
+    }
+    _noteWriteChains[noteId] = _noteWriteChains[noteId]!.then((_) => _projectNow(noteId, markDirty: markDirty));
+    return _noteWriteChains[noteId];
+  }
+
+  Future<void> _projectNow(String noteId, {bool markDirty = true}) async {
     final doc = _docs[noteId];
     if (doc == null) return;
 
-    // YIELD to event loop to prevent ANR during heavy synchronous Yjs processing
-    await Future.delayed(const Duration(milliseconds: 10));
-
     final data = deriveProjectedData(noteId, doc, userId, markDirty: markDirty);
-
     final existingRows = await (_db.select(_db.tasks)
       ..where((t) => t.noteId.equals(noteId))
     ).get();
-    final projectedIds = data.tasks.map((t) => t.id.value).toSet();
-    final toDelete = existingRows.where((r) => !projectedIds.contains(r.id)).toList();
+
+    // Indexed reconciliation: build map for O(1) lookups
+    final existingById = {for (final row in existingRows) row.id: row};
 
     await _db.batch((batch) {
       batch.update(
@@ -125,37 +132,56 @@ class YjsSyncManager {
         data.noteCompanion,
         where: (t) => t.id.equals(noteId),
       );
+      
       for (final task in data.tasks) {
-        final existingTask = existingRows.where((r) => r.id == task.id.value).isEmpty 
-            ? null 
-            : existingRows.where((r) => r.id == task.id.value).first;
-            
-        if (existingTask != null) {
+        final existing = existingById.remove(task.id.value);
+        if (existing == null) {
+          batch.insert(_db.tasks, task);
+        } else {
+          // Only write if something changed
           bool changed = false;
-          if (existingTask.title != task.title.value) changed = true;
-          if (existingTask.status != task.status.value) changed = true;
-          if (existingTask.position != task.position.value) changed = true;
-          if (existingTask.dueDate != task.dueDate.value) changed = true;
-          if (existingTask.hasTime != task.hasTime.value) changed = true;
-          if (existingTask.recurrence != task.recurrence.value) changed = true;
-          if (existingTask.reminder != task.reminder.value) changed = true;
-          if (existingTask.completedAt != task.completedAt.value) changed = true;
+          if (existing.title != task.title.value) changed = true;
+          if (existing.status != task.status.value) changed = true;
+          if (existing.position != task.position.value) changed = true;
+          if (existing.dueDate != task.dueDate.value) changed = true;
+          if (existing.hasTime != task.hasTime.value) changed = true;
+          if (existing.recurrence != task.recurrence.value) changed = true;
+          if (existing.reminder != task.reminder.value) changed = true;
+          if (existing.completedAt != task.completedAt.value) changed = true;
           
           if (changed) {
             batch.update(
               _db.tasks,
-              task.copyWith(createdAt: Value(existingTask.createdAt)),
-              where: (t) => t.id.equals(existingTask.id),
+              task.copyWith(createdAt: Value(existing.createdAt)),
+              where: (t) => t.id.equals(existing.id),
             );
           }
-        } else {
-          batch.insert(_db.tasks, task);
         }
       }
-      for (final row in toDelete) {
-        batch.delete(_db.tasks, row);
+      
+      // Delete orphan tasks that no longer exist in the YDoc
+      for (final orphan in existingById.values) {
+        batch.delete(_db.tasks, orphan);
       }
     });
+
+    // Clean up resolved write chain entry
+    _noteWriteChains.remove(noteId);
+  }
+
+  /// Persist the current in-memory Doc state with the synced state vector.
+  Future<void> persistWithSyncedVector(String noteId, Uint8List? syncedStateVector) async {
+    final doc = _docs[noteId];
+    if (doc == null) return;
+    final state = encodeStateAsUpdate(doc);
+    await _db.into(_db.localYjsStates).insertOnConflictUpdate(
+      LocalYjsStatesCompanion(
+        noteId: Value(noteId),
+        state: Value(state),
+        syncedStateVector: Value(syncedStateVector),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Merges remote Yjs states into local states and projects the result.

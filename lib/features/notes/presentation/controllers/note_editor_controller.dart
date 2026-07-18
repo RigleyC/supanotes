@@ -45,6 +45,7 @@ class NoteEditorController extends ChangeNotifier {
     required Doc doc,
     required String noteId,
     void Function()? onDocChanged,
+    void Function(Set<String> nodeIds)? onDocCommitted,
   }) {
     dev.log(
       '[NoteEditorController.initFromDoc] noteId=$noteId',
@@ -63,6 +64,7 @@ class NoteEditorController extends ChangeNotifier {
       userId: userId,
       coordinator: _coordinator!,
       onDocChanged: onDocChanged,
+      onDocCommitted: onDocCommitted,
     );
     document!.addListener(_onDocChanged);
     dev.log(

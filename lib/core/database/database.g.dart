@@ -4807,6 +4807,18 @@ class $LocalYjsStatesTable extends LocalYjsStates
     type: DriftSqlType.blob,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _syncedStateVectorMeta = const VerificationMeta(
+    'syncedStateVector',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> syncedStateVector =
+      GeneratedColumn<Uint8List>(
+        'synced_state_vector',
+        aliasedName,
+        true,
+        type: DriftSqlType.blob,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -4820,7 +4832,12 @@ class $LocalYjsStatesTable extends LocalYjsStates
     defaultValue: currentDateAndTime,
   );
   @override
-  List<GeneratedColumn> get $columns => [noteId, state, updatedAt];
+  List<GeneratedColumn> get $columns => [
+    noteId,
+    state,
+    syncedStateVector,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -4849,6 +4866,15 @@ class $LocalYjsStatesTable extends LocalYjsStates
     } else if (isInserting) {
       context.missing(_stateMeta);
     }
+    if (data.containsKey('synced_state_vector')) {
+      context.handle(
+        _syncedStateVectorMeta,
+        syncedStateVector.isAcceptableOrUnknown(
+          data['synced_state_vector']!,
+          _syncedStateVectorMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -4872,6 +4898,10 @@ class $LocalYjsStatesTable extends LocalYjsStates
         DriftSqlType.blob,
         data['${effectivePrefix}state'],
       )!,
+      syncedStateVector: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}synced_state_vector'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -4888,10 +4918,12 @@ class $LocalYjsStatesTable extends LocalYjsStates
 class LocalYjsState extends DataClass implements Insertable<LocalYjsState> {
   final String noteId;
   final Uint8List state;
+  final Uint8List? syncedStateVector;
   final DateTime updatedAt;
   const LocalYjsState({
     required this.noteId,
     required this.state,
+    this.syncedStateVector,
     required this.updatedAt,
   });
   @override
@@ -4899,6 +4931,9 @@ class LocalYjsState extends DataClass implements Insertable<LocalYjsState> {
     final map = <String, Expression>{};
     map['note_id'] = Variable<String>(noteId);
     map['state'] = Variable<Uint8List>(state);
+    if (!nullToAbsent || syncedStateVector != null) {
+      map['synced_state_vector'] = Variable<Uint8List>(syncedStateVector);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -4907,6 +4942,9 @@ class LocalYjsState extends DataClass implements Insertable<LocalYjsState> {
     return LocalYjsStatesCompanion(
       noteId: Value(noteId),
       state: Value(state),
+      syncedStateVector: syncedStateVector == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncedStateVector),
       updatedAt: Value(updatedAt),
     );
   }
@@ -4919,6 +4957,9 @@ class LocalYjsState extends DataClass implements Insertable<LocalYjsState> {
     return LocalYjsState(
       noteId: serializer.fromJson<String>(json['noteId']),
       state: serializer.fromJson<Uint8List>(json['state']),
+      syncedStateVector: serializer.fromJson<Uint8List?>(
+        json['syncedStateVector'],
+      ),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -4928,6 +4969,7 @@ class LocalYjsState extends DataClass implements Insertable<LocalYjsState> {
     return <String, dynamic>{
       'noteId': serializer.toJson<String>(noteId),
       'state': serializer.toJson<Uint8List>(state),
+      'syncedStateVector': serializer.toJson<Uint8List?>(syncedStateVector),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -4935,16 +4977,23 @@ class LocalYjsState extends DataClass implements Insertable<LocalYjsState> {
   LocalYjsState copyWith({
     String? noteId,
     Uint8List? state,
+    Value<Uint8List?> syncedStateVector = const Value.absent(),
     DateTime? updatedAt,
   }) => LocalYjsState(
     noteId: noteId ?? this.noteId,
     state: state ?? this.state,
+    syncedStateVector: syncedStateVector.present
+        ? syncedStateVector.value
+        : this.syncedStateVector,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   LocalYjsState copyWithCompanion(LocalYjsStatesCompanion data) {
     return LocalYjsState(
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
       state: data.state.present ? data.state.value : this.state,
+      syncedStateVector: data.syncedStateVector.present
+          ? data.syncedStateVector.value
+          : this.syncedStateVector,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -4954,37 +5003,49 @@ class LocalYjsState extends DataClass implements Insertable<LocalYjsState> {
     return (StringBuffer('LocalYjsState(')
           ..write('noteId: $noteId, ')
           ..write('state: $state, ')
+          ..write('syncedStateVector: $syncedStateVector, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(noteId, $driftBlobEquality.hash(state), updatedAt);
+  int get hashCode => Object.hash(
+    noteId,
+    $driftBlobEquality.hash(state),
+    $driftBlobEquality.hash(syncedStateVector),
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is LocalYjsState &&
           other.noteId == this.noteId &&
           $driftBlobEquality.equals(other.state, this.state) &&
+          $driftBlobEquality.equals(
+            other.syncedStateVector,
+            this.syncedStateVector,
+          ) &&
           other.updatedAt == this.updatedAt);
 }
 
 class LocalYjsStatesCompanion extends UpdateCompanion<LocalYjsState> {
   final Value<String> noteId;
   final Value<Uint8List> state;
+  final Value<Uint8List?> syncedStateVector;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const LocalYjsStatesCompanion({
     this.noteId = const Value.absent(),
     this.state = const Value.absent(),
+    this.syncedStateVector = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalYjsStatesCompanion.insert({
     required String noteId,
     required Uint8List state,
+    this.syncedStateVector = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : noteId = Value(noteId),
@@ -4992,12 +5053,14 @@ class LocalYjsStatesCompanion extends UpdateCompanion<LocalYjsState> {
   static Insertable<LocalYjsState> custom({
     Expression<String>? noteId,
     Expression<Uint8List>? state,
+    Expression<Uint8List>? syncedStateVector,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (noteId != null) 'note_id': noteId,
       if (state != null) 'state': state,
+      if (syncedStateVector != null) 'synced_state_vector': syncedStateVector,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -5006,12 +5069,14 @@ class LocalYjsStatesCompanion extends UpdateCompanion<LocalYjsState> {
   LocalYjsStatesCompanion copyWith({
     Value<String>? noteId,
     Value<Uint8List>? state,
+    Value<Uint8List?>? syncedStateVector,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return LocalYjsStatesCompanion(
       noteId: noteId ?? this.noteId,
       state: state ?? this.state,
+      syncedStateVector: syncedStateVector ?? this.syncedStateVector,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -5025,6 +5090,9 @@ class LocalYjsStatesCompanion extends UpdateCompanion<LocalYjsState> {
     }
     if (state.present) {
       map['state'] = Variable<Uint8List>(state.value);
+    }
+    if (syncedStateVector.present) {
+      map['synced_state_vector'] = Variable<Uint8List>(syncedStateVector.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -5040,6 +5108,7 @@ class LocalYjsStatesCompanion extends UpdateCompanion<LocalYjsState> {
     return (StringBuffer('LocalYjsStatesCompanion(')
           ..write('noteId: $noteId, ')
           ..write('state: $state, ')
+          ..write('syncedStateVector: $syncedStateVector, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -8227,6 +8296,7 @@ typedef $$LocalYjsStatesTableCreateCompanionBuilder =
     LocalYjsStatesCompanion Function({
       required String noteId,
       required Uint8List state,
+      Value<Uint8List?> syncedStateVector,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -8234,6 +8304,7 @@ typedef $$LocalYjsStatesTableUpdateCompanionBuilder =
     LocalYjsStatesCompanion Function({
       Value<String> noteId,
       Value<Uint8List> state,
+      Value<Uint8List?> syncedStateVector,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -8275,6 +8346,11 @@ class $$LocalYjsStatesTableFilterComposer
   });
   ColumnFilters<Uint8List> get state => $composableBuilder(
     column: $table.state,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get syncedStateVector => $composableBuilder(
+    column: $table.syncedStateVector,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8321,6 +8397,11 @@ class $$LocalYjsStatesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<Uint8List> get syncedStateVector => $composableBuilder(
+    column: $table.syncedStateVector,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -8361,6 +8442,11 @@ class $$LocalYjsStatesTableAnnotationComposer
   });
   GeneratedColumn<Uint8List> get state =>
       $composableBuilder(column: $table.state, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get syncedStateVector => $composableBuilder(
+    column: $table.syncedStateVector,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -8421,11 +8507,13 @@ class $$LocalYjsStatesTableTableManager
               ({
                 Value<String> noteId = const Value.absent(),
                 Value<Uint8List> state = const Value.absent(),
+                Value<Uint8List?> syncedStateVector = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalYjsStatesCompanion(
                 noteId: noteId,
                 state: state,
+                syncedStateVector: syncedStateVector,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -8433,11 +8521,13 @@ class $$LocalYjsStatesTableTableManager
               ({
                 required String noteId,
                 required Uint8List state,
+                Value<Uint8List?> syncedStateVector = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalYjsStatesCompanion.insert(
                 noteId: noteId,
                 state: state,
+                syncedStateVector: syncedStateVector,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
