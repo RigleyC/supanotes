@@ -102,8 +102,7 @@ class YjsDocEditorBridge {
     String id,
     YMap<Object> nodesMap,
   ) {
-    final dataStr = NodeCodec.nodeData(node);
-    final data = jsonDecode(dataStr) as Map<String, dynamic>;
+    final data = NodeCodec.nodeData(node);
 
     if (position == null) {
       final existing = _readPosition(id, nodesMap);
@@ -140,9 +139,12 @@ class YjsDocEditorBridge {
       nodesMap.set('$id:completed', node.isComplete);
     }
 
-    final text = data['text'] as String?;
-    _writeNodeTextContent(id, text ?? '');
-    dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text?.length ?? 0}', name: 'YjsBridge');
+    String text = '';
+    if (node is TextNode) {
+      text = node.text.toPlainText();
+    }
+    _writeNodeTextContent(id, text);
+    dev.log('[YjsBridge] _serializeNode: id=$id type=${_attributionFor(node)} position=$position textLen=${text.length}', name: 'YjsBridge');
   }
 
   void _writeNodeTextContent(String id, String text) {

@@ -75,6 +75,9 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
     
     final hasTime = nodesMap?.get('$nodeId:hasTime') ?? nodeMap.get('hasTime');
     if (hasTime is bool) data['hasTime'] = hasTime;
+    
+    final reminder = nodesMap?.get('$nodeId:reminder') ?? nodeMap.get('reminder');
+    if (reminder is String) data['reminder'] = reminder;
   }
 
   final rawParentId = nodeMap.get('parentId') as String?;
@@ -86,7 +89,7 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
     parentId: resolvedParentId,
     position: nodeMap.get('position')?.toString() ?? 'a0',
     type: derivedType,
-    data: jsonEncode(data),
+    data: data,
     createdAt: DateTime.fromMillisecondsSinceEpoch(
       (nodeMap.get('createdAt') as num?)?.toInt() ?? 0,
     ),
@@ -137,7 +140,7 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
       parentId: resolvedParentId,
       position: meta['position']?.toString() ?? 'a0',
       type: derivedType,
-      data: jsonEncode(data),
+      data: data,
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         (meta['createdAt'] as num?)?.toInt() ?? 0,
       ),

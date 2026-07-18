@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as dev;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,13 +24,15 @@ final openTasksStreamProvider = StreamProvider.autoDispose<List<TaskData>>(
 );
 
 final taskNotificationSchedulerProvider =
-    NotifierProvider<TaskNotificationScheduler, Map<String, DateTime>>(
+    AsyncNotifierProvider<TaskNotificationScheduler, Map<String, DateTime>>(
   TaskNotificationScheduler.new,
 );
 
-class TaskNotificationScheduler extends Notifier<Map<String, DateTime>> {
+class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
+  static const _kPrefKey = 'task_notification_schedule_cache';
+
   @override
-  Map<String, DateTime> build() {
+  Future<Map<String, DateTime>> build() async {
     dev.log('[Scheduler] Provider build() triggered');
 
     // Watch auth state directly. When it changes, this provider rebuilds.
@@ -40,16 +44,24 @@ class TaskNotificationScheduler extends Notifier<Map<String, DateTime>> {
       return {};
     }
 
-    dev.log('[Scheduler] Authenticated, canceling stale notifications');
-    final bootstrapService = ref.read(localNotificationServiceProvider);
-    unawaited(
-      bootstrapService.cancelAll().catchError((e, st) {
-        dev.log('[Scheduler] cancelAll failed: $e');
-      }),
-    );
-
-    dev.log('[Scheduler] Setting up task listener');
+    dev.log('[Scheduler] Authenticated, loading cached schedule state');
+    final prefs = await SharedPreferences.getInstance();
+    final cachedStr = prefs.getString(_kPrefKey);
+    final cachedSchedule = <String, DateTime>{};
     
+    if (cachedStr != null) {
+      try {
+        final decoded = jsonDecode(cachedStr) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          cachedSchedule[entry.key] = DateTime.parse(entry.value as String);
+        }
+      } catch (e) {
+        dev.log('[Scheduler] Failed to parse cached schedule: $e');
+      }
+    }
+    
+    dev.log('[Scheduler] Loaded ${cachedSchedule.length} cached schedules. Setting up task listener');
+
     // ref.listen keeps the stream provider alive and reacts to data changes
     ref.listen(openTasksStreamProvider, (_, next) {
       next.when(
@@ -59,10 +71,10 @@ class TaskNotificationScheduler extends Notifier<Map<String, DateTime>> {
       );
     });
 
-    return {};
+    return cachedSchedule;
   }
 
-  void _reschedule(List<TaskData> tasks) {
+  Future<void> _reschedule(List<TaskData> tasks) async {
     final now = DateTime.now();
     dev.log('[Scheduler] _reschedule called. Total open tasks: ${tasks.length}. now=$now');
 
@@ -82,29 +94,49 @@ class TaskNotificationScheduler extends Notifier<Map<String, DateTime>> {
       }
     }
 
-    for (final id in state.keys) {
-      if (!newSchedule.containsKey(id)) {
+    final sortedEntries = newSchedule.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    final limitedSchedule = Map.fromEntries(sortedEntries.take(30));
+
+    final currentState = state.asData?.value ?? <String, DateTime>{};
+    
+    for (final id in currentState.keys) {
+      if (!limitedSchedule.containsKey(id)) {
         dev.log('[Scheduler] Cancelling notification for task id=$id');
-        service.cancel(id.hashCode);
+        await service.cancel(id.hashCode);
       }
     }
 
-    for (final MapEntry(:key, :value) in newSchedule.entries) {
-      if (state[key] != value) {
+    for (final MapEntry(:key, :value) in limitedSchedule.entries) {
+      final cachedTime = currentState[key];
+      if (cachedTime == null || cachedTime.millisecondsSinceEpoch != value.millisecondsSinceEpoch) {
         final task = tasks.firstWhere((t) => t.id == key);
         final body = formatDueDate(
           task.dueDate!,
           hasTime: task.hasTime,
         );
         dev.log('[Scheduler] Scheduling notification for "${task.title}" at $value');
-        service.scheduleTaskNotification(key, task.title, body, value);
+        await service.scheduleTaskNotification(key, task.title, body, value);
+        // Small delay to prevent flooding the platform channel and blocking Android Main Thread
+        await Future.delayed(const Duration(milliseconds: 100));
       } else {
         dev.log('[Scheduler] Task "${tasks.firstWhere((t) => t.id == key).title}" already scheduled');
       }
     }
 
-    dev.log('[Scheduler] Done. Scheduled: ${newSchedule.length} notifications');
-    state = newSchedule;
+    dev.log('[Scheduler] Done. Scheduled: ${limitedSchedule.length} notifications');
+    state = AsyncValue.data(limitedSchedule);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final toSave = <String, String>{};
+      for (final entry in limitedSchedule.entries) {
+        toSave[entry.key] = entry.value.toIso8601String();
+      }
+      await prefs.setString(TaskNotificationScheduler._kPrefKey, jsonEncode(toSave));
+    } catch (e) {
+      dev.log('[Scheduler] Failed to cache schedule state: $e');
+    }
   }
 
   DateTime _computeNotificationTime(DateTime due, bool hasTime, String? reminder) {

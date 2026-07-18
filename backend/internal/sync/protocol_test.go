@@ -75,3 +75,16 @@ func TestSyncProtocolByteStripHeuristicIsGone(t *testing.T) {
 	require.Equal(t, ygsync.MsgUpdate, int(wrapped[0]), "wrapped must start with MsgUpdate tag, proving no heuristic byte stripping exists")
 	require.Greater(t, len(wrapped), len(update), "wrapping adds the type tag byte + length prefix")
 }
+
+// TODO(Task 5/6): Uncomment when the PostSyncHandler authorization and
+// duplicate-persistence guards are implemented.
+//
+// func TestPostSyncRejectsUserWithoutEditPermission(t *testing.T) {
+// 	res := performSyncRequest(t, ownerOnlyNoteID, nonOwnerToken, update)
+// 	require.Equal(t, http.StatusForbidden, res.Code)
+// }
+//
+// func TestLargeUpdateIsPersistedOnce(t *testing.T) {
+// 	require.NoError(t, svc.ApplyNodeMutation(ctx, noteID, bytes.Repeat([]byte{1}, 6001)))
+// 	require.Equal(t, 1, countYjsUpdates(t, ctx, pool, noteID))
+// }

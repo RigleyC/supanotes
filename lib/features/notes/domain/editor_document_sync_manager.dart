@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:super_editor/super_editor.dart';
@@ -245,7 +244,7 @@ class EditorDocumentSyncManager {
         // Check content changes
         if (existingNode is TaskNode && incoming.type == 'task') {
           try {
-            final incomingData = jsonDecode(incoming.data) as Map<String, dynamic>;
+            final incomingData = incoming.data;
             final incomingCompleted = incomingData['completed'] == true;
 
             if (existingNode.isComplete != incomingCompleted) {
@@ -256,9 +255,9 @@ class EditorDocumentSyncManager {
             }
 
             // Check if only task state changed — skip full node replacement
-            final existingData = jsonDecode(NodeCodec.nodeData(existingNode)) as Map<String, dynamic>;
+            final existingData = NodeCodec.nodeData(existingNode);
             existingData['completed'] = incomingCompleted;
-            if (jsonEncode(existingData) == incoming.data) continue;
+            if (NodeCodec.deepEquals(existingData, incoming.data)) continue;
           } catch (_) {}
         }
 

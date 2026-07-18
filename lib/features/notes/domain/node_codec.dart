@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 import 'package:super_editor/super_editor.dart';
 
@@ -61,12 +60,12 @@ class NodeCodec {
     return {'text': text.toPlainText(), 'spans': spansList};
   }
 
-  static String nodeData(DocumentNode node) {
+  static Map<String, dynamic> nodeData(DocumentNode node) {
     if (node is TaskNode) {
-      return jsonEncode({
+      return {
         ..._serializeAttributedText(node.text),
         'indent': node.indent,
-      });
+      };
     }
     if (node is ParagraphNode) {
       final blockType = node.metadata['blockType'];
@@ -82,46 +81,46 @@ class NodeCodec {
         if (blockType == header4Attribution) level = 4;
         if (blockType == header5Attribution) level = 5;
         if (blockType == header6Attribution) level = 6;
-        return jsonEncode({
+        return {
           ..._serializeAttributedText(node.text),
           'level': level,
-        });
+        };
       }
       if (blockType == blockquoteAttribution) {
-        return jsonEncode({..._serializeAttributedText(node.text)});
+        return {..._serializeAttributedText(node.text)};
       }
-      return jsonEncode({..._serializeAttributedText(node.text)});
+      return {..._serializeAttributedText(node.text)};
     }
     if (node is ListItemNode) {
-      return jsonEncode({
+      return {
         ..._serializeAttributedText(node.text),
         'type': node.type == ListItemType.ordered ? 'ordered' : 'unordered',
         'indent': node.indent,
-      });
+      };
     }
     if (node is TextNode) {
-      return jsonEncode({..._serializeAttributedText(node.text)});
+      return {..._serializeAttributedText(node.text)};
     }
     if (node is ImageNode) {
-      return jsonEncode({'url': node.imageUrl, 'alt': node.altText});
+      return {'url': node.imageUrl, 'alt': node.altText};
     }
     if (node is HorizontalRuleNode) {
-      return '{}';
+      return <String, dynamic>{};
     }
     if (node is DocumentAttachmentNode) {
-      return jsonEncode({'id': node.id});
+      return {'id': node.id};
     }
     if (node is RichLinkNode) {
-      return jsonEncode({
+      return {
         'id': node.id,
         if (node.url != null) 'url': node.url,
         if (node.title != null) 'title': node.title,
         if (node.description != null) 'description': node.description,
         if (node.imageUrl != null) 'image_url': node.imageUrl,
         if (node.domain != null) 'domain': node.domain,
-      });
+      };
     }
-    return '{}';
+    return <String, dynamic>{};
   }
 
   static MutableDocument documentFromNodes(List<NoteNode> nodes) {
@@ -143,8 +142,7 @@ class NodeCodec {
   }
 
   static DocumentNode createNodeFromSchema(NoteNode schema) {
-    final data = jsonDecode(schema.data) as Map<String, dynamic>;
-    return _createNode(id: schema.id, type: schema.type, data: data);
+    return _createNode(id: schema.id, type: schema.type, data: schema.data);
   }
 
   static DocumentNode _createNode({
@@ -272,15 +270,7 @@ class NodeCodec {
   }
 
   static DocumentNode? _nodeFromData(NoteNode node) {
-    Map<String, dynamic> data;
-    try {
-      data = node.data.isNotEmpty
-          ? jsonDecode(node.data) as Map<String, dynamic>
-          : <String, dynamic>{};
-    } catch (_) {
-      data = <String, dynamic>{};
-    }
-    return _createNode(id: node.id, type: node.type, data: data);
+    return _createNode(id: node.id, type: node.type, data: node.data);
   }
 
   static String? nodeType(DocumentNode node) {
@@ -303,42 +293,76 @@ class NodeCodec {
     final existingAttribution = nodeType(existingNode);
     if (existingAttribution != incoming.type) return false;
 
-    if (existingNode is TextNode &&
-        incoming.type != 'image' &&
-        incoming.type != 'divider') {
-      final data = jsonDecode(incoming.data) as Map<String, dynamic>;
-      if (existingNode.text.toPlainText() != (data['text'] as String? ?? '')) {
+    // 1. Plain text comparison for all text nodes
+    if (existingNode is TextNode) {
+      final existingText = existingNode.text.toPlainText();
+      final incomingText = incoming.data['text'] as String? ?? '';
+      if (existingText != incomingText) return false;
+    }
+
+    // 2. Type-specific semantic checks
+    if (existingNode is TaskNode && incoming.type == 'task') {
+      final existingDataMap = nodeData(existingNode);
+      try {
+        final existingEntry = YjsTaskEntry.fromJson(existingDataMap);
+        final incomingEntry = YjsTaskEntry.fromJson(incoming.data);
+        return existingEntry == incomingEntry;
+      } catch (_) {
         return false;
       }
     }
 
-    final existingDataStr = nodeData(existingNode);
-    try {
-      if (existingNode is TaskNode && incoming.type == 'task') {
-        final existingEntry = YjsTaskEntry.decode(existingDataStr);
-        final incomingEntry = YjsTaskEntry.decode(incoming.data);
-        if (existingEntry != null && incomingEntry != null) {
-          return existingEntry == incomingEntry;
-        }
-      }
-      final existingMap = jsonDecode(existingDataStr) as Map<String, dynamic>;
-      final incomingMap = jsonDecode(incoming.data) as Map<String, dynamic>;
-      if (existingMap.length != incomingMap.length) return false;
-      for (final key in existingMap.keys) {
-        if (!incomingMap.containsKey(key)) return false;
-        if (!_deepEquals(existingMap[key], incomingMap[key])) return false;
-      }
+    if (existingNode is ListItemNode && incoming.type == 'list_item') {
+      final existingType = existingNode.type;
+      final incomingTypeStr = incoming.data['type'] as String? ?? 'unordered';
+      final resolvedIncomingType = incomingTypeStr == 'ordered' ? ListItemType.ordered : ListItemType.unordered;
+      if (existingType != resolvedIncomingType) return false;
+
+      final existingIndent = existingNode.indent;
+      final incomingIndent = incoming.data['indent'] as int? ?? 0;
+      if (existingIndent != incomingIndent) return false;
+
       return true;
-    } catch (_) {
-      return false;
     }
+
+    if (existingNode is ParagraphNode && incoming.type == 'header') {
+      final blockType = existingNode.metadata['blockType'] as Attribution?;
+      final level = incoming.data['level'] as int? ?? 1;
+      final expectedBlockType = switch (level) {
+        1 => header1Attribution,
+        2 => header2Attribution,
+        3 => header3Attribution,
+        4 => header4Attribution,
+        5 => header5Attribution,
+        _ => header6Attribution,
+      };
+      return blockType == expectedBlockType;
+    }
+
+    if (existingNode is ParagraphNode && incoming.type == 'paragraph') {
+      // Already checked plain text, and it's a normal paragraph
+      return true;
+    }
+
+    if (existingNode is ImageNode && incoming.type == 'image') {
+      return existingNode.imageUrl == (incoming.data['url'] as String? ?? '') &&
+             existingNode.altText == (incoming.data['alt'] as String? ?? '');
+    }
+
+    if (existingNode is HorizontalRuleNode && incoming.type == 'divider') {
+      return true;
+    }
+
+    // Fallback for any other custom types
+    final existingDataMap = nodeData(existingNode);
+    return deepEquals(existingDataMap, incoming.data);
   }
 
-  static bool _deepEquals(dynamic a, dynamic b) {
+  static bool deepEquals(dynamic a, dynamic b) {
     if (a is List && b is List) {
       if (a.length != b.length) return false;
       for (int i = 0; i < a.length; i++) {
-        if (!_deepEquals(a[i], b[i])) return false;
+        if (!deepEquals(a[i], b[i])) return false;
       }
       return true;
     }
@@ -346,7 +370,7 @@ class NodeCodec {
       if (a.length != b.length) return false;
       for (final key in a.keys) {
         if (!b.containsKey(key)) return false;
-        if (!_deepEquals(a[key], b[key])) return false;
+        if (!deepEquals(a[key], b[key])) return false;
       }
       return true;
     }

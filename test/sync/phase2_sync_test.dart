@@ -6,12 +6,9 @@ void main() {
       // Simulação: se a sessão WS está ativa, o sync REST é suprimido para evitar corrupção
       bool wsActive = true;
       bool pushDisparado = false;
-      bool pullDisparado = false;
 
       void mockRestSync() {
         if (wsActive) return; // Guard logic
-        pushDisparado = true;
-        pullDisparado = true;
       }
 
       mockRestSync();

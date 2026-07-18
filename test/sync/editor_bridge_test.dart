@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:super_editor/super_editor.dart';
@@ -99,7 +98,7 @@ void main() {
           noteId: 'note-1',
           position: '1.0',
           type: 'paragraph',
-          data: jsonEncode({'text': 'Hello World', 'spans': []}),
+          data: {'text': 'Hello World', 'spans': []},
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
@@ -116,7 +115,7 @@ void main() {
           noteId: 'note-1',
           position: '1.0',
           type: 'paragraph',
-          data: jsonEncode({'text': 'Hi', 'spans': []}),
+          data: {'text': 'Hi', 'spans': []},
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
@@ -156,12 +155,12 @@ void main() {
           noteId: 'note-1',
           position: '1.0',
           type: 'task',
-          data: jsonEncode({
+          data: {
             'text': 'Buy milk',
             'spans': [],
             'completed': true,
             'indent': 0,
-          }),
+          },
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
@@ -213,6 +212,52 @@ void main() {
       final nodesMap = doc.getMap<Object>('nodes')!;
       expect(nodesMap.get('t1:completed'), isFalse);
       expect(nodesMap.get('t1:dueDate'), '2026-07-15');
+
+      bridge.dispose();
+    });
+
+    test('updateTaskMetadataInYDoc writes composite keys for dueDate, recurrence, and reminder',
+        () async {
+      final doc = Doc();
+      final mutableDoc = MutableDocument.empty();
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: mutableDoc,
+        composer: composer,
+      )..reactionPipeline.clear();
+
+      final coordinator = EditorDocumentSyncManager(
+        document: mutableDoc,
+        editor: editor,
+      );
+
+      final bridge = YjsDocEditorBridge(
+        doc: doc,
+        userId: 'test-user',
+        coordinator: coordinator,
+      );
+
+      doc.transact((txn) {
+        final nodeMap = YMap<Object>();
+        nodeMap.set('id', 't1');
+        nodeMap.set('position', 'a0');
+        nodeMap.set('type', 'task');
+        nodeMap.set('data', jsonEncode({'text': 'Task with dates'}));
+        doc.getMap<Object>('nodes')!.set('t1', nodeMap);
+        doc.getText('content/t1')!.insert(0, 'Task with dates');
+      });
+
+      bridge.updateTaskMetadataInYDoc(
+        't1',
+        dueDate: DateTime(2026, 8, 15),
+        recurrence: 'weekly',
+        reminder: '9am',
+      );
+
+      final nodesMap = doc.getMap<Object>('nodes')!;
+      expect(nodesMap.get('t1:dueDate'), '2026-08-15');
+      expect(nodesMap.get('t1:recurrence'), 'weekly');
+      expect(nodesMap.get('t1:reminder'), '9am');
 
       bridge.dispose();
     });

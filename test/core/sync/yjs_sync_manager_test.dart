@@ -104,4 +104,31 @@ void main() {
     expect(note.content, contains('Second line'));
     expect(note.excerpt, contains('Second line'));
   });
+
+  test('projectNodes derives task metadata from composite YMap keys', () async {
+    final mgr = YjsSyncManager(db: db, userId: 'user-1');
+    final doc = await mgr.loadDoc('note-1');
+
+    doc.transact((txn) {
+      final nodeMap = YMap<Object>();
+      nodeMap.set('id', 'task-1');
+      nodeMap.set('position', 'c0');
+      nodeMap.set('type', 'task');
+      nodeMap.set('data', '{"text":"Recurring task"}');
+      doc.getMap<Object>('nodes')!.set('task-1', nodeMap);
+      doc.getText('content/task-1')!.insert(0, 'Recurring task');
+      doc.getMap<Object>('nodes')!.set('task-1:dueDate', '2026-07-20');
+      doc.getMap<Object>('nodes')!.set('task-1:recurrence', 'daily');
+      doc.getMap<Object>('nodes')!.set('task-1:completed', true);
+    });
+
+    await mgr.projectNodes('note-1');
+
+    final tasks = await (db.select(db.tasks)
+          ..where((t) => t.noteId.equals('note-1'))).get();
+    expect(tasks, hasLength(1));
+    expect(tasks.first.title, 'Recurring task');
+    expect(tasks.first.status, 'done');
+    expect(tasks.first.recurrence?.name, 'daily');
+  });
 }

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 import 'package:supanotes/core/utils/fractional_indexing.dart';
@@ -12,7 +11,6 @@ void main() {
       for (int i = 0; i < 5; i++) {
         final id = 'node$i';
         final prevNodeId = i > 0 ? 'node${i - 1}' : null;
-        final nextNodeId = null;
 
         String? prevPos;
         String? nextPos;

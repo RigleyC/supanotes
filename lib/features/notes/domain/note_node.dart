@@ -4,7 +4,7 @@ class NoteNode {
   final String? parentId;
   final String position;
   final String type;
-  final String data;
+  final Map<String, dynamic> data;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -27,7 +27,7 @@ class NoteNode {
     String? parentId,
     String? position,
     String? type,
-    String? data,
+    Map<String, dynamic>? data,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,

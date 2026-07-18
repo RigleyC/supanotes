@@ -61,7 +61,7 @@ void main() {
 
     final element = tester.element(find.byType(NoteEditorScreen));
     final container = ProviderScope.containerOf(element);
-    final controller = container.read(noteEditorControllerProvider('note-1'));
+    container.read(noteEditorControllerProvider('note-1'));
 
     // Clean up: unmount widget tree to dispose providers and cancel database streams
     await tester.pumpWidget(const SizedBox());
