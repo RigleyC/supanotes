@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class TaskSnackBarHelper {
   static Future<DateTime?> completeTaskWithFeedback({
-    required Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> Function() onComplete,
+    required Future<TaskCompletionResult> Function() onComplete,
     required void Function(DateTime? previousDue, bool previousHasTime) onUndo,
   }) async {
     debugPrint('[TaskSnackBarHelper] completeTaskWithFeedback CALLED');

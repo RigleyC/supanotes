@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:supanotes/core/utils/fractional_indexing.dart';
+import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
@@ -227,16 +229,53 @@ class YjsDocEditorBridge {
     return null;
   }
 
-  void completeRecurringTask(String nodeId, DateTime nextDue) {
-    _doc.transact((txn) {
-      final nodesMap = _doc.getMap<Object>('nodes')!;
-      final raw = nodesMap.get(nodeId);
-      if (raw == null) return;
-      if (raw is! YMap) return;
+  YMap _requireTaskNode(String nodeId) {
+    final nodesMap = _doc.getMap<Object>('nodes')!;
+    final raw = nodesMap.get(nodeId);
+    if (raw is! YMap) {
+      throw StateError('Task node $nodeId not found in YDoc');
+    }
+    return raw;
+  }
 
-      nodesMap.set('$nodeId:completed', false);
-      nodesMap.set('$nodeId:dueDate', _formatDueDate(nextDue));
-      nodesMap.set('$nodeId:lastCompletedAt', DateTime.now().toUtc().toIso8601String());
+  TaskSnapshot _readTaskSnapshot(String nodeId, YMap nodeMap) {
+    final dueDateStr = nodeMap.get('dueDate') as String?;
+    final hasTime = nodeMap.get('hasTime') as bool? ?? false;
+    final recurrenceStr = nodeMap.get('recurrence') as String?;
+    return TaskSnapshot(
+      dueDate: dueDateStr != null ? DateTime.parse(dueDateStr) : null,
+      hasTime: hasTime,
+      recurrence: TaskRecurrence.parse(recurrenceStr),
+    );
+  }
+
+  TaskCompletionResult completeTaskInYDoc(String nodeId, {DateTime? now}) {
+    final nodeMap = _requireTaskNode(nodeId);
+    final snapshot = _readTaskSnapshot(nodeId, nodeMap);
+    final result = TaskCompletionCommand(() => now ?? DateTime.now()).complete(snapshot);
+
+    _doc.transact((txn) {
+      nodeMap.set('completed', result.completed);
+      nodeMap.set('lastCompletedAt', result.completedAt.toIso8601String());
+      if (result.nextDue == null) {
+        nodeMap.delete('dueDate');
+      } else {
+        nodeMap.set('dueDate', _formatDueDate(result.nextDue!, hasTime: result.previousHasTime));
+      }
+    });
+
+    _onDocChanged?.call();
+    return result;
+  }
+
+  void reopenTaskInYDoc(String nodeId, {DateTime? previousDue}) {
+    final nodeMap = _requireTaskNode(nodeId);
+    _doc.transact((txn) {
+      nodeMap.set('completed', false);
+      nodeMap.delete('lastCompletedAt');
+      if (previousDue != null) {
+        nodeMap.set('dueDate', _formatDueDate(previousDue));
+      }
     });
 
     _onDocChanged?.call();

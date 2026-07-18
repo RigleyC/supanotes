@@ -74,9 +74,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
           }
 
           try {
-            final nextDue = await onTaskComplete?.call(node.id);
-            if (nextDue != null && isRecurring) {
-              onRecurringTaskComplete?.call(node.id, nextDue);
+            await onTaskComplete?.call(node.id);
+            if (isRecurring) {
               await Future.delayed(const Duration(seconds: 1));
             }
           } finally {

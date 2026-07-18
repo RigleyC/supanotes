@@ -10,11 +10,9 @@ import 'package:flutter/services.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
@@ -24,7 +22,6 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_pr
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
-import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -182,13 +179,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       },
                 onTaskComplete: (taskId) =>
                     TaskSnackBarHelper.completeTaskWithFeedback(
-                      onComplete: () => ref
-                          .read(tasksRepositoryProvider)
-                          .completeTask(taskId),
+                      onComplete: () async {
+                        final controller = ref.read(
+                          noteEditorControllerProvider(widget.noteId),
+                        );
+                        return controller.completeTaskInYDoc(taskId)!;
+                      },
                       onUndo: (previousDue, previousHasTime) {
                         final controller = ref.read(
                           noteEditorControllerProvider(widget.noteId),
                         );
+                        controller.reopenTaskInYDoc(taskId, previousDue: previousDue);
                         if (previousDue != null) {
                           controller.updateTaskMetadataInYDoc(
                             taskId,
@@ -196,24 +197,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             hasTime: previousHasTime,
                           );
                         }
-                        controller.editor?.execute([
-                          ChangeTaskCompletionRequest(
-                            nodeId: taskId,
-                            isComplete: false,
-                          ),
-                        ]);
-                        ref
-                            .read(appDatabaseProvider)
-                            .taskCompletionsDao
-                            .undoLastCompletion(taskId);
                       },
                     ),
-                onTaskReopen: (taskId) =>
-                    ref.read(tasksRepositoryProvider).reopenTask(taskId),
-                onRecurringTaskComplete: (taskId, nextDue) {
-                  ref
-                      .read(noteEditorControllerProvider(widget.noteId))
-                      .completeRecurringTask(taskId, nextDue);
+                onTaskReopen: (taskId) async {
+                  final controller = ref.read(
+                    noteEditorControllerProvider(widget.noteId),
+                  );
+                  controller.reopenTaskInYDoc(taskId);
                 },
               ),
             );

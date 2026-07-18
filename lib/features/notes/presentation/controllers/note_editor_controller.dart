@@ -9,7 +9,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
-
+import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/node_codec.dart';
 import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
@@ -76,8 +76,12 @@ class NoteEditorController extends ChangeNotifier {
     onHasContentChanged?.call(document != null && document!.isNotEmpty);
   }
 
-  void completeRecurringTask(String nodeId, DateTime nextDue) {
-    _bridge?.completeRecurringTask(nodeId, nextDue);
+  TaskCompletionResult? completeTaskInYDoc(String nodeId, {DateTime? now}) {
+    return _bridge?.completeTaskInYDoc(nodeId, now: now);
+  }
+
+  void reopenTaskInYDoc(String nodeId, {DateTime? previousDue}) {
+    _bridge?.reopenTaskInYDoc(nodeId, previousDue: previousDue);
   }
 
   void updateTaskMetadataInYDoc(

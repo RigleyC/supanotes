@@ -110,11 +110,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       onTaskComplete: widget.delegate.onTaskComplete,
       onTaskReopen: widget.delegate.onTaskReopen,
       onRecurringTaskComplete: (taskId, nextDue) {
-        controller.completeRecurringTask(taskId, nextDue);
-        widget.delegate.onRecurringTaskComplete?.call(
-          taskId,
-          nextDue,
-        );
+        controller.completeTaskInYDoc(taskId, now: nextDue);
       },
     );
 
