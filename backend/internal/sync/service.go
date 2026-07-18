@@ -165,6 +165,47 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 		r = s.repo.WithQuerier(sqlcgen.New(tx))
 	}
 
+	// Batch upsert all contexts
+	{
+		var ids, userIDs []pgtype.UUID
+		var slugs, names []string
+		var createdAts []pgtype.Timestamptz
+		for _, c := range payload.Contexts {
+			ids = append(ids, c.ID)
+			userIDs = append(userIDs, userID)
+			slugs = append(slugs, c.Slug)
+			names = append(names, c.Name)
+			createdAts = append(createdAts, c.CreatedAt)
+		}
+		if len(ids) > 0 {
+			if err := r.UpsertContextsBatch(ctx, sqlcgen.UpsertContextsBatchParams{
+				Column1: ids, Column2: userIDs, Column3: slugs, Column4: names, Column5: createdAts,
+			}); err != nil {
+				return fmt.Errorf("batch upsert contexts: %w", err)
+			}
+		}
+	}
+
+	// Batch upsert all tags
+	{
+		var ids, userIDs []pgtype.UUID
+		var names []string
+		var createdAts []pgtype.Timestamptz
+		for _, t := range payload.Tags {
+			ids = append(ids, t.ID)
+			userIDs = append(userIDs, userID)
+			names = append(names, t.Name)
+			createdAts = append(createdAts, t.CreatedAt)
+		}
+		if len(ids) > 0 {
+			if err := r.UpsertTagsBatch(ctx, sqlcgen.UpsertTagsBatchParams{
+				Column1: ids, Column2: userIDs, Column3: names, Column4: createdAts,
+			}); err != nil {
+				return fmt.Errorf("batch upsert tags: %w", err)
+			}
+		}
+	}
+
 	// Batch upsert all notes
 	{
 		var ids, userIDs, contextIDs []pgtype.UUID
@@ -258,47 +299,6 @@ func (s *service) Push(ctx context.Context, userID pgtype.UUID, payload *SyncPay
 			if err := s.ydoc.ApplyNodeMutation(ctx, ys.NoteID, ys.State); err != nil {
 				slog.Error("sync push: ApplyNodeMutation failed", "note_id", ys.NoteID, "error", err)
 				return err
-			}
-		}
-	}
-
-	// Batch upsert all contexts
-	{
-		var ids, userIDs []pgtype.UUID
-		var slugs, names []string
-		var createdAts []pgtype.Timestamptz
-		for _, c := range payload.Contexts {
-			ids = append(ids, c.ID)
-			userIDs = append(userIDs, userID)
-			slugs = append(slugs, c.Slug)
-			names = append(names, c.Name)
-			createdAts = append(createdAts, c.CreatedAt)
-		}
-		if len(ids) > 0 {
-			if err := r.UpsertContextsBatch(ctx, sqlcgen.UpsertContextsBatchParams{
-				Column1: ids, Column2: userIDs, Column3: slugs, Column4: names, Column5: createdAts,
-			}); err != nil {
-				return fmt.Errorf("batch upsert contexts: %w", err)
-			}
-		}
-	}
-
-	// Batch upsert all tags
-	{
-		var ids, userIDs []pgtype.UUID
-		var names []string
-		var createdAts []pgtype.Timestamptz
-		for _, t := range payload.Tags {
-			ids = append(ids, t.ID)
-			userIDs = append(userIDs, userID)
-			names = append(names, t.Name)
-			createdAts = append(createdAts, t.CreatedAt)
-		}
-		if len(ids) > 0 {
-			if err := r.UpsertTagsBatch(ctx, sqlcgen.UpsertTagsBatchParams{
-				Column1: ids, Column2: userIDs, Column3: names, Column4: createdAts,
-			}); err != nil {
-				return fmt.Errorf("batch upsert tags: %w", err)
 			}
 		}
 	}
