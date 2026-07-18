@@ -72,15 +72,13 @@ class TaskNotificationScheduler extends Notifier<Map<String, DateTime>> {
     for (final task in tasks) {
       final due = task.dueDate;
       if (due == null) continue;
-      
-      final scheduledDate = task.hasTime
-          ? due
-          : DateTime(due.year, due.month, due.day, 9, 0);
 
-      if (scheduledDate.isAfter(now)) {
-        newSchedule[task.id] = scheduledDate;
+      final notificationTime = _computeNotificationTime(due, task.hasTime, task.reminder);
+
+      if (notificationTime.isAfter(now)) {
+        newSchedule[task.id] = notificationTime;
       } else {
-        dev.log('[Scheduler] Task "${task.title}" SKIPPED — scheduledDate $scheduledDate is in the past (now=$now)');
+        dev.log('[Scheduler] Task "${task.title}" SKIPPED — notificationTime $notificationTime is in the past (now=$now)');
       }
     }
 
@@ -107,5 +105,31 @@ class TaskNotificationScheduler extends Notifier<Map<String, DateTime>> {
 
     dev.log('[Scheduler] Done. Scheduled: ${newSchedule.length} notifications');
     state = newSchedule;
+  }
+
+  DateTime _computeNotificationTime(DateTime due, bool hasTime, String? reminder) {
+    final base = hasTime ? due : DateTime(due.year, due.month, due.day, 9, 0);
+
+    if (reminder == null || reminder == 'at_time') return base;
+
+    switch (reminder) {
+      case '5m_before':
+        return base.subtract(const Duration(minutes: 5));
+      case '1h_before':
+        return base.subtract(const Duration(hours: 1));
+      case '1d_before':
+        return base.subtract(const Duration(days: 1));
+      case '9am':
+        return DateTime(due.year, due.month, due.day, 9, 0);
+      case '12pm':
+        return DateTime(due.year, due.month, due.day, 12, 0);
+      case '6pm':
+        return DateTime(due.year, due.month, due.day, 18, 0);
+      case '1d_before_9am':
+        final dayBefore = due.subtract(const Duration(days: 1));
+        return DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 9, 0);
+      default:
+        return base;
+    }
   }
 }

@@ -536,6 +536,7 @@ class SyncService {
         );
         await _yjsMgr.projectState(remoteState.noteId, mergedState);
         _yjsMgr.evictDoc(remoteState.noteId);
+        _lastYjsSyncAt[remoteState.noteId] = DateTime.now();
       } catch (e, _) {
         debugPrint('[SyncService] pull: merge failed for ${remoteState.noteId}, falling back to remote: $e');
         await _db.into(_db.localYjsStates).insertOnConflictUpdate(
@@ -547,6 +548,7 @@ class SyncService {
         );
         await _yjsMgr.projectState(remoteState.noteId, remoteState.state);
         _yjsMgr.evictDoc(remoteState.noteId);
+        _lastYjsSyncAt[remoteState.noteId] = DateTime.now();
       }
     }
 

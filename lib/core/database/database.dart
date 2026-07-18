@@ -74,7 +74,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -156,6 +156,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 17) {
         await m.addColumn(tasks, tasks.hasTime);
+      }
+      if (from < 18) {
+        await m.addColumn(tasks, tasks.reminder);
       }
     },
     beforeOpen: (details) async {

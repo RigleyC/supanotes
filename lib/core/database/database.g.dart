@@ -986,6 +986,17 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _reminderMeta = const VerificationMeta(
+    'reminder',
+  );
+  @override
+  late final GeneratedColumn<String> reminder = GeneratedColumn<String>(
+    'reminder',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _completedAtMeta = const VerificationMeta(
     'completedAt',
   );
@@ -1041,6 +1052,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     recurrence,
     dueDate,
     hasTime,
+    reminder,
     completedAt,
     createdAt,
     updatedAt,
@@ -1111,6 +1123,12 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
       context.handle(
         _hasTimeMeta,
         hasTime.isAcceptableOrUnknown(data['has_time']!, _hasTimeMeta),
+      );
+    }
+    if (data.containsKey('reminder')) {
+      context.handle(
+        _reminderMeta,
+        reminder.isAcceptableOrUnknown(data['reminder']!, _reminderMeta),
       );
     }
     if (data.containsKey('completed_at')) {
@@ -1191,6 +1209,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         DriftSqlType.bool,
         data['${effectivePrefix}has_time'],
       )!,
+      reminder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reminder'],
+      ),
       completedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}completed_at'],
@@ -1231,6 +1253,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final TaskRecurrence? recurrence;
   final DateTime? dueDate;
   final bool hasTime;
+  final String? reminder;
   final DateTime? completedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -1245,6 +1268,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     this.recurrence,
     this.dueDate,
     required this.hasTime,
+    this.reminder,
     this.completedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -1268,6 +1292,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       map['due_date'] = Variable<DateTime>(dueDate);
     }
     map['has_time'] = Variable<bool>(hasTime);
+    if (!nullToAbsent || reminder != null) {
+      map['reminder'] = Variable<String>(reminder);
+    }
     if (!nullToAbsent || completedAt != null) {
       map['completed_at'] = Variable<DateTime>(completedAt);
     }
@@ -1294,6 +1321,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ? const Value.absent()
           : Value(dueDate),
       hasTime: Value(hasTime),
+      reminder: reminder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminder),
       completedAt: completedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(completedAt),
@@ -1322,6 +1352,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       ),
       dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
       hasTime: serializer.fromJson<bool>(json['hasTime']),
+      reminder: serializer.fromJson<String?>(json['reminder']),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1343,6 +1374,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       ),
       'dueDate': serializer.toJson<DateTime?>(dueDate),
       'hasTime': serializer.toJson<bool>(hasTime),
+      'reminder': serializer.toJson<String?>(reminder),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1360,6 +1392,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     Value<TaskRecurrence?> recurrence = const Value.absent(),
     Value<DateTime?> dueDate = const Value.absent(),
     bool? hasTime,
+    Value<String?> reminder = const Value.absent(),
     Value<DateTime?> completedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -1374,6 +1407,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     recurrence: recurrence.present ? recurrence.value : this.recurrence,
     dueDate: dueDate.present ? dueDate.value : this.dueDate,
     hasTime: hasTime ?? this.hasTime,
+    reminder: reminder.present ? reminder.value : this.reminder,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -1392,6 +1426,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           : this.recurrence,
       dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
       hasTime: data.hasTime.present ? data.hasTime.value : this.hasTime,
+      reminder: data.reminder.present ? data.reminder.value : this.reminder,
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
@@ -1413,6 +1448,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ..write('recurrence: $recurrence, ')
           ..write('dueDate: $dueDate, ')
           ..write('hasTime: $hasTime, ')
+          ..write('reminder: $reminder, ')
           ..write('completedAt: $completedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -1432,6 +1468,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     recurrence,
     dueDate,
     hasTime,
+    reminder,
     completedAt,
     createdAt,
     updatedAt,
@@ -1450,6 +1487,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           other.recurrence == this.recurrence &&
           other.dueDate == this.dueDate &&
           other.hasTime == this.hasTime &&
+          other.reminder == this.reminder &&
           other.completedAt == this.completedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -1466,6 +1504,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<TaskRecurrence?> recurrence;
   final Value<DateTime?> dueDate;
   final Value<bool> hasTime;
+  final Value<String?> reminder;
   final Value<DateTime?> completedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -1481,6 +1520,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.recurrence = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.hasTime = const Value.absent(),
+    this.reminder = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1497,6 +1537,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.recurrence = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.hasTime = const Value.absent(),
+    this.reminder = const Value.absent(),
     this.completedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -1519,6 +1560,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<String>? recurrence,
     Expression<DateTime>? dueDate,
     Expression<bool>? hasTime,
+    Expression<String>? reminder,
     Expression<DateTime>? completedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1535,6 +1577,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       if (recurrence != null) 'recurrence': recurrence,
       if (dueDate != null) 'due_date': dueDate,
       if (hasTime != null) 'has_time': hasTime,
+      if (reminder != null) 'reminder': reminder,
       if (completedAt != null) 'completed_at': completedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1553,6 +1596,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Value<TaskRecurrence?>? recurrence,
     Value<DateTime?>? dueDate,
     Value<bool>? hasTime,
+    Value<String?>? reminder,
     Value<DateTime?>? completedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -1569,6 +1613,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       recurrence: recurrence ?? this.recurrence,
       dueDate: dueDate ?? this.dueDate,
       hasTime: hasTime ?? this.hasTime,
+      reminder: reminder ?? this.reminder,
       completedAt: completedAt ?? this.completedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1609,6 +1654,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     if (hasTime.present) {
       map['has_time'] = Variable<bool>(hasTime.value);
     }
+    if (reminder.present) {
+      map['reminder'] = Variable<String>(reminder.value);
+    }
     if (completedAt.present) {
       map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
@@ -1639,6 +1687,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
           ..write('recurrence: $recurrence, ')
           ..write('dueDate: $dueDate, ')
           ..write('hasTime: $hasTime, ')
+          ..write('reminder: $reminder, ')
           ..write('completedAt: $completedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -5664,6 +5713,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       Value<TaskRecurrence?> recurrence,
       Value<DateTime?> dueDate,
       Value<bool> hasTime,
+      Value<String?> reminder,
       Value<DateTime?> completedAt,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -5681,6 +5731,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<TaskRecurrence?> recurrence,
       Value<DateTime?> dueDate,
       Value<bool> hasTime,
+      Value<String?> reminder,
       Value<DateTime?> completedAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -5739,6 +5790,11 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<bool> get hasTime => $composableBuilder(
     column: $table.hasTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reminder => $composableBuilder(
+    column: $table.reminder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5817,6 +5873,11 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get reminder => $composableBuilder(
+    column: $table.reminder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
     builder: (column) => ColumnOrderings(column),
@@ -5877,6 +5938,9 @@ class $$TasksTableAnnotationComposer
   GeneratedColumn<bool> get hasTime =>
       $composableBuilder(column: $table.hasTime, builder: (column) => column);
 
+  GeneratedColumn<String> get reminder =>
+      $composableBuilder(column: $table.reminder, builder: (column) => column);
+
   GeneratedColumn<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
     builder: (column) => column,
@@ -5929,6 +5993,7 @@ class $$TasksTableTableManager
                 Value<TaskRecurrence?> recurrence = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<bool> hasTime = const Value.absent(),
+                Value<String?> reminder = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -5944,6 +6009,7 @@ class $$TasksTableTableManager
                 recurrence: recurrence,
                 dueDate: dueDate,
                 hasTime: hasTime,
+                reminder: reminder,
                 completedAt: completedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -5961,6 +6027,7 @@ class $$TasksTableTableManager
                 Value<TaskRecurrence?> recurrence = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<bool> hasTime = const Value.absent(),
+                Value<String?> reminder = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -5976,6 +6043,7 @@ class $$TasksTableTableManager
                 recurrence: recurrence,
                 dueDate: dueDate,
                 hasTime: hasTime,
+                reminder: reminder,
                 completedAt: completedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

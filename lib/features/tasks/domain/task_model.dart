@@ -24,6 +24,7 @@ class TaskModel {
     required this.hasTime,
     required this.completedAt,
     required this.recurrence,
+    required this.reminder,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -38,6 +39,7 @@ class TaskModel {
   final bool hasTime;
   final DateTime? completedAt;
   final TaskRecurrence? recurrence;
+  final String? reminder;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -55,6 +57,7 @@ class TaskModel {
       hasTime: d.hasTime,
       completedAt: d.completedAt,
       recurrence: d.recurrence,
+      reminder: d.reminder,
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
     );

@@ -14,6 +14,7 @@ class Tasks extends Table {
       text().map(const EnumNameConverter(TaskRecurrence.values)).nullable()();
   DateTimeColumn get dueDate => dateTime().nullable()();
   BoolColumn get hasTime => boolean().withDefault(const Constant(false))();
+  TextColumn get reminder => text().nullable()();
   DateTimeColumn get completedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

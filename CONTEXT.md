@@ -16,6 +16,10 @@ _Avoid_: Yjs state, CRDT, document state
 A node within a note that has a checkbox and optional metadata (due date with optional time, recurrence). Not an independent entity — it exists only inside a note.
 _Avoid_: Todo, action item, checklist item
 
+**Reminder**:
+A user-defined rule that specifies when they should receive a notification for a task (e.g., "at task time", "5 mins before", "9AM"). Reminders are relative to the task's due date.
+_Avoid_: Notification rule, alert time
+
 **Task Completion**:
 An event record created when a task transitions to completed. Derived by the server projection from YDoc changes, never written directly by the client.
 _Avoid_: Completion log, history entry

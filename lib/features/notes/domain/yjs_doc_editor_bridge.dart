@@ -247,6 +247,8 @@ class YjsDocEditorBridge {
     bool clearDueDate = false,
     bool clearRecurrence = false,
     bool? hasTime,
+    String? reminder,
+    bool clearReminder = false,
   }) {
     _doc.transact((txn) {
       final nodesMap = _doc.getMap<Object>('nodes')!;
@@ -267,6 +269,12 @@ class YjsDocEditorBridge {
         nodesMap.delete('$nodeId:recurrence');
       } else if (recurrence != null) {
         nodesMap.set('$nodeId:recurrence', recurrence);
+      }
+
+      if (clearReminder) {
+        nodesMap.delete('$nodeId:reminder');
+      } else if (reminder != null) {
+        nodesMap.set('$nodeId:reminder', reminder);
       }
     });
 

@@ -16,7 +16,7 @@ final isGridViewProvider = Provider.autoDispose<bool>((ref) {
 /// Orchestrates preference mutations with optimistic local updates and
 /// automatic rollback on server failure.
 final preferencesControllerProvider =
-    NotifierProvider.autoDispose<PreferencesController, void>(
+    NotifierProvider<PreferencesController, void>(
       PreferencesController.new,
     );
 

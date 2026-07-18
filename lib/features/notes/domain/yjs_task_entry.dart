@@ -8,6 +8,7 @@ class YjsTaskEntry {
   final bool? hasTime;
   final String? recurrence;
   final String? lastCompletedAt;
+  final String? reminder;
 
   const YjsTaskEntry({
     required this.nodeId,
@@ -17,6 +18,7 @@ class YjsTaskEntry {
     this.hasTime,
     this.recurrence,
     this.lastCompletedAt,
+    this.reminder,
   });
 
   factory YjsTaskEntry.fromJson(Map<String, dynamic> json) {
@@ -28,6 +30,7 @@ class YjsTaskEntry {
       hasTime: json['hasTime'] as bool?,
       recurrence: json['recurrence'] as String?,
       lastCompletedAt: json['lastCompletedAt'] as String?,
+      reminder: json['reminder'] as String?,
     );
   }
 
@@ -38,6 +41,7 @@ class YjsTaskEntry {
     if (hasTime != null) map['hasTime'] = hasTime;
     if (recurrence != null) map['recurrence'] = recurrence;
     if (lastCompletedAt != null) map['lastCompletedAt'] = lastCompletedAt;
+    if (reminder != null) map['reminder'] = reminder;
     return map;
   }
 
@@ -49,6 +53,7 @@ class YjsTaskEntry {
     bool? hasTime,
     String? recurrence,
     String? lastCompletedAt,
+    String? reminder,
   }) {
     return YjsTaskEntry(
       nodeId: nodeId ?? this.nodeId,
@@ -58,6 +63,7 @@ class YjsTaskEntry {
       hasTime: hasTime ?? this.hasTime,
       recurrence: recurrence ?? this.recurrence,
       lastCompletedAt: lastCompletedAt ?? this.lastCompletedAt,
+      reminder: reminder ?? this.reminder,
     );
   }
 
@@ -81,9 +87,12 @@ class YjsTaskEntry {
         other.dueDate == dueDate &&
         other.hasTime == hasTime &&
         other.recurrence == recurrence &&
-        other.lastCompletedAt == lastCompletedAt;
+        other.lastCompletedAt == lastCompletedAt &&
+        other.reminder == reminder;
   }
 
   @override
-  int get hashCode => Object.hash(nodeId, title, dueDate, hasTime, recurrence, lastCompletedAt);
+  int get hashCode => Object.hash(
+    nodeId, title, dueDate, hasTime, recurrence, lastCompletedAt, reminder,
+  );
 }

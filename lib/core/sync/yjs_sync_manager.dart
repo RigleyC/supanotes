@@ -91,7 +91,7 @@ class YjsSyncManager {
     final previousDoc = _docs[noteId];
     _docs[noteId] = doc;
     try {
-      await projectNodes(noteId);
+      await projectNodes(noteId, markDirty: false);
     } finally {
       if (previousDoc != null) {
         _docs[noteId] = previousDoc;
@@ -105,7 +105,7 @@ class YjsSyncManager {
   /// Projects task nodes to the tasks table and derives the note's
   /// content/excerpt so list views reflect edits without waiting for a
   /// sync round-trip.
-  Future<void> projectNodes(String noteId) async {
+  Future<void> projectNodes(String noteId, {bool markDirty = true}) async {
     final doc = _docs[noteId];
     if (doc == null) return;
 
@@ -124,6 +124,7 @@ class YjsSyncManager {
       String? dueDate;
       bool hasTime = false;
       String? recurrence;
+      String? reminder;
 
       if (raw is YMap) {
         type = raw.get('type') as String? ?? '';
@@ -135,6 +136,7 @@ class YjsSyncManager {
         dueDate = (nodesMap.get('$nodeId:dueDate') as String?) ?? (raw.get('dueDate') as String?);
         hasTime = nodesMap.get('$nodeId:hasTime') == true || raw.get('hasTime') == true;
         recurrence = (nodesMap.get('$nodeId:recurrence') as String?) ?? (raw.get('recurrence') as String?);
+        reminder = (nodesMap.get('$nodeId:reminder') as String?) ?? (raw.get('reminder') as String?);
       } else {
         continue;
       }
@@ -167,6 +169,7 @@ class YjsSyncManager {
         dueDate: Value(resolvedDueDate),
         hasTime: Value(hasTime),
         recurrence: Value(resolvedRecurrence),
+        reminder: Value(reminder),
         createdAt: now,
         updatedAt: now,
       ));
@@ -178,14 +181,15 @@ class YjsSyncManager {
     final now = DateTime.now();
 
     await _db.transaction(() async {
+      final companion = NotesCompanion(
+        id: Value(noteId),
+        content: Value(content),
+        excerpt: Value(excerpt),
+        updatedAt: Value(now),
+      );
+      
       await _db.notesDao.updateNote(
-        NotesCompanion(
-          id: Value(noteId),
-          content: Value(content),
-          excerpt: Value(excerpt),
-          updatedAt: Value(now),
-          isDirty: const Value(true),
-        ),
+        markDirty ? companion.copyWith(isDirty: const Value(true)) : companion,
       );
 
       for (final task in tasks) {

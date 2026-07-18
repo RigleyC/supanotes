@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_spacing.dart';
 
 /// A full-width, tappable tile for list-based single-selection UIs.
 ///

@@ -7,11 +7,13 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_pr
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 import '../controllers/task_metadata_controller.dart';
 import 'task_metadata_date_page.dart';
 import 'task_metadata_recurrence_page.dart';
+import 'task_metadata_reminder_page.dart';
 import 'task_metadata_time_page.dart';
 
 Future<void> showTaskMetadataSheet({
@@ -44,6 +46,8 @@ Future<void> showTaskMetadataSheet({
         recurrence: state.recurrence?.name,
         clearRecurrence: state.recurrence == null,
         hasTime: state.hasTime,
+        reminder: state.reminder?.yjsValue,
+        clearReminder: state.reminder == null,
       );
 }
 
@@ -122,6 +126,21 @@ class _TaskMetadataSheetBodyState extends ConsumerState<TaskMetadataSheetBody> {
             onClear: ref
                 .read(taskMetadataControllerProvider.notifier)
                 .clearRecurrence,
+          ),
+          _ReminderTile(
+            reminder: ctrl.reminder,
+            onTap: () => FamilyModalSheet.of(context).pushPage(
+              TaskMetadataReminderPage(
+                selected: ctrl.reminder,
+                hasTime: ctrl.hasTime,
+                onSelected: ref
+                    .read(taskMetadataControllerProvider.notifier)
+                    .setReminder,
+              ),
+            ),
+            onClear: () => ref
+                .read(taskMetadataControllerProvider.notifier)
+                .setReminder(null),
           ),
         ],
       ),
@@ -238,6 +257,39 @@ class _RecurrenceTile extends StatelessWidget {
         style: Theme.of(context).textTheme.bodyMedium,
       ),
       trailing: recurrence != null
+          ? IconButton(
+              icon: const Icon(Icons.close_rounded, size: 20),
+              onPressed: onClear,
+            )
+          : null,
+      onTap: onTap,
+    );
+  }
+}
+
+class _ReminderTile extends StatelessWidget {
+  const _ReminderTile({
+    required this.reminder,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final TaskReminderOption? reminder;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      tileColor: Colors.transparent,
+      dense: true,
+      leading: const Icon(Icons.notifications_outlined, size: 20),
+      title: Text(
+        reminder?.label ?? 'Adicionar lembrete',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      trailing: reminder != null
           ? IconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
               onPressed: onClear,

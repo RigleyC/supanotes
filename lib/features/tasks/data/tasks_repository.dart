@@ -150,6 +150,7 @@ class TasksRepository implements ITasksRepository {
       completedAt: null,
       recurrence: recurrence,
       hasTime: false,
+      reminder: null,
       createdAt: DateTime.now().toUtc(),
       updatedAt: DateTime.now().toUtc(),
     );

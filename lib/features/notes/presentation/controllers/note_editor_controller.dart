@@ -87,6 +87,8 @@ class NoteEditorController extends ChangeNotifier {
     bool clearDueDate = false,
     bool clearRecurrence = false,
     bool? hasTime,
+    String? reminder,
+    bool clearReminder = false,
   }) {
     _bridge?.updateTaskMetadataInYDoc(
       nodeId,
@@ -95,6 +97,8 @@ class NoteEditorController extends ChangeNotifier {
       clearDueDate: clearDueDate,
       clearRecurrence: clearRecurrence,
       hasTime: hasTime,
+      reminder: reminder,
+      clearReminder: clearReminder,
     );
   }
 
