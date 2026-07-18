@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 // SyncPayload is the wire shape for both push (client → server) and
@@ -107,36 +108,20 @@ func (s *service) Pull(ctx context.Context, userID pgtype.UUID, lastSyncedAt pgt
 		prefs[i] = toUserNotePreferencePayload(p)
 	}
 
-	yjsStateRows, err := s.pool.Query(ctx, `
-		SELECT ns.note_id::text, ns.state, ns.updated_at
-		FROM note_yjs_states ns
-		JOIN notes n ON n.id = ns.note_id
-		LEFT JOIN note_shares nsh ON nsh.note_id = n.id AND nsh.user_id = $1
-		WHERE (n.user_id = $1 OR nsh.user_id = $1)
-		AND ($2::timestamptz IS NULL OR ns.updated_at > $2)
-		ORDER BY ns.updated_at ASC
-		LIMIT $3
-	`, userID, lastSyncedAt, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer yjsStateRows.Close()
-
-	var yjsStates []NoteYjsStatePayload
-	for yjsStateRows.Next() {
-		var ys NoteYjsStatePayload
-		var updatedAt pgtype.Timestamptz
-		if err := yjsStateRows.Scan(&ys.NoteID, &ys.State, &updatedAt); err != nil {
-			return nil, err
+	yjsStates := make([]NoteYjsStatePayload, 0, len(notes))
+	for _, n := range notes {
+		stateBytes, err := LoadYDocState(ctx, s.pool, uid.UUIDToString(n.ID))
+		if err != nil {
+			slog.Error("Pull: failed to load ydoc state", "note_id", uid.UUIDToString(n.ID), "error", err)
+			continue
 		}
-		ys.UpdatedAt = updatedAt.Time
-		yjsStates = append(yjsStates, ys)
-	}
-	if err := yjsStateRows.Err(); err != nil {
-		return nil, err
-	}
-	if yjsStates == nil {
-		yjsStates = make([]NoteYjsStatePayload, 0)
+		if len(stateBytes) > 0 {
+			yjsStates = append(yjsStates, NoteYjsStatePayload{
+				NoteID:    uid.UUIDToString(n.ID),
+				State:     stateBytes,
+				UpdatedAt: n.UpdatedAt.Time,
+			})
+		}
 	}
 
 	return &SyncPayload{

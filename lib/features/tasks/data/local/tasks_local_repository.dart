@@ -74,7 +74,7 @@ class TasksLocalRepository {
     await _dao.updateTask(companion);
   }
 
-  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id) async {
+  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id) async {
     return await _dao.completeTask(id);
   }
 

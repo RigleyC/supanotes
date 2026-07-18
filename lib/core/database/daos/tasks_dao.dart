@@ -187,11 +187,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   ///
   /// Returns the next due date for recurring tasks, or null for
   /// non-recurring tasks.
-  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id) async {
+  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id) async {
     final task = await (select(
       tasks,
     )..where((t) => t.id.equals(id))).getSingleOrNull();
-    if (task == null) return (nextDue: null, previousDue: null);
+    if (task == null) return (nextDue: null, previousDue: null, previousHasTime: false);
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -236,7 +236,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
               updatedAt: Value(now),
             ),
           );
-          return;
+          return (nextDue: nextDue, previousDue: previousDue, previousHasTime: task.hasTime);
         }
       }
 
@@ -250,7 +250,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       );
     });
 
-    return (nextDue: nextDue, previousDue: previousDue);
+    return (nextDue: nextDue, previousDue: previousDue, previousHasTime: task.hasTime);
   }
 
   /// Hard-deletes a task (used when the user removes a task from the

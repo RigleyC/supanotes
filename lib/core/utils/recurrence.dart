@@ -6,15 +6,15 @@ DateTime? nextDueDate({required DateTime from, required TaskRecurrence recurrenc
   DateTime? raw;
   switch (recurrence) {
     case TaskRecurrence.daily:
-      raw = from.add(const Duration(days: 1));
+      raw = _copyWith(from, day: from.day + 1);
     case TaskRecurrence.weekdays:
-      var day = from.add(const Duration(days: 1));
+      var day = _copyWith(from, day: from.day + 1);
       while (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
-        day = day.add(const Duration(days: 1));
+        day = _copyWith(day, day: day.day + 1);
       }
       raw = day;
     case TaskRecurrence.weekly:
-      raw = from.add(const Duration(days: 7));
+      raw = _copyWith(from, day: from.day + 7);
     case TaskRecurrence.monthly:
       final desiredMonth = from.month + 1;
       final overflow = desiredMonth > 12;
@@ -22,9 +22,39 @@ DateTime? nextDueDate({required DateTime from, required TaskRecurrence recurrenc
       final month = overflow ? 1 : desiredMonth;
       final lastDayOfTarget = DateTime(year, month + 1, 0).day;
       final day = from.day <= lastDayOfTarget ? from.day : lastDayOfTarget;
-      raw = DateTime(year, month, day);
+      raw = _copyWith(from, year: year, month: month, day: day);
   }
   return raw;
+}
+
+DateTime _copyWith(
+  DateTime date, {
+  int? year,
+  int? month,
+  int? day,
+}) {
+  if (date.isUtc) {
+    return DateTime.utc(
+      year ?? date.year,
+      month ?? date.month,
+      day ?? date.day,
+      date.hour,
+      date.minute,
+      date.second,
+      date.millisecond,
+      date.microsecond,
+    );
+  }
+  return DateTime(
+    year ?? date.year,
+    month ?? date.month,
+    day ?? date.day,
+    date.hour,
+    date.minute,
+    date.second,
+    date.millisecond,
+    date.microsecond,
+  );
 }
 
 /// Advances an overdue recurring [from] date forward to [today] by repeatedly

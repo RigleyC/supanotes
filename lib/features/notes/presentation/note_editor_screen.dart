@@ -185,7 +185,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       onComplete: () => ref
                           .read(tasksRepositoryProvider)
                           .completeTask(taskId),
-                      onUndo: (previousDue) {
+                      onUndo: (previousDue, previousHasTime) {
                         final controller = ref.read(
                           noteEditorControllerProvider(widget.noteId),
                         );
@@ -193,6 +193,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           controller.updateTaskMetadataInYDoc(
                             taskId,
                             dueDate: previousDue,
+                            hasTime: previousHasTime,
                           );
                         }
                         controller.editor?.execute([

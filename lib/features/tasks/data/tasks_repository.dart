@@ -29,7 +29,7 @@ abstract class ITasksRepository {
     TaskRecurrence? recurrence,
     String position = 'a0',
   });
-  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id);
+  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id);
   Future<void> reopenTask(String id, {DateTime? originalDueDate});
   Future<void> updateTask(
     String id, {
@@ -159,7 +159,7 @@ class TasksRepository implements ITasksRepository {
   /// task is recurring, schedules the next occurrence in the same
   /// transaction.
   @override
-  Future<({DateTime? nextDue, DateTime? previousDue})> completeTask(String id) => _local.completeTask(id);
+  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id) => _local.completeTask(id);
 
   /// Reverses a completion: clears `completedAt` and re-opens the task.
   @override

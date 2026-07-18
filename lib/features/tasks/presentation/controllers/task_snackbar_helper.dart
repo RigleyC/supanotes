@@ -4,8 +4,8 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class TaskSnackBarHelper {
   static Future<DateTime?> completeTaskWithFeedback({
-    required Future<({DateTime? nextDue, DateTime? previousDue})> Function() onComplete,
-    required void Function(DateTime? previousDue) onUndo,
+    required Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> Function() onComplete,
+    required void Function(DateTime? previousDue, bool previousHasTime) onUndo,
   }) async {
     debugPrint('[TaskSnackBarHelper] completeTaskWithFeedback CALLED');
     final result = await onComplete();
@@ -23,7 +23,7 @@ class TaskSnackBarHelper {
         label: 'Desfazer',
         onPressed: () {
           debugPrint('[TaskSnackBarHelper] onUndo PRESSED, previousDue=${result.previousDue}');
-          onUndo(result.previousDue);
+          onUndo(result.previousDue, result.previousHasTime);
         },
       ),
     );
