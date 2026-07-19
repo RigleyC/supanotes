@@ -48,11 +48,8 @@ void main() async {
     ),
   );
 
-  // Must be called after runApp so the Flutter engine has registered
-  // native plugins and method channels are ready.
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    container.read(localNotificationServiceProvider).requestPermissions();
-  });
+  // Permission is requested on first reminder intent by the notification
+  // scheduler, not at app startup.
 }
 
 class SupaNotesApp extends ConsumerWidget {

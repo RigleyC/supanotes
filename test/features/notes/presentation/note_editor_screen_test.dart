@@ -51,7 +51,7 @@ class _MockTasksRepository extends Mock implements ITasksRepository {}
 _MockTasksRepository _defaultMockTasksRepo() {
   final mock = _MockTasksRepository();
   when(() => mock.watchByNote(any())).thenAnswer((_) => Stream.value([]));
-  when(() => mock.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null));
+  when(() => mock.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null, previousHasTime: false));
   when(() => mock.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
   return mock;
 }
@@ -334,12 +334,13 @@ void main() {
           completedAt: null,
           recurrence: null,
           hasTime: false,
+          reminder: null,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
       ]),
     );
-    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null));
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null, previousHasTime: false));
     when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
 
     const noteContent = '# Test note\n\n- [ ] buy milk <!-- task:task-1 -->\n';
@@ -403,12 +404,13 @@ void main() {
           completedAt: DateTime.now(),
           recurrence: null,
           hasTime: false,
+          reminder: null,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         ),
       ]),
     );
-    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null));
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null, previousHasTime: false));
     when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
 
       const noteContent =

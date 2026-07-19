@@ -202,6 +202,9 @@ class SyncService {
     return inner;
   }
 
+  Uint8List? _lastLocalUpdate;
+  Uint8List? _lastServerUpdate;
+
   Future<void> _exchangeNote(String noteId) async {
     final doc = await _yjsMgr.loadDoc(noteId);
     final localState = await _getLocalState(noteId);
@@ -211,15 +214,22 @@ class SyncService {
     if (localUpdate.isEmpty) return;
 
     final stateVector = encodeStateVector(doc);
+    final svB64 = base64Encode(stateVector);
 
-    debugPrint('[SyncService] _exchangeNote: sending ${localUpdate.length} bytes for note $noteId');
+    // OPTIMIZATION: yjs ALWAYS includes the entire DeleteSet in encodeStateAsUpdate.
+    // If we have no new inserts, this will repeatedly generate the exact same DeleteSet bytes.
+    // We suppress the log spam if it's identical to the last polling tick.
+    final isIdenticalToLastLocal = _lastLocalUpdate != null && _listEquals(localUpdate, _lastLocalUpdate!);
+    if (!isIdenticalToLastLocal) {
+      debugPrint('[SyncService] _exchangeNote: sending ${localUpdate.length} bytes for note $noteId. SV length=${stateVector.length}, SV b64=$svB64, dbSV length=${sv?.length}');
+    }
 
     final response = await _api.post<List<int>>(
       '/sync/note/$noteId',
       data: Stream.fromIterable([localUpdate]),
       options: Options(
         headers: {
-          'X-State-Vector': base64Encode(stateVector),
+          'X-State-Vector': svB64,
         },
         contentType: 'application/octet-stream',
         responseType: ResponseType.bytes,
@@ -229,18 +239,35 @@ class SyncService {
     final responseData = response.data;
     if (responseData != null && responseData.isNotEmpty) {
       final serverUpdate = Uint8List.fromList(responseData);
-      applyUpdate(doc, serverUpdate);
-      debugPrint('[SyncService] _exchangeNote: applied ${serverUpdate.length} bytes from server for note $noteId');
+      
+      final isIdenticalToLastServer = _lastServerUpdate != null && _listEquals(serverUpdate, _lastServerUpdate!);
+      
+      // If the server just echoed back the exact same DeleteSet, we don't need to re-apply or re-persist it.
+      if (!isIdenticalToLastServer || !isIdenticalToLastLocal) {
+        applyUpdate(doc, serverUpdate);
+        debugPrint('[SyncService] _exchangeNote: applied ${serverUpdate.length} bytes from server for note $noteId');
+        
+        // Persist the new synced state vector ONLY after a successful exchange with new data.
+        await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
+      }
+      
+      _lastServerUpdate = serverUpdate;
     }
-
-    // Persist the new synced state vector ONLY after a successful exchange.
-    await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
+    _lastLocalUpdate = localUpdate;
 
     // Project remote changes to SQLite so list views reflect the update
     // even for background notes (not just the active editor).
     if (_activeNoteId != noteId) {
       await _yjsMgr.projectNodes(noteId, markDirty: false);
     }
+  }
+
+  bool _listEquals(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   Future<LocalYjsState?> _getLocalState(String noteId) async {

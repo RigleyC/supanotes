@@ -103,7 +103,12 @@ class YjsDocEditorBridge {
     }
     if (nodes.isNotEmpty) {
       nodes.sort((a, b) => a.position.compareTo(b.position));
-      _coordinator.updateNodesIncrementally(nodes);
+      _coordinator.suspendSync();
+      try {
+        _coordinator.updateNodesIncrementally(nodes);
+      } finally {
+        _coordinator.resumeSync();
+      }
     }
     _onDocChanged?.call(isRemote: true);
     dev.log('[YjsBridge] _applyChangedNodes: apply ${nodes.length} nodes elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');

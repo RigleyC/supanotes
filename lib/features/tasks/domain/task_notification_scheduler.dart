@@ -215,7 +215,7 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
       // Compute notification time for new or changed tasks
       final notificationTime = _computeNotificationTime(due, task.hasTime, task.reminder);
 
-      if (notificationTime.isAfter(now)) {
+      if (notificationTime != null && notificationTime.isAfter(now)) {
         newSchedule[task.id] = notificationTime;
         dev.log('[Scheduler] Scheduling notification id=${task.id} at $notificationTime');
         final body = formatDueDate(due, hasTime: task.hasTime);
@@ -295,10 +295,12 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     return authState.asData?.value?.id ?? '';
   }
 
-  DateTime _computeNotificationTime(DateTime due, bool hasTime, String? reminder) {
+  DateTime? _computeNotificationTime(DateTime due, bool hasTime, String? reminder) {
+    if (reminder == null) return null;
+
     final base = hasTime ? due : DateTime(due.year, due.month, due.day, 9, 0);
 
-    if (reminder == null || reminder == 'at_time') return base;
+    if (reminder == 'at_time') return base;
 
     switch (reminder) {
       case '5m_before':

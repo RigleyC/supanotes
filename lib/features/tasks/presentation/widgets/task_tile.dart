@@ -70,11 +70,13 @@ class TaskTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (task.dueDate != null || task.recurrence != null) ...[
+                    if (task.dueDate != null || task.recurrence != null || task.reminder != null) ...[
                       const SizedBox(height: AppSpacing.xs),
                       TaskMetadataBadges(
                         dueDate: task.dueDate,
                         recurrence: task.recurrence,
+                        hasReminder: task.reminder != null,
+                        hasTime: task.hasTime,
                         isCompleted: isCompleted,
                       ),
                     ],

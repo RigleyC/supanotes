@@ -24,9 +24,9 @@ void main() {
     await TaskSnackBarHelper.completeTaskWithFeedback(
       onComplete: () async {
         completed = true;
-        return (nextDue: null, previousDue: null);
+        return (nextDue: null, previousDue: null, previousHasTime: false);
       },
-      onUndo: (_) {},
+      onUndo: (_, __) {},
     );
 
     await tester.pump();
@@ -51,8 +51,8 @@ void main() {
     final nextDue = DateTime(2030, 3, 15);
 
     await TaskSnackBarHelper.completeTaskWithFeedback(
-      onComplete: () async => (nextDue: nextDue, previousDue: null),
-      onUndo: (_) {},
+      onComplete: () async => (nextDue: nextDue, previousDue: null, previousHasTime: false),
+      onUndo: (_, __) {},
     );
 
     await tester.pump();

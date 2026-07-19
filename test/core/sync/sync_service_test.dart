@@ -42,6 +42,10 @@ class FakeApiClient extends ApiClient {
     if (path == '/sync/pull') {
       return Response<T>(data: pullResponse as T, requestOptions: RequestOptions(path: path));
     }
+    if (path.startsWith('/sync/note/')) {
+      // Yjs delta exchange — return null (no server changes) for tests
+      return Response<T>(data: null, requestOptions: RequestOptions(path: path));
+    }
     throw UnimplementedError();
   }
 }

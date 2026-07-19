@@ -88,7 +88,7 @@ func main() {
 		log.Info().Strs("cors_origins", cfg.CORSOrigins).Msg("CORS enabled")
 	}
 
-	registerRoutes(e, cfg, pool, cronCtx)
+	ydocSvc := registerRoutes(e, cfg, pool, cronCtx)
 
 	go func() {
 		log.Info().Str("addr", cfg.Addr()).Str("env", cfg.Environment).Msg("supanotes backend starting")
@@ -106,6 +106,10 @@ func main() {
 	if err := e.Shutdown(shutdownCtx); err != nil {
 		log.Error().Err(err).Msg("graceful shutdown failed")
 		os.Exit(1)
+	}
+
+	if ydocSvc != nil {
+		ydocSvc.Close()
 	}
 
 	log.Info().Msg("server stopped cleanly")
@@ -153,7 +157,7 @@ func connectDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCtx context.Context) {
+func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCtx context.Context) *syncpkg.YDocService {
 	e.GET("/debug/goroutine", func(c echo.Context) error {
 		c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
 		c.Response().WriteHeader(http.StatusOK)
@@ -165,7 +169,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	if pool == nil {
 		log.Warn().Msg("skipping /auth routes (no DB)")
-		return
+		return nil
 	}
 
 	queries := sqlcgen.New(pool)
@@ -326,6 +330,10 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	routinesH := routines.NewHandler(routinesSvc)
 	routines.RegisterRoutes(protected, routinesH)
 
+	// Sync repository — declared here so it's available for both the
+	// REST sync handler and the push/pull sync endpoints below.
+	syncRepo := syncpkg.NewRepository(queries)
+
 	// REST sync handler (authorized)
 	protected.POST("/sync/note/:id", syncpkg.PostSyncHandler(ydocSvc, syncpkg.NewNoteAuthorizer(syncRepo)))
 
@@ -377,9 +385,10 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	api.POST("/gateway/telegram/webhook", gatewayH.Webhook)
 
 	// Sync (push/pull)
-	syncRepo := syncpkg.NewRepository(queries)
 	syncSvc := syncpkg.NewService(syncRepo, pool, ydocSvc)
 	syncH := syncpkg.NewHandler(syncSvc)
 	protected.POST("/sync/push", syncH.Push)
 	protected.POST("/sync/pull", syncH.Pull)
+
+	return ydocSvc
 }

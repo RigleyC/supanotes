@@ -8,10 +8,12 @@ class TaskMetadataTimePage extends StatefulWidget {
   const TaskMetadataTimePage({
     super.key,
     required this.currentDueDate,
+    required this.hasTime,
     required this.onSelected,
   });
 
   final DateTime currentDueDate;
+  final bool hasTime;
   final void Function(DateTime date, {required bool hasTime}) onSelected;
 
   @override
@@ -24,7 +26,18 @@ class _TaskMetadataTimePageState extends State<TaskMetadataTimePage> {
   @override
   void initState() {
     super.initState();
-    _selectedTime = widget.currentDueDate;
+    if (widget.hasTime) {
+      _selectedTime = widget.currentDueDate;
+    } else {
+      final now = DateTime.now();
+      _selectedTime = DateTime(
+        widget.currentDueDate.year,
+        widget.currentDueDate.month,
+        widget.currentDueDate.day,
+        now.hour,
+        now.minute,
+      );
+    }
   }
 
   @override

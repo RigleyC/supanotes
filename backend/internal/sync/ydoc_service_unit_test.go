@@ -3,7 +3,10 @@
 package sync
 
 import (
+	"fmt"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/reearth/ygo/crdt"
 	"github.com/stretchr/testify/assert"
@@ -45,4 +48,95 @@ func TestMergeYjsUpdates_Multiple(t *testing.T) {
 	merged, err := mergeYjsUpdates([][]byte{update1, update2})
 	require.NoError(t, err)
 	require.NotEmpty(t, merged)
+}
+
+func TestYDocServiceCloseIsIdempotent(t *testing.T) {
+	svc := NewYDocService(nil, nil, "test", WithMaxCachedDocs(10))
+	// First Close should cancel the context and wait for the goroutine.
+	svc.Close()
+	// Second Close must not panic — evictCancel on a cancelled context is safe.
+	svc.Close()
+}
+
+func TestYDocServiceEvictLRURemovesOldest(t *testing.T) {
+	svc := NewYDocService(nil, nil, "test", WithMaxCachedDocs(2))
+	defer svc.Close()
+
+	// Add 3 entries to the internal map.
+	svc.mu.Lock()
+	for i := 0; i < 3; i++ {
+		id := fmt.Sprintf("note-%d", i)
+		svc.notes[id] = &noteEntry{lastUsed: time.Now()}
+	}
+	svc.mu.Unlock()
+
+	svc.mu.Lock()
+	svc.evictLRU()
+	svc.mu.Unlock()
+
+	svc.mu.Lock()
+	assert.Equal(t, 2, len(svc.notes), "evictLRU must reduce cache to maxCachedDocs")
+	svc.mu.Unlock()
+}
+
+func TestYDocServiceEvictIdleRemovesStaleOnly(t *testing.T) {
+	svc := NewYDocService(nil, nil, "test", WithMaxCachedDocs(10), WithIdleTTL(100*time.Millisecond))
+	defer svc.Close()
+
+	svc.mu.Lock()
+	svc.notes["stale"] = &noteEntry{lastUsed: time.Now().Add(-1 * time.Hour)}
+	svc.notes["fresh"] = &noteEntry{lastUsed: time.Now()}
+	svc.mu.Unlock()
+
+	svc.mu.Lock()
+	svc.evictIdle()
+	svc.mu.Unlock()
+
+	svc.mu.Lock()
+	assert.Equal(t, 1, len(svc.notes), "only fresh entry should survive evictIdle")
+	_, exists := svc.notes["fresh"]
+	assert.True(t, exists, "fresh entry must still be in cache")
+	svc.mu.Unlock()
+}
+
+func TestYDocServiceLeaseProtectsFromEviction(t *testing.T) {
+	svc := NewYDocService(nil, nil, "test", WithMaxCachedDocs(1))
+	defer svc.Close()
+
+	now := time.Now()
+	svc.mu.Lock()
+	svc.notes["leased"] = &noteEntry{
+		lastUsed:   now.Add(-1 * time.Hour),
+		leaseCount: 1, // active lease prevents eviction
+	}
+	svc.notes["idle"] = &noteEntry{
+		lastUsed:   now.Add(-1 * time.Hour),
+		leaseCount: 0, // no lease — eligible for eviction
+	}
+	svc.mu.Unlock()
+
+	svc.mu.Lock()
+	svc.evictIdle()
+	svc.mu.Unlock()
+
+	svc.mu.Lock()
+	_, leasedExists := svc.notes["leased"]
+	assert.True(t, leasedExists, "leased entry must survive eviction")
+	_, idleExists := svc.notes["idle"]
+	assert.False(t, idleExists, "idle entry without lease must be evicted")
+	svc.mu.Unlock()
+}
+
+func TestYDocServiceAcquireReleaseLease(t *testing.T) {
+	svc := NewYDocService(nil, nil, "test", WithMaxCachedDocs(10))
+	defer svc.Close()
+
+	entry := &noteEntry{}
+	assert.Equal(t, int32(0), atomic.LoadInt32(&entry.leaseCount))
+
+	svc.acquireLease(entry)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&entry.leaseCount))
+
+	svc.releaseLease(entry)
+	assert.Equal(t, int32(0), atomic.LoadInt32(&entry.leaseCount))
 }

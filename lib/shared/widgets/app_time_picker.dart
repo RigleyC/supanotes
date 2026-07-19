@@ -7,12 +7,13 @@ import 'package:flutter/material.dart';
 /// [CupertinoPicker] modal sheet on iOS.
 Future<TimeOfDay?> showAppTimePicker({
   required BuildContext context,
-  required TimeOfDay initialTime,
+  TimeOfDay? initialTime,
 }) async {
+  final initial = initialTime ?? TimeOfDay.now();
   if (defaultTargetPlatform == TargetPlatform.iOS) {
-    return _showCupertinoTimePicker(context, initialTime);
+    return _showCupertinoTimePicker(context, initial);
   }
-  return showTimePicker(context: context, initialTime: initialTime);
+  return showTimePicker(context: context, initialTime: initial);
 }
 
 Future<TimeOfDay?> _showCupertinoTimePicker(

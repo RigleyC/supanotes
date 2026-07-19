@@ -243,6 +243,12 @@ func ProjectNoteContentFromYDoc(ctx context.Context, pool *pgxpool.Pool, noteID 
 	}
 	defer tx.Rollback(ctx)
 
+	// Serialize projections per note so two concurrent calls for the same note
+	// cannot race (e.g., debounce callback + handleNotification or scheduler).
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext('projection'))", noteID); err != nil {
+		return fmt.Errorf("advisory lock: %w", err)
+	}
+
 	q := sqlcgen.New(tx)
 
 	var defaultUserID pgtype.UUID

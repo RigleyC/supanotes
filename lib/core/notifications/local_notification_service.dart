@@ -80,4 +80,10 @@ class LocalNotificationService {
   Future<void> cancelAll() async {
     await _plugin.cancelAll();
   }
+
+  /// Returns the list of pending notification requests from the platform.
+  Future<List<PendingNotificationRequest>> getPendingNotificationRequests() async {
+    await initialize();
+    return await _plugin.pendingNotificationRequests();
+  }
 }

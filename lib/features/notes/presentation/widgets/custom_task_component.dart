@@ -292,11 +292,13 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                     underlines: widget.viewModel.createUnderlines(),
                   ),
                   if (widget.taskMetadata?.dueDate != null ||
-                      widget.taskMetadata?.recurrence != null) ...[
+                      widget.taskMetadata?.recurrence != null ||
+                      widget.taskMetadata?.reminder != null) ...[
                     const SizedBox(height: 4),
                     TaskMetadataBadges(
                       dueDate: widget.taskMetadata?.dueDate,
                       recurrence: widget.taskMetadata?.recurrence,
+                      hasReminder: widget.taskMetadata?.reminder != null,
                       hasTime: widget.taskMetadata?.hasTime ?? false,
                       isCompleted: _isComplete,
                     ),

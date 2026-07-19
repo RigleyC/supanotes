@@ -82,7 +82,7 @@ void main() {
       updatedAt: now,
     );
 
-    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: now.add(const Duration(days: 1)), previousDue: now));
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: now.add(const Duration(days: 1)), previousDue: now, previousHasTime: false));
     when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
 
     await tester.pumpWidget(
@@ -103,8 +103,8 @@ void main() {
               },
               delegate: NoteEditorDelegate(
                 onTaskComplete: (taskId) => TaskSnackBarHelper.completeTaskWithFeedback(
-                  onComplete: () => mockTasksRepo.completeTask(taskId),
-                  onUndo: (previousDue) => mockTasksRepo.reopenTask(taskId, originalDueDate: previousDue),
+                  onComplete: () async => (nextDue: task.dueDate, previousDue: task.dueDate, previousHasTime: task.hasTime),
+                  onUndo: (previousDue, _) => mockTasksRepo.reopenTask(taskId, originalDueDate: previousDue),
                 ),
                 onTaskReopen: (taskId) => mockTasksRepo.reopenTask(taskId),
               ),

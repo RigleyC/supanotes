@@ -192,14 +192,19 @@ class YjsSyncManager {
     final doc = _docs[noteId];
     if (doc == null) return;
     final state = encodeStateAsUpdate(doc);
-    await _db.into(_db.localYjsStates).insertOnConflictUpdate(
-      LocalYjsStatesCompanion(
-        noteId: Value(noteId),
-        state: Value(state),
-        syncedStateVector: Value(syncedStateVector),
-        updatedAt: Value(DateTime.now()),
-      ),
-    );
+    try {
+      await _db.into(_db.localYjsStates).insertOnConflictUpdate(
+        LocalYjsStatesCompanion(
+          noteId: Value(noteId),
+          state: Value(state),
+          syncedStateVector: Value(syncedStateVector),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+      dev.log('[YjsSyncManager] Persisted synced vector for note=$noteId', name: 'YjsSync');
+    } catch (e, stackTrace) {
+      dev.log('YjsSyncManager persistWithSyncedVector error: $e', name: 'YjsSync', error: e, stackTrace: stackTrace, level: 1000);
+    }
   }
 
   /// Merges remote Yjs states into local states and projects the result.

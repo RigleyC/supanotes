@@ -11,6 +11,7 @@ class TaskMetadataBadges extends StatelessWidget {
     super.key,
     this.dueDate,
     this.recurrence,
+    this.hasReminder = false,
     this.isCompleted = false,
     this.hasTime = false,
     this.now,
@@ -18,6 +19,7 @@ class TaskMetadataBadges extends StatelessWidget {
 
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
+  final bool hasReminder;
   final bool isCompleted;
   final bool hasTime;
   final DateTime? now;
@@ -27,7 +29,7 @@ class TaskMetadataBadges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasDueDate && !_hasRecurrence) {
+    if (!_hasDueDate && !_hasRecurrence && !hasReminder) {
       return const SizedBox.shrink();
     }
 
@@ -56,9 +58,16 @@ class TaskMetadataBadges extends StatelessWidget {
             label: recurrence!.shortLabel,
             color: scheme.onSurfaceVariant,
           ),
+        if (hasReminder)
+          Icon(
+            Icons.notifications_active_outlined,
+            size: 14,
+            color: scheme.onSurfaceVariant,
+          ),
       ],
     );
   }
+
   Color _dueDateColor(BuildContext context, DateTime dueDate) {
     if (isCompleted) {
       return Theme.of(context).colorScheme.onSurfaceVariant;

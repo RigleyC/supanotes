@@ -24,6 +24,7 @@ void main() {
       completedAt: null,
       recurrence: TaskRecurrence.daily,
       hasTime: false,
+      reminder: null,
       createdAt: now,
       updatedAt: now,
     );
@@ -35,7 +36,7 @@ void main() {
     );
   }
   testWidgets('renders metadata pickers for existing task', (tester) async {
-    await tester.pumpWidget(wrap(TaskMetadataSheet(noteId: 'note-1', task: task())));
+    await tester.pumpWidget(wrap(TaskMetadataSheetBody(noteId: 'note-1', taskId: task().id)));
     await tester.pumpAndSettle();
 
     expect(find.text('Data de vencimento'), findsOneWidget);
@@ -45,13 +46,13 @@ void main() {
   });
 
   testWidgets('does not show title input', (tester) async {
-    await tester.pumpWidget(wrap(TaskMetadataSheet(noteId: 'note-1', task: task())));
+    await tester.pumpWidget(wrap(TaskMetadataSheetBody(noteId: 'note-1', taskId: task().id)));
 
     expect(find.byType(TextFormField), findsNothing);
   });
 
   testWidgets('does not show delete button', (tester) async {
-    await tester.pumpWidget(wrap(TaskMetadataSheet(noteId: 'note-1', task: task())));
+    await tester.pumpWidget(wrap(TaskMetadataSheetBody(noteId: 'note-1', taskId: task().id)));
 
     expect(find.text('Excluir'), findsNothing);
   });
@@ -69,11 +70,12 @@ void main() {
       completedAt: null,
       recurrence: TaskRecurrence.weekly,
       hasTime: false,
+      reminder: null,
       createdAt: thursday,
       updatedAt: thursday,
     );
 
-    await tester.pumpWidget(wrap(TaskMetadataSheet(noteId: 'note-1', task: t)));
+    await tester.pumpWidget(wrap(TaskMetadataSheetBody(noteId: 'note-1', taskId: t.id)));
     await tester.pumpAndSettle();
 
     expect(find.text('Semanalmente (quinta-feira)'), findsOneWidget);
@@ -92,11 +94,12 @@ void main() {
       completedAt: null,
       recurrence: TaskRecurrence.monthly,
       hasTime: false,
+      reminder: null,
       createdAt: fifteenth,
       updatedAt: fifteenth,
     );
 
-    await tester.pumpWidget(wrap(TaskMetadataSheet(noteId: 'note-1', task: t)));
+    await tester.pumpWidget(wrap(TaskMetadataSheetBody(noteId: 'note-1', taskId: t.id)));
     await tester.pumpAndSettle();
 
     expect(find.text('Mensalmente (dia 15)'), findsOneWidget);

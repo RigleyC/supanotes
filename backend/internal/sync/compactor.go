@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -13,27 +14,51 @@ import (
 	"github.com/reearth/ygo/crdt"
 )
 
+// debounceState tracks the pending debounce timer for a single note.
+// seq is a monotonically increasing sequence number that lets the timer
+// callback verify it is still the current entry before deleting.
 type debounceState struct {
-	timer   *time.Timer
-	skipSeq int
+	timer *time.Timer
+	seq   uint64
 }
 
 type Compactor struct {
 	pool       *pgxpool.Pool
 	debounce   map[string]*debounceState
 	debounceMu sync.Mutex
+	nextSeq    atomic.Uint64
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func NewCompactor(pool *pgxpool.Pool) *Compactor {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Compactor{
 		pool:     pool,
 		debounce: make(map[string]*debounceState),
+		ctx:      ctx,
+		cancel:   cancel,
 	}
+}
+
+// Close stops all pending debounce timers and cancels the compactor context.
+// Idempotent — safe to call multiple times.
+func (c *Compactor) Close() error {
+	c.cancel()
+	c.debounceMu.Lock()
+	defer c.debounceMu.Unlock()
+	for _, st := range c.debounce {
+		if st.timer != nil {
+			st.timer.Stop()
+		}
+	}
+	c.debounce = make(map[string]*debounceState)
+	return nil
 }
 
 func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
 	c.debounceMu.Lock()
-	defer c.debounceMu.Unlock()
 	st := c.debounce[noteID]
 	if st == nil {
 		st = &debounceState{}
@@ -42,17 +67,34 @@ func (c *Compactor) RunDebouncedProjection(ctx context.Context, noteID string) {
 	if st.timer != nil {
 		st.timer.Stop()
 	}
-	st.skipSeq++
-	seq := st.skipSeq
+	// Assign a unique sequence number so the timer callback can check
+	// whether another call has superseded it before deleting the entry.
+	// This is necessary because Timer.Stop() returns false if the
+	// callback has already started executing — in that case the old
+	// callback must not delete the entry created by a newer call.
+	seq := c.nextSeq.Add(1)
+	st.seq = seq
 	st.timer = time.AfterFunc(500*time.Millisecond, func() {
 		c.debounceMu.Lock()
-		if cur := c.debounce[noteID]; cur == nil || cur.skipSeq != seq {
+		// Validate seq BEFORE the projection. If a newer call already
+		// replaced this timer, skip the projection entirely — it would
+		// use stale state and waste I/O.
+		if cur := c.debounce[noteID]; cur == nil || cur.seq != seq {
 			c.debounceMu.Unlock()
 			return
 		}
 		c.debounceMu.Unlock()
-		_ = ProjectNoteContentFromYDoc(context.Background(), c.pool, noteID)
+
+		_ = ProjectNoteContentFromYDoc(c.ctx, c.pool, noteID)
+
+		// Clean up only if we're still the current entry.
+		c.debounceMu.Lock()
+		if cur := c.debounce[noteID]; cur != nil && cur.seq == seq {
+			delete(c.debounce, noteID)
+		}
+		c.debounceMu.Unlock()
 	})
+	c.debounceMu.Unlock()
 }
 
 func (c *Compactor) ProjectCanonicalDoc(ctx context.Context, noteID string) error {

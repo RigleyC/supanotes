@@ -30,6 +30,7 @@ void main() {
       dueDate: dueDate,
       completedAt: null,
       hasTime: false,
+      reminder: null,
       createdAt: now,
       updatedAt: now,
     );

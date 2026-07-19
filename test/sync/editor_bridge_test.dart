@@ -171,7 +171,7 @@ void main() {
       expect(updatedNode.isComplete, isTrue);
     });
 
-    test('completeRecurringTask preserves recurrence in YMap tasks entry', () async {
+    test('completeTaskInYDoc with recurring task advances due date', () async {
       final doc = Doc();
       final mutableDoc = MutableDocument.empty();
       final composer = MutableDocumentComposer();
@@ -197,21 +197,22 @@ void main() {
         nodeMap.set('id', 't1');
         nodeMap.set('position', 'a0');
         nodeMap.set('type', 'task');
+        nodeMap.set('recurrence', 'daily');
         nodeMap.set('data', jsonEncode({
           'text': 'Daily task',
           'completed': false,
-          'recurrence': 'daily',
         }));
         doc.getMap<Object>('nodes')!.set('t1', nodeMap);
         doc.getText('content/t1')!.insert(0, 'Daily task');
       });
 
-      final nextDue = DateTime(2026, 7, 15);
-      bridge.completeRecurringTask('t1', nextDue);
+      final result = bridge.completeTaskInYDoc('t1', now: DateTime(2026, 7, 14));
 
       final nodesMap = doc.getMap<Object>('nodes')!;
       final t1Map = nodesMap.get('t1') as YMap;
+      // Task should NOT be completed — it was reopened by recurrence
       expect(t1Map.get('completed'), isFalse);
+      // Due date should have advanced
       expect(t1Map.get('dueDate'), '2026-07-15');
       // Composite keys should NOT be written
       expect(nodesMap.get('t1:completed'), isNull);
@@ -267,6 +268,192 @@ void main() {
       expect(nodesMap.get('t1:dueDate'), isNull);
       expect(nodesMap.get('t1:recurrence'), isNull);
       expect(nodesMap.get('t1:reminder'), isNull);
+
+      bridge.dispose();
+    });
+
+    test('updateTaskMetadataInYDoc with hasTime:true writes time in dueDate and hasTime flag',
+        () async {
+      final doc = Doc();
+      final mutableDoc = MutableDocument.empty();
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: mutableDoc,
+        composer: composer,
+      )..reactionPipeline.clear();
+
+      final coordinator = EditorDocumentSyncManager(
+        document: mutableDoc,
+        editor: editor,
+      );
+
+      final bridge = YjsDocEditorBridge(
+        doc: doc,
+        userId: 'test-user',
+        coordinator: coordinator,
+      );
+
+      doc.transact((txn) {
+        final nodeMap = YMap<Object>();
+        nodeMap.set('id', 't1');
+        nodeMap.set('position', 'a0');
+        nodeMap.set('type', 'task');
+        nodeMap.set('data', jsonEncode({'text': 'Task with time'}));
+        doc.getMap<Object>('nodes')!.set('t1', nodeMap);
+        doc.getText('content/t1')!.insert(0, 'Task with time');
+      });
+
+      bridge.updateTaskMetadataInYDoc(
+        't1',
+        dueDate: DateTime(2026, 8, 15, 14, 30),
+        recurrence: 'daily',
+        hasTime: true,
+      );
+
+      final nodesMap = doc.getMap<Object>('nodes')!;
+      final t1Map = nodesMap.get('t1') as YMap;
+      expect(t1Map.get('dueDate'), '2026-08-15T14:30');
+      expect(t1Map.get('recurrence'), 'daily');
+      expect(t1Map.get('hasTime'), true);
+
+      bridge.dispose();
+    });
+
+    test('updateTaskMetadataInYDoc with hasTime:false writes date-only dueDate',
+        () async {
+      final doc = Doc();
+      final mutableDoc = MutableDocument.empty();
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: mutableDoc,
+        composer: composer,
+      )..reactionPipeline.clear();
+
+      final coordinator = EditorDocumentSyncManager(
+        document: mutableDoc,
+        editor: editor,
+      );
+
+      final bridge = YjsDocEditorBridge(
+        doc: doc,
+        userId: 'test-user',
+        coordinator: coordinator,
+      );
+
+      doc.transact((txn) {
+        final nodeMap = YMap<Object>();
+        nodeMap.set('id', 't1');
+        nodeMap.set('position', 'a0');
+        nodeMap.set('type', 'task');
+        nodeMap.set('data', jsonEncode({'text': 'Task all-day'}));
+        doc.getMap<Object>('nodes')!.set('t1', nodeMap);
+        doc.getText('content/t1')!.insert(0, 'Task all-day');
+      });
+
+      bridge.updateTaskMetadataInYDoc(
+        't1',
+        dueDate: DateTime(2026, 8, 15),
+        hasTime: false,
+      );
+
+      final t1Map = doc.getMap<Object>('nodes')!.get('t1') as YMap;
+      expect(t1Map.get('dueDate'), '2026-08-15');
+      expect(t1Map.get('hasTime'), false);
+
+      bridge.dispose();
+    });
+
+    test('updateTaskMetadataInYDoc simula persistencia da sheet (dueDate + hasTime + recurrence + clearReminder)',
+        () async {
+      final doc = Doc();
+      final mutableDoc = MutableDocument.empty();
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: mutableDoc,
+        composer: composer,
+      )..reactionPipeline.clear();
+
+      final coordinator = EditorDocumentSyncManager(
+        document: mutableDoc,
+        editor: editor,
+      );
+
+      final bridge = YjsDocEditorBridge(
+        doc: doc,
+        userId: 'test-user',
+        coordinator: coordinator,
+      );
+
+      doc.transact((txn) {
+        final nodeMap = YMap<Object>();
+        nodeMap.set('id', 't1');
+        nodeMap.set('position', 'a0');
+        nodeMap.set('type', 'task');
+        nodeMap.set('data', jsonEncode({'text': 'Sheet metadata test'}));
+        doc.getMap<Object>('nodes')!.set('t1', nodeMap);
+        doc.getText('content/t1')!.insert(0, 'Sheet metadata test');
+      });
+
+      // Exatamente os parametros que showTaskMetadataSheet envia
+      bridge.updateTaskMetadataInYDoc(
+        't1',
+        dueDate: DateTime(2026, 7, 18, 14, 30),
+        clearDueDate: false,
+        recurrence: 'daily',
+        clearRecurrence: false,
+        hasTime: true,
+        reminder: null,
+        clearReminder: true,
+      );
+
+      final t1Map = doc.getMap<Object>('nodes')!.get('t1') as YMap;
+      expect(t1Map.get('dueDate'), '2026-07-18T14:30');
+      expect(t1Map.get('hasTime'), true);
+      expect(t1Map.get('recurrence'), 'daily');
+      expect(t1Map.get('reminder'), isNull);
+
+      bridge.dispose();
+    });
+
+    test('updateTaskMetadataInYDoc with clearRecurrence deletes recurrence',
+        () async {
+      final doc = Doc();
+      final mutableDoc = MutableDocument.empty();
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: mutableDoc,
+        composer: composer,
+      )..reactionPipeline.clear();
+
+      final coordinator = EditorDocumentSyncManager(
+        document: mutableDoc,
+        editor: editor,
+      );
+
+      final bridge = YjsDocEditorBridge(
+        doc: doc,
+        userId: 'test-user',
+        coordinator: coordinator,
+      );
+
+      doc.transact((txn) {
+        final nodeMap = YMap<Object>();
+        nodeMap.set('id', 't1');
+        nodeMap.set('position', 'a0');
+        nodeMap.set('type', 'task');
+        nodeMap.set('recurrence', 'weekly');
+        nodeMap.set('data', jsonEncode({'text': 'Task with recurrence'}));
+        doc.getMap<Object>('nodes')!.set('t1', nodeMap);
+        doc.getText('content/t1')!.insert(0, 'Task with recurrence');
+      });
+
+      bridge.updateTaskMetadataInYDoc(
+        't1',
+        clearRecurrence: true,
+      );
+
+      final t1Map = doc.getMap<Object>('nodes')!.get('t1') as YMap;
+      expect(t1Map.get('recurrence'), isNull);
 
       bridge.dispose();
     });

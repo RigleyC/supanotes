@@ -44,7 +44,7 @@ abstract final class YjsNoteSchema {
         ? Map<String, dynamic>.from(jsonDecode(rawData) as Map)
         : <String, dynamic>{};
 
-    final textContent = _readNodeTextContent(doc, nodeId);
+    final textContent = readNodeTextContent(doc, nodeId);
     if (textContent.isNotEmpty) {
       data['text'] = textContent;
     }
@@ -211,7 +211,17 @@ abstract final class YjsNoteSchema {
     if (reminder is String) data['reminder'] = reminder;
   }
 
-  static String _readNodeTextContent(Doc doc, String nodeId) {
+  /// Canonical YText reader — single rule for the entire codebase.
+  ///
+  /// Priority: `content/$id` (canonical) → `content_fixed/$id` (legacy) →
+  /// `nodeData['text']` (inline) → empty string.
+  ///
+  /// Every caller MUST use this method instead of rolling its own copy.
+  static String readNodeTextContent(
+    Doc doc,
+    String nodeId, {
+    Map<String, dynamic>? nodeData,
+  }) {
     final contentKey = 'content/$nodeId';
     if (doc.share.containsKey(contentKey)) {
       try {
@@ -233,6 +243,9 @@ abstract final class YjsNoteSchema {
         }
       } catch (_) {}
     }
+
+    final dataText = nodeData?['text'] as String?;
+    if (dataText != null && dataText.isNotEmpty) return dataText;
 
     return '';
   }

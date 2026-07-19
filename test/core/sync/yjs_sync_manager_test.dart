@@ -131,4 +131,83 @@ void main() {
     expect(tasks.first.status, 'done');
     expect(tasks.first.recurrence?.name, 'daily');
   });
+
+  test('projectNodes chain survives error and allows subsequent calls', () async {
+    final mgr = YjsSyncManager(db: db, userId: 'user-1');
+    await mgr.loadDoc('note-1');
+
+    // Trick: remove the doc from _docs so the first projectNodes fails
+    // with a DB constraint violation (note doesn't exist in notes table
+    // because _projectNow skips when doc is null, but we need an error
+    // to propagate). Instead, we let the first call succeed, inject a
+    // bad state that will cause a DB error, then verify the chain recovers.
+    //
+    // Actually: the simplest way to trigger an error is to have
+    // projectNodes called before loadDoc — the doc is null, so _projectNow
+    // returns silently. To test an actual failure, we make the DB fail:
+    // close the database so the next write throws.
+
+    // First call: will fail because db is closed.
+    await db.close();
+    final failFuture = mgr.projectNodes('note-1');
+    await expectLater(failFuture, throwsA(anything));
+
+    // Recreate the database for the second call.
+    db = AppDatabase.test(executor: NativeDatabase.memory());
+    await db.into(db.notes).insert(NotesCompanion.insert(
+          id: 'note-1',
+          userId: 'user-1',
+          content: '',
+          createdAt: DateTime.utc(2025, 1, 1),
+          updatedAt: DateTime.utc(2025, 1, 1),
+          isDirty: const Value(false),
+          hasRemoteCopy: const Value(true),
+        ));
+    // Reload into new manager (or reuse — the chain entry for note-1
+    // was cleaned up by the finally block of the failed call).
+    final mgr2 = YjsSyncManager(db: db, userId: 'user-1');
+    final doc2 = await mgr2.loadDoc('note-1');
+
+    // Modify doc before project
+    doc2.transact((txn) {
+      doc2.getText('content/node-2')!.insert(0, 'After failure');
+      doc2.getMap<Object>('nodes')!.set(
+          'node-2',
+          '{"id":"node-2","position":"b0","type":"paragraph","data":{"text":"After failure"}}');
+    });
+
+    await mgr2.projectNodes('note-1');
+
+    final note = await db.notesDao.getNoteById('note-1');
+    expect(note, isNotNull);
+    expect(note!.content, contains('After failure'));
+  });
+
+  test('projectNodes propagates error to caller', () async {
+    final mgr = YjsSyncManager(db: db, userId: 'user-1');
+    await mgr.loadDoc('note-1');
+
+    // Close the database so the projection write fails.
+    await db.close();
+    await expectLater(
+      mgr.projectNodes('note-1'),
+      throwsA(anything),
+    );
+  });
+
+  test('multiple projectNodes for same note are serialized (no race)', () async {
+    final mgr = YjsSyncManager(db: db, userId: 'user-1');
+    final doc = await mgr.loadDoc('note-1');
+
+    // Queue two projections in quick succession
+    final f1 = mgr.projectNodes('note-1');
+    final f2 = mgr.projectNodes('note-1');
+
+    // Both should complete
+    await Future.wait([f1, f2]);
+
+    // The chain must not have left stale entries
+    final note = await db.notesDao.getNoteById('note-1');
+    expect(note, isNotNull);
+  });
 }

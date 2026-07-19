@@ -5,41 +5,6 @@ import 'package:yjs_dart/yjs_dart.dart';
 import 'note_node.dart';
 import 'yjs_note_schema.dart';
 
-String _readNodeTextContent(
-  Doc doc,
-  String nodeId, {
-  Map<String, dynamic>? nodeData,
-}) {
-  // Canonical reads prefer content/$id (canonical) over content_fixed/$id (legacy).
-  // This mirrors YjsNoteSchema._readNodeTextContent priority.
-  final contentKey = 'content/$nodeId';
-  if (doc.share.containsKey(contentKey)) {
-    try {
-      final sharedType = doc.getText(contentKey);
-      if (sharedType != null) {
-        final text = sharedType.toString();
-        if (text.isNotEmpty) return text;
-      }
-    } catch (_) {}
-  }
-
-  final fixedKey = 'content_fixed/$nodeId';
-  if (doc.share.containsKey(fixedKey)) {
-    try {
-      final fallbackType = doc.getText(fixedKey);
-      if (fallbackType != null) {
-        final text = fallbackType.toString();
-        if (text.isNotEmpty) return text;
-      }
-    } catch (_) {}
-  }
-
-  final dataText = nodeData?['text'] as String?;
-  if (dataText != null && dataText.isNotEmpty) return dataText;
-
-  return '';
-}
-
 NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
   // Attempt canonical read first via schema.
   try {
@@ -58,7 +23,7 @@ NoteNode? _readNodeFromYMap(Doc doc, String key, YMap nodeMap) {
       ? Map<String, dynamic>.from(jsonDecode(rawData) as Map)
       : <String, dynamic>{};
 
-  final textContent = _readNodeTextContent(doc, nodeId, nodeData: data);
+  final textContent = YjsNoteSchema.readNodeTextContent(doc, nodeId, nodeData: data);
 
   if (textContent.isNotEmpty) {
     data['text'] = textContent;
@@ -113,7 +78,7 @@ NoteNode? _readNodeFromJsonString(Doc doc, String key, String raw, {String? note
 
     final data = Map<String, dynamic>.from(meta['data'] as Map? ?? {});
 
-    final textContent = _readNodeTextContent(doc, nodeId, nodeData: data);
+    final textContent = YjsNoteSchema.readNodeTextContent(doc, nodeId, nodeData: data);
 
     if (derivedType == 'task') {
       final nodesMap = doc.getMap<Object>('nodes');

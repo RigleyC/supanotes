@@ -122,7 +122,9 @@ class _DueDatePickerState extends State<DueDatePicker> {
             onTap: () async {
               final time = await showAppTimePicker(
                 context: context,
-                initialTime: TimeOfDay.now(),
+                initialTime: widget.initialHasTime && widget.initialDate != null
+                    ? TimeOfDay.fromDateTime(widget.initialDate!)
+                    : null,
               );
               if (time != null) {
                 final date = widget.initialDate!;

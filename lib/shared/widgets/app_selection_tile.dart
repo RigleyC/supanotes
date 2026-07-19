@@ -30,7 +30,6 @@ class AppSelectionTile extends StatelessWidget {
 
       selected: isSelected,
       onTap: onTap,
-      tileColor: Colors.transparent,
       leading: icon != null
           ? Icon(
               icon,

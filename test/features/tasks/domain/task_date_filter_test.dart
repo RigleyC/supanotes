@@ -13,6 +13,7 @@ TaskModel _task({DateTime? dueDate, bool completed = false, DateTime? createdAt}
       completedAt: completed ? DateTime.now() : null,
       recurrence: null,
       hasTime: false,
+      reminder: null,
       createdAt: createdAt ?? DateTime(2026, 6, 15),
       updatedAt: DateTime(2026, 6, 15),
     );

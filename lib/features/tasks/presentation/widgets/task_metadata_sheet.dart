@@ -1,11 +1,15 @@
+import 'dart:developer' as dev;
+
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:supanotes/core/utils/date_time_extensions.dart';
 
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -22,8 +26,10 @@ Future<void> showTaskMetadataSheet({
   required String noteId,
   required TaskModel task,
 }) async {
-  // Inicializa o state no controller global para sobreviver às reconstruções do modal
-  ref.read(taskMetadataControllerProvider.notifier).init(task);
+  final taskId = task.id;
+
+  ref.read(taskMetadataProvider(taskId).notifier).state =
+      taskMetadataStateFromModel(task);
 
   await FamilyModalSheet.show<void>(
     context: context,
@@ -32,15 +38,20 @@ Future<void> showTaskMetadataSheet({
     contentBackgroundColor: Theme.of(context).brightness == Brightness.dark
         ? const Color(0xFF333333)
         : Theme.of(context).colorScheme.surface,
-    builder: (ctx) => TaskMetadataSheetBody(noteId: noteId, taskId: task.id),
+    builder: (ctx) => TaskMetadataSheetBody(noteId: noteId, taskId: taskId),
   );
 
-  // Quando o modal fechar (Future completar), salvamos no YDoc
-  final state = ref.read(taskMetadataControllerProvider);
+  final state = ref.read(taskMetadataProvider(taskId));
+
+  dev.log(
+    '[TaskMetadataSheet] Persisting: taskId=$taskId dueDate=${state.dueDate} hasTime=${state.hasTime} recurrence=${state.recurrence?.name} reminder=${state.reminder?.yjsValue}',
+    name: 'TaskMetadata',
+  );
+
   ref
       .read(noteEditorControllerProvider(noteId))
       .updateTaskMetadataInYDoc(
-        task.id,
+        taskId,
         dueDate: state.dueDate,
         clearDueDate: state.dueDate == null,
         recurrence: state.recurrence?.name,
@@ -49,9 +60,16 @@ Future<void> showTaskMetadataSheet({
         reminder: state.reminder?.yjsValue,
         clearReminder: state.reminder == null,
       );
+
+  if (state.reminder != null) {
+    final scheduler = ref.read(taskNotificationSchedulerProvider.notifier);
+    await scheduler.requestPermissionForReminder();
+  }
+
+  ref.invalidate(taskMetadataProvider(taskId));
 }
 
-class TaskMetadataSheetBody extends ConsumerStatefulWidget {
+class TaskMetadataSheetBody extends ConsumerWidget {
   const TaskMetadataSheetBody({
     super.key,
     required this.noteId,
@@ -62,89 +80,125 @@ class TaskMetadataSheetBody extends ConsumerStatefulWidget {
   final String taskId;
 
   @override
-  ConsumerState<TaskMetadataSheetBody> createState() =>
-      _TaskMetadataSheetBodyState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(taskMetadataProvider(taskId));
+    final notifier = ref.read(taskMetadataProvider(taskId).notifier);
 
-class _TaskMetadataSheetBodyState extends ConsumerState<TaskMetadataSheetBody> {
-  @override
-  Widget build(BuildContext context) {
-    final ctrl = ref.watch(taskMetadataControllerProvider);
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Text(
             'Editar horário e frequência',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.md),
           _DateTile(
-            dueDate: ctrl.dueDate,
-            hasTime: ctrl.hasTime,
+            dueDate: state.dueDate,
+            hasTime: state.hasTime,
             onTap: () => FamilyModalSheet.of(context).pushPage(
               TaskMetadataDatePage(
-                selected: ctrl.dueDate,
-                onSelected: ref
-                    .read(taskMetadataControllerProvider.notifier)
-                    .setDate,
+                selected: state.dueDate,
+                onSelected: (date) {
+                  notifier.state = TaskMetadataState(
+                    dueDate: date,
+                    hasTime: false,
+                    recurrence: state.recurrence,
+                    reminder: state.reminder?.toAllDayFallback(),
+                  );
+                },
               ),
             ),
-            onClear: ref
-                .read(taskMetadataControllerProvider.notifier)
-                .clearDate,
+            onClear: () {
+              notifier.state = TaskMetadataState();
+            },
           ),
           _TimeTile(
-            dueDate: ctrl.dueDate,
-            hasTime: ctrl.hasTime,
+            dueDate: state.dueDate,
+            hasTime: state.hasTime,
             onTap: () => FamilyModalSheet.of(context).pushPage(
               TaskMetadataTimePage(
-                currentDueDate: ctrl.dueDate!,
-                onSelected: ref
-                    .read(taskMetadataControllerProvider.notifier)
-                    .setTime,
+                currentDueDate: state.dueDate!,
+                hasTime: state.hasTime,
+                onSelected: (date, {required bool hasTime}) {
+                  notifier.state = TaskMetadataState(
+                    dueDate: date,
+                    hasTime: hasTime,
+                    recurrence: state.recurrence,
+                    reminder: state.reminder,
+                  );
+                },
               ),
             ),
-            onClear: ref
-                .read(taskMetadataControllerProvider.notifier)
-                .clearTime,
+            onClear: () {
+              notifier.state = TaskMetadataState(
+                dueDate: state.dueDate,
+                hasTime: false,
+                recurrence: state.recurrence,
+                reminder: state.reminder?.toAllDayFallback(),
+              );
+            },
           ),
           _RecurrenceTile(
-            recurrence: ctrl.recurrence,
-            dueDate: ctrl.dueDate,
+            recurrence: state.recurrence,
+            dueDate: state.dueDate,
             onTap: () => FamilyModalSheet.of(context).pushPage(
               TaskMetadataRecurrencePage(
-                selected: ctrl.recurrence,
-                dueDate: ctrl.dueDate,
-                onSelected: ref
-                    .read(taskMetadataControllerProvider.notifier)
-                    .setRecurrence,
+                selected: state.recurrence,
+                dueDate: state.dueDate,
+                onSelected: (r) {
+                  notifier.state = TaskMetadataState(
+                    dueDate:
+                        state.dueDate ??
+                        (r != null ? DateTime.now().startOfDay : null),
+                    hasTime: state.hasTime,
+                    recurrence: r,
+                    reminder: state.reminder,
+                  );
+                },
               ),
             ),
-            onClear: ref
-                .read(taskMetadataControllerProvider.notifier)
-                .clearRecurrence,
+            onClear: () {
+              notifier.state = TaskMetadataState(
+                dueDate: state.dueDate,
+                hasTime: state.hasTime,
+                recurrence: null,
+                reminder: state.reminder,
+              );
+            },
           ),
           _ReminderTile(
-            reminder: ctrl.reminder,
+            reminder: state.reminder,
             onTap: () => FamilyModalSheet.of(context).pushPage(
               TaskMetadataReminderPage(
-                selected: ctrl.reminder,
-                hasTime: ctrl.hasTime,
-                onSelected: ref
-                    .read(taskMetadataControllerProvider.notifier)
-                    .setReminder,
+                selected: state.reminder,
+                hasTime: state.hasTime,
+                onSelected: (reminder) {
+                  notifier.state = TaskMetadataState(
+                    dueDate: state.dueDate,
+                    hasTime: state.hasTime,
+                    recurrence: state.recurrence,
+                    reminder: reminder,
+                  );
+                },
               ),
             ),
-            onClear: () => ref
-                .read(taskMetadataControllerProvider.notifier)
-                .setReminder(null),
+            onClear: () {
+              notifier.state = TaskMetadataState(
+                dueDate: state.dueDate,
+                hasTime: state.hasTime,
+                recurrence: state.recurrence,
+                reminder: null,
+              );
+            },
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -165,14 +219,13 @@ class _DateTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      tileColor: Colors.transparent,
       dense: true,
       leading: const Icon(Icons.calendar_today_rounded, size: 20),
       title: Text(
         dueDate != null
             ? formatDueDate(dueDate!, hasTime: hasTime)
             : 'Adicionar data',
-        style: Theme.of(context).textTheme.bodyMedium,
+        style: Theme.of(context).textTheme.titleSmall,
       ),
       trailing: dueDate != null
           ? IconButton(
@@ -204,10 +257,8 @@ class _TimeTile extends StatelessWidget {
     final color = enabled
         ? null
         : Theme.of(context).colorScheme.onSurfaceVariant;
-
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      tileColor: Colors.transparent,
       dense: true,
       leading: Icon(Icons.access_time_rounded, color: color, size: 20),
       title: Text(
@@ -215,8 +266,8 @@ class _TimeTile extends StatelessWidget {
             ? DateFormat('h:mm a').format(dueDate!)
             : 'Adicionar horário',
         style: color != null
-            ? Theme.of(context).textTheme.bodyMedium?.copyWith(color: color)
-            : Theme.of(context).textTheme.bodyMedium,
+            ? Theme.of(context).textTheme.titleSmall?.copyWith(color: color)
+            : Theme.of(context).textTheme.titleSmall,
       ),
       trailing: hasTime
           ? IconButton(
@@ -247,14 +298,13 @@ class _RecurrenceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      tileColor: Colors.transparent,
       dense: true,
-      leading: Icon(Icons.refresh_rounded, size: 20),
+      leading: const Icon(Icons.refresh_rounded, size: 20),
       title: Text(
         recurrence != null
             ? recurrence!.getLocalizedLabel(dueDate)
             : 'Adicionar recorrência',
-        style: Theme.of(context).textTheme.bodyMedium,
+        style: Theme.of(context).textTheme.titleSmall,
       ),
       trailing: recurrence != null
           ? IconButton(
@@ -282,12 +332,11 @@ class _ReminderTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      tileColor: Colors.transparent,
       dense: true,
       leading: const Icon(Icons.notifications_outlined, size: 20),
       title: Text(
         reminder?.label ?? 'Adicionar lembrete',
-        style: Theme.of(context).textTheme.bodyMedium,
+        style: Theme.of(context).textTheme.titleSmall,
       ),
       trailing: reminder != null
           ? IconButton(

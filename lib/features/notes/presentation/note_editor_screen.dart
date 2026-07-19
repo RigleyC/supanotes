@@ -127,22 +127,29 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               },
             ),
             if (!note.isReadOnly)
-              Consumer(builder: (context, ref, child) {
-                final controller = ref.watch(noteEditorControllerProvider(widget.noteId));
-                return AnimatedBuilder(
-                  animation: controller.focusNode,
-                  builder: (context, _) {
-                    if (!controller.focusNode.hasFocus) return const SizedBox.shrink();
-                    return IconButton(
-                      icon: const Icon(Icons.check),
-                      onPressed: () {
-                        controller.focusNode.unfocus();
-                        SystemChannels.textInput.invokeMethod('TextInput.hide');
-                      },
-                    );
-                  },
-                );
-              }),
+              Consumer(
+                builder: (context, ref, child) {
+                  final controller = ref.watch(
+                    noteEditorControllerProvider(widget.noteId),
+                  );
+                  return AnimatedBuilder(
+                    animation: controller.focusNode,
+                    builder: (context, _) {
+                      if (!controller.focusNode.hasFocus)
+                        return const SizedBox.shrink();
+                      return IconButton(
+                        icon: const Icon(Icons.check),
+                        onPressed: () {
+                          controller.focusNode.unfocus();
+                          SystemChannels.textInput.invokeMethod(
+                            'TextInput.hide',
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
           ],
         ],
       ),
@@ -169,7 +176,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     ? null
                     : (task, flushSnapshot) async {
                         await flushSnapshot();
-                        if (!mounted || task == null) return;
+                        if (!context.mounted || task == null) return;
                         await showTaskMetadataSheet(
                           context: context,
                           ref: ref,
@@ -183,13 +190,21 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         final controller = ref.read(
                           noteEditorControllerProvider(widget.noteId),
                         );
-                        return controller.completeTaskInYDoc(taskId)!;
+                        final result = controller.completeTaskInYDoc(taskId)!;
+                        return (
+                          nextDue: result.nextDue,
+                          previousDue: result.previousDue,
+                          previousHasTime: result.previousHasTime,
+                        );
                       },
                       onUndo: (previousDue, previousHasTime) {
                         final controller = ref.read(
                           noteEditorControllerProvider(widget.noteId),
                         );
-                        controller.reopenTaskInYDoc(taskId, previousDue: previousDue);
+                        controller.reopenTaskInYDoc(
+                          taskId,
+                          previousDue: previousDue,
+                        );
                         if (previousDue != null) {
                           controller.updateTaskMetadataInYDoc(
                             taskId,
