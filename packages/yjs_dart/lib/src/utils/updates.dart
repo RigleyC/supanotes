@@ -276,11 +276,12 @@ void yjsReadUpdate(
   dynamic structDecoder,
 ]) {
   structDecoder ??= UpdateDecoderV2(decoder);
+  var retry = false;
+  Uint8List? retryUpdate;
   transact(
     ydoc,
     (transaction) {
       transaction.local = false;
-      var retry = false;
       // ignore: avoid_dynamic_calls
       final store = transaction.doc.store as StructStore;
       final ss = readStructSet(structDecoder, transaction.doc);
@@ -343,16 +344,17 @@ void yjsReadUpdate(
       } else {
         store.pendingDs = dsRest;
       }
-      // Matches JS: retry inside transact (nested call reuses same transaction)
       if (retry) {
-        final update = store.pendingStructs!.update;
+        retryUpdate = store.pendingStructs!.update;
         store.pendingStructs = null;
-        applyUpdateV2(transaction.doc, update);
       }
     },
     transactionOrigin,
     false,
   );
+  if (retry && retryUpdate != null) {
+    applyUpdateV2(ydoc, retryUpdate!);
+  }
 }
 
 

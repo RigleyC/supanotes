@@ -180,6 +180,8 @@ This is because the `yjs_dart` protocol decoder has a bug where unknown root sha
 If we didn't use this fork, the Flutter app would experience silent data loss (turning paragraphs into empty tasks) or crash with type cast errors (`YMap is not a subtype of YText`).
 **Do not** remove the local path override in `pubspec.yaml` until the upstream `yjs_dart` package correctly infers binary root types without relying on `.getText()` or `.getMap()` pre-registration.
 
+*Update (PendingStructs Retry Patch):* We also patched `lib/src/utils/updates.dart` inside the local fork to move the `pendingStructs` retry logic *outside* the `transact` block. This prevents an unbounded recursion bug during `yjsReadUpdate` that causes severe ANRs in Flutter Debug mode when connecting to large notes with unresolved dependencies.
+
 ### Dual-write avoidance document (061)
 
 The YDoc is the single source of truth for task metadata (dueDate, recurrence).
