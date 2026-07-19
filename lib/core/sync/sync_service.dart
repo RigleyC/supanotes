@@ -186,7 +186,7 @@ class SyncService {
     // inner: carries the real result/error back to the caller
     final inner = _noteSyncChains[noteId]!.then((_) async {
       try {
-        await _exchangeNote(noteId, gen);
+        await _exchangeNote(noteId);
       } finally {
         if (_noteSyncGenerations[noteId] == gen) {
           _noteSyncChains.remove(noteId);
@@ -202,7 +202,7 @@ class SyncService {
     return inner;
   }
 
-  Future<void> _exchangeNote(String noteId, int generation) async {
+  Future<void> _exchangeNote(String noteId) async {
     final doc = await _yjsMgr.loadDoc(noteId);
     final localState = await _getLocalState(noteId);
     final sv = localState?.syncedStateVector;
@@ -384,21 +384,15 @@ class SyncService {
       }
     });
 
-    // After the relational push, send Yjs deltas for dirty notes (max 2
-    // concurrent to avoid overwhelming the network on large batches).
+    // After the relational push, send Yjs deltas for dirty notes (chunked
+    // into groups of 2 to avoid overwhelming the network on large batches).
     if (pushingNoteIds.isNotEmpty) {
       debugPrint('[SyncService] push: sending Yjs deltas for ${pushingNoteIds.length} notes');
-      final semaphore = Semaphore(2);
-      await Future.wait(
-        pushingNoteIds.map((noteId) async {
-          await semaphore.acquire();
-          try {
-            await syncDirtyNote(noteId);
-          } finally {
-            semaphore.release();
-          }
-        }),
-      );
+      final ids = pushingNoteIds.toList();
+      for (var i = 0; i < ids.length; i += 2) {
+        final chunk = ids.skip(i).take(2).toList();
+        await Future.wait(chunk.map(syncDirtyNote));
+      }
       debugPrint('[SyncService] push: Yjs deltas done elapsed=${sw.elapsedMilliseconds}ms');
     }
 
@@ -432,9 +426,8 @@ class SyncService {
       final response = await _api.post<Map<String, dynamic>>(
         '/sync/pull',
         data: {
-          'last_synced_at': lastSyncedAt.toUtc().toIso8601String(),
+          'last_synced_at': cursor ?? lastSyncedAt.toUtc().toIso8601String(),
           'limit': pageLimit,
-          if (cursor != null) 'cursor': cursor,
         },
       );
       final data = response.data ?? const <String, dynamic>{};
@@ -550,28 +543,3 @@ class SyncService {
   }
 }
 
-/// Simple semaphore for limiting concurrent Yjs delta exchanges.
-class Semaphore {
-  Semaphore(this._max);
-  final int _max;
-  int _acquired = 0;
-  final _queue = <void Function()>[];
-
-  Future<void> acquire() async {
-    if (_acquired < _max) {
-      _acquired++;
-      return;
-    }
-    final completer = Completer<void>();
-    _queue.add(completer.complete);
-    return completer.future;
-  }
-
-  void release() {
-    if (_queue.isNotEmpty) {
-      _queue.removeAt(0)();
-    } else {
-      _acquired--;
-    }
-  }
-}

@@ -197,12 +197,11 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
       final due = task.dueDate;
       if (due == null) continue;
 
-      // Check if this task is unchanged from the previous snapshot
+      // Check if this task is unchanged from the previous snapshot.
+      // Drift-generated TaskData overrides == for structural equality,
+      // so unchanged tasks skip the platform notification call.
       final previous = previousMap?[task.id];
-      final bool isUnchanged = previous != null
-          && previous.dueDate == task.dueDate
-          && previous.hasTime == task.hasTime
-          && previous.reminder == task.reminder;
+      final bool isUnchanged = previous != null && previous == task;
 
       if (isUnchanged && currentState.containsKey(task.id)) {
         // Reuse cached notification time if it's still in the future
