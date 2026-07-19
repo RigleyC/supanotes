@@ -70,27 +70,19 @@ class SyncService {
 
   String? _activeNoteId;
   Timer? _syncTimer;
-  Uint8List? _lastSyncedStateVector;
   AppLifecycleListener? _lifecycleListener;
 
   bool _isSyncing = false;
 
-  /// Tracks last successful push time per note Yjs state so we only push
-  /// states that changed since then.
-  final Map<String, DateTime> _lastYjsSyncAt = {};
-
   /// Per-note sync queue to serialize exchanges per note.
   final Map<String, Future<void>> _noteSyncChains = {};
 
+  /// Monotonically increasing generation counter per note so [_syncNote]
+  /// can check whether another call has already been chained after it.
+  final Map<String, int> _noteSyncGenerations = {};
+
   StreamSubscription<bool>? _connectivitySub;
   Timer? _periodicSyncTimer;
-
-  /// Whether a note with the given [noteId] is currently being synced via
-  /// the polling timer. The active note is excluded from batch push/pull
-  /// because the per-note polling handles it with finer granularity.
-  bool _isActiveNote(String noteId) {
-    return _activeNoteId != null && _activeNoteId == noteId;
-  }
 
   Future<Doc?> connectNote(String noteId) async {
     final sw = Stopwatch()..start();
@@ -102,18 +94,11 @@ class SyncService {
     await disconnectNote();
     debugPrint('[SyncService] connectNote disconnected previous elapsed=${sw.elapsedMilliseconds}ms');
 
-    _lastSyncedStateVector = null;
-
     try {
       final noteData = await _db.notesDao.getNoteById(noteId);
       if (noteData != null && !noteData.hasRemoteCopy) {
-        // Push BEFORE marking the note as active so the Yjs state is not
-        // filtered out by _isActiveNote() inside push().
         debugPrint('[SyncService] connectNote: note missing on server, pushing first...');
         await push();
-        // Clear the Yjs sync timestamp so the next batch sync re-sends the
-        // state if the server silently dropped it (e.g. race on note insert).
-        _lastYjsSyncAt.remove(noteId);
       }
 
       _activeNoteId = noteId;
@@ -124,7 +109,7 @@ class SyncService {
       void startTimer() {
         _syncTimer?.cancel();
         _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-          _syncActiveNote();
+          unawaited(syncDirtyNote(noteId));
         });
       }
 
@@ -140,18 +125,18 @@ class SyncService {
       _lifecycleListener = AppLifecycleListener(
         onPause: () {
           debugPrint('[SyncService] lifecycle: onPause — triggering sync and stopping timer');
-          _syncActiveNote();
+          unawaited(syncDirtyNote(noteId));
           stopTimer();
         },
         onInactive: () {
           debugPrint('[SyncService] lifecycle: onInactive — triggering sync and stopping timer');
-          _syncActiveNote();
+          unawaited(syncDirtyNote(noteId));
           stopTimer();
         },
         onResume: () {
           debugPrint('[SyncService] lifecycle: onResume — restarting timer');
           startTimer();
-          _syncActiveNote();
+          unawaited(syncDirtyNote(noteId));
         },
       );
 
@@ -161,47 +146,6 @@ class SyncService {
       debugPrint('[SyncService] connectNote FAIL: $e\n$stackTrace');
       _notifier.markError(e.toString());
       rethrow;
-    }
-  }
-
-  Future<void> _syncActiveNote() async {
-    final noteId = _activeNoteId;
-    if (noteId == null) return;
-
-    try {
-      final doc = await _yjsMgr.loadDoc(noteId);
-
-      // Generate local changes since last sync
-      final localUpdate = encodeStateAsUpdate(doc, _lastSyncedStateVector);
-      if (localUpdate.isEmpty) return;
-
-      final stateVector = encodeStateVector(doc);
-
-      debugPrint('[SyncService] _syncActiveNote: sending ${localUpdate.length} bytes to $noteId');
-
-      final response = await _api.post<List<int>>(
-        '/sync/note/$noteId',
-        data: Stream.fromIterable([localUpdate]),
-        options: Options(
-          headers: {
-            'X-State-Vector': base64Encode(stateVector),
-          },
-          contentType: 'application/octet-stream',
-          responseType: ResponseType.bytes,
-        ),
-      );
-
-      final responseData = response.data;
-      if (responseData != null && responseData.isNotEmpty) {
-        final serverUpdate = Uint8List.fromList(responseData);
-        applyUpdate(doc, serverUpdate);
-        await _yjsMgr.persist(noteId);
-        debugPrint('[SyncService] _syncActiveNote: applied ${serverUpdate.length} bytes from server');
-      }
-
-      _lastSyncedStateVector = stateVector;
-    } catch (e, stackTrace) {
-      debugPrint('[SyncService] _syncActiveNote FAIL: $e\n$stackTrace');
     }
   }
 
@@ -219,59 +163,83 @@ class SyncService {
     _lifecycleListener?.dispose();
     _lifecycleListener = null;
     _activeNoteId = null;
-    _lastSyncedStateVector = null;
 
     debugPrint('[SyncService] disconnectNote DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
 
-  /// Serializes per-note Yjs exchanges so concurrent calls for the same note
-  /// are queued sequentially.
+  /// Per-note Yjs delta exchange.
+  ///
+  /// Serializes exchanges for the same note via a generation-counter chain so
+  /// concurrent calls are queued sequentially.  Errors are propagated to the
+  /// caller but do NOT poison the chain for subsequent calls.
+  ///
+  /// This is the ONE exchange method — both the active-note polling timer and
+  /// background batch push use it.
   Future<void> syncDirtyNote(String noteId) {
+    final gen = (_noteSyncGenerations[noteId] ?? 0) + 1;
+    _noteSyncGenerations[noteId] = gen;
+
     if (!_noteSyncChains.containsKey(noteId)) {
       _noteSyncChains[noteId] = Future.value();
     }
-    _noteSyncChains[noteId] =
-        _noteSyncChains[noteId]!.then((_) => _syncNote(noteId));
-    return _noteSyncChains[noteId]!;
+
+    // inner: carries the real result/error back to the caller
+    final inner = _noteSyncChains[noteId]!.then((_) async {
+      try {
+        await _exchangeNote(noteId, gen);
+      } finally {
+        if (_noteSyncGenerations[noteId] == gen) {
+          _noteSyncChains.remove(noteId);
+          _noteSyncGenerations.remove(noteId);
+        }
+      }
+    });
+
+    // Chain entry swallows errors so a failing exchange never blocks
+    // subsequent calls for the same note.
+    _noteSyncChains[noteId] = inner.catchError((_) {});
+
+    return inner;
   }
 
-  Future<void> _syncNote(String noteId) async {
-    try {
-      final doc = await _yjsMgr.loadDoc(noteId);
-      final localState = await _getLocalState(noteId);
-      final sv = localState?.syncedStateVector;
+  Future<void> _exchangeNote(String noteId, int generation) async {
+    final doc = await _yjsMgr.loadDoc(noteId);
+    final localState = await _getLocalState(noteId);
+    final sv = localState?.syncedStateVector;
 
-      final localUpdate = encodeStateAsUpdate(doc, sv);
-      if (localUpdate.isEmpty) return;
+    final localUpdate = encodeStateAsUpdate(doc, sv);
+    if (localUpdate.isEmpty) return;
 
-      final stateVector = encodeStateVector(doc);
+    final stateVector = encodeStateVector(doc);
 
-      debugPrint('[SyncService] _syncNote: sending ${localUpdate.length} bytes for note $noteId');
+    debugPrint('[SyncService] _exchangeNote: sending ${localUpdate.length} bytes for note $noteId');
 
-      final response = await _api.post<List<int>>(
-        '/sync/note/$noteId',
-        data: Stream.fromIterable([localUpdate]),
-        options: Options(
-          headers: {
-            'X-State-Vector': base64Encode(stateVector),
-          },
-          contentType: 'application/octet-stream',
-          responseType: ResponseType.bytes,
-        ),
-      );
+    final response = await _api.post<List<int>>(
+      '/sync/note/$noteId',
+      data: Stream.fromIterable([localUpdate]),
+      options: Options(
+        headers: {
+          'X-State-Vector': base64Encode(stateVector),
+        },
+        contentType: 'application/octet-stream',
+        responseType: ResponseType.bytes,
+      ),
+    );
 
-      final responseData = response.data;
-      if (responseData != null && responseData.isNotEmpty) {
-        final serverUpdate = Uint8List.fromList(responseData);
-        applyUpdate(doc, serverUpdate);
-        debugPrint('[SyncService] _syncNote: applied ${serverUpdate.length} bytes from server for note $noteId');
-      }
+    final responseData = response.data;
+    if (responseData != null && responseData.isNotEmpty) {
+      final serverUpdate = Uint8List.fromList(responseData);
+      applyUpdate(doc, serverUpdate);
+      debugPrint('[SyncService] _exchangeNote: applied ${serverUpdate.length} bytes from server for note $noteId');
+    }
 
-      await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
-    } catch (e, stackTrace) {
-      debugPrint('[SyncService] _syncNote FAIL noteId=$noteId: $e\n$stackTrace');
-    } finally {
-      _noteSyncChains.remove(noteId);
+    // Persist the new synced state vector ONLY after a successful exchange.
+    await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
+
+    // Project remote changes to SQLite so list views reflect the update
+    // even for background notes (not just the active editor).
+    if (_activeNoteId != noteId) {
+      await _yjsMgr.projectNodes(noteId, markDirty: false);
     }
   }
 
@@ -364,51 +332,20 @@ class SyncService {
     final contexts = await _db.contextsDao.getDirtyContexts();
     final tags = await _db.tagsDao.getDirtyTags();
 
-    // Collect Yjs states for dirty notes only.
-    // We strictly use pushingNoteIds (which only contains is_dirty = true notes)
-    // rather than allowedNoteIds (which contains ALL notes that have a remote copy).
-    // This eliminates the colossal memory overhead of loading all Yjs binaries.
-    final relevantStates = pushingNoteIds.isEmpty
-        ? <LocalYjsState>[]
-        : await (_db.select(_db.localYjsStates)
-            ..where((t) => t.noteId.isIn(pushingNoteIds.toList()))
-          ).get();
-    final yjsStates = <LocalYjsState>[];
-    for (final s in relevantStates) {
-      if (_isActiveNote(s.noteId)) continue;
-      final lastSync = _lastYjsSyncAt[s.noteId];
-      if (lastSync == null || s.updatedAt.isAfter(lastSync)) {
-        // YIELD to event loop to prevent ANR during heavy synchronous Yjs processing
-        await Future.delayed(const Duration(milliseconds: 10));
-        // Migration: decode and re-encode to strip out buggy formatting
-        // from older dart_crdt versions before sending to Go backend.
-        try {
-          final tmpDoc = Doc();
-          applyUpdate(tmpDoc, s.state);
-          final cleanState = encodeStateAsUpdate(tmpDoc);
-          yjsStates.add(s.copyWith(state: cleanState));
-        } catch (e, st) {
-          debugPrint('[SyncService] migration failed for noteId=${s.noteId}: $e\n$st');
-          // State is hopelessly corrupted. Delete it to prevent endless sync loops
-          // and allow it to be pulled fresh from the server next time.
-          await (_db.delete(_db.localYjsStates)..where((t) => t.noteId.equals(s.noteId))).go();
-        }
-      }
-    }
-
-    debugPrint('[SyncService] push: dirty data collected elapsed=${sw.elapsedMilliseconds}ms notes=${notes.length} links=${filteredLinks.length} yjsStates=${yjsStates.length}');
+    debugPrint('[SyncService] push: dirty data collected elapsed=${sw.elapsedMilliseconds}ms notes=${notes.length} links=${filteredLinks.length}');
 
     if (notes.isEmpty &&
         contexts.isEmpty &&
         tags.isEmpty &&
         filteredLinks.isEmpty &&
         filteredNoteTags.isEmpty &&
-        filteredPrefs.isEmpty &&
-        yjsStates.isEmpty) {
+        filteredPrefs.isEmpty) {
       debugPrint('[SyncService] push: nothing dirty, SKIP elapsed=${sw.elapsedMilliseconds}ms');
       return;
     }
 
+    // Relational push — no Yjs states. Those are sent separately via
+    // per-note delta exchange (syncDirtyNote).
     final payload = <String, dynamic>{
       'notes': notes.map(_mapper.noteToJson).toList(),
       'contexts': contexts.map(_mapper.contextToJson).toList(),
@@ -418,17 +355,11 @@ class SyncService {
       'user_note_preferences': filteredPrefs
           .map(_mapper.userNotePreferenceToJson)
           .toList(),
-      'note_yjs_states': yjsStates.map(_mapper.localYjsStateToJson).toList(),
     };
 
     debugPrint('[SyncService] push: sending HTTP POST elapsed=${sw.elapsedMilliseconds}ms');
     await _api.post('/sync/push', data: payload);
     debugPrint('[SyncService] push: HTTP POST done elapsed=${sw.elapsedMilliseconds}ms');
-
-    final now = DateTime.now();
-    for (final s in yjsStates) {
-      _lastYjsSyncAt[s.noteId] = now;
-    }
 
     debugPrint('[SyncService] push: clearing dirty flags elapsed=${sw.elapsedMilliseconds}ms');
     await _db.transaction(() async {
@@ -452,6 +383,25 @@ class SyncService {
         await _db.userNotePreferencesDao.clearDirtyFlag(p.userId, p.noteId);
       }
     });
+
+    // After the relational push, send Yjs deltas for dirty notes (max 2
+    // concurrent to avoid overwhelming the network on large batches).
+    if (pushingNoteIds.isNotEmpty) {
+      debugPrint('[SyncService] push: sending Yjs deltas for ${pushingNoteIds.length} notes');
+      final semaphore = Semaphore(2);
+      await Future.wait(
+        pushingNoteIds.map((noteId) async {
+          await semaphore.acquire();
+          try {
+            await syncDirtyNote(noteId);
+          } finally {
+            semaphore.release();
+          }
+        }),
+      );
+      debugPrint('[SyncService] push: Yjs deltas done elapsed=${sw.elapsedMilliseconds}ms');
+    }
+
     debugPrint('[SyncService] push DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
 
@@ -459,21 +409,7 @@ class SyncService {
     final sw = Stopwatch()..start();
     debugPrint('[SyncService] pull START');
     final prefs = await SharedPreferences.getInstance();
-    final lastSyncedStr = prefs.getString(_kLastSyncedAtPref);
-    final lastSyncedAt = lastSyncedStr != null
-        ? DateTime.parse(lastSyncedStr)
-        : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 
-    debugPrint('[SyncService] pull: HTTP GET lastSyncedAt=$lastSyncedStr');
-    final response = await _api.post<Map<String, dynamic>>(
-      '/sync/pull',
-      data: {
-        'last_synced_at': lastSyncedAt.toUtc().toIso8601String(),
-        'limit': 100000,
-      },
-    );
-    final data = response.data ?? const <String, dynamic>{};
-    debugPrint('[SyncService] pull: HTTP GET done elapsed=${sw.elapsedMilliseconds}ms');
     final dirtyNoteIds = {
       for (final note in await (_db.select(
         _db.notes,
@@ -481,110 +417,161 @@ class SyncService {
         note.id,
     };
 
-    // Collect existing local content for all pulled notes so we don't
-    // overwrite non-empty local content with a stale/empty server payload.
-    // The server derives content asynchronously from the YDoc, so pull
-    // payloads may contain content=''. Yjs state processing (below) will
-    // update notes.content with the correct derived content via projectNodes.
-    final pulledNoteIds = (data['notes'] as List? ?? [])
-        .map((raw) => (raw as Map<String, dynamic>)['id'] as String)
-        .toSet();
-    final localContentById = <String, String>{};
-    if (pulledNoteIds.isNotEmpty) {
-      final rows = await (_db.select(_db.notes)
-            ..where((t) => t.id.isIn(pulledNoteIds.toList())))
-          .get();
-      for (final row in rows) {
-        if (row.content.trim().isNotEmpty) {
-          localContentById[row.id] = row.content;
+    const int pageLimit = 500;
+    String? cursor;
+    int totalNotes = 0;
+    final allRawYjsStates = <Map<String, dynamic>>[];
+
+    while (true) {
+      final lastSyncedStr = prefs.getString(_kLastSyncedAtPref);
+      final lastSyncedAt = lastSyncedStr != null
+          ? DateTime.parse(lastSyncedStr)
+          : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
+      debugPrint('[SyncService] pull: HTTP GET lastSyncedAt=$lastSyncedStr cursor=$cursor');
+      final response = await _api.post<Map<String, dynamic>>(
+        '/sync/pull',
+        data: {
+          'last_synced_at': lastSyncedAt.toUtc().toIso8601String(),
+          'limit': pageLimit,
+          if (cursor != null) 'cursor': cursor,
+        },
+      );
+      final data = response.data ?? const <String, dynamic>{};
+
+      final notes = data['notes'] as List? ?? [];
+      if (notes.isEmpty) break;
+
+      totalNotes += notes.length;
+
+      // Collect existing local content for pulled notes so we don't
+      // overwrite non-empty local content with a stale/empty server payload.
+      final pulledNoteIds = notes
+          .map((raw) => (raw as Map<String, dynamic>)['id'] as String)
+          .toSet();
+      final localContentById = <String, String>{};
+      if (pulledNoteIds.isNotEmpty) {
+        final rows = await (_db.select(_db.notes)
+              ..where((t) => t.id.isIn(pulledNoteIds.toList())))
+            .get();
+        for (final row in rows) {
+          if (row.content.trim().isNotEmpty) {
+            localContentById[row.id] = row.content;
+          }
         }
       }
+
+      debugPrint('[SyncService] pull: applying page batch elapsed=${sw.elapsedMilliseconds}ms notes=${notes.length}');
+      await _db.batch((batch) {
+        for (final raw in notes) {
+          final json = raw as Map<String, dynamic>;
+          final noteId = json['id'] as String;
+
+          if (localContentById.containsKey(noteId)) {
+            json['content'] = localContentById[noteId];
+          }
+
+          final note = _mapper
+              .noteFromJson(json)
+              .copyWith(isDirty: false, hasRemoteCopy: true);
+          if (dirtyNoteIds.contains(note.id)) {
+            continue;
+          }
+          batch.insert(_db.notes, note, onConflict: DoUpdate((_) => note));
+        }
+        for (final raw in (data['contexts'] as List? ?? [])) {
+          final context = _mapper
+              .contextFromJson(raw as Map<String, dynamic>)
+              .copyWith(isDirty: false);
+          batch.insert(
+            _db.contexts,
+            context,
+            onConflict: DoUpdate((_) => context),
+          );
+        }
+        for (final raw in (data['tags'] as List? ?? [])) {
+          final tag = _mapper
+              .tagFromJson(raw as Map<String, dynamic>)
+              .copyWith(isDirty: false);
+          batch.insert(_db.tags, tag, onConflict: DoUpdate((_) => tag));
+        }
+        for (final raw in (data['note_links'] as List? ?? [])) {
+          final link = _mapper
+              .noteLinkFromJson(raw as Map<String, dynamic>)
+              .copyWith(isDirty: false);
+          batch.insert(_db.noteLinks, link, onConflict: DoUpdate((_) => link));
+        }
+        for (final raw in (data['note_tags'] as List? ?? [])) {
+          final noteTag = _mapper
+              .localNoteTagFromJson(raw as Map<String, dynamic>)
+              .copyWith(isDirty: false);
+          batch.insert(
+            _db.localNoteTags,
+            noteTag,
+            onConflict: DoUpdate((_) => noteTag),
+          );
+        }
+        for (final raw in (data['user_note_preferences'] as List? ?? [])) {
+          final pref = _mapper.userNotePreferenceFromJson(
+            raw as Map<String, dynamic>,
+          );
+          batch.insert(
+            _db.userNotePreferences,
+            pref,
+            onConflict: DoUpdate((_) => pref),
+          );
+        }
+      });
+
+      // Collect Yjs states from this page
+      final pageYjsStates = data['note_yjs_states'] as List? ?? [];
+      allRawYjsStates.addAll(pageYjsStates.cast<Map<String, dynamic>>());
+
+      // Update cursor for next page
+      cursor = data['synced_at'] as String?;
+
+      if (notes.length < pageLimit) break;
     }
 
-    // Insert notes BEFORE processing Yjs states so the FK constraint on
-    // local_yjs_states(note_id → notes.id) is satisfied. projectNodes()
-    // will update notes.content with the correct content after the Yjs merge.
-    debugPrint('[SyncService] pull: applying batch elapsed=${sw.elapsedMilliseconds}ms notes=${(data['notes'] as List?)?.length ?? 0}');
-    await _db.batch((batch) {
-      for (final raw in (data['notes'] as List? ?? [])) {
-        final json = raw as Map<String, dynamic>;
-        final noteId = json['id'] as String;
-
-        // Preserve non-empty local content; Yjs state processing below will
-        // overwrite it with the authoritative YDoc-derived content.
-        if (localContentById.containsKey(noteId)) {
-          json['content'] = localContentById[noteId];
-        }
-
-        final note = _mapper
-            .noteFromJson(json)
-            .copyWith(isDirty: false, hasRemoteCopy: true);
-        if (dirtyNoteIds.contains(note.id)) {
-          continue;
-        }
-        batch.insert(_db.notes, note, onConflict: DoUpdate((_) => note));
-      }
-      for (final raw in (data['contexts'] as List? ?? [])) {
-        final context = _mapper
-            .contextFromJson(raw as Map<String, dynamic>)
-            .copyWith(isDirty: false);
-        batch.insert(
-          _db.contexts,
-          context,
-          onConflict: DoUpdate((_) => context),
-        );
-      }
-      for (final raw in (data['tags'] as List? ?? [])) {
-        final tag = _mapper
-            .tagFromJson(raw as Map<String, dynamic>)
-            .copyWith(isDirty: false);
-        batch.insert(_db.tags, tag, onConflict: DoUpdate((_) => tag));
-      }
-      for (final raw in (data['note_links'] as List? ?? [])) {
-        final link = _mapper
-            .noteLinkFromJson(raw as Map<String, dynamic>)
-            .copyWith(isDirty: false);
-        batch.insert(_db.noteLinks, link, onConflict: DoUpdate((_) => link));
-      }
-      for (final raw in (data['note_tags'] as List? ?? [])) {
-        final noteTag = _mapper
-            .localNoteTagFromJson(raw as Map<String, dynamic>)
-            .copyWith(isDirty: false);
-        batch.insert(
-          _db.localNoteTags,
-          noteTag,
-          onConflict: DoUpdate((_) => noteTag),
-        );
-      }
-      for (final raw in (data['user_note_preferences'] as List? ?? [])) {
-        final pref = _mapper.userNotePreferenceFromJson(
-          raw as Map<String, dynamic>,
-        );
-        batch.insert(
-          _db.userNotePreferences,
-          pref,
-          onConflict: DoUpdate((_) => pref),
-        );
-      }
-    });
-
-    // Process Yjs states via the manager
-    final rawYjsStates = data['note_yjs_states'] as List? ?? [];
-    if (rawYjsStates.isNotEmpty) {
+    // Process accumulated Yjs states once after all pages
+    if (allRawYjsStates.isNotEmpty) {
       await _yjsMgr.mergeRemoteStatesAndProject(
-        rawYjsStates: rawYjsStates.cast<Map<String, dynamic>>(),
-        isActiveNote: _isActiveNote,
-        onMerged: (noteId) {
-          _lastYjsSyncAt[noteId] = DateTime.now();
-        },
+        rawYjsStates: allRawYjsStates,
+        isActiveNote: (noteId) => _activeNoteId != null && _activeNoteId == noteId,
+        onMerged: (_) {},
       );
     }
 
-
-    final nextSyncedAtStr = data['synced_at'] as String?;
-    if (nextSyncedAtStr != null) {
-      await prefs.setString(_kLastSyncedAtPref, nextSyncedAtStr);
+    // Save the final cursor or fall back to now
+    if (cursor != null) {
+      await prefs.setString(_kLastSyncedAtPref, cursor);
     }
-    debugPrint('[SyncService] pull DONE elapsed=${sw.elapsedMilliseconds}ms');
+    debugPrint('[SyncService] pull DONE elapsed=${sw.elapsedMilliseconds}ms totalNotes=$totalNotes pages=${totalNotes ~/ pageLimit + (totalNotes % pageLimit != 0 ? 1 : 0)}');
+  }
+}
+
+/// Simple semaphore for limiting concurrent Yjs delta exchanges.
+class Semaphore {
+  Semaphore(this._max);
+  final int _max;
+  int _acquired = 0;
+  final _queue = <void Function()>[];
+
+  Future<void> acquire() async {
+    if (_acquired < _max) {
+      _acquired++;
+      return;
+    }
+    final completer = Completer<void>();
+    _queue.add(completer.complete);
+    return completer.future;
+  }
+
+  void release() {
+    if (_queue.isNotEmpty) {
+      _queue.removeAt(0)();
+    } else {
+      _acquired--;
+    }
   }
 }

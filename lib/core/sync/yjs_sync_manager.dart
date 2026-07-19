@@ -238,8 +238,15 @@ class YjsSyncManager {
       currentUserId: userId,
     );
 
-    // Run the CPU-heavy Yjs merging logic in a background isolate to prevent ANRs
-    final result = await compute(_mergeRemoteStatesAndProjectIsolate, params);
+    // For small payloads (≤5 notes), run synchronously to avoid Isolate
+    // spawning overhead (~1.8s penalty on mobile). Larger payloads still
+    // use the background Isolate to prevent ANRs.
+    final IsolateMergeResult result;
+    if (rawYjsStates.length <= 5) {
+      result = _mergeRemoteStatesAndProjectIsolate(params);
+    } else {
+      result = await compute(_mergeRemoteStatesAndProjectIsolate, params);
+    }
 
     for (final noteId in result.mergedNoteIds) {
       evictDoc(noteId);
@@ -310,12 +317,6 @@ class YjsSyncManager {
         continue;
       }
 
-      if (hasTime || recurrence != null) {
-        dev.log(
-          '[Projection] nodeId=$nodeId hasTime=$hasTime recurrence=$recurrence dueDate=$dueDate',
-          name: 'YjsProjection',
-        );
-      }
 
       final nodeData = _extractNodeData(raw);
       final text = YjsNoteSchema.readNodeTextContent(doc, nodeId, nodeData: nodeData);

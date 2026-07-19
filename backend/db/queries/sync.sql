@@ -9,9 +9,21 @@ FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = sqlc.arg('user_id')::uuid
 LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
 LEFT JOIN users u ON u.id = n.user_id
-WHERE (n.user_id = sqlc.arg('user_id')::uuid OR ns.user_id = sqlc.arg('user_id')::uuid)
+WHERE n.user_id = sqlc.arg('user_id')::uuid
   AND n.updated_at > sqlc.arg('last_synced_at')
-ORDER BY n.updated_at ASC
+UNION ALL
+SELECT n.*,
+  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(ns.permission, '')::text AS shared_permission,
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
+FROM notes n
+JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = sqlc.arg('user_id')::uuid
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = sqlc.arg('user_id')::uuid
+LEFT JOIN users u ON u.id = n.user_id
+WHERE n.updated_at > sqlc.arg('last_synced_at')
+ORDER BY updated_at ASC
 LIMIT sqlc.arg('limit');
 
 -- name: HardDeleteExpiredNotes :exec

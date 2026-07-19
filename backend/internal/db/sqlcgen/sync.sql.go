@@ -150,19 +150,31 @@ SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.c
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
   CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
 FROM notes n
-LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1::uuid
-LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1::uuid
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2::uuid
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $2::uuid
 LEFT JOIN users u ON u.id = n.user_id
-WHERE (n.user_id = $1::uuid OR ns.user_id = $1::uuid)
-  AND n.updated_at > $2
-ORDER BY n.updated_at ASC
-LIMIT $3
+WHERE n.user_id = $2::uuid
+  AND n.updated_at > $3
+UNION ALL
+SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+  COALESCE(unp.favorite, FALSE)::boolean AS favorite,
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(ns.permission, '')::text AS shared_permission,
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.email, '') ELSE '' END AS shared_by_email,
+  CASE WHEN ns.id IS NOT NULL THEN COALESCE(u.name, '') ELSE '' END AS shared_by_name
+FROM notes n
+JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $2::uuid
+LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2::uuid
+LEFT JOIN users u ON u.id = n.user_id
+WHERE n.updated_at > $3
+ORDER BY updated_at ASC
+LIMIT $1
 `
 
 type GetSyncNotesParams struct {
+	Limit        int32              `json:"limit"`
 	UserID       pgtype.UUID        `json:"user_id"`
 	LastSyncedAt pgtype.Timestamptz `json:"last_synced_at"`
-	Limit        int32              `json:"limit"`
 }
 
 type GetSyncNotesRow struct {
@@ -185,7 +197,7 @@ type GetSyncNotesRow struct {
 }
 
 func (q *Queries) GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]GetSyncNotesRow, error) {
-	rows, err := q.db.Query(ctx, getSyncNotes, arg.UserID, arg.LastSyncedAt, arg.Limit)
+	rows, err := q.db.Query(ctx, getSyncNotes, arg.Limit, arg.UserID, arg.LastSyncedAt)
 	if err != nil {
 		return nil, err
 	}
