@@ -26,7 +26,7 @@ void main() {
       userId: 'test-user',
       coordinator: coord1,
       sendUpdate: (_) {},
-      onDocChanged: () {},
+      onDocChanged: ({required isRemote}) {},
     );
     // Seed initial nodes into YDoc
     doc1.transact((txn) {
@@ -86,7 +86,7 @@ void main() {
       userId: 'test-user',
       coordinator: coord2,
       sendUpdate: (_) {},
-      onDocChanged: () {},
+      onDocChanged: ({required isRemote}) {},
     );
 
     // 5. Mark T3 as complete on Device 2

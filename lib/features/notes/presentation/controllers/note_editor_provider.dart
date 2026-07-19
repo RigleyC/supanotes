@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,6 +32,7 @@ final noteEditorControllerProvider = Provider.autoDispose
       final db = ref.read(appDatabaseProvider);
       Future<void>? lastProjection;
       Timer? projectionDebounce;
+      bool wasLocallyEdited = false;
 
       syncService?.connectNote(noteId).then((doc) async {
         if (disposed || doc == null) return;
@@ -48,18 +50,32 @@ final noteEditorControllerProvider = Provider.autoDispose
         controller.initFromDoc(
           doc: doc,
           noteId: noteId,
-          onDocChanged: () {
+          onDocChanged: ({required isRemote}) {
+            if (!isRemote) wasLocallyEdited = true;
+            dev.log(
+              '[Provider] onDocChanged fired, debouncing 500ms',
+              name: 'NoteEditorProvider',
+            );
             projectionDebounce?.cancel();
             projectionDebounce = Timer(
               const Duration(milliseconds: 500),
               () {
                 if (disposed) return;
-                lastProjection = yjsMgr.projectNodes(noteId);
+                dev.log(
+                  '[Provider] onDocChanged debounce elapsed, projecting',
+                  name: 'NoteEditorProvider',
+                );
+                lastProjection = yjsMgr.projectNodes(noteId, markDirty: wasLocallyEdited);
+                wasLocallyEdited = false;
                 unawaited(yjsMgr.persist(noteId));
               },
             );
           },
           onDocCommitted: (_) {
+            dev.log(
+              '[Provider] onDocCommitted fired, projecting immediately',
+              name: 'NoteEditorProvider',
+            );
             projectionDebounce?.cancel();
             lastProjection = yjsMgr.projectNodes(noteId);
             unawaited(yjsMgr.persistWithSyncedVector(noteId, null));

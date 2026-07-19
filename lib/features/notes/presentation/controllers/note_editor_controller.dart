@@ -44,7 +44,7 @@ class NoteEditorController extends ChangeNotifier {
   void initFromDoc({
     required Doc doc,
     required String noteId,
-    void Function()? onDocChanged,
+    void Function({required bool isRemote})? onDocChanged,
     void Function(Set<String> nodeIds)? onDocCommitted,
   }) {
     dev.log(

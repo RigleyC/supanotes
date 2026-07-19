@@ -28,7 +28,7 @@ class YjsDocEditorBridge {
     required Doc doc,
     required String userId,
     required EditorDocumentSyncManager coordinator,
-    void Function()? onDocChanged,
+    void Function({required bool isRemote})? onDocChanged,
     void Function(Uint8List)? sendUpdate,
     void Function(Set<String> nodeIds)? onDocCommitted,
   })  : _doc = doc,
@@ -64,7 +64,7 @@ class YjsDocEditorBridge {
   final Doc _doc;
   final String _userId;
   final EditorDocumentSyncManager _coordinator;
-  final void Function()? _onDocChanged;
+  final void Function({required bool isRemote})? _onDocChanged;
   final void Function(Uint8List)? _sendUpdate;
   final void Function(Set<String> nodeIds)? _onDocCommitted;
   late final void Function(dynamic, Transaction) _onNodesChangedHandler;
@@ -105,7 +105,7 @@ class YjsDocEditorBridge {
       nodes.sort((a, b) => a.position.compareTo(b.position));
       _coordinator.updateNodesIncrementally(nodes);
     }
-    _onDocChanged?.call();
+    _onDocChanged?.call(isRemote: true);
     dev.log('[YjsBridge] _applyChangedNodes: apply ${nodes.length} nodes elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
   }
 
@@ -179,7 +179,7 @@ class YjsDocEditorBridge {
       _isFlushingLocal = false;
     }
 
-    _onDocChanged?.call();
+    _onDocChanged?.call(isRemote: false);
     _onDocCommitted?.call(changedIds);
 
     if (_sendUpdate != null) {
@@ -243,18 +243,8 @@ class YjsDocEditorBridge {
       }
     });
 
-    _onDocChanged?.call();
+    _onDocChanged?.call(isRemote: false);
     return result;
-  }
-
-  void completeRecurringTask(String nodeId, DateTime nextDue) {
-    final nodeMap = _requireTaskNode(nodeId);
-    _doc.transact((txn) {
-      nodeMap.set('completed', false);
-      nodeMap.set('dueDate', _formatDueDate(nextDue));
-      nodeMap.set('lastCompletedAt', DateTime.now().toIso8601String());
-    });
-    _onDocChanged?.call();
   }
 
   void reopenTaskInYDoc(String nodeId, {DateTime? previousDue}) {
@@ -267,7 +257,7 @@ class YjsDocEditorBridge {
       }
     });
 
-    _onDocChanged?.call();
+    _onDocChanged?.call(isRemote: false);
   }
 
   void updateTaskMetadataInYDoc(
@@ -280,6 +270,10 @@ class YjsDocEditorBridge {
     String? reminder,
     bool clearReminder = false,
   }) {
+    dev.log(
+      '[Bridge] updateTaskMetadataInYDoc: nodeId=$nodeId dueDate=$dueDate clearDueDate=$clearDueDate recurrence=$recurrence clearRecurrence=$clearRecurrence hasTime=$hasTime reminder=$reminder clearReminder=$clearReminder',
+      name: 'YjsBridge',
+    );
     _doc.transact((txn) {
       final nodesMap = _doc.getMap<Object>('nodes')!;
       final raw = nodesMap.get(nodeId);
@@ -308,7 +302,15 @@ class YjsDocEditorBridge {
       }
     });
 
-    _onDocChanged?.call();
+    dev.log(
+      '[Bridge] _onDocChanged called after updateTaskMetadataInYDoc',
+      name: 'YjsBridge',
+    );
+    _onDocChanged?.call(isRemote: false);
+    dev.log(
+      '[Bridge] _onDocChanged done',
+      name: 'YjsBridge',
+    );
   }
 
   // ---------------------------------------------------------------------------

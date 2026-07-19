@@ -30,7 +30,7 @@ void main() {
       doc: doc,
       userId: 'test-user',
       coordinator: coord,
-      onDocChanged: () {},
+      onDocChanged: ({required isRemote}) {},
     );
     
     // Initial flush

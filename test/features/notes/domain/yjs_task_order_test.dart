@@ -41,7 +41,7 @@ void main() {
       doc: doc1,
       userId: 'test-user',
       coordinator: coord1,
-      onDocChanged: () {},
+      onDocChanged: ({required isRemote}) {},
     );
     await coord1.flushNow();
 
@@ -64,7 +64,7 @@ void main() {
       doc: doc2,
       userId: 'test-user',
       coordinator: coord2,
-      onDocChanged: () {},
+      onDocChanged: ({required isRemote}) {},
     );
 
     // Device 2 inserts a new task below t1 using editor command

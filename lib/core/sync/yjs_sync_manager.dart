@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
+import 'package:supanotes/features/notes/domain/yjs_note_schema.dart';
 import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import '../database/database.dart';
@@ -79,39 +80,46 @@ class YjsSyncManager {
     await _persistLock;
   }
 
-  /// Projects a raw Yjs state into local SQLite tables.
-  /// Used by SyncService to project the state after a pull without
-  /// affecting the active editor document.
-  Future<void> projectState(String noteId, Uint8List state) async {
-    final doc = Doc();
-    applyUpdate(doc, state);
-    
-    final previousDoc = _docs[noteId];
-    _docs[noteId] = doc;
-    try {
-      await projectNodes(noteId, markDirty: false);
-    } finally {
-      if (previousDoc != null) {
-        _docs[noteId] = previousDoc;
-      } else {
-        _docs.remove(noteId);
-      }
-    }
-  }
-
   /// Per-note serial write chains to avoid concurrent projection for the same note.
+  /// Uses a generation counter to avoid the race where an old projection removes
+  /// a chain entry that a newer projection was chained onto.
   final Map<String, Future<void>> _noteWriteChains = {};
+  final Map<String, int> _noteWriteGenerations = {};
 
   /// Project YMap("nodes") to local SQLite tables.
   /// Projects task nodes to the tasks table and derives the note's
   /// content/excerpt so list views reflect edits without waiting for a
   /// sync round-trip.
+  ///
+  /// Errors propagate to the caller so it can react (e.g., signal staleness).
+  /// The internal chain recovers via the generation counter so subsequent
+  /// calls still execute.
   Future<void> projectNodes(String noteId, {bool markDirty = true}) async {
     if (!_noteWriteChains.containsKey(noteId)) {
       _noteWriteChains[noteId] = Future.value();
+      _noteWriteGenerations[noteId] = 0;
     }
-    _noteWriteChains[noteId] = _noteWriteChains[noteId]!.then((_) => _projectNow(noteId, markDirty: markDirty));
-    return _noteWriteChains[noteId];
+    final gen = (_noteWriteGenerations[noteId] ?? 0) + 1;
+    _noteWriteGenerations[noteId] = gen;
+
+    // inner: the operation future that IS allowed to reject
+    final inner = _noteWriteChains[noteId]!.then((_) async {
+      try {
+        await _projectNow(noteId, markDirty: markDirty);
+      } finally {
+        if (_noteWriteGenerations[noteId] == gen) {
+          _noteWriteChains.remove(noteId);
+          _noteWriteGenerations.remove(noteId);
+        }
+      }
+    });
+
+    // Chain entry gets a safe version that never rejects:
+    // the internal chain survives even when individual operations fail.
+    _noteWriteChains[noteId] = inner.catchError((_) {});
+
+    // Caller receives the real future — errors are propagated.
+    return inner;
   }
 
   Future<void> _projectNow(String noteId, {bool markDirty = true}) async {
@@ -126,12 +134,25 @@ class YjsSyncManager {
     // Indexed reconciliation: build map for O(1) lookups
     final existingById = {for (final row in existingRows) row.id: row};
 
+    final existingNote = await (_db.select(_db.notes)..where((t) => t.id.equals(noteId))).getSingleOrNull();
+
+    bool noteChanged = markDirty;
+    if (existingNote != null) {
+      final companion = data.noteCompanion;
+      if (companion.content.value != existingNote.content) noteChanged = true;
+      if (companion.excerpt.value != existingNote.excerpt) noteChanged = true;
+    } else {
+      noteChanged = true;
+    }
+
     await _db.batch((batch) {
-      batch.update(
-        _db.notes,
-        data.noteCompanion,
-        where: (t) => t.id.equals(noteId),
-      );
+      if (noteChanged) {
+        batch.update(
+          _db.notes,
+          data.noteCompanion,
+          where: (t) => t.id.equals(noteId),
+        );
+      }
       
       for (final task in data.tasks) {
         final existing = existingById.remove(task.id.value);
@@ -143,11 +164,11 @@ class YjsSyncManager {
           if (existing.title != task.title.value) changed = true;
           if (existing.status != task.status.value) changed = true;
           if (existing.position != task.position.value) changed = true;
-          if (existing.dueDate != task.dueDate.value) changed = true;
+          if (existing.dueDate?.toUtc() != task.dueDate.value?.toUtc()) changed = true;
           if (existing.hasTime != task.hasTime.value) changed = true;
           if (existing.recurrence != task.recurrence.value) changed = true;
           if (existing.reminder != task.reminder.value) changed = true;
-          if (existing.completedAt != task.completedAt.value) changed = true;
+          if (existing.completedAt?.toUtc() != task.completedAt.value?.toUtc()) changed = true;
           
           if (changed) {
             batch.update(
@@ -164,9 +185,6 @@ class YjsSyncManager {
         batch.delete(_db.tasks, orphan);
       }
     });
-
-    // Clean up resolved write chain entry
-    _noteWriteChains.remove(noteId);
   }
 
   /// Persist the current in-memory Doc state with the synced state vector.
@@ -292,8 +310,15 @@ class YjsSyncManager {
         continue;
       }
 
+      if (hasTime || recurrence != null) {
+        dev.log(
+          '[Projection] nodeId=$nodeId hasTime=$hasTime recurrence=$recurrence dueDate=$dueDate',
+          name: 'YjsProjection',
+        );
+      }
+
       final nodeData = _extractNodeData(raw);
-      final text = _readNodeTextContent(doc, nodeId, nodeData: nodeData);
+      final text = YjsNoteSchema.readNodeTextContent(doc, nodeId, nodeData: nodeData);
 
       final now = DateTime.now();
 
@@ -349,7 +374,7 @@ class YjsSyncManager {
     final lines = <String>[];
     for (final node in nodes) {
       final nodeData = node.data;
-      final text = _readNodeTextContent(doc, node.id, nodeData: nodeData);
+      final text = YjsNoteSchema.readNodeTextContent(doc, node.id, nodeData: nodeData);
       switch (node.type) {
         case 'header':
           int level = 1;
@@ -398,39 +423,6 @@ class YjsSyncManager {
     if (flat.isEmpty) return null;
     if (flat.length <= 120) return flat;
     return '${flat.substring(0, 120)}…';
-  }
-
-  static String _readNodeTextContent(
-    Doc doc,
-    String nodeId, {
-    Map<String, dynamic>? nodeData,
-  }) {
-    final fixedKey = 'content_fixed/$nodeId';
-    if (doc.share.containsKey(fixedKey)) {
-      try {
-        final fixedType = doc.getText(fixedKey);
-        if (fixedType != null) {
-          final text = fixedType.toString();
-          if (text.isNotEmpty) return text;
-        }
-      } catch (_) {}
-    }
-
-    final contentKey = 'content/$nodeId';
-    if (doc.share.containsKey(contentKey)) {
-      try {
-        final sharedType = doc.getText(contentKey);
-        if (sharedType != null) {
-          final text = sharedType.toString();
-          if (text.isNotEmpty) return text;
-        }
-      } catch (_) {}
-    }
-
-    final dataText = nodeData?['text'] as String?;
-    if (dataText != null && dataText.isNotEmpty) return dataText;
-
-    return '';
   }
 
   static Map<String, dynamic>? _extractNodeData(dynamic raw) {

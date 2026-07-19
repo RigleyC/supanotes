@@ -24,7 +24,7 @@ void main() {
       userId: 'test-user',
       coordinator: coordinator,
       sendUpdate: (_) {},
-      onDocChanged: () {},
+      onDocChanged: ({required isRemote}) {},
     );
     
     // 2. Simulate user typing via editor
