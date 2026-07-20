@@ -91,9 +91,10 @@ func main() {
 
 		cleanDoc.Transact(func(txn *crdt.Transaction) {
 			cleanNodesMap.Set(txn, n.ID, string(nodeJSON))
-			// Populate YText
+			// Populate the canonical YText root. content_fixed is read-only
+			// compatibility for states produced by older squash runs.
 			if n.Text != "" {
-				ytext := cleanDoc.GetText("content_fixed/" + n.ID)
+				ytext := cleanDoc.GetText("content/" + n.ID)
 				ytext.Insert(txn, 0, n.Text, nil)
 			}
 		})

@@ -47,6 +47,16 @@ func TestMakeNodeDoc(t *testing.T) {
 	assert.Equal(t, "hello", textType.ToString())
 }
 
+func TestNodeTextPrefersCanonicalRootOverLegacyFallback(t *testing.T) {
+	doc := crdt.New(crdt.WithGC(false))
+	doc.Transact(func(txn *crdt.Transaction) {
+		doc.GetText("content/node-1").Insert(txn, 0, "canonical", nil)
+		doc.GetText("content_fixed/node-1").Insert(txn, 0, "legacy", nil)
+	})
+
+	assert.Equal(t, "canonical", nodeText(doc, "node-1", nil))
+}
+
 func TestNodesFromDoc_SortsByPosition(t *testing.T) {
 	doc := makeNodeDoc(t, []struct{ key, pos, typ, text string }{
 		{key: "c", pos: "z0", typ: "paragraph", text: "third"},

@@ -109,7 +109,7 @@ func posToString(pos any) string {
 }
 
 func nodeText(doc *crdt.Doc, nodeID string, data json.RawMessage) string {
-	for _, key := range []string{"content_fixed/" + nodeID, "content/" + nodeID} {
+	for _, key := range []string{"content/" + nodeID, "content_fixed/" + nodeID} {
 		if textType := doc.GetText(key); textType != nil {
 			if text := textType.ToString(); text != "" {
 				return text

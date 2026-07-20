@@ -50,6 +50,27 @@ func TestMergeYjsUpdates_Multiple(t *testing.T) {
 	require.NotEmpty(t, merged)
 }
 
+func TestPreRegisterYTextSupportsLegacyAndNonUUIDContentRoots(t *testing.T) {
+	source := crdt.New(crdt.WithGC(false))
+	for root, text := range map[string]string{
+		"content/p1":       "paragraph with a short id",
+		"content_fixed/p2": "legacy paragraph",
+	} {
+		ytext := source.GetText(root)
+		source.Transact(func(txn *crdt.Transaction) {
+			ytext.Insert(txn, 0, text, nil)
+		})
+	}
+
+	update := crdt.EncodeStateAsUpdateV1(source, nil)
+	target := crdt.New(crdt.WithGC(false))
+	PreRegisterYText(target, update)
+	require.NoError(t, crdt.ApplyUpdateV1(target, update, nil))
+
+	assert.Equal(t, "paragraph with a short id", target.GetText("content/p1").ToString())
+	assert.Equal(t, "legacy paragraph", target.GetText("content_fixed/p2").ToString())
+}
+
 func TestYDocServiceCloseIsIdempotent(t *testing.T) {
 	svc := NewYDocService(nil, nil, "test", WithMaxCachedDocs(10))
 	// First Close should cancel the context and wait for the goroutine.

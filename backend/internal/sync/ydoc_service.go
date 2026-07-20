@@ -15,7 +15,11 @@ import (
 	"github.com/reearth/ygo/crdt"
 )
 
-var contentRegex = regexp.MustCompile(`content/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`)
+// Yjs needs the root shared type to exist before an update is decoded. Node
+// ids are normally UUIDs, but historic documents and tests also contain other
+// stable ids, and the former content_fixed root is still readable. Limiting
+// this to UUID-shaped content roots let those YTexts be decoded as YMaps.
+var contentRegex = regexp.MustCompile(`content(?:_fixed)?/[A-Za-z0-9_-]+`)
 
 func PreRegisterYText(doc *crdt.Doc, state []byte) {
 	doc.GetMap("nodes")
