@@ -21,7 +21,7 @@ func (t *AddTaskTool) Name() string { return "add_task" }
 func (t *AddTaskTool) Description() string {
 	return "Create a new task. Optionally link to a note via note_id. Set recurrence for repeating tasks (daily/weekdays/weekly/monthly). Set due_date (YYYY-MM-DD) for deadline tracking."
 }
-func (t *AddTaskTool) Label() string { return "Atualizando tarefas" }
+func (t *AddTaskTool) Label() string         { return "Atualizando tarefas" }
 func (t *AddTaskTool) Summary(string) string { return "[AddTaskTool executed successfully]" }
 
 func (t *AddTaskTool) SchemaJSON() string {
@@ -53,7 +53,17 @@ func (t *AddTaskTool) Execute(ctx context.Context, userID pgtype.UUID, sessionID
 		}
 		dueDateTime = &t
 	}
-	task, err := t.tasksSvc.CreateTask(ctx, userID, noteID, args.Title, dueDateTime, args.Recurrence, "0")
+	task, err := t.tasksSvc.CreateTask(
+		ctx,
+		userID,
+		noteID,
+		args.Title,
+		dueDateTime,
+		args.Recurrence,
+		"0",
+		nil,
+		nil,
+	)
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +78,7 @@ func (t *CompleteTaskTool) Name() string { return "complete_task" }
 func (t *CompleteTaskTool) Description() string {
 	return "Mark a task as done. Use this when the user says they completed something (e.g., 'comprei o arroz', 'fiz o treino', 'terminei o relatório'). Pass the task_id from get_open_tasks or get_today_tasks."
 }
-func (t *CompleteTaskTool) Label() string { return "Atualizando tarefas" }
+func (t *CompleteTaskTool) Label() string         { return "Atualizando tarefas" }
 func (t *CompleteTaskTool) Summary(string) string { return "[CompleteTaskTool executed successfully]" }
 
 func (t *CompleteTaskTool) SchemaJSON() string {
@@ -101,7 +111,7 @@ func (t *QueryTasksTool) Name() string { return "query_tasks" }
 func (t *QueryTasksTool) Description() string {
 	return "Search and filter tasks. Use this when the user asks for their open tasks, today's tasks, or searches for a specific task. You can filter by status (open/done/all), timeframe (today/overdue/all), and keyword query."
 }
-func (t *QueryTasksTool) Label() string { return "Consultando tarefas" }
+func (t *QueryTasksTool) Label() string         { return "Consultando tarefas" }
 func (t *QueryTasksTool) Summary(string) string { return "[Task query completed]" }
 
 func (t *QueryTasksTool) SchemaJSON() string {
@@ -187,7 +197,7 @@ func (t *UpdateTaskTool) Name() string { return "update_task" }
 func (t *UpdateTaskTool) Description() string {
 	return "Update a task's title, due_date, or recurrence"
 }
-func (t *UpdateTaskTool) Label() string { return "Atualizando tarefas" }
+func (t *UpdateTaskTool) Label() string         { return "Atualizando tarefas" }
 func (t *UpdateTaskTool) Summary(string) string { return "[UpdateTaskTool executed successfully]" }
 
 func (t *UpdateTaskTool) SchemaJSON() string {

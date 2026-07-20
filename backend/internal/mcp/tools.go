@@ -272,7 +272,17 @@ func RegisterTools(
 				return asError(err)
 			}
 			title := getStr(args, "title")
-			res, err := tasksSvc.CreateTask(ctx, userID, pgtype.UUID{}, title, nil, nil, "0")
+			res, err := tasksSvc.CreateTask(
+				ctx,
+				userID,
+				pgtype.UUID{},
+				title,
+				nil,
+				nil,
+				"0",
+				nil,
+				nil,
+			)
 			if err != nil {
 				return asError(err)
 			}
