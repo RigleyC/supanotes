@@ -6,3 +6,8 @@ bin/
 .env
 .git
 .tmp
+tmp/
+backend/
+dev/
+scratch/
+*.test
