@@ -195,15 +195,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           nextDue: result.nextDue,
                           previousDue: result.previousDue,
                           previousHasTime: result.previousHasTime,
+                          scheduledAt: result.scheduledAt,
                         );
                       },
-                      onUndo: (previousDue, previousHasTime) {
+                      onUndo: (previousDue, previousHasTime, scheduledAt) {
                         final controller = ref.read(
                           noteEditorControllerProvider(widget.noteId),
                         );
                         controller.reopenTaskInYDoc(
                           taskId,
                           previousDue: previousDue,
+                          scheduledAt: scheduledAt,
                         );
                         if (previousDue != null) {
                           controller.updateTaskMetadataInYDoc(

@@ -31,30 +31,45 @@ class YjsSyncManager {
     final cached = _docs[noteId];
     if (cached != null) return cached;
 
-    final stateRow = await (_db.select(_db.localYjsStates)
-          ..where((t) => t.noteId.equals(noteId)))
-        .getSingleOrNull();
+    final stateRow = await (_db.select(
+      _db.localYjsStates,
+    )..where((t) => t.noteId.equals(noteId))).getSingleOrNull();
     if (stateRow != null) {
       final doc = Doc();
       try {
         applyUpdate(doc, stateRow.state);
         _docs[noteId] = doc;
-        dev.log('[YjsSyncManager] Loaded snapshot for note=$noteId', name: 'YjsSync');
+        dev.log(
+          '[YjsSyncManager] Loaded snapshot for note=$noteId',
+          name: 'YjsSync',
+        );
         return doc;
       } catch (e, stackTrace) {
-        dev.log('[YjsSyncManager] CRITICAL: Failed to apply snapshot for note=$noteId: $e. Clearing corrupted snapshot.',
-            name: 'YjsSync', error: e, stackTrace: stackTrace);
-        await (_db.delete(_db.localYjsStates)..where((t) => t.noteId.equals(noteId))).go();
+        dev.log(
+          '[YjsSyncManager] CRITICAL: Failed to apply snapshot for note=$noteId: $e. Clearing corrupted snapshot.',
+          name: 'YjsSync',
+          error: e,
+          stackTrace: stackTrace,
+        );
+        await (_db.delete(
+          _db.localYjsStates,
+        )..where((t) => t.noteId.equals(noteId))).go();
         final doc = Doc();
         _docs[noteId] = doc;
-        dev.log('[YjsSyncManager] Initialized empty doc for note=$noteId after clearing corrupted snapshot. Waiting for server sync.', name: 'YjsSync');
+        dev.log(
+          '[YjsSyncManager] Initialized empty doc for note=$noteId after clearing corrupted snapshot. Waiting for server sync.',
+          name: 'YjsSync',
+        );
         return doc;
       }
     }
 
     final doc = Doc();
     _docs[noteId] = doc;
-    dev.log('[YjsSyncManager] Initialized empty doc for note=$noteId. Waiting for server sync.', name: 'YjsSync');
+    dev.log(
+      '[YjsSyncManager] Initialized empty doc for note=$noteId. Waiting for server sync.',
+      name: 'YjsSync',
+    );
     return doc;
   }
 
@@ -67,16 +82,27 @@ class YjsSyncManager {
     final state = encodeStateAsUpdate(doc);
     _persistLock = _persistLock.then((_) async {
       try {
-        await _db.into(_db.localYjsStates).insertOnConflictUpdate(
+        await _db
+            .into(_db.localYjsStates)
+            .insertOnConflictUpdate(
               LocalYjsStatesCompanion(
                 noteId: Value(noteId),
                 state: Value(state),
                 updatedAt: Value(DateTime.now()),
               ),
             );
-        dev.log('[YjsSyncManager] Persisted state for note=$noteId', name: 'YjsSync');
+        dev.log(
+          '[YjsSyncManager] Persisted state for note=$noteId',
+          name: 'YjsSync',
+        );
       } catch (e, stackTrace) {
-        dev.log('YjsSyncManager persist error: $e', name: 'YjsSync', error: e, stackTrace: stackTrace, level: 1000);
+        dev.log(
+          'YjsSyncManager persist error: $e',
+          name: 'YjsSync',
+          error: e,
+          stackTrace: stackTrace,
+          level: 1000,
+        );
       }
     });
     await _persistLock;
@@ -129,14 +155,16 @@ class YjsSyncManager {
     if (doc == null) return;
 
     final data = deriveProjectedData(noteId, doc, userId, markDirty: markDirty);
-    final existingRows = await (_db.select(_db.tasks)
-      ..where((t) => t.noteId.equals(noteId))
-    ).get();
+    final existingRows = await (_db.select(
+      _db.tasks,
+    )..where((t) => t.noteId.equals(noteId))).get();
 
     // Indexed reconciliation: build map for O(1) lookups
     final existingById = {for (final row in existingRows) row.id: row};
 
-    final existingNote = await (_db.select(_db.notes)..where((t) => t.id.equals(noteId))).getSingleOrNull();
+    final existingNote = await (_db.select(
+      _db.notes,
+    )..where((t) => t.id.equals(noteId))).getSingleOrNull();
 
     bool noteChanged = markDirty;
     if (existingNote != null) {
@@ -147,6 +175,17 @@ class YjsSyncManager {
       noteChanged = true;
     }
 
+    final recurringTaskIds = data.tasks
+        .where((task) => task.recurrence.value != null)
+        .map((task) => task.id.value)
+        .toList(growable: false);
+    final existingRecurringCompletions = recurringTaskIds.isEmpty
+        ? const <LocalTaskCompletionData>[]
+        : await (_db.select(_db.localTaskCompletions)..where(
+                (completion) => completion.taskId.isIn(recurringTaskIds),
+              ))
+              .get();
+
     await _db.batch((batch) {
       if (noteChanged) {
         batch.update(
@@ -155,7 +194,7 @@ class YjsSyncManager {
           where: (t) => t.id.equals(noteId),
         );
       }
-      
+
       for (final task in data.tasks) {
         final existing = existingById.remove(task.id.value);
         if (existing == null) {
@@ -163,15 +202,24 @@ class YjsSyncManager {
         } else {
           // Only write if something changed
           bool changed = false;
-          if (existing.title != task.title.value) changed = true;
-          if (existing.status != task.status.value) changed = true;
+          if (existing.title != task.title.value) {
+            changed = true;
+          }
+          if (existing.status != task.status.value) {
+            changed = true;
+          }
           if (existing.position != task.position.value) changed = true;
-          if (existing.dueDate?.toUtc() != task.dueDate.value?.toUtc()) changed = true;
+          if (existing.dueDate?.toUtc() != task.dueDate.value?.toUtc()) {
+            changed = true;
+          }
           if (existing.hasTime != task.hasTime.value) changed = true;
           if (existing.recurrence != task.recurrence.value) changed = true;
           if (existing.reminder != task.reminder.value) changed = true;
-          if (existing.completedAt?.toUtc() != task.completedAt.value?.toUtc()) changed = true;
-          
+          if (existing.completedAt?.toUtc() !=
+              task.completedAt.value?.toUtc()) {
+            changed = true;
+          }
+
           if (changed) {
             batch.update(
               _db.tasks,
@@ -181,16 +229,26 @@ class YjsSyncManager {
           }
         }
       }
-      
+
       // Delete orphan tasks that no longer exist in the YDoc
       for (final orphan in existingById.values) {
         batch.delete(_db.tasks, orphan);
       }
 
-      // Upsert task completions projected from the YDoc
+      // Recurring completion events are a projection of the YDoc. Replace the
+      // note's recurring history so deleted YMap entries (undo) are deleted
+      // locally as well.
+      for (final completion in existingRecurringCompletions) {
+        batch.delete(_db.localTaskCompletions, completion);
+      }
+
+      // Upsert task completions projected from the YDoc.
       for (final completion in data.completions) {
-        batch.insert(_db.localTaskCompletions, completion,
-            mode: InsertMode.insertOrReplace);
+        batch.insert(
+          _db.localTaskCompletions,
+          completion,
+          mode: InsertMode.insertOrReplace,
+        );
       }
     });
   }
@@ -198,22 +256,36 @@ class YjsSyncManager {
   /// Persist the current in-memory Doc state with the synced state vector.
   /// Always re-encodes — the cache is not safe because the YDoc may have
   /// changed (e.g. after applying a remote update).
-  Future<void> persistWithSyncedVector(String noteId, Uint8List? syncedStateVector) async {
+  Future<void> persistWithSyncedVector(
+    String noteId,
+    Uint8List? syncedStateVector,
+  ) async {
     final doc = _docs[noteId];
     if (doc == null) return;
     final state = encodeStateAsUpdate(doc);
     try {
-      await _db.into(_db.localYjsStates).insertOnConflictUpdate(
-        LocalYjsStatesCompanion(
-          noteId: Value(noteId),
-          state: Value(state),
-          syncedStateVector: Value(syncedStateVector),
-          updatedAt: Value(DateTime.now()),
-        ),
+      await _db
+          .into(_db.localYjsStates)
+          .insertOnConflictUpdate(
+            LocalYjsStatesCompanion(
+              noteId: Value(noteId),
+              state: Value(state),
+              syncedStateVector: Value(syncedStateVector),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+      dev.log(
+        '[YjsSyncManager] Persisted synced vector for note=$noteId',
+        name: 'YjsSync',
       );
-      dev.log('[YjsSyncManager] Persisted synced vector for note=$noteId', name: 'YjsSync');
     } catch (e, stackTrace) {
-      dev.log('YjsSyncManager persistWithSyncedVector error: $e', name: 'YjsSync', error: e, stackTrace: stackTrace, level: 1000);
+      dev.log(
+        'YjsSyncManager persistWithSyncedVector error: $e',
+        name: 'YjsSync',
+        error: e,
+        stackTrace: stackTrace,
+        level: 1000,
+      );
     }
   }
 
@@ -226,12 +298,22 @@ class YjsSyncManager {
   }) async {
     if (rawYjsStates.isEmpty) return;
 
-    final noteIdsToProject = rawYjsStates.map((raw) => raw['note_id'] as String).toList();
-    
-    final localStatesList = noteIdsToProject.isEmpty ? <LocalYjsState>[] : await (_db.select(_db.localYjsStates)..where((t) => t.noteId.isIn(noteIdsToProject))).get();
+    final noteIdsToProject = rawYjsStates
+        .map((raw) => raw['note_id'] as String)
+        .toList();
+
+    final localStatesList = noteIdsToProject.isEmpty
+        ? <LocalYjsState>[]
+        : await (_db.select(
+            _db.localYjsStates,
+          )..where((t) => t.noteId.isIn(noteIdsToProject))).get();
     final localStatesMap = {for (final s in localStatesList) s.noteId: s.state};
-    
-    final existingTasksList = noteIdsToProject.isEmpty ? <TaskData>[] : await (_db.select(_db.tasks)..where((t) => t.noteId.isIn(noteIdsToProject))).get();
+
+    final existingTasksList = noteIdsToProject.isEmpty
+        ? <TaskData>[]
+        : await (_db.select(
+            _db.tasks,
+          )..where((t) => t.noteId.isIn(noteIdsToProject))).get();
     final existingTasksByNote = <String, List<TaskData>>{};
     for (final t in existingTasksList) {
       existingTasksByNote.putIfAbsent(t.noteId, () => []).add(t);
@@ -282,13 +364,17 @@ class YjsSyncManager {
       onMerged(noteId);
     }
 
-    if (result.yjsStatesToInsert.isNotEmpty || 
-        result.projectedNotes.isNotEmpty || 
-        result.projectedTasks.isNotEmpty || 
+    if (result.yjsStatesToInsert.isNotEmpty ||
+        result.projectedNotes.isNotEmpty ||
+        result.projectedTasks.isNotEmpty ||
         result.tasksToDelete.isNotEmpty) {
       await _db.batch((batch) {
         for (final state in result.yjsStatesToInsert) {
-          batch.insert(_db.localYjsStates, state, onConflict: DoUpdate((_) => state));
+          batch.insert(
+            _db.localYjsStates,
+            state,
+            onConflict: DoUpdate((_) => state),
+          );
         }
         for (final note in result.projectedNotes) {
           batch.update(
@@ -307,7 +393,12 @@ class YjsSyncManager {
     }
   }
 
-  static ProjectedData deriveProjectedData(String noteId, Doc doc, String userId, {bool markDirty = true}) {
+  static ProjectedData deriveProjectedData(
+    String noteId,
+    Doc doc,
+    String userId, {
+    bool markDirty = true,
+  }) {
     final nodes = noteNodesFromDoc(doc);
     final nodesMap = doc.getMap<Object>('nodes')!;
     final now = DateTime.now();
@@ -317,7 +408,11 @@ class YjsSyncManager {
     final tasks = <TasksCompanion>[];
 
     for (final node in nodes) {
-      final text = YjsNoteSchema.readNodeTextContent(doc, node.id, nodeData: node.data);
+      final text = YjsNoteSchema.readNodeTextContent(
+        doc,
+        node.id,
+        nodeData: node.data,
+      );
 
       // Build markdown line
       switch (node.type) {
@@ -326,7 +421,10 @@ class YjsSyncManager {
           lines.add('${List.filled(level, '#').join()} $text');
         case 'task':
           final raw = nodesMap.get(node.id);
-          final completed = raw is YMap && (nodesMap.get('${node.id}:completed') == true || raw.get('completed') == true);
+          final completed =
+              raw is YMap &&
+              (nodesMap.get('${node.id}:completed') == true ||
+                  raw.get('completed') == true);
           lines.add('- [${completed ? 'x' : ' '}] $text');
         case 'list_item':
           lines.add('- $text');
@@ -342,12 +440,24 @@ class YjsSyncManager {
       if (node.type == 'task') {
         final raw = nodesMap.get(node.id);
         if (raw is YMap) {
-          final completed = nodesMap.get('${node.id}:completed') == true || raw.get('completed') == true;
-          final dueDate = (nodesMap.get('${node.id}:dueDate') as String?) ?? (raw.get('dueDate') as String?);
-          final hasTime = nodesMap.get('${node.id}:hasTime') == true || raw.get('hasTime') == true;
-          final recurrence = (nodesMap.get('${node.id}:recurrence') as String?) ?? (raw.get('recurrence') as String?);
-          final reminder = (nodesMap.get('${node.id}:reminder') as String?) ?? (raw.get('reminder') as String?);
-          final lastCompletedAtStr = (nodesMap.get('${node.id}:lastCompletedAt') as String?) ?? (raw.get('lastCompletedAt') as String?);
+          final completed =
+              nodesMap.get('${node.id}:completed') == true ||
+              raw.get('completed') == true;
+          final dueDate =
+              (nodesMap.get('${node.id}:dueDate') as String?) ??
+              (raw.get('dueDate') as String?);
+          final hasTime =
+              nodesMap.get('${node.id}:hasTime') == true ||
+              raw.get('hasTime') == true;
+          final recurrence =
+              (nodesMap.get('${node.id}:recurrence') as String?) ??
+              (raw.get('recurrence') as String?);
+          final reminder =
+              (nodesMap.get('${node.id}:reminder') as String?) ??
+              (raw.get('reminder') as String?);
+          final lastCompletedAtStr =
+              (nodesMap.get('${node.id}:lastCompletedAt') as String?) ??
+              (raw.get('lastCompletedAt') as String?);
 
           DateTime? completedAt;
           if (lastCompletedAtStr != null) {
@@ -365,28 +475,32 @@ class YjsSyncManager {
             resolvedRecurrence = TaskRecurrence.parse(recurrence);
           }
 
-          tasks.add(TasksCompanion.insert(
-            id: node.id,
-            userId: userId,
-            noteId: noteId,
-            title: text,
-            status: completed ? 'done' : 'open',
-            position: Value(node.position),
-            dueDate: Value(resolvedDueDate),
-            hasTime: Value(hasTime),
-            recurrence: Value(resolvedRecurrence),
-            reminder: Value(reminder),
-            completedAt: Value(completedAt),
-            createdAt: now,
-            updatedAt: now,
-          ));
+          tasks.add(
+            TasksCompanion.insert(
+              id: node.id,
+              userId: userId,
+              noteId: noteId,
+              title: text,
+              status: completed ? 'done' : 'open',
+              position: Value(node.position),
+              dueDate: Value(resolvedDueDate),
+              hasTime: Value(hasTime),
+              recurrence: Value(resolvedRecurrence),
+              reminder: Value(reminder),
+              completedAt: Value(completedAt),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
         }
       }
     }
 
     // Project task completion events from YDoc's taskCompletions YMap
     final completions = <LocalTaskCompletionsCompanion>[];
-    final taskCompletionsMap = doc.getMap<Object>(YjsNoteSchema.taskCompletionsRoot);
+    final taskCompletionsMap = doc.getMap<Object>(
+      YjsNoteSchema.taskCompletionsRoot,
+    );
     if (taskCompletionsMap != null) {
       for (final key in taskCompletionsMap.keys) {
         final colonIdx = key.indexOf(':');
@@ -403,13 +517,15 @@ class YjsSyncManager {
         if (completedAt == null || scheduledAt == null) continue;
 
         final uuid = const Uuid().v4();
-        completions.add(LocalTaskCompletionsCompanion.insert(
-          id: uuid,
-          taskId: taskId,
-          userId: userId,
-          completedAt: completedAt.toUtc(),
-          scheduledAt: scheduledAt.toUtc(),
-        ));
+        completions.add(
+          LocalTaskCompletionsCompanion.insert(
+            id: uuid,
+            taskId: taskId,
+            userId: userId,
+            completedAt: completedAt.toUtc(),
+            scheduledAt: scheduledAt.toUtc(),
+          ),
+        );
       }
     }
 
@@ -422,7 +538,9 @@ class YjsSyncManager {
       excerpt: Value(excerpt),
       updatedAt: Value(now),
     );
-    final finalCompanion = markDirty ? companion.copyWith(isDirty: const Value(true)) : companion;
+    final finalCompanion = markDirty
+        ? companion.copyWith(isDirty: const Value(true))
+        : companion;
 
     return ProjectedData(finalCompanion, tasks, completions: completions);
   }
@@ -488,7 +606,9 @@ class IsolateMergeResult {
   });
 }
 
-IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(IsolateMergeParams params) {
+IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(
+  IsolateMergeParams params,
+) {
   final projectedNotes = <NotesCompanion>[];
   final projectedTasks = <TasksCompanion>[];
   final yjsStatesToInsert = <LocalYjsStatesCompanion>[];
@@ -519,7 +639,7 @@ IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(IsolateMergeParams params
     } else {
       remoteStateBytes = (rawState as List).cast<int>();
     }
-    
+
     final remoteUpdatedAtStr = raw['updated_at'] as String;
     final remoteUpdatedAt = DateTime.parse(remoteUpdatedAtStr);
 
@@ -532,38 +652,64 @@ IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(IsolateMergeParams params
       applyUpdate(tmpDoc, Uint8List.fromList(remoteStateBytes));
 
       final mergedState = encodeStateAsUpdate(tmpDoc);
-      yjsStatesToInsert.add(LocalYjsStatesCompanion(
-        noteId: Value(noteId),
-        state: Value(mergedState),
-        updatedAt: Value(DateTime.now()),
-      ));
-      
-      final projectedData = YjsSyncManager.deriveProjectedData(noteId, tmpDoc, userId, markDirty: false);
-      projectedNotes.add(projectedData.noteCompanion.copyWith(hasRemoteCopy: const Value(true)));
+      yjsStatesToInsert.add(
+        LocalYjsStatesCompanion(
+          noteId: Value(noteId),
+          state: Value(mergedState),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      final projectedData = YjsSyncManager.deriveProjectedData(
+        noteId,
+        tmpDoc,
+        userId,
+        markDirty: false,
+      );
+      projectedNotes.add(
+        projectedData.noteCompanion.copyWith(hasRemoteCopy: const Value(true)),
+      );
       projectedTasks.addAll(projectedData.tasks);
-      
-      final projectedTaskIds = projectedData.tasks.map((t) => t.id.value).toSet();
+
+      final projectedTaskIds = projectedData.tasks
+          .map((t) => t.id.value)
+          .toSet();
       final noteExistingTasks = params.existingTasksByNote[noteId] ?? [];
-      tasksToDelete.addAll(noteExistingTasks.where((t) => !projectedTaskIds.contains(t.id)));
+      tasksToDelete.addAll(
+        noteExistingTasks.where((t) => !projectedTaskIds.contains(t.id)),
+      );
 
       mergedNoteIds.add(noteId);
     } catch (e, st) {
       debugPrint('[IsolateYjsSync] mergeRemoteStatesAndProject ERROR: $e\n$st');
-      yjsStatesToInsert.add(LocalYjsStatesCompanion(
-        noteId: Value(noteId),
-        state: Value(Uint8List.fromList(remoteStateBytes)),
-        updatedAt: Value(remoteUpdatedAt),
-      ));
-      
+      yjsStatesToInsert.add(
+        LocalYjsStatesCompanion(
+          noteId: Value(noteId),
+          state: Value(Uint8List.fromList(remoteStateBytes)),
+          updatedAt: Value(remoteUpdatedAt),
+        ),
+      );
+
       final fallbackDoc = Doc();
       applyUpdate(fallbackDoc, Uint8List.fromList(remoteStateBytes));
-      final projectedData = YjsSyncManager.deriveProjectedData(noteId, fallbackDoc, userId, markDirty: false);
-      projectedNotes.add(projectedData.noteCompanion.copyWith(hasRemoteCopy: const Value(true)));
+      final projectedData = YjsSyncManager.deriveProjectedData(
+        noteId,
+        fallbackDoc,
+        userId,
+        markDirty: false,
+      );
+      projectedNotes.add(
+        projectedData.noteCompanion.copyWith(hasRemoteCopy: const Value(true)),
+      );
       projectedTasks.addAll(projectedData.tasks);
-      
-      final projectedTaskIds = projectedData.tasks.map((t) => t.id.value).toSet();
+
+      final projectedTaskIds = projectedData.tasks
+          .map((t) => t.id.value)
+          .toSet();
       final noteExistingTasks = params.existingTasksByNote[noteId] ?? [];
-      tasksToDelete.addAll(noteExistingTasks.where((t) => !projectedTaskIds.contains(t.id)));
+      tasksToDelete.addAll(
+        noteExistingTasks.where((t) => !projectedTaskIds.contains(t.id)),
+      );
 
       mergedNoteIds.add(noteId);
     }

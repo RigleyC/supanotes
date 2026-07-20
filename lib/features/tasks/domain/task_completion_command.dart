@@ -1,4 +1,3 @@
-import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 class TaskSnapshot {
@@ -6,11 +5,7 @@ class TaskSnapshot {
   final bool hasTime;
   final TaskRecurrence? recurrence;
 
-  const TaskSnapshot({
-    this.dueDate,
-    this.hasTime = false,
-    this.recurrence,
-  });
+  const TaskSnapshot({this.dueDate, this.hasTime = false, this.recurrence});
 }
 
 class TaskCompletionResult {
@@ -54,8 +49,8 @@ class TaskCompletionCommand {
     // not advanced. The completion records which occurrence was completed
     // (scheduledAt). The occurrence date defaults to the task's dueDate
     // or, if missing, today's start.
-    final occurrenceDate = scheduledAt ?? task.dueDate ??
-        DateTime(now.year, now.month, now.day);
+    final occurrenceDate =
+        scheduledAt ?? task.dueDate ?? DateTime(now.year, now.month, now.day);
     return TaskCompletionResult(
       completed: false,
       nextDue: null,

@@ -190,21 +190,23 @@ type Task struct {
 	UserID      pgtype.UUID        `json:"user_id"`
 	Title       string             `json:"title"`
 	Status      string             `json:"status"`
-	DueDate     pgtype.Date        `json:"due_date"`
+	DueDate     pgtype.Timestamptz `json:"due_date"`
 	Recurrence  pgtype.Text        `json:"recurrence"`
 	Position    string             `json:"position"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	HasTime     bool               `json:"has_time"`
+	Reminder    pgtype.Text        `json:"reminder"`
 }
 
 type TaskCompletion struct {
 	ID          pgtype.UUID        `json:"id"`
 	TaskID      pgtype.UUID        `json:"task_id"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
 	DueDate     pgtype.Date        `json:"due_date"`
+	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
 }
 
 type TelegramLink struct {

@@ -45,18 +45,20 @@ func (q *Queries) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, er
 }
 
 const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at
+INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position, has_time, reminder)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder
 `
 
 type CreateTaskParams struct {
-	NoteID     pgtype.UUID `json:"note_id"`
-	UserID     pgtype.UUID `json:"user_id"`
-	Title      string      `json:"title"`
-	DueDate    pgtype.Date `json:"due_date"`
-	Recurrence pgtype.Text `json:"recurrence"`
-	Position   string      `json:"position"`
+	NoteID     pgtype.UUID        `json:"note_id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	Title      string             `json:"title"`
+	DueDate    pgtype.Timestamptz `json:"due_date"`
+	Recurrence pgtype.Text        `json:"recurrence"`
+	Position   string             `json:"position"`
+	HasTime    bool               `json:"has_time"`
+	Reminder   pgtype.Text        `json:"reminder"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error) {
@@ -67,6 +69,8 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		arg.DueDate,
 		arg.Recurrence,
 		arg.Position,
+		arg.HasTime,
+		arg.Reminder,
 	)
 	var i Task
 	err := row.Scan(
@@ -82,6 +86,8 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.CompletedAt,
+		&i.HasTime,
+		&i.Reminder,
 	)
 	return i, err
 }
@@ -89,7 +95,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 const createTaskCompletion = `-- name: CreateTaskCompletion :one
 INSERT INTO task_completions (task_id, completed_at, scheduled_at, due_date)
 VALUES ($1, NOW(), NOW(), $2)
-RETURNING id, task_id, completed_at, scheduled_at, due_date
+RETURNING id, task_id, completed_at, due_date, scheduled_at
 `
 
 type CreateTaskCompletionParams struct {
@@ -104,8 +110,8 @@ func (q *Queries) CreateTaskCompletion(ctx context.Context, arg CreateTaskComple
 		&i.ID,
 		&i.TaskID,
 		&i.CompletedAt,
-		&i.ScheduledAt,
 		&i.DueDate,
+		&i.ScheduledAt,
 	)
 	return i, err
 }
@@ -159,7 +165,7 @@ func (q *Queries) DeleteTasksByNoteID(ctx context.Context, arg DeleteTasksByNote
 }
 
 const getRecentlyCompletedTasks = `-- name: GetRecentlyCompletedTasks :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder FROM tasks
 WHERE user_id = $1
   AND deleted_at IS NULL
   AND status = 'done'
@@ -194,6 +200,8 @@ func (q *Queries) GetRecentlyCompletedTasks(ctx context.Context, arg GetRecently
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.CompletedAt,
+			&i.HasTime,
+			&i.Reminder,
 		); err != nil {
 			return nil, err
 		}
@@ -206,7 +214,7 @@ func (q *Queries) GetRecentlyCompletedTasks(ctx context.Context, arg GetRecently
 }
 
 const getTaskByID = `-- name: GetTaskByID :one
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder FROM tasks
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 `
 
@@ -231,12 +239,14 @@ func (q *Queries) GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task,
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.CompletedAt,
+		&i.HasTime,
+		&i.Reminder,
 	)
 	return i, err
 }
 
 const getTasks = `-- name: GetTasks :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder FROM tasks
 WHERE user_id = $1
   AND deleted_at IS NULL
   AND ($4::uuid IS NULL OR note_id = $4)
@@ -287,6 +297,8 @@ func (q *Queries) GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, err
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.CompletedAt,
+			&i.HasTime,
+			&i.Reminder,
 		); err != nil {
 			return nil, err
 		}
@@ -299,7 +311,7 @@ func (q *Queries) GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, err
 }
 
 const getTasksByNodeID = `-- name: GetTasksByNodeID :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder FROM tasks
 WHERE id = $1 AND deleted_at IS NULL
 ORDER BY position ASC, created_at ASC
 `
@@ -326,6 +338,8 @@ func (q *Queries) GetTasksByNodeID(ctx context.Context, id pgtype.UUID) ([]Task,
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.CompletedAt,
+			&i.HasTime,
+			&i.Reminder,
 		); err != nil {
 			return nil, err
 		}
@@ -338,7 +352,7 @@ func (q *Queries) GetTasksByNodeID(ctx context.Context, id pgtype.UUID) ([]Task,
 }
 
 const getTasksByNoteID = `-- name: GetTasksByNoteID :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder FROM tasks
 WHERE user_id = $1 AND note_id = $2 AND deleted_at IS NULL
 ORDER BY position ASC, created_at ASC
 `
@@ -370,6 +384,8 @@ func (q *Queries) GetTasksByNoteID(ctx context.Context, arg GetTasksByNoteIDPara
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.CompletedAt,
+			&i.HasTime,
+			&i.Reminder,
 		); err != nil {
 			return nil, err
 		}
@@ -382,7 +398,7 @@ func (q *Queries) GetTasksByNoteID(ctx context.Context, arg GetTasksByNoteIDPara
 }
 
 const getTodayTasks = `-- name: GetTodayTasks :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder FROM tasks
 WHERE user_id = $1
   AND deleted_at IS NULL
   AND status = 'open'
@@ -418,6 +434,8 @@ func (q *Queries) GetTodayTasks(ctx context.Context, arg GetTodayTasksParams) ([
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.CompletedAt,
+			&i.HasTime,
+			&i.Reminder,
 		); err != nil {
 			return nil, err
 		}
@@ -430,7 +448,7 @@ func (q *Queries) GetTodayTasks(ctx context.Context, arg GetTodayTasksParams) ([
 }
 
 const searchTasks = `-- name: SearchTasks :many
-SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at FROM tasks
+SELECT id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder FROM tasks
 WHERE user_id = $1
   AND deleted_at IS NULL
   AND title ILIKE '%' || $4::text || '%'
@@ -475,6 +493,8 @@ func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Tas
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.CompletedAt,
+			&i.HasTime,
+			&i.Reminder,
 		); err != nil {
 			return nil, err
 		}
@@ -494,9 +514,11 @@ SET title        = CASE WHEN $3::bool        THEN $4        ELSE title        EN
     recurrence   = CASE WHEN $9::bool   THEN $10   ELSE recurrence   END,
     position     = CASE WHEN $11::bool     THEN $12     ELSE position     END,
     completed_at = CASE WHEN $13::bool THEN $14 ELSE completed_at END,
+    has_time     = CASE WHEN $15::bool     THEN $16     ELSE has_time     END,
+    reminder     = CASE WHEN $17::bool     THEN $18     ELSE reminder     END,
     updated_at   = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at
+RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder
 `
 
 type UpdateTaskParams struct {
@@ -507,13 +529,17 @@ type UpdateTaskParams struct {
 	SetStatus      pgtype.Bool        `json:"set_status"`
 	Status         pgtype.Text        `json:"status"`
 	SetDueDate     pgtype.Bool        `json:"set_due_date"`
-	DueDate        pgtype.Date        `json:"due_date"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
 	SetRecurrence  pgtype.Bool        `json:"set_recurrence"`
 	Recurrence     pgtype.Text        `json:"recurrence"`
 	SetPosition    pgtype.Bool        `json:"set_position"`
 	Position       pgtype.Text        `json:"position"`
 	SetCompletedAt pgtype.Bool        `json:"set_completed_at"`
 	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	SetHasTime     pgtype.Bool        `json:"set_has_time"`
+	HasTime        pgtype.Bool        `json:"has_time"`
+	SetReminder    pgtype.Bool        `json:"set_reminder"`
+	Reminder       pgtype.Text        `json:"reminder"`
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error) {
@@ -532,6 +558,10 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		arg.Position,
 		arg.SetCompletedAt,
 		arg.CompletedAt,
+		arg.SetHasTime,
+		arg.HasTime,
+		arg.SetReminder,
+		arg.Reminder,
 	)
 	var i Task
 	err := row.Scan(
@@ -547,6 +577,8 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.CompletedAt,
+		&i.HasTime,
+		&i.Reminder,
 	)
 	return i, err
 }

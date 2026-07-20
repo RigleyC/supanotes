@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-
 /// A full-width, tappable tile for list-based single-selection UIs.
 ///
-/// Used by [DueDatePicker] and [RecurrencePicker] to replace the old
-/// chip-based layout with a more scannable, thumb-friendly vertical list.
+/// Used by task metadata selection pages for a scannable, thumb-friendly
+/// vertical list.
 class AppSelectionTile extends StatelessWidget {
   const AppSelectionTile({
     super.key,
@@ -27,7 +26,6 @@ class AppSelectionTile extends StatelessWidget {
 
     return ListTile(
       dense: true,
-
       selected: isSelected,
       onTap: onTap,
       leading: icon != null
@@ -39,7 +37,7 @@ class AppSelectionTile extends StatelessWidget {
           : null,
       title: Text(
         label,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
           color: isSelected ? scheme.primary : scheme.onSurface,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
         ),

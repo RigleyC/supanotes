@@ -30,6 +30,9 @@ type UpdateTaskOpts struct {
 	Recurrence      *string
 	ClearRecurrence bool
 	Position        *string
+	HasTime         *bool
+	Reminder        *string
+	ClearReminder   bool
 }
 
 // Validate catches conflicting "set" + "clear" inputs early so callers
@@ -53,7 +56,7 @@ func NewService(repo Repository, ydoc yDocIngest) *Service {
 	return &Service{repo: repo, ydoc: ydoc}
 }
 
-func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, title string, dueDate *time.Time, recurrence *string, position string) (sqlcgen.Task, error) {
+func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, title string, dueDate *time.Time, recurrence *string, position string, hasTime *bool, reminder *string) (sqlcgen.Task, error) {
 	arg := sqlcgen.CreateTaskParams{
 		NoteID:   noteID,
 		UserID:   userID,
@@ -61,10 +64,16 @@ func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, ti
 		Position: position,
 	}
 	if dueDate != nil {
-		arg.DueDate = pgtype.Date{Time: *dueDate, Valid: true}
+		arg.DueDate = pgtype.Timestamptz{Time: *dueDate, Valid: true}
 	}
 	if recurrence != nil {
 		arg.Recurrence = pgtype.Text{String: *recurrence, Valid: true}
+	}
+	if hasTime != nil {
+		arg.HasTime = *hasTime
+	}
+	if reminder != nil {
+		arg.Reminder = pgtype.Text{String: *reminder, Valid: true}
 	}
 	task, err := s.repo.CreateTask(ctx, arg)
 	if err != nil {
@@ -103,7 +112,7 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 	}
 	if opts.DueDate != nil {
 		arg.SetDueDate = pgtype.Bool{Bool: true, Valid: true}
-		arg.DueDate = pgtype.Date{Time: *opts.DueDate, Valid: true}
+		arg.DueDate = pgtype.Timestamptz{Time: *opts.DueDate, Valid: true}
 	} else if opts.ClearDueDate {
 		arg.SetDueDate = pgtype.Bool{Bool: true, Valid: true}
 	}
@@ -116,6 +125,16 @@ func (s *Service) UpdateTask(ctx context.Context, userID, id pgtype.UUID, opts U
 	if opts.Position != nil {
 		arg.SetPosition = pgtype.Bool{Bool: true, Valid: true}
 		arg.Position = pgtype.Text{String: *opts.Position, Valid: true}
+	}
+	if opts.HasTime != nil {
+		arg.SetHasTime = pgtype.Bool{Bool: true, Valid: true}
+		arg.HasTime = pgtype.Bool{Bool: *opts.HasTime, Valid: true}
+	}
+	if opts.Reminder != nil {
+		arg.SetReminder = pgtype.Bool{Bool: true, Valid: true}
+		arg.Reminder = pgtype.Text{String: *opts.Reminder, Valid: true}
+	} else if opts.ClearReminder {
+		arg.SetReminder = pgtype.Bool{Bool: true, Valid: true}
 	}
 
 	// Clear completed_at when re-opening
@@ -258,4 +277,3 @@ func (s *Service) GetRecentlyCompletedTasks(ctx context.Context, userID pgtype.U
 		Days:   days,
 	})
 }
-

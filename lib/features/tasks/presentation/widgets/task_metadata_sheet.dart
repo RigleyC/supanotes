@@ -4,7 +4,6 @@ import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:supanotes/core/utils/date_time_extensions.dart';
 
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
@@ -16,8 +15,7 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 
 import '../controllers/task_metadata_controller.dart';
 import 'task_metadata_date_page.dart';
-import 'task_metadata_recurrence_page.dart';
-import 'task_metadata_reminder_page.dart';
+import 'task_metadata_selection_page.dart';
 import 'task_metadata_time_page.dart';
 
 Future<void> showTaskMetadataSheet({
@@ -28,8 +26,7 @@ Future<void> showTaskMetadataSheet({
 }) async {
   final taskId = task.id;
 
-  ref.read(taskMetadataProvider(taskId).notifier).state =
-      taskMetadataStateFromModel(task);
+  ref.read(taskMetadataProvider(taskId).notifier).initialize(task);
 
   await FamilyModalSheet.show<void>(
     context: context,
@@ -82,7 +79,7 @@ class TaskMetadataSheetBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(taskMetadataProvider(taskId));
-    final notifier = ref.read(taskMetadataProvider(taskId).notifier);
+    final controller = ref.read(taskMetadataProvider(taskId).notifier);
 
     return Material(
       type: MaterialType.transparency,
@@ -92,117 +89,80 @@ class TaskMetadataSheetBody extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          Text(
-            'Editar horário e frequência',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _DateTile(
-            dueDate: state.dueDate,
-            hasTime: state.hasTime,
-            onTap: () => FamilyModalSheet.of(context).pushPage(
-              TaskMetadataDatePage(
-                selected: state.dueDate,
-                onSelected: (date) {
-                  final oldDueDate = state.dueDate;
-                  final mergedDate = (oldDueDate != null && state.hasTime)
-                      ? DateTime(date.year, date.month, date.day, oldDueDate.hour, oldDueDate.minute)
-                      : date;
-                  notifier.state = TaskMetadataState(
-                    dueDate: mergedDate,
-                    hasTime: state.hasTime,
-                    recurrence: state.recurrence,
-                    reminder: state.reminder,
-                  );
-                },
-              ),
+            Text(
+              'Editar horário e frequência',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            onClear: () {
-              notifier.state = TaskMetadataState();
-            },
-          ),
-          _TimeTile(
-            dueDate: state.dueDate,
-            hasTime: state.hasTime,
-            onTap: () => FamilyModalSheet.of(context).pushPage(
-              TaskMetadataTimePage(
-                currentDueDate: state.dueDate!,
-                hasTime: state.hasTime,
-                onSelected: (date, {required bool hasTime}) {
-                  notifier.state = TaskMetadataState(
-                    dueDate: date,
-                    hasTime: hasTime,
-                    recurrence: state.recurrence,
-                    reminder: state.reminder,
-                  );
-                },
+            const SizedBox(height: AppSpacing.md),
+            _DateTile(
+              dueDate: state.dueDate,
+              hasTime: state.hasTime,
+              onTap: () => FamilyModalSheet.of(context).pushPage(
+                TaskMetadataDatePage(
+                  selected: state.dueDate,
+                  onSelected: (date) {
+                    controller.setDueDate(date);
+                  },
+                ),
               ),
+              onClear: controller.clearDueDate,
             ),
-            onClear: () {
-              notifier.state = TaskMetadataState(
-                dueDate: state.dueDate,
-                hasTime: false,
-                recurrence: state.recurrence,
-                reminder: state.reminder?.toAllDayFallback(),
-              );
-            },
-          ),
-          _RecurrenceTile(
-            recurrence: state.recurrence,
-            dueDate: state.dueDate,
-            onTap: () => FamilyModalSheet.of(context).pushPage(
-              TaskMetadataRecurrencePage(
-                selected: state.recurrence,
-                dueDate: state.dueDate,
-                onSelected: (r) {
-                  notifier.state = TaskMetadataState(
-                    dueDate:
-                        state.dueDate ??
-                        (r != null ? DateTime.now().startOfDay : null),
-                    hasTime: state.hasTime,
-                    recurrence: r,
-                    reminder: state.reminder,
-                  );
-                },
+            _TimeTile(
+              dueDate: state.dueDate,
+              hasTime: state.hasTime,
+              onTap: () => FamilyModalSheet.of(context).pushPage(
+                TaskMetadataTimePage(
+                  currentDueDate: state.dueDate!,
+                  hasTime: state.hasTime,
+                  onSelected: (date, {required bool hasTime}) {
+                    controller.setTime(date, hasTime: hasTime);
+                  },
+                ),
               ),
+              onClear: controller.clearTime,
             ),
-            onClear: () {
-              notifier.state = TaskMetadataState(
-                dueDate: state.dueDate,
-                hasTime: state.hasTime,
-                recurrence: null,
-                reminder: state.reminder,
-              );
-            },
-          ),
-          _ReminderTile(
-            reminder: state.reminder,
-            onTap: () => FamilyModalSheet.of(context).pushPage(
-              TaskMetadataReminderPage(
-                selected: state.reminder,
-                hasTime: state.hasTime,
-                onSelected: (reminder) {
-                  notifier.state = TaskMetadataState(
-                    dueDate: state.dueDate,
-                    hasTime: state.hasTime,
-                    recurrence: state.recurrence,
-                    reminder: reminder,
-                  );
-                },
+            _RecurrenceTile(
+              recurrence: state.recurrence,
+              dueDate: state.dueDate,
+              onTap: () => FamilyModalSheet.of(context).pushPage(
+                TaskMetadataSelectionPage<TaskRecurrence>(
+                  title: 'Repetição',
+                  selected: state.recurrence,
+                  options: TaskRecurrence.values,
+                  noneLabel: 'Nenhuma',
+                  optionLabel: (recurrence) =>
+                      recurrence.getLocalizedLabel(state.dueDate),
+                  optionIcon: (recurrence) => recurrence.icon,
+                  onSelected: (r) {
+                    controller.setRecurrence(r);
+                  },
+                ),
               ),
+              onClear: () => controller.setRecurrence(null),
             ),
-            onClear: () {
-              notifier.state = TaskMetadataState(
-                dueDate: state.dueDate,
-                hasTime: state.hasTime,
-                recurrence: state.recurrence,
-                reminder: null,
-              );
-            },
-          ),
-        ],
+            _ReminderTile(
+              reminder: state.reminder,
+              onTap: () => FamilyModalSheet.of(context).pushPage(
+                TaskMetadataSelectionPage<TaskReminderOption>(
+                  title: 'Lembrete',
+                  selected: state.reminder,
+                  options: TaskReminderOption.values.where(
+                    (option) => option.isRelative == state.hasTime,
+                  ),
+                  noneLabel: 'Nenhum',
+                  optionLabel: (reminder) => reminder.label,
+                  optionIcon: (_) => Icons.notifications_outlined,
+                  onSelected: (reminder) {
+                    controller.setReminder(reminder);
+                  },
+                ),
+              ),
+              onClear: () => controller.setReminder(null),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -221,17 +181,22 @@ class _DateTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasDueDate = dueDate != null;
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
       leading: const Icon(Icons.calendar_today_rounded, size: 20),
       title: Text(
-        dueDate != null
+        hasDueDate
             ? formatDueDate(dueDate!, hasTime: hasTime)
             : 'Adicionar data',
-        style: Theme.of(context).textTheme.titleSmall,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: hasDueDate ? scheme.primary : scheme.onSurface,
+          fontWeight: hasDueDate ? FontWeight.w600 : FontWeight.w500,
+        ),
       ),
-      trailing: dueDate != null
+      trailing: hasDueDate
           ? IconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
               onPressed: onClear,
@@ -258,20 +223,24 @@ class _TimeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = dueDate != null;
-    final color = enabled
-        ? null
-        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final hasValue = hasTime && dueDate != null;
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      leading: Icon(Icons.access_time_rounded, color: color, size: 20),
+      leading: Icon(
+        Icons.access_time_rounded,
+        color: hasValue ? scheme.primary : scheme.onSurfaceVariant,
+        size: 20,
+      ),
       title: Text(
-        hasTime && dueDate != null
-            ? DateFormat('h:mm a').format(dueDate!)
-            : 'Adicionar horário',
-        style: color != null
-            ? Theme.of(context).textTheme.titleSmall?.copyWith(color: color)
-            : Theme.of(context).textTheme.titleSmall,
+        hasValue ? DateFormat('h:mm a').format(dueDate!) : 'Adicionar horário',
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: enabled
+              ? (hasValue ? scheme.primary : scheme.onSurface)
+              : scheme.onSurfaceVariant,
+          fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
+        ),
       ),
       trailing: hasTime
           ? IconButton(
@@ -300,17 +269,26 @@ class _RecurrenceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasValue = recurrence != null;
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      leading: const Icon(Icons.refresh_rounded, size: 20),
+      leading: Icon(
+        Icons.refresh_rounded,
+        size: 20,
+        color: hasValue ? scheme.primary : scheme.onSurfaceVariant,
+      ),
       title: Text(
-        recurrence != null
+        hasValue
             ? recurrence!.getLocalizedLabel(dueDate)
             : 'Adicionar recorrência',
-        style: Theme.of(context).textTheme.titleSmall,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: hasValue ? scheme.primary : scheme.onSurface,
+          fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
+        ),
       ),
-      trailing: recurrence != null
+      trailing: hasValue
           ? IconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
               onPressed: onClear,
@@ -334,15 +312,24 @@ class _ReminderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasValue = reminder != null;
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      leading: const Icon(Icons.notifications_outlined, size: 20),
+      leading: Icon(
+        Icons.notifications_outlined,
+        size: 20,
+        color: hasValue ? scheme.primary : scheme.onSurfaceVariant,
+      ),
       title: Text(
         reminder?.label ?? 'Adicionar lembrete',
-        style: Theme.of(context).textTheme.titleSmall,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: hasValue ? scheme.primary : scheme.onSurface,
+          fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
+        ),
       ),
-      trailing: reminder != null
+      trailing: hasValue
           ? IconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
               onPressed: onClear,

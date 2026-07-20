@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
@@ -8,7 +10,8 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badg
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
-const double _taskCheckboxGap = 9.0;
+const double _taskCheckboxGap = 0.0;
+const double _taskCheckboxTouchTarget = 44.0;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
@@ -31,6 +34,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final Future<void> Function(String taskId)? onTaskReopen;
 
   final Set<String> _completingIds = {};
+  final Map<String, Future<void> Function(bool)> _completionHandlers = {};
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -41,50 +45,50 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     final metadata = taskMetadataById[node.id];
 
+    Future<void> updateCompletion(bool isComplete) async {
+      final isRecurring = taskMetadataById[node.id]?.recurrence != null;
+
+      final shouldUpdateDoc = !isComplete || !isRecurring;
+      if (shouldUpdateDoc) {
+        editor?.execute([
+          ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),
+        ]);
+      }
+
+      if (isComplete) {
+        if (isRecurring) {
+          _completingIds.add(node.id);
+        }
+
+        if (hideCompleted) {
+          FocusManager.instance.primaryFocus?.unfocus();
+          composer?.clearSelection();
+        }
+
+        try {
+          await onTaskComplete?.call(node.id);
+          if (isRecurring) {
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        } finally {
+          if (isRecurring) {
+            _completingIds.remove(node.id);
+          }
+        }
+      } else {
+        await onTaskReopen?.call(node.id);
+      }
+    }
+
+    _completionHandlers[node.id] = updateCompletion;
+
     return CustomTaskComponentViewModel(
       nodeId: node.id,
       createdAt: node.metadata[NodeMetadata.createdAt],
       padding: EdgeInsets.zero,
       indent: node.indent,
       isComplete: _completingIds.contains(node.id) || node.isComplete,
-      setComplete: (bool isComplete) async {
-        final isRecurring = taskMetadataById[node.id]?.recurrence != null;
-
-        final shouldUpdateDoc =
-            !isComplete || !isRecurring;
-        if (shouldUpdateDoc) {
-          editor?.execute([
-            ChangeTaskCompletionRequest(
-              nodeId: node.id,
-              isComplete: isComplete,
-            ),
-          ]);
-        }
-
-        if (isComplete) {
-          if (isRecurring) {
-            _completingIds.add(node.id);
-          }
-
-          if (hideCompleted) {
-            FocusManager.instance.primaryFocus?.unfocus();
-            composer?.clearSelection();
-          }
-
-          try {
-            await onTaskComplete?.call(node.id);
-            if (isRecurring) {
-              await Future.delayed(const Duration(seconds: 1));
-            }
-          } finally {
-            if (isRecurring) {
-              _completingIds.remove(node.id);
-            }
-          }
-        } else {
-          await onTaskReopen?.call(node.id);
-        }
-      },
+      setComplete: (isComplete) => unawaited(updateCompletion(isComplete)),
       text: node.text,
       textDirection: getParagraphDirection(node.text.toPlainText()),
       textAlignment: TextAlign.left,
@@ -108,6 +112,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       key: componentContext.componentKey,
       viewModel: componentViewModel,
       taskMetadata: taskMetadataById[nodeId],
+      onCompletionChange: _completionHandlers[nodeId],
       hideCompleted: hideCompleted,
       onLongPress: onTaskLongPress == null
           ? null
@@ -155,12 +160,14 @@ class CustomTaskComponent extends StatefulWidget {
     this.taskMetadata,
     this.hideCompleted = false,
     this.onLongPress,
+    this.onCompletionChange,
   });
 
   final TaskComponentViewModel viewModel;
   final TaskModel? taskMetadata;
   final bool hideCompleted;
   final VoidCallback? onLongPress;
+  final Future<void> Function(bool isComplete)? onCompletionChange;
 
   @override
   State<CustomTaskComponent> createState() => _CustomTaskComponentState();
@@ -169,9 +176,10 @@ class CustomTaskComponent extends StatefulWidget {
 class _CustomTaskComponentState extends State<CustomTaskComponent>
     with ProxyDocumentComponent<CustomTaskComponent>, ProxyTextComposable {
   final _textKey = GlobalKey();
-  
+
   late bool _isComplete;
   bool _isAnimating = false;
+  bool _isUpdatingCompletion = false;
 
   @override
   void initState() {
@@ -187,15 +195,36 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     }
   }
 
-  void _onCheckboxTap() {
+  Future<void> _onCheckboxTap() async {
+    if (_isUpdatingCompletion || widget.onCompletionChange == null) {
+      return;
+    }
+
+    final previousValue = _isComplete;
     final newComplete = !_isComplete;
     setState(() {
       _isComplete = newComplete;
+      _isUpdatingCompletion = true;
       if (widget.hideCompleted && newComplete) {
         _isAnimating = true;
       }
     });
-    widget.viewModel.setComplete!(newComplete);
+
+    try {
+      await widget.onCompletionChange!(newComplete);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isComplete = previousValue;
+          _isAnimating = false;
+        });
+      }
+      rethrow;
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingCompletion = false);
+      }
+    }
   }
 
   @override
@@ -243,28 +272,38 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: widget.viewModel.setComplete == null
-                  ? null
-                  : _onCheckboxTap,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: defaultTaskIndentCalculator(
-                      widget.viewModel.textStyleBuilder({}),
-                      widget.viewModel.indent,
+            SizedBox(
+              width:
+                  defaultTaskIndentCalculator(
+                    widget.viewModel.textStyleBuilder({}),
+                    widget.viewModel.indent,
+                  ) +
+                  _taskCheckboxTouchTarget +
+                  _taskCheckboxGap,
+              height: _taskCheckboxTouchTarget,
+              child: Semantics(
+                button: true,
+                checked: _isComplete,
+                enabled: !_isUpdatingCompletion,
+                label: _isComplete
+                    ? 'Marcar tarefa como pendente'
+                    : 'Concluir tarefa',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _isUpdatingCompletion ? null : _onCheckboxTap,
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 11, left: 11),
+                      child: AppTaskCheckbox(
+                        value: _isComplete,
+                        accentColor: taskColor,
+                        inactiveColor: colorScheme.outline,
+                        shape: AppTaskCheckboxShape.rounded,
+                      ),
                     ),
                   ),
-                  AppTaskCheckbox(
-                    value: _isComplete,
-                    accentColor: taskColor,
-                    inactiveColor: colorScheme.outline,
-                    shape: AppTaskCheckboxShape.rounded,
-                  ),
-                  const SizedBox(width: _taskCheckboxGap),
-                ],
+                ),
               ),
             ),
             Expanded(
@@ -318,10 +357,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       onAnimationComplete: _isAnimating
           ? () => setState(() => _isAnimating = false)
           : null,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 14),
-        child: content,
-      ),
+      child: Padding(padding: const EdgeInsets.only(top: 14), child: content),
     );
   }
 }

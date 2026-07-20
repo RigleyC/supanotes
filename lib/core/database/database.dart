@@ -74,7 +74,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -144,7 +144,7 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 14) {
         // note_nodes position migration; now unnecessary
-        
+
         await customStatement('PRAGMA foreign_keys=ON;');
       }
       if (from < 15) {
@@ -162,6 +162,17 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 19) {
         await m.addColumn(localYjsStates, localYjsStates.syncedStateVector);
+      }
+      if (from < 20) {
+        await customStatement(
+          'ALTER TABLE local_task_completions ADD COLUMN scheduled_at INTEGER NOT NULL DEFAULT 0',
+        );
+        await customStatement(
+          'UPDATE local_task_completions SET scheduled_at = completed_at',
+        );
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS local_task_completions_task_scheduled_idx ON local_task_completions(task_id, scheduled_at)',
+        );
       }
     },
     beforeOpen: (details) async {

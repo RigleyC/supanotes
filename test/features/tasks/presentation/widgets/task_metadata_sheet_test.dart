@@ -136,7 +136,11 @@ Widget _buildSheetForTask(TaskModel task) {
   return ProviderScope(
     child: _ProviderInitializer(
       task: task,
-      child: MaterialApp(home: Scaffold(body: TaskMetadataSheetBody(noteId: task.noteId, taskId: task.id))),
+      child: MaterialApp(
+        home: Scaffold(
+          body: TaskMetadataSheetBody(noteId: task.noteId, taskId: task.id),
+        ),
+      ),
     ),
   );
 }
@@ -149,7 +153,7 @@ class _ProviderInitializer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(taskMetadataProvider(task.id).notifier).state = taskMetadataStateFromModel(task);
+      ref.read(taskMetadataProvider(task.id).notifier).initialize(task);
     });
     return child;
   }

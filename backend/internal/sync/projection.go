@@ -373,6 +373,10 @@ func ProjectNoteContentFromYDoc(ctx context.Context, pool *pgxpool.Pool, noteID 
 		return fmt.Errorf("batch upsert tasks: %w", err)
 	}
 
+	if err := q.DeleteRecurringTaskCompletionsByNoteID(ctx, noteUUID); err != nil {
+		return fmt.Errorf("clear recurring task completions: %w", err)
+	}
+
 	// --- Insert task completions from two sources: ---
 
 	// 1) Legacy: completedAt transition nil → value (covers non-recurring tasks)

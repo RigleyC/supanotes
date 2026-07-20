@@ -38,6 +38,7 @@ type Querier interface {
 	DeleteMemory(ctx context.Context, arg DeleteMemoryParams) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
+	DeleteRecurringTaskCompletionsByNoteID(ctx context.Context, noteID pgtype.UUID) error
 	DeleteSessionMessages(ctx context.Context, arg DeleteSessionMessagesParams) error
 	DeleteTag(ctx context.Context, arg DeleteTagParams) error
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error

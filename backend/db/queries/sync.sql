@@ -116,6 +116,13 @@ WHERE tasks.id = sqlc.arg('task_id')::uuid
 ON CONFLICT (task_id, scheduled_at) DO UPDATE SET
     completed_at = EXCLUDED.completed_at;
 
+-- name: DeleteRecurringTaskCompletionsByNoteID :exec
+DELETE FROM task_completions completion
+USING tasks task
+WHERE completion.task_id = task.id
+  AND task.note_id = $1
+  AND task.recurrence IS NOT NULL;
+
 -- name: GetSyncNoteTags :many
 SELECT nt.note_id, nt.tag_id
 FROM note_tags nt

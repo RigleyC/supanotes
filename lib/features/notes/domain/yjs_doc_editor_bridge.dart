@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:typed_data';
 import 'package:supanotes/core/utils/fractional_indexing.dart';
+import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:super_editor/super_editor.dart';
@@ -232,13 +233,19 @@ class YjsDocEditorBridge {
     );
   }
 
-  TaskCompletionResult completeTaskInYDoc(String nodeId,
-      {DateTime? now, DateTime? scheduledAt}) {
+  TaskCompletionResult completeTaskInYDoc(
+    String nodeId, {
+    DateTime? now,
+    DateTime? scheduledAt,
+  }) {
     final nodeMap = _requireTaskNode(nodeId);
     final snapshot = _readTaskSnapshot(nodeId, nodeMap);
+    final effectiveNow = now ?? DateTime.now();
+    final resolvedScheduledAt =
+        scheduledAt ?? _currentOccurrence(snapshot, effectiveNow);
     final result = TaskCompletionCommand(
-      () => now ?? DateTime.now(),
-    ).complete(snapshot, scheduledAt: scheduledAt);
+      () => effectiveNow,
+    ).complete(snapshot, scheduledAt: resolvedScheduledAt);
 
     _doc.transact((txn) {
       if (result.completed) {
@@ -251,8 +258,10 @@ class YjsDocEditorBridge {
         // Do NOT modify the template's completed, dueDate, or
         // lastCompletedAt — the template is the anchor.
         final scheduledUtc = result.scheduledAt!.toUtc();
-        final formattedScheduled = _formatDueDate(scheduledUtc,
-            hasTime: snapshot.hasTime);
+        final formattedScheduled = _formatDueDate(
+          scheduledUtc,
+          hasTime: snapshot.hasTime,
+        );
         final completionsRoot = _doc.getMap<Object>(
           YjsNoteSchema.taskCompletionsRoot,
         )!;
@@ -267,16 +276,33 @@ class YjsDocEditorBridge {
     return result;
   }
 
-  void reopenTaskInYDoc(String nodeId,
-      {DateTime? previousDue, DateTime? scheduledAt}) {
+  DateTime? _currentOccurrence(TaskSnapshot task, DateTime now) {
+    if (task.recurrence == null || task.dueDate == null) return null;
+    final latest = task.hasTime ? now : DateTime(now.year, now.month, now.day);
+    final occurrences = enumerateOccurrences(
+      anchor: task.dueDate,
+      recurrence: task.recurrence,
+      from: task.dueDate!,
+      to: latest,
+    );
+    return occurrences.isEmpty ? task.dueDate : occurrences.last;
+  }
+
+  void reopenTaskInYDoc(
+    String nodeId, {
+    DateTime? previousDue,
+    DateTime? scheduledAt,
+  }) {
     final nodeMap = _requireTaskNode(nodeId);
     final snapshot = _readTaskSnapshot(nodeId, nodeMap);
 
     _doc.transact((txn) {
       if (snapshot.recurrence != null && scheduledAt != null) {
         // Recurring: remove the completion event for the specific occurrence
-        final formattedScheduled = _formatDueDate(scheduledAt.toUtc(),
-            hasTime: snapshot.hasTime);
+        final formattedScheduled = _formatDueDate(
+          scheduledAt.toUtc(),
+          hasTime: snapshot.hasTime,
+        );
         final completionsRoot = _doc.getMap<Object>(
           YjsNoteSchema.taskCompletionsRoot,
         )!;

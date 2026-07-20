@@ -3,7 +3,32 @@ import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/shared/widgets/app_selection_tile.dart';
 
-import 'due_date_picker.dart' show QuickDueDate;
+import 'task_metadata_page_header.dart';
+
+enum QuickDueDate {
+  today,
+  tomorrow,
+  nextWeek;
+
+  String get label {
+    return switch (this) {
+      QuickDueDate.today => 'Hoje',
+      QuickDueDate.tomorrow => 'Amanhã',
+      QuickDueDate.nextWeek => 'Próxima semana',
+    };
+  }
+
+  IconData get icon => Icons.calendar_month_rounded;
+
+  DateTime compute(DateTime now) {
+    final today = now.startOfDay;
+    return switch (this) {
+      QuickDueDate.today => today,
+      QuickDueDate.tomorrow => today.add(const Duration(days: 1)),
+      QuickDueDate.nextWeek => today.add(const Duration(days: 7)),
+    };
+  }
+}
 
 class TaskMetadataDatePage extends StatelessWidget {
   const TaskMetadataDatePage({
@@ -22,13 +47,7 @@ class TaskMetadataDatePage extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
-          child: Text(
-            'Escolher data',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
+        const TaskMetadataPageHeader(title: 'Escolher data'),
         ListView.builder(
           shrinkWrap: true,
           itemCount: QuickDueDate.values.length,

@@ -1,6 +1,6 @@
 -- name: CreateTask :one
-INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO tasks (note_id, user_id, title, due_date, recurrence, position, has_time, reminder)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: GetTasksByNodeID :many
@@ -20,6 +20,8 @@ SET title        = CASE WHEN sqlc.narg('set_title')::bool        THEN sqlc.narg(
     recurrence   = CASE WHEN sqlc.narg('set_recurrence')::bool   THEN sqlc.narg('recurrence')   ELSE recurrence   END,
     position     = CASE WHEN sqlc.narg('set_position')::bool     THEN sqlc.narg('position')     ELSE position     END,
     completed_at = CASE WHEN sqlc.narg('set_completed_at')::bool THEN sqlc.narg('completed_at') ELSE completed_at END,
+    has_time     = CASE WHEN sqlc.narg('set_has_time')::bool     THEN sqlc.narg('has_time')     ELSE has_time     END,
+    reminder     = CASE WHEN sqlc.narg('set_reminder')::bool     THEN sqlc.narg('reminder')     ELSE reminder     END,
     updated_at   = NOW()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 RETURNING *;

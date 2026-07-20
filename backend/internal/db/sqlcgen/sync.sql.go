@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteRecurringTaskCompletionsByNoteID = `-- name: DeleteRecurringTaskCompletionsByNoteID :exec
+DELETE FROM task_completions completion
+USING tasks task
+WHERE completion.task_id = task.id
+  AND task.note_id = $1
+  AND task.recurrence IS NOT NULL
+`
+
+func (q *Queries) DeleteRecurringTaskCompletionsByNoteID(ctx context.Context, noteID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteRecurringTaskCompletionsByNoteID, noteID)
+	return err
+}
+
 const getNoteMeta = `-- name: GetNoteMeta :one
 SELECT user_id, deleted_at FROM notes WHERE id = $1
 `
@@ -713,7 +726,7 @@ SET note_id = EXCLUDED.note_id,
     completed_at = EXCLUDED.completed_at,
     updated_at = NOW(),
     deleted_at = EXCLUDED.deleted_at
-RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at
+RETURNING id, note_id, user_id, title, status, due_date, recurrence, position, created_at, updated_at, deleted_at, completed_at, has_time, reminder
 `
 
 type UpsertTaskParams struct {
@@ -724,7 +737,7 @@ type UpsertTaskParams struct {
 	Status      string             `json:"status"`
 	Position    string             `json:"position"`
 	Recurrence  pgtype.Text        `json:"recurrence"`
-	DueDate     pgtype.Date        `json:"due_date"`
+	DueDate     pgtype.Timestamptz `json:"due_date"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
@@ -758,6 +771,8 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.CompletedAt,
+		&i.HasTime,
+		&i.Reminder,
 	)
 	return i, err
 }
@@ -767,13 +782,13 @@ INSERT INTO task_completions (id, task_id, completed_at, scheduled_at)
 SELECT $1::uuid,
        $2::uuid,
        $3::timestamptz,
-       $5::timestamptz
+       $4::timestamptz
 FROM tasks
 WHERE tasks.id = $2::uuid
-  AND (tasks.user_id = $4::uuid
+  AND (tasks.user_id = $5::uuid
        OR EXISTS (SELECT 1 FROM note_shares ns
                   WHERE ns.note_id = tasks.note_id
-                    AND ns.user_id = $4::uuid
+                    AND ns.user_id = $5::uuid
                     AND ns.permission = 'edit'))
 ON CONFLICT (task_id, scheduled_at) DO UPDATE SET
     completed_at = EXCLUDED.completed_at
@@ -783,8 +798,8 @@ type UpsertTaskCompletionParams struct {
 	ID          pgtype.UUID        `json:"id"`
 	TaskID      pgtype.UUID        `json:"task_id"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	UserID      pgtype.UUID        `json:"user_id"`
 	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
+	UserID      pgtype.UUID        `json:"user_id"`
 }
 
 func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error {
@@ -792,8 +807,8 @@ func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskComple
 		arg.ID,
 		arg.TaskID,
 		arg.CompletedAt,
-		arg.UserID,
 		arg.ScheduledAt,
+		arg.UserID,
 	)
 	return err
 }

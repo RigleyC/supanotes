@@ -1,8 +1,9 @@
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 
 import 'package:supanotes/shared/widgets/app_button.dart';
+
+import 'task_metadata_page_header.dart';
 
 class TaskMetadataTimePage extends StatefulWidget {
   const TaskMetadataTimePage({
@@ -46,13 +47,7 @@ class _TaskMetadataTimePageState extends State<TaskMetadataTimePage> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
-          child: Text(
-            'Escolher horário',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
+        const TaskMetadataPageHeader(title: 'Escolher horário'),
         SizedBox(
           height: 200,
           child: CupertinoDatePicker(

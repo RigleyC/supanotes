@@ -20,6 +20,8 @@ type CreateTaskRequest struct {
 	DueDate    *string `json:"due_date"`
 	Recurrence *string `json:"recurrence"`
 	Position   string  `json:"position"`
+	HasTime    *bool   `json:"has_time"`
+	Reminder   *string `json:"reminder"`
 }
 
 // UpdateTaskRequest expresses a partial update. For each nullable field
@@ -36,6 +38,9 @@ type UpdateTaskRequest struct {
 	Recurrence      *string `json:"recurrence"`
 	ClearRecurrence bool    `json:"clear_recurrence"`
 	Position        *string `json:"position"`
+	HasTime         *bool   `json:"has_time"`
+	Reminder        *string `json:"reminder"`
+	ClearReminder   bool    `json:"clear_reminder"`
 }
 
 type TaskResponse struct {
@@ -45,6 +50,8 @@ type TaskResponse struct {
 	Status     string  `json:"status"`
 	DueDate    *string `json:"due_date,omitempty"`
 	Recurrence *string `json:"recurrence,omitempty"`
+	HasTime    bool    `json:"has_time"`
+	Reminder   *string `json:"reminder,omitempty"`
 	Position   string  `json:"position"`
 	CreatedAt  string  `json:"created_at"`
 	UpdatedAt  string  `json:"updated_at"`
@@ -87,7 +94,7 @@ func (h *Handler) Create(c echo.Context) error {
 		dueDate = &t
 	}
 
-	task, err := h.svc.CreateTask(c.Request().Context(), userID, noteID, req.Title, dueDate, req.Recurrence, req.Position)
+	task, err := h.svc.CreateTask(c.Request().Context(), userID, noteID, req.Title, dueDate, req.Recurrence, req.Position, req.HasTime, req.Reminder)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create task")
@@ -174,6 +181,9 @@ func (h *Handler) Update(c echo.Context) error {
 		Recurrence:      req.Recurrence,
 		ClearRecurrence: req.ClearRecurrence,
 		Position:        req.Position,
+		HasTime:         req.HasTime,
+		Reminder:        req.Reminder,
+		ClearReminder:   req.ClearReminder,
 	})
 	if err != nil {
 		if errors.Is(err, ErrTaskNotFound) {
@@ -299,6 +309,8 @@ func mapToTaskResponse(t sqlcgen.Task) TaskResponse {
 		Status:     t.Status,
 		DueDate:    FormatDate(t.DueDate),
 		Recurrence: FormatText(t.Recurrence),
+		HasTime:    t.HasTime,
+		Reminder:   FormatText(t.Reminder),
 		Position:   t.Position,
 		CreatedAt:  t.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:  t.UpdatedAt.Time.Format(time.RFC3339),

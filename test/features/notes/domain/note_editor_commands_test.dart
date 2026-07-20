@@ -89,6 +89,16 @@ void main() {
         range: SpanRange(0, 5),
       );
       expect(spans, isNotEmpty);
+      expect(
+        node.text
+            .getAttributionSpansInRange(
+              attributionFilter: (a) => a == boldAttribution,
+              range: SpanRange(4, 5),
+            )
+            .isNotEmpty,
+        isTrue,
+        reason: 'The last selected character must receive bold attribution.',
+      );
     });
   });
 

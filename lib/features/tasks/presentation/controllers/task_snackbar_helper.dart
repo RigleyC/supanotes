@@ -4,12 +4,28 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class TaskSnackBarHelper {
   static Future<DateTime?> completeTaskWithFeedback({
-    required Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> Function() onComplete,
-    required void Function(DateTime? previousDue, bool previousHasTime) onUndo,
+    required Future<
+      ({
+        DateTime? nextDue,
+        DateTime? previousDue,
+        bool previousHasTime,
+        DateTime? scheduledAt,
+      })
+    >
+    Function()
+    onComplete,
+    required void Function(
+      DateTime? previousDue,
+      bool previousHasTime,
+      DateTime? scheduledAt,
+    )
+    onUndo,
   }) async {
     debugPrint('[TaskSnackBarHelper] completeTaskWithFeedback CALLED');
     final result = await onComplete();
-    debugPrint('[TaskSnackBarHelper] onComplete returned nextDue=${result.nextDue}');
+    debugPrint(
+      '[TaskSnackBarHelper] onComplete returned nextDue=${result.nextDue}',
+    );
 
     final title = 'Concluída!';
     final subtitle = result.nextDue != null
@@ -22,8 +38,14 @@ class TaskSnackBarHelper {
       action: SnackBarAction(
         label: 'Desfazer',
         onPressed: () {
-          debugPrint('[TaskSnackBarHelper] onUndo PRESSED, previousDue=${result.previousDue}');
-          onUndo(result.previousDue, result.previousHasTime);
+          debugPrint(
+            '[TaskSnackBarHelper] onUndo PRESSED, previousDue=${result.previousDue}',
+          );
+          onUndo(
+            result.previousDue,
+            result.previousHasTime,
+            result.scheduledAt,
+          );
         },
       ),
     );

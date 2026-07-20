@@ -1,4 +1,3 @@
-
 import 'package:super_editor/super_editor.dart';
 
 import 'attachment_nodes.dart';
@@ -51,21 +50,20 @@ class NodeCodec {
         for (int i = spansList.length - 1; i >= 0; i--) {
           if (spansList[i]['attribution'] == name &&
               spansList[i]['end'] == -1) {
-            spansList[i]['end'] = span.offset;
+            // SuperEditor end markers are inclusive, while persisted spans use
+            // an exclusive end offset so they remain valid at text.length.
+            spansList[i]['end'] = span.offset + 1;
             break;
           }
         }
       }
     }
-    return {'text': text.toPlainText(), 'spans': spansList};
+    return {'text': text.toPlainText(), 'spans': spansList, 'spansVersion': 2};
   }
 
   static Map<String, dynamic> nodeData(DocumentNode node) {
     if (node is TaskNode) {
-      return {
-        ..._serializeAttributedText(node.text),
-        'indent': node.indent,
-      };
+      return {..._serializeAttributedText(node.text), 'indent': node.indent};
     }
     if (node is ParagraphNode) {
       final blockType = node.metadata['blockType'];
@@ -81,10 +79,7 @@ class NodeCodec {
         if (blockType == header4Attribution) level = 4;
         if (blockType == header5Attribution) level = 5;
         if (blockType == header6Attribution) level = 6;
-        return {
-          ..._serializeAttributedText(node.text),
-          'level': level,
-        };
+        return {..._serializeAttributedText(node.text), 'level': level};
       }
       if (blockType == blockquoteAttribution) {
         return {..._serializeAttributedText(node.text)};
@@ -180,8 +175,16 @@ class NodeCodec {
           'Conteúdo indisponível — Erro de Sincronização',
           AttributedSpans(
             attributions: [
-              const SpanMarker(attribution: corruptedAttribution, offset: 0, markerType: SpanMarkerType.start),
-              const SpanMarker(attribution: corruptedAttribution, offset: 44, markerType: SpanMarkerType.end),
+              const SpanMarker(
+                attribution: corruptedAttribution,
+                offset: 0,
+                markerType: SpanMarkerType.start,
+              ),
+              const SpanMarker(
+                attribution: corruptedAttribution,
+                offset: 44,
+                markerType: SpanMarkerType.end,
+              ),
             ],
           ),
         ),
@@ -249,12 +252,18 @@ class NodeCodec {
       final spanMap = s as Map<String, dynamic>;
       final attributionName = spanMap['attribution'] as String?;
       final start = spanMap['start'] as int?;
-      final end = spanMap['end'] as int?;
+      final storedEnd = spanMap['end'] as int?;
 
-      if (attributionName == null || start == null || end == null || end == -1) {
+      if (attributionName == null ||
+          start == null ||
+          storedEnd == null ||
+          storedEnd == -1) {
         continue;
       }
 
+      // Spans written before version 2 stored SuperEditor's inclusive marker
+      // offset. Version 2 persists an exclusive end offset.
+      final end = data['spansVersion'] == 2 ? storedEnd : storedEnd + 1;
       final safeStart = start.clamp(0, text.length);
       final safeEnd = end.clamp(safeStart, text.length);
       if (safeEnd > safeStart) {
@@ -315,7 +324,9 @@ class NodeCodec {
     if (existingNode is ListItemNode && incoming.type == 'list_item') {
       final existingType = existingNode.type;
       final incomingTypeStr = incoming.data['type'] as String? ?? 'unordered';
-      final resolvedIncomingType = incomingTypeStr == 'ordered' ? ListItemType.ordered : ListItemType.unordered;
+      final resolvedIncomingType = incomingTypeStr == 'ordered'
+          ? ListItemType.ordered
+          : ListItemType.unordered;
       if (existingType != resolvedIncomingType) return false;
 
       final existingIndent = existingNode.indent;
@@ -346,7 +357,7 @@ class NodeCodec {
 
     if (existingNode is ImageNode && incoming.type == 'image') {
       return existingNode.imageUrl == (incoming.data['url'] as String? ?? '') &&
-             existingNode.altText == (incoming.data['alt'] as String? ?? '');
+          existingNode.altText == (incoming.data['alt'] as String? ?? '');
     }
 
     if (existingNode is HorizontalRuleNode && incoming.type == 'divider') {

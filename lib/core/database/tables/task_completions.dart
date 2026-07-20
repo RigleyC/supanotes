@@ -21,7 +21,5 @@ class LocalTaskCompletions extends Table {
   Set<Column> get primaryKey => {id};
 
   @override
-  List<Set<Column>> get uniqueConstraints => [
-    {taskId, scheduledAt},
-  ];
+  List<String> get customConstraints => const ['UNIQUE(task_id, scheduled_at)'];
 }
