@@ -81,8 +81,17 @@ class SyncService {
   /// can check whether another call has already been chained after it.
   final Map<String, int> _noteSyncGenerations = {};
 
+  /// Set of note IDs that have been locally edited since last exchange.
+  /// Avoids encoding, DB query, and HTTP call when nothing changed.
+  final Set<String> _dirtyNotes = {};
+
   StreamSubscription<bool>? _connectivitySub;
   Timer? _periodicSyncTimer;
+
+  /// Marks a note as having local changes needing sync.
+  void markDirty(String noteId) {
+    _dirtyNotes.add(noteId);
+  }
 
   Future<Doc?> connectNote(String noteId) async {
     final sw = Stopwatch()..start();
@@ -97,8 +106,8 @@ class SyncService {
     try {
       final noteData = await _db.notesDao.getNoteById(noteId);
       if (noteData != null && !noteData.hasRemoteCopy) {
-        debugPrint('[SyncService] connectNote: note missing on server, pushing first...');
-        await push();
+        debugPrint('[SyncService] connectNote: note missing on server, scheduling push...');
+        unawaited(push());
       }
 
       _activeNoteId = noteId;
@@ -109,7 +118,9 @@ class SyncService {
       void startTimer() {
         _syncTimer?.cancel();
         _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-          unawaited(syncDirtyNote(noteId));
+          if (_dirtyNotes.contains(noteId)) {
+            unawaited(syncDirtyNote(noteId));
+          }
         });
       }
 
@@ -118,6 +129,7 @@ class SyncService {
         _syncTimer = null;
       }
 
+      markDirty(noteId);
       startTimer();
       debugPrint('[SyncService] connectNote polling timer started elapsed=${sw.elapsedMilliseconds}ms');
 
@@ -125,16 +137,19 @@ class SyncService {
       _lifecycleListener = AppLifecycleListener(
         onPause: () {
           debugPrint('[SyncService] lifecycle: onPause — triggering sync and stopping timer');
+          markDirty(noteId);
           unawaited(syncDirtyNote(noteId));
           stopTimer();
         },
         onInactive: () {
           debugPrint('[SyncService] lifecycle: onInactive — triggering sync and stopping timer');
+          markDirty(noteId);
           unawaited(syncDirtyNote(noteId));
           stopTimer();
         },
         onResume: () {
           debugPrint('[SyncService] lifecycle: onResume — restarting timer');
+          markDirty(noteId);
           startTimer();
           unawaited(syncDirtyNote(noteId));
         },
@@ -202,27 +217,23 @@ class SyncService {
     return inner;
   }
 
-  Uint8List? _lastLocalUpdate;
-  Uint8List? _lastServerUpdate;
-
   Future<void> _exchangeNote(String noteId) async {
+    if (!_dirtyNotes.contains(noteId)) return;
+
     final doc = await _yjsMgr.loadDoc(noteId);
     final localState = await _getLocalState(noteId);
     final sv = localState?.syncedStateVector;
 
     final localUpdate = encodeStateAsUpdate(doc, sv);
-    if (localUpdate.isEmpty) return;
+    if (localUpdate.isEmpty) {
+      _dirtyNotes.remove(noteId);
+      return;
+    }
 
     final stateVector = encodeStateVector(doc);
     final svB64 = base64Encode(stateVector);
 
-    // OPTIMIZATION: yjs ALWAYS includes the entire DeleteSet in encodeStateAsUpdate.
-    // If we have no new inserts, this will repeatedly generate the exact same DeleteSet bytes.
-    // We suppress the log spam if it's identical to the last polling tick.
-    final isIdenticalToLastLocal = _lastLocalUpdate != null && _listEquals(localUpdate, _lastLocalUpdate!);
-    if (!isIdenticalToLastLocal) {
-      debugPrint('[SyncService] _exchangeNote: sending ${localUpdate.length} bytes for note $noteId. SV length=${stateVector.length}, SV b64=$svB64, dbSV length=${sv?.length}');
-    }
+    debugPrint('[SyncService] _exchangeNote: sending ${localUpdate.length}B for note $noteId');
 
     final response = await _api.post<List<int>>(
       '/sync/note/$noteId',
@@ -236,38 +247,22 @@ class SyncService {
       ),
     );
 
+    _dirtyNotes.remove(noteId);
+
     final responseData = response.data;
     if (responseData != null && responseData.isNotEmpty) {
       final serverUpdate = Uint8List.fromList(responseData);
-      
-      final isIdenticalToLastServer = _lastServerUpdate != null && _listEquals(serverUpdate, _lastServerUpdate!);
-      
-      // If the server just echoed back the exact same DeleteSet, we don't need to re-apply or re-persist it.
-      if (!isIdenticalToLastServer || !isIdenticalToLastLocal) {
-        applyUpdate(doc, serverUpdate);
-        debugPrint('[SyncService] _exchangeNote: applied ${serverUpdate.length} bytes from server for note $noteId');
-        
-        // Persist the new synced state vector ONLY after a successful exchange with new data.
-        await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
-      }
-      
-      _lastServerUpdate = serverUpdate;
+      applyUpdate(doc, serverUpdate);
+      debugPrint('[SyncService] _exchangeNote: applied ${serverUpdate.length}B from server for note $noteId');
+
+      await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
     }
-    _lastLocalUpdate = localUpdate;
 
     // Project remote changes to SQLite so list views reflect the update
     // even for background notes (not just the active editor).
     if (_activeNoteId != noteId) {
       await _yjsMgr.projectNodes(noteId, markDirty: false);
     }
-  }
-
-  bool _listEquals(Uint8List a, Uint8List b) {
-    if (a.length != b.length) return false;
-    for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
   }
 
   Future<LocalYjsState?> _getLocalState(String noteId) async {
@@ -413,8 +408,12 @@ class SyncService {
 
     // After the relational push, send Yjs deltas for dirty notes (chunked
     // into groups of 2 to avoid overwhelming the network on large batches).
+    // Mark them dirty first so the per-note exchange actually runs.
     if (pushingNoteIds.isNotEmpty) {
       debugPrint('[SyncService] push: sending Yjs deltas for ${pushingNoteIds.length} notes');
+      for (final id in pushingNoteIds) {
+        markDirty(id);
+      }
       final ids = pushingNoteIds.toList();
       for (var i = 0; i < ids.length; i += 2) {
         final chunk = ids.skip(i).take(2).toList();

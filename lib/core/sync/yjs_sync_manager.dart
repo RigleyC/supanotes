@@ -58,11 +58,16 @@ class YjsSyncManager {
 
   Future<void> _persistLock = Future.value();
 
+  /// Cache of last-encoded state per note — avoids re-serializing the YDoc
+  /// when both [persist] and [persistWithSyncedVector] are called in quick succession.
+  final Map<String, Uint8List> _lastPersistedState = {};
+
   /// Persist the current in-memory Doc state for [noteId] to the database.
   Future<void> persist(String noteId) async {
     final doc = _docs[noteId];
     if (doc == null) return;
     final state = encodeStateAsUpdate(doc);
+    _lastPersistedState[noteId] = state;
     _persistLock = _persistLock.then((_) async {
       try {
         await _db.into(_db.localYjsStates).insertOnConflictUpdate(
@@ -188,10 +193,12 @@ class YjsSyncManager {
   }
 
   /// Persist the current in-memory Doc state with the synced state vector.
+  /// Uses [_lastPersistedState] cache to avoid re-encoding if [persist] was just called.
   Future<void> persistWithSyncedVector(String noteId, Uint8List? syncedStateVector) async {
     final doc = _docs[noteId];
     if (doc == null) return;
-    final state = encodeStateAsUpdate(doc);
+    final state = _lastPersistedState[noteId] ?? encodeStateAsUpdate(doc);
+    _lastPersistedState[noteId] = state;
     try {
       await _db.into(_db.localYjsStates).insertOnConflictUpdate(
         LocalYjsStatesCompanion(
@@ -243,11 +250,25 @@ class YjsSyncManager {
       currentUserId: userId,
     );
 
-    // For small payloads (≤5 notes), run synchronously to avoid Isolate
-    // spawning overhead (~1.8s penalty on mobile). Larger payloads still
-    // use the background Isolate to prevent ANRs.
+    // Estimate total byte cost: remote states (base64 ≈ ¾ of string length)
+    // + local states.  If the total is below 256 KB, run inline to avoid
+    // Isolate spawning overhead (~1.8 s penalty on mobile).
+    int totalBytes = 0;
+    for (final raw in rawYjsStates) {
+      final rawState = raw['state'];
+      if (rawState is String) {
+        totalBytes += rawState.length * 3 ~/ 4;
+      } else if (rawState is List) {
+        totalBytes += rawState.length;
+      }
+    }
+    for (final localState in localStatesMap.values) {
+      totalBytes += localState.length;
+    }
+
+    const int kInlineThreshold = 256 * 1024; // 256 KB
     final IsolateMergeResult result;
-    if (rawYjsStates.length <= 5) {
+    if (totalBytes < kInlineThreshold || rawYjsStates.length <= 5) {
       result = _mergeRemoteStatesAndProjectIsolate(params);
     } else {
       result = await compute(_mergeRemoteStatesAndProjectIsolate, params);
@@ -284,113 +305,25 @@ class YjsSyncManager {
   }
 
   static ProjectedData deriveProjectedData(String noteId, Doc doc, String userId, {bool markDirty = true}) {
+    final nodes = noteNodesFromDoc(doc);
     final nodesMap = doc.getMap<Object>('nodes')!;
-
-    final tasks = <TasksCompanion>[];
-    for (final key in nodesMap.keys) {
-      if (key.contains(':')) continue;
-      final raw = nodesMap.get(key);
-      if (raw == null) continue;
-
-      String type = '';
-      String nodeId = '';
-      String? position;
-      bool completed = false;
-      String? dueDate;
-      bool hasTime = false;
-      String? recurrence;
-      String? reminder;
-      DateTime? completedAt;
-
-      if (raw is YMap) {
-        type = raw.get('type') as String? ?? '';
-        if (type != 'task') continue;
-        nodeId = raw.get('id') as String? ?? key;
-        position = raw.get('position')?.toString();
-        
-        completed = nodesMap.get('$nodeId:completed') == true || raw.get('completed') == true;
-        dueDate = (nodesMap.get('$nodeId:dueDate') as String?) ?? (raw.get('dueDate') as String?);
-        hasTime = nodesMap.get('$nodeId:hasTime') == true || raw.get('hasTime') == true;
-        recurrence = (nodesMap.get('$nodeId:recurrence') as String?) ?? (raw.get('recurrence') as String?);
-        reminder = (nodesMap.get('$nodeId:reminder') as String?) ?? (raw.get('reminder') as String?);
-        
-        final lastCompletedAtStr = (nodesMap.get('$nodeId:lastCompletedAt') as String?) ?? (raw.get('lastCompletedAt') as String?);
-        if (lastCompletedAtStr != null) {
-          completedAt = DateTime.tryParse(lastCompletedAtStr);
-        }
-      } else {
-        continue;
-      }
-
-
-      final nodeData = _extractNodeData(raw);
-      final text = YjsNoteSchema.readNodeTextContent(doc, nodeId, nodeData: nodeData);
-
-      final now = DateTime.now();
-
-      DateTime? resolvedDueDate;
-      TaskRecurrence? resolvedRecurrence;
-      if (dueDate != null) {
-        if (dueDate.contains('T')) {
-          resolvedDueDate = DateTime.tryParse(dueDate);
-        } else {
-          resolvedDueDate = DateTime.tryParse('${dueDate}T00:00:00');
-        }
-      }
-      if (recurrence != null) {
-        resolvedRecurrence = TaskRecurrence.parse(recurrence);
-      }
-
-      tasks.add(TasksCompanion.insert(
-        id: nodeId,
-        userId: userId,
-        noteId: noteId,
-        title: text,
-        status: completed ? 'done' : 'open',
-        position: Value(position ?? ''),
-        dueDate: Value(resolvedDueDate),
-        hasTime: Value(hasTime),
-        recurrence: Value(resolvedRecurrence),
-        reminder: Value(reminder),
-        completedAt: Value(completedAt),
-        createdAt: now,
-        updatedAt: now,
-      ));
-    }
-
-    final content = _deriveMarkdownFromDoc(doc);
-    final excerpt = _excerptFrom(content);
     final now = DateTime.now();
 
-    final companion = NotesCompanion(
-      id: Value(noteId),
-      content: Value(content),
-      excerpt: Value(excerpt),
-      updatedAt: Value(now),
-    );
-    final finalCompanion = markDirty ? companion.copyWith(isDirty: const Value(true)) : companion;
-
-    return ProjectedData(finalCompanion, tasks);
-  }
-
-  static String _deriveMarkdownFromDoc(Doc doc) {
-    final nodes = noteNodesFromDoc(doc);
-    if (nodes.isEmpty) return '';
-
+    // Single pass: build markdown lines AND extract task metadata
     final lines = <String>[];
+    final tasks = <TasksCompanion>[];
+
     for (final node in nodes) {
-      final nodeData = node.data;
-      final text = YjsNoteSchema.readNodeTextContent(doc, node.id, nodeData: nodeData);
+      final text = YjsNoteSchema.readNodeTextContent(doc, node.id, nodeData: node.data);
+
+      // Build markdown line
       switch (node.type) {
         case 'header':
-          int level = 1;
-          try {
-            level = node.data['level'] as int? ?? 1;
-          } catch (_) {}
-          final prefix = List.filled(level, '#').join('');
-          lines.add('$prefix $text');
+          final level = node.data['level'] as int? ?? 1;
+          lines.add('${List.filled(level, '#').join()} $text');
         case 'task':
-          final completed = _isTaskCompleted(doc, node.id);
+          final raw = nodesMap.get(node.id);
+          final completed = raw is YMap && (nodesMap.get('${node.id}:completed') == true || raw.get('completed') == true);
           lines.add('- [${completed ? 'x' : ' '}] $text');
         case 'list_item':
           lines.add('- $text');
@@ -401,16 +334,65 @@ class YjsSyncManager {
         default:
           lines.add(text);
       }
-    }
-    return lines.join('\n');
-  }
 
-  static bool _isTaskCompleted(Doc doc, String nodeId) {
-    final raw = doc.getMap<Object>('nodes')!.get(nodeId);
-    if (raw is YMap) {
-      return raw.get('completed') == true;
+      // Extract task companion
+      if (node.type == 'task') {
+        final raw = nodesMap.get(node.id);
+        if (raw is YMap) {
+          final completed = nodesMap.get('${node.id}:completed') == true || raw.get('completed') == true;
+          final dueDate = (nodesMap.get('${node.id}:dueDate') as String?) ?? (raw.get('dueDate') as String?);
+          final hasTime = nodesMap.get('${node.id}:hasTime') == true || raw.get('hasTime') == true;
+          final recurrence = (nodesMap.get('${node.id}:recurrence') as String?) ?? (raw.get('recurrence') as String?);
+          final reminder = (nodesMap.get('${node.id}:reminder') as String?) ?? (raw.get('reminder') as String?);
+          final lastCompletedAtStr = (nodesMap.get('${node.id}:lastCompletedAt') as String?) ?? (raw.get('lastCompletedAt') as String?);
+
+          DateTime? completedAt;
+          if (lastCompletedAtStr != null) {
+            completedAt = DateTime.tryParse(lastCompletedAtStr);
+          }
+
+          DateTime? resolvedDueDate;
+          if (dueDate != null) {
+            resolvedDueDate = dueDate.contains('T')
+                ? DateTime.tryParse(dueDate)
+                : DateTime.tryParse('${dueDate}T00:00:00');
+          }
+          TaskRecurrence? resolvedRecurrence;
+          if (recurrence != null) {
+            resolvedRecurrence = TaskRecurrence.parse(recurrence);
+          }
+
+          tasks.add(TasksCompanion.insert(
+            id: node.id,
+            userId: userId,
+            noteId: noteId,
+            title: text,
+            status: completed ? 'done' : 'open',
+            position: Value(node.position),
+            dueDate: Value(resolvedDueDate),
+            hasTime: Value(hasTime),
+            recurrence: Value(resolvedRecurrence),
+            reminder: Value(reminder),
+            completedAt: Value(completedAt),
+            createdAt: now,
+            updatedAt: now,
+          ));
+        }
+      }
     }
-    return false;
+
+    final content = lines.join('\n');
+    final excerpt = _excerptFrom(content);
+
+    final companion = NotesCompanion(
+      id: Value(noteId),
+      content: Value(content),
+      excerpt: Value(excerpt),
+      updatedAt: Value(now),
+    );
+    final finalCompanion = markDirty ? companion.copyWith(isDirty: const Value(true)) : companion;
+
+    return ProjectedData(finalCompanion, tasks);
   }
 
   static String? _excerptFrom(String content) {
@@ -429,27 +411,6 @@ class YjsSyncManager {
     if (flat.isEmpty) return null;
     if (flat.length <= 120) return flat;
     return '${flat.substring(0, 120)}…';
-  }
-
-  static Map<String, dynamic>? _extractNodeData(dynamic raw) {
-    if (raw is YMap) {
-      final dataRaw = raw.get('data');
-      if (dataRaw is String) {
-        return _jsonMapFromString(dataRaw);
-      }
-    }
-    return null;
-  }
-
-  static Map<String, dynamic>? _jsonMapFromString(String raw) {
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) {
-        return decoded.cast<String, dynamic>();
-      }
-    } catch (_) {}
-    return null;
   }
 
   /// Evict the in-memory Doc for [noteId] so the next [loadDoc] re-reads from DB.

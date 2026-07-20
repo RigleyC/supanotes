@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,75 +29,65 @@ final noteEditorControllerProvider = Provider.autoDispose
 
       final yjsMgr = ref.read(yjsSyncManagerProvider);
       final db = ref.read(appDatabaseProvider);
-      Future<void>? lastProjection;
-      Timer? projectionDebounce;
+
+      // Single flush queue: coalesces multiple events into one project+persist
+      Timer? flushDebounce;
       bool wasLocallyEdited = false;
+
+      Future<void> doFlush() async {
+        flushDebounce?.cancel();
+        flushDebounce = null;
+        await yjsMgr.projectNodes(noteId, markDirty: wasLocallyEdited);
+        wasLocallyEdited = false;
+        await yjsMgr.persist(noteId);
+      }
+
+      void scheduleFlush() {
+        flushDebounce?.cancel();
+        flushDebounce = Timer(
+          const Duration(milliseconds: 500),
+          () {
+            if (disposed) return;
+            unawaited(doFlush());
+          },
+        );
+      }
 
       syncService?.connectNote(noteId).then((doc) async {
         if (disposed || doc == null) return;
 
         // If the relational content is empty but the YDoc has nodes, re-project
         // now so the title/task list is restored without waiting for an edit.
-        // This fixes "Sem título" stuck after app restart for notes whose
-        // content projection was missed or corrupted.
         final existing = await db.notesDao.getNoteById(noteId);
         if (existing?.content.trim().isEmpty ?? true) {
-          lastProjection = yjsMgr.projectNodes(noteId);
-          await lastProjection;
+          await yjsMgr.projectNodes(noteId);
         }
 
         controller.initFromDoc(
           doc: doc,
           noteId: noteId,
           onDocChanged: ({required isRemote}) {
-            if (!isRemote) wasLocallyEdited = true;
-            dev.log(
-              '[Provider] onDocChanged fired, debouncing 500ms',
-              name: 'NoteEditorProvider',
-            );
-            projectionDebounce?.cancel();
-            projectionDebounce = Timer(
-              const Duration(milliseconds: 500),
-              () {
-                if (disposed) return;
-                dev.log(
-                  '[Provider] onDocChanged debounce elapsed, projecting',
-                  name: 'NoteEditorProvider',
-                );
-                lastProjection = yjsMgr.projectNodes(noteId, markDirty: wasLocallyEdited);
-                wasLocallyEdited = false;
-                unawaited(yjsMgr.persist(noteId));
-              },
-            );
+            if (!isRemote) {
+              wasLocallyEdited = true;
+              syncService.markDirty(noteId);
+            }
+            scheduleFlush();
           },
           onDocCommitted: (_) {
-            dev.log(
-              '[Provider] onDocCommitted fired, projecting immediately',
-              name: 'NoteEditorProvider',
-            );
-            projectionDebounce?.cancel();
-            lastProjection = yjsMgr.projectNodes(noteId);
-            unawaited(yjsMgr.persistWithSyncedVector(noteId, null));
+            scheduleFlush();
           },
         );
       }).catchError((_) {
-        // connectNote errored (e.g., WS failure) — ignore if disposed.
+        // connectNote errored — ignore if disposed.
       });
 
       ref.onDispose(() {
         disposed = true;
-        final hadPendingDebounce = projectionDebounce?.isActive ?? false;
-        projectionDebounce?.cancel();
-        if (hadPendingDebounce) {
-          lastProjection = yjsMgr.projectNodes(noteId);
-          unawaited(yjsMgr.persist(noteId));
-        }
+        flushDebounce?.cancel();
         unawaited(
           controller.dispose()
             .then((_) async {
-              if (lastProjection != null) {
-                await lastProjection;
-              }
+              await doFlush();
               await syncService?.disconnectNote();
             })
         );
