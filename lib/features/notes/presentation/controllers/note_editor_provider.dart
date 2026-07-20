@@ -42,7 +42,6 @@ final noteEditorControllerProvider = Provider.autoDispose
         flushDebounce = null;
         final prev = flushChain ?? Future.value();
         flushChain = prev.then((_) async {
-          if (disposed) return;
           await yjsMgr.projectNodes(noteId, markDirty: wasLocallyEdited);
           wasLocallyEdited = false;
           await yjsMgr.persist(noteId);

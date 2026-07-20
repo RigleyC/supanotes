@@ -265,9 +265,14 @@ class SyncService {
       debugPrint('[SyncService] _exchangeNote: applied ${serverUpdate.length}B from server for note $noteId');
     }
 
-    // Persist the synced state vector even when the server returned nothing,
-    // because the exchange still defines the ground truth for incremental sync.
-    await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
+    // Persist state always. Only advance synced state vector if no concurrent
+    // edit happened during the HTTP request — if generation changed, keeping
+    // the old SV ensures the next exchange computes a delta that includes it.
+    if (_dirtyGenerations[noteId] == genAtStart) {
+      await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
+    } else {
+      await _yjsMgr.persist(noteId);
+    }
 
     // Project remote changes to SQLite so list views reflect the update
     // even for background notes (not just the active editor).
@@ -278,10 +283,10 @@ class SyncService {
 
   /// Clears the dirty flag for [noteId] only if no new edit happened
   /// during the exchange (i.e., the generation hasn't changed).
+  /// Keeps the generation entry for the SV check that follows.
   void _tryClearDirty(String noteId, int genAtStart) {
     if (_dirtyGenerations[noteId] == genAtStart) {
       _dirtyNotes.remove(noteId);
-      _dirtyGenerations.remove(noteId);
     }
   }
 
