@@ -51,7 +51,7 @@ Object? readTaskField(Doc doc, String nodeId, String field) {
 void main() {
   group('YjsDocEditorBridge - task commands', () {
     test(
-        'recurring completion produces one Yjs transaction and one projection request',
+        'recurring completion records per-occurrence event without advancing dueDate',
         () async {
       final recorder = RecordingProjectionScheduler();
       final doc = Doc();
@@ -66,14 +66,27 @@ void main() {
         nodeMap.set('data', '{}');
         nodeMap.set('createdAt', 1000.0);
         nodeMap.set('recurrence', 'daily');
+        nodeMap.set('dueDate', '2026-07-18');
         doc.getMap<Object>('nodes')!.set('task-1', nodeMap);
       });
 
       final result = bridge.completeTaskInYDoc('task-1',
           now: DateTime.utc(2026, 7, 18, 9));
 
-      expect(result.nextDue, DateTime.utc(2026, 7, 19, 9));
-      expect(readTaskField(doc, 'task-1', 'lastCompletedAt'), isNotNull);
+      // Template should NOT be advanced
+      expect(result.nextDue, isNull);
+      expect(result.completed, false);
+      expect(result.scheduledAt, DateTime(2026, 7, 18));
+
+      // Completion event should be in taskCompletions YMap, not on template
+      final nodeMap = readTaskField(doc, 'task-1', 'dueDate');
+      expect(nodeMap, '2026-07-18'); // dueDate still anchor
+      expect(readTaskField(doc, 'task-1', 'completed'), isNull);
+      expect(readTaskField(doc, 'task-1', 'lastCompletedAt'), isNull);
+
+      final completionsRoot = doc.getMap<Object>('taskCompletions')!;
+      final key = 'task-1:2026-07-18';
+      expect(completionsRoot.get(key), result.completedAt.toIso8601String());
     });
   });
 }

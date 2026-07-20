@@ -60,8 +60,8 @@ WHERE user_id = $1 AND note_id = $2 AND deleted_at IS NULL
 ORDER BY position ASC, created_at ASC;
 
 -- name: CreateTaskCompletion :one
-INSERT INTO task_completions (task_id, completed_at, due_date)
-VALUES ($1, NOW(), $2)
+INSERT INTO task_completions (task_id, completed_at, scheduled_at, due_date)
+VALUES ($1, NOW(), NOW(), $2)
 RETURNING *;
 
 -- name: CountTasks :one

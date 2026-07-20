@@ -78,12 +78,15 @@ class NoteEditorController extends ChangeNotifier {
     onHasContentChanged?.call(document != null && document!.isNotEmpty);
   }
 
-  TaskCompletionResult? completeTaskInYDoc(String nodeId, {DateTime? now}) {
-    return _bridge?.completeTaskInYDoc(nodeId, now: now);
+  TaskCompletionResult? completeTaskInYDoc(String nodeId,
+      {DateTime? now, DateTime? scheduledAt}) {
+    return _bridge?.completeTaskInYDoc(nodeId, now: now, scheduledAt: scheduledAt);
   }
 
-  void reopenTaskInYDoc(String nodeId, {DateTime? previousDue}) {
-    _bridge?.reopenTaskInYDoc(nodeId, previousDue: previousDue);
+  void reopenTaskInYDoc(String nodeId,
+      {DateTime? previousDue, DateTime? scheduledAt}) {
+    _bridge?.reopenTaskInYDoc(nodeId,
+        previousDue: previousDue, scheduledAt: scheduledAt);
   }
 
   void updateTaskMetadataInYDoc(

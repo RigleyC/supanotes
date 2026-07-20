@@ -11,6 +11,10 @@ abstract final class YjsNoteSchema {
   static const nodesRoot = 'nodes';
   static String contentRoot(String id) => 'content/$id';
 
+  static const taskCompletionsRoot = 'taskCompletions';
+  static String taskCompletionKey(String taskId, String scheduledAtUtc) =>
+      '$taskId:$scheduledAtUtc';
+
   static const fieldId = 'id';
   static const fieldType = 'type';
   static const fieldPosition = 'position';

@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
+import 'package:uuid/uuid.dart';
+
 import 'package:supanotes/features/notes/domain/yjs_note_schema.dart';
 import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
@@ -183,6 +185,12 @@ class YjsSyncManager {
       // Delete orphan tasks that no longer exist in the YDoc
       for (final orphan in existingById.values) {
         batch.delete(_db.tasks, orphan);
+      }
+
+      // Upsert task completions projected from the YDoc
+      for (final completion in data.completions) {
+        batch.insert(_db.localTaskCompletions, completion,
+            mode: InsertMode.insertOrReplace);
       }
     });
   }
@@ -376,6 +384,35 @@ class YjsSyncManager {
       }
     }
 
+    // Project task completion events from YDoc's taskCompletions YMap
+    final completions = <LocalTaskCompletionsCompanion>[];
+    final taskCompletionsMap = doc.getMap<Object>(YjsNoteSchema.taskCompletionsRoot);
+    if (taskCompletionsMap != null) {
+      for (final key in taskCompletionsMap.keys) {
+        final colonIdx = key.indexOf(':');
+        if (colonIdx == -1) continue;
+        final taskId = key.substring(0, colonIdx);
+        final scheduledAtStr = key.substring(colonIdx + 1);
+        final value = taskCompletionsMap.get(key);
+        if (value is! String) continue;
+
+        final completedAt = DateTime.tryParse(value);
+        final scheduledAt = scheduledAtStr.contains('T')
+            ? DateTime.tryParse(scheduledAtStr)
+            : DateTime.tryParse('${scheduledAtStr}T00:00:00');
+        if (completedAt == null || scheduledAt == null) continue;
+
+        final uuid = const Uuid().v4();
+        completions.add(LocalTaskCompletionsCompanion.insert(
+          id: uuid,
+          taskId: taskId,
+          userId: userId,
+          completedAt: completedAt.toUtc(),
+          scheduledAt: scheduledAt.toUtc(),
+        ));
+      }
+    }
+
     final content = lines.join('\n');
     final excerpt = _excerptFrom(content);
 
@@ -387,7 +424,7 @@ class YjsSyncManager {
     );
     final finalCompanion = markDirty ? companion.copyWith(isDirty: const Value(true)) : companion;
 
-    return ProjectedData(finalCompanion, tasks);
+    return ProjectedData(finalCompanion, tasks, completions: completions);
   }
 
   static String? _excerptFrom(String content) {
@@ -544,5 +581,6 @@ IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(IsolateMergeParams params
 class ProjectedData {
   final NotesCompanion noteCompanion;
   final List<TasksCompanion> tasks;
-  ProjectedData(this.noteCompanion, this.tasks);
+  final List<LocalTaskCompletionsCompanion> completions;
+  ProjectedData(this.noteCompanion, this.tasks, {this.completions = const []});
 }

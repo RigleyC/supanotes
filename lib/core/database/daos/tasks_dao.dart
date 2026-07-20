@@ -164,29 +164,14 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     });
   }
 
-  /// Marks the row with [id] as completed, records the completion event
-  /// in the [LocalTaskCompletions] history, and — if the task is
-  /// recurring — schedules the next occurrence.
+  /// Marks the row with [id] as completed and records the completion event
+  /// in the [LocalTaskCompletions] history.
   ///
-  /// Recurrence rules (case-sensitive, applied to the **current** due
-  /// date, falling back to "today" if the task has no due date):
+  /// Recurrence logic is now centralized in [TaskCompletionCommand] (YDoc path).
+  /// This method only persists the completion — the YDoc projection (sync layer)
+  /// handles advancing recurring due dates.
   ///
-  ///   * `daily`    → current due + 1 day
-  ///   * `weekdays` → current due + 1 day, skipping Sat/Sun
-  ///   * `weekly`   → current due + 7 days
-  ///   * `monthly`  → current due + 1 calendar month, clamped to the
-  ///                  last valid day if the target month is shorter
-  ///   * anything else (or empty / null) → task is left as "completed"
-  ///     and no new row is inserted
-  ///
-  /// For recurring tasks the same row is updated in place: the `dueDate`
-  /// advances to the next occurrence, `completedAt` is cleared, and
-  /// `status` stays `open`. Non-recurring tasks are marked `done`. The
-  /// completion event is recorded in [LocalTaskCompletions]. Dirty flags
-  /// are set so the sync layer propagates the change to the backend.
-  ///
-  /// Returns the next due date for recurring tasks, or null for
-  /// non-recurring tasks.
+  /// Returns the previous due date and hasTime for undo purposes.
   Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id) async {
     final task = await (select(
       tasks,
@@ -194,25 +179,9 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     if (task == null) return (nextDue: null, previousDue: null, previousHasTime: false);
 
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
     final previousDue = task.dueDate;
-    DateTime? nextDue;
 
     await transaction(() async {
-      // 1. If recurring and overdue, catch up to the current active date.
-      final recurrence = task.recurrence;
-      var taskDueDate = task.dueDate;
-      if (recurrence != null &&
-          taskDueDate != null &&
-          taskDueDate.isBefore(today)) {
-        taskDueDate = catchUpDueDate(
-          from: taskDueDate,
-          recurrence: recurrence,
-          today: today,
-        );
-      }
-
-      // 2. Record the completion event.
       if (completionsDao != null) {
         await completionsDao!.recordCompletion(
           taskId: task.id,
@@ -221,26 +190,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         );
       }
 
-      // 3. If recurring, schedule the next occurrence on the same row.
-      if (recurrence != null) {
-        nextDue = nextDueDate(
-          from: taskDueDate ?? now,
-          recurrence: recurrence,
-        );
-        if (nextDue != null) {
-          await (update(tasks)..where((t) => t.id.equals(id))).write(
-            TasksCompanion(
-              dueDate: Value(nextDue),
-              completedAt: const Value(null),
-              status: const Value('open'),
-              updatedAt: Value(now),
-            ),
-          );
-          return (nextDue: nextDue, previousDue: previousDue, previousHasTime: task.hasTime);
-        }
-      }
-
-      // 4. Non-recurring or unsupported recurrence: mark completed.
       await (update(tasks)..where((t) => t.id.equals(id))).write(
         TasksCompanion(
           status: const Value('done'),
@@ -250,7 +199,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       );
     });
 
-    return (nextDue: nextDue, previousDue: previousDue, previousHasTime: task.hasTime);
+    return (nextDue: null, previousDue: previousDue, previousHasTime: task.hasTime);
   }
 
   /// Hard-deletes a task (used when the user removes a task from the

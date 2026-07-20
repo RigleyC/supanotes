@@ -78,6 +78,7 @@ void main() {
       completedAt: null,
       recurrence: TaskRecurrence.daily,
       hasTime: false,
+      reminder: null,
       createdAt: now,
       updatedAt: now,
     );

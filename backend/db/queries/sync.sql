@@ -101,10 +101,11 @@ WHERE tags.user_id = EXCLUDED.user_id
 RETURNING *;
 
 -- name: UpsertTaskCompletion :exec
-INSERT INTO task_completions (id, task_id, completed_at)
+INSERT INTO task_completions (id, task_id, completed_at, scheduled_at)
 SELECT sqlc.arg('id')::uuid,
        sqlc.arg('task_id')::uuid,
-       sqlc.arg('completed_at')::timestamptz
+       sqlc.arg('completed_at')::timestamptz,
+       sqlc.arg('scheduled_at')::timestamptz
 FROM tasks
 WHERE tasks.id = sqlc.arg('task_id')::uuid
   AND (tasks.user_id = sqlc.arg('user_id')::uuid
@@ -112,7 +113,8 @@ WHERE tasks.id = sqlc.arg('task_id')::uuid
                   WHERE ns.note_id = tasks.note_id
                     AND ns.user_id = sqlc.arg('user_id')::uuid
                     AND ns.permission = 'edit'))
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (task_id, scheduled_at) DO UPDATE SET
+    completed_at = EXCLUDED.completed_at;
 
 -- name: GetSyncNoteTags :many
 SELECT nt.note_id, nt.tag_id

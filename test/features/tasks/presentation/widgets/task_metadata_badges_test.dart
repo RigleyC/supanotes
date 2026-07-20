@@ -54,7 +54,7 @@ void main() {
     expect(find.textContaining('Atrasada'), findsNothing);
   });
 
-  testWidgets('shows dynamic weekly label when dueDate is set', (tester) async {
+  testWidgets('shows short recurrence label when dueDate is set', (tester) async {
     final thursday = DateTime.utc(2026, 6, 11);
 
     await tester.pumpWidget(
@@ -65,10 +65,10 @@ void main() {
     );
 
     expect(find.byIcon(Icons.refresh), findsOneWidget);
-    expect(find.text('Semanalmente (quinta-feira)'), findsOneWidget);
+    expect(find.text('Semanalmente'), findsOneWidget);
   });
 
-  testWidgets('shows dynamic monthly label when dueDate is set', (tester) async {
+  testWidgets('shows short monthly label when dueDate is set', (tester) async {
     final fifteenth = DateTime.utc(2026, 7, 15);
 
     await tester.pumpWidget(
@@ -79,6 +79,6 @@ void main() {
     );
 
     expect(find.byIcon(Icons.refresh), findsOneWidget);
-    expect(find.text('Mensalmente (dia 15)'), findsOneWidget);
+    expect(find.text('Mensalmente'), findsOneWidget);
   });
 }

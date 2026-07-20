@@ -104,11 +104,15 @@ class TaskMetadataSheetBody extends ConsumerWidget {
               TaskMetadataDatePage(
                 selected: state.dueDate,
                 onSelected: (date) {
+                  final oldDueDate = state.dueDate;
+                  final mergedDate = (oldDueDate != null && state.hasTime)
+                      ? DateTime(date.year, date.month, date.day, oldDueDate.hour, oldDueDate.minute)
+                      : date;
                   notifier.state = TaskMetadataState(
-                    dueDate: date,
-                    hasTime: false,
+                    dueDate: mergedDate,
+                    hasTime: state.hasTime,
                     recurrence: state.recurrence,
-                    reminder: state.reminder?.toAllDayFallback(),
+                    reminder: state.reminder,
                   );
                 },
               ),

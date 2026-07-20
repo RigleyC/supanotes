@@ -763,10 +763,11 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, e
 }
 
 const upsertTaskCompletion = `-- name: UpsertTaskCompletion :exec
-INSERT INTO task_completions (id, task_id, completed_at)
+INSERT INTO task_completions (id, task_id, completed_at, scheduled_at)
 SELECT $1::uuid,
        $2::uuid,
-       $3::timestamptz
+       $3::timestamptz,
+       $5::timestamptz
 FROM tasks
 WHERE tasks.id = $2::uuid
   AND (tasks.user_id = $4::uuid
@@ -774,7 +775,8 @@ WHERE tasks.id = $2::uuid
                   WHERE ns.note_id = tasks.note_id
                     AND ns.user_id = $4::uuid
                     AND ns.permission = 'edit'))
-ON CONFLICT (id) DO NOTHING
+ON CONFLICT (task_id, scheduled_at) DO UPDATE SET
+    completed_at = EXCLUDED.completed_at
 `
 
 type UpsertTaskCompletionParams struct {
@@ -782,6 +784,7 @@ type UpsertTaskCompletionParams struct {
 	TaskID      pgtype.UUID        `json:"task_id"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	UserID      pgtype.UUID        `json:"user_id"`
+	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
 }
 
 func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error {
@@ -790,6 +793,7 @@ func (q *Queries) UpsertTaskCompletion(ctx context.Context, arg UpsertTaskComple
 		arg.TaskID,
 		arg.CompletedAt,
 		arg.UserID,
+		arg.ScheduledAt,
 	)
 	return err
 }

@@ -203,6 +203,7 @@ type TaskCompletion struct {
 	ID          pgtype.UUID        `json:"id"`
 	TaskID      pgtype.UUID        `json:"task_id"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
 	DueDate     pgtype.Date        `json:"due_date"`
 }
 

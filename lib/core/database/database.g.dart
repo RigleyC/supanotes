@@ -2870,8 +2870,25 @@ class $LocalTaskCompletionsTable extends LocalTaskCompletions
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _scheduledAtMeta = const VerificationMeta(
+    'scheduledAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, taskId, userId, completedAt];
+  late final GeneratedColumn<DateTime> scheduledAt = GeneratedColumn<DateTime>(
+    'scheduled_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    taskId,
+    userId,
+    completedAt,
+    scheduledAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2916,6 +2933,17 @@ class $LocalTaskCompletionsTable extends LocalTaskCompletions
     } else if (isInserting) {
       context.missing(_completedAtMeta);
     }
+    if (data.containsKey('scheduled_at')) {
+      context.handle(
+        _scheduledAtMeta,
+        scheduledAt.isAcceptableOrUnknown(
+          data['scheduled_at']!,
+          _scheduledAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduledAtMeta);
+    }
     return context;
   }
 
@@ -2944,6 +2972,10 @@ class $LocalTaskCompletionsTable extends LocalTaskCompletions
         DriftSqlType.dateTime,
         data['${effectivePrefix}completed_at'],
       )!,
+      scheduledAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}scheduled_at'],
+      )!,
     );
   }
 
@@ -2959,11 +2991,13 @@ class LocalTaskCompletionData extends DataClass
   final String taskId;
   final String userId;
   final DateTime completedAt;
+  final DateTime scheduledAt;
   const LocalTaskCompletionData({
     required this.id,
     required this.taskId,
     required this.userId,
     required this.completedAt,
+    required this.scheduledAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2972,6 +3006,7 @@ class LocalTaskCompletionData extends DataClass
     map['task_id'] = Variable<String>(taskId);
     map['user_id'] = Variable<String>(userId);
     map['completed_at'] = Variable<DateTime>(completedAt);
+    map['scheduled_at'] = Variable<DateTime>(scheduledAt);
     return map;
   }
 
@@ -2981,6 +3016,7 @@ class LocalTaskCompletionData extends DataClass
       taskId: Value(taskId),
       userId: Value(userId),
       completedAt: Value(completedAt),
+      scheduledAt: Value(scheduledAt),
     );
   }
 
@@ -2994,6 +3030,7 @@ class LocalTaskCompletionData extends DataClass
       taskId: serializer.fromJson<String>(json['taskId']),
       userId: serializer.fromJson<String>(json['userId']),
       completedAt: serializer.fromJson<DateTime>(json['completedAt']),
+      scheduledAt: serializer.fromJson<DateTime>(json['scheduledAt']),
     );
   }
   @override
@@ -3004,6 +3041,7 @@ class LocalTaskCompletionData extends DataClass
       'taskId': serializer.toJson<String>(taskId),
       'userId': serializer.toJson<String>(userId),
       'completedAt': serializer.toJson<DateTime>(completedAt),
+      'scheduledAt': serializer.toJson<DateTime>(scheduledAt),
     };
   }
 
@@ -3012,11 +3050,13 @@ class LocalTaskCompletionData extends DataClass
     String? taskId,
     String? userId,
     DateTime? completedAt,
+    DateTime? scheduledAt,
   }) => LocalTaskCompletionData(
     id: id ?? this.id,
     taskId: taskId ?? this.taskId,
     userId: userId ?? this.userId,
     completedAt: completedAt ?? this.completedAt,
+    scheduledAt: scheduledAt ?? this.scheduledAt,
   );
   LocalTaskCompletionData copyWithCompanion(
     LocalTaskCompletionsCompanion data,
@@ -3028,6 +3068,9 @@ class LocalTaskCompletionData extends DataClass
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      scheduledAt: data.scheduledAt.present
+          ? data.scheduledAt.value
+          : this.scheduledAt,
     );
   }
 
@@ -3037,13 +3080,14 @@ class LocalTaskCompletionData extends DataClass
           ..write('id: $id, ')
           ..write('taskId: $taskId, ')
           ..write('userId: $userId, ')
-          ..write('completedAt: $completedAt')
+          ..write('completedAt: $completedAt, ')
+          ..write('scheduledAt: $scheduledAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, taskId, userId, completedAt);
+  int get hashCode => Object.hash(id, taskId, userId, completedAt, scheduledAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3051,7 +3095,8 @@ class LocalTaskCompletionData extends DataClass
           other.id == this.id &&
           other.taskId == this.taskId &&
           other.userId == this.userId &&
-          other.completedAt == this.completedAt);
+          other.completedAt == this.completedAt &&
+          other.scheduledAt == this.scheduledAt);
 }
 
 class LocalTaskCompletionsCompanion
@@ -3060,12 +3105,14 @@ class LocalTaskCompletionsCompanion
   final Value<String> taskId;
   final Value<String> userId;
   final Value<DateTime> completedAt;
+  final Value<DateTime> scheduledAt;
   final Value<int> rowid;
   const LocalTaskCompletionsCompanion({
     this.id = const Value.absent(),
     this.taskId = const Value.absent(),
     this.userId = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.scheduledAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalTaskCompletionsCompanion.insert({
@@ -3073,16 +3120,19 @@ class LocalTaskCompletionsCompanion
     required String taskId,
     required String userId,
     required DateTime completedAt,
+    required DateTime scheduledAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        taskId = Value(taskId),
        userId = Value(userId),
-       completedAt = Value(completedAt);
+       completedAt = Value(completedAt),
+       scheduledAt = Value(scheduledAt);
   static Insertable<LocalTaskCompletionData> custom({
     Expression<String>? id,
     Expression<String>? taskId,
     Expression<String>? userId,
     Expression<DateTime>? completedAt,
+    Expression<DateTime>? scheduledAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3090,6 +3140,7 @@ class LocalTaskCompletionsCompanion
       if (taskId != null) 'task_id': taskId,
       if (userId != null) 'user_id': userId,
       if (completedAt != null) 'completed_at': completedAt,
+      if (scheduledAt != null) 'scheduled_at': scheduledAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3099,6 +3150,7 @@ class LocalTaskCompletionsCompanion
     Value<String>? taskId,
     Value<String>? userId,
     Value<DateTime>? completedAt,
+    Value<DateTime>? scheduledAt,
     Value<int>? rowid,
   }) {
     return LocalTaskCompletionsCompanion(
@@ -3106,6 +3158,7 @@ class LocalTaskCompletionsCompanion
       taskId: taskId ?? this.taskId,
       userId: userId ?? this.userId,
       completedAt: completedAt ?? this.completedAt,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3125,6 +3178,9 @@ class LocalTaskCompletionsCompanion
     if (completedAt.present) {
       map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
+    if (scheduledAt.present) {
+      map['scheduled_at'] = Variable<DateTime>(scheduledAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3138,6 +3194,7 @@ class LocalTaskCompletionsCompanion
           ..write('taskId: $taskId, ')
           ..write('userId: $userId, ')
           ..write('completedAt: $completedAt, ')
+          ..write('scheduledAt: $scheduledAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7069,6 +7126,7 @@ typedef $$LocalTaskCompletionsTableCreateCompanionBuilder =
       required String taskId,
       required String userId,
       required DateTime completedAt,
+      required DateTime scheduledAt,
       Value<int> rowid,
     });
 typedef $$LocalTaskCompletionsTableUpdateCompanionBuilder =
@@ -7077,6 +7135,7 @@ typedef $$LocalTaskCompletionsTableUpdateCompanionBuilder =
       Value<String> taskId,
       Value<String> userId,
       Value<DateTime> completedAt,
+      Value<DateTime> scheduledAt,
       Value<int> rowid,
     });
 
@@ -7106,6 +7165,11 @@ class $$LocalTaskCompletionsTableFilterComposer
 
   ColumnFilters<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7138,6 +7202,11 @@ class $$LocalTaskCompletionsTableOrderingComposer
     column: $table.completedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalTaskCompletionsTableAnnotationComposer
@@ -7160,6 +7229,11 @@ class $$LocalTaskCompletionsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
     builder: (column) => column,
   );
 }
@@ -7211,12 +7285,14 @@ class $$LocalTaskCompletionsTableTableManager
                 Value<String> taskId = const Value.absent(),
                 Value<String> userId = const Value.absent(),
                 Value<DateTime> completedAt = const Value.absent(),
+                Value<DateTime> scheduledAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalTaskCompletionsCompanion(
                 id: id,
                 taskId: taskId,
                 userId: userId,
                 completedAt: completedAt,
+                scheduledAt: scheduledAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -7225,12 +7301,14 @@ class $$LocalTaskCompletionsTableTableManager
                 required String taskId,
                 required String userId,
                 required DateTime completedAt,
+                required DateTime scheduledAt,
                 Value<int> rowid = const Value.absent(),
               }) => LocalTaskCompletionsCompanion.insert(
                 id: id,
                 taskId: taskId,
                 userId: userId,
                 completedAt: completedAt,
+                scheduledAt: scheduledAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

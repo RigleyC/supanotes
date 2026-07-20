@@ -1,23 +1,27 @@
 import 'package:drift/drift.dart';
 
-/// Append-only history of task completions.
+/// History of task completions, keyed per occurrence.
 ///
-/// Each row records the fact that a given [taskId] was completed at
-/// [completedAt] by [userId]. The row is marked [isDirty] until the next
-/// successful sync round, after which [TaskCompletionsDao.clearDirtyFlag]
-/// flips it to `false`.
+/// Each row records that a given [taskId] had its occurrence at
+/// [scheduledAt] completed at [completedAt] by [userId].
 ///
-/// Repeated completions of a recurring task create multiple rows — the
-/// table intentionally does not enforce a unique constraint on
-/// `(taskId, completedAt)` so that a task completed twice on the same
-/// wall-clock second still produces two distinct history entries.
+/// A recurring task's template stays unchanged; only per-occurrence
+/// completion events are recorded. The unique constraint on
+/// `(taskId, scheduledAt)` ensures idempotent retries and CRDT
+/// convergence across devices.
 @DataClassName('LocalTaskCompletionData')
 class LocalTaskCompletions extends Table {
   TextColumn get id => text()();
   TextColumn get taskId => text()();
   TextColumn get userId => text()();
   DateTimeColumn get completedAt => dateTime()();
+  DateTimeColumn get scheduledAt => dateTime()();
 
   @override
   Set<Column> get primaryKey => {id};
+
+  @override
+  List<Set<Column>> get uniqueConstraints => [
+    {taskId, scheduledAt},
+  ];
 }

@@ -171,7 +171,8 @@ void main() {
       expect(updatedNode.isComplete, isTrue);
     });
 
-    test('completeTaskInYDoc with recurring task advances due date', () async {
+    test('completeTaskInYDoc with recurring task records per-occurrence event',
+        () async {
       final doc = Doc();
       final mutableDoc = MutableDocument.empty();
       final composer = MutableDocumentComposer();
@@ -198,6 +199,7 @@ void main() {
         nodeMap.set('position', 'a0');
         nodeMap.set('type', 'task');
         nodeMap.set('recurrence', 'daily');
+        nodeMap.set('dueDate', '2026-07-14');
         nodeMap.set('data', jsonEncode({
           'text': 'Daily task',
           'completed': false,
@@ -210,13 +212,17 @@ void main() {
 
       final nodesMap = doc.getMap<Object>('nodes')!;
       final t1Map = nodesMap.get('t1') as YMap;
-      // Task should NOT be completed — it was reopened by recurrence
-      expect(t1Map.get('completed'), isFalse);
-      // Due date should have advanced
-      expect(t1Map.get('dueDate'), '2026-07-15');
+      // Template should be unchanged (no advancement)
+      expect(t1Map.get('completed'), isNull);
+      expect(t1Map.get('dueDate'), '2026-07-14');
+      expect(t1Map.get('lastCompletedAt'), isNull);
       // Composite keys should NOT be written
       expect(nodesMap.get('t1:completed'), isNull);
       expect(nodesMap.get('t1:dueDate'), isNull);
+
+      // Completion event should be in taskCompletions YMap
+      final completionsRoot = doc.getMap<Object>('taskCompletions')!;
+      expect(completionsRoot.get('t1:2026-07-14'), isNotNull);
 
       bridge.dispose();
     });

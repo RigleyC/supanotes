@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -372,19 +373,73 @@ func ProjectNoteContentFromYDoc(ctx context.Context, pool *pgxpool.Pool, noteID 
 		return fmt.Errorf("batch upsert tasks: %w", err)
 	}
 
-	// Insert task_completion when completed transitions from nil → value
-	// Uses deterministic UUID v5 from task_id + completed_at for idempotency
+	// --- Insert task completions from two sources: ---
+
+	// 1) Legacy: completedAt transition nil → value (covers non-recurring tasks)
 	for _, t := range tasks {
 		oldCompleted := existingCompleted[t.ID.Bytes]
 		if t.CompletedAt.Valid && !oldCompleted.Valid {
-			completionUUID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(uuid.UUID(t.ID.Bytes).String()+t.CompletedAt.Time.Format(time.RFC3339Nano)))
+			scheduledAt := t.CompletedAt.Time
+			completionUUID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(uuid.UUID(t.ID.Bytes).String()+scheduledAt.Format(time.RFC3339Nano)))
 			if err := q.UpsertTaskCompletion(ctx, sqlcgen.UpsertTaskCompletionParams{
 				ID:          pgtype.UUID{Bytes: completionUUID, Valid: true},
 				TaskID:      t.ID,
 				CompletedAt: t.CompletedAt,
+				ScheduledAt: pgtype.Timestamptz{Time: scheduledAt, Valid: true},
 				UserID:      defaultUserID,
 			}); err != nil {
-				return fmt.Errorf("create task completion for %s: %w", uuid.UUID(t.ID.Bytes).String(), err)
+				return fmt.Errorf("legacy task completion for %s: %w", uuid.UUID(t.ID.Bytes).String(), err)
+			}
+		}
+	}
+
+	// 2) Per-occurrence completions from YDoc taskCompletions root YMap
+	//    (covers recurring tasks — new model)
+	if taskCompletionsMap := doc.GetMap("taskCompletions"); taskCompletionsMap != nil {
+		for key, rawVal := range taskCompletionsMap.Entries() {
+			if rawVal == nil {
+				continue
+			}
+			completedAtStr, ok := rawVal.(string)
+			if !ok || completedAtStr == "" {
+				continue
+			}
+			completedAt, err := time.Parse(time.RFC3339, completedAtStr)
+			if err != nil {
+				continue
+			}
+
+			colonIdx := strings.Index(key, ":")
+			if colonIdx == -1 {
+				continue
+			}
+			taskID := key[:colonIdx]
+			scheduledAtStr := key[colonIdx+1:]
+
+			taskUUID, err := parseUUIDStr(taskID)
+			if err != nil {
+				continue
+			}
+
+			var scheduledAt time.Time
+			if strings.Contains(scheduledAtStr, "T") {
+				scheduledAt, err = time.Parse("2006-01-02T15:04", scheduledAtStr)
+			} else {
+				scheduledAt, err = time.Parse("2006-01-02", scheduledAtStr)
+			}
+			if err != nil {
+				continue
+			}
+
+			completionUUID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(taskID+":"+scheduledAt.Format(time.RFC3339)))
+			if err := q.UpsertTaskCompletion(ctx, sqlcgen.UpsertTaskCompletionParams{
+				ID:          pgtype.UUID{Bytes: completionUUID, Valid: true},
+				TaskID:      taskUUID,
+				CompletedAt: pgtype.Timestamptz{Time: completedAt, Valid: true},
+				ScheduledAt: pgtype.Timestamptz{Time: scheduledAt, Valid: true},
+				UserID:      defaultUserID,
+			}); err != nil {
+				return fmt.Errorf("task completion for %s@%s: %w", taskID, scheduledAtStr, err)
 			}
 		}
 	}

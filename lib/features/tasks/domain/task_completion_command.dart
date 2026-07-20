@@ -19,6 +19,7 @@ class TaskCompletionResult {
   final DateTime completedAt;
   final DateTime? previousDue;
   final bool previousHasTime;
+  final DateTime? scheduledAt;
 
   const TaskCompletionResult({
     required this.completed,
@@ -26,6 +27,7 @@ class TaskCompletionResult {
     required this.completedAt,
     this.previousDue,
     required this.previousHasTime,
+    this.scheduledAt,
   });
 }
 
@@ -33,17 +35,34 @@ class TaskCompletionCommand {
   const TaskCompletionCommand(this._clock);
   final DateTime Function() _clock;
 
-  TaskCompletionResult complete(TaskSnapshot task) {
-    final completedAt = _clock().toUtc();
-    final nextDue = task.recurrence == null
-        ? null
-        : nextDueDate(from: task.dueDate ?? completedAt, recurrence: task.recurrence!);
+  TaskCompletionResult complete(TaskSnapshot task, {DateTime? scheduledAt}) {
+    final now = _clock();
+    final completedAt = now.toUtc();
+
+    if (task.recurrence == null) {
+      return TaskCompletionResult(
+        completed: true,
+        nextDue: null,
+        completedAt: completedAt,
+        previousDue: task.dueDate,
+        previousHasTime: task.hasTime,
+        scheduledAt: scheduledAt,
+      );
+    }
+
+    // For recurring tasks, the template stays open and its dueDate is
+    // not advanced. The completion records which occurrence was completed
+    // (scheduledAt). The occurrence date defaults to the task's dueDate
+    // or, if missing, today's start.
+    final occurrenceDate = scheduledAt ?? task.dueDate ??
+        DateTime(now.year, now.month, now.day);
     return TaskCompletionResult(
-      completed: nextDue == null,
-      nextDue: nextDue,
+      completed: false,
+      nextDue: null,
       completedAt: completedAt,
       previousDue: task.dueDate,
       previousHasTime: task.hasTime,
+      scheduledAt: occurrenceDate,
     );
   }
 }

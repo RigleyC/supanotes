@@ -1,45 +1,206 @@
-# Yjs Synchronization Engine Audit & Implementation Plan
+# Plano de Implementacao: recorrencias por ocorrencia e historico esparso
 
-## Goal Description
-Conduct a comprehensive review of the `Yjs` synchronization engine between Flutter (`super_editor`, SQLite, `yjs_dart`) and the Go backend to identify and resolve systemic issues preventing note edits from being saved.
+## Objetivo
 
-The user reported that even after the `getText` fix, edits made to notes on Android are still not being saved when the user exits the note.
+Preservar cada ocorrencia prevista de uma tarefa recorrente sem criar uma nova
+linha de `tasks` para cada periodo. Uma tarefa recorrente permanece um unico
+template no YDoc; uma ocorrencia e considerada concluida somente quando existe
+um registro de conclusao para sua data programada. A ausencia do registro
+significa que ela continua pendente ou atrasada.
 
-## Root Cause Analysis (Hypotheses)
+Isso substitui o comportamento atual que, ao concluir uma recorrencia, move o
+`dueDate` do proprio no para a proxima data e usa `catchUpDueDate`, descartando
+as ocorrencias perdidas.
 
-1. **Persistent Corruption of Root Types**:
-   Due to the previous bug in `yjs_dart`, many existing `content/$id` root types were incorrectly initialized as `YMap` in the user's database. When the user edits these existing paragraphs, our new code (`_doc.getText('content/$id')`) throws a `TypeMismatch` exception. The exception is caught and the text update is silently discarded. Because Yjs root types cannot be deleted or changed once created, these specific paragraphs are permanently corrupted.
-   *Proof*: The `catch (e)` in `_serializeNode` logs a `corrupted type` error, resulting in no text being written to the CRDT.
+## Decisoes de dominio
 
-2. **Asynchronous Disposal Race Condition**:
-   In `NoteEditorController.dispose()`, we call `await _coordinator?.dispose();`. This calls `flushNow()`, which triggers `yjsMgr.projectNodes` via an unawaited callback. Immediately after, `syncService.disconnectNote()` is called, which persists the `YDoc` and closes the WebSocket. If the app is closed or the isolate is paused before `projectNodes` (a Drift transaction) completes, the SQLite view might not update, though the CRDT blob is saved.
-   
-3. **super_editor Delta Mapping Missing**:
-   Currently, we are entirely replacing the `YText` content (`sharedType.delete(0, len); sharedType.insert(0, newText);`) instead of applying specific deltas. While inefficient, this should not cause data loss unless `currentText.length` is misaligned due to concurrent edits.
+### Template
 
-## Proposed Changes
+O no de tarefa existente continua sendo o template e conserva:
 
-### 1. Graceful Recovery for Corrupted Nodes (Fallback Key)
-Since we cannot change a root type in Yjs from `YMap` to `YText`, we must introduce a fallback mechanism for corrupted nodes.
-#### [MODIFY] lib/features/notes/domain/yjs_doc_editor_bridge.dart
-- Update `_serializeNode` to catch the type mismatch exception. If caught, fallback to a new root type key: `content_fixed/$id`.
-- Write the text to `content_fixed/$id` instead.
+- `nodeId` / `taskId`
+- texto e posicao na nota
+- `dueDate` como data ancora da recorrencia
+- `hasTime`, hora, timezone e `recurrence`
+- `reminder`
 
-#### [MODIFY] lib/features/notes/domain/yjs_node_codec.dart
-- Update `_readNodeFromYMap` and `_readNodeFromJsonString` to first attempt to read from `content_fixed/$id` (as a `YText`). If it doesn't exist, try `content/$id`.
+Para tarefas sem recorrencia, o comportamento atual de `completed` permanece.
+Para tarefas recorrentes, `completed` e `lastCompletedAt` deixam de representar
+o estado global do template e nao devem ser usados para avancar a data.
 
-### 2. Await `projectNodes` on Dispose
-Ensure that local SQLite projections are fully awaited before the WebSocket is disconnected and the provider is disposed, guaranteeing no background tasks are killed prematurely.
-#### [MODIFY] lib/features/notes/presentation/controllers/note_editor_provider.dart
-- Change the `onDocChanged` callback to return a `Future<void>`.
-- Refactor `dispose()` chains to ensure `projectNodes` completes if it's currently running.
+### Ocorrencia
 
-### 3. Comprehensive Logging for Diagnostics
-- Add strict, visible logging (e.g. `debugPrint`) during the serialization fallback so we can confirm if corruption was the true cause of the user's ongoing issue.
+Uma ocorrencia e derivada, nao uma task armazenada:
 
-## User Review Required
-Please review this plan. The most likely reason the app is still failing for you is that the previous bug permanently corrupted the paragraphs you are trying to edit, turning their text containers into dictionaries in the database. Since Yjs doesn't allow changing a container's type once created, we need to implement a "fallback" container (`content_fixed/$id`) to bypass the corrupted ones.
+```
+OccurrenceKey = taskId + scheduledAtUtc
+```
 
-## Open Questions
-- Did you try creating a **brand new note** and typing into it, or did you only test by editing existing notes? If a brand new note works but old ones fail, it 100% confirms the corruption hypothesis.
-- Are you comfortable with me implementing this fallback mechanism to salvage the existing notes?
+Campos persistidos somente quando houver evento:
+
+- `task_id`
+- `scheduled_at` (a data/hora prevista, nao a hora do clique)
+- `completed_at`
+- `id` deterministico ou chave unica `(task_id, scheduled_at)`
+
+Estado derivado na UI:
+
+- ha completion para `scheduled_at`: concluida
+- nao ha completion e `scheduled_at` passou: atrasada
+- nao ha completion e esta no periodo atual/futuro: pendente
+
+Futuramente, uma dispensa explicita pode ser outro evento (`skipped_at`), sem
+confundir omissao com conclusao.
+
+## Fonte de verdade e sync
+
+O YDoc permanece a fonte de verdade do editor. Para que uma conclusao feita em
+um dispositivo apareca em outro, o evento de conclusao precisa estar no YDoc,
+em uma colecao propria por tarefa, por exemplo:
+
+```
+taskCompletions/<taskId>/<scheduledAtUtc> = completedAtUtc
+```
+
+SQLite e PostgreSQL projetam essa colecao para `local_task_completions` e
+`task_completions`. Eles nao decidem qual e a proxima ocorrencia nem alteram o
+template. A chave por data programada torna a operacao idempotente entre
+retries, reconexao e convergencia CRDT.
+
+## Etapas de implementacao
+
+### 1. Definir e testar o calculo de ocorrencias
+
+- Criar um modulo de dominio para enumerar ocorrencias entre uma ancora e uma
+  janela de consulta, preservando hora e timezone.
+- Remover `catchUpDueDate` do fluxo de conclusao de recorrencias; ele pode ser
+  removido por completo se nao houver outro consumidor valido.
+- Definir uma janela limitada para a listagem, por exemplo pendencias desde a
+  ancora e proximas ocorrencias ate 30 dias. A consulta deve paginar/limitar
+  recorrencias antigas para nao gerar listas infinitas.
+- Cobrir diariamente, semanalmente, mensalmente, dias uteis, virada de mes,
+  horario de verao e tarefas sem hora.
+
+Arquivos iniciais:
+
+- `lib/core/utils/recurrence.dart`
+- `lib/features/tasks/domain/task_completion_command.dart`
+- novos testes de dominio em `test/features/tasks/domain/`
+
+### 2. Introduzir eventos de conclusao no YDoc
+
+- Adicionar nomes de campos/raizes a `YjsNoteSchema`.
+- Criar uma API pequena no bridge: registrar, remover para desfazer e ler
+  conclusoes de uma tarefa por `scheduledAt`.
+- Ao concluir uma recorrencia, gravar o evento com a data da ocorrencia que o
+  usuario marcou. Nao modificar `dueDate`, `recurrence` ou `completed` do
+  template.
+- Manter a leitura de `lastCompletedAt` somente durante a migracao; nao criar
+  novos valores desse campo para recorrencias.
+- Atualizar codec e reconciliacao para que a colecao de eventos sobreviva a
+  reload, merge remoto e compactacao.
+
+Arquivos iniciais:
+
+- `lib/features/notes/domain/yjs_note_schema.dart`
+- `lib/features/notes/domain/yjs_doc_editor_bridge.dart`
+- `lib/features/notes/domain/yjs_node_codec.dart`
+- `lib/features/notes/presentation/controllers/note_editor_controller.dart`
+
+### 3. Corrigir a projecao local
+
+- Alterar `LocalTaskCompletions` para incluir `scheduledAt`.
+- Criar indice/constraint unico por `(taskId, scheduledAt)`.
+- Gerar migracao Drift e atualizar o DAO para upsert idempotente, em vez de
+  apenas anexar por horario de conclusao.
+- Fazer `YjsSyncManager.projectNodes` projetar os eventos do YDoc para SQLite.
+- Remover o caminho legado que adiciona completions diretamente a partir de
+  `TasksDao.completeTask`, ou limita-lo a tarefas nao editadas pelo YDoc. O
+  editor nao pode executar os dois caminhos.
+
+Arquivos iniciais:
+
+- `lib/core/database/tables/task_completions.dart`
+- `lib/core/database/database.dart`
+- `lib/core/database/daos/task_completions_dao.dart`
+- `lib/core/database/daos/tasks_dao.dart`
+- `lib/core/sync/yjs_sync_manager.dart`
+
+### 4. Corrigir a projecao no backend
+
+- Adicionar `scheduled_at TIMESTAMPTZ NOT NULL` a `task_completions`.
+- Criar constraint unica `(task_id, scheduled_at)` e indice para consultas por
+  tarefa/data.
+- Atualizar SQL, sqlc e a projecao Go para receber os eventos do YDoc.
+- Remover a heuristica atual que cria uma completion apenas na transicao
+  `completedAt` nulo para preenchido. Ela nao representa repeticoes.
+- Garantir que reprocessar o mesmo YDoc nao duplica eventos e que apagar uma
+  tarefa segue preservando o historico conforme a regra atual.
+
+Arquivos iniciais:
+
+- `backend/db/migrations/`
+- `backend/db/queries/sync.sql`
+- `backend/internal/sync/projection.go`
+- `backend/internal/sync/task_projection.go`
+- arquivos sqlc gerados
+
+### 5. Montar a lista a partir de templates + eventos
+
+- Criar um read model de ocorrencia para a listagem e para a nota.
+- Enumerar datas previstas, cruzar com completions por `scheduledAt` e expor
+  itens `pendente`, `atrasada` e `concluida`.
+- Definir uma apresentacao que nao polua a nota: mostrar a ocorrencia atual e
+  pendencias antigas, agrupando historico concluido quando necessario.
+- O comando de concluir deve receber a ocorrencia selecionada, nao apenas o
+  `taskId` do template.
+
+Arquivos iniciais:
+
+- `lib/features/tasks/`
+- listagens e widgets que chamam `completeTaskInYDoc`
+- `lib/features/notes/presentation/note_editor_screen.dart`
+
+### 6. Migracao de dados existentes
+
+- Para cada tarefa recorrente existente, manter o `dueDate` atual como ancora
+  mais segura disponivel. Nao tentar inventar ocorrencias anteriores.
+- Converter o `lastCompletedAt` atual, quando houver, em no maximo um evento:
+  associar a ocorrencia derivada mais proxima que seja anterior ou igual a
+  `lastCompletedAt`.
+- Executar a conversao de forma idempotente no primeiro carregamento/projecao
+  e registrar uma versao de schema no YDoc para que ela nao se repita.
+- Validar manualmente notas com recorrencias ja concluidas antes do rollout.
+
+## Testes obrigatorios
+
+1. Semanal: conclui 07/jul, nao conclui 14/jul, abre em 21/jul. Devem existir
+   14/jul atrasada e 21/jul pendente.
+2. Concluir atrasada nao altera nem remove a ocorrencia atual.
+3. Concluir a mesma ocorrencia em dois dispositivos converge para um unico
+   completion por `taskId + scheduledAt`.
+4. Retry de sync, reload do app e compactacao YDoc nao criam duplicatas.
+5. Desfazer remove somente o evento da ocorrencia selecionada.
+6. Mensal em dias inexistentes, dias uteis, fuso e horario configurado mantem
+   as datas esperadas.
+7. Migracao de tarefa recorrente antiga preserva o template e nao apaga
+   historico existente.
+8. Integracao Flutter/Go confirma que a mesma lista e exibida apos sync em um
+   segundo dispositivo.
+
+## Criterios de aceite
+
+- Nenhuma ocorrencia atrasada e substituida por uma futura.
+- Nenhuma conclusao duplica em sync concorrente.
+- A recorrencia nao cria uma linha de `tasks` por periodo.
+- O banco armazena apenas templates e eventos de conclusao/dispensa.
+- A alteracao de uma recorrencia futura nao reescreve o historico concluido.
+- O fluxo continua offline-first: a conclusao aparece localmente de imediato e
+  converge pelo YDoc quando a conexao retorna.
+
+## Fora de escopo desta entrega
+
+- Interface de "dispensar" uma ocorrencia, embora o contrato deixe espaco para
+  isso.
+- Remodelacao visual do modal de data/recorrencia. Ela deve ser tratada depois
+  que o contrato de recorrencia estiver estabilizado.

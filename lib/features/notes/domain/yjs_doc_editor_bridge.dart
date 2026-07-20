@@ -232,22 +232,33 @@ class YjsDocEditorBridge {
     );
   }
 
-  TaskCompletionResult completeTaskInYDoc(String nodeId, {DateTime? now}) {
+  TaskCompletionResult completeTaskInYDoc(String nodeId,
+      {DateTime? now, DateTime? scheduledAt}) {
     final nodeMap = _requireTaskNode(nodeId);
     final snapshot = _readTaskSnapshot(nodeId, nodeMap);
     final result = TaskCompletionCommand(
       () => now ?? DateTime.now(),
-    ).complete(snapshot);
+    ).complete(snapshot, scheduledAt: scheduledAt);
 
     _doc.transact((txn) {
-      nodeMap.set('completed', result.completed);
-      nodeMap.set('lastCompletedAt', result.completedAt.toIso8601String());
-      if (result.nextDue == null) {
+      if (result.completed) {
+        // Non-recurring: close the task
+        nodeMap.set('completed', true);
+        nodeMap.set('lastCompletedAt', result.completedAt.toIso8601String());
         nodeMap.delete('dueDate');
       } else {
-        nodeMap.set(
-          'dueDate',
-          _formatDueDate(result.nextDue!, hasTime: result.previousHasTime),
+        // Recurring: record the completion event per-occurrence.
+        // Do NOT modify the template's completed, dueDate, or
+        // lastCompletedAt — the template is the anchor.
+        final scheduledUtc = result.scheduledAt!.toUtc();
+        final formattedScheduled = _formatDueDate(scheduledUtc,
+            hasTime: snapshot.hasTime);
+        final completionsRoot = _doc.getMap<Object>(
+          YjsNoteSchema.taskCompletionsRoot,
+        )!;
+        completionsRoot.set(
+          YjsNoteSchema.taskCompletionKey(nodeId, formattedScheduled),
+          result.completedAt.toIso8601String(),
         );
       }
     });
@@ -256,13 +267,29 @@ class YjsDocEditorBridge {
     return result;
   }
 
-  void reopenTaskInYDoc(String nodeId, {DateTime? previousDue}) {
+  void reopenTaskInYDoc(String nodeId,
+      {DateTime? previousDue, DateTime? scheduledAt}) {
     final nodeMap = _requireTaskNode(nodeId);
+    final snapshot = _readTaskSnapshot(nodeId, nodeMap);
+
     _doc.transact((txn) {
-      nodeMap.set('completed', false);
-      nodeMap.delete('lastCompletedAt');
-      if (previousDue != null) {
-        nodeMap.set('dueDate', _formatDueDate(previousDue));
+      if (snapshot.recurrence != null && scheduledAt != null) {
+        // Recurring: remove the completion event for the specific occurrence
+        final formattedScheduled = _formatDueDate(scheduledAt.toUtc(),
+            hasTime: snapshot.hasTime);
+        final completionsRoot = _doc.getMap<Object>(
+          YjsNoteSchema.taskCompletionsRoot,
+        )!;
+        completionsRoot.delete(
+          YjsNoteSchema.taskCompletionKey(nodeId, formattedScheduled),
+        );
+      } else {
+        // Non-recurring: restore the template
+        nodeMap.set('completed', false);
+        nodeMap.delete('lastCompletedAt');
+        if (previousDue != null) {
+          nodeMap.set('dueDate', _formatDueDate(previousDue));
+        }
       }
     });
 

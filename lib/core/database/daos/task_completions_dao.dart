@@ -19,28 +19,35 @@ class TaskCompletionsDao extends DatabaseAccessor<AppDatabase>
 
   final Uuid _uuid = const Uuid();
 
-  /// Records a completion of [taskId] by [userId] at the given
-  /// [completedAt] (defaults to "now"). The new row is marked dirty so
-  /// the next sync round pushes it to the backend.
+  /// Records a completion of [taskId] by [userId] for the scheduled
+  /// occurrence at [scheduledAt] (defaults to the current time for
+  /// non-recurring tasks).
   Future<LocalTaskCompletionData> recordCompletion({
     required String taskId,
     required String userId,
     DateTime? completedAt,
+    DateTime? scheduledAt,
   }) async {
     final when = (completedAt ?? DateTime.now()).toUtc();
+    final occurrenceDate = (scheduledAt ?? when).toUtc();
     final id = _uuid.v4();
     final companion = LocalTaskCompletionsCompanion.insert(
       id: id,
       taskId: taskId,
       userId: userId,
       completedAt: when,
+      scheduledAt: occurrenceDate,
     );
-    await into(localTaskCompletions).insert(companion);
+    await into(localTaskCompletions).insert(
+      companion,
+      mode: InsertMode.insertOrReplace,
+    );
     return LocalTaskCompletionData(
       id: id,
       taskId: taskId,
       userId: userId,
       completedAt: when,
+      scheduledAt: occurrenceDate,
     );
   }
 
@@ -77,8 +84,53 @@ class TaskCompletionsDao extends DatabaseAccessor<AppDatabase>
     }
   }
 
+  /// Upserts a completion for a specific occurrence. The unique
+  /// constraint on `(taskId, scheduledAt)` ensures idempotent retries
+  /// and CRDT convergence across devices.
+  Future<void> upsertCompletion({
+    required String taskId,
+    required String userId,
+    required DateTime scheduledAt,
+    required DateTime completedAt,
+  }) async {
+    final occurrenceDate = scheduledAt.toUtc();
+    final id = _uuid.v4();
+    final companion = LocalTaskCompletionsCompanion.insert(
+      id: id,
+      taskId: taskId,
+      userId: userId,
+      completedAt: completedAt.toUtc(),
+      scheduledAt: occurrenceDate,
+    );
+    await into(localTaskCompletions).insert(
+      companion,
+      mode: InsertMode.insertOrReplace,
+    );
+  }
+
   /// Stores a completion row from the server projection.
   Future<void> upsertFromRemote(LocalTaskCompletionData completion) async {
     await into(localTaskCompletions).insertOnConflictUpdate(completion);
+  }
+
+  /// Returns the completion record for a specific occurrence, or null.
+  Future<LocalTaskCompletionData?> getCompletion(
+    String taskId,
+    DateTime scheduledAt,
+  ) async {
+    return (select(localTaskCompletions)
+          ..where((c) =>
+              c.taskId.equals(taskId) &
+              c.scheduledAt.equals(scheduledAt.toUtc())))
+        .getSingleOrNull();
+  }
+
+  /// Checks whether a specific occurrence is completed.
+  Future<bool> isOccurrenceCompleted(
+    String taskId,
+    DateTime scheduledAt,
+  ) async {
+    final row = await getCompletion(taskId, scheduledAt);
+    return row != null;
   }
 }

@@ -57,6 +57,49 @@ DateTime _copyWith(
   );
 }
 
+/// Enumerates all scheduled occurrence dates for a recurring task within
+/// the query window [from]..[to] (inclusive), starting from the [anchor]
+/// date and applying [recurrence].
+///
+/// Returns an ordered list of dates. When [anchor] is null or [recurrence]
+/// is null, returns an empty list.
+///
+/// The enumeration walks forward from [anchor] until it reaches [to],
+/// capping at [maxCount] occurrences to avoid infinite loops.
+List<DateTime> enumerateOccurrences({
+  required DateTime? anchor,
+  required TaskRecurrence? recurrence,
+  required DateTime from,
+  required DateTime to,
+  int maxCount = 365,
+}) {
+  if (anchor == null || recurrence == null) return [];
+  if (to.isBefore(from)) return [];
+
+  final results = <DateTime>[];
+  var current = anchor;
+
+  // Phase 1: advance from anchor to the first occurrence >= from
+  // (separate counter so far-past anchors don't consume the result budget)
+  for (var i = 0; i < maxCount; i++) {
+    if (!current.isBefore(from)) break;
+    final next = nextDueDate(from: current, recurrence: recurrence);
+    if (next == null || next.isAtSameMomentAs(current)) break;
+    current = next;
+  }
+
+  // Phase 2: collect occurrences within the query window
+  for (var i = 0; i < maxCount; i++) {
+    if (current.isBefore(from) || current.isAfter(to)) break;
+    results.add(current);
+    final next = nextDueDate(from: current, recurrence: recurrence);
+    if (next == null || next.isAtSameMomentAs(current)) break;
+    current = next;
+  }
+
+  return results;
+}
+
 /// Advances an overdue recurring [from] date forward to [today] by repeatedly
 /// applying [nextDueDate].
 DateTime catchUpDueDate({

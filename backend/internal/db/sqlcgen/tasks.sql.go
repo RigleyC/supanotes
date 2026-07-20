@@ -87,9 +87,9 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 }
 
 const createTaskCompletion = `-- name: CreateTaskCompletion :one
-INSERT INTO task_completions (task_id, completed_at, due_date)
-VALUES ($1, NOW(), $2)
-RETURNING id, task_id, completed_at, due_date
+INSERT INTO task_completions (task_id, completed_at, scheduled_at, due_date)
+VALUES ($1, NOW(), NOW(), $2)
+RETURNING id, task_id, completed_at, scheduled_at, due_date
 `
 
 type CreateTaskCompletionParams struct {
@@ -104,6 +104,7 @@ func (q *Queries) CreateTaskCompletion(ctx context.Context, arg CreateTaskComple
 		&i.ID,
 		&i.TaskID,
 		&i.CompletedAt,
+		&i.ScheduledAt,
 		&i.DueDate,
 	)
 	return i, err
