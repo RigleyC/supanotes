@@ -141,6 +141,12 @@ List<NoteNode> noteNodesFromDoc(Doc doc) {
     if (node != null) nodes.add(node);
   }
 
-  nodes.sort((a, b) => a.position.compareTo(b.position));
+  nodes.sort((a, b) {
+    final positionComparison = a.position.compareTo(b.position);
+    // Older documents may contain duplicate fractional positions. Dart's
+    // List.sort is not stable, so use the immutable node id to make reloads
+    // deterministic while those documents are gradually rewritten.
+    return positionComparison != 0 ? positionComparison : a.id.compareTo(b.id);
+  });
   return nodes;
 }

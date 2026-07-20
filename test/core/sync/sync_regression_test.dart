@@ -491,6 +491,21 @@ void main() {
     });
   });
 
+  group('Sync regression — deterministic legacy ordering', () {
+    test('duplicate positions use node id as a stable tie-breaker', () {
+      final doc = Doc();
+      seedDocWithParagraphs(doc, [
+        {'id': 'node-b', 'position': 'a0', 'text': 'Second'},
+        {'id': 'node-a', 'position': 'a0', 'text': 'First'},
+      ]);
+
+      expect(
+        noteNodesFromDoc(doc).map((node) => node.id).toList(),
+        ['node-a', 'node-b'],
+      );
+    });
+  });
+
   group('Sync regression — partial remote update applies correctly', () {
     test('remote merge via mergeRemoteStatesAndProject updates single node',
         () async {

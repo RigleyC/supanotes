@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/database/database.dart';
@@ -29,6 +27,7 @@ class RecordingApiClient extends ApiClient {
   int exchangeCallCount = 0;
   int exchangeFailAfter = 0;
   int exchangeFailCount = 0;
+  List<int> exchangeResponse = const [];
 
   @override
   Future<Response<T>> post<T>(
@@ -70,7 +69,10 @@ class RecordingApiClient extends ApiClient {
         'noteId': noteId,
         'bodyLength': bodyLength,
       });
-      return Response<T>(data: <int>[] as T, requestOptions: RequestOptions(path: path));
+      return Response<T>(
+        data: exchangeResponse as T,
+        requestOptions: RequestOptions(path: path),
+      );
     }
 
     throw UnimplementedError('Unexpected path: $path');
@@ -139,6 +141,54 @@ void main() {
 
       service.markDirty('note-1');
       await service.syncDirtyNote('note-1');
+      await db.close();
+    });
+
+    test('disconnect exchanges a dirty active note before persisting it', () async {
+      SharedPreferences.setMockInitialValues({});
+      TestWidgetsFlutterBinding.ensureInitialized();
+
+      final db = AppDatabase.test();
+      final transport = RecordingApiClient();
+      final service = buildSyncService(db: db, apiClient: transport);
+
+      await insertNote(db, 'note-disconnect');
+      await service.connectNote('note-disconnect');
+      await service.disconnectNote();
+
+      expect(
+        transport.exchangeCallCount,
+        1,
+        reason:
+            'Leaving a note must not leave its latest local Yjs state only on the device.',
+      );
+      await db.close();
+    });
+
+    test('keeps the note dirty when applying a successful response fails',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final db = AppDatabase.test();
+      final transport = RecordingApiClient()
+        ..exchangeResponse = [0xff];
+      final service = buildSyncService(db: db, apiClient: transport);
+
+      await insertNote(db, 'note-invalid-response');
+      service.markDirty('note-invalid-response');
+      await expectLater(
+        service.syncDirtyNote('note-invalid-response'),
+        throwsA(anything),
+      );
+
+      transport.exchangeResponse = const [];
+      await service.syncDirtyNote('note-invalid-response');
+
+      expect(
+        transport.exchangeCallCount,
+        2,
+        reason: 'A failed local apply must remain eligible for retry.',
+      );
       await db.close();
     });
 

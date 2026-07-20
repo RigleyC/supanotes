@@ -177,15 +177,21 @@ class SyncService {
     debugPrint('[SyncService] disconnectNote START noteId=$_activeNoteId');
     final noteId = _activeNoteId;
 
-    if (noteId != null) {
-      await _yjsMgr.persist(noteId);
-    }
-
     _syncTimer?.cancel();
     _syncTimer = null;
     _lifecycleListener?.dispose();
     _lifecycleListener = null;
-    _activeNoteId = null;
+
+    try {
+      if (noteId != null && _dirtyNotes.contains(noteId)) {
+        await syncDirtyNote(noteId);
+      }
+    } finally {
+      if (noteId != null) {
+        await _yjsMgr.persist(noteId);
+      }
+      _activeNoteId = null;
+    }
 
     debugPrint('[SyncService] disconnectNote DONE elapsed=${sw.elapsedMilliseconds}ms');
   }
@@ -256,8 +262,6 @@ class SyncService {
       ),
     );
 
-    _tryClearDirty(noteId, genAtStart);
-
     final responseData = response.data;
     if (responseData != null && responseData.isNotEmpty) {
       final serverUpdate = Uint8List.fromList(responseData);
@@ -278,6 +282,11 @@ class SyncService {
     } else {
       await _yjsMgr.persist(noteId);
     }
+
+    // An HTTP success alone is not a completed exchange. Keep the note dirty
+    // until the server response has been applied and the merged document is
+    // durable locally, so a decode or SQLite failure is retried.
+    _tryClearDirty(noteId, genAtStart);
 
     // Project remote changes to SQLite so list views reflect the update
     // even for background notes (not just the active editor).

@@ -171,6 +171,49 @@ void main() {
       expect(updatedNode.isComplete, isTrue);
     });
 
+    test('applies a remote node position change to the active editor', () async {
+      final doc = Doc();
+      final nodesMap = doc.getMap<Object>('nodes')!;
+      doc.transact((_) {
+        for (final (id, position, text) in [
+          ('p1', 'a0', 'First'),
+          ('p2', 'b0', 'Second'),
+        ]) {
+          final nodeMap = YMap<Object>();
+          nodeMap.set('id', id);
+          nodeMap.set('position', position);
+          nodeMap.set('type', 'paragraph');
+          nodeMap.set('data', jsonEncode({'text': text, 'spans': []}));
+          nodesMap.set(id, nodeMap);
+          doc.getText('content/$id')!.insert(0, text);
+        }
+      });
+
+      final mutableDoc = MutableDocument(nodes: [
+        ParagraphNode(id: 'p1', text: AttributedText('First')),
+        ParagraphNode(id: 'p2', text: AttributedText('Second')),
+      ]);
+      final editor = createDefaultDocumentEditor(
+        document: mutableDoc,
+        composer: MutableDocumentComposer(),
+      );
+      final coordinator = EditorDocumentSyncManager(
+        document: mutableDoc,
+        editor: editor,
+      );
+      final bridge = YjsDocEditorBridge(
+        doc: doc,
+        userId: 'test-user',
+        coordinator: coordinator,
+      );
+
+      (nodesMap.get('p1') as YMap<Object>).set('position', 'z0');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(mutableDoc.toList().map((node) => node.id), ['p2', 'p1']);
+      bridge.dispose();
+    });
+
     test('completeTaskInYDoc with recurring task records per-occurrence event',
         () async {
       final doc = Doc();
