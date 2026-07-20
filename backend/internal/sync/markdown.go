@@ -8,12 +8,12 @@ import (
 )
 
 func deriveMarkdownFromDoc(doc *crdt.Doc) string {
-	entries := nodesFromDoc(doc)
-	if len(entries) == 0 {
+	nodes := NodesFromDoc(doc)
+	if len(nodes) == 0 {
 		return ""
 	}
 	var lines []string
-	for _, nd := range entries {
+	for _, nd := range nodes {
 		switch nd.Type {
 		case "header":
 			level := 1

@@ -52,6 +52,11 @@ backend/supanotes-server
 backend/*.exe
 backend/**/__debug_bin*
 backend/bin/
+backend/tmp/
+backend/check_sizes
+backend/check_sizes.go
+backend/query.bat
+backend/run_*.go
 
 # Environment variables — never commit real .env files
 .env

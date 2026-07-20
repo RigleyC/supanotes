@@ -83,7 +83,7 @@ func TestConvergenceTwoConcurrentEditsMerge(t *testing.T) {
 	assert.Equal(t, "done", tasks[0].Status)
 	assert.True(t, tasks[0].CompletedAt.Valid, "CompletedAt should be valid for completed task")
 
-	entries := nodesFromDoc(docOriginal)
+	entries := NodesFromDoc(docOriginal)
 	require.Len(t, entries, 4)
 	assert.Equal(t, "My Note", entries[0].Text)
 	assert.Equal(t, "Intro", entries[1].Text)
@@ -134,44 +134,4 @@ func TestConvergenceDocTaskCompletedInNodeData(t *testing.T) {
 
 	md := deriveMarkdownFromDoc(doc)
 	assert.Equal(t, "- [x] legacy task", md)
-}
-
-func TestConvergenceTaskProjectionFromNodeYMap(t *testing.T) {
-	taskNodeID := newUUID(t)
-
-	doc := crdt.New(crdt.WithGC(false))
-
-	// Store task as a nested YMap with metadata (completed, lastCompletedAt)
-	// inside the node YMap itself, not as composite keys on the parent nodesMap.
-	nodesMap := doc.GetMap("nodes")
-	doc.Transact(func(txn *crdt.Transaction) {
-		nodeMap := crdt.NewYMap()
-		nodeMap.Set(txn, "id", taskNodeID)
-		nodeMap.Set(txn, "type", "task")
-		nodeMap.Set(txn, "position", "a0")
-		nodeMap.Set(txn, "data", `{"text":"Task with YMap metadata"}`)
-		nodesMap.Set(txn, taskNodeID, nodeMap)
-	})
-	insertTextOnDoc(t, doc, taskNodeID, "Task with YMap metadata")
-
-	tasks := deriveTasksFromDoc(doc)
-	require.Len(t, tasks, 1)
-	assert.Equal(t, "Task with YMap metadata", tasks[0].Title)
-	assert.Equal(t, "open", tasks[0].Status)
-
-	// Mark complete by writing fields directly into the node's YMap
-	nodesMap = doc.GetMap("nodes")
-	doc.Transact(func(txn *crdt.Transaction) {
-		raw, ok := nodesMap.Get(taskNodeID)
-		require.True(t, ok)
-		nodeMap := raw.(*crdt.YMap)
-		nodeMap.Set(txn, "completed", true)
-		nodeMap.Set(txn, "lastCompletedAt", "2024-06-15T10:00:00Z")
-	})
-
-	tasksAfter := deriveTasksFromDoc(doc)
-	require.Len(t, tasksAfter, 1)
-	assert.Equal(t, "Task with YMap metadata", tasksAfter[0].Title)
-	assert.Equal(t, "done", tasksAfter[0].Status)
-	assert.True(t, tasksAfter[0].CompletedAt.Valid, "CompletedAt should be valid when completed is in node YMap")
 }

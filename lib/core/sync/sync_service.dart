@@ -270,6 +270,11 @@ class SyncService {
     // the old SV ensures the next exchange computes a delta that includes it.
     if (_dirtyGenerations[noteId] == genAtStart) {
       await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
+      // Re-check after the async persist — a concurrent edit during the
+      // database write would have bumped the generation.
+      if (_dirtyGenerations[noteId] == genAtStart) {
+        _dirtyGenerations.remove(noteId);
+      }
     } else {
       await _yjsMgr.persist(noteId);
     }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/reearth/ygo/crdt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // makeNodeDoc creates a Doc with nodes at given (key, position, text) triples.
@@ -53,11 +54,32 @@ func TestNodesFromDoc_SortsByPosition(t *testing.T) {
 		{key: "b", pos: "m0", typ: "paragraph", text: "second"},
 	})
 
-	entries := nodesFromDoc(doc)
+	entries := NodesFromDoc(doc)
 	assert.Len(t, entries, 3)
 	assert.Equal(t, "first", entries[0].Text)
 	assert.Equal(t, "second", entries[1].Text)
 	assert.Equal(t, "third", entries[2].Text)
+}
+
+func TestNodesFromDoc_ReadsNestedMapEntries(t *testing.T) {
+	doc := crdt.New(crdt.WithGC(false))
+	nodesMap := doc.GetMap("nodes")
+	doc.Transact(func(txn *crdt.Transaction) {
+		nodesMap.Set(txn, "task-1", map[string]any{
+			"id":         "task-1",
+			"type":       "task",
+			"position":   "a0",
+			"data":       `{"text":"nested task"}`,
+			"completed":  true,
+			"recurrence": "weekly",
+		})
+	})
+
+	entries := NodesFromDoc(doc)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "nested task", entries[0].Text)
+	assert.True(t, entries[0].Metadata["completed"].(bool))
+	assert.Equal(t, "weekly", entries[0].Metadata["recurrence"])
 }
 
 func TestDeriveMarkdownFromDoc_OrdersByPosition(t *testing.T) {

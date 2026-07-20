@@ -8,7 +8,6 @@ import 'package:super_editor/super_editor.dart';
 import 'package:yjs_dart/yjs_dart.dart';
 
 import 'editor_document_sync_manager.dart';
-import 'note_node.dart';
 import 'yjs_note_schema.dart';
 import 'yjs_node_codec.dart';
 
@@ -31,12 +30,12 @@ class YjsDocEditorBridge {
     void Function({required bool isRemote})? onDocChanged,
     void Function(Uint8List)? sendUpdate,
     void Function(Set<String> nodeIds)? onDocCommitted,
-  })  : _doc = doc,
-        _userId = userId,
-        _coordinator = coordinator,
-        _onDocChanged = onDocChanged,
-        _sendUpdate = sendUpdate,
-        _onDocCommitted = onDocCommitted {
+  }) : _doc = doc,
+       _userId = userId,
+       _coordinator = coordinator,
+       _onDocChanged = onDocChanged,
+       _sendUpdate = sendUpdate,
+       _onDocCommitted = onDocCommitted {
     final nodesMap = doc.getMap<Object>('nodes')!;
     _onNodesChangedHandler = nodesMap.observe((e, _) {
       if (_isFlushingLocal) return;
@@ -53,9 +52,9 @@ class YjsDocEditorBridge {
     coordinator.onNodeFlush = onLocalFlush;
 
     // Apply initial YDoc state (observer only fires on changes).
-    final initialIds = Set<String>.from(nodesMap.keys.where(
-      (k) => !k.contains(':'),
-    ));
+    final initialIds = Set<String>.from(
+      nodesMap.keys.where((k) => !k.contains(':')),
+    );
     if (initialIds.isNotEmpty) {
       _scheduleRemoteApply(initialIds);
     }
@@ -91,27 +90,16 @@ class YjsDocEditorBridge {
     });
   }
 
-  void _applyChangedNodes(Set<String> ids) {
-    if (_isFlushingLocal || ids.isEmpty) return;
+  void _applyChangedNodes(Set<String> changedIds) {
+    if (_isFlushingLocal || changedIds.isEmpty) return;
     final sw = Stopwatch()..start();
-    final nodes = <NoteNode>[];
-    for (final id in ids) {
-      // Skip composite keys
-      if (id.contains(':')) continue;
-      final node = noteNodeFromYDoc(_doc, id);
-      if (node != null) nodes.add(node);
-    }
-    if (nodes.isNotEmpty) {
-      nodes.sort((a, b) => a.position.compareTo(b.position));
-      _coordinator.suspendSync();
-      try {
-        _coordinator.updateNodesIncrementally(nodes);
-      } finally {
-        _coordinator.resumeSync();
-      }
-    }
+    final nodes = noteNodesFromDoc(_doc);
+    _coordinator.reconcileRemoteSnapshot(nodes);
     _onDocChanged?.call(isRemote: true);
-    dev.log('[YjsBridge] _applyChangedNodes: apply ${nodes.length} nodes elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
+    dev.log(
+      '[YjsBridge] _applyChangedNodes: apply ${nodes.length} nodes elapsed=${sw.elapsedMilliseconds}ms',
+      name: 'YjsBridge',
+    );
   }
 
   void _onAfterTransaction(Transaction tr, Doc d) {
@@ -152,7 +140,10 @@ class YjsDocEditorBridge {
   void onLocalFlush(List<NodeOperation> ops) {
     if (ops.isEmpty) return;
     final sw = Stopwatch()..start();
-    dev.log('[YjsBridge] onLocalFlush START ops=${ops.length}', name: 'YjsBridge');
+    dev.log(
+      '[YjsBridge] onLocalFlush START ops=${ops.length}',
+      name: 'YjsBridge',
+    );
 
     final changedIds = <String>{};
 
@@ -163,7 +154,12 @@ class YjsDocEditorBridge {
 
         for (final op in ops) {
           switch (op) {
-            case InsertOp(:final id, :final node, :final prevNodeId, :final nextNodeId):
+            case InsertOp(
+              :final id,
+              :final node,
+              :final prevNodeId,
+              :final nextNodeId,
+            ):
               final pos = _calcPosition(prevNodeId, nextNodeId, id, nodesMap);
               _writeCanonicalNode(node, pos, id, nodesMap);
               changedIds.add(id);
@@ -192,7 +188,10 @@ class YjsDocEditorBridge {
       _sendUpdate(updateBytes);
     }
 
-    dev.log('[YjsBridge] onLocalFlush DONE elapsed=${sw.elapsedMilliseconds}ms', name: 'YjsBridge');
+    dev.log(
+      '[YjsBridge] onLocalFlush DONE elapsed=${sw.elapsedMilliseconds}ms',
+      name: 'YjsBridge',
+    );
   }
 
   void _writeCanonicalNode(
@@ -236,7 +235,9 @@ class YjsDocEditorBridge {
   TaskCompletionResult completeTaskInYDoc(String nodeId, {DateTime? now}) {
     final nodeMap = _requireTaskNode(nodeId);
     final snapshot = _readTaskSnapshot(nodeId, nodeMap);
-    final result = TaskCompletionCommand(() => now ?? DateTime.now()).complete(snapshot);
+    final result = TaskCompletionCommand(
+      () => now ?? DateTime.now(),
+    ).complete(snapshot);
 
     _doc.transact((txn) {
       nodeMap.set('completed', result.completed);
@@ -244,7 +245,10 @@ class YjsDocEditorBridge {
       if (result.nextDue == null) {
         nodeMap.delete('dueDate');
       } else {
-        nodeMap.set('dueDate', _formatDueDate(result.nextDue!, hasTime: result.previousHasTime));
+        nodeMap.set(
+          'dueDate',
+          _formatDueDate(result.nextDue!, hasTime: result.previousHasTime),
+        );
       }
     });
 
@@ -312,10 +316,7 @@ class YjsDocEditorBridge {
       name: 'YjsBridge',
     );
     _onDocChanged?.call(isRemote: false);
-    dev.log(
-      '[Bridge] _onDocChanged done',
-      name: 'YjsBridge',
-    );
+    dev.log('[Bridge] _onDocChanged done', name: 'YjsBridge');
   }
 
   // ---------------------------------------------------------------------------
@@ -337,7 +338,12 @@ class YjsDocEditorBridge {
     return null;
   }
 
-  String _calcPosition(String? prevNodeId, String? nextNodeId, String? ignoreId, YMap<Object> nodesMap) {
+  String _calcPosition(
+    String? prevNodeId,
+    String? nextNodeId,
+    String? ignoreId,
+    YMap<Object> nodesMap,
+  ) {
     String? prevPos;
     String? nextPos;
 

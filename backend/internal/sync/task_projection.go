@@ -21,7 +21,7 @@ type projectedTask struct {
 }
 
 func deriveTasksFromDoc(doc *crdt.Doc) []projectedTask {
-	entries := nodesFromDoc(doc)
+	entries := NodesFromDoc(doc)
 
 	var tasks []projectedTask
 	for _, nd := range entries {

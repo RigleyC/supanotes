@@ -30,8 +30,8 @@ class ControllableApiClient extends ApiClient {
 
   final List<Uint8List> exchangeBodies = [];
 
-  /// If set, exchange POST awaits this completer before returning.
   Completer<void>? holdResponse;
+  Completer<void>? exchangeStarted;
 
   @override
   Future<Response<T>> post<T>(
@@ -50,6 +50,7 @@ class ControllableApiClient extends ApiClient {
           final bytes = await data.first;
           if (bytes is List<int>) {
             exchangeBodies.add(Uint8List.fromList(bytes));
+            exchangeStarted?.complete();
           }
         } catch (_) {}
       }
@@ -132,8 +133,15 @@ void main() {
 
       await insertNote(db, 'race-note');
 
-      // Seed initial content and establish synced state vector.
       final doc = await mgr.loadDoc('race-note');
+
+      // Persist SV at the EMPTY state so there is unsynchronised content
+      // for the first exchange to send.
+      final emptySV = encodeStateVector(doc);
+      await mgr.persistWithSyncedVector('race-note', emptySV);
+
+      // First unsynchronised edit — makes the next delta non-empty
+      // so _exchangeNote reaches the HTTP POST.
       doc.transact((txn) {
         doc.getMap<Object>('nodes')!.set(
           'p1',
@@ -141,21 +149,20 @@ void main() {
         );
         doc.getText('content/p1')!.insert(0, 'initial');
       });
-      final initialSV = encodeStateVector(doc);
-      await mgr.persistWithSyncedVector('race-note', initialSV);
 
-      // Hold the exchange HTTP so we can mutate during it.
+      // Start exchange with held response.
       api.holdResponse = Completer<void>();
+      api.exchangeStarted = Completer<void>();
 
       service.markDirty('race-note');
       final exchange1Future = service.syncDirtyNote('race-note');
 
-      // Yield enough for the exchange to reach the HTTP hold point.
-      for (int i = 0; i < 5; i++) {
-        await Future.delayed(Duration.zero);
-      }
+      // Block until the HTTP POST has sent the body and is about to
+      // enter the holdResponse await — guarantees the mutation below
+      // happens DURING the in-flight request, not before it.
+      await api.exchangeStarted!.future;
 
-      // --- Mutate the YDoc during the held HTTP ---
+      // ---- mutation happens DURING the in-flight request ----
       doc.transact((txn) {
         doc.getMap<Object>('nodes')!.set(
           'p2',
@@ -163,19 +170,17 @@ void main() {
         );
         doc.getText('content/p2')!.insert(0, 'edited during HTTP');
       });
-
-      // Mark dirty again (bumps generation — what the provider does).
       service.markDirty('race-note');
 
       // Release the response.
       api.holdResponse!.complete();
       await exchange1Future;
 
-      // After exchange1: SV must NOT have advanced (gen changed during flight).
+      // After exchange1: SV must NOT have advanced.
       final state1 = await (db.select(db.localYjsStates)
         ..where((t) => t.noteId.equals('race-note'))).getSingleOrNull();
       expect(state1, isNotNull);
-      expect(state1!.syncedStateVector, equals(initialSV),
+      expect(state1!.syncedStateVector, equals(emptySV),
         reason: 'SV must NOT advance after exchange with concurrent edit');
 
       // Second exchange: body must contain the mutation.
@@ -183,17 +188,17 @@ void main() {
       service.markDirty('race-note');
       await service.syncDirtyNote('race-note');
 
-      expect(api.exchangeBodies, hasLength(1),
-        reason: 'Second exchange must send a non-empty body');
+      expect(api.exchangeBodies, hasLength(1));
       final verify = Doc();
       applyUpdate(verify, api.exchangeBodies[0]);
+      expect(verify.getText('content/p1')!.toString(), 'initial');
       expect(verify.getText('content/p2')!.toString(), 'edited during HTTP',
         reason: 'Mutation made during held HTTP must appear in second exchange');
 
       // SV advanced after successful second exchange.
       final state2 = await (db.select(db.localYjsStates)
         ..where((t) => t.noteId.equals('race-note'))).getSingleOrNull();
-      expect(state2!.syncedStateVector, isNot(equals(initialSV)),
+      expect(state2!.syncedStateVector, isNot(equals(emptySV)),
         reason: 'SV must advance after successful exchange');
 
       await db.close();
@@ -219,7 +224,10 @@ void main() {
       final mgr = YjsSyncManager(db: db, userId: 'test-user');
       final doc = await mgr.loadDoc('n-dispose');
 
-      // === Replicate note_editor_provider.dart lifecycle verbatim ===
+      // Replicate note_editor_provider.dart lifecycle verbatim
+      // (scheduleFlush + doFlush + controller.dispose).
+      // This tests the same invariants the provider's dispose handler
+      // must guarantee: data persists without waiting for the 500ms timer.
       final controller = NoteEditorController(userId: 'test-user');
       controller.bind('n-dispose');
 
@@ -269,13 +277,16 @@ void main() {
         ),
       ]);
 
-      // Let coordinator's 50ms debounce + bridge flush + onDocChanged fire.
-      await Future.delayed(const Duration(milliseconds: 100));
+      // Let the coordinator's 50ms debounce + bridge flush propagate
+      // the edit to the YDoc.  The 500ms PROVIDER debounce hasn't fired.
+      // (Note: coordinator uses real Timer, so we wait real time.)
+      await Future.delayed(const Duration(milliseconds: 60));
 
       expect(wasLocallyEdited, isTrue,
         reason: 'Edit must propagate through bridge before dispose');
 
-      // "Dispose" before the 500ms debounce fires.
+      // "Dispose" before the 500ms debounce fires (replicates
+      // note_editor_provider.dart ref.onDispose handler).
       final disposeStart = DateTime.now();
       flushDebounce?.cancel();
       await controller.dispose().then((_) async {
@@ -313,7 +324,6 @@ void main() {
       final dbB = AppDatabase.test(executor: NativeDatabase.memory());
       final now = DateTime.now().toUtc();
 
-      // Insert same note in both databases.
       for (final db in [dbA, dbB]) {
         await db.into(db.notes).insert(
           NotesCompanion.insert(
@@ -331,7 +341,6 @@ void main() {
       final mgrA = YjsSyncManager(db: dbA, userId: 'u-1');
       final mgrB = YjsSyncManager(db: dbB, userId: 'u-1');
 
-      // Device A: create initial doc with two paragraphs.
       final docA = await mgrA.loadDoc('n-converge');
       seedDocWithParagraphs(docA, [
         {'id': 'p1', 'position': 'a0', 'text': 'Hello from A'},
@@ -346,10 +355,8 @@ void main() {
         ),
       );
 
-      // Device B: apply the same initial state.
       final docB = Doc();
       applyUpdate(docB, initState);
-      // We inject the binary state via a fresh mgrB load by writing it.
       await dbB.into(dbB.localYjsStates).insertOnConflictUpdate(
         LocalYjsStatesCompanion(
           noteId: const Value('n-converge'),
@@ -358,7 +365,6 @@ void main() {
         ),
       );
 
-      // Device A edits p1.
       await mgrA.loadDoc('n-converge');
       final da = await mgrA.loadDoc('n-converge');
       da.transact((txn) {
@@ -371,7 +377,6 @@ void main() {
       });
       final updateA = encodeStateAsUpdate(da);
 
-      // Device B edits p2.
       await mgrB.loadDoc('n-converge');
       final dbDoc = await mgrB.loadDoc('n-converge');
       dbDoc.transact((txn) {
@@ -384,16 +389,13 @@ void main() {
       });
       final updateB = encodeStateAsUpdate(dbDoc);
 
-      // Sync: A receives B's update.
       applyUpdate(da, updateB);
       await mgrA.persist('n-converge');
 
-      // Sync: B receives A's update.
       final docB2 = await mgrB.loadDoc('n-converge');
       applyUpdate(docB2, updateA);
       await mgrB.persist('n-converge');
 
-      // Validate convergence: both docs have both edits.
       expect(
         da.getText('content/p1')!.toString(),
         'A edits p1',
@@ -415,7 +417,6 @@ void main() {
         reason: 'Device B must have its own edit on p2',
       );
 
-      // Reopen on both devices: state must survive persist+reload.
       final mgrA2 = YjsSyncManager(db: dbA, userId: 'u-1');
       final reloadA = await mgrA2.loadDoc('n-converge');
       expect(reloadA.getText('content/p1')!.toString(), 'A edits p1');
@@ -450,14 +451,12 @@ void main() {
       final mgr = YjsSyncManager(db: db, userId: 'u-1');
       final doc = await mgr.loadDoc('n-reorder');
 
-      // Create three nodes in order: A, B, C.
       seedDocWithParagraphs(doc, [
         {'id': 'a', 'position': 'a0', 'text': 'Node A'},
         {'id': 'b', 'position': 'b0', 'text': 'Node B'},
         {'id': 'c', 'position': 'c0', 'text': 'Node C'},
       ]);
 
-      // Reorder locally: move C to first position.
       doc.transact((txn) {
         final nodesMap = doc.getMap<Object>('nodes')!;
         final rawC = nodesMap.get('c');
@@ -477,7 +476,6 @@ void main() {
       var afterReorder = noteNodesFromDoc(doc);
       expect(afterReorder.map((n) => n.id).toList(), ['c', 'a', 'b']);
 
-      // Persist + reload.
       await mgr.persist('n-reorder');
       final mgr2 = YjsSyncManager(db: db, userId: 'u-1');
       final reloaded = await mgr2.loadDoc('n-reorder');
@@ -510,7 +508,6 @@ void main() {
         ),
       );
 
-      // Seed initial Yjs state (local doc + snapshot).
       final mgr = YjsSyncManager(db: db, userId: 'u-1');
       final doc = await mgr.loadDoc('n-patch');
       seedDocWithParagraphs(doc, [
@@ -520,7 +517,6 @@ void main() {
       ]);
       await mgr.persist('n-patch');
 
-      // Build a remote Yjs state that contains only B's update.
       final stateBytes = encodeStateAsUpdate(doc);
       final remoteUpdate = Doc();
       applyUpdate(remoteUpdate, stateBytes);
@@ -532,8 +528,6 @@ void main() {
       });
       final remoteStateBytes = encodeStateAsUpdate(remoteUpdate);
 
-      // Process via the app's actual remote merge path.
-      // Note: this only processes non-active notes (background sync).
       await mgr.mergeRemoteStatesAndProject(
         rawYjsStates: [
           {
@@ -546,21 +540,17 @@ void main() {
         onMerged: (_) {},
       );
 
-      // Reload doc from DB
       mgr.evictDoc('n-patch');
       final reloaded = await mgr.loadDoc('n-patch');
 
-      // Node A and C must be untouched in the nodes map.
       final rawA = reloaded.getMap<Object>('nodes')!.get('a') as String;
       final rawC = reloaded.getMap<Object>('nodes')!.get('c') as String;
       expect(rawA, contains('Paragraph A'));
       expect(rawC, contains('Paragraph C'));
 
-      // Node B must reflect the remote update.
       final rawB = reloaded.getMap<Object>('nodes')!.get('b') as String;
       expect(rawB, contains('Paragraph B updated by server'));
 
-      // All three nodes present in sorted projection.
       final nodes = noteNodesFromDoc(reloaded);
       expect(nodes, hasLength(3));
       expect(nodes.map((n) => n.id).toList(), ['a', 'b', 'c']);

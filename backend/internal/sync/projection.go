@@ -18,8 +18,8 @@ import (
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
-// nodeEntry holds a parsed node from the YMap with its positional ordering key.
-type nodeEntry struct {
+// NodeEntry holds a parsed node from the YMap with its positional ordering key.
+type NodeEntry struct {
 	Type     string
 	ID       string
 	Position string
@@ -27,7 +27,7 @@ type nodeEntry struct {
 	Data     json.RawMessage
 	// Metadata holds task-specific fields (completed, dueDate, recurrence, etc.)
 	// normalized from either nested YMap keys (new schema) or the "data" sub-object
-	// in the legacy JSON string. Consumers of nodeEntry should read from Metadata
+	// in the legacy JSON string. Consumers of NodeEntry should read from Metadata
 	// instead of re-parsing raw YMap or JSON types.
 	Metadata map[string]any
 }
@@ -47,6 +47,15 @@ func normalizeNodeMetadata(nodesMap *crdt.YMap, nodeID string, raw any) map[stri
 			}
 			val, ok := v.Get(key)
 			if ok {
+				meta[key] = val
+			}
+		}
+	case map[string]any:
+		for key, val := range v {
+			switch key {
+			case "id", "type", "position", "data":
+				continue
+			default:
 				meta[key] = val
 			}
 		}
@@ -98,17 +107,33 @@ func posToString(pos any) string {
 	}
 }
 
-// nodesFromDoc reads all nodes from the YMap and returns them sorted by position.
+func nodeText(doc *crdt.Doc, nodeID string, data json.RawMessage) string {
+	for _, key := range []string{"content_fixed/" + nodeID, "content/" + nodeID} {
+		if textType := doc.GetText(key); textType != nil {
+			if text := textType.ToString(); text != "" {
+				return text
+			}
+		}
+	}
+
+	var dataMap map[string]any
+	if json.Unmarshal(data, &dataMap) == nil {
+		text, _ := dataMap["text"].(string)
+		return text
+	}
+	return ""
+}
+
+// NodesFromDoc reads all nodes from the YMap and returns them sorted by position.
 // Supports both nested YMap entries (new schema) and JSON string entries (legacy).
-func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
+func NodesFromDoc(doc *crdt.Doc) []NodeEntry {
 	nodesMap := doc.GetMap("nodes")
 	if nodesMap == nil {
 		return nil
 	}
-	var entries []nodeEntry
-	for _, key := range nodesMap.Keys() {
-		raw, ok := nodesMap.Get(key)
-		if !ok || raw == nil {
+	var entries []NodeEntry
+	for key, raw := range nodesMap.Entries() {
+		if raw == nil {
 			continue
 		}
 		switch v := raw.(type) {
@@ -122,12 +147,6 @@ func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
 			typeStr, _ := typeName.(string)
 			pos, _ := v.Get("position")
 			posStr := posToString(pos)
-			text := ""
-			if textType := doc.GetText("content_fixed/" + idStr); textType != nil && textType.ToString() != "" {
-				text = textType.ToString()
-			} else if textType := doc.GetText("content/" + idStr); textType != nil {
-				text = textType.ToString()
-			}
 			// Serialize YMap data to JSON for backward compat
 			var dataRaw json.RawMessage
 			if d, exists := v.Get("data"); exists {
@@ -142,7 +161,40 @@ func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
 					}
 				}
 			}
-			entries = append(entries, nodeEntry{
+			text := nodeText(doc, idStr, dataRaw)
+			entries = append(entries, NodeEntry{
+				ID:       idStr,
+				Type:     typeStr,
+				Position: posStr,
+				Data:     dataRaw,
+				Text:     text,
+				Metadata: normalizeNodeMetadata(nodesMap, idStr, v),
+			})
+		case map[string]any:
+			idStr, _ := v["id"].(string)
+			if idStr == "" {
+				idStr = key
+			}
+			typeStr, _ := v["type"].(string)
+			posStr := posToString(v["position"])
+
+			var dataRaw json.RawMessage
+			if data, exists := v["data"]; exists {
+				switch d := data.(type) {
+				case string:
+					dataRaw = json.RawMessage(d)
+				case []byte:
+					dataRaw = json.RawMessage(d)
+				default:
+					if encoded, err := json.Marshal(d); err == nil {
+						dataRaw = encoded
+					}
+				}
+			}
+
+			text := nodeText(doc, idStr, dataRaw)
+
+			entries = append(entries, NodeEntry{
 				ID:       idStr,
 				Type:     typeStr,
 				Position: posStr,
@@ -161,20 +213,8 @@ func nodesFromDoc(doc *crdt.Doc) []nodeEntry {
 				continue
 			}
 			posStr := posToString(nd.Position)
-			text := ""
-			if textType := doc.GetText("content_fixed/" + nd.ID); textType != nil && textType.ToString() != "" {
-				text = textType.ToString()
-			} else if textType := doc.GetText("content/" + nd.ID); textType != nil {
-				text = textType.ToString()
-			} else {
-				var dataMap map[string]interface{}
-				if json.Unmarshal(nd.Data, &dataMap) == nil {
-					if t, ok := dataMap["text"].(string); ok {
-						text = t
-					}
-				}
-			}
-			entries = append(entries, nodeEntry{
+			text := nodeText(doc, nd.ID, nd.Data)
+			entries = append(entries, NodeEntry{
 				ID:       nd.ID,
 				Type:     nd.Type,
 				Position: posStr,
@@ -203,9 +243,9 @@ func parseUUIDStr(s string) (pgtype.UUID, error) {
 //
 // Pipeline (3 phases, all synchronous within a single DB transaction):
 //
-//	1. Load — fetch YDoc state from DB, reconstruct crdt.Doc
-//	2. Derive — compute markdown content + task list from the Doc
-//	3. Persist — write content + upsert tasks + delete orphans + record completions
+//  1. Load — fetch YDoc state from DB, reconstruct crdt.Doc
+//  2. Derive — compute markdown content + task list from the Doc
+//  3. Persist — write content + upsert tasks + delete orphans + record completions
 func ProjectNoteContentFromYDoc(ctx context.Context, pool *pgxpool.Pool, noteID string) error {
 	startTotal := time.Now()
 
@@ -224,7 +264,7 @@ func ProjectNoteContentFromYDoc(ctx context.Context, pool *pgxpool.Pool, noteID 
 	}
 
 	doc := crdt.New(crdt.WithGC(false))
-	preRegisterYText(doc, state)
+	PreRegisterYText(doc, state)
 	if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
 		return fmt.Errorf("apply ydoc state: %w", err)
 	}
@@ -235,7 +275,6 @@ func ProjectNoteContentFromYDoc(ctx context.Context, pool *pgxpool.Pool, noteID 
 	tasks := deriveTasksFromDoc(doc)
 
 	// ---- Phase 3: Persist projections to SQL ----
-
 
 	tx, err := pool.Begin(ctx)
 	if err != nil {

@@ -17,7 +17,8 @@ import (
 
 var contentRegex = regexp.MustCompile(`content/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`)
 
-func preRegisterYText(doc *crdt.Doc, state []byte) {
+func PreRegisterYText(doc *crdt.Doc, state []byte) {
+	doc.GetMap("nodes")
 	matches := contentRegex.FindAll(state, -1)
 	for _, match := range matches {
 		doc.GetText(string(match))
@@ -36,10 +37,10 @@ type projectionRunner interface {
 // is protected from eviction — no concurrent request can forge a fresh lock
 // for the same note.
 type noteEntry struct {
-	mu         sync.Mutex   // per-note lock — synchronises YDoc mutations
-	doc        *crdt.Doc    // nil means the doc needs to be loaded from DB
-	lastUsed   time.Time    // bumped on every DocFor / WithDoc
-	leaseCount int32        // number of in-flight WithDoc calls
+	mu         sync.Mutex // per-note lock — synchronises YDoc mutations
+	doc        *crdt.Doc  // nil means the doc needs to be loaded from DB
+	lastUsed   time.Time  // bumped on every DocFor / WithDoc
+	leaseCount int32      // number of in-flight WithDoc calls
 }
 
 type YDocService struct {
@@ -232,7 +233,7 @@ func (s *YDocService) DocFor(ctx context.Context, noteID string) (*crdt.Doc, err
 	startApply := time.Now()
 	doc := crdt.New(crdt.WithGC(false))
 	if len(state) > 0 {
-		preRegisterYText(doc, state)
+		PreRegisterYText(doc, state)
 		if err := crdt.ApplyUpdateV1(doc, state, nil); err != nil {
 			slog.Error("DocFor: ApplyUpdateV1 failed", "note_id", noteID, "error", err, "elapsed_ms", time.Since(startApply).Milliseconds())
 			return nil, err
@@ -279,7 +280,7 @@ func (s *YDocService) ApplyNodeMutation(ctx context.Context, noteID string, upda
 
 func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc, noteID string, update []byte) error {
 	startApply := time.Now()
-	preRegisterYText(doc, update)
+	PreRegisterYText(doc, update)
 	if err := crdt.ApplyUpdateV1(doc, update, "local"); err != nil {
 		slog.Error("ApplyNodeMutationLocked: ApplyUpdateV1 failed", "note_id", noteID, "error", err)
 		return err

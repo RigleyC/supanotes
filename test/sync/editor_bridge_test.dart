@@ -92,7 +92,7 @@ void main() {
       );
 
       // 1. Remote update with longer text -> selection offset 3 must be preserved
-      coordinator.updateNodesIncrementally([
+      coordinator.reconcileRemoteSnapshot([
         NoteNode(
           id: 'p1',
           noteId: 'note-1',
@@ -109,7 +109,7 @@ void main() {
       expect((composer.selection!.base.nodePosition as TextNodePosition).offset, 3);
 
       // 2. Remote update with shorter text -> selection offset must be clamped
-      coordinator.updateNodesIncrementally([
+      coordinator.reconcileRemoteSnapshot([
         NoteNode(
           id: 'p1',
           noteId: 'note-1',
@@ -149,7 +149,7 @@ void main() {
       expect(firstNode.isComplete, isFalse);
 
       // Apply incoming node change where completion status becomes true
-      coordinator.updateNodesIncrementally([
+        coordinator.reconcileRemoteSnapshot([
         NoteNode(
           id: 't1',
           noteId: 'note-1',
@@ -206,7 +206,7 @@ void main() {
         doc.getText('content/t1')!.insert(0, 'Daily task');
       });
 
-      final result = bridge.completeTaskInYDoc('t1', now: DateTime(2026, 7, 14));
+      bridge.completeTaskInYDoc('t1', now: DateTime(2026, 7, 14));
 
       final nodesMap = doc.getMap<Object>('nodes')!;
       final t1Map = nodesMap.get('t1') as YMap;

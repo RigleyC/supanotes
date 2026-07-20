@@ -44,8 +44,8 @@ class EditorDocumentSyncManager {
     required MutableDocument document,
     required Editor editor,
     this.onNodeFlush,
-  })  : _document = document,
-        _editor = editor {
+  }) : _document = document,
+       _editor = editor {
     _document.addListener(_onDocumentChanged);
   }
 
@@ -68,7 +68,13 @@ class EditorDocumentSyncManager {
       try {
         await action();
       } catch (e, stackTrace) {
-        dev.log('SQLite write error: $e', name: 'EditorDocumentSyncManager', error: e, stackTrace: stackTrace, level: 1000);
+        dev.log(
+          'SQLite write error: $e',
+          name: 'EditorDocumentSyncManager',
+          error: e,
+          stackTrace: stackTrace,
+          level: 1000,
+        );
       }
     });
   }
@@ -84,35 +90,73 @@ class EditorDocumentSyncManager {
         final node = _document.getNodeById(change.nodeId);
         if (node != null) {
           final currentIndex = _document.getNodeIndexById(change.nodeId);
-          final prevNodeId = currentIndex > 0 
-              ? _document.getNodeAt(currentIndex - 1)?.id 
+          final prevNodeId = currentIndex > 0
+              ? _document.getNodeAt(currentIndex - 1)?.id
               : null;
-          final nextNodeId = currentIndex + 1 < _document.nodeCount 
-              ? _document.getNodeAt(currentIndex + 1)?.id 
+          final nextNodeId = currentIndex + 1 < _document.nodeCount
+              ? _document.getNodeAt(currentIndex + 1)?.id
               : null;
-          _pendingOps[change.nodeId] = InsertOp(change.nodeId, node, prevNodeId, nextNodeId);
+          _pendingOps[change.nodeId] = InsertOp(
+            change.nodeId,
+            node,
+            prevNodeId,
+            nextNodeId,
+          );
           locallyDirtyNodeIds.add(change.nodeId);
           _dirtyNodeSequences[change.nodeId] = _opSequence;
         }
       } else if (change is NodeRemovedEvent) {
-        _pendingOps[change.nodeId] = DeleteOp(change.nodeId);
-        locallyDirtyNodeIds.add(change.nodeId);
-        _dirtyNodeSequences[change.nodeId] = _opSequence;
+        if (_pendingOps[change.nodeId] is InsertOp) {
+          _pendingOps.remove(change.nodeId);
+          locallyDirtyNodeIds.remove(change.nodeId);
+          _dirtyNodeSequences.remove(change.nodeId);
+        } else {
+          _pendingOps[change.nodeId] = DeleteOp(change.nodeId);
+          locallyDirtyNodeIds.add(change.nodeId);
+          _dirtyNodeSequences[change.nodeId] = _opSequence;
+        }
       } else if (change is NodeMovedEvent) {
         final currentIndex = _document.getNodeIndexById(change.nodeId);
-        final prevNodeId = currentIndex > 0 
-            ? _document.getNodeAt(currentIndex - 1)?.id 
+        final prevNodeId = currentIndex > 0
+            ? _document.getNodeAt(currentIndex - 1)?.id
             : null;
-        final nextNodeId = currentIndex + 1 < _document.nodeCount 
-            ? _document.getNodeAt(currentIndex + 1)?.id 
+        final nextNodeId = currentIndex + 1 < _document.nodeCount
+            ? _document.getNodeAt(currentIndex + 1)?.id
             : null;
-        _pendingOps[change.nodeId] = MoveOp(change.nodeId, prevNodeId, nextNodeId);
+        final existing = _pendingOps[change.nodeId];
+        if (existing is InsertOp) {
+          final node = _document.getNodeById(change.nodeId);
+          if (node != null) {
+            _pendingOps[change.nodeId] = InsertOp(
+              change.nodeId,
+              node,
+              prevNodeId,
+              nextNodeId,
+            );
+          }
+        } else {
+          _pendingOps[change.nodeId] = MoveOp(
+            change.nodeId,
+            prevNodeId,
+            nextNodeId,
+          );
+        }
         locallyDirtyNodeIds.add(change.nodeId);
         _dirtyNodeSequences[change.nodeId] = _opSequence;
       } else if (change is NodeChangeEvent) {
         final node = _document.getNodeById(change.nodeId);
         if (node != null) {
-          _pendingOps[change.nodeId] = UpdateOp(change.nodeId, node);
+          final existing = _pendingOps[change.nodeId];
+          if (existing is InsertOp) {
+            _pendingOps[change.nodeId] = InsertOp(
+              change.nodeId,
+              node,
+              existing.prevNodeId,
+              existing.nextNodeId,
+            );
+          } else {
+            _pendingOps[change.nodeId] = UpdateOp(change.nodeId, node);
+          }
           locallyDirtyNodeIds.add(change.nodeId);
           _dirtyNodeSequences[change.nodeId] = _opSequence;
         }
@@ -155,7 +199,10 @@ class EditorDocumentSyncManager {
     final snapshotSeq = _opSequence;
 
     _enqueueDbWrite(() async {
-      final flushedIds = opsToProcess.map(_opNodeId).whereType<String>().toSet();
+      final flushedIds = opsToProcess
+          .map(_opNodeId)
+          .whereType<String>()
+          .toSet();
       for (final id in flushedIds) {
         final seq = _dirtyNodeSequences[id];
         if (seq != null && seq <= snapshotSeq) {
@@ -183,7 +230,7 @@ class EditorDocumentSyncManager {
   // Remote-change application
   // ---------------------------------------------------------------------------
 
-  void updateNodesIncrementally(List<NoteNode> incomingNodes) {
+  void reconcileRemoteSnapshot(List<NoteNode> incomingNodes) {
     _applyRemote(() => _applyIncomingNodes(incomingNodes));
   }
 
@@ -197,10 +244,6 @@ class EditorDocumentSyncManager {
   }
 
   void _applyIncomingNodes(List<NoteNode> incomingNodes) {
-    if (incomingNodes.isEmpty) {
-      return;
-    }
-
     final dirtyIds = locallyDirtyNodeIds;
     final requests = <EditRequest>[];
     final incomingIds = incomingNodes.map((n) => n.id).toSet();
@@ -221,7 +264,7 @@ class EditorDocumentSyncManager {
     for (int i = 0; i < incomingNodes.length; i++) {
       final incoming = incomingNodes[i];
       final existingNode = _document.getNodeById(incoming.id);
-      
+
       // If it exists in the YDoc but is dirty locally, we keep local state (skip replacement).
       // However, its POSITION in YDoc might still be different from local document.
       // For now, if it's dirty locally, we also skip moving it, to avoid fighting the user's cursor.
@@ -248,10 +291,12 @@ class EditorDocumentSyncManager {
             final incomingCompleted = incomingData['completed'] == true;
 
             if (existingNode.isComplete != incomingCompleted) {
-              requests.add(ChangeTaskCompletionRequest(
-                nodeId: incoming.id,
-                isComplete: incomingCompleted,
-              ));
+              requests.add(
+                ChangeTaskCompletionRequest(
+                  nodeId: incoming.id,
+                  isComplete: incomingCompleted,
+                ),
+              );
             }
 
             // Check if only task state changed — skip full node replacement
@@ -262,13 +307,10 @@ class EditorDocumentSyncManager {
         }
 
         if (NodeCodec.isNodeEquivalent(existingNode, incoming)) continue;
-        
+
         final newNode = NodeCodec.createNodeFromSchema(incoming);
         requests.add(
-          ReplaceNodeRequest(
-            existingNodeId: incoming.id,
-            newNode: newNode,
-          ),
+          ReplaceNodeRequest(existingNodeId: incoming.id, newNode: newNode),
         );
       }
     }
@@ -323,12 +365,17 @@ extension EditorSelectionPreservation on Editor {
     execute(requests);
 
     if (oldSelection != null) {
-      final baseNodeExists = document.getNodeById(oldSelection.base.nodeId) != null;
-      final extentNodeExists = document.getNodeById(oldSelection.extent.nodeId) != null;
+      final baseNodeExists =
+          document.getNodeById(oldSelection.base.nodeId) != null;
+      final extentNodeExists =
+          document.getNodeById(oldSelection.extent.nodeId) != null;
       if (baseNodeExists && extentNodeExists) {
         final newBase = _clampPosition(document, oldSelection.base);
         final newExtent = _clampPosition(document, oldSelection.extent);
-        final finalSelection = DocumentSelection(base: newBase, extent: newExtent);
+        final finalSelection = DocumentSelection(
+          base: newBase,
+          extent: newExtent,
+        );
 
         execute([
           ChangeSelectionRequest(
