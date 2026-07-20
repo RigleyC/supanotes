@@ -58,16 +58,11 @@ class YjsSyncManager {
 
   Future<void> _persistLock = Future.value();
 
-  /// Cache of last-encoded state per note — avoids re-serializing the YDoc
-  /// when both [persist] and [persistWithSyncedVector] are called in quick succession.
-  final Map<String, Uint8List> _lastPersistedState = {};
-
   /// Persist the current in-memory Doc state for [noteId] to the database.
   Future<void> persist(String noteId) async {
     final doc = _docs[noteId];
     if (doc == null) return;
     final state = encodeStateAsUpdate(doc);
-    _lastPersistedState[noteId] = state;
     _persistLock = _persistLock.then((_) async {
       try {
         await _db.into(_db.localYjsStates).insertOnConflictUpdate(
@@ -193,12 +188,12 @@ class YjsSyncManager {
   }
 
   /// Persist the current in-memory Doc state with the synced state vector.
-  /// Uses [_lastPersistedState] cache to avoid re-encoding if [persist] was just called.
+  /// Always re-encodes — the cache is not safe because the YDoc may have
+  /// changed (e.g. after applying a remote update).
   Future<void> persistWithSyncedVector(String noteId, Uint8List? syncedStateVector) async {
     final doc = _docs[noteId];
     if (doc == null) return;
-    final state = _lastPersistedState[noteId] ?? encodeStateAsUpdate(doc);
-    _lastPersistedState[noteId] = state;
+    final state = encodeStateAsUpdate(doc);
     try {
       await _db.into(_db.localYjsStates).insertOnConflictUpdate(
         LocalYjsStatesCompanion(
@@ -268,7 +263,7 @@ class YjsSyncManager {
 
     const int kInlineThreshold = 256 * 1024; // 256 KB
     final IsolateMergeResult result;
-    if (totalBytes < kInlineThreshold || rawYjsStates.length <= 5) {
+    if (totalBytes < kInlineThreshold && rawYjsStates.length <= 5) {
       result = _mergeRemoteStatesAndProjectIsolate(params);
     } else {
       result = await compute(_mergeRemoteStatesAndProjectIsolate, params);

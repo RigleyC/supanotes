@@ -131,11 +131,13 @@ void main() {
       final service = buildSyncService(db: db, apiClient: transport);
 
       await insertNote(db, 'note-1');
+      service.markDirty('note-1');
       await service.syncDirtyNote('note-1');
 
       expect(transport.requests, hasLength(1));
       expect(transport.requests.first['path'], '/sync/note/note-1');
 
+      service.markDirty('note-1');
       await service.syncDirtyNote('note-1');
       await db.close();
     });
@@ -149,6 +151,9 @@ void main() {
 
       await insertNote(db, 'note-a');
       await insertNote(db, 'note-b');
+
+      service.markDirty('note-a');
+      service.markDirty('note-b');
 
       // Sync two different notes concurrently — both must complete.
       await Future.wait([
@@ -181,6 +186,7 @@ void main() {
       // Fail first exchange to see serialization.
       transport.exchangeFailAfter = 1;
 
+      service.markDirty('note-serial');
       await Future.wait([
         service.syncDirtyNote('note-serial').catchError((_) {}),
         service.syncDirtyNote('note-serial'),
@@ -205,17 +211,20 @@ void main() {
       // First two exchanges fail; third succeeds.
       transport.exchangeFailAfter = 2;
 
+      service.markDirty('note-chain');
       expect(
         () => service.syncDirtyNote('note-chain'),
         throwsA(isA<DioException>()),
       );
 
+      service.markDirty('note-chain');
       expect(
         () => service.syncDirtyNote('note-chain'),
         throwsA(isA<DioException>()),
       );
 
       // Third call — chain must not be broken.
+      service.markDirty('note-chain');
       await service.syncDirtyNote('note-chain');
 
       expect(transport.exchangeCallCount, 3, reason: 'all three calls must have been attempted');
@@ -232,6 +241,7 @@ void main() {
       await insertNote(db, 'note-vec');
 
       // First exchange succeeds — vector is persisted.
+      service.markDirty('note-vec');
       await service.syncDirtyNote('note-vec');
 
       final stateAfterSuccess = await (db.select(db.localYjsStates)
@@ -243,6 +253,7 @@ void main() {
       // Second exchange fails.
       transport.exchangeFailAfter = 1;
 
+      service.markDirty('note-vec');
       expect(
         () => service.syncDirtyNote('note-vec'),
         throwsA(isA<DioException>()),

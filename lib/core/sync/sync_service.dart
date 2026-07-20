@@ -85,11 +85,19 @@ class SyncService {
   /// Avoids encoding, DB query, and HTTP call when nothing changed.
   final Set<String> _dirtyNotes = {};
 
+  /// Monotonically increasing generation counter per note so [_exchangeNote]
+  /// can detect concurrent edits during an in-flight HTTP request.
+  /// If the generation has changed between the start and end of an exchange,
+  /// the dirty flag is NOT cleared — ensuring the new edit is sent.
+  final Map<String, int> _dirtyGenerations = {};
+
   StreamSubscription<bool>? _connectivitySub;
   Timer? _periodicSyncTimer;
 
   /// Marks a note as having local changes needing sync.
   void markDirty(String noteId) {
+    final gen = (_dirtyGenerations[noteId] ?? 0) + 1;
+    _dirtyGenerations[noteId] = gen;
     _dirtyNotes.add(noteId);
   }
 
@@ -219,6 +227,7 @@ class SyncService {
 
   Future<void> _exchangeNote(String noteId) async {
     if (!_dirtyNotes.contains(noteId)) return;
+    final genAtStart = _dirtyGenerations[noteId] ?? 0;
 
     final doc = await _yjsMgr.loadDoc(noteId);
     final localState = await _getLocalState(noteId);
@@ -226,7 +235,7 @@ class SyncService {
 
     final localUpdate = encodeStateAsUpdate(doc, sv);
     if (localUpdate.isEmpty) {
-      _dirtyNotes.remove(noteId);
+      _tryClearDirty(noteId, genAtStart);
       return;
     }
 
@@ -247,21 +256,32 @@ class SyncService {
       ),
     );
 
-    _dirtyNotes.remove(noteId);
+    _tryClearDirty(noteId, genAtStart);
 
     final responseData = response.data;
     if (responseData != null && responseData.isNotEmpty) {
       final serverUpdate = Uint8List.fromList(responseData);
       applyUpdate(doc, serverUpdate);
       debugPrint('[SyncService] _exchangeNote: applied ${serverUpdate.length}B from server for note $noteId');
-
-      await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
     }
+
+    // Persist the synced state vector even when the server returned nothing,
+    // because the exchange still defines the ground truth for incremental sync.
+    await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
 
     // Project remote changes to SQLite so list views reflect the update
     // even for background notes (not just the active editor).
     if (_activeNoteId != noteId) {
       await _yjsMgr.projectNodes(noteId, markDirty: false);
+    }
+  }
+
+  /// Clears the dirty flag for [noteId] only if no new edit happened
+  /// during the exchange (i.e., the generation hasn't changed).
+  void _tryClearDirty(String noteId, int genAtStart) {
+    if (_dirtyGenerations[noteId] == genAtStart) {
+      _dirtyNotes.remove(noteId);
+      _dirtyGenerations.remove(noteId);
     }
   }
 

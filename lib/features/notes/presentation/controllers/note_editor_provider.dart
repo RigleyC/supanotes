@@ -30,16 +30,24 @@ final noteEditorControllerProvider = Provider.autoDispose
       final yjsMgr = ref.read(yjsSyncManagerProvider);
       final db = ref.read(appDatabaseProvider);
 
-      // Single flush queue: coalesces multiple events into one project+persist
+      // Single flush queue: coalesces multiple events into one project+persist.
+      // Chain serializes calls so concurrent flushes (debounce + dispose) never
+      // observe different versions of the YDoc.
       Timer? flushDebounce;
+      Future<void>? flushChain;
       bool wasLocallyEdited = false;
 
       Future<void> doFlush() async {
         flushDebounce?.cancel();
         flushDebounce = null;
-        await yjsMgr.projectNodes(noteId, markDirty: wasLocallyEdited);
-        wasLocallyEdited = false;
-        await yjsMgr.persist(noteId);
+        final prev = flushChain ?? Future.value();
+        flushChain = prev.then((_) async {
+          if (disposed) return;
+          await yjsMgr.projectNodes(noteId, markDirty: wasLocallyEdited);
+          wasLocallyEdited = false;
+          await yjsMgr.persist(noteId);
+        });
+        await flushChain;
       }
 
       void scheduleFlush() {
