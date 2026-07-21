@@ -7,6 +7,7 @@ import 'package:yjs_dart/yjs_dart.dart';
 
 import 'package:uuid/uuid.dart';
 
+import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/features/notes/domain/yjs_note_schema.dart';
 import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
@@ -367,6 +368,7 @@ class YjsSyncManager {
     if (result.yjsStatesToInsert.isNotEmpty ||
         result.projectedNotes.isNotEmpty ||
         result.projectedTasks.isNotEmpty ||
+        result.projectedCompletions.isNotEmpty ||
         result.tasksToDelete.isNotEmpty) {
       await _db.batch((batch) {
         for (final state in result.yjsStatesToInsert) {
@@ -385,6 +387,13 @@ class YjsSyncManager {
         }
         for (final task in result.projectedTasks) {
           batch.insert(_db.tasks, task, mode: InsertMode.insertOrReplace);
+        }
+        for (final completion in result.projectedCompletions) {
+          batch.insert(
+            _db.localTaskCompletions,
+            completion,
+            mode: InsertMode.insertOrReplace,
+          );
         }
         for (final task in result.tasksToDelete) {
           batch.delete(_db.tasks, task);
@@ -529,6 +538,40 @@ class YjsSyncManager {
       }
     }
 
+    // Migration: recurring tasks with legacy completedAt but no taskCompletions
+    // entries get one synthetic completion for the closest occurrence.
+    final completedTaskIds = completions.map((c) => c.taskId.value).toSet();
+    for (final task in tasks) {
+      if (task.recurrence.value == null) continue;
+      if (task.completedAt.value == null) continue;
+      if (task.dueDate.value == null) continue;
+      if (completedTaskIds.contains(task.id.value)) continue;
+
+      final anchor = task.dueDate.value!;
+      final completedAt = task.completedAt.value!;
+      final recurrence = task.recurrence.value!;
+      final legacyOccurrences = enumerateOccurrences(
+        anchor: anchor,
+        recurrence: recurrence,
+        from: anchor,
+        to: completedAt.isBefore(anchor) ? anchor : completedAt,
+      );
+      final scheduledAt = legacyOccurrences.isNotEmpty
+          ? legacyOccurrences.last
+          : anchor;
+
+      final uuid = const Uuid().v4();
+      completions.add(
+        LocalTaskCompletionsCompanion.insert(
+          id: uuid,
+          taskId: task.id.value,
+          userId: userId,
+          completedAt: completedAt.toUtc(),
+          scheduledAt: scheduledAt.toUtc(),
+        ),
+      );
+    }
+
     final content = lines.join('\n');
     final excerpt = _excerptFrom(content);
 
@@ -594,6 +637,7 @@ class IsolateMergeResult {
   final List<LocalYjsStatesCompanion> yjsStatesToInsert;
   final List<NotesCompanion> projectedNotes;
   final List<TasksCompanion> projectedTasks;
+  final List<LocalTaskCompletionsCompanion> projectedCompletions;
   final List<TaskData> tasksToDelete;
   final List<String> mergedNoteIds;
 
@@ -601,6 +645,7 @@ class IsolateMergeResult {
     required this.yjsStatesToInsert,
     required this.projectedNotes,
     required this.projectedTasks,
+    required this.projectedCompletions,
     required this.tasksToDelete,
     required this.mergedNoteIds,
   });
@@ -611,6 +656,7 @@ IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(
 ) {
   final projectedNotes = <NotesCompanion>[];
   final projectedTasks = <TasksCompanion>[];
+  final projectedCompletions = <LocalTaskCompletionsCompanion>[];
   final yjsStatesToInsert = <LocalYjsStatesCompanion>[];
   final tasksToDelete = <TaskData>[];
   final mergedNoteIds = <String>[];
@@ -621,6 +667,7 @@ IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(
       yjsStatesToInsert: [],
       projectedNotes: [],
       projectedTasks: [],
+      projectedCompletions: [],
       tasksToDelete: [],
       mergedNoteIds: [],
     );
@@ -669,6 +716,7 @@ IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(
       projectedNotes.add(
         projectedData.noteCompanion.copyWith(hasRemoteCopy: const Value(true)),
       );
+      projectedCompletions.addAll(projectedData.completions);
       projectedTasks.addAll(projectedData.tasks);
 
       final projectedTaskIds = projectedData.tasks
@@ -701,6 +749,7 @@ IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(
       projectedNotes.add(
         projectedData.noteCompanion.copyWith(hasRemoteCopy: const Value(true)),
       );
+      projectedCompletions.addAll(projectedData.completions);
       projectedTasks.addAll(projectedData.tasks);
 
       final projectedTaskIds = projectedData.tasks
@@ -719,6 +768,7 @@ IsolateMergeResult _mergeRemoteStatesAndProjectIsolate(
     yjsStatesToInsert: yjsStatesToInsert,
     projectedNotes: projectedNotes,
     projectedTasks: projectedTasks,
+    projectedCompletions: projectedCompletions,
     tasksToDelete: tasksToDelete,
     mergedNoteIds: mergedNoteIds,
   );

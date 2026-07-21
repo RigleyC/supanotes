@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import '../database.dart';
 import '../tables/tasks.dart';
 import '../../utils/fractional_indexing.dart';
-import '../../utils/recurrence.dart';
 import 'task_completions_dao.dart';
 
 part 'tasks_dao.g.dart';
@@ -94,74 +93,35 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
   Future<void> updateTask(TasksCompanion companion) async {
     final now = DateTime.now();
-    await transaction(() async {
-      var updatedCompanion = companion.copyWith(
-        updatedAt: Value(now),
-      );
+    var updatedCompanion = companion.copyWith(
+      updatedAt: Value(now),
+    );
 
-      if (companion.recurrence.present && companion.recurrence.value != null) {
-        final current = await (select(
-          tasks,
-        )..where((t) => t.id.equals(companion.id.value))).getSingleOrNull();
-
-        if (current != null && current.status == 'done') {
-          final recurrence = companion.recurrence.value!;
-          final baseTime = current.completedAt ?? current.dueDate ?? now;
-          var nextDue = nextDueDate(from: baseTime, recurrence: recurrence);
-          if (nextDue != null) {
-            final today = DateTime(now.year, now.month, now.day);
-            nextDue = catchUpDueDate(
-              from: nextDue,
-              recurrence: recurrence,
-              today: today,
-            );
-            updatedCompanion = updatedCompanion.copyWith(
-              status: const Value('open'),
-              dueDate: Value(nextDue),
-              completedAt: const Value(null),
-            );
-          }
-        }
-      }
-
-      await (update(
+    // Recurring tasks no longer advance the dueDate. If a completed
+    // task gains recurrence, re-open it and keep the dueDate as anchor.
+    if (companion.recurrence.present && companion.recurrence.value != null) {
+      final current = await (select(
         tasks,
-      )..where((t) => t.id.equals(companion.id.value))).write(updatedCompanion);
-    });
+      )..where((t) => t.id.equals(companion.id.value))).getSingleOrNull();
+
+      if (current != null && current.status == 'done') {
+        updatedCompanion = updatedCompanion.copyWith(
+          status: const Value('open'),
+          completedAt: const Value(null),
+        );
+      }
+    }
+
+    await (update(
+      tasks,
+    )..where((t) => t.id.equals(companion.id.value))).write(updatedCompanion);
   }
 
+  /// No-op in the per-occurrence model. The dueDate is the anchor and
+  /// never advances — occurrences are derived from it at query time.
+  /// Kept as a no-op to avoid breaking callers during migration.
   Future<void> catchUpRecurringTasks() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    final query = select(tasks)
-      ..where((t) => t.status.equals('open'))
-      ..where((t) => t.dueDate.isSmallerThanValue(today))
-      ..where((t) => t.recurrence.isNotNull())
-      ..where((t) => t.deletedAt.isNull());
-
-    final overdue = await query.get();
-    if (overdue.isEmpty) return;
-
-    await transaction(() async {
-      for (final task in overdue) {
-        final recurrence = task.recurrence!;
-        final currentDue = catchUpDueDate(
-          from: task.dueDate!,
-          recurrence: recurrence,
-          today: today,
-        );
-
-        if (currentDue != task.dueDate) {
-          await (update(tasks)..where((t) => t.id.equals(task.id))).write(
-            TasksCompanion(
-              dueDate: Value(currentDue),
-              updatedAt: Value(now),
-            ),
-          );
-        }
-      }
-    });
+    // No-op: dueDate is the anchor, not advanced.
   }
 
   /// Marks the row with [id] as completed and records the completion event

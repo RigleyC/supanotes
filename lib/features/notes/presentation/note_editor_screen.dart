@@ -183,47 +183,54 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           task: task,
                         );
                       },
-                onTaskComplete: (taskId) =>
-                    TaskSnackBarHelper.completeTaskWithFeedback(
-                  onComplete: () async {
-                    final controller = ref
-                        .read(noteEditorControllerProvider(widget.noteId))
-                        .value;
-                    if (controller == null) {
+                onTaskComplete: (taskId) {
+                  final task = tasksMap[taskId];
+                  final isRecurring = task?.isRepeating ?? false;
+                  return TaskSnackBarHelper.completeTaskWithFeedback(
+                    onComplete: () async {
+                      final controller = ref
+                          .read(noteEditorControllerProvider(widget.noteId))
+                          .value;
+                      if (controller == null) {
+                        return (
+                          nextDue: null,
+                          previousDue: null,
+                          previousHasTime: false,
+                          scheduledAt: null,
+                        );
+                      }
+                      final result = controller.completeTaskInYDoc(taskId);
                       return (
-                        nextDue: null,
-                        previousDue: null,
-                        previousHasTime: false,
-                        scheduledAt: null,
+                        nextDue: result?.nextDue,
+                        previousDue: result?.previousDue,
+                        previousHasTime: result?.previousHasTime ?? false,
+                        scheduledAt: result?.scheduledAt,
                       );
-                    }
-                    final result = controller.completeTaskInYDoc(taskId);
-                    return (
-                      nextDue: result?.nextDue,
-                      previousDue: result?.previousDue,
-                      previousHasTime: result?.previousHasTime ?? false,
-                      scheduledAt: result?.scheduledAt,
-                    );
-                  },
-                  onUndo: (previousDue, previousHasTime, scheduledAt) {
-                    final controller = ref
-                        .read(noteEditorControllerProvider(widget.noteId))
-                        .value;
-                    if (controller != null) {
-                      controller.updateTaskMetadataInYDoc(
-                        taskId,
-                        dueDate: previousDue,
-                        clearDueDate: previousDue == null,
-                        hasTime: previousHasTime,
-                      );
-                      controller.reopenTaskInYDoc(
-                        taskId,
-                        previousDue: previousDue,
-                        scheduledAt: scheduledAt,
-                      );
-                    }
-                  },
-                ),
+                    },
+                    onUndo: (previousDue, previousHasTime, scheduledAt) {
+                      final controller = ref
+                          .read(noteEditorControllerProvider(widget.noteId))
+                          .value;
+                      if (controller != null) {
+                        // For recurring tasks, the template's dueDate is the
+                        // anchor and never changes — only remove the completion.
+                        if (!isRecurring) {
+                          controller.updateTaskMetadataInYDoc(
+                            taskId,
+                            dueDate: previousDue,
+                            clearDueDate: previousDue == null,
+                            hasTime: previousHasTime,
+                          );
+                        }
+                        controller.reopenTaskInYDoc(
+                          taskId,
+                          previousDue: previousDue,
+                          scheduledAt: scheduledAt,
+                        );
+                      }
+                    },
+                  );
+                },
                 onTaskReopen: (taskId) async {
                   final controller = ref
                       .read(noteEditorControllerProvider(widget.noteId))

@@ -131,7 +131,7 @@ void main() {
     await db.close();
   });
 
-  test('catchUpRecurringTasks advances overdue daily task to today', () async {
+  test('catchUpRecurringTasks is a no-op in per-occurrence model', () async {
     final db = AppDatabase.test();
     db.tasksDao.completionsDao = db.taskCompletionsDao;
     final today = DateTime.now();
@@ -160,10 +160,8 @@ void main() {
     expect(tasks, hasLength(1));
     final task = tasks.single;
     expect(task.status, 'open');
-    expect(task.dueDate, todayStart);
-    // No completion records — the missed days are just skipped
-    final completions = await db.select(db.localTaskCompletions).get();
-    expect(completions, isEmpty);
+    // In the per-occurrence model, dueDate is the anchor and never advances.
+    expect(task.dueDate, twoDaysAgo);
 
     await db.close();
   });
@@ -229,7 +227,7 @@ void main() {
     await db.close();
   });
 
-  test('adding recurrence to a completed task re-opens it with next due date', () async {
+  test('adding recurrence to a completed task re-opens it and keeps dueDate as anchor', () async {
     final db = AppDatabase.test();
     db.tasksDao.completionsDao = db.taskCompletionsDao;
     final today = DateTime.now();
@@ -262,7 +260,8 @@ void main() {
     expect(task.status, 'open');
     expect(task.completedAt, isNull);
     expect(task.recurrence, TaskRecurrence.daily);
-    expect(task.dueDate!.isAfter(todayStart.subtract(const Duration(days: 1))), isTrue);
+    // In per-occurrence model, dueDate stays as anchor — not advanced.
+    expect(task.dueDate, todayStart);
     await db.close();
   });
 
