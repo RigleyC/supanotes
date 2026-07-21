@@ -126,7 +126,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 }
               },
             ),
-            if (!note.isReadOnly)
+            /* if (!note.isReadOnly)
               Consumer(
                 builder: (context, ref, child) {
                   final controller = ref.watch(
@@ -149,7 +149,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     },
                   );
                 },
-              ),
+              ), */
           ],
         ],
       ),
@@ -184,44 +184,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           task: task,
                         );
                       },
-                onTaskComplete: (taskId) =>
-                    TaskSnackBarHelper.completeTaskWithFeedback(
-                      onComplete: () async {
-                        final controller = ref.read(
-                          noteEditorControllerProvider(widget.noteId),
-                        );
-                        final result = controller.completeTaskInYDoc(taskId)!;
-                        return (
-                          nextDue: result.nextDue,
-                          previousDue: result.previousDue,
-                          previousHasTime: result.previousHasTime,
-                          scheduledAt: result.scheduledAt,
-                        );
-                      },
-                      onUndo: (previousDue, previousHasTime, scheduledAt) {
-                        final controller = ref.read(
-                          noteEditorControllerProvider(widget.noteId),
-                        );
-                        controller.reopenTaskInYDoc(
-                          taskId,
-                          previousDue: previousDue,
-                          scheduledAt: scheduledAt,
-                        );
-                        if (previousDue != null) {
-                          controller.updateTaskMetadataInYDoc(
-                            taskId,
-                            dueDate: previousDue,
-                            hasTime: previousHasTime,
-                          );
-                        }
-                      },
-                    ),
-                onTaskReopen: (taskId) async {
-                  final controller = ref.read(
-                    noteEditorControllerProvider(widget.noteId),
-                  );
-                  controller.reopenTaskInYDoc(taskId);
-                },
+                /* onTaskComplete: (taskId) => 
+                     TaskSnackBarHelper.completeTaskWithFeedback(...),
+                onTaskReopen: (taskId) async { ... } */
               ),
             );
           },

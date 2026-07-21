@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
@@ -45,7 +44,7 @@ Future<void> showTaskMetadataSheet({
     name: 'TaskMetadata',
   );
 
-  ref
+ /*  ref
       .read(noteEditorControllerProvider(noteId))
       .updateTaskMetadataInYDoc(
         taskId,
@@ -56,7 +55,7 @@ Future<void> showTaskMetadataSheet({
         hasTime: state.hasTime,
         reminder: state.reminder?.yjsValue,
         clearReminder: state.reminder == null,
-      );
+      ); */
 
   if (state.reminder != null) {
     final scheduler = ref.read(taskNotificationSchedulerProvider.notifier);
