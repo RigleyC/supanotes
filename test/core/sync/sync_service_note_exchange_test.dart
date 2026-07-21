@@ -144,6 +144,27 @@ void main() {
       await db.close();
     });
 
+    test('successful exchange clears dirty state and stops timer retries',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final db = AppDatabase.test();
+      final transport = RecordingApiClient();
+      final service = buildSyncService(db: db, apiClient: transport);
+
+      await insertNote(db, 'note-clean-after-exchange');
+      service.markDirty('note-clean-after-exchange');
+      await service.syncDirtyNote('note-clean-after-exchange');
+      await service.syncDirtyNote('note-clean-after-exchange');
+
+      expect(
+        transport.exchangeCallCount,
+        1,
+        reason: 'A completed exchange must not leave the note dirty.',
+      );
+      await db.close();
+    });
+
     test('disconnect exchanges a dirty active note before persisting it', () async {
       SharedPreferences.setMockInitialValues({});
       TestWidgetsFlutterBinding.ensureInitialized();

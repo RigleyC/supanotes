@@ -277,16 +277,14 @@ class SyncService {
       // Re-check after the async persist — a concurrent edit during the
       // database write would have bumped the generation.
       if (_dirtyGenerations[noteId] == genAtStart) {
+        // Clear while the generation is still present. Removing it first
+        // makes the ownership check fail and leaves this note dirty forever.
+        _tryClearDirty(noteId, genAtStart);
         _dirtyGenerations.remove(noteId);
       }
     } else {
       await _yjsMgr.persist(noteId);
     }
-
-    // An HTTP success alone is not a completed exchange. Keep the note dirty
-    // until the server response has been applied and the merged document is
-    // durable locally, so a decode or SQLite failure is retried.
-    _tryClearDirty(noteId, genAtStart);
 
     // Project remote changes to SQLite so list views reflect the update
     // even for background notes (not just the active editor).
