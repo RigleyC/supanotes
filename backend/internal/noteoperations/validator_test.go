@@ -41,20 +41,6 @@ func TestValidateOperationInvalidKind(t *testing.T) {
 	assert.Equal(t, "INVALID_KIND", err.Code)
 }
 
-func TestValidateOperationTextDeltaBlockDeleted(t *testing.T) {
-	doc := NewEmptyDocument()
-	req := OperationRequest{
-		OperationID:  "550e8400-e29b-41d4-a716-446655440000",
-		BaseRevision: 0,
-		Kind:         "text_delta",
-		BlockID:      strPtr("nonexistent"),
-		Payload:      json.RawMessage(`{"ops":[{"insert":"a"}]}`),
-	}
-
-	err := ValidateOperation(req, doc, 0, 0)
-	assert.NotNil(t, err)
-	assert.Equal(t, "BLOCK_DELETED", err.Code)
-}
 
 func TestValidateOperationDeleteBlockValid(t *testing.T) {
 	doc := Document{
@@ -75,20 +61,6 @@ func TestValidateOperationDeleteBlockValid(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestValidateOperationDeleteBlockAlreadyDeleted(t *testing.T) {
-	doc := NewEmptyDocument()
-	req := OperationRequest{
-		OperationID:  "550e8400-e29b-41d4-a716-446655440000",
-		BaseRevision: 0,
-		Kind:         "delete_block",
-		BlockID:      strPtr("nonexistent"),
-		Payload:      json.RawMessage(`{}`),
-	}
-
-	err := ValidateOperation(req, doc, 0, 0)
-	assert.NotNil(t, err)
-	assert.Equal(t, "BLOCK_DELETED", err.Code)
-}
 
 func TestValidateOperationCreateBlock(t *testing.T) {
 	doc := NewEmptyDocument()

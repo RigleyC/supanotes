@@ -196,34 +196,19 @@ func validateAgainstDocument(kind string, blockID *string, doc Document) *Valida
 				Message: "block_id is required for text_delta",
 			}
 		}
-		for _, b := range doc.Blocks {
-			if b.ID == *blockID {
-				return nil
-			}
-		}
-		return &ValidationError{
-			Code:    "BLOCK_DELETED",
-			Message: fmt.Sprintf("block %s not found", *blockID),
-		}
 	case KindDeleteBlock:
-		for _, b := range doc.Blocks {
-			if b.ID == *blockID {
-				return nil
+		if blockID == nil || *blockID == "" {
+			return &ValidationError{
+				Code:    "INVALID_BLOCK_ID",
+				Message: "block_id is required for delete_block",
 			}
-		}
-		return &ValidationError{
-			Code:    "BLOCK_DELETED",
-			Message: fmt.Sprintf("block %s not found", *blockID),
 		}
 	case KindMoveBlock:
-		for _, b := range doc.Blocks {
-			if b.ID == *blockID {
-				return nil
+		if blockID == nil || *blockID == "" {
+			return &ValidationError{
+				Code:    "INVALID_BLOCK_ID",
+				Message: "block_id is required for move_block",
 			}
-		}
-		return &ValidationError{
-			Code:    "BLOCK_DELETED",
-			Message: fmt.Sprintf("block %s not found", *blockID),
 		}
 	case KindSetBlockType:
 		if blockID == nil || *blockID == "" {
@@ -231,15 +216,6 @@ func validateAgainstDocument(kind string, blockID *string, doc Document) *Valida
 				Code:    "INVALID_BLOCK_ID",
 				Message: "block_id is required for set_block_type",
 			}
-		}
-		for _, b := range doc.Blocks {
-			if b.ID == *blockID {
-				return nil
-			}
-		}
-		return &ValidationError{
-			Code:    "BLOCK_DELETED",
-			Message: fmt.Sprintf("block %s not found", *blockID),
 		}
 	}
 	return nil

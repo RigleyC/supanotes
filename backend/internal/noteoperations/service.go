@@ -84,7 +84,9 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 		}
 
 		if err := doc.ApplyOperation(Kind(opReq.Kind), ptrStr(opReq.BlockID), opReq.Payload); err != nil {
-			return SyncResponse{}, fmt.Errorf("apply operation: %w", err)
+			if !errors.Is(err, ErrBlockNotFound) {
+				return SyncResponse{}, fmt.Errorf("apply operation: %w", err)
+			}
 		}
 
 		currentRevision++

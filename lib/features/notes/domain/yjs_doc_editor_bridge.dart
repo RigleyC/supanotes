@@ -41,6 +41,7 @@ class YjsDocEditorBridge {
     _onNodesChangedHandler = nodesMap.observe((e, _) {
       if (_isFlushingLocal) return;
       if (e.keysChanged.isNotEmpty) {
+        dev.log('[YjsBridge] nodesMap observer fired for keys: ${e.keysChanged}', name: 'YjsBridge');
         _scheduleRemoteApply(e.keysChanged.cast<String>());
       }
     });
@@ -57,7 +58,10 @@ class YjsDocEditorBridge {
       nodesMap.keys.where((k) => !k.contains(':')),
     );
     if (initialIds.isNotEmpty) {
+      dev.log('[YjsBridge] init: scheduling remote apply for ${initialIds.length} initial nodes', name: 'YjsBridge');
       _scheduleRemoteApply(initialIds);
+    } else {
+      dev.log('[YjsBridge] init: YDoc has no initial nodes', name: 'YjsBridge');
     }
   }
 
@@ -114,6 +118,7 @@ class YjsDocEditorBridge {
       }
     }
     if (changedIds.isNotEmpty) {
+      dev.log('[YjsBridge] _onAfterTransaction: observed text changes for nodes $changedIds', name: 'YjsBridge');
       _scheduleRemoteApply(changedIds);
     }
   }

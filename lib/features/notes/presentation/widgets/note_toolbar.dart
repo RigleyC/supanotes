@@ -197,25 +197,30 @@ class NoteToolbar extends StatelessWidget {
     Attribution attribution,
   ) {
     if (selection == null) return false;
-    final nodes = editor.context.document
-        .getNodesInside(selection.start, selection.end)
-        .whereType<TextNode>();
-    for (final node in nodes) {
-      final start = (selection.start.nodeId == node.id)
-          ? (selection.start.nodePosition as TextNodePosition).offset
-          : 0;
-      final end = (selection.end.nodeId == node.id)
-          ? (selection.end.nodePosition as TextNodePosition).offset
-          : node.text.length;
-      if (start >= end) continue;
-      if (node.text
-          .getAttributionSpansInRange(
-            attributionFilter: (a) => a == attribution,
-            range: SpanRange(start, end),
-          )
-          .isNotEmpty) {
-        return true;
+    try {
+      final nodes = editor.context.document
+          .getNodesInside(selection.start, selection.end)
+          .whereType<TextNode>();
+      for (final node in nodes) {
+        final start = (selection.start.nodeId == node.id)
+            ? (selection.start.nodePosition as TextNodePosition).offset
+            : 0;
+        final end = (selection.end.nodeId == node.id)
+            ? (selection.end.nodePosition as TextNodePosition).offset
+            : node.text.length;
+        if (start >= end) continue;
+        if (node.text
+            .getAttributionSpansInRange(
+              attributionFilter: (a) => a == attribution,
+              range: SpanRange(start, end),
+            )
+            .isNotEmpty) {
+          return true;
+        }
       }
+    } catch (_) {
+      // Ignoring errors if nodes were concurrently deleted by sync operations.
+      return false;
     }
     return false;
   }
@@ -225,11 +230,15 @@ class NoteToolbar extends StatelessWidget {
 
   ListItemType? _selectedListType(DocumentSelection? selection) {
     if (selection == null) return null;
-    for (final node in NoteEditorCommands.selectedNodes(
-      editor.context.document,
-      selection,
-    )) {
-      if (node is ListItemNode) return node.type;
+    try {
+      for (final node in NoteEditorCommands.selectedNodes(
+        editor.context.document,
+        selection,
+      )) {
+        if (node is ListItemNode) return node.type;
+      }
+    } catch (_) {
+      return null;
     }
     return null;
   }

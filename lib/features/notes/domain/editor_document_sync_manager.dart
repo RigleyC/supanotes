@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as dev;
-
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'node_codec.dart';
@@ -230,55 +231,47 @@ class EditorDocumentSyncManager {
   // Remote-change application
   // ---------------------------------------------------------------------------
 
-  void reconcileRemoteSnapshot(List<NoteNode> incomingNodes) {
-    _applyRemote(() => _applyIncomingNodes(incomingNodes));
+  void reconcileRemoteSnapshot(List<NoteNode> snapshot) {
+    dev.log('[EditorSync] reconcileRemoteSnapshot START (snapshot size: ${snapshot.length})', name: 'EditorDocumentSyncManager');
+    _applyIncomingNodes(snapshot);
+    dev.log('[EditorSync] reconcileRemoteSnapshot END', name: 'EditorDocumentSyncManager');
   }
 
-  void _applyRemote(void Function() fn) {
-    suspendSync();
-    try {
-      fn();
-    } finally {
-      resumeSync();
-    }
-  }
-
-  void _applyIncomingNodes(List<NoteNode> incomingNodes) {
-    final dirtyIds = locallyDirtyNodeIds;
-    final requests = <EditRequest>[];
-    final incomingIds = incomingNodes.map((n) => n.id).toSet();
+  void _applyIncomingNodes(List<NoteNode> snapshot) {
+    dev.log('[EditorSync] _applyIncomingNodes START', name: 'EditorDocumentSyncManager');
     final currentIds = _document.toList().map((n) => n.id).toList();
+    final incomingIds = snapshot.map((n) => n.id).toList();
+    final incomingById = {for (final n in snapshot) n.id: n};
+    final requests = <EditRequest>[];
 
-    // 1. Delete nodes that are not in incoming (and not dirty locally)
+    dev.log('[EditorSync] _applyIncomingNodes currentIds: ${currentIds.length}, incomingIds: ${incomingIds.length}', name: 'EditorDocumentSyncManager');
+
+    // 1. Delete nodes that are not in incoming
     for (int i = currentIds.length - 1; i >= 0; i--) {
       final id = currentIds[i];
       if (!incomingIds.contains(id)) {
-        if (!dirtyIds.contains(id)) {
-          requests.add(DeleteNodeRequest(nodeId: id));
-          currentIds.removeAt(i);
-        }
+        dev.log('[EditorSync] Deleting node $id (not in incoming)', name: 'EditorDocumentSyncManager');
+        requests.add(DeleteNodeRequest(nodeId: id));
+        currentIds.removeAt(i);
       }
     }
 
     // 2. Process incoming nodes in order
-    for (int i = 0; i < incomingNodes.length; i++) {
-      final incoming = incomingNodes[i];
+    for (int i = 0; i < snapshot.length; i++) {
+      final incoming = snapshot[i];
       final existingNode = _document.getNodeById(incoming.id);
-
-      // If it exists in the YDoc but is dirty locally, we keep local state (skip replacement).
-      // However, its POSITION in YDoc might still be different from local document.
-      // For now, if it's dirty locally, we also skip moving it, to avoid fighting the user's cursor.
-      if (dirtyIds.contains(incoming.id)) continue;
 
       if (existingNode == null) {
         // Insert
         final newNode = NodeCodec.createNodeFromSchema(incoming);
+        dev.log('[EditorSync] Inserting new node ${incoming.id} at index $i', name: 'EditorDocumentSyncManager');
         requests.add(InsertNodeAtIndexRequest(nodeIndex: i, newNode: newNode));
         currentIds.insert(i, incoming.id);
       } else {
         // Check position
         final oldIndex = currentIds.indexOf(incoming.id);
         if (oldIndex != i && oldIndex != -1) {
+          dev.log('[EditorSync] Moving existing node ${incoming.id} from $oldIndex to $i', name: 'EditorDocumentSyncManager');
           requests.add(MoveNodeRequest(nodeId: incoming.id, newIndex: i));
           currentIds.removeAt(oldIndex);
           currentIds.insert(i, incoming.id);
@@ -309,6 +302,7 @@ class EditorDocumentSyncManager {
         if (NodeCodec.isNodeEquivalent(existingNode, incoming)) continue;
 
         final newNode = NodeCodec.createNodeFromSchema(incoming);
+        dev.log('[EditorSync] Replacing node ${incoming.id} (content/type changed)', name: 'EditorDocumentSyncManager');
         requests.add(
           ReplaceNodeRequest(existingNodeId: incoming.id, newNode: newNode),
         );
@@ -350,25 +344,60 @@ extension EditorSelectionPreservation on Editor {
     } catch (_) {}
     final oldSelection = composer?.selection;
 
-    // Commented out temporary selection clearing to prevent keyboard from closing
-    // during remote sync node replacement.
-    // if (oldSelection != null) {
-    //   execute([
-    //     const ChangeSelectionRequest(
-    //       null,
-    //       SelectionChangeType.clearSelection,
-    //       SelectionReason.contentChange,
-    //     ),
-    //   ]);
-    // }
+    dev.log(
+      '[EditorSync] executePreservingSelection starting. Requests: ${requests.length}, oldSelection: $oldSelection',
+      name: 'EditorDocumentSyncManager',
+    );
 
-    execute(requests);
-
+    // Check if the current selection points to a node that will be deleted.
+    bool selectionWillBeDeleted = false;
     if (oldSelection != null) {
+      final deletedIds = requests
+          .whereType<DeleteNodeRequest>()
+          .map((req) => req.nodeId)
+          .toSet();
+      if (deletedIds.contains(oldSelection.base.nodeId) ||
+          deletedIds.contains(oldSelection.extent.nodeId)) {
+        selectionWillBeDeleted = true;
+      }
+      
+      dev.log(
+        '[EditorSync] deletedIds: $deletedIds, selectionWillBeDeleted: $selectionWillBeDeleted',
+        name: 'EditorDocumentSyncManager',
+      );
+    }
+
+    if (selectionWillBeDeleted) {
+      dev.log('[EditorSync] Prepending clear selection request.', name: 'EditorDocumentSyncManager');
+      requests.insert(
+        0,
+        const ChangeSelectionRequest(
+          null,
+          SelectionChangeType.clearSelection,
+          SelectionReason.contentChange,
+        ),
+      );
+    }
+
+    try {
+      execute(requests);
+      dev.log('[EditorSync] Batch execute finished.', name: 'EditorDocumentSyncManager');
+    } catch (e, st) {
+      dev.log('[EditorSync] CRASH during execute!', error: e, stackTrace: st, name: 'EditorDocumentSyncManager');
+      rethrow;
+    }
+
+    if (oldSelection != null && !selectionWillBeDeleted) {
       final baseNodeExists =
           document.getNodeById(oldSelection.base.nodeId) != null;
       final extentNodeExists =
           document.getNodeById(oldSelection.extent.nodeId) != null;
+      
+      dev.log(
+        '[EditorSync] Restoring selection. baseExists: $baseNodeExists, extentExists: $extentNodeExists',
+        name: 'EditorDocumentSyncManager',
+      );
+
       if (baseNodeExists && extentNodeExists) {
         final newBase = _clampPosition(document, oldSelection.base);
         final newExtent = _clampPosition(document, oldSelection.extent);
@@ -377,10 +406,21 @@ extension EditorSelectionPreservation on Editor {
           extent: newExtent,
         );
 
+        dev.log('[EditorSync] Restored clamped selection.', name: 'EditorDocumentSyncManager');
         execute([
           ChangeSelectionRequest(
             finalSelection,
             SelectionChangeType.placeCaret,
+            SelectionReason.contentChange,
+          ),
+        ]);
+      } else {
+        dev.log('[EditorSync] Node was lost unexpectedly, falling back to clear selection.', name: 'EditorDocumentSyncManager');
+        // Fallback in case a node was lost in a way other than DeleteNodeRequest
+        execute([
+          const ChangeSelectionRequest(
+            null,
+            SelectionChangeType.clearSelection,
             SelectionReason.contentChange,
           ),
         ]);

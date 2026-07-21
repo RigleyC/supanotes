@@ -193,8 +193,10 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS idx_pending_ops_note_ordinal ON pending_note_operations(note_id, ordinal)',
         );
       }
-      if (from < 22) {
+      if (from == 21) {
         await m.addColumn(pendingNoteOperations, pendingNoteOperations.status);
+      }
+      if (from < 22) {
         await m.createTable(syncSessions);
       }
     },

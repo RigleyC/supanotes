@@ -67,6 +67,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Widget build(BuildContext context) {
     final repo = ref.read(notesRepositoryProvider);
     final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
+    final controllerAsync = ref.watch(noteEditorControllerProvider(widget.noteId));
     final note = noteWithTasksAsync.asData?.value.note;
 
     return Scaffold(
@@ -126,30 +127,28 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 }
               },
             ),
-            /* if (!note.isReadOnly)
-              Consumer(
-                builder: (context, ref, child) {
-                  final controller = ref.watch(
-                    noteEditorControllerProvider(widget.noteId),
-                  );
-                  return AnimatedBuilder(
-                    animation: controller.focusNode,
-                    builder: (context, _) {
-                      if (!controller.focusNode.hasFocus)
-                        return const SizedBox.shrink();
-                      return IconButton(
-                        icon: const Icon(Icons.check),
-                        onPressed: () {
-                          controller.focusNode.unfocus();
-                          SystemChannels.textInput.invokeMethod(
-                            'TextInput.hide',
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ), */
+            if (!note.isReadOnly)
+              controllerAsync.when(
+                data: (controller) => AnimatedBuilder(
+                  animation: controller.focusNode,
+                  builder: (context, _) {
+                    if (!controller.focusNode.hasFocus) {
+                      return const SizedBox.shrink();
+                    }
+                    return IconButton(
+                      icon: const Icon(Icons.check),
+                      onPressed: () {
+                        controller.focusNode.unfocus();
+                        SystemChannels.textInput.invokeMethod(
+                          'TextInput.hide',
+                        );
+                      },
+                    );
+                  },
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
           ],
         ],
       ),
@@ -184,9 +183,55 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           task: task,
                         );
                       },
-                /* onTaskComplete: (taskId) => 
-                     TaskSnackBarHelper.completeTaskWithFeedback(...),
-                onTaskReopen: (taskId) async { ... } */
+                onTaskComplete: (taskId) =>
+                    TaskSnackBarHelper.completeTaskWithFeedback(
+                  onComplete: () async {
+                    final controller = ref
+                        .read(noteEditorControllerProvider(widget.noteId))
+                        .value;
+                    if (controller == null) {
+                      return (
+                        nextDue: null,
+                        previousDue: null,
+                        previousHasTime: false,
+                        scheduledAt: null,
+                      );
+                    }
+                    final result = controller.completeTaskInYDoc(taskId);
+                    return (
+                      nextDue: result?.nextDue,
+                      previousDue: result?.previousDue,
+                      previousHasTime: result?.previousHasTime ?? false,
+                      scheduledAt: result?.scheduledAt,
+                    );
+                  },
+                  onUndo: (previousDue, previousHasTime, scheduledAt) {
+                    final controller = ref
+                        .read(noteEditorControllerProvider(widget.noteId))
+                        .value;
+                    if (controller != null) {
+                      controller.updateTaskMetadataInYDoc(
+                        taskId,
+                        dueDate: previousDue,
+                        clearDueDate: previousDue == null,
+                        hasTime: previousHasTime,
+                      );
+                      controller.reopenTaskInYDoc(
+                        taskId,
+                        previousDue: previousDue,
+                        scheduledAt: scheduledAt,
+                      );
+                    }
+                  },
+                ),
+                onTaskReopen: (taskId) async {
+                  final controller = ref
+                      .read(noteEditorControllerProvider(widget.noteId))
+                      .value;
+                  if (controller != null) {
+                    controller.reopenTaskInYDoc(taskId);
+                  }
+                },
               ),
             );
           },

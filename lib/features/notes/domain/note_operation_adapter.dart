@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart';
 
 import 'package:super_editor/super_editor.dart';
 
@@ -229,6 +230,8 @@ class NoteOperationAdapter {
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
     if (!_listening || _suppressOperations) return;
+
+    debugPrint('[NoteOpAdapter] _onDocumentChanged: ${changeLog.changes.length} changes');
 
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
@@ -499,6 +502,7 @@ class NoteOperationAdapter {
 
   Future<void> _flushLocalOps() async {
     if (_pendingOps.isEmpty) return;
+    debugPrint('[NoteOpAdapter] _flushLocalOps START pending=${_pendingOps.length}');
     final projectedCount =
         await _syncService.getProjectedOutboxOperationCount(_noteId);
     final ops = List<OperationRequest>.from(_pendingOps);
@@ -539,27 +543,48 @@ class NoteOperationAdapter {
   }
 
   Future<void> reconcile(SyncResult result) async {
-    final canonical = result.canonicalDocument;
-    if (canonical == null) return;
+    debugPrint('[NoteOpAdapter] reconcile START finalRevision=${result.finalRevision}, remoteOps=${result.remoteOperations.length}');
     _confirmedRevision = result.finalRevision;
-    final rebasedOps = await _syncService.loadPendingProjection(_noteId);
-    await rebuildFromSnapshot(
-      snapshot: canonical.document,
-      rebasedOps: rebasedOps,
-    );
+
+    if (result.remoteOperations.isNotEmpty) {
+      debugPrint('[NoteOpAdapter] applying ${result.remoteOperations.length} remote ops to document');
+      _suppressOperations = true;
+      try {
+        for (final op in result.remoteOperations) {
+          _applyOperation(op);
+        }
+      } finally {
+        _suppressOperations = false;
+      }
+    }
+
+    _buildMirror();
   }
 
   Future<void> rebuildFromSnapshot({
     required Map<String, dynamic> snapshot,
     required List<PendingNoteOperationData>? rebasedOps,
   }) async {
+    debugPrint('[NoteOpAdapter] rebuildFromSnapshot START isComposing=$_isComposing');
     if (_isComposing) {
       _pendingRebuild = _RebuildRequest(snapshot: snapshot, ops: rebasedOps);
       return;
     }
 
+    final composer = _editor.context.composer;
+    final oldSelection = composer.selection;
+
     _suppressOperations = true;
     try {
+      // Clear selection before deleting nodes so IME and AndroidHandlesDocumentLayer do not dereference deleted nodes during layout build
+      _editor.execute([
+        const ChangeSelectionRequest(
+          null,
+          SelectionChangeType.clearSelection,
+          SelectionReason.contentChange,
+        ),
+      ]);
+
       final existingNodes = _document.toList();
       for (final node in existingNodes.reversed) {
         _editor.execute([DeleteNodeRequest(nodeId: node.id)]);
@@ -571,12 +596,27 @@ class NoteOperationAdapter {
         }
       }
       _buildMirror();
+
+      // Restore selection if target node still exists
+      if (oldSelection != null) {
+        final node = _document.getNodeById(oldSelection.extent.nodeId);
+        if (node != null) {
+          _editor.execute([
+            ChangeSelectionRequest(
+              oldSelection,
+              SelectionChangeType.placeCaret,
+              SelectionReason.contentChange,
+            ),
+          ]);
+        }
+      }
     } finally {
       _suppressOperations = false;
     }
   }
 
   void _applyOperationRequest(PendingNoteOperationData op) {
+    debugPrint('[NoteOpAdapter] _applyOperationRequest: ${op.kind} on ${op.blockId}');
     _applyOperation(Operation(
       operationId: op.operationId,
       noteId: op.noteId,

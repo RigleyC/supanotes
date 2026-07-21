@@ -145,13 +145,13 @@ class SyncResponse {
 
   factory SyncResponse.fromJson(Map<String, dynamic> json) {
     return SyncResponse(
-      accepted: (json['accepted'] as List)
-          .map((e) => AcceptedOperation.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      accepted: (json['accepted'] as List?)
+          ?.map((e) => AcceptedOperation.fromJson(e as Map<String, dynamic>))
+          .toList() ?? [],
       finalRevision: json['finalRevision'] as int,
-      remoteOperations: (json['remoteOperations'] as List)
-          .map((e) => Operation.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      remoteOperations: (json['remoteOperations'] as List?)
+          ?.map((e) => Operation.fromJson(e as Map<String, dynamic>))
+          .toList() ?? [],
       canonicalDocument: json['canonicalDocument'] as Map<String, dynamic>?,
       serverTime: DateTime.parse(json['serverTime'] as String),
     );
@@ -171,9 +171,9 @@ class OperationsListResponse {
 
   factory OperationsListResponse.fromJson(Map<String, dynamic> json) {
     return OperationsListResponse(
-      operations: (json['operations'] as List)
-          .map((e) => Operation.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      operations: (json['operations'] as List?)
+          ?.map((e) => Operation.fromJson(e as Map<String, dynamic>))
+          .toList() ?? [],
       document: json['document'] as Map<String, dynamic>?,
       revision: json['revision'] as int?,
     );
