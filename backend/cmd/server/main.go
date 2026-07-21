@@ -30,6 +30,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/linkpreview"
 	mcpapp "github.com/RigleyC/supanotes/internal/mcp"
 	"github.com/RigleyC/supanotes/internal/memories"
+	"github.com/RigleyC/supanotes/internal/noteoperations"
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/routines"
 	"github.com/RigleyC/supanotes/internal/search"
@@ -329,6 +330,11 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	routinesSvc := routines.NewService(routinesRepo, agentCtxBldr, llmFactory)
 	routinesH := routines.NewHandler(routinesSvc)
 	routines.RegisterRoutes(protected, routinesH)
+
+	// Note Operations (REST OT protocol)
+	noteOpsSvc := noteoperations.NewService(noteoperations.NewRepository(pool), pool)
+	noteOpsH := noteoperations.NewHandler(noteOpsSvc)
+	noteOpsH.RegisterRoutes(protected)
 
 	// Sync repository — declared here so it's available for both the
 	// REST sync handler and the push/pull sync endpoints below.

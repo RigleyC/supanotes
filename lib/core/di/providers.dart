@@ -10,16 +10,20 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
+import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/core/sync/yjs_sync_manager.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/notes/data/note_operations_api.dart';
 
 // ---------------------------------------------------------------------------
 // API client
@@ -88,6 +92,43 @@ final tagsDaoProvider = Provider.autoDispose(
 final localNotificationServiceProvider =
     Provider<LocalNotificationService>((ref) {
   return LocalNotificationService();
+});
+
+// ---------------------------------------------------------------------------
+// Note operations DAO
+// ---------------------------------------------------------------------------
+
+final noteOperationsDaoProvider = Provider.autoDispose<NoteOperationsDao>((ref) {
+  return ref.watch(appDatabaseProvider).noteOperationsDao;
+});
+
+// ---------------------------------------------------------------------------
+// Note operations API client
+// ---------------------------------------------------------------------------
+
+final noteOperationsApiClientProvider = Provider.autoDispose<NoteOperationsApiClient>(
+  (ref) {
+    return NoteOperationsApiClient(client: ref.watch(apiClientProvider));
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Note operations sync service
+// ---------------------------------------------------------------------------
+
+final noteOperationsSyncServiceProvider =
+    Provider.autoDispose<NoteOperationsSyncService>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  String clientId = prefs.getString('note_ops_client_id') ?? '';
+  if (clientId.isEmpty) {
+    clientId = const Uuid().v4();
+    prefs.setString('note_ops_client_id', clientId);
+  }
+  return NoteOperationsSyncService(
+    api: ref.watch(noteOperationsApiClientProvider),
+    dao: ref.watch(noteOperationsDaoProvider),
+    clientId: clientId,
+  );
 });
 
 // ---------------------------------------------------------------------------

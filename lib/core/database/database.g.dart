@@ -5173,6 +5173,1405 @@ class LocalYjsStatesCompanion extends UpdateCompanion<LocalYjsState> {
   }
 }
 
+class $LocalNoteDocumentsTable extends LocalNoteDocuments
+    with TableInfo<$LocalNoteDocumentsTable, LocalNoteDocumentData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalNoteDocumentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _documentJsonMeta = const VerificationMeta(
+    'documentJson',
+  );
+  @override
+  late final GeneratedColumn<String> documentJson = GeneratedColumn<String>(
+    'document_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    noteId,
+    revision,
+    documentJson,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_note_documents';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalNoteDocumentData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_revisionMeta);
+    }
+    if (data.containsKey('document_json')) {
+      context.handle(
+        _documentJsonMeta,
+        documentJson.isAcceptableOrUnknown(
+          data['document_json']!,
+          _documentJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_documentJsonMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {noteId};
+  @override
+  LocalNoteDocumentData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalNoteDocumentData(
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+      documentJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}document_json'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalNoteDocumentsTable createAlias(String alias) {
+    return $LocalNoteDocumentsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalNoteDocumentData extends DataClass
+    implements Insertable<LocalNoteDocumentData> {
+  final String noteId;
+  final int revision;
+  final String documentJson;
+  final DateTime updatedAt;
+  const LocalNoteDocumentData({
+    required this.noteId,
+    required this.revision,
+    required this.documentJson,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['note_id'] = Variable<String>(noteId);
+    map['revision'] = Variable<int>(revision);
+    map['document_json'] = Variable<String>(documentJson);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LocalNoteDocumentsCompanion toCompanion(bool nullToAbsent) {
+    return LocalNoteDocumentsCompanion(
+      noteId: Value(noteId),
+      revision: Value(revision),
+      documentJson: Value(documentJson),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LocalNoteDocumentData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalNoteDocumentData(
+      noteId: serializer.fromJson<String>(json['noteId']),
+      revision: serializer.fromJson<int>(json['revision']),
+      documentJson: serializer.fromJson<String>(json['documentJson']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'noteId': serializer.toJson<String>(noteId),
+      'revision': serializer.toJson<int>(revision),
+      'documentJson': serializer.toJson<String>(documentJson),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LocalNoteDocumentData copyWith({
+    String? noteId,
+    int? revision,
+    String? documentJson,
+    DateTime? updatedAt,
+  }) => LocalNoteDocumentData(
+    noteId: noteId ?? this.noteId,
+    revision: revision ?? this.revision,
+    documentJson: documentJson ?? this.documentJson,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LocalNoteDocumentData copyWithCompanion(LocalNoteDocumentsCompanion data) {
+    return LocalNoteDocumentData(
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      revision: data.revision.present ? data.revision.value : this.revision,
+      documentJson: data.documentJson.present
+          ? data.documentJson.value
+          : this.documentJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalNoteDocumentData(')
+          ..write('noteId: $noteId, ')
+          ..write('revision: $revision, ')
+          ..write('documentJson: $documentJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(noteId, revision, documentJson, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalNoteDocumentData &&
+          other.noteId == this.noteId &&
+          other.revision == this.revision &&
+          other.documentJson == this.documentJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalNoteDocumentsCompanion
+    extends UpdateCompanion<LocalNoteDocumentData> {
+  final Value<String> noteId;
+  final Value<int> revision;
+  final Value<String> documentJson;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LocalNoteDocumentsCompanion({
+    this.noteId = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.documentJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalNoteDocumentsCompanion.insert({
+    required String noteId,
+    required int revision,
+    required String documentJson,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : noteId = Value(noteId),
+       revision = Value(revision),
+       documentJson = Value(documentJson),
+       updatedAt = Value(updatedAt);
+  static Insertable<LocalNoteDocumentData> custom({
+    Expression<String>? noteId,
+    Expression<int>? revision,
+    Expression<String>? documentJson,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (noteId != null) 'note_id': noteId,
+      if (revision != null) 'revision': revision,
+      if (documentJson != null) 'document_json': documentJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalNoteDocumentsCompanion copyWith({
+    Value<String>? noteId,
+    Value<int>? revision,
+    Value<String>? documentJson,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalNoteDocumentsCompanion(
+      noteId: noteId ?? this.noteId,
+      revision: revision ?? this.revision,
+      documentJson: documentJson ?? this.documentJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (documentJson.present) {
+      map['document_json'] = Variable<String>(documentJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalNoteDocumentsCompanion(')
+          ..write('noteId: $noteId, ')
+          ..write('revision: $revision, ')
+          ..write('documentJson: $documentJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PendingNoteOperationsTable extends PendingNoteOperations
+    with TableInfo<$PendingNoteOperationsTable, PendingNoteOperationData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingNoteOperationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _operationIdMeta = const VerificationMeta(
+    'operationId',
+  );
+  @override
+  late final GeneratedColumn<String> operationId = GeneratedColumn<String>(
+    'operation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _baseRevisionMeta = const VerificationMeta(
+    'baseRevision',
+  );
+  @override
+  late final GeneratedColumn<int> baseRevision = GeneratedColumn<int>(
+    'base_revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ordinalMeta = const VerificationMeta(
+    'ordinal',
+  );
+  @override
+  late final GeneratedColumn<int> ordinal = GeneratedColumn<int>(
+    'ordinal',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _blockIdMeta = const VerificationMeta(
+    'blockId',
+  );
+  @override
+  late final GeneratedColumn<String> blockId = GeneratedColumn<String>(
+    'block_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastAttemptAtMeta = const VerificationMeta(
+    'lastAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastAttemptAt =
+      GeneratedColumn<DateTime>(
+        'last_attempt_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _attemptCountMeta = const VerificationMeta(
+    'attemptCount',
+  );
+  @override
+  late final GeneratedColumn<int> attemptCount = GeneratedColumn<int>(
+    'attempt_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    operationId,
+    noteId,
+    baseRevision,
+    ordinal,
+    kind,
+    blockId,
+    payloadJson,
+    createdAt,
+    lastAttemptAt,
+    attemptCount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_note_operations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingNoteOperationData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('operation_id')) {
+      context.handle(
+        _operationIdMeta,
+        operationId.isAcceptableOrUnknown(
+          data['operation_id']!,
+          _operationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_operationIdMeta);
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('base_revision')) {
+      context.handle(
+        _baseRevisionMeta,
+        baseRevision.isAcceptableOrUnknown(
+          data['base_revision']!,
+          _baseRevisionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_baseRevisionMeta);
+    }
+    if (data.containsKey('ordinal')) {
+      context.handle(
+        _ordinalMeta,
+        ordinal.isAcceptableOrUnknown(data['ordinal']!, _ordinalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ordinalMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('block_id')) {
+      context.handle(
+        _blockIdMeta,
+        blockId.isAcceptableOrUnknown(data['block_id']!, _blockIdMeta),
+      );
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('last_attempt_at')) {
+      context.handle(
+        _lastAttemptAtMeta,
+        lastAttemptAt.isAcceptableOrUnknown(
+          data['last_attempt_at']!,
+          _lastAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('attempt_count')) {
+      context.handle(
+        _attemptCountMeta,
+        attemptCount.isAcceptableOrUnknown(
+          data['attempt_count']!,
+          _attemptCountMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {operationId};
+  @override
+  PendingNoteOperationData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingNoteOperationData(
+      operationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operation_id'],
+      )!,
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      baseRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}base_revision'],
+      )!,
+      ordinal: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ordinal'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      blockId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}block_id'],
+      ),
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      lastAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_attempt_at'],
+      ),
+      attemptCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempt_count'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingNoteOperationsTable createAlias(String alias) {
+    return $PendingNoteOperationsTable(attachedDatabase, alias);
+  }
+}
+
+class PendingNoteOperationData extends DataClass
+    implements Insertable<PendingNoteOperationData> {
+  final String operationId;
+  final String noteId;
+  final int baseRevision;
+  final int ordinal;
+  final String kind;
+  final String? blockId;
+  final String payloadJson;
+  final DateTime createdAt;
+  final DateTime? lastAttemptAt;
+  final int attemptCount;
+  const PendingNoteOperationData({
+    required this.operationId,
+    required this.noteId,
+    required this.baseRevision,
+    required this.ordinal,
+    required this.kind,
+    this.blockId,
+    required this.payloadJson,
+    required this.createdAt,
+    this.lastAttemptAt,
+    required this.attemptCount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['operation_id'] = Variable<String>(operationId);
+    map['note_id'] = Variable<String>(noteId);
+    map['base_revision'] = Variable<int>(baseRevision);
+    map['ordinal'] = Variable<int>(ordinal);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || blockId != null) {
+      map['block_id'] = Variable<String>(blockId);
+    }
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastAttemptAt != null) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt);
+    }
+    map['attempt_count'] = Variable<int>(attemptCount);
+    return map;
+  }
+
+  PendingNoteOperationsCompanion toCompanion(bool nullToAbsent) {
+    return PendingNoteOperationsCompanion(
+      operationId: Value(operationId),
+      noteId: Value(noteId),
+      baseRevision: Value(baseRevision),
+      ordinal: Value(ordinal),
+      kind: Value(kind),
+      blockId: blockId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(blockId),
+      payloadJson: Value(payloadJson),
+      createdAt: Value(createdAt),
+      lastAttemptAt: lastAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAttemptAt),
+      attemptCount: Value(attemptCount),
+    );
+  }
+
+  factory PendingNoteOperationData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingNoteOperationData(
+      operationId: serializer.fromJson<String>(json['operationId']),
+      noteId: serializer.fromJson<String>(json['noteId']),
+      baseRevision: serializer.fromJson<int>(json['baseRevision']),
+      ordinal: serializer.fromJson<int>(json['ordinal']),
+      kind: serializer.fromJson<String>(json['kind']),
+      blockId: serializer.fromJson<String?>(json['blockId']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
+      attemptCount: serializer.fromJson<int>(json['attemptCount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'operationId': serializer.toJson<String>(operationId),
+      'noteId': serializer.toJson<String>(noteId),
+      'baseRevision': serializer.toJson<int>(baseRevision),
+      'ordinal': serializer.toJson<int>(ordinal),
+      'kind': serializer.toJson<String>(kind),
+      'blockId': serializer.toJson<String?>(blockId),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
+      'attemptCount': serializer.toJson<int>(attemptCount),
+    };
+  }
+
+  PendingNoteOperationData copyWith({
+    String? operationId,
+    String? noteId,
+    int? baseRevision,
+    int? ordinal,
+    String? kind,
+    Value<String?> blockId = const Value.absent(),
+    String? payloadJson,
+    DateTime? createdAt,
+    Value<DateTime?> lastAttemptAt = const Value.absent(),
+    int? attemptCount,
+  }) => PendingNoteOperationData(
+    operationId: operationId ?? this.operationId,
+    noteId: noteId ?? this.noteId,
+    baseRevision: baseRevision ?? this.baseRevision,
+    ordinal: ordinal ?? this.ordinal,
+    kind: kind ?? this.kind,
+    blockId: blockId.present ? blockId.value : this.blockId,
+    payloadJson: payloadJson ?? this.payloadJson,
+    createdAt: createdAt ?? this.createdAt,
+    lastAttemptAt: lastAttemptAt.present
+        ? lastAttemptAt.value
+        : this.lastAttemptAt,
+    attemptCount: attemptCount ?? this.attemptCount,
+  );
+  PendingNoteOperationData copyWithCompanion(
+    PendingNoteOperationsCompanion data,
+  ) {
+    return PendingNoteOperationData(
+      operationId: data.operationId.present
+          ? data.operationId.value
+          : this.operationId,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      baseRevision: data.baseRevision.present
+          ? data.baseRevision.value
+          : this.baseRevision,
+      ordinal: data.ordinal.present ? data.ordinal.value : this.ordinal,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      blockId: data.blockId.present ? data.blockId.value : this.blockId,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastAttemptAt: data.lastAttemptAt.present
+          ? data.lastAttemptAt.value
+          : this.lastAttemptAt,
+      attemptCount: data.attemptCount.present
+          ? data.attemptCount.value
+          : this.attemptCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingNoteOperationData(')
+          ..write('operationId: $operationId, ')
+          ..write('noteId: $noteId, ')
+          ..write('baseRevision: $baseRevision, ')
+          ..write('ordinal: $ordinal, ')
+          ..write('kind: $kind, ')
+          ..write('blockId: $blockId, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('attemptCount: $attemptCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    operationId,
+    noteId,
+    baseRevision,
+    ordinal,
+    kind,
+    blockId,
+    payloadJson,
+    createdAt,
+    lastAttemptAt,
+    attemptCount,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingNoteOperationData &&
+          other.operationId == this.operationId &&
+          other.noteId == this.noteId &&
+          other.baseRevision == this.baseRevision &&
+          other.ordinal == this.ordinal &&
+          other.kind == this.kind &&
+          other.blockId == this.blockId &&
+          other.payloadJson == this.payloadJson &&
+          other.createdAt == this.createdAt &&
+          other.lastAttemptAt == this.lastAttemptAt &&
+          other.attemptCount == this.attemptCount);
+}
+
+class PendingNoteOperationsCompanion
+    extends UpdateCompanion<PendingNoteOperationData> {
+  final Value<String> operationId;
+  final Value<String> noteId;
+  final Value<int> baseRevision;
+  final Value<int> ordinal;
+  final Value<String> kind;
+  final Value<String?> blockId;
+  final Value<String> payloadJson;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> lastAttemptAt;
+  final Value<int> attemptCount;
+  final Value<int> rowid;
+  const PendingNoteOperationsCompanion({
+    this.operationId = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.baseRevision = const Value.absent(),
+    this.ordinal = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.blockId = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
+    this.attemptCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingNoteOperationsCompanion.insert({
+    required String operationId,
+    required String noteId,
+    required int baseRevision,
+    required int ordinal,
+    required String kind,
+    this.blockId = const Value.absent(),
+    required String payloadJson,
+    required DateTime createdAt,
+    this.lastAttemptAt = const Value.absent(),
+    this.attemptCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : operationId = Value(operationId),
+       noteId = Value(noteId),
+       baseRevision = Value(baseRevision),
+       ordinal = Value(ordinal),
+       kind = Value(kind),
+       payloadJson = Value(payloadJson),
+       createdAt = Value(createdAt);
+  static Insertable<PendingNoteOperationData> custom({
+    Expression<String>? operationId,
+    Expression<String>? noteId,
+    Expression<int>? baseRevision,
+    Expression<int>? ordinal,
+    Expression<String>? kind,
+    Expression<String>? blockId,
+    Expression<String>? payloadJson,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastAttemptAt,
+    Expression<int>? attemptCount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (operationId != null) 'operation_id': operationId,
+      if (noteId != null) 'note_id': noteId,
+      if (baseRevision != null) 'base_revision': baseRevision,
+      if (ordinal != null) 'ordinal': ordinal,
+      if (kind != null) 'kind': kind,
+      if (blockId != null) 'block_id': blockId,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (createdAt != null) 'created_at': createdAt,
+      if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
+      if (attemptCount != null) 'attempt_count': attemptCount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingNoteOperationsCompanion copyWith({
+    Value<String>? operationId,
+    Value<String>? noteId,
+    Value<int>? baseRevision,
+    Value<int>? ordinal,
+    Value<String>? kind,
+    Value<String?>? blockId,
+    Value<String>? payloadJson,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? lastAttemptAt,
+    Value<int>? attemptCount,
+    Value<int>? rowid,
+  }) {
+    return PendingNoteOperationsCompanion(
+      operationId: operationId ?? this.operationId,
+      noteId: noteId ?? this.noteId,
+      baseRevision: baseRevision ?? this.baseRevision,
+      ordinal: ordinal ?? this.ordinal,
+      kind: kind ?? this.kind,
+      blockId: blockId ?? this.blockId,
+      payloadJson: payloadJson ?? this.payloadJson,
+      createdAt: createdAt ?? this.createdAt,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      attemptCount: attemptCount ?? this.attemptCount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (operationId.present) {
+      map['operation_id'] = Variable<String>(operationId.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (baseRevision.present) {
+      map['base_revision'] = Variable<int>(baseRevision.value);
+    }
+    if (ordinal.present) {
+      map['ordinal'] = Variable<int>(ordinal.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (blockId.present) {
+      map['block_id'] = Variable<String>(blockId.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (lastAttemptAt.present) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt.value);
+    }
+    if (attemptCount.present) {
+      map['attempt_count'] = Variable<int>(attemptCount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingNoteOperationsCompanion(')
+          ..write('operationId: $operationId, ')
+          ..write('noteId: $noteId, ')
+          ..write('baseRevision: $baseRevision, ')
+          ..write('ordinal: $ordinal, ')
+          ..write('kind: $kind, ')
+          ..write('blockId: $blockId, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('attemptCount: $attemptCount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $NoteSyncErrorsTable extends NoteSyncErrors
+    with TableInfo<$NoteSyncErrorsTable, NoteSyncErrorData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NoteSyncErrorsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _operationIdMeta = const VerificationMeta(
+    'operationId',
+  );
+  @override
+  late final GeneratedColumn<String> operationId = GeneratedColumn<String>(
+    'operation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _errorCodeMeta = const VerificationMeta(
+    'errorCode',
+  );
+  @override
+  late final GeneratedColumn<String> errorCode = GeneratedColumn<String>(
+    'error_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _messageMeta = const VerificationMeta(
+    'message',
+  );
+  @override
+  late final GeneratedColumn<String> message = GeneratedColumn<String>(
+    'message',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    operationId,
+    noteId,
+    errorCode,
+    message,
+    payloadJson,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'note_sync_errors';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NoteSyncErrorData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('operation_id')) {
+      context.handle(
+        _operationIdMeta,
+        operationId.isAcceptableOrUnknown(
+          data['operation_id']!,
+          _operationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_operationIdMeta);
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('error_code')) {
+      context.handle(
+        _errorCodeMeta,
+        errorCode.isAcceptableOrUnknown(data['error_code']!, _errorCodeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_errorCodeMeta);
+    }
+    if (data.containsKey('message')) {
+      context.handle(
+        _messageMeta,
+        message.isAcceptableOrUnknown(data['message']!, _messageMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {operationId};
+  @override
+  NoteSyncErrorData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NoteSyncErrorData(
+      operationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operation_id'],
+      )!,
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      errorCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error_code'],
+      )!,
+      message: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message'],
+      )!,
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NoteSyncErrorsTable createAlias(String alias) {
+    return $NoteSyncErrorsTable(attachedDatabase, alias);
+  }
+}
+
+class NoteSyncErrorData extends DataClass
+    implements Insertable<NoteSyncErrorData> {
+  final String operationId;
+  final String noteId;
+  final String errorCode;
+  final String message;
+  final String payloadJson;
+  final DateTime createdAt;
+  const NoteSyncErrorData({
+    required this.operationId,
+    required this.noteId,
+    required this.errorCode,
+    required this.message,
+    required this.payloadJson,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['operation_id'] = Variable<String>(operationId);
+    map['note_id'] = Variable<String>(noteId);
+    map['error_code'] = Variable<String>(errorCode);
+    map['message'] = Variable<String>(message);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  NoteSyncErrorsCompanion toCompanion(bool nullToAbsent) {
+    return NoteSyncErrorsCompanion(
+      operationId: Value(operationId),
+      noteId: Value(noteId),
+      errorCode: Value(errorCode),
+      message: Value(message),
+      payloadJson: Value(payloadJson),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory NoteSyncErrorData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NoteSyncErrorData(
+      operationId: serializer.fromJson<String>(json['operationId']),
+      noteId: serializer.fromJson<String>(json['noteId']),
+      errorCode: serializer.fromJson<String>(json['errorCode']),
+      message: serializer.fromJson<String>(json['message']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'operationId': serializer.toJson<String>(operationId),
+      'noteId': serializer.toJson<String>(noteId),
+      'errorCode': serializer.toJson<String>(errorCode),
+      'message': serializer.toJson<String>(message),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  NoteSyncErrorData copyWith({
+    String? operationId,
+    String? noteId,
+    String? errorCode,
+    String? message,
+    String? payloadJson,
+    DateTime? createdAt,
+  }) => NoteSyncErrorData(
+    operationId: operationId ?? this.operationId,
+    noteId: noteId ?? this.noteId,
+    errorCode: errorCode ?? this.errorCode,
+    message: message ?? this.message,
+    payloadJson: payloadJson ?? this.payloadJson,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  NoteSyncErrorData copyWithCompanion(NoteSyncErrorsCompanion data) {
+    return NoteSyncErrorData(
+      operationId: data.operationId.present
+          ? data.operationId.value
+          : this.operationId,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      errorCode: data.errorCode.present ? data.errorCode.value : this.errorCode,
+      message: data.message.present ? data.message.value : this.message,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteSyncErrorData(')
+          ..write('operationId: $operationId, ')
+          ..write('noteId: $noteId, ')
+          ..write('errorCode: $errorCode, ')
+          ..write('message: $message, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    operationId,
+    noteId,
+    errorCode,
+    message,
+    payloadJson,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NoteSyncErrorData &&
+          other.operationId == this.operationId &&
+          other.noteId == this.noteId &&
+          other.errorCode == this.errorCode &&
+          other.message == this.message &&
+          other.payloadJson == this.payloadJson &&
+          other.createdAt == this.createdAt);
+}
+
+class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
+  final Value<String> operationId;
+  final Value<String> noteId;
+  final Value<String> errorCode;
+  final Value<String> message;
+  final Value<String> payloadJson;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const NoteSyncErrorsCompanion({
+    this.operationId = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.errorCode = const Value.absent(),
+    this.message = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NoteSyncErrorsCompanion.insert({
+    required String operationId,
+    required String noteId,
+    required String errorCode,
+    required String message,
+    required String payloadJson,
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : operationId = Value(operationId),
+       noteId = Value(noteId),
+       errorCode = Value(errorCode),
+       message = Value(message),
+       payloadJson = Value(payloadJson),
+       createdAt = Value(createdAt);
+  static Insertable<NoteSyncErrorData> custom({
+    Expression<String>? operationId,
+    Expression<String>? noteId,
+    Expression<String>? errorCode,
+    Expression<String>? message,
+    Expression<String>? payloadJson,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (operationId != null) 'operation_id': operationId,
+      if (noteId != null) 'note_id': noteId,
+      if (errorCode != null) 'error_code': errorCode,
+      if (message != null) 'message': message,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NoteSyncErrorsCompanion copyWith({
+    Value<String>? operationId,
+    Value<String>? noteId,
+    Value<String>? errorCode,
+    Value<String>? message,
+    Value<String>? payloadJson,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return NoteSyncErrorsCompanion(
+      operationId: operationId ?? this.operationId,
+      noteId: noteId ?? this.noteId,
+      errorCode: errorCode ?? this.errorCode,
+      message: message ?? this.message,
+      payloadJson: payloadJson ?? this.payloadJson,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (operationId.present) {
+      map['operation_id'] = Variable<String>(operationId.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (errorCode.present) {
+      map['error_code'] = Variable<String>(errorCode.value);
+    }
+    if (message.present) {
+      map['message'] = Variable<String>(message.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteSyncErrorsCompanion(')
+          ..write('operationId: $operationId, ')
+          ..write('noteId: $noteId, ')
+          ..write('errorCode: $errorCode, ')
+          ..write('message: $message, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5188,6 +6587,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $UserNotePreferencesTable userNotePreferences =
       $UserNotePreferencesTable(this);
   late final $LocalYjsStatesTable localYjsStates = $LocalYjsStatesTable(this);
+  late final $LocalNoteDocumentsTable localNoteDocuments =
+      $LocalNoteDocumentsTable(this);
+  late final $PendingNoteOperationsTable pendingNoteOperations =
+      $PendingNoteOperationsTable(this);
+  late final $NoteSyncErrorsTable noteSyncErrors = $NoteSyncErrorsTable(this);
   late final NotesDao notesDao = NotesDao(this as AppDatabase);
   late final ContextsDao contextsDao = ContextsDao(this as AppDatabase);
   late final TasksDao tasksDao = TasksDao(this as AppDatabase);
@@ -5202,6 +6606,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final UserNotePreferencesDao userNotePreferencesDao =
       UserNotePreferencesDao(this as AppDatabase);
+  late final NoteOperationsDao noteOperationsDao = NoteOperationsDao(
+    this as AppDatabase,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5217,6 +6624,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     attachments,
     userNotePreferences,
     localYjsStates,
+    localNoteDocuments,
+    pendingNoteOperations,
+    noteSyncErrors,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -8677,6 +10087,755 @@ typedef $$LocalYjsStatesTableProcessedTableManager =
       LocalYjsState,
       PrefetchHooks Function({bool noteId})
     >;
+typedef $$LocalNoteDocumentsTableCreateCompanionBuilder =
+    LocalNoteDocumentsCompanion Function({
+      required String noteId,
+      required int revision,
+      required String documentJson,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalNoteDocumentsTableUpdateCompanionBuilder =
+    LocalNoteDocumentsCompanion Function({
+      Value<String> noteId,
+      Value<int> revision,
+      Value<String> documentJson,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalNoteDocumentsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalNoteDocumentsTable> {
+  $$LocalNoteDocumentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get documentJson => $composableBuilder(
+    column: $table.documentJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalNoteDocumentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalNoteDocumentsTable> {
+  $$LocalNoteDocumentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get documentJson => $composableBuilder(
+    column: $table.documentJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalNoteDocumentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalNoteDocumentsTable> {
+  $$LocalNoteDocumentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
+  GeneratedColumn<String> get documentJson => $composableBuilder(
+    column: $table.documentJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LocalNoteDocumentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalNoteDocumentsTable,
+          LocalNoteDocumentData,
+          $$LocalNoteDocumentsTableFilterComposer,
+          $$LocalNoteDocumentsTableOrderingComposer,
+          $$LocalNoteDocumentsTableAnnotationComposer,
+          $$LocalNoteDocumentsTableCreateCompanionBuilder,
+          $$LocalNoteDocumentsTableUpdateCompanionBuilder,
+          (
+            LocalNoteDocumentData,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalNoteDocumentsTable,
+              LocalNoteDocumentData
+            >,
+          ),
+          LocalNoteDocumentData,
+          PrefetchHooks Function()
+        > {
+  $$LocalNoteDocumentsTableTableManager(
+    _$AppDatabase db,
+    $LocalNoteDocumentsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalNoteDocumentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalNoteDocumentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalNoteDocumentsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> noteId = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<String> documentJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalNoteDocumentsCompanion(
+                noteId: noteId,
+                revision: revision,
+                documentJson: documentJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String noteId,
+                required int revision,
+                required String documentJson,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalNoteDocumentsCompanion.insert(
+                noteId: noteId,
+                revision: revision,
+                documentJson: documentJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalNoteDocumentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalNoteDocumentsTable,
+      LocalNoteDocumentData,
+      $$LocalNoteDocumentsTableFilterComposer,
+      $$LocalNoteDocumentsTableOrderingComposer,
+      $$LocalNoteDocumentsTableAnnotationComposer,
+      $$LocalNoteDocumentsTableCreateCompanionBuilder,
+      $$LocalNoteDocumentsTableUpdateCompanionBuilder,
+      (
+        LocalNoteDocumentData,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalNoteDocumentsTable,
+          LocalNoteDocumentData
+        >,
+      ),
+      LocalNoteDocumentData,
+      PrefetchHooks Function()
+    >;
+typedef $$PendingNoteOperationsTableCreateCompanionBuilder =
+    PendingNoteOperationsCompanion Function({
+      required String operationId,
+      required String noteId,
+      required int baseRevision,
+      required int ordinal,
+      required String kind,
+      Value<String?> blockId,
+      required String payloadJson,
+      required DateTime createdAt,
+      Value<DateTime?> lastAttemptAt,
+      Value<int> attemptCount,
+      Value<int> rowid,
+    });
+typedef $$PendingNoteOperationsTableUpdateCompanionBuilder =
+    PendingNoteOperationsCompanion Function({
+      Value<String> operationId,
+      Value<String> noteId,
+      Value<int> baseRevision,
+      Value<int> ordinal,
+      Value<String> kind,
+      Value<String?> blockId,
+      Value<String> payloadJson,
+      Value<DateTime> createdAt,
+      Value<DateTime?> lastAttemptAt,
+      Value<int> attemptCount,
+      Value<int> rowid,
+    });
+
+class $$PendingNoteOperationsTableFilterComposer
+    extends Composer<_$AppDatabase, $PendingNoteOperationsTable> {
+  $$PendingNoteOperationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get baseRevision => $composableBuilder(
+    column: $table.baseRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ordinal => $composableBuilder(
+    column: $table.ordinal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get blockId => $composableBuilder(
+    column: $table.blockId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingNoteOperationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PendingNoteOperationsTable> {
+  $$PendingNoteOperationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get baseRevision => $composableBuilder(
+    column: $table.baseRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ordinal => $composableBuilder(
+    column: $table.ordinal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get blockId => $composableBuilder(
+    column: $table.blockId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingNoteOperationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PendingNoteOperationsTable> {
+  $$PendingNoteOperationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<int> get baseRevision => $composableBuilder(
+    column: $table.baseRevision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get ordinal =>
+      $composableBuilder(column: $table.ordinal, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get blockId =>
+      $composableBuilder(column: $table.blockId, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => column,
+  );
+}
+
+class $$PendingNoteOperationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingNoteOperationsTable,
+          PendingNoteOperationData,
+          $$PendingNoteOperationsTableFilterComposer,
+          $$PendingNoteOperationsTableOrderingComposer,
+          $$PendingNoteOperationsTableAnnotationComposer,
+          $$PendingNoteOperationsTableCreateCompanionBuilder,
+          $$PendingNoteOperationsTableUpdateCompanionBuilder,
+          (
+            PendingNoteOperationData,
+            BaseReferences<
+              _$AppDatabase,
+              $PendingNoteOperationsTable,
+              PendingNoteOperationData
+            >,
+          ),
+          PendingNoteOperationData,
+          PrefetchHooks Function()
+        > {
+  $$PendingNoteOperationsTableTableManager(
+    _$AppDatabase db,
+    $PendingNoteOperationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingNoteOperationsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$PendingNoteOperationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PendingNoteOperationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> operationId = const Value.absent(),
+                Value<String> noteId = const Value.absent(),
+                Value<int> baseRevision = const Value.absent(),
+                Value<int> ordinal = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String?> blockId = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
+                Value<int> attemptCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingNoteOperationsCompanion(
+                operationId: operationId,
+                noteId: noteId,
+                baseRevision: baseRevision,
+                ordinal: ordinal,
+                kind: kind,
+                blockId: blockId,
+                payloadJson: payloadJson,
+                createdAt: createdAt,
+                lastAttemptAt: lastAttemptAt,
+                attemptCount: attemptCount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String operationId,
+                required String noteId,
+                required int baseRevision,
+                required int ordinal,
+                required String kind,
+                Value<String?> blockId = const Value.absent(),
+                required String payloadJson,
+                required DateTime createdAt,
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
+                Value<int> attemptCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingNoteOperationsCompanion.insert(
+                operationId: operationId,
+                noteId: noteId,
+                baseRevision: baseRevision,
+                ordinal: ordinal,
+                kind: kind,
+                blockId: blockId,
+                payloadJson: payloadJson,
+                createdAt: createdAt,
+                lastAttemptAt: lastAttemptAt,
+                attemptCount: attemptCount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingNoteOperationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingNoteOperationsTable,
+      PendingNoteOperationData,
+      $$PendingNoteOperationsTableFilterComposer,
+      $$PendingNoteOperationsTableOrderingComposer,
+      $$PendingNoteOperationsTableAnnotationComposer,
+      $$PendingNoteOperationsTableCreateCompanionBuilder,
+      $$PendingNoteOperationsTableUpdateCompanionBuilder,
+      (
+        PendingNoteOperationData,
+        BaseReferences<
+          _$AppDatabase,
+          $PendingNoteOperationsTable,
+          PendingNoteOperationData
+        >,
+      ),
+      PendingNoteOperationData,
+      PrefetchHooks Function()
+    >;
+typedef $$NoteSyncErrorsTableCreateCompanionBuilder =
+    NoteSyncErrorsCompanion Function({
+      required String operationId,
+      required String noteId,
+      required String errorCode,
+      required String message,
+      required String payloadJson,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$NoteSyncErrorsTableUpdateCompanionBuilder =
+    NoteSyncErrorsCompanion Function({
+      Value<String> operationId,
+      Value<String> noteId,
+      Value<String> errorCode,
+      Value<String> message,
+      Value<String> payloadJson,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$NoteSyncErrorsTableFilterComposer
+    extends Composer<_$AppDatabase, $NoteSyncErrorsTable> {
+  $$NoteSyncErrorsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get errorCode => $composableBuilder(
+    column: $table.errorCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$NoteSyncErrorsTableOrderingComposer
+    extends Composer<_$AppDatabase, $NoteSyncErrorsTable> {
+  $$NoteSyncErrorsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get errorCode => $composableBuilder(
+    column: $table.errorCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NoteSyncErrorsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NoteSyncErrorsTable> {
+  $$NoteSyncErrorsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<String> get errorCode =>
+      $composableBuilder(column: $table.errorCode, builder: (column) => column);
+
+  GeneratedColumn<String> get message =>
+      $composableBuilder(column: $table.message, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$NoteSyncErrorsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NoteSyncErrorsTable,
+          NoteSyncErrorData,
+          $$NoteSyncErrorsTableFilterComposer,
+          $$NoteSyncErrorsTableOrderingComposer,
+          $$NoteSyncErrorsTableAnnotationComposer,
+          $$NoteSyncErrorsTableCreateCompanionBuilder,
+          $$NoteSyncErrorsTableUpdateCompanionBuilder,
+          (
+            NoteSyncErrorData,
+            BaseReferences<
+              _$AppDatabase,
+              $NoteSyncErrorsTable,
+              NoteSyncErrorData
+            >,
+          ),
+          NoteSyncErrorData,
+          PrefetchHooks Function()
+        > {
+  $$NoteSyncErrorsTableTableManager(
+    _$AppDatabase db,
+    $NoteSyncErrorsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NoteSyncErrorsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NoteSyncErrorsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NoteSyncErrorsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> operationId = const Value.absent(),
+                Value<String> noteId = const Value.absent(),
+                Value<String> errorCode = const Value.absent(),
+                Value<String> message = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteSyncErrorsCompanion(
+                operationId: operationId,
+                noteId: noteId,
+                errorCode: errorCode,
+                message: message,
+                payloadJson: payloadJson,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String operationId,
+                required String noteId,
+                required String errorCode,
+                required String message,
+                required String payloadJson,
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => NoteSyncErrorsCompanion.insert(
+                operationId: operationId,
+                noteId: noteId,
+                errorCode: errorCode,
+                message: message,
+                payloadJson: payloadJson,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$NoteSyncErrorsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NoteSyncErrorsTable,
+      NoteSyncErrorData,
+      $$NoteSyncErrorsTableFilterComposer,
+      $$NoteSyncErrorsTableOrderingComposer,
+      $$NoteSyncErrorsTableAnnotationComposer,
+      $$NoteSyncErrorsTableCreateCompanionBuilder,
+      $$NoteSyncErrorsTableUpdateCompanionBuilder,
+      (
+        NoteSyncErrorData,
+        BaseReferences<_$AppDatabase, $NoteSyncErrorsTable, NoteSyncErrorData>,
+      ),
+      NoteSyncErrorData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8700,4 +10859,10 @@ class $AppDatabaseManager {
       $$UserNotePreferencesTableTableManager(_db, _db.userNotePreferences);
   $$LocalYjsStatesTableTableManager get localYjsStates =>
       $$LocalYjsStatesTableTableManager(_db, _db.localYjsStates);
+  $$LocalNoteDocumentsTableTableManager get localNoteDocuments =>
+      $$LocalNoteDocumentsTableTableManager(_db, _db.localNoteDocuments);
+  $$PendingNoteOperationsTableTableManager get pendingNoteOperations =>
+      $$PendingNoteOperationsTableTableManager(_db, _db.pendingNoteOperations);
+  $$NoteSyncErrorsTableTableManager get noteSyncErrors =>
+      $$NoteSyncErrorsTableTableManager(_db, _db.noteSyncErrors);
 }

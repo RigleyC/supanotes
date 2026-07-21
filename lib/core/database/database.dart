@@ -11,6 +11,7 @@ import 'package:sqlite3/sqlite3.dart';
 import 'daos/attachments_dao.dart';
 import 'daos/contexts_dao.dart';
 import 'daos/note_links_dao.dart';
+import 'daos/note_operations_dao.dart';
 import 'daos/note_tags_dao.dart';
 import 'daos/notes_dao.dart';
 import 'daos/tags_dao.dart';
@@ -19,10 +20,13 @@ import 'daos/tasks_dao.dart';
 import 'daos/user_note_preferences_dao.dart';
 import 'tables/attachments.dart';
 import 'tables/contexts.dart';
+import 'tables/local_note_documents.dart';
 import 'tables/local_yjs_states.dart';
 import 'tables/note_links.dart';
+import 'tables/note_sync_errors.dart';
 import 'tables/note_tags.dart';
 import 'tables/notes.dart';
+import 'tables/pending_note_operations.dart';
 import 'tables/tags.dart';
 import 'tables/task_completions.dart';
 import 'tables/tasks.dart';
@@ -44,6 +48,9 @@ part 'database.g.dart';
     Attachments,
     UserNotePreferences,
     LocalYjsStates,
+    LocalNoteDocuments,
+    PendingNoteOperations,
+    NoteSyncErrors,
   ],
   daos: [
     NotesDao,
@@ -55,6 +62,7 @@ part 'database.g.dart';
     NoteTagsDao,
     AttachmentsDao,
     UserNotePreferencesDao,
+    NoteOperationsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -74,7 +82,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 20;
+  int get schemaVersion => 21;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -172,6 +180,14 @@ class AppDatabase extends _$AppDatabase {
         );
         await customStatement(
           'CREATE UNIQUE INDEX IF NOT EXISTS local_task_completions_task_scheduled_idx ON local_task_completions(task_id, scheduled_at)',
+        );
+      }
+      if (from < 21) {
+        await m.createTable(localNoteDocuments);
+        await m.createTable(pendingNoteOperations);
+        await m.createTable(noteSyncErrors);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_pending_ops_note_ordinal ON pending_note_operations(note_id, ordinal)',
         );
       }
     },
