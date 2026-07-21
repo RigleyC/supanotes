@@ -175,13 +175,14 @@ void main() {
 
       await insertNote(db, 'note-disconnect');
       await service.connectNote('note-disconnect');
+      service.markDirty('note-disconnect');
       await service.disconnectNote();
 
       expect(
         transport.exchangeCallCount,
         1,
         reason:
-            'Leaving a note must not leave its latest local Yjs state only on the device.',
+            'Leaving a locally edited note must not leave its latest local Yjs state only on the device.',
       );
       await db.close();
     });

@@ -137,29 +137,30 @@ class SyncService {
         _syncTimer = null;
       }
 
-      markDirty(noteId);
       startTimer();
       debugPrint('[SyncService] connectNote polling timer started elapsed=${sw.elapsedMilliseconds}ms');
+      unawaited(syncRemoteNote(noteId));
 
       // Register lifecycle listener for app pause/inactive/resume
       _lifecycleListener = AppLifecycleListener(
         onPause: () {
           debugPrint('[SyncService] lifecycle: onPause — triggering sync and stopping timer');
-          markDirty(noteId);
-          unawaited(syncDirtyNote(noteId));
+          if (_dirtyNotes.contains(noteId)) {
+            unawaited(syncDirtyNote(noteId));
+          }
           stopTimer();
         },
         onInactive: () {
           debugPrint('[SyncService] lifecycle: onInactive — triggering sync and stopping timer');
-          markDirty(noteId);
-          unawaited(syncDirtyNote(noteId));
+          if (_dirtyNotes.contains(noteId)) {
+            unawaited(syncDirtyNote(noteId));
+          }
           stopTimer();
         },
         onResume: () {
           debugPrint('[SyncService] lifecycle: onResume — restarting timer');
-          markDirty(noteId);
           startTimer();
-          unawaited(syncDirtyNote(noteId));
+          unawaited(syncRemoteNote(noteId));
         },
       );
 
@@ -205,6 +206,16 @@ class SyncService {
   /// This is the ONE exchange method — both the active-note polling timer and
   /// background batch push use it.
   Future<void> syncDirtyNote(String noteId) {
+    return _enqueueExchange(noteId);
+  }
+
+  /// Pulls remote changes without claiming a local edit. Opening or resuming a
+  /// note needs this, but must not create a new dirty generation.
+  Future<void> syncRemoteNote(String noteId) {
+    return _enqueueExchange(noteId, force: true);
+  }
+
+  Future<void> _enqueueExchange(String noteId, {bool force = false}) {
     final gen = (_noteSyncGenerations[noteId] ?? 0) + 1;
     _noteSyncGenerations[noteId] = gen;
 
@@ -215,7 +226,7 @@ class SyncService {
     // inner: carries the real result/error back to the caller
     final inner = _noteSyncChains[noteId]!.then((_) async {
       try {
-        await _exchangeNote(noteId);
+        await _exchangeNote(noteId, force: force);
       } finally {
         if (_noteSyncGenerations[noteId] == gen) {
           _noteSyncChains.remove(noteId);
@@ -231,8 +242,9 @@ class SyncService {
     return inner;
   }
 
-  Future<void> _exchangeNote(String noteId) async {
-    if (!_dirtyNotes.contains(noteId)) return;
+  Future<void> _exchangeNote(String noteId, {required bool force}) async {
+    final wasDirty = _dirtyNotes.contains(noteId);
+    if (!wasDirty && !force) return;
     final genAtStart = _dirtyGenerations[noteId] ?? 0;
 
     final doc = await _yjsMgr.loadDoc(noteId);
@@ -240,7 +252,7 @@ class SyncService {
     final sv = localState?.syncedStateVector;
 
     final localUpdate = encodeStateAsUpdate(doc, sv);
-    if (localUpdate.isEmpty) {
+    if (localUpdate.isEmpty && !force) {
       _tryClearDirty(noteId, genAtStart);
       return;
     }
@@ -272,11 +284,11 @@ class SyncService {
     // Persist state always. Only advance synced state vector if no concurrent
     // edit happened during the HTTP request — if generation changed, keeping
     // the old SV ensures the next exchange computes a delta that includes it.
-    if (_dirtyGenerations[noteId] == genAtStart) {
+    if (_dirtyGenerations[noteId] == genAtStart || !wasDirty) {
       await _yjsMgr.persistWithSyncedVector(noteId, encodeStateVector(doc));
       // Re-check after the async persist — a concurrent edit during the
       // database write would have bumped the generation.
-      if (_dirtyGenerations[noteId] == genAtStart) {
+      if (wasDirty && _dirtyGenerations[noteId] == genAtStart) {
         // Clear while the generation is still present. Removing it first
         // makes the ownership check fail and leaves this note dirty forever.
         _tryClearDirty(noteId, genAtStart);
