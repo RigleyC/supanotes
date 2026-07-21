@@ -116,7 +116,7 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
         loading: () => dev.log('[Scheduler] Stream loading...'),
         error: (e, st) => dev.log('[Scheduler] Stream error: $e'),
       );
-    });
+    }, fireImmediately: true);
 
     return cachedSchedule;
   }

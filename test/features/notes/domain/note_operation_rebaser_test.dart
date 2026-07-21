@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:supanotes/core/database/database.dart';
@@ -8,57 +7,6 @@ import 'package:supanotes/features/notes/data/note_operations_api.dart';
 import 'package:supanotes/features/notes/domain/note_operation_rebaser.dart';
 
 void main() {
-  group('transformTextPair', () {
-    test('local wins when localKey > remoteKey', () {
-      final result = transformTextPair(
-        local: quill.Delta()..insert('Hello'),
-        remote: quill.Delta()..insert('World'),
-        localKey: 'b:1',
-        remoteKey: 'a:1',
-      );
-
-      expect(result.local.toJson(), [
-        {'insert': 'Hello'},
-      ]);
-    });
-
-    test('remote wins when remoteKey > localKey', () {
-      final result = transformTextPair(
-        local: quill.Delta()..insert('Hello'),
-        remote: quill.Delta()..insert('World'),
-        localKey: 'a:1',
-        remoteKey: 'b:1',
-      );
-
-      expect(result.remote.toJson(), [
-        {'insert': 'World'},
-      ]);
-    });
-
-    test('transforms concurrent insert at same position', () {
-      final result = transformTextPair(
-        local: quill.Delta()
-          ..retain(5)
-          ..insert(' AB'),
-        remote: quill.Delta()
-          ..retain(5)
-          ..insert(' CD'),
-        localKey: 'actor-1:op-1',
-        remoteKey: 'actor-2:op-1',
-      );
-
-      expect(result.local.toJson(), [
-        {'retain': 8},
-        {'insert': ' AB'},
-      ]);
-
-      expect(result.remote.toJson(), [
-        {'retain': 5},
-        {'insert': ' CD'},
-      ]);
-    });
-  });
-
   group('NoteOperationRebaser.rebase', () {
     late NoteOperationRebaser rebaser;
 
@@ -66,7 +14,7 @@ void main() {
       rebaser = NoteOperationRebaser(localActorId: 'local-actor');
     });
 
-    PendingNoteOperationData _pending({
+    PendingNoteOperationData makePending({
       required String operationId,
       required String kind,
       String? blockId,
@@ -89,7 +37,7 @@ void main() {
       );
     }
 
-    Operation _remote({
+    Operation makeRemote({
       required String operationId,
       required String kind,
       String actorId = 'remote-actor',
@@ -112,7 +60,7 @@ void main() {
     group('text_delta', () {
       test('transforms text_delta against remote text_delta on same block', () {
         final pending = [
-          _pending(
+          makePending(
             operationId: 'op-1',
             kind: 'text_delta',
             blockId: 'block-1',
@@ -125,7 +73,7 @@ void main() {
           ),
         ];
         final remote = [
-          _remote(
+          makeRemote(
             operationId: 'remote-1',
             kind: 'text_delta',
             blockId: 'block-1',
@@ -157,7 +105,7 @@ void main() {
       test('transforms text_delta against remote text_delta on different blocks',
           () {
         final pending = [
-          _pending(
+          makePending(
             operationId: 'op-1',
             kind: 'text_delta',
             blockId: 'block-1',
@@ -170,7 +118,7 @@ void main() {
           ),
         ];
         final remote = [
-          _remote(
+          makeRemote(
             operationId: 'remote-1',
             kind: 'text_delta',
             blockId: 'block-2',
@@ -200,7 +148,7 @@ void main() {
 
       test('eliminates text_delta when remote deletes the block', () {
         final pending = [
-          _pending(
+          makePending(
             operationId: 'op-1',
             kind: 'text_delta',
             blockId: 'block-1',
@@ -213,7 +161,7 @@ void main() {
           ),
         ];
         final remote = [
-          _remote(
+          makeRemote(
             operationId: 'remote-1',
             kind: 'delete_block',
             blockId: 'block-1',
@@ -232,7 +180,7 @@ void main() {
 
       test('handles empty text_delta payload', () {
         final pending = [
-          _pending(
+          makePending(
             operationId: 'op-1',
             kind: 'text_delta',
             blockId: 'block-1',
@@ -258,7 +206,7 @@ void main() {
         test('adjusts afterBlockId when remote create_block targets same parent',
             () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'local-create',
               kind: 'create_block',
               blockId: 'new-block-a',
@@ -270,7 +218,7 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'remote-create',
               kind: 'create_block',
               blockId: 'new-block-b',
@@ -296,7 +244,7 @@ void main() {
 
         test('keeps afterBlockId when local has higher operationId', () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'z-local-create',
               kind: 'create_block',
               blockId: 'new-block-a',
@@ -308,8 +256,9 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'a-remote-create',
+              actorId: 'a-actor',
               kind: 'create_block',
               blockId: 'new-block-b',
               payload: {
@@ -334,7 +283,7 @@ void main() {
 
       test('clears afterBlockId when remote deletes the target', () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'local-create',
               kind: 'create_block',
               blockId: 'new-block',
@@ -346,7 +295,7 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'remote-del',
               kind: 'delete_block',
               blockId: 'sibling-block',
@@ -370,7 +319,7 @@ void main() {
       group('delete_block', () {
         test('eliminates delete_block when remote also deletes same block', () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'local-del',
               kind: 'delete_block',
               blockId: 'block-1',
@@ -378,7 +327,7 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'remote-del',
               kind: 'delete_block',
               blockId: 'block-1',
@@ -400,7 +349,7 @@ void main() {
         test('eliminates when remote also moves same target with higher priority',
             () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'a-local',
               kind: 'move_block',
               blockId: 'block-1',
@@ -411,7 +360,7 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'z-remote',
               kind: 'move_block',
               blockId: 'block-1',
@@ -433,7 +382,7 @@ void main() {
 
         test('keeps move_block when local has higher priority', () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'z-local',
               kind: 'move_block',
               blockId: 'block-1',
@@ -444,8 +393,9 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'a-remote',
+              actorId: 'a-actor',
               kind: 'move_block',
               blockId: 'block-1',
               payload: {
@@ -466,7 +416,7 @@ void main() {
 
         test('clears afterBlockId when remote deletes the target', () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'local-move',
               kind: 'move_block',
               blockId: 'block-1',
@@ -477,7 +427,7 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'remote-del',
               kind: 'delete_block',
               blockId: 'sibling-block',
@@ -499,7 +449,7 @@ void main() {
 
         test('eliminates when remote deletes the moved block', () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'local-move',
               kind: 'move_block',
               blockId: 'block-1',
@@ -510,7 +460,7 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'remote-del',
               kind: 'delete_block',
               blockId: 'block-1',
@@ -531,7 +481,7 @@ void main() {
       group('set_block_type', () {
         test('eliminates when remote deletes the block', () {
           final pending = [
-            _pending(
+            makePending(
               operationId: 'local-set',
               kind: 'set_block_type',
               blockId: 'block-1',
@@ -539,7 +489,7 @@ void main() {
             ),
           ];
           final remote = [
-            _remote(
+            makeRemote(
               operationId: 'remote-del',
               kind: 'delete_block',
               blockId: 'block-1',
@@ -561,19 +511,19 @@ void main() {
     group('baseRevision assignment', () {
       test('assigns sequential baseRevisions starting from finalRevision', () {
         final pending = [
-          _pending(
+          makePending(
             operationId: 'op-1',
             kind: 'create_block',
             blockId: 'b1',
             payload: {'id': 'b1', 'type': 'paragraph'},
           ),
-          _pending(
+          makePending(
             operationId: 'op-2',
             kind: 'text_delta',
             blockId: 'b1',
             payload: {'ops': [{'insert': 'Hello'}]},
           ),
-          _pending(
+          makePending(
             operationId: 'op-3',
             kind: 'create_block',
             blockId: 'b2',
@@ -595,13 +545,13 @@ void main() {
 
       test('assigns sequential after eliminating no-ops', () {
         final pending = [
-          _pending(
+          makePending(
             operationId: 'op-1',
             kind: 'delete_block',
             blockId: 'b1',
             payload: {'blockId': 'b1'},
           ),
-          _pending(
+          makePending(
             operationId: 'op-2',
             kind: 'create_block',
             blockId: 'b2',
@@ -609,7 +559,7 @@ void main() {
           ),
         ];
         final remote = [
-          _remote(
+          makeRemote(
             operationId: 'remote-del',
             kind: 'delete_block',
             blockId: 'b1',
@@ -632,13 +582,13 @@ void main() {
     group('mixed operations', () {
       test('transforms text_delta and block ops together', () {
         final pending = [
-          _pending(
+          makePending(
             operationId: 'op-1',
             kind: 'create_block',
             blockId: 'b2',
             payload: {'id': 'b2', 'type': 'paragraph', 'afterBlockId': 'b1'},
           ),
-          _pending(
+          makePending(
             operationId: 'op-2',
             kind: 'text_delta',
             blockId: 'b2',
@@ -650,7 +600,7 @@ void main() {
           ),
         ];
         final remote = [
-          _remote(
+          makeRemote(
             operationId: 'remote-create',
             kind: 'create_block',
             blockId: 'b1',
@@ -675,7 +625,7 @@ void main() {
 
       test('returns empty when all ops eliminated', () {
         final pending = [
-          _pending(
+          makePending(
             operationId: 'op-1',
             kind: 'delete_block',
             blockId: 'b1',
@@ -683,7 +633,7 @@ void main() {
           ),
         ];
         final remote = [
-          _remote(
+          makeRemote(
             operationId: 'remote-del',
             kind: 'delete_block',
             blockId: 'b1',
@@ -698,6 +648,89 @@ void main() {
         );
 
         expect(result, isEmpty);
+      });
+    });
+
+    group('two-client concurrent convergence', () {
+      test('Client A and Client B rebase concurrent text deltas deterministically', () {
+        final rebaserA = NoteOperationRebaser(localActorId: 'actor-A');
+        final rebaserB = NoteOperationRebaser(localActorId: 'actor-B');
+
+        final opsA = [
+          makePending(
+            operationId: 'op-A1',
+            kind: 'text_delta',
+            blockId: 'b1',
+            payload: {
+              'ops': [
+                {'retain': 5},
+                {'insert': ' Alpha'},
+              ],
+            },
+          ),
+        ];
+
+        final opsB = [
+          makePending(
+            operationId: 'op-B1',
+            kind: 'text_delta',
+            blockId: 'b1',
+            payload: {
+              'ops': [
+                {'retain': 5},
+                {'insert': ' Beta'},
+              ],
+            },
+          ),
+        ];
+
+        final remoteForA = [
+          makeRemote(
+            operationId: 'op-B1',
+            actorId: 'actor-B',
+            kind: 'text_delta',
+            blockId: 'b1',
+            payload: {
+              'ops': [
+                {'retain': 5},
+                {'insert': ' Beta'},
+              ],
+            },
+          ),
+        ];
+
+        final remoteForB = [
+          makeRemote(
+            operationId: 'op-A1',
+            actorId: 'actor-A',
+            kind: 'text_delta',
+            blockId: 'b1',
+            payload: {
+              'ops': [
+                {'retain': 5},
+                {'insert': ' Alpha'},
+              ],
+            },
+          ),
+        ];
+
+        final rebasedA = rebaserA.rebase(pending: opsA, remote: remoteForA, finalRevision: 1);
+        final rebasedB = rebaserB.rebase(pending: opsB, remote: remoteForB, finalRevision: 1);
+
+        expect(rebasedA.length, 1);
+        expect(rebasedB.length, 1);
+
+        final decodedA = jsonDecode(rebasedA[0].payloadJson)['ops'] as List;
+        final decodedB = jsonDecode(rebasedB[0].payloadJson)['ops'] as List;
+
+        expect(decodedB, [
+          {'retain': 5},
+          {'insert': ' Beta'},
+        ]);
+        expect(decodedA, [
+          {'retain': 10},
+          {'insert': ' Alpha'},
+        ]);
       });
     });
   });

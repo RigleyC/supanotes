@@ -11,70 +11,39 @@ import (
 )
 
 type Querier interface {
-	AddTagToNote(ctx context.Context, arg AddTagToNoteParams) error
-	CleanupOldMessages(ctx context.Context) error
+	CheckNotePermission(ctx context.Context, arg CheckNotePermissionParams) (interface{}, error)
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
-	CountMemories(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
-	CreateContext(ctx context.Context, arg CreateContextParams) (Context, error)
-	CreateMemory(ctx context.Context, arg CreateMemoryParams) (Memory, error)
-	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error)
 	CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) error
 	CreateNoteShare(ctx context.Context, arg CreateNoteShareParams) (NoteShare, error)
-	CreatePendingToolConfirmation(ctx context.Context, arg CreatePendingToolConfirmationParams) (PendingToolConfirmation, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
-	CreateRoutine(ctx context.Context, arg CreateRoutineParams) (Routine, error)
-	CreateRoutineLog(ctx context.Context, arg CreateRoutineLogParams) (RoutineLog, error)
-	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
 	CreateTaskCompletion(ctx context.Context, arg CreateTaskCompletionParams) (TaskCompletion, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserSettings(ctx context.Context, arg CreateUserSettingsParams) (UserSetting, error)
 	DeleteAttachment(ctx context.Context, id pgtype.UUID) error
-	DeleteContext(ctx context.Context, arg DeleteContextParams) error
-	DeleteMemory(ctx context.Context, arg DeleteMemoryParams) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
-	DeleteRecurringTaskCompletionsByNoteID(ctx context.Context, noteID pgtype.UUID) error
-	DeleteSessionMessages(ctx context.Context, arg DeleteSessionMessagesParams) error
-	DeleteTag(ctx context.Context, arg DeleteTagParams) error
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteTaskByNodeID(ctx context.Context, arg DeleteTaskByNodeIDParams) error
 	DeleteTasksByNoteID(ctx context.Context, arg DeleteTasksByNoteIDParams) error
-	DeleteWorkingMemoryForSession(ctx context.Context, arg DeleteWorkingMemoryForSessionParams) error
 	GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesForMigrationRow, error)
-	GetContexts(ctx context.Context, userID pgtype.UUID) ([]Context, error)
-	GetEnabledRoutines(ctx context.Context) ([]GetEnabledRoutinesRow, error)
-	GetLatestBriefByType(ctx context.Context, arg GetLatestBriefByTypeParams) (RoutineLog, error)
+	GetLastOperation(ctx context.Context, noteID pgtype.UUID) (NoteOperation, error)
 	GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) ([]Note, error)
-	GetMemories(ctx context.Context, arg GetMemoriesParams) ([]Memory, error)
-	GetMessages(ctx context.Context, arg GetMessagesParams) ([]Message, error)
 	GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNoteByIDRow, error)
-	GetNoteMeta(ctx context.Context, id pgtype.UUID) (GetNoteMetaRow, error)
+	GetNoteDocument(ctx context.Context, id pgtype.UUID) (GetNoteDocumentRow, error)
+	GetNoteOperationByOpID(ctx context.Context, arg GetNoteOperationByOpIDParams) (NoteOperation, error)
 	GetNoteOwner(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
-	GetNoteOwnerID(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 	GetNoteShareForUser(ctx context.Context, arg GetNoteShareForUserParams) (NoteShare, error)
 	GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]GetNoteSharesRow, error)
 	GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesRow, error)
-	GetPendingToolConfirmation(ctx context.Context, arg GetPendingToolConfirmationParams) (PendingToolConfirmation, error)
+	GetOperationsSince(ctx context.Context, arg GetOperationsSinceParams) ([]NoteOperation, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]GetRecentNotesRow, error)
 	GetRecentlyCompletedTasks(ctx context.Context, arg GetRecentlyCompletedTasksParams) ([]Task, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
-	GetRetryableEmbeddings(ctx context.Context, limit int32) ([]GetRetryableEmbeddingsRow, error)
-	GetRoutineLogsByUser(ctx context.Context, arg GetRoutineLogsByUserParams) ([]RoutineLog, error)
-	GetRoutinesByUser(ctx context.Context, userID pgtype.UUID) ([]Routine, error)
-	GetSoul(ctx context.Context, userID pgtype.UUID) (Soul, error)
-	GetSyncContexts(ctx context.Context, arg GetSyncContextsParams) ([]Context, error)
-	GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]NoteLink, error)
-	GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]NoteTag, error)
-	GetSyncNotes(ctx context.Context, arg GetSyncNotesParams) ([]GetSyncNotesRow, error)
-	GetSyncTags(ctx context.Context, arg GetSyncTagsParams) ([]Tag, error)
-	GetSyncUserNotePreferences(ctx context.Context, arg GetSyncUserNotePreferencesParams) ([]UserNotePreference, error)
-	GetTags(ctx context.Context, userID pgtype.UUID) ([]Tag, error)
-	GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]Tag, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
 	GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, error)
 	GetTasksByNodeID(ctx context.Context, id pgtype.UUID) ([]Task, error)
@@ -83,53 +52,21 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserSettings(ctx context.Context, userID pgtype.UUID) (UserSetting, error)
-	GetWorkingMemoryForSession(ctx context.Context, arg GetWorkingMemoryForSessionParams) ([]GetWorkingMemoryForSessionRow, error)
-	GetWorkingMemoryValue(ctx context.Context, arg GetWorkingMemoryValueParams) (string, error)
-	HardDeleteExpiredContexts(ctx context.Context) error
-	HardDeleteExpiredNotes(ctx context.Context) error
-	HardDeleteExpiredTasks(ctx context.Context) error
 	HardDeleteOldNotes(ctx context.Context) error
 	InsertAttachment(ctx context.Context, arg InsertAttachmentParams) (Attachment, error)
+	InsertOperation(ctx context.Context, arg InsertOperationParams) (NoteOperation, error)
 	ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]Attachment, error)
-	RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error
-	ResolvePendingToolConfirmation(ctx context.Context, arg ResolvePendingToolConfirmationParams) (PendingToolConfirmation, error)
+	LockNote(ctx context.Context, id pgtype.UUID) (LockNoteRow, error)
 	RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error
-	SearchMemoriesByEmbedding(ctx context.Context, arg SearchMemoriesByEmbeddingParams) ([]SearchMemoriesByEmbeddingRow, error)
-	SearchNotesByEmbedding(ctx context.Context, arg SearchNotesByEmbeddingParams) ([]SearchNotesByEmbeddingRow, error)
-	SearchNotesFTS(ctx context.Context, arg SearchNotesFTSParams) ([]SearchNotesFTSRow, error)
-	SearchNotesHybrid(ctx context.Context, arg SearchNotesHybridParams) ([]SearchNotesHybridRow, error)
-	SearchNotesSemantic(ctx context.Context, arg SearchNotesSemanticParams) ([]SearchNotesSemanticRow, error)
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Task, error)
-	SetWorkingMemoryValue(ctx context.Context, arg SetWorkingMemoryValueParams) (AgentWorkingMemory, error)
 	TryAcquireGCLock(ctx context.Context) (bool, error)
-	UpdateMemory(ctx context.Context, arg UpdateMemoryParams) (Memory, error)
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteContent(ctx context.Context, arg UpdateNoteContentParams) error
-	UpdateNoteEmbeddingStatus(ctx context.Context, arg UpdateNoteEmbeddingStatusParams) error
-	UpdateNoteSearchVector(ctx context.Context, arg UpdateNoteSearchVectorParams) error
-	UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (Routine, error)
-	UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error
-	UpdateSoulProfile(ctx context.Context, arg UpdateSoulProfileParams) (Soul, error)
+	UpdateNoteDocument(ctx context.Context, arg UpdateNoteDocumentParams) error
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error)
-	UpsertContext(ctx context.Context, arg UpsertContextParams) (Context, error)
-	UpsertContextsBatch(ctx context.Context, arg UpsertContextsBatchParams) error
-	UpsertNote(ctx context.Context, arg UpsertNoteParams) (Note, error)
-	UpsertNoteEmbedding(ctx context.Context, arg UpsertNoteEmbeddingParams) error
-	UpsertNoteLink(ctx context.Context, arg UpsertNoteLinkParams) error
-	UpsertNoteLinksBatch(ctx context.Context, arg UpsertNoteLinksBatchParams) error
-	UpsertNoteTag(ctx context.Context, arg UpsertNoteTagParams) error
-	UpsertNoteTagsBatch(ctx context.Context, arg UpsertNoteTagsBatchParams) error
-	UpsertNoteYjsState(ctx context.Context, arg UpsertNoteYjsStateParams) error
-	UpsertNotesBatch(ctx context.Context, arg UpsertNotesBatchParams) error
-	UpsertSoul(ctx context.Context, arg UpsertSoulParams) (Soul, error)
-	UpsertTag(ctx context.Context, arg UpsertTagParams) (Tag, error)
-	UpsertTagsBatch(ctx context.Context, arg UpsertTagsBatchParams) error
-	UpsertTask(ctx context.Context, arg UpsertTaskParams) (Task, error)
-	UpsertTaskCompletion(ctx context.Context, arg UpsertTaskCompletionParams) error
 	UpsertTasksBatch(ctx context.Context, arg UpsertTasksBatchParams) error
-	UpsertUserNotePreference(ctx context.Context, arg UpsertUserNotePreferenceParams) (UserNotePreference, error)
 }
 
 var _ Querier = (*Queries)(nil)

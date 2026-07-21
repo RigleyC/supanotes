@@ -69,10 +69,6 @@ dependencies:
   # Markdown parsing
   markdown: ^7.3.1
 
-  # CRDT collaborative editing
-  yjs_dart:
-    path: packages/yjs_dart
-
   # UI
   adaptive_platform_ui: ^0.1.107
   family_bottom_sheet: ^0.1.0

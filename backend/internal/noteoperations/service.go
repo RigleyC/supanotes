@@ -84,9 +84,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 		}
 
 		if err := doc.ApplyOperation(Kind(opReq.Kind), ptrStr(opReq.BlockID), opReq.Payload); err != nil {
-			if !errors.Is(err, ErrBlockNotFound) {
-				return SyncResponse{}, fmt.Errorf("apply operation: %w", err)
-			}
+			return SyncResponse{}, fmt.Errorf("apply operation: %w", err)
 		}
 
 		currentRevision++
@@ -219,6 +217,9 @@ func (s *Service) GetDocument(ctx context.Context, noteID pgtype.UUID, userID pg
 	if err != nil {
 		return DocumentResponse{}, fmt.Errorf("check permission: %w", err)
 	}
+	if perm == "not_found" {
+		return DocumentResponse{}, ErrNoteNotFound
+	}
 	if perm != "owner" && perm != "edit" && perm != "view" {
 		return DocumentResponse{}, ErrNoPermission
 	}
@@ -243,6 +244,9 @@ func (s *Service) GetOperationsSince(ctx context.Context, noteID pgtype.UUID, us
 	perm, err := s.repo.CheckNotePermission(ctx, noteID, userID)
 	if err != nil {
 		return OperationsListResponse{}, fmt.Errorf("check permission: %w", err)
+	}
+	if perm == "not_found" {
+		return OperationsListResponse{}, ErrNoteNotFound
 	}
 	if perm != "owner" && perm != "edit" && perm != "view" {
 		return OperationsListResponse{}, ErrNoPermission

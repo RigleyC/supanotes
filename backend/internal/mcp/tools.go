@@ -7,15 +7,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/notes"
-	"github.com/RigleyC/supanotes/internal/soul"
-	"github.com/RigleyC/supanotes/internal/tags"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
-// Schemas
 var noParamSchema = map[string]any{"type": "object", "properties": map[string]any{}}
 
 var idParamSchema = map[string]any{
@@ -81,54 +77,6 @@ var updateTaskSchema = map[string]any{
 	"required": []any{"id", "title"},
 }
 
-var contentSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"content": map[string]any{
-			"type":        "string",
-			"description": "Content",
-		},
-	},
-	"required": []any{"content"},
-}
-
-var createTagSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"name": map[string]any{
-			"type":        "string",
-			"description": "Tag name",
-		},
-	},
-	"required": []any{"name"},
-}
-
-var noteTagSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"note_id": map[string]any{
-			"type":        "string",
-			"description": "Note ID",
-		},
-		"tag_id": map[string]any{
-			"type":        "string",
-			"description": "Tag ID",
-		},
-	},
-	"required": []any{"note_id", "tag_id"},
-}
-
-var updateSoulSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"personality": map[string]any{
-			"type":        "string",
-			"description": "Personality description",
-		},
-	},
-	"required": []any{"personality"},
-}
-
 func asText(v any) []mcp.Content {
 	b, _ := json.Marshal(v)
 	return []mcp.Content{&mcp.TextContent{Text: string(b)}}
@@ -158,9 +106,6 @@ func RegisterTools(
 	server *mcp.Server,
 	notesSvc *notes.Service,
 	tasksSvc *tasks.Service,
-	memoriesSvc *memories.Service,
-	tagsSvc *tags.Service,
-	soulSvc *soul.Service,
 ) {
 	// Notes
 	server.AddTool(&mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: noParamSchema},
@@ -169,7 +114,7 @@ func RegisterTools(
 			if err != nil {
 				return asError(err)
 			}
-			res, err := notesSvc.GetNotes(ctx, userID, nil, nil, 50, nil, nil)
+			res, err := notesSvc.GetNotes(ctx, userID, nil, 50, nil, nil)
 			if err != nil {
 				return asError(err)
 			}
@@ -203,7 +148,7 @@ func RegisterTools(
 				return asError(err)
 			}
 			content := getStr(args, "content")
-			res, err := notesSvc.CreateNote(ctx, userID, content, nil, false)
+			res, err := notesSvc.CreateNote(ctx, userID, content, false)
 			if err != nil {
 				return asError(err)
 			}
@@ -223,7 +168,7 @@ func RegisterTools(
 				return asError(err)
 			}
 			content := getStr(args, "content")
-			res, err := notesSvc.UpdateNote(ctx, userID, id, &content, nil, nil)
+			res, err := notesSvc.UpdateNote(ctx, userID, id, &content, nil)
 			if err != nil {
 				return asError(err)
 			}
@@ -365,163 +310,6 @@ func RegisterTools(
 				return asError(err)
 			}
 			return &mcp.CallToolResult{Content: asText("deleted")}, nil
-		},
-	)
-
-	// Memories
-	server.AddTool(&mcp.Tool{Name: "list_memories", Description: "List memories", InputSchema: noParamSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			res, err := memoriesSvc.GetMemories(ctx, userID, 50, 0)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText(res)}, nil
-		},
-	)
-	server.AddTool(&mcp.Tool{Name: "create_memory", Description: "Create memory", InputSchema: contentSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			args := parseArgs(request)
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			content := getStr(args, "content")
-			res, err := memoriesSvc.CreateMemory(ctx, userID, content)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText(res)}, nil
-		},
-	)
-	server.AddTool(&mcp.Tool{Name: "delete_memory", Description: "Delete memory", InputSchema: idParamSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			args := parseArgs(request)
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			idStr := getStr(args, "id")
-			id, err := uid.UUIDFromString(idStr)
-			if err != nil {
-				return asError(err)
-			}
-			err = memoriesSvc.DeleteMemory(ctx, id, userID)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText("deleted")}, nil
-		},
-	)
-
-	// Tags
-	server.AddTool(&mcp.Tool{Name: "list_tags", Description: "List tags", InputSchema: noParamSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			res, err := tagsSvc.List(ctx, userID)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText(res)}, nil
-		},
-	)
-	server.AddTool(&mcp.Tool{Name: "create_tag", Description: "Create tag", InputSchema: createTagSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			args := parseArgs(request)
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			name := getStr(args, "name")
-			res, err := tagsSvc.Create(ctx, userID, name)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText(res)}, nil
-		},
-	)
-	server.AddTool(&mcp.Tool{Name: "add_tag_to_note", Description: "Add tag to note", InputSchema: noteTagSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			args := parseArgs(request)
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			noteIDStr := getStr(args, "note_id")
-			noteID, err := uid.UUIDFromString(noteIDStr)
-			if err != nil {
-				return asError(err)
-			}
-			tagIDStr := getStr(args, "tag_id")
-			tagID, err := uid.UUIDFromString(tagIDStr)
-			if err != nil {
-				return asError(err)
-			}
-			err = tagsSvc.AddTagToNote(ctx, noteID, tagID, userID)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText("added")}, nil
-		},
-	)
-	server.AddTool(&mcp.Tool{Name: "remove_tag_from_note", Description: "Remove tag from note", InputSchema: noteTagSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			args := parseArgs(request)
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			noteIDStr := getStr(args, "note_id")
-			noteID, err := uid.UUIDFromString(noteIDStr)
-			if err != nil {
-				return asError(err)
-			}
-			tagIDStr := getStr(args, "tag_id")
-			tagID, err := uid.UUIDFromString(tagIDStr)
-			if err != nil {
-				return asError(err)
-			}
-			err = tagsSvc.RemoveTagFromNote(ctx, noteID, tagID, userID)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText("removed")}, nil
-		},
-	)
-
-	// Soul
-	server.AddTool(&mcp.Tool{Name: "get_soul", Description: "Get soul", InputSchema: noParamSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			res, err := soulSvc.Get(ctx, userID)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText(res)}, nil
-		},
-	)
-	server.AddTool(&mcp.Tool{Name: "update_soul", Description: "Update soul", InputSchema: updateSoulSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			args := parseArgs(request)
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			personality := getStr(args, "personality")
-			res, err := soulSvc.Update(ctx, userID, personality)
-			if err != nil {
-				return asError(err)
-			}
-			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
 }

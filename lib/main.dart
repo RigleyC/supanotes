@@ -11,8 +11,7 @@ import 'core/di/providers.dart';
 import 'shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
 import 'core/router/app_router.dart';
-import 'core/sync/sync_service.dart';
-import 'features/auth/domain/user.dart';
+
 
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:timezone/data/latest.dart';
@@ -59,19 +58,9 @@ class SupaNotesApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // We must listen to it (not just read) so Riverpod keeps it active and
     // forces it to rebuild when its internal dependencies (like auth) change.
-    ref.listen(taskNotificationSchedulerProvider, (_, __) {});
+    ref.listen(taskNotificationSchedulerProvider, (_, _) {});
 
-    ref.listen<AsyncValue<User?>>(authControllerProvider, (prev, next) {
-      next.when(
-        data: (user) {
-          if (user != null) {
-            ref.read(syncServiceProvider)?.start();
-          }
-        },
-        loading: () {},
-        error: (_, _) {},
-      );
-    });
+
 
     final router = ref.watch(goRouterProvider);
 

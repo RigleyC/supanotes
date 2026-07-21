@@ -31,10 +31,10 @@ void main() {
       expect(AppTypography.headlineMediumSize, 28.0);
       expect(AppTypography.headlineSmallSize, 24.0);
 
-      // Title group: 22 / 16 / 14
+      // Title group: 22 / 18 / 16
       expect(AppTypography.titleLargeSize, 22.0);
-      expect(AppTypography.titleMediumSize, 16.0);
-      expect(AppTypography.titleSmallSize, 14.0);
+      expect(AppTypography.titleMediumSize, 18.0);
+      expect(AppTypography.titleSmallSize, 16.0);
 
       // Body group: 16 / 14 / 12
       expect(AppTypography.bodyLargeSize, 16.0);

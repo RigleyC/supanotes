@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/data/attachments_repository.dart';
-import 'package:supanotes/features/notes/domain/note_operation_adapter.dart';
+import 'package:supanotes/features/notes/domain/note_sync_session.dart';
 import 'note_editor_controller.dart';
 
 final noteEditorControllerProvider = FutureProvider.autoDispose
@@ -25,60 +24,20 @@ final noteEditorControllerProvider = FutureProvider.autoDispose
 
   controller.initOtOnly(noteId: noteId);
 
-  var disposed = false;
+  final syncService = ref.read(noteOperationsSyncServiceProvider);
 
-  final noteOpsSyncService = ref.read(noteOperationsSyncServiceProvider);
-  final adapter = NoteOperationAdapter(
-    document: controller.document!,
-    syncService: noteOpsSyncService,
+  final session = NoteSyncSession(
     noteId: noteId,
+    syncService: syncService,
+    document: controller.document!,
     editor: controller.editor!,
   );
 
-  adapter.onLocalOperations = (_) {
-    unawaited(noteOpsSyncService.syncPending(noteId).then((result) async {
-      if (!disposed && result.canonicalDocument != null) {
-        await adapter.reconcile(result);
-      }
-    }).catchError((error, stackTrace) {
-      dev.log(
-        'Note operation sync failed',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }));
-  };
-
-  await adapter.start();
-  if (disposed) {
-    controller.dispose();
-    throw StateError('Disposed before initialization completed');
-  }
-  controller.operationAdapter = adapter;
-
-  Timer? pollTimer;
-  void startPolling() {
-    pollTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      if (disposed) return;
-      try {
-        final result = await noteOpsSyncService.pollAndReconcile(noteId);
-        if (!disposed && result.canonicalDocument != null) {
-          await adapter.reconcile(result);
-        }
-      } catch (error, stackTrace) {
-        dev.log(
-          'Note operation poll failed',
-          error: error,
-          stackTrace: stackTrace,
-        );
-      }
-    });
-  }
-  startPolling();
+  await session.start();
+  controller.operationAdapter = session.adapter;
 
   ref.onDispose(() {
-    disposed = true;
-    pollTimer?.cancel();
+    session.dispose();
     unawaited(controller.dispose());
   });
   return controller;

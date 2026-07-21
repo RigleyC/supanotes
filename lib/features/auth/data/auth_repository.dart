@@ -110,6 +110,7 @@ class AuthRepository implements IAuthRepository {
         );
       }
     } on DioException {
+      // Ignored: best-effort logout clean up
     } finally {
       await _storage.clear();
     }
@@ -129,6 +130,7 @@ class AuthRepository implements IAuthRepository {
         data: {'token': token, 'platform': _getPlatformName()},
       );
     } on DioException {
+      // Ignored: best-effort device token registration
     }
   }
 }

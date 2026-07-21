@@ -21,10 +21,6 @@ func TestSchemas_haveCorrectType(t *testing.T) {
 		{"updateNoteSchema", updateNoteSchema},
 		{"taskTitleSchema", taskTitleSchema},
 		{"updateTaskSchema", updateTaskSchema},
-		{"contentSchema", contentSchema},
-		{"createTagSchema", createTagSchema},
-		{"noteTagSchema", noteTagSchema},
-		{"updateSoulSchema", updateSoulSchema},
 	}
 	for _, tt := range schemas {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,21 +55,10 @@ func TestSchemas_updateNote(t *testing.T) {
 	assert.ElementsMatch(t, []any{"id", "content"}, required)
 }
 
-func TestSchemas_noteTag(t *testing.T) {
-	props, ok := noteTagSchema["properties"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, props, "note_id")
-	assert.Contains(t, props, "tag_id")
-
-	required, ok := noteTagSchema["required"].([]any)
-	require.True(t, ok)
-	assert.ElementsMatch(t, []any{"note_id", "tag_id"}, required)
-}
-
 func TestRegisterTools(t *testing.T) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "Test"}, nil)
 	require.NotPanics(t, func() {
-		RegisterTools(server, nil, nil, nil, nil, nil)
+		RegisterTools(server, nil, nil)
 	})
 }
 

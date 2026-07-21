@@ -12,19 +12,29 @@ import (
 type Kind string
 
 const (
-	KindTextDelta    Kind = "text_delta"
-	KindCreateBlock  Kind = "create_block"
-	KindDeleteBlock  Kind = "delete_block"
-	KindMoveBlock    Kind = "move_block"
-	KindSetBlockType Kind = "set_block_type"
+	KindTextDelta        Kind = "text_delta"
+	KindCreateBlock      Kind = "create_block"
+	KindDeleteBlock      Kind = "delete_block"
+	KindMoveBlock        Kind = "move_block"
+	KindSetBlockType     Kind = "set_block_type"
+	KindSetBlockMetadata       Kind = "set_block_metadata"
+	KindCompleteTaskOccurrence Kind = "complete_task_occurrence"
 )
 
 var ValidKinds = map[Kind]bool{
-	KindTextDelta:    true,
-	KindCreateBlock:  true,
-	KindDeleteBlock:  true,
-	KindMoveBlock:    true,
-	KindSetBlockType: true,
+	KindTextDelta:              true,
+	KindCreateBlock:            true,
+	KindDeleteBlock:            true,
+	KindMoveBlock:              true,
+	KindSetBlockType:           true,
+	KindSetBlockMetadata:       true,
+	KindCompleteTaskOccurrence: true,
+}
+
+type CompleteTaskOccurrencePayload struct {
+	TaskID      string  `json:"taskId"`
+	ScheduledAt string  `json:"scheduledAt"`
+	CompletedAt *string `json:"completedAt"`
 }
 
 type BlockType string
@@ -38,6 +48,9 @@ const (
 	BlockBulletList  BlockType = "bulletList"
 	BlockOrderedList BlockType = "orderedList"
 	BlockDivider     BlockType = "divider"
+	BlockTask        BlockType = "task"
+	BlockAttachment  BlockType = "attachment"
+	BlockRichLink    BlockType = "rich_link"
 )
 
 var ValidBlockTypes = map[BlockType]bool{
@@ -49,6 +62,9 @@ var ValidBlockTypes = map[BlockType]bool{
 	BlockBulletList:  true,
 	BlockOrderedList: true,
 	BlockDivider:     true,
+	BlockTask:        true,
+	BlockAttachment:  true,
+	BlockRichLink:    true,
 }
 
 type Operation struct {

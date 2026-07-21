@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
@@ -35,6 +36,7 @@ Future<ProviderContainer> makeContainer({
       sharedPreferencesProvider.overrideWithValue(prefs),
       authLocalStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWithValue(repository),
+      appDatabaseProvider.overrideWithValue(AppDatabase.test()),
     ],
   );
   addTearDown(container.dispose);
@@ -137,7 +139,6 @@ void main() {
               settings: {},
               soul: {},
               contexts: [],
-              routines: [],
             ),
           ));
 
@@ -206,7 +207,6 @@ void main() {
               settings: {},
               soul: {},
               contexts: [],
-              routines: [],
             ),
           ));
 

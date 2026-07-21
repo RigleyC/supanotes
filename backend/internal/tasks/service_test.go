@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
@@ -81,7 +82,7 @@ func TestCompleteTask_Fallback(t *testing.T) {
 		},
 	}
 
-	svc := NewService(repo, nil)
+	svc := NewService(repo)
 	_, err := svc.CompleteTask(context.Background(), userID, taskID)
 	if err != nil {
 		t.Fatalf("CompleteTask failed: %v", err)

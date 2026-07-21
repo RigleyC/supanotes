@@ -9,10 +9,14 @@ honor its STOP conditions, and update your row when done.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001  | Implement fallback for corrupted Yjs text nodes and await SQLite projection | P1       | S      | —          | DONE   |
+| 002  | Reduce SupaNotes to the note product core | P1       | L      | —          | DONE   |
 
 ## Dependency notes
 
 - (No dependencies)
+
+- Plan 002 is a staged migration. Its mandatory decision gate must be completed
+  before any Yjs, database, agent, or Telegram deletion.
 
 ## Findings considered and rejected
 

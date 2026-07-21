@@ -139,7 +139,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   @override
   void dispose() {
     _controller?.removeListener(_onControllerReady);
-    _controller!.onHasContentChanged = null;
+    _controller?.onHasContentChanged = null;
     _controls?.dispose();
     super.dispose();
   }
@@ -178,7 +178,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           left: 24,
           right: 24,
           top: topPadding,
-          bottom: 24,
+          bottom: widget.isReadOnly ? 24 : 140,
         );
 
         if (_cachedStylesheet == null ||
@@ -191,9 +191,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           );
         }
 
-        return Column(
+        return Stack(
           children: [
-            Expanded(
+            Positioned.fill(
               child: SuperEditorAndroidControlsScope(
                 controller: _controls!.androidController,
                 child: SuperEditorIosControlsScope(
@@ -212,20 +212,29 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
               ),
             ),
             if (!widget.isReadOnly)
-              NoteSuggestionOverlay(
-                editor: controller.editor!,
-                composer: controller.composer!,
-                currentNoteId: widget.noteId,
-                onPersist: () async {},
-              ),
-            if (!widget.isReadOnly)
-              NoteToolbar(
-                editor: controller.editor!,
-                composer: controller.composer!,
-                onAttachFile: () =>
-                    controller.pickAndAttachFile(imageOnly: false),
-                onAttachImage: () =>
-                    controller.pickAndAttachFile(imageOnly: true),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    NoteSuggestionOverlay(
+                      editor: controller.editor!,
+                      composer: controller.composer!,
+                      currentNoteId: widget.noteId,
+                      onPersist: () async {},
+                    ),
+                    NoteToolbar(
+                      editor: controller.editor!,
+                      composer: controller.composer!,
+                      onAttachFile: () =>
+                          controller.pickAndAttachFile(imageOnly: false),
+                      onAttachImage: () =>
+                          controller.pickAndAttachFile(imageOnly: true),
+                    ),
+                  ],
+                ),
               ),
           ],
         );

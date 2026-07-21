@@ -36,7 +36,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       // Editor renders without crashing
-      expect(find.byType(Scaffold), findsOneWidget);
+      expect(find.byType(NoteEditor), findsOneWidget);
     });
 
     testWidgets('NoteLinkTapHandler extracts noteId from LinkAttribution', (

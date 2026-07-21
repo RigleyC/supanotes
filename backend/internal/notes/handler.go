@@ -15,20 +15,17 @@ import (
 )
 
 type CreateNoteRequest struct {
-	Content        string  `json:"content" validate:"required"`
-	ContextID      *string `json:"context_id"`
-	CollapseImages bool    `json:"collapse_images"`
+	Content        string `json:"content" validate:"required"`
+	CollapseImages bool   `json:"collapse_images"`
 }
 
 type UpdateNoteRequest struct {
 	Content        *string `json:"content"`
-	ContextID      *string `json:"context_id"`
 	CollapseImages *bool   `json:"collapse_images"`
 }
 
 type NoteResponse struct {
 	ID             string  `json:"id"`
-	ContextID      *string `json:"context_id,omitempty"`
 	Content        string  `json:"content"`
 	Excerpt        *string `json:"excerpt,omitempty"`
 	Favorite       bool    `json:"favorite"`
@@ -57,15 +54,7 @@ func (h *Handler) Create(c echo.Context) error {
 		return err
 	}
 
-	var ctxID *pgtype.UUID
-	if req.ContextID != nil {
-		ctxID, err = web.OptUUID(req.ContextID)
-		if err != nil {
-			return web.JSONError(c, http.StatusBadRequest, "invalid context_id")
-		}
-	}
-
-	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, ctxID, req.CollapseImages)
+	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, req.CollapseImages)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create note")
@@ -79,15 +68,6 @@ func (h *Handler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-
-	var ctxID *pgtype.UUID
-	if ctxStr := c.QueryParam("context_id"); ctxStr != "" {
-		ctxID, err = web.OptUUID(&ctxStr)
-		if err != nil {
-			return web.JSONError(c, http.StatusBadRequest, "invalid context_id")
-		}
-	}
-
 	var fav *bool
 	if favStr := c.QueryParam("favorite"); favStr == "true" {
 		t := true
@@ -118,7 +98,7 @@ func (h *Handler) List(c echo.Context) error {
 		}
 	}
 
-	notes, err := h.svc.GetNotes(c.Request().Context(), userID, ctxID, fav, limit, cursorUpdatedAt, cursorID)
+	notes, err := h.svc.GetNotes(c.Request().Context(), userID, fav, limit, cursorUpdatedAt, cursorID)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get notes")
@@ -126,12 +106,7 @@ func (h *Handler) List(c echo.Context) error {
 
 	res := make([]NoteResponse, 0, len(notes))
 	for _, n := range notes {
-		res = append(res, mapToNoteResponse(NoteResponseFields{
-			ID: n.ID, ContextID: n.ContextID, Content: "",
-			Excerpt: n.Excerpt,
-			Favorite: n.Favorite, Archived: n.Archived,
-			CollapseImages: n.CollapseImages, CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
-		}))
+		res = append(res, mapToNoteResponseFields(n))
 	}
 
 	return c.JSON(http.StatusOK, res)
@@ -158,7 +133,7 @@ func (h *Handler) Get(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, mapToNoteResponse(NoteResponseFields{
-		ID: note.ID, ContextID: note.ContextID, Content: note.Content,
+		ID: note.ID, Content: note.Content,
 		Excerpt: note.Excerpt, Favorite: note.Favorite,
 		Archived: note.Archived, CollapseImages: note.CollapseImages,
 		CreatedAt: note.CreatedAt, UpdatedAt: note.UpdatedAt,
@@ -181,15 +156,7 @@ func (h *Handler) Update(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	var ctxID *pgtype.UUID
-	if req.ContextID != nil {
-		ctxID, err = web.OptUUID(req.ContextID)
-		if err != nil {
-			return web.JSONError(c, http.StatusBadRequest, "invalid context_id")
-		}
-	}
-
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, ctxID, req.CollapseImages)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, req.CollapseImages)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
@@ -231,13 +198,8 @@ func parseInt32(s string) (int32, error) {
 	return int32(n), err
 }
 
-// NoteResponseFields carries the fields needed to build a NoteResponse.
-// It eliminates the long parameter list that was previously passed to a
-// mapper function, since the same set of fields comes from several
-// sqlc-generated row types (Note, GetNotesRow, GetNoteByIDRow, …).
 type NoteResponseFields struct {
 	ID             pgtype.UUID
-	ContextID      pgtype.UUID
 	Content        string
 	Excerpt        pgtype.Text
 	Favorite       bool
@@ -248,11 +210,6 @@ type NoteResponseFields struct {
 }
 
 func mapToNoteResponse(f NoteResponseFields) NoteResponse {
-	var ctxID *string
-	if f.ContextID.Valid {
-		cid := uid.UUIDToString(f.ContextID)
-		ctxID = &cid
-	}
 	var exc *string
 	if f.Excerpt.Valid {
 		e := f.Excerpt.String
@@ -260,7 +217,6 @@ func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 	}
 	return NoteResponse{
 		ID:             uid.UUIDToString(f.ID),
-		ContextID:      ctxID,
 		Content:        f.Content,
 		Excerpt:        exc,
 		Favorite:       f.Favorite,
@@ -274,11 +230,28 @@ func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 func noteToResponseFields(n sqlcgen.Note) NoteResponseFields {
 	return NoteResponseFields{
 		ID:             n.ID,
-		ContextID:      n.ContextID,
 		Content:        n.Content,
 		Excerpt:        n.Excerpt,
 		CollapseImages: n.CollapseImages,
 		CreatedAt:      n.CreatedAt,
 		UpdatedAt:      n.UpdatedAt,
+	}
+}
+
+func mapToNoteResponseFields(n sqlcgen.GetNotesRow) NoteResponse {
+	var exc *string
+	if n.Excerpt.Valid {
+		e := n.Excerpt.String
+		exc = &e
+	}
+	return NoteResponse{
+		ID:             uid.UUIDToString(n.ID),
+		Content:        "",
+		Excerpt:        exc,
+		Favorite:       n.Favorite,
+		Archived:       n.Archived,
+		CollapseImages: n.CollapseImages,
+		CreatedAt:      n.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:      n.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }

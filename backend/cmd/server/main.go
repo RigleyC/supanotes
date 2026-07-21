@@ -19,30 +19,19 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/RigleyC/supanotes/internal/agent"
 	"github.com/RigleyC/supanotes/internal/attachments"
 	"github.com/RigleyC/supanotes/internal/auth"
-	"github.com/RigleyC/supanotes/internal/contexts"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
-	"github.com/RigleyC/supanotes/internal/embeddings"
-	"github.com/RigleyC/supanotes/internal/gateway"
 	"github.com/RigleyC/supanotes/internal/handler"
 	"github.com/RigleyC/supanotes/internal/linkpreview"
 	mcpapp "github.com/RigleyC/supanotes/internal/mcp"
-	"github.com/RigleyC/supanotes/internal/memories"
 	"github.com/RigleyC/supanotes/internal/noteoperations"
 	"github.com/RigleyC/supanotes/internal/notes"
-	"github.com/RigleyC/supanotes/internal/routines"
-	"github.com/RigleyC/supanotes/internal/search"
 	"github.com/RigleyC/supanotes/internal/settings"
 	"github.com/RigleyC/supanotes/internal/shares"
-	"github.com/RigleyC/supanotes/internal/soul"
-	syncpkg "github.com/RigleyC/supanotes/internal/sync"
-	"github.com/RigleyC/supanotes/internal/tags"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/config"
 	"github.com/RigleyC/supanotes/pkg/db"
-	"github.com/RigleyC/supanotes/pkg/llm"
 	"github.com/RigleyC/supanotes/pkg/migrate"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/robfig/cron/v3"
@@ -89,7 +78,7 @@ func main() {
 		log.Info().Strs("cors_origins", cfg.CORSOrigins).Msg("CORS enabled")
 	}
 
-	ydocSvc := registerRoutes(e, cfg, pool, cronCtx)
+	registerRoutes(e, cfg, pool, cronCtx)
 
 	go func() {
 		log.Info().Str("addr", cfg.Addr()).Str("env", cfg.Environment).Msg("supanotes backend starting")
@@ -107,10 +96,6 @@ func main() {
 	if err := e.Shutdown(shutdownCtx); err != nil {
 		log.Error().Err(err).Msg("graceful shutdown failed")
 		os.Exit(1)
-	}
-
-	if ydocSvc != nil {
-		ydocSvc.Close()
 	}
 
 	log.Info().Msg("server stopped cleanly")
@@ -158,7 +143,7 @@ func connectDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCtx context.Context) *syncpkg.YDocService {
+func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCtx context.Context) {
 	e.GET("/debug/goroutine", func(c echo.Context) error {
 		c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
 		c.Response().WriteHeader(http.StatusOK)
@@ -170,7 +155,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	if pool == nil {
 		log.Warn().Msg("skipping /auth routes (no DB)")
-		return nil
+		return
 	}
 
 	queries := sqlcgen.New(pool)
@@ -185,38 +170,19 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected := api.Group("")
 	protected.Use(auth.JWT(cfg))
 
-	// Contexts
-	ctxSvc := contexts.NewService(queries)
-	ctxH := contexts.NewHandler(ctxSvc)
-	protected.GET("/contexts", ctxH.List)
-	protected.POST("/contexts", ctxH.Create)
-	protected.DELETE("/contexts/:id", ctxH.Delete)
-
-	// Tags
-	tagsSvc := tags.NewService(queries)
-	tagsH := tags.NewHandler(tagsSvc)
-	protected.GET("/tags", tagsH.List)
-	protected.POST("/tags", tagsH.Create)
-	protected.DELETE("/tags/:id", tagsH.Delete)
-	protected.POST("/notes/:id/tags", tagsH.AddTag)
-	protected.DELETE("/notes/:id/tags/:tagId", tagsH.RemoveTag)
-
-	// Yjs Sync Engine (built before Notes/Tasks so the syncer can be injected)
-	machineID, _ := os.Hostname()
-	if machineID == "" {
-		machineID = "default"
-	}
-	compactor := syncpkg.NewCompactor(pool)
-	ydocSvc := syncpkg.NewYDocService(pool, compactor, machineID)
-	ydocSvc.StartListener(cronCtx)
-	compactor.StartScheduler(cronCtx, 5*time.Minute)
 	// Notes
 	notesRepo := notes.NewRepository(queries)
 	notesSvc := notes.NewService(notesRepo, pool)
+	notesH := notes.NewHandler(notesSvc)
+	protected.POST("/notes", notesH.Create)
+	protected.GET("/notes", notesH.List)
+	protected.GET("/notes/:id", notesH.Get)
+	protected.PATCH("/notes/:id", notesH.Update)
+	protected.DELETE("/notes/:id", notesH.Delete)
 
 	// Tasks
 	tasksRepo := tasks.NewRepository(queries)
-	tasksSvc := tasks.NewService(tasksRepo, ydocSvc)
+	tasksSvc := tasks.NewService(tasksRepo)
 	tasksH := tasks.NewHandler(tasksSvc)
 	protected.POST("/tasks", tasksH.Create)
 	protected.GET("/tasks", tasksH.List)
@@ -226,75 +192,6 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/tasks/:id/reopen", tasksH.Reopen)
 	protected.GET("/tasks/today", tasksH.Today)
 	protected.GET("/notes/:id/tasks", tasksH.GetByNoteID)
-
-	// Embeddings worker
-	embeddingsRepo := embeddings.NewRepository(queries)
-	embeddingClient := llm.NewEmbeddingClient(cfg.OpenAIEmbeddingsAPIKey, cfg.EmbeddingsBaseURL, cfg.EmbeddingsModel)
-	embeddingsSvc := embeddings.NewService(embeddingsRepo, embeddingClient)
-	cronJob := cron.New(cron.WithSeconds())
-	cronJob.AddFunc(cfg.EmbeddingsCronInterval, func() {
-		embeddingsSvc.ProcessPending(cronCtx)
-	})
-	cronJob.AddFunc("0 0 * * * *", func() {
-		tx, err := pool.Begin(cronCtx)
-		if err != nil {
-			log.Error().Err(err).Msg("cron: failed to begin tx for GC")
-			return
-		}
-		defer tx.Rollback(cronCtx)
-		
-		qtx := queries.WithTx(tx)
-		acquired, err := qtx.TryAcquireGCLock(cronCtx)
-		if err != nil {
-			log.Error().Err(err).Msg("cron: failed to acquire GC lock")
-			return
-		}
-		
-		if acquired {
-			log.Info().Msg("cron: acquired GC lock, running hard delete")
-			if err := qtx.HardDeleteOldNotes(cronCtx); err != nil {
-				log.Error().Err(err).Msg("cron: failed to hard delete old notes")
-				return
-			}
-			if err := tx.Commit(cronCtx); err != nil {
-				log.Error().Err(err).Msg("cron: failed to commit GC tx")
-			}
-		} else {
-			log.Debug().Msg("cron: GC lock already held, skipping")
-		}
-	})
-	cronJob.Start()
-
-	// Soul
-	soulSvc := soul.NewService(queries)
-	soulH := soul.NewHandler(soulSvc)
-	protected.GET("/soul", soulH.Get)
-	protected.PUT("/soul", soulH.Update)
-
-	// LLM Factory
-	llmFactory := llm.NewFactory(cfg)
-
-	// Memories
-	memoriesRepo := memories.NewRepository(queries)
-	memoriesSvc := memories.NewService(memoriesRepo, embeddingClient, llmFactory.For(llm.TaskTypeAgentHelper))
-	memoriesH := memories.NewHandler(memoriesSvc)
-	protected.GET("/memories", memoriesH.List)
-
-	protected.POST("/memories", memoriesH.Create)
-	protected.DELETE("/memories/:id", memoriesH.Delete)
-
-	// Search
-	searchSvc := search.NewService(queries, embeddingClient)
-	searchH := search.NewHandler(searchSvc)
-	search.RegisterRoutes(protected, searchH)
-
-	// Notes
-	notesH := notes.NewHandler(notesSvc)
-	protected.POST("/notes", notesH.Create)
-	protected.GET("/notes", notesH.List)
-	protected.GET("/notes/:id", notesH.Get)
-	protected.PATCH("/notes/:id", notesH.Update)
-	protected.DELETE("/notes/:id", notesH.Delete)
 
 	// Shares
 	sharesRepo := shares.NewRepository(queries)
@@ -322,52 +219,45 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	linkPreviewH := linkpreview.NewHandler(linkPreviewSvc)
 	protected.GET("/links/preview", linkPreviewH.Preview)
 
-	// Agent Context Builder
-	agentCtxBldr := agent.NewContextBuilder(queries, tasksSvc, memoriesRepo, embeddingClient)
-
-	// Routines
-	routinesRepo := routines.NewRepository(queries)
-	routinesSvc := routines.NewService(routinesRepo, agentCtxBldr, llmFactory)
-	routinesH := routines.NewHandler(routinesSvc)
-	routines.RegisterRoutes(protected, routinesH)
-
 	// Note Operations (REST OT protocol)
 	noteOpsSvc := noteoperations.NewService(noteoperations.NewRepository(pool), pool)
 	noteOpsH := noteoperations.NewHandler(noteOpsSvc)
 	noteOpsH.RegisterRoutes(protected)
 
-	// Sync repository — declared here so it's available for both the
-	// REST sync handler and the push/pull sync endpoints below.
-	syncRepo := syncpkg.NewRepository(queries)
+	// GC cron for hard-deleting old notes
+	cronJob := cron.New(cron.WithSeconds())
+	cronJob.AddFunc("0 0 * * * *", func() {
+		tx, err := pool.Begin(cronCtx)
+		if err != nil {
+			log.Error().Err(err).Msg("cron: failed to begin tx for GC")
+			return
+		}
+		defer tx.Rollback(cronCtx)
 
-	// REST sync handler (authorized)
-	protected.POST("/sync/note/:id", syncpkg.PostSyncHandler(ydocSvc, syncpkg.NewNoteAuthorizer(syncRepo)))
+		qtx := queries.WithTx(tx)
+		acquired, err := qtx.TryAcquireGCLock(cronCtx)
+		if err != nil {
+			log.Error().Err(err).Msg("cron: failed to acquire GC lock")
+			return
+		}
 
-	// Agent Loop (built before the runner so the runner and the
-	// gateway can both depend on it).
-	agentRepo := agent.NewRepository(queries)
-	workingMemSvc := agent.NewWorkingMemoryService(queries)
-	agentTools := agent.NewToolRegistry(queries, notesSvc, tasksSvc, memoriesSvc, routinesSvc, soulSvc, embeddingClient, llmFactory, workingMemSvc, ydocSvc, pool)
-	agentLoop := agent.NewLoop(agentRepo, llmFactory, agentCtxBldr, agentTools, workingMemSvc)
-	agentH := agent.NewHandler(agentLoop, agentRepo)
-	protected.POST("/agent/chat", agentH.Chat)
-	protected.POST("/agent/chat/stream", agentH.ChatSSE)
-	protected.GET("/agent/messages", agentH.ListMessages)
-	protected.DELETE("/agent/messages", agentH.DeleteMessages)
-	protected.POST("/agent/tool-confirmations/:id/resolve", agentH.ResolveToolConfirmation)
-	protected.GET("/agent/traces/:id", agentH.GetSessionTraces)
+		if acquired {
+			log.Info().Msg("cron: acquired GC lock, running hard delete")
+			if err := qtx.HardDeleteOldNotes(cronCtx); err != nil {
+				log.Error().Err(err).Msg("cron: failed to hard delete old notes")
+				return
+			}
+			if err := tx.Commit(cronCtx); err != nil {
+				log.Error().Err(err).Msg("cron: failed to commit GC tx")
+			}
+		} else {
+			log.Debug().Msg("cron: GC lock already held, skipping")
+		}
+	})
+	cronJob.Start()
 
-
-	// Telegram sender — feed into the routines runner so a fired
-	// brief can notify the user.
-	gatewayRepo := gateway.NewRepository(pool)
-	gatewayBot := gateway.NewTelegramClient(cfg.TelegramBotToken)
-	gatewayBot.AttachRepo(gatewayRepo)
-
-	routinesRunner := routines.NewRunner(cronCtx, routinesRepo, agentCtxBldr, llmFactory, noopNotifier{}, gatewayBot)
-	routinesRunner.Start()
 	// MCP Server
-	mcpServer := mcpapp.NewServer(notesSvc, tasksSvc, memoriesSvc, tagsSvc, soulSvc)
+	mcpServer := mcpapp.NewServer(notesSvc, tasksSvc)
 	mcpHandler := mcpsdk.NewStreamableHTTPHandler(func(req *http.Request) *mcpsdk.Server { return mcpServer }, nil)
 
 	// Personal Token Generation Route
@@ -382,19 +272,4 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	settingsH := settings.NewHandler(settingsSvc)
 	protected.GET("/settings", settingsH.Get)
 	protected.PUT("/settings", settingsH.Update)
-
-	// Telegram gateway (uses the agent loop as a bridge for free-form
-	// messages; the public webhook is mounted on the unauthenticated
-	// `api` group because Telegram's servers do not send our JWT).
-	gatewayH := gateway.NewHandler(gatewayRepo, gatewayBot, agentLoop, cfg.TelegramWebhookSecret)
-	gateway.RegisterRoutes(protected, gatewayH)
-	api.POST("/gateway/telegram/webhook", gatewayH.Webhook)
-
-	// Sync (push/pull)
-	syncSvc := syncpkg.NewService(syncRepo, pool, ydocSvc)
-	syncH := syncpkg.NewHandler(syncSvc)
-	protected.POST("/sync/push", syncH.Push)
-	protected.POST("/sync/pull", syncH.Pull)
-
-	return ydocSvc
 }

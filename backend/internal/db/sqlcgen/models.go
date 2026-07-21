@@ -9,15 +9,6 @@ import (
 	"github.com/pgvector/pgvector-go"
 )
 
-type AgentWorkingMemory struct {
-	UserID    pgtype.UUID        `json:"user_id"`
-	SessionID pgtype.UUID        `json:"session_id"`
-	Key       string             `json:"key"`
-	Value     string             `json:"value"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
 type Attachment struct {
 	ID        pgtype.UUID        `json:"id"`
 	NoteID    pgtype.UUID        `json:"note_id"`
@@ -28,48 +19,18 @@ type Attachment struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-type Context struct {
-	ID        pgtype.UUID        `json:"id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	Slug      string             `json:"slug"`
-	Name      string             `json:"name"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
-}
-
-type Memory struct {
-	ID        pgtype.UUID        `json:"id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	Content   string             `json:"content"`
-	Embedding pgvector.Vector    `json:"embedding"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
-type Message struct {
-	ID         pgtype.UUID        `json:"id"`
-	UserID     pgtype.UUID        `json:"user_id"`
-	SessionID  pgtype.UUID        `json:"session_id"`
-	Role       string             `json:"role"`
-	Content    string             `json:"content"`
-	ToolCalls  []byte             `json:"tool_calls"`
-	ToolCallID pgtype.Text        `json:"tool_call_id"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-}
-
 type Note struct {
-	ID              pgtype.UUID        `json:"id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	ContextID       pgtype.UUID        `json:"context_id"`
-	Content         string             `json:"content"`
-	Excerpt         pgtype.Text        `json:"excerpt"`
-	SearchVector    pgtype.Text        `json:"search_vector"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
-	EmbeddingStatus string             `json:"embedding_status"`
-	CollapseImages  bool               `json:"collapse_images"`
+	ID               pgtype.UUID        `json:"id"`
+	UserID           pgtype.UUID        `json:"user_id"`
+	Content          string             `json:"content"`
+	Excerpt          pgtype.Text        `json:"excerpt"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	CollapseImages   bool               `json:"collapse_images"`
+	Revision         int64              `json:"revision"`
+	Document         []byte             `json:"document"`
+	SnapshotRevision int64              `json:"snapshot_revision"`
 }
 
 type NoteEmbedding struct {
@@ -89,6 +50,18 @@ type NoteLink struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type NoteOperation struct {
+	NoteID       pgtype.UUID        `json:"note_id"`
+	Revision     int64              `json:"revision"`
+	OperationID  pgtype.UUID        `json:"operation_id"`
+	ActorID      pgtype.UUID        `json:"actor_id"`
+	BaseRevision int64              `json:"base_revision"`
+	Kind         string             `json:"kind"`
+	BlockID      pgtype.Text        `json:"block_id"`
+	Payload      []byte             `json:"payload"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
 type NoteShare struct {
 	ID         pgtype.UUID        `json:"id"`
 	NoteID     pgtype.UUID        `json:"note_id"`
@@ -98,39 +71,10 @@ type NoteShare struct {
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
-type NoteTag struct {
-	NoteID pgtype.UUID `json:"note_id"`
-	TagID  pgtype.UUID `json:"tag_id"`
-}
-
 type NoteWsLease struct {
 	NoteID    pgtype.UUID        `json:"note_id"`
 	MachineID string             `json:"machine_id"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
-}
-
-type NoteYjsState struct {
-	NoteID    pgtype.UUID        `json:"note_id"`
-	State     []byte             `json:"state"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
-type NoteYjsUpdate struct {
-	ID         pgtype.UUID        `json:"id"`
-	NoteID     pgtype.UUID        `json:"note_id"`
-	UpdateData []byte             `json:"update_data"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-}
-
-type PendingToolConfirmation struct {
-	ID         pgtype.UUID        `json:"id"`
-	UserID     pgtype.UUID        `json:"user_id"`
-	SessionID  pgtype.UUID        `json:"session_id"`
-	ToolName   string             `json:"tool_name"`
-	ArgsJson   []byte             `json:"args_json"`
-	Status     string             `json:"status"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	ResolvedAt pgtype.Timestamptz `json:"resolved_at"`
 }
 
 type RefreshToken struct {
@@ -140,48 +84,6 @@ type RefreshToken struct {
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
-}
-
-type Routine struct {
-	ID         pgtype.UUID        `json:"id"`
-	UserID     pgtype.UUID        `json:"user_id"`
-	Type       string             `json:"type"`
-	CronExpr   string             `json:"cron_expr"`
-	Enabled    bool               `json:"enabled"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	Name       string             `json:"name"`
-	LastRunAt  pgtype.Timestamptz `json:"last_run_at"`
-	BriefType  string             `json:"brief_type"`
-	TimeOfDay  pgtype.Time        `json:"time_of_day"`
-	DaysOfWeek []int16            `json:"days_of_week"`
-}
-
-type RoutineLog struct {
-	ID             pgtype.UUID        `json:"id"`
-	RoutineID      pgtype.UUID        `json:"routine_id"`
-	UserID         pgtype.UUID        `json:"user_id"`
-	Status         string             `json:"status"`
-	Content        pgtype.Text        `json:"content"`
-	ErrorMsg       pgtype.Text        `json:"error_msg"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	TelegramSentAt pgtype.Timestamptz `json:"telegram_sent_at"`
-}
-
-type Soul struct {
-	ID          pgtype.UUID        `json:"id"`
-	UserID      pgtype.UUID        `json:"user_id"`
-	Personality string             `json:"personality"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	Profile     []byte             `json:"profile"`
-}
-
-type Tag struct {
-	ID        pgtype.UUID        `json:"id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	Name      string             `json:"name"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Task struct {
@@ -207,15 +109,6 @@ type TaskCompletion struct {
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	DueDate     pgtype.Date        `json:"due_date"`
 	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
-}
-
-type TelegramLink struct {
-	ID               pgtype.UUID        `json:"id"`
-	UserID           pgtype.UUID        `json:"user_id"`
-	TelegramChatID   int64              `json:"telegram_chat_id"`
-	TelegramUsername pgtype.Text        `json:"telegram_username"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	TelegramUserID   pgtype.Int8        `json:"telegram_user_id"`
 }
 
 type TelegramLinkCode struct {

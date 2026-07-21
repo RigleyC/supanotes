@@ -1,3 +1,5 @@
+library;
+
 /// Compact horizontal toolbar for the note editor.
 ///
 /// Each button mutates the editor by dispatching a single
@@ -9,7 +11,7 @@
 /// The toolbar rebuilds itself independently by listening to
 /// [MutableDocumentComposer.selectionNotifier], so the parent widget
 /// does not need to call `setState` whenever the selection changes.
-library;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
@@ -47,29 +49,34 @@ class NoteToolbar extends StatelessWidget {
             : null;
         final isTask = activeNode is TaskNode;
 
-        return Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: 6,
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.shadow.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 6,
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _ToolbarButton(
@@ -169,10 +176,13 @@ class NoteToolbar extends StatelessWidget {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      ),
+    ),
+  );
+},
+);
+}
 
   String? _activeNodeId(DocumentSelection? selection) {
     if (selection == null) return null;

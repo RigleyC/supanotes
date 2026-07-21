@@ -4,10 +4,6 @@ abstract final class AppRoutes {
   static const register = '/register';
   static const home = '/home';
   static const settings = '/settings';
-  static const soul = '/soul';
-  static const contexts = '/contexts';
-  static const chat = '/chat';
-  static const memories = '/memories';
   static const mcp = '/settings/mcp';
 
   static const _noteBase = '/notes';

@@ -190,6 +190,7 @@ func (r *repository) GetNoteOperationByOpID(ctx context.Context, noteID pgtype.U
 const checkNotePermissionSQL = `SELECT COALESCE(
   (SELECT 'owner'::text FROM notes WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL),
   (SELECT permission::text FROM note_shares ns JOIN notes n ON n.id = ns.note_id WHERE ns.note_id = $1 AND ns.user_id = $2 AND n.deleted_at IS NULL),
+  (SELECT 'not_found'::text FROM notes WHERE id = $1),
   'none'::text
 ) AS permission`
 

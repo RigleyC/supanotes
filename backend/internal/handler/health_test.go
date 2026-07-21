@@ -15,7 +15,7 @@ func TestHealth(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	if err := Health(c); err != nil {
+	if err := Health(nil)(c); err != nil {
 		t.Fatalf("Health() returned error: %v", err)
 	}
 

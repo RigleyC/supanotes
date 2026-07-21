@@ -12,6 +12,7 @@ import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
@@ -50,6 +51,7 @@ Widget _wrap(Widget child, {required ProviderContainer container}) {
     container: container,
     child: MaterialApp.router(
       scaffoldMessengerKey: AppMessenger.key,
+      builder: (context, child) => SnackOverlay(child: child!),
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
@@ -198,7 +200,6 @@ void main() {
             settings: {},
             soul: {},
             contexts: [],
-            routines: [],
           ),
         ));
 

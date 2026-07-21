@@ -2,7 +2,6 @@ import 'package:super_editor/super_editor.dart';
 
 import 'attachment_nodes.dart';
 import 'note_node.dart';
-import 'yjs_task_entry.dart';
 
 const header4Attribution = NamedAttribution('header4');
 const header5Attribution = NamedAttribution('header5');
@@ -312,13 +311,7 @@ class NodeCodec {
     // 2. Type-specific semantic checks
     if (existingNode is TaskNode && incoming.type == 'task') {
       final existingDataMap = nodeData(existingNode);
-      try {
-        final existingEntry = YjsTaskEntry.fromJson(existingDataMap);
-        final incomingEntry = YjsTaskEntry.fromJson(incoming.data);
-        return existingEntry == incomingEntry;
-      } catch (_) {
-        return false;
-      }
+      return deepEquals(existingDataMap, incoming.data);
     }
 
     if (existingNode is ListItemNode && incoming.type == 'list_item') {

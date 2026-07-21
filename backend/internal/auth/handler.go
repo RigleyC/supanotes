@@ -54,21 +54,9 @@ type UserResponse struct {
 
 type AuthResponse struct {
 	User         *UserResponse        `json:"user"`
-	AccessToken  string              `json:"access_token"`
-	RefreshToken string              `json:"refresh_token"`
+	AccessToken  string               `json:"access_token"`
+	RefreshToken string               `json:"refresh_token"`
 	Settings     dto.SettingsResponse `json:"settings"`
-	Soul         dto.SoulResponse     `json:"soul"`
-	Contexts     []dto.ContextResponse `json:"contexts"`
-	Routines     []RoutineResponse    `json:"routines"`
-}
-
-type RoutineResponse struct {
-	ID        string `json:"id"`
-	Type      string `json:"type"`
-	CronExpr  string `json:"cron_expr"`
-	Enabled   bool   `json:"enabled"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
 }
 
 type RefreshResponse struct {
@@ -94,18 +82,6 @@ func buildAuthResponse(session *SessionData, access, refresh string) AuthRespons
 		AccessToken:  access,
 		RefreshToken: refresh,
 		Settings:     session.Settings,
-		Soul:         session.Soul,
-		Contexts:     session.Contexts,
-	}
-	for _, r := range session.Routines {
-		resp.Routines = append(resp.Routines, RoutineResponse{
-			ID:        uid.UUIDToString(r.ID),
-			Type:      r.Type,
-			CronExpr:  r.CronExpr,
-			Enabled:   r.Enabled,
-			CreatedAt: r.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt: r.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		})
 	}
 	return resp
 }

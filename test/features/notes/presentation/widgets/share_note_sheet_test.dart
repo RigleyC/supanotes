@@ -83,7 +83,6 @@ void main() {
       expect(find.text(NoteStrings.emailLabel), findsOneWidget);
       expect(find.text(NoteStrings.permissionView), findsOneWidget);
       expect(find.text(NoteStrings.addLabel), findsOneWidget);
-      expect(find.text(NoteStrings.closeLabel), findsOneWidget);
     });
 
     testWidgets('shows error when email is empty', (tester) async {

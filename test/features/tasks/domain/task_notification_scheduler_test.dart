@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,7 +13,7 @@ import 'package:supanotes/features/auth/presentation/controllers/auth_controller
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
-import 'package:timezone/data/latest.dart' as tzData;
+import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 /// Mock auth controller that returns a fixed user without storage/network deps.
@@ -81,7 +83,7 @@ void main() {
   late ProviderContainer container;
 
   setUp(() {
-    tzData.initializeTimeZones();
+    tz_data.initializeTimeZones();
     SharedPreferences.setMockInitialValues({});
     fakePlugin = FakeFlutterLocalNotificationsPlugin();
     mockTasksRepo = MockTasksLocalRepository();
@@ -110,7 +112,7 @@ void main() {
     final openTasks = [
       TaskData(
         id: 'task-1',
-        userId: 'user-1',
+        userId: 'test-user',
         noteId: 'note-1',
         title: 'Has Time',
         status: 'open',
@@ -119,10 +121,11 @@ void main() {
         updatedAt: now,
         hasTime: true,
         dueDate: tomorrow,
+        reminder: 'at_time',
       ),
       TaskData(
         id: 'task-2',
-        userId: 'user-1',
+        userId: 'test-user',
         noteId: 'note-1',
         title: 'No Time',
         status: 'open',
@@ -131,10 +134,11 @@ void main() {
         updatedAt: now,
         hasTime: false,
         dueDate: tomorrow,
+        reminder: 'at_time',
       ),
       TaskData(
         id: 'task-3',
-        userId: 'user-1',
+        userId: 'test-user',
         noteId: 'note-1',
         title: 'Past Task',
         status: 'open',
@@ -143,13 +147,15 @@ void main() {
         updatedAt: now,
         hasTime: true,
         dueDate: now.subtract(const Duration(days: 1)),
+        reminder: 'at_time',
       ),
     ];
     
     when(() => mockTasksRepo.watchOpenTasks())
-        .thenAnswer((_) => Stream.value(openTasks));
+        .thenAnswer((_) => Stream.multi((controller) => controller.add(openTasks)));
         
-    final sub = container.listen(taskNotificationSchedulerProvider, (_, __) {});
+    await container.read(authControllerProvider.future);
+    final sub = container.listen(taskNotificationSchedulerProvider, (_, _) {});
     
     // Wait for the scheduler to build and the stream to emit
     await Future.delayed(const Duration(milliseconds: 500));
@@ -191,7 +197,7 @@ void main() {
     
     final task1 = TaskData(
       id: 'task-1',
-      userId: 'user-1',
+      userId: 'test-user',
       noteId: 'note-1',
       title: 'Has Time',
       status: 'open',
@@ -200,19 +206,23 @@ void main() {
       updatedAt: now,
       hasTime: true,
       dueDate: tomorrow,
+      reminder: 'at_time',
     );
     
+    final controller = StreamController<List<TaskData>>();
+    addTearDown(controller.close);
     when(() => mockTasksRepo.watchOpenTasks())
-        .thenAnswer((_) => Stream.fromIterable([
-              [task1],
-              <TaskData>[], 
-            ]));
+        .thenAnswer((_) => controller.stream);
             
-    final sub = container.listen(taskNotificationSchedulerProvider, (_, __) {});
+    await container.read(authControllerProvider.future);
+    final sub = container.listen(taskNotificationSchedulerProvider, (_, _) {});
     
-    await Future.delayed(const Duration(milliseconds: 500));
-    
+    controller.add([task1]);
+    await Future.delayed(const Duration(milliseconds: 300));
     expect(fakePlugin.schedules, hasLength(1));
+
+    controller.add([]);
+    await Future.delayed(const Duration(milliseconds: 300));
     expect(fakePlugin.cancelled, contains(notificationIdForTask('test-user', 'task-1')));
     
     sub.close();

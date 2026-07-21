@@ -86,12 +86,30 @@ class NoteOperationsSyncService {
 
   // ---- Public API ----
 
-  Future<SyncResult> syncPending(String noteId) {
-    return _syncQueue.run(noteId, () => _syncPendingInner(noteId));
+  Future<SyncResult> syncPending(
+    String noteId, {
+    Future<void> Function(SyncResult)? onReconcile,
+  }) {
+    return _syncQueue.run(noteId, () async {
+      final result = await _syncPendingInner(noteId);
+      if (onReconcile != null) {
+        await onReconcile(result);
+      }
+      return result;
+    });
   }
 
-  Future<SyncResult> pollAndReconcile(String noteId) {
-    return _syncQueue.run(noteId, () => _pollAndReconcileInner(noteId));
+  Future<SyncResult> pollAndReconcile(
+    String noteId, {
+    Future<void> Function(SyncResult)? onReconcile,
+  }) {
+    return _syncQueue.run(noteId, () async {
+      final result = await _pollAndReconcileInner(noteId);
+      if (onReconcile != null) {
+        await onReconcile(result);
+      }
+      return result;
+    });
   }
 
   Future<void> enqueueOperation(
@@ -344,8 +362,12 @@ class NoteOperationsSyncService {
     }
 
     final confirmed = await _dao.watchNoteDocument(noteId).first;
+    if (confirmed == null) {
+      return SyncResult.empty();
+    }
+
     final response =
-        await _api.getOperationsSince(noteId, confirmed?.revision ?? 0);
+        await _api.getOperationsSince(noteId, confirmed.revision);
 
     if (response.operations.isEmpty) {
       return SyncResult.empty();

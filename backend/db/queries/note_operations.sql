@@ -34,7 +34,7 @@ WHERE note_id = $1 AND operation_id = $2;
 
 -- name: CheckNotePermission :one
 SELECT COALESCE(
-  (SELECT 'owner'::text FROM notes WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL),
-  (SELECT permission::text FROM note_shares WHERE note_id = $1 AND user_id = $2),
+  (SELECT 'owner'::text FROM notes WHERE notes.id = $1 AND notes.user_id = $2 AND notes.deleted_at IS NULL),
+  (SELECT permission::text FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2),
   'none'::text
 ) AS permission;

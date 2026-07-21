@@ -157,60 +157,54 @@ func (m *mockQuerier) GetUserSettings(ctx context.Context, userID pgtype.UUID) (
 func (m *mockQuerier) RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error {
 	return errors.New("RevokeAllUserRefreshTokens: not implemented in mock")
 }
-func (m *mockQuerier) CreateDeviceToken(ctx context.Context, arg sqlcgen.CreateDeviceTokenParams) (sqlcgen.DeviceToken, error) {
-	return sqlcgen.DeviceToken{}, errors.New("CreateDeviceToken: not implemented in mock")
-}
-func (m *mockQuerier) DeleteDeviceToken(ctx context.Context, arg sqlcgen.DeleteDeviceTokenParams) error {
-	return errors.New("DeleteDeviceToken: not implemented in mock")
-}
-func (m *mockQuerier) DeleteDeviceTokenByToken(ctx context.Context, arg sqlcgen.DeleteDeviceTokenByTokenParams) error {
-	return errors.New("DeleteDeviceTokenByToken: not implemented in mock")
-}
-func (m *mockQuerier) AddTagToNote(ctx context.Context, arg sqlcgen.AddTagToNoteParams) error {
-	return nil
-}
-func (m *mockQuerier) CreateContext(ctx context.Context, arg sqlcgen.CreateContextParams) (sqlcgen.Context, error) {
-	return sqlcgen.Context{}, nil
-}
 func (m *mockQuerier) CreateNote(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
-func (m *mockQuerier) CreateNoteLink(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
-	return nil
-}
-func (m *mockQuerier) CreateTag(ctx context.Context, arg sqlcgen.CreateTagParams) (sqlcgen.Tag, error) {
-	return sqlcgen.Tag{}, nil
-}
-func (m *mockQuerier) DeleteContext(ctx context.Context, arg sqlcgen.DeleteContextParams) error {
-	return nil
-}
 func (m *mockQuerier) DeleteNote(ctx context.Context, arg sqlcgen.DeleteNoteParams) error { return nil }
-func (m *mockQuerier) DeleteTag(ctx context.Context, arg sqlcgen.DeleteTagParams) error   { return nil }
-func (m *mockQuerier) GetContexts(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Context, error) {
-	return nil, nil
-}
-func (m *mockQuerier) GetLatestBriefByType(ctx context.Context, arg sqlcgen.GetLatestBriefByTypeParams) (sqlcgen.RoutineLog, error) {
-	return sqlcgen.RoutineLog{}, nil
-}
 func (m *mockQuerier) GetNoteByID(ctx context.Context, arg sqlcgen.GetNoteByIDParams) (sqlcgen.GetNoteByIDRow, error) {
 	return sqlcgen.GetNoteByIDRow{}, nil
 }
 func (m *mockQuerier) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Tag, error) {
-	return nil, nil
-}
-func (m *mockQuerier) GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Tag, error) {
-	return nil, nil
-}
-func (m *mockQuerier) RemoveTagFromNote(ctx context.Context, arg sqlcgen.RemoveTagFromNoteParams) error {
-	return nil
-}
 func (m *mockQuerier) UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
 }
-
+func (m *mockQuerier) UpdateNoteContent(ctx context.Context, arg sqlcgen.UpdateNoteContentParams) error {
+	return nil
+}
+func (m *mockQuerier) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+func (m *mockQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
+	return nil, nil
+}
+func (m *mockQuerier) GetLinkedNotes(ctx context.Context, arg sqlcgen.GetLinkedNotesParams) ([]sqlcgen.Note, error) {
+	return nil, nil
+}
+func (m *mockQuerier) CreateNoteLink(ctx context.Context, arg sqlcgen.CreateNoteLinkParams) error {
+	return nil
+}
+func (m *mockQuerier) GetAllNotesForMigration(ctx context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) {
+	return nil, nil
+}
+func (m *mockQuerier) HardDeleteOldNotes(ctx context.Context) error { return nil }
+func (m *mockQuerier) TryAcquireGCLock(ctx context.Context) (bool, error) { return true, nil }
+func (m *mockQuerier) CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
+func (m *mockQuerier) DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error {
+	return nil
+}
+func (m *mockQuerier) GetNoteOwner(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
+func (m *mockQuerier) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
+	return sqlcgen.NoteShare{}, nil
+}
+func (m *mockQuerier) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
+	return nil, nil
+}
 func (m *mockQuerier) CreateTask(ctx context.Context, arg sqlcgen.CreateTaskParams) (sqlcgen.Task, error) {
 	return sqlcgen.Task{}, nil
 }
@@ -218,10 +212,15 @@ func (m *mockQuerier) CreateTaskCompletion(ctx context.Context, arg sqlcgen.Crea
 	return sqlcgen.TaskCompletion{}, nil
 }
 func (m *mockQuerier) DeleteTask(ctx context.Context, arg sqlcgen.DeleteTaskParams) error { return nil }
+func (m *mockQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error { return nil }
+func (m *mockQuerier) DeleteTasksByNoteID(ctx context.Context, arg sqlcgen.DeleteTasksByNoteIDParams) error { return nil }
 func (m *mockQuerier) GetTaskByID(ctx context.Context, arg sqlcgen.GetTaskByIDParams) (sqlcgen.Task, error) {
 	return sqlcgen.Task{}, nil
 }
 func (m *mockQuerier) GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) ([]sqlcgen.Task, error) {
+	return nil, nil
+}
+func (m *mockQuerier) GetTasksByNodeID(ctx context.Context, id pgtype.UUID) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
 func (m *mockQuerier) GetTasksByNoteID(ctx context.Context, arg sqlcgen.GetTasksByNoteIDParams) ([]sqlcgen.Task, error) {
@@ -233,78 +232,12 @@ func (m *mockQuerier) GetTodayTasks(ctx context.Context, arg sqlcgen.GetTodayTas
 func (m *mockQuerier) UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
 	return sqlcgen.Task{}, nil
 }
-
-func (m *mockQuerier) CreateMemory(ctx context.Context, arg sqlcgen.CreateMemoryParams) (sqlcgen.Memory, error) {
-	return sqlcgen.Memory{}, nil
-}
-func (m *mockQuerier) DeleteMemory(ctx context.Context, arg sqlcgen.DeleteMemoryParams) error {
-	return nil
-}
-func (m *mockQuerier) GetMemories(ctx context.Context, arg sqlcgen.GetMemoriesParams) ([]sqlcgen.Memory, error) {
+func (m *mockQuerier) UpsertTasksBatch(ctx context.Context, arg sqlcgen.UpsertTasksBatchParams) error { return nil }
+func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
-func (m *mockQuerier) GetRetryableEmbeddings(ctx context.Context, limit int32) ([]sqlcgen.GetRetryableEmbeddingsRow, error) {
+func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
-}
-func (m *mockQuerier) GetSoul(ctx context.Context, userID pgtype.UUID) (sqlcgen.Soul, error) {
-	return sqlcgen.Soul{}, nil
-}
-func (m *mockQuerier) UpdateNoteEmbeddingStatus(ctx context.Context, arg sqlcgen.UpdateNoteEmbeddingStatusParams) error {
-	return nil
-}
-func (m *mockQuerier) UpsertNoteEmbedding(ctx context.Context, arg sqlcgen.UpsertNoteEmbeddingParams) error {
-	return nil
-}
-func (m *mockQuerier) UpsertSoul(ctx context.Context, arg sqlcgen.UpsertSoulParams) (sqlcgen.Soul, error) {
-	return sqlcgen.Soul{}, nil
-}
-func (m *mockQuerier) UpdateSoulProfile(ctx context.Context, arg sqlcgen.UpdateSoulProfileParams) (sqlcgen.Soul, error) {
-	return sqlcgen.Soul{}, nil
-}
-
-func (m *mockQuerier) CreateMessage(ctx context.Context, arg sqlcgen.CreateMessageParams) (sqlcgen.Message, error) {
-	return sqlcgen.Message{}, nil
-}
-func (m *mockQuerier) DeleteSessionMessages(ctx context.Context, arg sqlcgen.DeleteSessionMessagesParams) error {
-	return nil
-}
-func (m *mockQuerier) GetMessages(ctx context.Context, arg sqlcgen.GetMessagesParams) ([]sqlcgen.Message, error) {
-	return nil, nil
-}
-func (m *mockQuerier) SearchNotesByEmbedding(ctx context.Context, arg sqlcgen.SearchNotesByEmbeddingParams) ([]sqlcgen.SearchNotesByEmbeddingRow, error) {
-	return nil, nil
-}
-func (m *mockQuerier) SearchMemoriesByEmbedding(ctx context.Context, arg sqlcgen.SearchMemoriesByEmbeddingParams) ([]sqlcgen.SearchMemoriesByEmbeddingRow, error) {
-	return nil, nil
-}
-func (m *mockQuerier) SearchNotesFTS(ctx context.Context, arg sqlcgen.SearchNotesFTSParams) ([]sqlcgen.SearchNotesFTSRow, error) {
-	return nil, nil
-}
-func (m *mockQuerier) SearchNotesSemantic(ctx context.Context, arg sqlcgen.SearchNotesSemanticParams) ([]sqlcgen.SearchNotesSemanticRow, error) {
-	return nil, nil
-}
-
-func (m *mockQuerier) CreateRoutine(ctx context.Context, arg sqlcgen.CreateRoutineParams) (sqlcgen.Routine, error) {
-	return sqlcgen.Routine{}, nil
-}
-func (m *mockQuerier) UpdateRoutine(ctx context.Context, arg sqlcgen.UpdateRoutineParams) (sqlcgen.Routine, error) {
-	return sqlcgen.Routine{}, nil
-}
-func (m *mockQuerier) GetRoutinesByUser(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.Routine, error) {
-	return nil, nil
-}
-func (m *mockQuerier) GetEnabledRoutines(ctx context.Context) ([]sqlcgen.GetEnabledRoutinesRow, error) {
-	return nil, nil
-}
-func (m *mockQuerier) CreateRoutineLog(ctx context.Context, arg sqlcgen.CreateRoutineLogParams) (sqlcgen.RoutineLog, error) {
-	return sqlcgen.RoutineLog{}, nil
-}
-func (m *mockQuerier) GetRoutineLogsByUser(ctx context.Context, arg sqlcgen.GetRoutineLogsByUserParams) ([]sqlcgen.RoutineLog, error) {
-	return nil, nil
-}
-func (m *mockQuerier) CleanupOldMessages(ctx context.Context) error { return nil }
-func (m *mockQuerier) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	return 0, nil
 }
 func (m *mockQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
@@ -315,17 +248,37 @@ func (m *mockQuerier) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (i
 func (m *mockQuerier) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	return 0, nil
 }
-
-func (m *mockQuerier) CountOverdueTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	return 0, nil
+func (m *mockQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
+	return sqlcgen.Attachment{}, nil
 }
-
-func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
+func (m *mockQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return nil, nil
 }
-
-func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
+func (m *mockQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
+func (m *mockQuerier) CheckNotePermission(ctx context.Context, arg sqlcgen.CheckNotePermissionParams) (interface{}, error) {
 	return nil, nil
+}
+func (m *mockQuerier) GetNoteDocument(ctx context.Context, id pgtype.UUID) (sqlcgen.GetNoteDocumentRow, error) {
+	return sqlcgen.GetNoteDocumentRow{}, nil
+}
+func (m *mockQuerier) UpdateNoteDocument(ctx context.Context, arg sqlcgen.UpdateNoteDocumentParams) error { return nil }
+func (m *mockQuerier) InsertOperation(ctx context.Context, arg sqlcgen.InsertOperationParams) (sqlcgen.NoteOperation, error) {
+	return sqlcgen.NoteOperation{}, nil
+}
+func (m *mockQuerier) GetLastOperation(ctx context.Context, noteID pgtype.UUID) (sqlcgen.NoteOperation, error) {
+	return sqlcgen.NoteOperation{}, nil
+}
+func (m *mockQuerier) GetNoteOperationByOpID(ctx context.Context, arg sqlcgen.GetNoteOperationByOpIDParams) (sqlcgen.NoteOperation, error) {
+	return sqlcgen.NoteOperation{}, nil
+}
+func (m *mockQuerier) GetOperationsSince(ctx context.Context, arg sqlcgen.GetOperationsSinceParams) ([]sqlcgen.NoteOperation, error) {
+	return nil, nil
+}
+func (m *mockQuerier) LockNote(ctx context.Context, id pgtype.UUID) (sqlcgen.LockNoteRow, error) {
+	return sqlcgen.LockNoteRow{}, nil
+}
+func (m *mockQuerier) GetOperationByOpID(ctx context.Context, arg sqlcgen.GetNoteOperationByOpIDParams) (sqlcgen.NoteOperation, error) {
+	return sqlcgen.NoteOperation{}, nil
 }
 
 func testConfig() *config.Config {
@@ -567,124 +520,7 @@ func TestService_IssuedTokenIsValid(t *testing.T) {
 	}
 }
 
-func (m *mockQuerier) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.GetRecentNotesRow, error) {
-	return nil, nil
-}
-
-func (m *mockQuerier) GetLinkedNotes(ctx context.Context, arg sqlcgen.GetLinkedNotesParams) ([]sqlcgen.Note, error) {
-	return nil, nil
-}
-
-func (m *mockQuerier) SearchNotesHybrid(ctx context.Context, arg sqlcgen.SearchNotesHybridParams) ([]sqlcgen.SearchNotesHybridRow, error) {
-	return nil, nil
-}
-
 func (m *mockQuerier) UpdateUserSettings(ctx context.Context, arg sqlcgen.UpdateUserSettingsParams) (sqlcgen.UserSetting, error) {
 	return sqlcgen.UserSetting{}, nil
-}
-
-func (m *mockQuerier) GetSyncNotes(ctx context.Context, arg sqlcgen.GetSyncNotesParams) ([]sqlcgen.GetSyncNotesRow, error) {
-	return nil, nil
-}
-
-func (m *mockQuerier) UpsertNote(ctx context.Context, arg sqlcgen.UpsertNoteParams) (sqlcgen.Note, error) {
-	return sqlcgen.Note{}, nil
-}
-
-func (m *mockQuerier) UpsertTask(ctx context.Context, arg sqlcgen.UpsertTaskParams) (sqlcgen.Task, error) {
-	return sqlcgen.Task{}, nil
-}
-
-func (m *mockQuerier) GetSyncContexts(ctx context.Context, arg sqlcgen.GetSyncContextsParams) ([]sqlcgen.Context, error) {
-	return nil, nil
-}
-
-func (m *mockQuerier) UpsertContext(ctx context.Context, arg sqlcgen.UpsertContextParams) (sqlcgen.Context, error) {
-	return sqlcgen.Context{}, nil
-}
-
-func (m *mockQuerier) GetSyncTags(ctx context.Context, arg sqlcgen.GetSyncTagsParams) ([]sqlcgen.Tag, error) {
-	return nil, nil
-}
-
-func (m *mockQuerier) UpsertTag(ctx context.Context, arg sqlcgen.UpsertTagParams) (sqlcgen.Tag, error) {
-	return sqlcgen.Tag{}, nil
-}
-
-func (m *mockQuerier) ListDeviceTokensByUser(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.DeviceToken, error) {
-	return nil, nil
-}
-
-func (m *mockQuerier) HardDeleteExpiredNotes(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockQuerier) HardDeleteExpiredTasks(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockQuerier) HardDeleteExpiredContexts(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockQuerier) UpdateRoutineLastRunAt(ctx context.Context, id pgtype.UUID) error {
-	return nil
-}
-
-func (m *mockQuerier) UpsertTaskCompletion(ctx context.Context, arg sqlcgen.UpsertTaskCompletionParams) error {
-	return nil
-}
-
-func (m *mockQuerier) GetSyncNoteTags(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteTag, error) {
-	return nil, nil
-}
-func (m *mockQuerier) UpsertNoteTag(ctx context.Context, arg sqlcgen.UpsertNoteTagParams) error {
-	return nil
-}
-func (m *mockQuerier) GetSyncNoteLinks(ctx context.Context, userID pgtype.UUID) ([]sqlcgen.NoteLink, error) {
-	return nil, nil
-}
-func (m *mockQuerier) UpsertNoteLink(ctx context.Context, arg sqlcgen.UpsertNoteLinkParams) error {
-	return nil
-}
-func (m *mockQuerier) CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
-	return sqlcgen.NoteShare{}, nil
-}
-func (m *mockQuerier) DeleteNoteShare(ctx context.Context, arg sqlcgen.DeleteNoteShareParams) error {
-	return nil
-}
-func (m *mockQuerier) GetNoteOwner(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
-	return pgtype.UUID{}, nil
-}
-func (m *mockQuerier) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNoteShareForUserParams) (sqlcgen.NoteShare, error) {
-	return sqlcgen.NoteShare{}, nil
-}
-func (m *mockQuerier) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
-	return nil, nil
-}
-func (m *mockQuerier) CreatePendingToolConfirmation(context.Context, sqlcgen.CreatePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
-	panic("unimplemented")
-}
-func (m *mockQuerier) GetPendingToolConfirmation(context.Context, sqlcgen.GetPendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
-	panic("unimplemented")
-}
-func (m *mockQuerier) ResolvePendingToolConfirmation(context.Context, sqlcgen.ResolvePendingToolConfirmationParams) (sqlcgen.PendingToolConfirmation, error) {
-	panic("unimplemented")
-}
-func (m *mockQuerier) DeleteAttachment(ctx context.Context, id pgtype.UUID) error { return nil }
-func (m *mockQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
-	return sqlcgen.Attachment{}, nil
-}
-func (m *mockQuerier) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
-	return nil, nil
-}
-func (m *mockQuerier) GetNoteOwnerID(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
-	return pgtype.UUID{}, nil
-}
-func (m *mockQuerier) GetSyncUserNotePreferences(ctx context.Context, arg sqlcgen.GetSyncUserNotePreferencesParams) ([]sqlcgen.UserNotePreference, error) {
-	return nil, nil
-}
-func (m *mockQuerier) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
-	return sqlcgen.UserNotePreference{}, nil
 }
 

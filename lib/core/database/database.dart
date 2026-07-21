@@ -9,27 +9,20 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 import 'daos/attachments_dao.dart';
-import 'daos/contexts_dao.dart';
 import 'daos/note_links_dao.dart';
 import 'daos/note_operations_dao.dart';
-import 'daos/note_tags_dao.dart';
 import 'daos/notes_dao.dart';
-import 'daos/tags_dao.dart';
 import 'daos/task_completions_dao.dart';
 import 'daos/tasks_dao.dart';
 import 'daos/user_note_preferences_dao.dart';
 import 'tables/attachments.dart';
-import 'tables/contexts.dart';
 import 'tables/local_note_documents.dart';
 import 'tables/local_yjs_states.dart';
 import 'tables/note_links.dart';
 import 'tables/note_sync_errors.dart';
-import 'tables/note_tags.dart';
 import 'tables/sync_sessions.dart';
-
 import 'tables/notes.dart';
 import 'tables/pending_note_operations.dart';
-import 'tables/tags.dart';
 import 'tables/task_completions.dart';
 import 'tables/tasks.dart';
 import 'tables/user_note_preferences.dart';
@@ -42,9 +35,6 @@ part 'database.g.dart';
   tables: [
     Notes,
     Tasks,
-    Contexts,
-    Tags,
-    LocalNoteTags,
     LocalTaskCompletions,
     NoteLinks,
     Attachments,
@@ -57,12 +47,9 @@ part 'database.g.dart';
   ],
   daos: [
     NotesDao,
-    ContextsDao,
     TasksDao,
-    TagsDao,
     TaskCompletionsDao,
     NoteLinksDao,
-    NoteTagsDao,
     AttachmentsDao,
     UserNotePreferencesDao,
     NoteOperationsDao,
@@ -92,9 +79,7 @@ class AppDatabase extends _$AppDatabase {
     onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
       if (from < 2) {
-        await m.createTable(localNoteTags);
         await m.createTable(localTaskCompletions);
-        await m.addColumn(tags, tags.updatedAt);
         await m.addColumn(tasks, tasks.completedAt);
       }
       if (from < 3) {

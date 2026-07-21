@@ -3,10 +3,8 @@ package tasks
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -49,11 +47,10 @@ func (o UpdateTaskOpts) Validate() error {
 
 type Service struct {
 	repo Repository
-	ydoc yDocIngest
 }
 
-func NewService(repo Repository, ydoc yDocIngest) *Service {
-	return &Service{repo: repo, ydoc: ydoc}
+func NewService(repo Repository) *Service {
+	return &Service{repo: repo}
 }
 
 func (s *Service) CreateTask(ctx context.Context, userID, noteID pgtype.UUID, title string, dueDate *time.Time, recurrence *string, position string, hasTime *bool, reminder *string) (sqlcgen.Task, error) {
@@ -173,30 +170,20 @@ func (s *Service) CompleteTask(ctx context.Context, userID, id pgtype.UUID) (sql
 		return sqlcgen.Task{}, err
 	}
 
-	noteIDStr := uuid.UUID(task.NoteID.Bytes).String()
-	nodeIDStr := uuid.UUID(id.Bytes).String()
-
-	if s.ydoc != nil {
-		if err := CompleteTaskYjs(ctx, s.ydoc, noteIDStr, nodeIDStr); err != nil {
-			return sqlcgen.Task{}, fmt.Errorf("complete task via yjs: %w", err)
+	now := time.Now()
+	task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
+		ID:             id,
+		UserID:         userID,
+		SetStatus:      pgtype.Bool{Bool: true, Valid: true},
+		Status:         pgtype.Text{String: "done", Valid: true},
+		SetCompletedAt: pgtype.Bool{Bool: true, Valid: true},
+		CompletedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlcgen.Task{}, ErrTaskNotFound
 		}
-	} else {
-		// Fallback: direct SQL mutation when no YDoc service available
-		now := time.Now()
-		task, err = s.repo.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
-			ID:             id,
-			UserID:         userID,
-			SetStatus:      pgtype.Bool{Bool: true, Valid: true},
-			Status:         pgtype.Text{String: "done", Valid: true},
-			SetCompletedAt: pgtype.Bool{Bool: true, Valid: true},
-			CompletedAt:    pgtype.Timestamptz{Time: now, Valid: true},
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return sqlcgen.Task{}, ErrTaskNotFound
-			}
-			return sqlcgen.Task{}, err
-		}
+		return sqlcgen.Task{}, err
 	}
 
 	// Re-read after projection to return projected state

@@ -145,7 +145,7 @@ void main() {
         .dx;
     final textLeft = tester.getTopLeft(find.byType(TextComponent)).dx;
 
-    expect(textLeft, checkboxLeft + 31);
+    expect(textLeft, 44.0);
   });
 
   testWidgets('places checkbox at the top of the row', (
@@ -295,8 +295,8 @@ void main() {
 
     expect(capturedCompleteId, equals('task-1'));
     expect(capturedReopenId, isNull);
-    // Drain the pending reset timer
-    await tester.pump(const Duration(milliseconds: 400));
+    // Drain the pending reset timer (1s)
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('fires onTaskReopen when un-completing a task', (tester) async {

@@ -11,22 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const addTagToNote = `-- name: AddTagToNote :exec
-INSERT INTO note_tags (note_id, tag_id)
-VALUES ($1, $2)
-ON CONFLICT DO NOTHING
-`
-
-type AddTagToNoteParams struct {
-	NoteID pgtype.UUID `json:"note_id"`
-	TagID  pgtype.UUID `json:"tag_id"`
-}
-
-func (q *Queries) AddTagToNote(ctx context.Context, arg AddTagToNoteParams) error {
-	_, err := q.db.Exec(ctx, addTagToNote, arg.NoteID, arg.TagID)
-	return err
-}
-
 const countNotes = `-- name: CountNotes :one
 SELECT COUNT(*) FROM notes WHERE user_id = $1 AND deleted_at IS NULL
 `
@@ -38,68 +22,33 @@ func (q *Queries) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, er
 	return count, err
 }
 
-const createContext = `-- name: CreateContext :one
-INSERT INTO contexts (user_id, slug, name)
-VALUES ($1, $2, $3)
-RETURNING id, user_id, slug, name, created_at, updated_at, deleted_at
-`
-
-type CreateContextParams struct {
-	UserID pgtype.UUID `json:"user_id"`
-	Slug   string      `json:"slug"`
-	Name   string      `json:"name"`
-}
-
-func (q *Queries) CreateContext(ctx context.Context, arg CreateContextParams) (Context, error) {
-	row := q.db.QueryRow(ctx, createContext, arg.UserID, arg.Slug, arg.Name)
-	var i Context
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Slug,
-		&i.Name,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-	)
-	return i, err
-}
-
 const createNote = `-- name: CreateNote :one
-INSERT INTO notes (user_id, context_id, content, embedding_status, collapse_images)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, user_id, context_id, content, excerpt, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
+INSERT INTO notes (user_id, content, collapse_images)
+VALUES ($1, $2, $3)
+RETURNING id, user_id, content, excerpt, created_at, updated_at, deleted_at, collapse_images, revision, document, snapshot_revision
 `
 
 type CreateNoteParams struct {
-	UserID          pgtype.UUID `json:"user_id"`
-	ContextID       pgtype.UUID `json:"context_id"`
-	Content         string      `json:"content"`
-	EmbeddingStatus string      `json:"embedding_status"`
-	CollapseImages  bool        `json:"collapse_images"`
+	UserID         pgtype.UUID `json:"user_id"`
+	Content        string      `json:"content"`
+	CollapseImages bool        `json:"collapse_images"`
 }
 
 func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error) {
-	row := q.db.QueryRow(ctx, createNote,
-		arg.UserID,
-		arg.ContextID,
-		arg.Content,
-		arg.EmbeddingStatus,
-		arg.CollapseImages,
-	)
+	row := q.db.QueryRow(ctx, createNote, arg.UserID, arg.Content, arg.CollapseImages)
 	var i Note
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.ContextID,
 		&i.Content,
 		&i.Excerpt,
-		&i.SearchVector,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
-		&i.EmbeddingStatus,
 		&i.CollapseImages,
+		&i.Revision,
+		&i.Document,
+		&i.SnapshotRevision,
 	)
 	return i, err
 }
@@ -120,44 +69,6 @@ func (q *Queries) CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) 
 	return err
 }
 
-const createTag = `-- name: CreateTag :one
-INSERT INTO tags (user_id, name)
-VALUES ($1, $2)
-RETURNING id, user_id, name, created_at
-`
-
-type CreateTagParams struct {
-	UserID pgtype.UUID `json:"user_id"`
-	Name   string      `json:"name"`
-}
-
-func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error) {
-	row := q.db.QueryRow(ctx, createTag, arg.UserID, arg.Name)
-	var i Tag
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Name,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const deleteContext = `-- name: DeleteContext :exec
-DELETE FROM contexts
-WHERE id = $1 AND user_id = $2
-`
-
-type DeleteContextParams struct {
-	ID     pgtype.UUID `json:"id"`
-	UserID pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) DeleteContext(ctx context.Context, arg DeleteContextParams) error {
-	_, err := q.db.Exec(ctx, deleteContext, arg.ID, arg.UserID)
-	return err
-}
-
 const deleteNote = `-- name: DeleteNote :exec
 UPDATE notes
 SET deleted_at = NOW()
@@ -171,21 +82,6 @@ type DeleteNoteParams struct {
 
 func (q *Queries) DeleteNote(ctx context.Context, arg DeleteNoteParams) error {
 	_, err := q.db.Exec(ctx, deleteNote, arg.ID, arg.UserID)
-	return err
-}
-
-const deleteTag = `-- name: DeleteTag :exec
-DELETE FROM tags
-WHERE id = $1 AND user_id = $2
-`
-
-type DeleteTagParams struct {
-	ID     pgtype.UUID `json:"id"`
-	UserID pgtype.UUID `json:"user_id"`
-}
-
-func (q *Queries) DeleteTag(ctx context.Context, arg DeleteTagParams) error {
-	_, err := q.db.Exec(ctx, deleteTag, arg.ID, arg.UserID)
 	return err
 }
 
@@ -218,42 +114,8 @@ func (q *Queries) GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesFor
 	return items, nil
 }
 
-const getContexts = `-- name: GetContexts :many
-SELECT id, user_id, slug, name, created_at, updated_at, deleted_at FROM contexts
-WHERE user_id = $1
-ORDER BY created_at DESC
-`
-
-func (q *Queries) GetContexts(ctx context.Context, userID pgtype.UUID) ([]Context, error) {
-	rows, err := q.db.Query(ctx, getContexts, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Context
-	for rows.Next() {
-		var i Context
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Slug,
-			&i.Name,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getLinkedNotes = `-- name: GetLinkedNotes :many
-SELECT DISTINCT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images FROM notes n
+SELECT DISTINCT n.id, n.user_id, n.content, n.excerpt, n.created_at, n.updated_at, n.deleted_at, n.collapse_images, n.revision, n.document, n.snapshot_revision FROM notes n
 JOIN note_links nl ON (n.id = nl.source_id OR n.id = nl.target_id)
 WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.id != ALL($1::uuid[])
@@ -279,15 +141,15 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
-			&i.ContextID,
 			&i.Content,
 			&i.Excerpt,
-			&i.SearchVector,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
-			&i.EmbeddingStatus,
 			&i.CollapseImages,
+			&i.Revision,
+			&i.Document,
+			&i.SnapshotRevision,
 		); err != nil {
 			return nil, err
 		}
@@ -300,7 +162,7 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 }
 
 const getNoteByID = `-- name: GetNoteByID :one
-SELECT n.id, n.user_id, n.context_id, n.content, n.excerpt, n.search_vector, n.created_at, n.updated_at, n.deleted_at, n.embedding_status, n.collapse_images,
+SELECT n.id, n.user_id, n.content, n.excerpt, n.created_at, n.updated_at, n.deleted_at, n.collapse_images, n.revision, n.document, n.snapshot_revision,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -315,19 +177,19 @@ type GetNoteByIDParams struct {
 }
 
 type GetNoteByIDRow struct {
-	ID              pgtype.UUID        `json:"id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	ContextID       pgtype.UUID        `json:"context_id"`
-	Content         string             `json:"content"`
-	Excerpt         pgtype.Text        `json:"excerpt"`
-	SearchVector    pgtype.Text        `json:"search_vector"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
-	EmbeddingStatus string             `json:"embedding_status"`
-	CollapseImages  bool               `json:"collapse_images"`
-	Favorite        bool               `json:"favorite"`
-	Archived        bool               `json:"archived"`
+	ID               pgtype.UUID        `json:"id"`
+	UserID           pgtype.UUID        `json:"user_id"`
+	Content          string             `json:"content"`
+	Excerpt          pgtype.Text        `json:"excerpt"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	CollapseImages   bool               `json:"collapse_images"`
+	Revision         int64              `json:"revision"`
+	Document         []byte             `json:"document"`
+	SnapshotRevision int64              `json:"snapshot_revision"`
+	Favorite         bool               `json:"favorite"`
+	Archived         bool               `json:"archived"`
 }
 
 func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNoteByIDRow, error) {
@@ -336,15 +198,15 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.ContextID,
 		&i.Content,
 		&i.Excerpt,
-		&i.SearchVector,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
-		&i.EmbeddingStatus,
 		&i.CollapseImages,
+		&i.Revision,
+		&i.Document,
+		&i.SnapshotRevision,
 		&i.Favorite,
 		&i.Archived,
 	)
@@ -353,10 +215,10 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 
 const getNotes = `-- name: GetNotes :many
 SELECT
-  n.id, n.user_id, n.context_id,
-  n.excerpt, n.search_vector,
+  n.id, n.user_id,
+  n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
-  n.embedding_status, n.collapse_images,
+  n.collapse_images,
   NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
@@ -364,16 +226,14 @@ FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
 WHERE n.deleted_at IS NULL
   AND (n.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = n.id AND note_shares.user_id = $1))
-  AND ($2::uuid IS NULL OR n.context_id = $2)
-  AND ($3::boolean IS NULL OR COALESCE(unp.favorite, FALSE) = $3)
-  AND ($4::timestamptz IS NULL OR n.updated_at < $4 OR (n.updated_at = $4 AND n.id < $5))
+  AND ($2::boolean IS NULL OR COALESCE(unp.favorite, FALSE) = $2)
+  AND ($3::timestamptz IS NULL OR n.updated_at < $3 OR (n.updated_at = $3 AND n.id < $4))
 ORDER BY n.updated_at DESC, n.id DESC
-LIMIT $6
+LIMIT $5
 `
 
 type GetNotesParams struct {
 	UserID          pgtype.UUID        `json:"user_id"`
-	ContextID       pgtype.UUID        `json:"context_id"`
 	Favorite        pgtype.Bool        `json:"favorite"`
 	CursorUpdatedAt pgtype.Timestamptz `json:"cursor_updated_at"`
 	CursorID        pgtype.UUID        `json:"cursor_id"`
@@ -381,25 +241,21 @@ type GetNotesParams struct {
 }
 
 type GetNotesRow struct {
-	ID              pgtype.UUID        `json:"id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	ContextID       pgtype.UUID        `json:"context_id"`
-	Excerpt         pgtype.Text        `json:"excerpt"`
-	SearchVector    pgtype.Text        `json:"search_vector"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
-	EmbeddingStatus string             `json:"embedding_status"`
-	CollapseImages  bool               `json:"collapse_images"`
-	Title           string             `json:"title"`
-	Favorite        bool               `json:"favorite"`
-	Archived        bool               `json:"archived"`
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	Excerpt        pgtype.Text        `json:"excerpt"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	CollapseImages bool               `json:"collapse_images"`
+	Title          string             `json:"title"`
+	Favorite       bool               `json:"favorite"`
+	Archived       bool               `json:"archived"`
 }
 
 func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesRow, error) {
 	rows, err := q.db.Query(ctx, getNotes,
 		arg.UserID,
-		arg.ContextID,
 		arg.Favorite,
 		arg.CursorUpdatedAt,
 		arg.CursorID,
@@ -415,13 +271,10 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
-			&i.ContextID,
 			&i.Excerpt,
-			&i.SearchVector,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
-			&i.EmbeddingStatus,
 			&i.CollapseImages,
 			&i.Title,
 			&i.Favorite,
@@ -439,10 +292,10 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 
 const getRecentNotes = `-- name: GetRecentNotes :many
 SELECT
-  n.id, n.user_id, n.context_id,
-  n.excerpt, n.search_vector,
+  n.id, n.user_id,
+  n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
-  n.embedding_status, n.collapse_images,
+  n.collapse_images,
   NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
@@ -456,19 +309,16 @@ LIMIT 10
 `
 
 type GetRecentNotesRow struct {
-	ID              pgtype.UUID        `json:"id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	ContextID       pgtype.UUID        `json:"context_id"`
-	Excerpt         pgtype.Text        `json:"excerpt"`
-	SearchVector    pgtype.Text        `json:"search_vector"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
-	EmbeddingStatus string             `json:"embedding_status"`
-	CollapseImages  bool               `json:"collapse_images"`
-	Title           string             `json:"title"`
-	Favorite        bool               `json:"favorite"`
-	Archived        bool               `json:"archived"`
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	Excerpt        pgtype.Text        `json:"excerpt"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	CollapseImages bool               `json:"collapse_images"`
+	Title          string             `json:"title"`
+	Favorite       bool               `json:"favorite"`
+	Archived       bool               `json:"archived"`
 }
 
 func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]GetRecentNotesRow, error) {
@@ -483,79 +333,14 @@ func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Get
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
-			&i.ContextID,
 			&i.Excerpt,
-			&i.SearchVector,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
-			&i.EmbeddingStatus,
 			&i.CollapseImages,
 			&i.Title,
 			&i.Favorite,
 			&i.Archived,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTags = `-- name: GetTags :many
-SELECT id, user_id, name, created_at FROM tags
-WHERE user_id = $1
-ORDER BY name ASC
-`
-
-func (q *Queries) GetTags(ctx context.Context, userID pgtype.UUID) ([]Tag, error) {
-	rows, err := q.db.Query(ctx, getTags, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Tag
-	for rows.Next() {
-		var i Tag
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Name,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTagsForNote = `-- name: GetTagsForNote :many
-SELECT t.id, t.user_id, t.name, t.created_at FROM tags t
-JOIN note_tags nt ON t.id = nt.tag_id
-WHERE nt.note_id = $1
-`
-
-func (q *Queries) GetTagsForNote(ctx context.Context, noteID pgtype.UUID) ([]Tag, error) {
-	rows, err := q.db.Query(ctx, getTagsForNote, noteID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Tag
-	for rows.Next() {
-		var i Tag
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Name,
-			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -577,21 +362,6 @@ func (q *Queries) HardDeleteOldNotes(ctx context.Context) error {
 	return err
 }
 
-const removeTagFromNote = `-- name: RemoveTagFromNote :exec
-DELETE FROM note_tags
-WHERE note_id = $1 AND tag_id = $2
-`
-
-type RemoveTagFromNoteParams struct {
-	NoteID pgtype.UUID `json:"note_id"`
-	TagID  pgtype.UUID `json:"tag_id"`
-}
-
-func (q *Queries) RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error {
-	_, err := q.db.Exec(ctx, removeTagFromNote, arg.NoteID, arg.TagID)
-	return err
-}
-
 const tryAcquireGCLock = `-- name: TryAcquireGCLock :one
 SELECT pg_try_advisory_xact_lock(hashtext('gc_notes_lock')) AS acquired
 `
@@ -606,22 +376,18 @@ func (q *Queries) TryAcquireGCLock(ctx context.Context) (bool, error) {
 const updateNote = `-- name: UpdateNote :one
 UPDATE notes
 SET content = COALESCE($3, content),
-    context_id = COALESCE($4, context_id),
-    embedding_status = COALESCE($5, embedding_status),
-    collapse_images = COALESCE($6, collapse_images),
+    collapse_images = COALESCE($4, collapse_images),
     updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
-RETURNING id, user_id, context_id, content, excerpt, search_vector, created_at, updated_at, deleted_at, embedding_status, collapse_images
+RETURNING id, user_id, content, excerpt, created_at, updated_at, deleted_at, collapse_images, revision, document, snapshot_revision
 `
 
 type UpdateNoteParams struct {
-	ID              pgtype.UUID `json:"id"`
-	UserID          pgtype.UUID `json:"user_id"`
-	Content         pgtype.Text `json:"content"`
-	ContextID       pgtype.UUID `json:"context_id"`
-	EmbeddingStatus pgtype.Text `json:"embedding_status"`
-	CollapseImages  pgtype.Bool `json:"collapse_images"`
+	ID             pgtype.UUID `json:"id"`
+	UserID         pgtype.UUID `json:"user_id"`
+	Content        pgtype.Text `json:"content"`
+	CollapseImages pgtype.Bool `json:"collapse_images"`
 }
 
 func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error) {
@@ -629,29 +395,27 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		arg.ID,
 		arg.UserID,
 		arg.Content,
-		arg.ContextID,
-		arg.EmbeddingStatus,
 		arg.CollapseImages,
 	)
 	var i Note
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.ContextID,
 		&i.Content,
 		&i.Excerpt,
-		&i.SearchVector,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
-		&i.EmbeddingStatus,
 		&i.CollapseImages,
+		&i.Revision,
+		&i.Document,
+		&i.SnapshotRevision,
 	)
 	return i, err
 }
 
 const updateNoteContent = `-- name: UpdateNoteContent :exec
-UPDATE notes SET content = $2, excerpt = COALESCE(substring($2 FROM 1 FOR 200), ''), embedding_status = 'pending', updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL
+UPDATE notes SET content = $2, excerpt = COALESCE(substring($2 FROM 1 FOR 200), ''), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL
 `
 
 type UpdateNoteContentParams struct {
@@ -661,19 +425,5 @@ type UpdateNoteContentParams struct {
 
 func (q *Queries) UpdateNoteContent(ctx context.Context, arg UpdateNoteContentParams) error {
 	_, err := q.db.Exec(ctx, updateNoteContent, arg.ID, arg.Content)
-	return err
-}
-
-const updateNoteSearchVector = `-- name: UpdateNoteSearchVector :exec
-UPDATE notes SET search_vector = $2 WHERE id = $1
-`
-
-type UpdateNoteSearchVectorParams struct {
-	ID           pgtype.UUID `json:"id"`
-	SearchVector pgtype.Text `json:"search_vector"`
-}
-
-func (q *Queries) UpdateNoteSearchVector(ctx context.Context, arg UpdateNoteSearchVectorParams) error {
-	_, err := q.db.Exec(ctx, updateNoteSearchVector, arg.ID, arg.SearchVector)
 	return err
 }

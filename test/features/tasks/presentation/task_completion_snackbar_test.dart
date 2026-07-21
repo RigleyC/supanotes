@@ -14,9 +14,25 @@ import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
+import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 class _MockTasksRepository extends Mock implements ITasksRepository {}
+
+NoteEditorController _createTestController(List<DocumentNode> nodes) {
+  final controller = NoteEditorController(userId: 'test-user');
+  final doc = MutableDocument(nodes: nodes);
+  controller.document = doc;
+  controller.bind('note-1');
+  controller.composer = MutableDocumentComposer();
+  controller.editor = createDefaultDocumentEditor(
+    document: doc,
+    composer: controller.composer!,
+  );
+  return controller;
+}
 
 void main() {
   setUpAll(() async {
@@ -106,6 +122,9 @@ void main() {
             tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
             currentUserIdProvider.overrideWithValue('user-1'),
             appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+            noteEditorControllerProvider.overrideWith((ref, id) async => _createTestController([
+              TaskNode(id: 'task-1', text: AttributedText('Tarefa recorrente'), isComplete: false),
+            ])),
           ],
           child: MaterialApp(
             scaffoldMessengerKey: AppMessenger.key,
@@ -123,7 +142,7 @@ void main() {
                           previousHasTime: task.hasTime,
                           scheduledAt: task.dueDate,
                         ),
-                        onUndo: (previousDue, _, __) => mockTasksRepo
+                        onUndo: (previousDue, _, _) => mockTasksRepo
                             .reopenTask(taskId, originalDueDate: previousDue),
                       ),
                   onTaskReopen: (taskId) => mockTasksRepo.reopenTask(taskId),
@@ -161,10 +180,7 @@ void main() {
       expect(find.textContaining('Concluída!'), findsOneWidget);
       final snackBarFinder = find.byType(SnackView);
       if (snackBarFinder.evaluate().isNotEmpty) {
-        final RenderBox box = tester.renderObject(snackBarFinder);
-        final position = box.localToGlobal(Offset.zero);
-        final size = box.size;
-        print('DEBUG: SnackView position = $position, size = $size');
+        // SnackView rendered successfully
       }
 
       // Advance time to allow the snackbar to disappear

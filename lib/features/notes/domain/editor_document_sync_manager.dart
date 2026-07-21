@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:developer' as dev;
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'node_codec.dart';
@@ -241,7 +239,6 @@ class EditorDocumentSyncManager {
     dev.log('[EditorSync] _applyIncomingNodes START', name: 'EditorDocumentSyncManager');
     final currentIds = _document.toList().map((n) => n.id).toList();
     final incomingIds = snapshot.map((n) => n.id).toList();
-    final incomingById = {for (final n in snapshot) n.id: n};
     final requests = <EditRequest>[];
 
     dev.log('[EditorSync] _applyIncomingNodes currentIds: ${currentIds.length}, incomingIds: ${incomingIds.length}', name: 'EditorDocumentSyncManager');

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
@@ -95,7 +97,7 @@ void main() {
       expect(ops.any((o) => (o as Map).containsKey('insert')), true);
     });
 
-    test('produces create_block+delete_block via ReplaceNodeRequest', () async {
+    test('produces text_delta via ReplaceNodeRequest on same block ID', () async {
       final adapter = createAdapter();
 
       List<OperationRequest>? capturedOps;
@@ -119,9 +121,9 @@ void main() {
       await adapter.flushNow();
 
       expect(capturedOps, isNotNull);
-      expect(capturedOps!.length, 2);
-      expect(capturedOps!.any((op) => op.kind == 'delete_block'), true);
-      expect(capturedOps!.any((op) => op.kind == 'create_block'), true);
+      expect(capturedOps!.length, 1);
+      expect(capturedOps!.first.kind, 'text_delta');
+      expect(capturedOps!.first.blockId, 'block-1');
     });
   });
 
@@ -534,6 +536,45 @@ void main() {
       await Future.delayed(Duration.zero);
 
       expect(adapter.confirmedRevision, 42);
+    });
+  });
+
+  group('flushNow', () {
+    test('awaits in-flight _flushLocalOps even when _pendingOps has already been emptied', () async {
+      final adapter = createAdapter();
+      adapter.start();
+      await Future.delayed(Duration.zero);
+
+      final completer = Completer<void>();
+      when(() => mockSyncService.enqueueOperation(any(), any()))
+          .thenAnswer((_) => completer.future);
+
+      editor.execute([
+        InsertTextRequest(
+          documentPosition: DocumentPosition(
+            nodeId: 'block-1',
+            nodePosition: const TextNodePosition(offset: 5),
+          ),
+          textToInsert: ' World',
+          attributions: {},
+        ),
+      ]);
+
+      final firstFlushFuture = adapter.flushNow();
+
+      bool secondFlushResolved = false;
+      final secondFlushFuture = adapter.flushNow().then((_) {
+        secondFlushResolved = true;
+      });
+
+      await Future.delayed(Duration.zero);
+      expect(secondFlushResolved, false);
+
+      completer.complete();
+      await firstFlushFuture;
+      await secondFlushFuture;
+
+      expect(secondFlushResolved, true);
     });
   });
 

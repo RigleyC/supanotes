@@ -25,10 +25,11 @@ type TextDeltaPayload struct {
 }
 
 type CreateBlockPayload struct {
-	ID           string      `json:"id"`
-	Type         string      `json:"type"`
-	Delta        []delta.Op  `json:"delta"`
-	AfterBlockID string      `json:"afterBlockId"`
+	ID           string         `json:"id"`
+	Type         string         `json:"type"`
+	Delta        []delta.Op     `json:"delta"`
+	Metadata     map[string]any `json:"metadata"`
+	AfterBlockID string         `json:"afterBlockId"`
 }
 
 type MoveBlockPayload struct {
@@ -55,9 +56,48 @@ func (d *Document) ApplyOperation(kind Kind, blockID string, payload json.RawMes
 		return d.applyMoveBlock(payload)
 	case KindSetBlockType:
 		return d.applySetBlockType(blockID, payload)
+	case KindSetBlockMetadata:
+		return d.applySetBlockMetadata(blockID, payload)
+	case KindCompleteTaskOccurrence:
+		return d.applyCompleteTaskOccurrence(blockID, payload)
 	default:
 		return ErrInvalidOperationKind
 	}
+}
+
+func (d *Document) applyCompleteTaskOccurrence(blockID string, payload json.RawMessage) error {
+	var p CompleteTaskOccurrencePayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return fmt.Errorf("parse complete task occurrence payload: %w", err)
+	}
+
+	targetID := blockID
+	if targetID == "" {
+		targetID = p.TaskID
+	}
+	if targetID == "" {
+		return fmt.Errorf("missing taskId in complete task occurrence")
+	}
+
+	for i := range d.Blocks {
+		if d.Blocks[i].ID == targetID {
+			if d.Blocks[i].Metadata == nil {
+				d.Blocks[i].Metadata = make(map[string]any)
+			}
+			completions, ok := d.Blocks[i].Metadata["completions"].(map[string]any)
+			if !ok {
+				completions = make(map[string]any)
+			}
+			if p.CompletedAt != nil && *p.CompletedAt != "" {
+				completions[p.ScheduledAt] = *p.CompletedAt
+			} else {
+				delete(completions, p.ScheduledAt)
+			}
+			d.Blocks[i].Metadata["completions"] = completions
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s", ErrBlockNotFound, targetID)
 }
 
 func (d *Document) applyTextDelta(blockID string, payload json.RawMessage) error {
@@ -83,11 +123,16 @@ func (d *Document) applyCreateBlock(payload json.RawMessage) error {
 		return fmt.Errorf("parse create block payload: %w", err)
 	}
 
+	meta := p.Metadata
+	if meta == nil {
+		meta = make(map[string]any)
+	}
+
 	newBlock := Block{
 		ID:       p.ID,
 		Type:     p.Type,
 		Delta:    p.Delta,
-		Metadata: make(map[string]any),
+		Metadata: meta,
 	}
 
 	if p.AfterBlockID == "" {
@@ -152,6 +197,10 @@ func (d *Document) applyMoveBlock(payload json.RawMessage) error {
 	return nil
 }
 
+type SetBlockMetadataPayload struct {
+	Metadata map[string]any `json:"metadata"`
+}
+
 func (d *Document) applySetBlockType(blockID string, payload json.RawMessage) error {
 	p, err := parseSetBlockTypePayload(payload)
 	if err != nil {
@@ -167,11 +216,35 @@ func (d *Document) applySetBlockType(blockID string, payload json.RawMessage) er
 	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
 }
 
+func (d *Document) applySetBlockMetadata(blockID string, payload json.RawMessage) error {
+	var p SetBlockMetadataPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return fmt.Errorf("parse set block metadata payload: %w", err)
+	}
+
+	for i := range d.Blocks {
+		if d.Blocks[i].ID == blockID {
+			if d.Blocks[i].Metadata == nil {
+				d.Blocks[i].Metadata = make(map[string]any)
+			}
+			for k, v := range p.Metadata {
+				if v == nil {
+					delete(d.Blocks[i].Metadata, k)
+				} else {
+					d.Blocks[i].Metadata[k] = v
+				}
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
+}
+
 func DeriveContentFromDocument(doc Document) (content, excerpt string) {
 	var parts []string
 	for _, block := range doc.Blocks {
 		text := deltaText(block.Delta)
-		line := formatBlockAsMarkdown(block.Type, text)
+		line := formatBlockAsMarkdown(block, text)
 		if line != "" {
 			parts = append(parts, line)
 		}
@@ -195,13 +268,13 @@ func deltaText(ops []delta.Op) string {
 	return b.String()
 }
 
-func formatBlockAsMarkdown(blockType, text string) string {
+func formatBlockAsMarkdown(block Block, text string) string {
 	text = strings.TrimSpace(text)
-	if text == "" && blockType != string(BlockDivider) {
+	if text == "" && block.Type != string(BlockDivider) {
 		return ""
 	}
 
-	switch BlockType(blockType) {
+	switch BlockType(block.Type) {
 	case BlockHeader1:
 		return "# " + text
 	case BlockHeader2:
@@ -214,6 +287,12 @@ func formatBlockAsMarkdown(blockType, text string) string {
 		return "- " + text
 	case BlockOrderedList:
 		return "1. " + text
+	case BlockTask:
+		isComp, _ := block.Metadata["isCompleted"].(bool)
+		if isComp {
+			return "- [x] " + text
+		}
+		return "- [ ] " + text
 	case BlockDivider:
 		return "---"
 	default:

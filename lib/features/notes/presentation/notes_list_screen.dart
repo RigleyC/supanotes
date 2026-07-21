@@ -14,15 +14,11 @@ import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_grid_view.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_list_view.dart';
-import 'package:supanotes/features/search/presentation/controllers/search_controller.dart';
-import 'package:supanotes/features/search/presentation/widgets/search_bar.dart';
-import 'package:supanotes/features/search/presentation/widgets/search_error_view.dart';
-import 'package:supanotes/features/search/presentation/widgets/search_loading_view.dart';
-import 'package:supanotes/features/search/presentation/widgets/search_results_view.dart';
+
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:supanotes/shared/widgets/quick_action_fabs.dart';
+
 import 'package:supanotes/features/notes/presentation/widgets/notes_more_menu.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
@@ -68,9 +64,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final isGridView = ref.watch(isGridViewProvider);
     final notesAsync = ref.watch(activeNotesProvider);
     final trimmedSearchQuery = _searchQuery.trim();
-    final searchAsync = trimmedSearchQuery.isEmpty
-        ? null
-        : ref.watch(searchResultsProvider(trimmedSearchQuery));
+
 
     final headerSlivers = [
       SliverToBoxAdapter(
@@ -92,11 +86,13 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
               AppSpacing.md,
               AppSpacing.md,
             ),
-            child: SearchInputBar(
+            child: TextField(
               key: const ValueKey('notes-inline-search-field'),
-              initialQuery: _searchQuery,
-              hintText: 'Buscar notas',
-              onQueryChanged: _onSearchQueryChanged,
+              decoration: const InputDecoration(
+                hintText: 'Buscar notas',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: _onSearchQueryChanged,
             ),
           ),
         ),
@@ -124,49 +120,39 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ),
         ],
       ),
-      body: trimmedSearchQuery.isEmpty
-          ? notesAsync.when(
-              loading: () => CustomScrollView(
-                slivers: [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ],
-              ),
-              error: (e, _) => AppErrorView(
-                title: 'Erro ao carregar as notas',
-                subtitle: e.toString(),
-              ),
-              data: (notes) => CustomScrollView(
-                slivers: [...headerSlivers, _buildNotesBody(notes, isGridView)],
-              ),
-            )
-          : searchAsync!.when(
-              loading: () => SearchLoadingView(headerSlivers: headerSlivers),
-              error: (e, _) => SearchErrorView(
-                headerSlivers: headerSlivers,
-                error: e.toString(),
-              ),
-              data: (results) => SearchResultsView(
-                headerSlivers: headerSlivers,
-                query: trimmedSearchQuery,
-                results: results,
-                onTap: (result) => context.push(AppRoutes.note(result.id)),
-              ),
+      body: notesAsync.when(
+        loading: () => CustomScrollView(
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
             ),
+          ],
+        ),
+        error: (e, _) => AppErrorView(
+          title: 'Erro ao carregar as notas',
+          subtitle: e.toString(),
+        ),
+        data: (notes) {
+          final filteredNotes = trimmedSearchQuery.isEmpty
+              ? notes
+              : notes.where((n) {
+                  final q = trimmedSearchQuery.toLowerCase();
+                  final bodyText = (n.excerpt ?? n.content ?? '').toLowerCase();
+                  return n.title.toLowerCase().contains(q) || bodyText.contains(q);
+                }).toList();
+          return CustomScrollView(
+            slivers: [...headerSlivers, _buildNotesBody(filteredNotes, isGridView)],
+          );
+        },
+      ),
 
-      floatingActionButton: QuickActionFabs(
-        smallFabKey: const ValueKey('home-chat-fab'),
-        smallHeroTag: 'home-chat-fab',
-        smallIcon: 'assets/icons/agent.svg',
-        smallTooltip: 'Conversar com o assistente',
-        onSmallPressed: () => context.push(AppRoutes.chat),
-        primaryFabKey: const ValueKey('home-create-note-fab'),
-        primaryHeroTag: 'home-create-note-fab',
-        primaryIcon: 'assets/icons/feather.svg',
-        primaryTooltip: 'Criar nota',
-        onPrimaryPressed: () => _openNewNote(context),
+      floatingActionButton: FloatingActionButton(
+        key: const ValueKey('home-create-note-fab'),
+        heroTag: 'home-create-note-fab',
+        tooltip: 'Criar nota',
+        onPressed: () => _openNewNote(context),
+        child: const Icon(Icons.add),
       ),
     );
   }

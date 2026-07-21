@@ -1,20 +1,15 @@
 library;
 
-import 'dart:developer' as dev;
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:yjs_dart/yjs_dart.dart';
-
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/node_codec.dart';
 import 'package:supanotes/features/notes/domain/note_operation_adapter.dart';
-import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
-import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -37,7 +32,6 @@ class NoteEditorController extends ChangeNotifier {
   void Function(bool)? onHasContentChanged;
 
   EditorDocumentSyncManager? _coordinator;
-  YjsDocEditorBridge? _bridge;
   NoteOperationAdapter? operationAdapter;
   String? _noteId;
 
@@ -55,52 +49,91 @@ class NoteEditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void initFromDoc({
-    required Doc doc,
-    required String noteId,
-    void Function({required bool isRemote})? onDocChanged,
-    void Function(Set<String> nodeIds)? onDocCommitted,
-  }) {
-    dev.log(
-      '[NoteEditorController.initFromDoc] noteId=$noteId',
-      name: 'NoteEditor',
-    );
-    final nodes = noteNodesFromDoc(doc);
-    document = NodeCodec.documentFromNodes(nodes);
-    _noteId = noteId;
-    _setupEditor();
-    _coordinator = EditorDocumentSyncManager(
-      document: document!,
-      editor: editor!,
-    );
-    _bridge = YjsDocEditorBridge(
-      doc: doc,
-      userId: userId,
-      coordinator: _coordinator!,
-      onDocChanged: onDocChanged,
-      onDocCommitted: onDocCommitted,
-    );
-    document!.addListener(_onDocChanged);
-    dev.log(
-      '[NoteEditorController.initFromDoc] done nodes=${nodes.length}',
-      name: 'NoteEditor',
-    );
-    notifyListeners();
-  }
-
   void _onDocChanged(DocumentChangeLog _) {
     onHasContentChanged?.call(document != null && document!.isNotEmpty);
   }
 
   TaskCompletionResult? completeTaskInYDoc(String nodeId,
       {DateTime? now, DateTime? scheduledAt}) {
-    return _bridge?.completeTaskInYDoc(nodeId, now: now, scheduledAt: scheduledAt);
+    final node = document?.getNodeById(nodeId);
+    if (node is TaskNode) {
+      final dueDateStr = node.metadata['dueDate'] as String?;
+      final hasTime = node.metadata['hasTime'] as bool? ?? false;
+      final recurrenceStr = node.metadata['recurrenceRule'] as String? ?? node.metadata['recurrence'] as String?;
+      final snapshot = TaskSnapshot(
+        dueDate: dueDateStr != null ? DateTime.tryParse(dueDateStr) : null,
+        hasTime: hasTime,
+        recurrence: TaskRecurrence.parse(recurrenceStr),
+      );
+      final effectiveNow = now ?? DateTime.now();
+      final result = TaskCompletionCommand(() => effectiveNow).complete(snapshot, scheduledAt: scheduledAt);
+
+      final updatedMeta = Map<String, dynamic>.from(node.metadata);
+      bool isCompleted = false;
+      if (result.completed) {
+        isCompleted = true;
+        updatedMeta['lastCompletedAt'] = result.completedAt.toIso8601String();
+        updatedMeta.remove('dueDate');
+      } else {
+        isCompleted = false;
+        if (result.scheduledAt != null) {
+          final completions = Map<String, dynamic>.from(
+            updatedMeta['completions'] as Map? ?? {},
+          );
+          final schedStr = result.scheduledAt!.toUtc().toIso8601String();
+          final compStr = result.completedAt.toUtc().toIso8601String();
+          completions[schedStr] = compStr;
+          updatedMeta['completions'] = completions;
+        }
+      }
+
+      final updatedNode = TaskNode(
+        id: node.id,
+        text: node.text,
+        isComplete: isCompleted,
+        metadata: updatedMeta,
+      );
+
+      editor?.execute([
+        ReplaceNodeRequest(
+          existingNodeId: nodeId,
+          newNode: updatedNode,
+        ),
+      ]);
+      return result;
+    }
+    return null;
   }
 
   void reopenTaskInYDoc(String nodeId,
       {DateTime? previousDue, DateTime? scheduledAt}) {
-    _bridge?.reopenTaskInYDoc(nodeId,
-        previousDue: previousDue, scheduledAt: scheduledAt);
+    final node = document?.getNodeById(nodeId);
+    if (node is TaskNode) {
+      final updatedMeta = Map<String, dynamic>.from(node.metadata);
+      if (previousDue != null) {
+        updatedMeta['dueDate'] = previousDue.toIso8601String();
+      }
+      if (scheduledAt != null) {
+        final completions = Map<String, dynamic>.from(
+          updatedMeta['completions'] as Map? ?? {},
+        );
+        final schedStr = scheduledAt.toUtc().toIso8601String();
+        completions.remove(schedStr);
+        updatedMeta['completions'] = completions;
+      }
+      final updatedNode = TaskNode(
+        id: node.id,
+        text: node.text,
+        isComplete: false,
+        metadata: updatedMeta,
+      );
+      editor?.execute([
+        ReplaceNodeRequest(
+          existingNodeId: nodeId,
+          newNode: updatedNode,
+        ),
+      ]);
+    }
   }
 
   void updateTaskMetadataInYDoc(
@@ -113,16 +146,43 @@ class NoteEditorController extends ChangeNotifier {
     String? reminder,
     bool clearReminder = false,
   }) {
-    _bridge?.updateTaskMetadataInYDoc(
-      nodeId,
-      dueDate: dueDate,
-      recurrence: recurrence,
-      clearDueDate: clearDueDate,
-      clearRecurrence: clearRecurrence,
-      hasTime: hasTime,
-      reminder: reminder,
-      clearReminder: clearReminder,
-    );
+    final node = document?.getNodeById(nodeId);
+    if (node is TaskNode) {
+      final updatedMeta = Map<String, dynamic>.from(node.metadata);
+      if (clearDueDate) {
+        updatedMeta.remove('dueDate');
+      } else if (dueDate != null) {
+        updatedMeta['dueDate'] = dueDate.toIso8601String();
+      }
+      if (clearRecurrence) {
+        updatedMeta.remove('recurrenceRule');
+        updatedMeta.remove('recurrence');
+      } else if (recurrence != null) {
+        updatedMeta['recurrenceRule'] = recurrence;
+        updatedMeta['recurrence'] = recurrence;
+      }
+      if (hasTime != null) {
+        updatedMeta['hasTime'] = hasTime;
+      }
+      if (clearReminder) {
+        updatedMeta.remove('reminder');
+      } else if (reminder != null) {
+        updatedMeta['reminder'] = reminder;
+      }
+
+      final updatedNode = TaskNode(
+        id: node.id,
+        text: node.text,
+        isComplete: node.isComplete,
+        metadata: updatedMeta,
+      );
+      editor?.execute([
+        ReplaceNodeRequest(
+          existingNodeId: nodeId,
+          newNode: updatedNode,
+        ),
+      ]);
+    }
   }
 
   void _setupEditor() {
@@ -209,8 +269,6 @@ class NoteEditorController extends ChangeNotifier {
     await operationAdapter?.flushNow();
     operationAdapter?.dispose();
     await _coordinator?.dispose();
-    _bridge?.dispose();
-    _bridge = null;
     editor?.dispose();
     document?.dispose();
     composer?.dispose();

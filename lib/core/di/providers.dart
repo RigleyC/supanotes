@@ -18,7 +18,6 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/core/sync/yjs_sync_manager.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
@@ -78,14 +77,6 @@ final authControllerProvider = AsyncNotifierProvider<AuthController, User?>(
 final sessionResetProvider = StateProvider<int>((ref) => 0);
 
 // ---------------------------------------------------------------------------
-// Database DAOs
-// ---------------------------------------------------------------------------
-
-final tagsDaoProvider = Provider.autoDispose(
-  (ref) => ref.watch(appDatabaseProvider).tagsDao,
-);
-
-// ---------------------------------------------------------------------------
 // Local notification service
 // ---------------------------------------------------------------------------
 
@@ -132,17 +123,7 @@ final noteOperationsSyncServiceProvider =
   );
 });
 
-// ---------------------------------------------------------------------------
-// Yjs sync manager (local Yjs docs per note)
-// ---------------------------------------------------------------------------
 
-final yjsSyncManagerProvider = Provider<YjsSyncManager>((ref) {
-  final db = ref.watch(appDatabaseProvider);
-  final userId = ref.watch(currentUserIdProvider)!;
-  final mgr = YjsSyncManager(db: db, userId: userId);
-  ref.onDispose(mgr.dispose);
-  return mgr;
-});
 
 // ---------------------------------------------------------------------------
 // Shared preferences

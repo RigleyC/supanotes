@@ -20,7 +20,7 @@ class _StubNotificationScheduler {
   }) async {
     // Cancel old notifications for previous user
     for (final task in tasks) {
-      final oldId = notificationIdForTask(userId, task.id);
+      notificationIdForTask(userId, task.id);
       // For the test: the 'a' task belongs to user-a, changing to user-b means
       // we cancel the old user's notifications for tasks not in the new set
     }
@@ -54,7 +54,7 @@ class FakeNotificationPlugin extends Fake
 
 int notificationIdForTaskLegacy(String taskId) => taskId.hashCode;
 
-_StubTaskData task(String id) => _StubTaskData(id);
+_StubTaskData _task(String id) => _StubTaskData(id);
 
 void main() {
   group('TaskNotificationScheduler - reconciliation', () {
@@ -75,8 +75,8 @@ void main() {
       final plugin = FakeNotificationPlugin();
       final scheduler = _StubNotificationScheduler();
 
-      await scheduler.reconcile(userId: 'user-a', tasks: [task('a')], plugin: plugin);
-      await scheduler.reconcile(userId: 'user-b', tasks: [task('b')], plugin: plugin);
+      await scheduler.reconcile(userId: 'user-a', tasks: [_task('a')], plugin: plugin);
+      await scheduler.reconcile(userId: 'user-b', tasks: [_task('b')], plugin: plugin);
 
       // Note: The stub doesn't actually call the plugin — this test
       // characterizes the expected API shape. The real reconciliation

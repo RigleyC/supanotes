@@ -196,7 +196,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   }
 
   Future<void> _onCheckboxTap() async {
-    if (_isUpdatingCompletion || widget.onCompletionChange == null) {
+    if (_isUpdatingCompletion) {
       return;
     }
 
@@ -211,7 +211,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     });
 
     try {
-      await widget.onCompletionChange!(newComplete);
+      if (widget.onCompletionChange != null) {
+        await widget.onCompletionChange!(newComplete);
+      } else {
+        widget.viewModel.setComplete?.call(newComplete);
+      }
     } catch (_) {
       if (mounted) {
         setState(() {

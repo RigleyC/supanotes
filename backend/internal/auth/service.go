@@ -1,10 +1,3 @@
-// Package auth wires the persistence layer (sqlcgen.Querier) with the
-// stateless primitives in pkg/auth (Argon2id, JWT, refresh tokens).
-//
-// Handlers should always go through Service; the package never returns
-// raw sqlcgen errors to callers — it normalises to ErrInvalidCredentials,
-// ErrEmailInUse, ErrInvalidRefreshToken so the HTTP layer can map them
-// to status codes without leaking storage details.
 package auth
 
 import (
@@ -35,14 +28,9 @@ var (
 
 const uniqueViolationCode = "23505"
 
-// SessionData holds the full user context returned on login / register
-// so the client can bootstrap its local cache without extra round-trips.
 type SessionData struct {
 	User     sqlcgen.User
 	Settings dto.SettingsResponse
-	Soul     dto.SoulResponse
-	Contexts []dto.ContextResponse
-	Routines []sqlcgen.Routine
 }
 
 type Service struct {
@@ -55,8 +43,6 @@ func NewService(q sqlcgen.Querier, cfg *config.Config, pool *pgxpool.Pool) *Serv
 	return &Service{q: q, pool: pool, cfg: cfg}
 }
 
-// inTx runs fn inside a transaction when a pool is available.
-// In tests (pool is nil), it runs fn directly on s.q.
 func (s *Service) inTx(ctx context.Context, fn func(sqlcgen.Querier) error) error {
 	if s.pool == nil {
 		return fn(s.q)
@@ -72,10 +58,6 @@ func (s *Service) inTx(ctx context.Context, fn func(sqlcgen.Querier) error) erro
 	return tx.Commit(ctx)
 }
 
-// Register creates the user, seeds defaults, and emits the access/refresh
-// token pair — all inside a single transaction so a failure at any step
-// leaves no partial state.
-// Email is lowercased before insert; password is hashed with Argon2id.
 func (s *Service) Register(ctx context.Context, email, password, name string) (*SessionData, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
@@ -113,7 +95,6 @@ func (s *Service) Register(ctx context.Context, email, password, name string) (*
 		return nil, "", "", fmt.Errorf("auth: register: %w", err)
 	}
 
-	// Load session data outside the auth tx so we don't hold it open.
 	if err := s.loadSessionData(ctx, &session); err != nil {
 		return nil, "", "", fmt.Errorf("auth: load session data: %w", err)
 	}
@@ -121,9 +102,6 @@ func (s *Service) Register(ctx context.Context, email, password, name string) (*
 	return &session, access, refresh, nil
 }
 
-// Login validates the credentials in constant time relative to the
-// hash, then emits a fresh token pair. Both "user not found" and
-// "wrong password" surface as ErrInvalidCredentials.
 func (s *Service) Login(ctx context.Context, email, password string) (*SessionData, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
@@ -153,10 +131,6 @@ func (s *Service) Login(ctx context.Context, email, password string) (*SessionDa
 	return &session, access, refresh, nil
 }
 
-// Refresh rotates the supplied refresh token: validates by hash,
-// revokes the old row, then mints a new pair — all inside a single
-// transaction to avoid orphaned tokens or double-use.
-// Unknown/expired/revoked tokens collapse to ErrInvalidRefreshToken.
 func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, string, error) {
 	hashed := authpkg.HashRefreshToken(refreshPlain)
 
@@ -185,9 +159,6 @@ func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, str
 	return access, refresh, nil
 }
 
-// Logout best-effort revokes the supplied refresh token. Unknown
-// tokens are not an error — logout should never leak whether a token
-// existed.
 func (s *Service) Logout(ctx context.Context, refreshPlain string) error {
 	hashed := authpkg.HashRefreshToken(refreshPlain)
 
@@ -231,7 +202,6 @@ func (s *Service) generateAuthResponse(ctx context.Context, q sqlcgen.Querier, u
 func (s *Service) loadSessionData(ctx context.Context, session *SessionData) error {
 	userID := session.User.ID
 
-	// Settings
 	settings, err := s.q.GetUserSettings(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("load settings: %w", err)
@@ -251,39 +221,6 @@ func (s *Service) loadSessionData(ctx context.Context, session *SessionData) err
 		UpdatedAt:   settings.UpdatedAt.Time.Format(time.RFC3339),
 	}
 
-	// Soul
-	soul, err := s.q.GetSoul(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("load soul: %w", err)
-	}
-	session.Soul = dto.SoulResponse{
-		Personality: soul.Personality,
-		CreatedAt:   soul.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt:   soul.UpdatedAt.Time.Format(time.RFC3339),
-	}
-
-	// Contexts
-	ctxs, err := s.q.GetContexts(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("load contexts: %w", err)
-	}
-	for _, c := range ctxs {
-		session.Contexts = append(session.Contexts, dto.ContextResponse{
-			ID:        uid.UUIDToString(c.ID),
-			Slug:      c.Slug,
-			Name:      c.Name,
-			CreatedAt: c.CreatedAt.Time.Format(time.RFC3339),
-			UpdatedAt: c.UpdatedAt.Time.Format(time.RFC3339),
-		})
-	}
-
-	// Routines
-	routines, err := s.q.GetRoutinesByUser(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("load routines: %w", err)
-	}
-	session.Routines = routines
-
 	return nil
 }
 
@@ -297,65 +234,10 @@ func seedUserDefaults(ctx context.Context, q sqlcgen.Querier, userID pgtype.UUID
 
 	content := "# Boas-vindas\n\nBem-vindo ao SupaNotes!"
 	if _, err := q.CreateNote(ctx, sqlcgen.CreateNoteParams{
-		UserID:          userID,
-		Content:         content,
-		EmbeddingStatus: "pending",
+		UserID:  userID,
+		Content: content,
 	}); err != nil {
 		return fmt.Errorf("auth: seed welcome note: %w", err)
-	}
-
-	personality := `# Personalidade
-Você é o assistente pessoal SupaNotes — um parceiro de organização proativo, claro e direto. Seu tom é caloroso mas profissional, como um assistente executivo de confiança.
-
-# Regras
-1. Seja conciso. Prefira bullet points a parágrafos.
-2. Seja proativo: sugira ações, não apenas liste informações.
-3. Contexto é rei: use as notas, tarefas e memórias do usuário para personalizar cada interação.
-4. Se o usuário pedir algo ambíguo, peça esclarecimento educadamente.
-5. Ao organizar o inbox, agrupe ideias relacionadas e sugira títulos descritivos.
-6. Mantenha confidencialidade — nunca compartilhe informações do usuário.
-7. Se não souber algo, admita e sugira alternativas.
-
-# Formato de Resposta
-- Use Markdown para formatação
-- Headings (##) para seções
-- Bullet points para listas
-- Checklist (- []) para tarefas sugeridas
-- Citações em bloco para citações ou exemplos
-
-# Briefs (Rotinas)
-Nos briefs diários/semanais:
-- Destaque tarefas urgentes primeiro
-- Resuma notas recentes em 1-2 frases
-- Sugira uma "intenção do dia" semanal
-- Mantenha o brief em 3-5 parágrafos`
-	if _, err := q.UpsertSoul(ctx, sqlcgen.UpsertSoulParams{
-		UserID:      userID,
-		Personality: personality,
-	}); err != nil {
-		return fmt.Errorf("auth: seed soul: %w", err)
-	}
-
-	if _, err := q.CreateRoutine(ctx, sqlcgen.CreateRoutineParams{
-		UserID:    userID,
-		Type:      "daily",
-		CronExpr:  "0 8 * * 1-5",
-		Enabled:   true,
-		Name:      "Daily Brief",
-		BriefType: "daily",
-	}); err != nil {
-		return fmt.Errorf("auth: seed daily routine: %w", err)
-	}
-
-	if _, err := q.CreateRoutine(ctx, sqlcgen.CreateRoutineParams{
-		UserID:    userID,
-		Type:      "weekly",
-		CronExpr:  "0 9 * * 1",
-		Enabled:   true,
-		Name:      "Weekly Brief",
-		BriefType: "weekly",
-	}); err != nil {
-		return fmt.Errorf("auth: seed weekly routine: %w", err)
 	}
 
 	return nil

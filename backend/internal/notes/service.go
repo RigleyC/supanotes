@@ -32,18 +32,14 @@ func isEmptyRegularNote(content string) bool {
 	return strings.TrimSpace(content) == ""
 }
 
-func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string, contextID *pgtype.UUID, collapseImages bool) (sqlcgen.Note, error) {
+func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string, collapseImages bool) (sqlcgen.Note, error) {
 	if isEmptyRegularNote(content) {
 		return sqlcgen.Note{}, ErrEmptyNote
 	}
 	arg := sqlcgen.CreateNoteParams{
-		UserID:          userID,
-		Content:         content,
-		EmbeddingStatus: "pending",
-		CollapseImages:  collapseImages,
-	}
-	if contextID != nil {
-		arg.ContextID = *contextID
+		UserID:         userID,
+		Content:        content,
+		CollapseImages: collapseImages,
 	}
 	note, err := s.repo.CreateNote(ctx, arg)
 	if err != nil {
@@ -64,17 +60,13 @@ func (s *Service) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype
 	return note, nil
 }
 
-func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, contextID *pgtype.UUID, collapseImages *bool) (sqlcgen.Note, error) {
+func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, collapseImages *bool) (sqlcgen.Note, error) {
 	arg := sqlcgen.UpdateNoteParams{
 		ID:     id,
 		UserID: userID,
 	}
 	if content != nil {
 		arg.Content = pgtype.Text{String: *content, Valid: true}
-		arg.EmbeddingStatus = pgtype.Text{String: "pending", Valid: true}
-	}
-	if contextID != nil {
-		arg.ContextID = *contextID
 	}
 	if collapseImages != nil {
 		arg.CollapseImages = pgtype.Bool{Bool: *collapseImages, Valid: true}
@@ -92,13 +84,10 @@ func (s *Service) DeleteNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	return s.repo.DeleteNote(ctx, id, userID)
 }
 
-func (s *Service) GetNotes(ctx context.Context, userID pgtype.UUID, contextID *pgtype.UUID, favorite *bool, limit int32, cursorUpdatedAt *time.Time, cursorID *pgtype.UUID) ([]sqlcgen.GetNotesRow, error) {
+func (s *Service) GetNotes(ctx context.Context, userID pgtype.UUID, favorite *bool, limit int32, cursorUpdatedAt *time.Time, cursorID *pgtype.UUID) ([]sqlcgen.GetNotesRow, error) {
 	arg := sqlcgen.GetNotesParams{
 		UserID: userID,
 		Limit:  limit,
-	}
-	if contextID != nil {
-		arg.ContextID = *contextID
 	}
 	if favorite != nil {
 		arg.Favorite = pgtype.Bool{Bool: *favorite, Valid: true}
