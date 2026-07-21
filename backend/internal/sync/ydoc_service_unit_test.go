@@ -71,6 +71,22 @@ func TestPreRegisterYTextSupportsLegacyAndNonUUIDContentRoots(t *testing.T) {
 	assert.Equal(t, "legacy paragraph", target.GetText("content_fixed/p2").ToString())
 }
 
+func TestApplyYjsUpdateIfChangedIgnoresDuplicateUpdate(t *testing.T) {
+	source := crdt.New(crdt.WithGC(false))
+	source.GetText("content/node-1").Insert(nil, 0, "hello", nil)
+	update := crdt.EncodeStateAsUpdateV1(source, nil)
+
+	target := crdt.New(crdt.WithGC(false))
+	changed, err := applyYjsUpdateIfChanged(target, update, "test")
+	require.NoError(t, err)
+	assert.True(t, changed)
+
+	changed, err = applyYjsUpdateIfChanged(target, update, "test")
+	require.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, "hello", target.GetText("content/node-1").ToString())
+}
+
 func TestYDocServiceCloseIsIdempotent(t *testing.T) {
 	svc := NewYDocService(nil, nil, "test", WithMaxCachedDocs(10))
 	// First Close should cancel the context and wait for the goroutine.

@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -284,12 +285,16 @@ func (s *YDocService) ApplyNodeMutation(ctx context.Context, noteID string, upda
 
 func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc, noteID string, update []byte) error {
 	startApply := time.Now()
-	PreRegisterYText(doc, update)
-	if err := crdt.ApplyUpdateV1(doc, update, "local"); err != nil {
+	changed, err := applyYjsUpdateIfChanged(doc, update, "local")
+	if err != nil {
 		slog.Error("ApplyNodeMutationLocked: ApplyUpdateV1 failed", "note_id", noteID, "error", err)
 		return err
 	}
 	slog.Debug("ApplyNodeMutationLocked: ApplyUpdateV1 done", "note_id", noteID, "update_bytes", len(update), "elapsed_ms", time.Since(startApply).Milliseconds())
+	if !changed {
+		slog.Debug("ApplyNodeMutationLocked: ignored duplicate update", "note_id", noteID, "update_bytes", len(update))
+		return nil
+	}
 
 	// Persist synchronously to DB
 	if err := s.persistNoteToDB(ctx, noteID, update); err != nil {
@@ -320,6 +325,19 @@ func (s *YDocService) ApplyNodeMutationLocked(ctx context.Context, doc *crdt.Doc
 	}()
 
 	return nil
+}
+
+// applyYjsUpdateIfChanged avoids persisting and projecting duplicate CRDT
+// updates. Compare full encoded state instead of only a state vector because a
+// delete-set mutation can change a document without advancing a client clock.
+func applyYjsUpdateIfChanged(doc *crdt.Doc, update []byte, origin any) (bool, error) {
+	before := crdt.EncodeStateAsUpdateV1(doc, nil)
+	PreRegisterYText(doc, update)
+	if err := crdt.ApplyUpdateV1(doc, update, origin); err != nil {
+		return false, err
+	}
+	after := crdt.EncodeStateAsUpdateV1(doc, nil)
+	return !bytes.Equal(before, after), nil
 }
 
 func (s *YDocService) persistNoteToDB(ctx context.Context, noteID string, update []byte) error {
