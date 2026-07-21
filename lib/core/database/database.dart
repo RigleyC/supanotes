@@ -25,6 +25,8 @@ import 'tables/local_yjs_states.dart';
 import 'tables/note_links.dart';
 import 'tables/note_sync_errors.dart';
 import 'tables/note_tags.dart';
+import 'tables/sync_sessions.dart';
+
 import 'tables/notes.dart';
 import 'tables/pending_note_operations.dart';
 import 'tables/tags.dart';
@@ -51,6 +53,7 @@ part 'database.g.dart';
     LocalNoteDocuments,
     PendingNoteOperations,
     NoteSyncErrors,
+    SyncSessions,
   ],
   daos: [
     NotesDao,
@@ -82,7 +85,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -189,6 +192,10 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS idx_pending_ops_note_ordinal ON pending_note_operations(note_id, ordinal)',
         );
+      }
+      if (from < 22) {
+        await m.addColumn(pendingNoteOperations, pendingNoteOperations.status);
+        await m.createTable(syncSessions);
       }
     },
     beforeOpen: (details) async {

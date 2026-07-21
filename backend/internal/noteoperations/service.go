@@ -79,7 +79,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 			return SyncResponse{}, fmt.Errorf("dedup check: %w", err)
 		}
 
-		if err := validateAndTransform(ctx, txRepo, &opReq, &doc, noteID, currentRevision); err != nil {
+		if err := validateAndTransform(ctx, txRepo, &opReq, userID, opID, &doc, noteID, currentRevision); err != nil {
 			return SyncResponse{}, err
 		}
 
@@ -133,11 +133,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 		return SyncResponse{}, fmt.Errorf("update note document: %w", err)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return SyncResponse{}, fmt.Errorf("commit tx: %w", err)
-	}
-
-	remoteOps, err := s.repo.GetOperationsSince(ctx, noteID, req.KnownRevision)
+	remoteOps, err := txRepo.GetOperationsRange(ctx, noteID, req.KnownRevision, currentRevision)
 	if err != nil {
 		return SyncResponse{}, fmt.Errorf("fetch remote ops: %w", err)
 	}
@@ -154,11 +150,16 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 		}
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		return SyncResponse{}, fmt.Errorf("commit tx: %w", err)
+	}
+
 	return SyncResponse{
-		Accepted:         accepted,
-		FinalRevision:    currentRevision,
-		RemoteOperations: filteredRemote,
-		ServerTime:       time.Now().UTC(),
+		Accepted:          accepted,
+		FinalRevision:     currentRevision,
+		RemoteOperations:  filteredRemote,
+		CanonicalDocument: docJSON,
+		ServerTime:        time.Now().UTC(),
 	}, nil
 }
 
@@ -166,11 +167,13 @@ func validateAndTransform(
 	ctx context.Context,
 	txRepo Repository,
 	opReq *OperationRequest,
+	userID pgtype.UUID,
+	opID pgtype.UUID,
 	doc *Document,
 	noteID pgtype.UUID,
 	currentRevision int64,
 ) error {
-	if err := ValidateOperation(*opReq, *doc, opReq.BaseRevision); err != nil {
+	if err := ValidateOperation(*opReq, *doc, opReq.BaseRevision, currentRevision); err != nil {
 		return err
 	}
 
@@ -195,7 +198,8 @@ func validateAndTransform(
 				return fmt.Errorf("parse concurrent delta: %w", err)
 			}
 
-			clientDelta = serverDelta.Transform(*clientDelta, false)
+			pri := serverHasPriority(co.ActorID, userID, co.OperationID, opID)
+			clientDelta = serverDelta.Transform(*clientDelta, pri)
 		}
 
 		transformedPayload, err := json.Marshal(clientDelta)
@@ -242,12 +246,41 @@ func (s *Service) GetOperationsSince(ctx context.Context, noteID pgtype.UUID, us
 		return OperationsListResponse{}, ErrNoPermission
 	}
 
-	ops, err := s.repo.GetOperationsSince(ctx, noteID, afterRevision)
+	if s.pool == nil {
+		ops, err := s.repo.GetOperationsSince(ctx, noteID, afterRevision)
+		if err != nil {
+			return OperationsListResponse{}, fmt.Errorf("get operations: %w", err)
+		}
+		return OperationsListResponse{Operations: ops}, nil
+	}
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return OperationsListResponse{}, fmt.Errorf("begin repeatable read tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txRepo := s.repo.WithTx(tx)
+
+	doc, err := txRepo.GetNoteDocument(ctx, noteID)
+	if err != nil {
+		return OperationsListResponse{}, fmt.Errorf("get document: %w", err)
+	}
+
+	ops, err := txRepo.GetOperationsRange(ctx, noteID, afterRevision, doc.Revision)
 	if err != nil {
 		return OperationsListResponse{}, fmt.Errorf("get operations: %w", err)
 	}
 
-	return OperationsListResponse{Operations: ops}, nil
+	if err := tx.Commit(ctx); err != nil {
+		return OperationsListResponse{}, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return OperationsListResponse{
+		Operations: ops,
+		Document:   doc.Document,
+		Revision:   doc.Revision,
+	}, nil
 }
 
 func mustParseUUID(s string) pgtype.UUID {

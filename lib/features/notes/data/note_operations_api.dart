@@ -95,6 +95,7 @@ class Operation {
   final String noteId;
   final int revision;
   final int baseRevision;
+  final String actorId;
   final String kind;
   final String? blockId;
   final Map<String, dynamic> payload;
@@ -105,6 +106,7 @@ class Operation {
     required this.noteId,
     required this.revision,
     required this.baseRevision,
+    required this.actorId,
     required this.kind,
     this.blockId,
     required this.payload,
@@ -117,6 +119,7 @@ class Operation {
       noteId: json['noteId'] as String,
       revision: json['revision'] as int,
       baseRevision: json['baseRevision'] as int,
+      actorId: json['actorId'] as String,
       kind: json['kind'] as String,
       blockId: json['blockId'] as String?,
       payload: json['payload'] as Map<String, dynamic>,
@@ -129,12 +132,14 @@ class SyncResponse {
   final List<AcceptedOperation> accepted;
   final int finalRevision;
   final List<Operation> remoteOperations;
+  final Map<String, dynamic>? canonicalDocument;
   final DateTime serverTime;
 
   SyncResponse({
     required this.accepted,
     required this.finalRevision,
     required this.remoteOperations,
+    this.canonicalDocument,
     required this.serverTime,
   });
 
@@ -147,6 +152,7 @@ class SyncResponse {
       remoteOperations: (json['remoteOperations'] as List)
           .map((e) => Operation.fromJson(e as Map<String, dynamic>))
           .toList(),
+      canonicalDocument: json['canonicalDocument'] as Map<String, dynamic>?,
       serverTime: DateTime.parse(json['serverTime'] as String),
     );
   }
@@ -154,9 +160,13 @@ class SyncResponse {
 
 class OperationsListResponse {
   final List<Operation> operations;
+  final Map<String, dynamic>? document;
+  final int? revision;
 
   OperationsListResponse({
     required this.operations,
+    this.document,
+    this.revision,
   });
 
   factory OperationsListResponse.fromJson(Map<String, dynamic> json) {
@@ -164,6 +174,8 @@ class OperationsListResponse {
       operations: (json['operations'] as List)
           .map((e) => Operation.fromJson(e as Map<String, dynamic>))
           .toList(),
+      document: json['document'] as Map<String, dynamic>?,
+      revision: json['revision'] as int?,
     );
   }
 }

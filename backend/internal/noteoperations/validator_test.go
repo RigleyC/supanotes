@@ -23,7 +23,7 @@ func TestValidateOperationValidTextDelta(t *testing.T) {
 		Payload:      json.RawMessage(`{"ops":[{"retain":2},{"insert":"a"}]}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.Nil(t, err)
 }
 
@@ -36,7 +36,7 @@ func TestValidateOperationInvalidKind(t *testing.T) {
 		Payload:      json.RawMessage(`{}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.NotNil(t, err)
 	assert.Equal(t, "INVALID_KIND", err.Code)
 }
@@ -51,7 +51,7 @@ func TestValidateOperationTextDeltaBlockDeleted(t *testing.T) {
 		Payload:      json.RawMessage(`{"ops":[{"insert":"a"}]}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.NotNil(t, err)
 	assert.Equal(t, "BLOCK_DELETED", err.Code)
 }
@@ -71,7 +71,7 @@ func TestValidateOperationDeleteBlockValid(t *testing.T) {
 		Payload:      json.RawMessage(`{}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.Nil(t, err)
 }
 
@@ -85,7 +85,7 @@ func TestValidateOperationDeleteBlockAlreadyDeleted(t *testing.T) {
 		Payload:      json.RawMessage(`{}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.NotNil(t, err)
 	assert.Equal(t, "BLOCK_DELETED", err.Code)
 }
@@ -99,7 +99,7 @@ func TestValidateOperationCreateBlock(t *testing.T) {
 		Payload:      json.RawMessage(`{"id":"new1","type":"paragraph","delta":[{"insert":""}]}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.Nil(t, err)
 }
 
@@ -112,7 +112,7 @@ func TestValidateOperationCreateBlockInvalidType(t *testing.T) {
 		Payload:      json.RawMessage(`{"id":"new1","type":"invalid_type","delta":[{"insert":""}]}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.NotNil(t, err)
 	assert.Equal(t, "INVALID_BLOCK_TYPE", err.Code)
 }
@@ -132,7 +132,7 @@ func TestValidateOperationSetBlockType(t *testing.T) {
 		Payload:      json.RawMessage(`{"type":"header1"}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.Nil(t, err)
 }
 
@@ -146,7 +146,7 @@ func TestValidateOperationInvalidPayloadJSON(t *testing.T) {
 		Payload:      json.RawMessage(`invalid json`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.NotNil(t, err)
 	assert.Equal(t, "INVALID_PAYLOAD", err.Code)
 }
@@ -167,6 +167,6 @@ func TestValidateOperationMoveBlock(t *testing.T) {
 		Payload:      json.RawMessage(`{"blockId":"b1","afterBlockId":"b2"}`),
 	}
 
-	err := ValidateOperation(req, doc, 0)
+	err := ValidateOperation(req, doc, 0, 0)
 	assert.Nil(t, err)
 }

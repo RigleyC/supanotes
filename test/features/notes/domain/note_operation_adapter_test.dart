@@ -42,6 +42,12 @@ void main() {
         .thenAnswer((_) async {});
     when(() => mockSyncService.getPendingOperations(any()))
         .thenAnswer((_) async => []);
+    when(() => mockSyncService.getProjectedOutboxOperationCount(any()))
+        .thenAnswer((_) async => 0);
+    when(() => mockSyncService.fetchDocument(any()))
+        .thenAnswer((_) async => null);
+    when(() => mockSyncService.loadPendingProjection(any()))
+        .thenAnswer((_) async => []);
   });
 
   NoteOperationAdapter createAdapter() {
@@ -249,23 +255,43 @@ void main() {
       final adapter = createAdapter();
       adapter.start();
 
-      await adapter.applyRemoteOperations([
-        Operation(
-          operationId: 'remote-1',
+      await adapter.reconcile(SyncResult(
+        acceptedCount: 1,
+        acceptedOperationIds: ['remote-1'],
+        finalRevision: 1,
+        remoteOperations: [
+          Operation(
+            operationId: 'remote-1',
+            noteId: 'note-1',
+            revision: 1,
+            baseRevision: 0,
+            actorId: '',
+            kind: 'text_delta',
+            blockId: 'block-1',
+            payload: {
+              'ops': [
+                {'retain': 5},
+                {'insert': ' World'},
+              ],
+            },
+            createdAt: DateTime.utc(2026, 7, 20),
+          ),
+        ],
+        canonicalDocument: NoteDocumentResponse(
           noteId: 'note-1',
           revision: 1,
-          baseRevision: 0,
-          kind: 'text_delta',
-          blockId: 'block-1',
-          payload: {
-            'ops': [
-              {'retain': 5},
-              {'insert': ' World'},
+          document: {
+            'blocks': [
+              {
+                'id': 'block-1',
+                'type': 'paragraph',
+                'delta': [{'insert': 'Hello World'}],
+              },
             ],
           },
-          createdAt: DateTime.utc(2026, 7, 20),
+          serverTime: DateTime.utc(2026, 7, 20),
         ),
-      ]);
+      ));
 
       final node = document.getNodeById('block-1') as TextNode?;
       expect(node, isNotNull);
@@ -276,23 +302,48 @@ void main() {
       final adapter = createAdapter();
       adapter.start();
 
-      await adapter.applyRemoteOperations([
-        Operation(
-          operationId: 'remote-2',
+      await adapter.reconcile(SyncResult(
+        acceptedCount: 1,
+        acceptedOperationIds: ['remote-2'],
+        finalRevision: 1,
+        remoteOperations: [
+          Operation(
+            operationId: 'remote-2',
+            noteId: 'note-1',
+            revision: 1,
+            baseRevision: 0,
+            actorId: '',
+            kind: 'create_block',
+            blockId: 'block-2',
+            payload: {
+              'id': 'block-2',
+              'type': 'paragraph',
+              'delta': [{'insert': 'Remote block'}],
+              'afterBlockId': null,
+            },
+            createdAt: DateTime.utc(2026, 7, 20),
+          ),
+        ],
+        canonicalDocument: NoteDocumentResponse(
           noteId: 'note-1',
           revision: 1,
-          baseRevision: 0,
-          kind: 'create_block',
-          blockId: 'block-2',
-          payload: {
-            'id': 'block-2',
-            'type': 'paragraph',
-            'delta': [{'insert': 'Remote block'}],
-            'afterBlockId': null,
+          document: {
+            'blocks': [
+              {
+                'id': 'block-1',
+                'type': 'paragraph',
+                'delta': [{'insert': 'Hello'}],
+              },
+              {
+                'id': 'block-2',
+                'type': 'paragraph',
+                'delta': [{'insert': 'Remote block'}],
+              },
+            ],
           },
-          createdAt: DateTime.utc(2026, 7, 20),
+          serverTime: DateTime.utc(2026, 7, 20),
         ),
-      ]);
+      ));
 
       expect(document.getNodeById('block-2'), isNotNull);
     });
@@ -301,18 +352,30 @@ void main() {
       final adapter = createAdapter();
       adapter.start();
 
-      await adapter.applyRemoteOperations([
-        Operation(
-          operationId: 'remote-3',
+      await adapter.reconcile(SyncResult(
+        acceptedCount: 1,
+        acceptedOperationIds: ['remote-3'],
+        finalRevision: 1,
+        remoteOperations: [
+          Operation(
+            operationId: 'remote-3',
+            noteId: 'note-1',
+            revision: 1,
+            baseRevision: 0,
+            actorId: '',
+            kind: 'delete_block',
+            blockId: 'block-1',
+            payload: {'blockId': 'block-1'},
+            createdAt: DateTime.utc(2026, 7, 20),
+          ),
+        ],
+        canonicalDocument: NoteDocumentResponse(
           noteId: 'note-1',
           revision: 1,
-          baseRevision: 0,
-          kind: 'delete_block',
-          blockId: 'block-1',
-          payload: {'blockId': 'block-1'},
-          createdAt: DateTime.utc(2026, 7, 20),
+          document: {'blocks': <dynamic>[]},
+          serverTime: DateTime.utc(2026, 7, 20),
         ),
-      ]);
+      ));
 
       expect(document.getNodeById('block-1'), isNull);
     });
@@ -321,25 +384,45 @@ void main() {
       final adapter = createAdapter();
       adapter.start();
 
-      await adapter.applyRemoteOperations([
-        Operation(
-          operationId: 'remote-4',
+      await adapter.reconcile(SyncResult(
+        acceptedCount: 1,
+        acceptedOperationIds: ['remote-4'],
+        finalRevision: 1,
+        remoteOperations: [
+          Operation(
+            operationId: 'remote-4',
+            noteId: 'note-1',
+            revision: 1,
+            baseRevision: 0,
+            actorId: '',
+            kind: 'set_block_type',
+            blockId: 'block-1',
+            payload: {'type': 'header1'},
+            createdAt: DateTime.utc(2026, 7, 20),
+          ),
+        ],
+        canonicalDocument: NoteDocumentResponse(
           noteId: 'note-1',
           revision: 1,
-          baseRevision: 0,
-          kind: 'set_block_type',
-          blockId: 'block-1',
-          payload: {'type': 'header1'},
-          createdAt: DateTime.utc(2026, 7, 20),
+          document: {
+            'blocks': [
+              {
+                'id': 'block-1',
+                'type': 'header1',
+                'delta': [{'insert': 'Hello'}],
+              },
+            ],
+          },
+          serverTime: DateTime.utc(2026, 7, 20),
         ),
-      ]);
+      ));
 
       final node = document.getNodeById('block-1') as ParagraphNode?;
       expect(node, isNotNull);
       expect(node!.getMetadataValue('blockType'), header1Attribution);
     });
 
-    test('resumes listening after applying remote operations', () async {
+    test('resumes listening after reconciling', () async {
       final adapter = createAdapter();
 
       List<OperationRequest>? capturedOps;
@@ -351,23 +434,43 @@ void main() {
       await Future.delayed(Duration.zero);
       capturedOps = null;
 
-      await adapter.applyRemoteOperations([
-        Operation(
-          operationId: 'remote-5',
+      await adapter.reconcile(SyncResult(
+        acceptedCount: 1,
+        acceptedOperationIds: ['remote-5'],
+        finalRevision: 1,
+        remoteOperations: [
+          Operation(
+            operationId: 'remote-5',
+            noteId: 'note-1',
+            revision: 1,
+            baseRevision: 0,
+            actorId: '',
+            kind: 'text_delta',
+            blockId: 'block-1',
+            payload: {
+              'ops': [
+                {'retain': 5},
+                {'insert': ' World'},
+              ],
+            },
+            createdAt: DateTime.utc(2026, 7, 20),
+          ),
+        ],
+        canonicalDocument: NoteDocumentResponse(
           noteId: 'note-1',
           revision: 1,
-          baseRevision: 0,
-          kind: 'text_delta',
-          blockId: 'block-1',
-          payload: {
-            'ops': [
-              {'retain': 5},
-              {'insert': ' World'},
+          document: {
+            'blocks': [
+              {
+                'id': 'block-1',
+                'type': 'paragraph',
+                'delta': [{'insert': 'Hello World'}],
+              },
             ],
           },
-          createdAt: DateTime.utc(2026, 7, 20),
+          serverTime: DateTime.utc(2026, 7, 20),
         ),
-      ]);
+      ));
 
       editor.execute([
         ReplaceNodeRequest(

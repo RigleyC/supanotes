@@ -15,6 +15,7 @@ import (
 type mockRepository struct {
 	lockNoteFn               func(ctx context.Context, noteID pgtype.UUID) (LockNoteResult, error)
 	getOperationsSinceFn     func(ctx context.Context, noteID pgtype.UUID, afterRevision int64) ([]Operation, error)
+	getOperationsRangeFn     func(ctx context.Context, noteID pgtype.UUID, afterRevision int64, upToRevision int64) ([]Operation, error)
 	updateNoteDocumentFn     func(ctx context.Context, arg UpdateNoteDocumentParams) error
 	getNoteOperationByOpIDFn func(ctx context.Context, noteID pgtype.UUID, operationID pgtype.UUID) (Operation, error)
 	checkNotePermissionFn    func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (string, error)
@@ -35,6 +36,13 @@ func (m *mockRepository) InsertOperation(ctx context.Context, arg InsertOperatio
 func (m *mockRepository) GetOperationsSince(ctx context.Context, noteID pgtype.UUID, afterRevision int64) ([]Operation, error) {
 	if m.getOperationsSinceFn != nil {
 		return m.getOperationsSinceFn(ctx, noteID, afterRevision)
+	}
+	return nil, nil
+}
+
+func (m *mockRepository) GetOperationsRange(ctx context.Context, noteID pgtype.UUID, afterRevision int64, upToRevision int64) ([]Operation, error) {
+	if m.getOperationsRangeFn != nil {
+		return m.getOperationsRangeFn(ctx, noteID, afterRevision, upToRevision)
 	}
 	return nil, nil
 }
@@ -149,7 +157,7 @@ func TestValidateAndTransformNoConcurrentOps(t *testing.T) {
 		Payload:      json.RawMessage(`{"ops":[{"insert":"hello"}]}`),
 	}
 
-	err := validateAndTransform(context.Background(), &mockRepository{}, &opReq, &doc, pgtype.UUID{}, 0)
+	err := validateAndTransform(context.Background(), &mockRepository{}, &opReq, pgtype.UUID{}, pgtype.UUID{}, &doc, pgtype.UUID{}, 0)
 	assert.NoError(t, err)
 }
 
@@ -162,7 +170,7 @@ func TestValidateAndTransformDetectsInvalidKind(t *testing.T) {
 		Payload:      json.RawMessage(`{}`),
 	}
 
-	err := validateAndTransform(context.Background(), &mockRepository{}, &opReq, &doc, pgtype.UUID{}, 0)
+	err := validateAndTransform(context.Background(), &mockRepository{}, &opReq, pgtype.UUID{}, pgtype.UUID{}, &doc, pgtype.UUID{}, 0)
 	assert.NotNil(t, err)
 }
 

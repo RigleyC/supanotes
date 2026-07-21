@@ -91,7 +91,7 @@ func (d *Document) applyCreateBlock(payload json.RawMessage) error {
 	}
 
 	if p.AfterBlockID == "" {
-		d.Blocks = append(d.Blocks, newBlock)
+		d.Blocks = append([]Block{newBlock}, d.Blocks...)
 		return nil
 	}
 
@@ -137,7 +137,7 @@ func (d *Document) applyMoveBlock(payload json.RawMessage) error {
 	}
 
 	if p.AfterBlockID == "" {
-		d.Blocks = append(d.Blocks, block)
+		d.Blocks = append([]Block{block}, d.Blocks...)
 		return nil
 	}
 

@@ -36,7 +36,7 @@ func (e *ValidationError) Unwrap() error {
 	return e.Err
 }
 
-func ValidateOperation(req OperationRequest, doc Document, baseRevision int64) *ValidationError {
+func ValidateOperation(req OperationRequest, doc Document, baseRevision int64, currentRevision int64) *ValidationError {
 	if !ValidKinds[Kind(req.Kind)] {
 		return &ValidationError{
 			Code:    "INVALID_KIND",
@@ -48,6 +48,13 @@ func ValidateOperation(req OperationRequest, doc Document, baseRevision int64) *
 		return &ValidationError{
 			Code:    "INVALID_BASE_REVISION",
 			Message: "base revision must be >= 0",
+		}
+	}
+
+	if baseRevision > currentRevision {
+		return &ValidationError{
+			Code:    "INVALID_BASE_REVISION",
+			Message: fmt.Sprintf("base revision %d > current revision %d", baseRevision, currentRevision),
 		}
 	}
 

@@ -1,45 +1,32 @@
 package noteoperations
 
 import (
+	"bytes"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/fmpwizard/go-quilljs-delta/delta"
 )
 
-func TransformDeltas(clientDelta, serverDelta []delta.Op) ([]delta.Op, error) {
-	client := delta.New(clientDelta)
-	server := delta.New(serverDelta)
-
-	result := server.Transform(*client, true)
-	return result.Ops, nil
+func compareUUID(a, b pgtype.UUID) int {
+	if !a.Valid || !b.Valid {
+		return 0
+	}
+	return bytes.Compare(a.Bytes[:], b.Bytes[:])
 }
 
-func ComposeDeltas(base, change []delta.Op) ([]delta.Op, error) {
-	baseDelta := delta.New(base)
-	changeDelta := delta.New(change)
-
-	result := baseDelta.Compose(*changeDelta)
-	return result.Ops, nil
+// serverHasPriority returns true when the server's operation (serverActorID, serverOpID)
+// should take priority over the client's operation (clientActorID, clientOpID).
+// Lower (actorId, operationId) tuple wins.
+func serverHasPriority(serverActorID, clientActorID, serverOpID, clientOpID pgtype.UUID) bool {
+	cmp := compareUUID(serverActorID, clientActorID)
+	if cmp != 0 {
+		return cmp < 0
+	}
+	return compareUUID(serverOpID, clientOpID) < 0
 }
 
-func InvertDelta(deltaOps, baseOps []delta.Op) ([]delta.Op, error) {
-	d := delta.New(deltaOps)
-	base := delta.New(baseOps)
 
-	result := d.Invert(base)
-	return result.Ops, nil
-}
-
-func TransformClientDeltasAgainstConcurrent(
-	clientOps []delta.Op,
-	concurrentOps []delta.Op,
-) ([]delta.Op, error) {
-	client := delta.New(clientOps)
-	concurrent := delta.New(concurrentOps)
-
-	result := concurrent.Transform(*client, true)
-	return result.Ops, nil
-}
 
 func concurrentDeltasForBlock(
 	operations []Operation,

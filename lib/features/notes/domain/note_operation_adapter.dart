@@ -1,21 +1,32 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:developer' as dev;
 
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/data/note_operations_api.dart';
+import 'package:supanotes/features/notes/domain/note_document_codec.dart';
 
 class _BlockMirror {
   String text;
   String? blockType;
   String attributionsSignature;
+  Set<String> previousAttributionIds;
 
   _BlockMirror({
     required this.text,
     this.blockType,
     required this.attributionsSignature,
+    required this.previousAttributionIds,
   });
+}
+
+class _RebuildRequest {
+  final Map<String, dynamic> snapshot;
+  final List<PendingNoteOperationData>? ops;
+  _RebuildRequest({required this.snapshot, this.ops});
 }
 
 class NoteOperationAdapter {
@@ -33,9 +44,11 @@ class NoteOperationAdapter {
   final NoteOperationsSyncService _syncService;
   final String _noteId;
   final Editor _editor;
+  final _codec = NoteDocumentCodec();
 
   int _confirmedRevision = 0;
   bool _listening = false;
+  bool _suppressOperations = false;
   final Map<String, _BlockMirror> _mirror = {};
   final List<OperationRequest> _pendingOps = [];
   Timer? _debounceTimer;
@@ -51,11 +64,78 @@ class NoteOperationAdapter {
 
   void Function(List<OperationRequest> ops)? onLocalOperations;
 
-  void start() {
+  bool _isComposing = false;
+  _RebuildRequest? _pendingRebuild;
+
+  void onCompositionStart() => _isComposing = true;
+  void onCompositionEnd() {
+    _isComposing = false;
+    if (_pendingRebuild != null) {
+      final req = _pendingRebuild!;
+      _pendingRebuild = null;
+      unawaited(rebuildFromSnapshot(snapshot: req.snapshot, rebasedOps: req.ops));
+    }
+  }
+
+  Future<void> start() async {
+    _suppressOperations = true;
     _buildMirror();
-    _loadConfirmedState();
-    _listening = true;
+    await _loadConfirmedState();
     _document.addListener(_onDocumentChanged);
+    await _hydrateFromServer();
+    _buildMirror();
+    _listening = true;
+    _suppressOperations = false;
+  }
+
+  Future<void> _hydrateFromServer() async {
+    try {
+      final doc = await _syncService.getConfirmedDocument(_noteId);
+      if (doc != null && doc.revision > 0) {
+        final snapshot = jsonDecode(doc.documentJson) as Map<String, dynamic>;
+        _applyFullDocument(snapshot);
+        final pending = await _syncService.loadPendingProjection(_noteId);
+        for (final op in pending) {
+          _applyOperationRequest(op);
+        }
+        _confirmedRevision = doc.revision;
+        return;
+      }
+      final serverDoc = await _syncService.fetchDocument(_noteId);
+      if (serverDoc != null && serverDoc.revision > 0) {
+        _applyFullDocument(serverDoc.document);
+        _confirmedRevision = serverDoc.revision;
+        await _syncService.storeDocument(_noteId, serverDoc);
+      }
+    } catch (e) {
+      dev.log(
+        '[NoteOperationAdapter] hydrateFromServer failed: $e',
+        name: 'NoteOperationAdapter',
+      );
+    }
+  }
+
+  void _applyFullDocument(Map<String, dynamic> doc) {
+    final blocks = doc['blocks'] as List<dynamic>? ?? [];
+    for (final block in blocks) {
+      if (block is! Map) continue;
+      final blockMap = block as Map<String, dynamic>;
+      final nodeId = blockMap['id'] as String?;
+      if (nodeId == null) continue;
+      if (_document.getNodeById(nodeId) != null) continue;
+
+      final blockType = blockMap['type'] as String? ?? 'paragraph';
+      final delta = blockMap['delta'] as List<dynamic>?;
+      final attributedText = _codec.attributedFromDelta(delta);
+
+      final newNode = _codec.createNodeFromBlockType(
+        nodeId: nodeId,
+        type: blockType,
+        text: attributedText,
+      );
+
+      _editor.execute([InsertNodeAtIndexRequest(nodeIndex: _document.nodeCount, newNode: newNode)]);
+    }
   }
 
   void _buildMirror() {
@@ -65,38 +145,68 @@ class NoteOperationAdapter {
     }
   }
 
+  String _mirrorBlockType(DocumentNode node) => _codec.blockTypeName(node) ?? 'paragraph';
+
   _BlockMirror _mirrorFromNode(DocumentNode node) {
     if (node is TextNode) {
       return _BlockMirror(
         text: node.text.toPlainText(),
-        blockType: _blockTypeName(node),
+        blockType: _mirrorBlockType(node),
         attributionsSignature: _attributionsSignature(node.text),
+        previousAttributionIds: _collectAttributionIds(node),
       );
     }
     return _BlockMirror(
       text: '',
-      blockType: _blockTypeName(node),
+      blockType: _mirrorBlockType(node),
       attributionsSignature: '',
+      previousAttributionIds: {},
     );
   }
 
-  String? _blockTypeName(DocumentNode node) {
-    if (node is ParagraphNode) {
-      final blockType = node.getMetadataValue('blockType') as Attribution?;
-      if (blockType == header1Attribution) return 'header1';
-      if (blockType == header2Attribution) return 'header2';
-      if (blockType == header3Attribution) return 'header3';
-      if (blockType == blockquoteAttribution) return 'quote';
-      return null;
+  Map<String, dynamic> _deltaSegmentWithAttributes(
+    String text,
+    Map<String, dynamic> attrs,
+  ) {
+    final op = <String, dynamic>{'insert': text};
+    if (attrs.isNotEmpty) {
+      op['attributes'] = Map<String, dynamic>.from(attrs);
     }
-    if (node is ListItemNode) {
-      return node.type == ListItemType.ordered
-          ? 'orderedList'
-          : 'bulletList';
+    return op;
+  }
+
+  List<MapEntry<String, Map<String, dynamic>>> _textSegmentsWithAttributes(
+    TextNode node,
+  ) {
+    final text = node.text.toPlainText();
+    if (text.isEmpty) return [];
+    final segments = <MapEntry<String, Map<String, dynamic>>>[];
+    int pos = 0;
+    while (pos < text.length) {
+      final attrs = _attributionsAtPosition(node, pos);
+      int end = pos + 1;
+      while (end < text.length) {
+        if (_codec.mapsEqual(attrs, _attributionsAtPosition(node, end))) {
+          end++;
+        } else {
+          break;
+        }
+      }
+      segments.add(MapEntry(text.substring(pos, end), attrs));
+      pos = end;
     }
-    if (node is TaskNode) return 'task';
-    if (node is HorizontalRuleNode) return 'divider';
-    return null;
+    return segments;
+  }
+
+  Set<String> _collectAttributionIds(TextNode node) {
+    final ids = <String>{};
+    for (final marker in node.text.spans.markers) {
+      if (marker.markerType == SpanMarkerType.start &&
+          marker.attribution.id != 'composing') {
+        ids.add(marker.attribution.id);
+      }
+    }
+    return ids;
   }
 
   String _attributionsSignature(AttributedText text) {
@@ -118,7 +228,7 @@ class NoteOperationAdapter {
   }
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
-    if (!_listening) return;
+    if (!_listening || _suppressOperations) return;
 
     for (final change in changeLog.changes) {
       if (change is NodeInsertedEvent) {
@@ -148,14 +258,19 @@ class NoteOperationAdapter {
 
     final payload = <String, dynamic>{
       'id': nodeId,
-      'type': _blockTypeName(node) ?? 'paragraph',
+      'type': _codec.blockTypeName(node) ?? 'paragraph',
       'afterBlockId': afterBlockId,
     };
     if (node is TextNode) {
       final text = node.text.toPlainText();
-      payload['delta'] = text.isNotEmpty
-          ? [{'insert': text}]
-          : [{'insert': ''}];
+      if (text.isNotEmpty) {
+        final segments = _textSegmentsWithAttributes(node);
+        payload['delta'] = segments
+            .map((seg) => _deltaSegmentWithAttributes(seg.key, seg.value))
+            .toList();
+      } else {
+        payload['delta'] = [{'insert': ''}];
+      }
     } else {
       payload['delta'] = [];
     }
@@ -228,7 +343,10 @@ class NoteOperationAdapter {
 
       final newSig = _attributionsSignature(node.text);
       if (newText == mirror.text && newSig != mirror.attributionsSignature) {
-        final delta = _computeAttributionDelta(node);
+        final delta = _computeAttributionDelta(
+          node,
+          mirror.previousAttributionIds,
+        );
         if (delta.isNotEmpty) {
           _pendingOps.add(OperationRequest(
             operationId: _syncService.generateOperationId(),
@@ -239,10 +357,11 @@ class NoteOperationAdapter {
           ));
         }
         mirror.attributionsSignature = newSig;
+        mirror.previousAttributionIds = _collectAttributionIds(node);
       }
     }
 
-    final newType = _blockTypeName(node);
+    final newType = _mirrorBlockType(node);
     if (newType != mirror.blockType) {
       _pendingOps.add(OperationRequest(
         operationId: _syncService.generateOperationId(),
@@ -290,18 +409,34 @@ class NoteOperationAdapter {
 
     if (ni >= prefix) {
       final insertedText = newText.substring(prefix, ni + 1);
-      final attrs = _getAttributionsInRange(node, prefix, ni + 1);
-      final insertOp = <String, dynamic>{'insert': insertedText};
-      if (attrs.isNotEmpty) {
-        insertOp['attributes'] = attrs;
+      final segments = <MapEntry<String, Map<String, dynamic>>>[];
+      int insertPos = 0;
+      while (insertPos < insertedText.length) {
+        final globalPos = prefix + insertPos;
+        final attrs = _attributionsAtPosition(node, globalPos);
+        int segEnd = insertPos + 1;
+        while (segEnd < insertedText.length) {
+          if (_codec.mapsEqual(attrs, _attributionsAtPosition(node, prefix + segEnd))) {
+            segEnd++;
+          } else {
+            break;
+          }
+        }
+        segments.add(MapEntry(insertedText.substring(insertPos, segEnd), attrs));
+        insertPos = segEnd;
       }
-      ops.add(insertOp);
+      for (final seg in segments) {
+        ops.add(_deltaSegmentWithAttributes(seg.key, seg.value));
+      }
     }
 
     return ops;
   }
 
-  List<Map<String, dynamic>> _computeAttributionDelta(TextNode node) {
+  List<Map<String, dynamic>> _computeAttributionDelta(
+    TextNode node,
+    Set<String> previousIds,
+  ) {
     final text = node.text.toPlainText();
     if (text.isEmpty) return [];
 
@@ -309,17 +444,28 @@ class NoteOperationAdapter {
     int pos = 0;
     while (pos < text.length) {
       final attrs = _attributionsAtPosition(node, pos);
+      for (final id in previousIds) {
+        if (!attrs.containsKey(id)) {
+          attrs[id] = null;
+        }
+      }
       int end = pos + 1;
       while (end < text.length) {
         final nextAttrs = _attributionsAtPosition(node, end);
-        if (_mapsEqual(attrs, nextAttrs)) {
+        for (final id in previousIds) {
+          if (!nextAttrs.containsKey(id)) {
+            nextAttrs[id] = null;
+          }
+        }
+        if (_codec.mapsEqual(attrs, nextAttrs)) {
           end++;
         } else {
           break;
         }
       }
       final len = end - pos;
-      if (attrs.isEmpty) {
+      final hasNonNull = attrs.values.any((v) => v != null);
+      if (!hasNonNull) {
         if (ops.isNotEmpty &&
             ops.last.length == 1 &&
             ops.last.containsKey('retain')) {
@@ -340,7 +486,7 @@ class NoteOperationAdapter {
     for (final marker in node.text.spans.markers) {
       if (marker.markerType == SpanMarkerType.start &&
           marker.offset <= pos) {
-        final spanEnd = _findSpanEnd(node.text.spans.markers, marker);
+        final spanEnd = _codec.findSpanEnd(node.text.spans.markers, marker);
         if (spanEnd > pos) {
           if (marker.attribution.id != 'composing') {
             attrs[marker.attribution.id] = true;
@@ -351,49 +497,23 @@ class NoteOperationAdapter {
     return attrs;
   }
 
-  int _findSpanEnd(Iterable<SpanMarker> markers, SpanMarker startMarker) {
-    for (final marker in markers) {
-      if (marker.attribution.id == startMarker.attribution.id &&
-          marker.markerType == SpanMarkerType.end &&
-          marker.offset >= startMarker.offset) {
-        return marker.offset;
-      }
-    }
-    return -1;
-  }
-
-  Map<String, dynamic> _getAttributionsInRange(
-    TextNode node,
-    int start,
-    int end,
-  ) {
-    final attrs = <String, dynamic>{};
-    for (int i = start; i < end && i < node.text.toPlainText().length; i++) {
-      for (final marker in node.text.spans.markers) {
-        if (marker.markerType == SpanMarkerType.start &&
-            marker.offset <= i) {
-          final spanEnd = _findSpanEnd(node.text.spans.markers, marker);
-          if (spanEnd > i && marker.attribution.id != 'composing') {
-            attrs[marker.attribution.id] = true;
-          }
-        }
-      }
-    }
-    return attrs;
-  }
-
-  bool _mapsEqual(Map<String, dynamic> a, Map<String, dynamic> b) {
-    if (a.length != b.length) return false;
-    for (final key in a.keys) {
-      if (a[key] != b[key]) return false;
-    }
-    return true;
-  }
-
   Future<void> _flushLocalOps() async {
     if (_pendingOps.isEmpty) return;
+    final projectedCount =
+        await _syncService.getProjectedOutboxOperationCount(_noteId);
     final ops = List<OperationRequest>.from(_pendingOps);
     _pendingOps.clear();
+
+    for (int i = 0; i < ops.length; i++) {
+      final old = ops[i];
+      ops[i] = OperationRequest(
+        operationId: old.operationId,
+        baseRevision: _confirmedRevision + projectedCount + i,
+        kind: old.kind,
+        blockId: old.blockId,
+        payload: old.payload,
+      );
+    }
 
     for (final op in ops) {
       await _syncService.enqueueOperation(_noteId, op);
@@ -418,17 +538,56 @@ class NoteOperationAdapter {
     _pendingOpsController.close();
   }
 
-  Future<void> applyRemoteOperations(List<Operation> operations) async {
-    _listening = false;
+  Future<void> reconcile(SyncResult result) async {
+    final canonical = result.canonicalDocument;
+    if (canonical == null) return;
+    _confirmedRevision = result.finalRevision;
+    final rebasedOps = await _syncService.loadPendingProjection(_noteId);
+    await rebuildFromSnapshot(
+      snapshot: canonical.document,
+      rebasedOps: rebasedOps,
+    );
+  }
 
-    try {
-      for (final op in operations) {
-        _applyOperation(op);
-      }
-    } finally {
-      _buildMirror();
-      _listening = true;
+  Future<void> rebuildFromSnapshot({
+    required Map<String, dynamic> snapshot,
+    required List<PendingNoteOperationData>? rebasedOps,
+  }) async {
+    if (_isComposing) {
+      _pendingRebuild = _RebuildRequest(snapshot: snapshot, ops: rebasedOps);
+      return;
     }
+
+    _suppressOperations = true;
+    try {
+      final existingNodes = _document.toList();
+      for (final node in existingNodes.reversed) {
+        _editor.execute([DeleteNodeRequest(nodeId: node.id)]);
+      }
+      _applyFullDocument(snapshot);
+      if (rebasedOps != null) {
+        for (final op in rebasedOps) {
+          _applyOperationRequest(op);
+        }
+      }
+      _buildMirror();
+    } finally {
+      _suppressOperations = false;
+    }
+  }
+
+  void _applyOperationRequest(PendingNoteOperationData op) {
+    _applyOperation(Operation(
+      operationId: op.operationId,
+      noteId: op.noteId,
+      revision: op.baseRevision,
+      baseRevision: op.baseRevision,
+      actorId: '',
+      kind: op.kind,
+      blockId: op.blockId,
+      payload: NoteOperationsSyncService.parsePayload(op.payloadJson),
+      createdAt: op.createdAt,
+    ));
   }
 
   void _applyOperation(Operation op) {
@@ -456,113 +615,19 @@ class NoteOperationAdapter {
     final ops = op.payload['ops'] as List<dynamic>?;
     if (ops == null || ops.isEmpty) return;
 
-    final composed = _composeDelta(node.text.toPlainText(), ops.cast<Map<String, dynamic>>());
-    if (composed == null) return;
+    final result = _codec.applyDeltaToText(
+      node.text,
+      ops.cast<Map<String, dynamic>>(),
+    );
+    if (result == null) return;
 
-    final newText = _buildAttributedText(composed, node.text);
-    final newNode = _replaceTextNode(node, newText);
+    final newNode = _codec.replaceTextNode(node, result);
     _editor.execute([
       ReplaceNodeRequest(
         existingNodeId: blockId,
         newNode: newNode,
       ),
     ]);
-  }
-
-  String? _composeDelta(String source, List<Map<String, dynamic>> ops) {
-    final buf = StringBuffer();
-    int srcPos = 0;
-
-    for (final op in ops) {
-      if (op.containsKey('retain')) {
-        final n = op['retain'] as int;
-        if (srcPos + n > source.length) return null;
-        buf.write(source.substring(srcPos, srcPos + n));
-        srcPos += n;
-      } else if (op.containsKey('insert')) {
-        buf.write(op['insert'] as String);
-      } else if (op.containsKey('delete')) {
-        final n = op['delete'] as int;
-        if (srcPos + n > source.length) return null;
-        srcPos += n;
-      } else {
-        return null;
-      }
-    }
-
-    buf.write(source.substring(srcPos));
-    return buf.toString();
-  }
-
-  AttributedText _buildAttributedText(String plainText, AttributedText source) {
-    if (plainText == source.toPlainText()) return source;
-
-    final spans = AttributedSpans();
-    final preservedSpans = <Map<String, dynamic>>[];
-
-    for (final marker in source.spans.markers) {
-      if (marker.offset < plainText.length) {
-        preservedSpans.add({
-          'a': marker.attribution.id,
-          'o': marker.offset.clamp(0, plainText.length),
-          't': marker.markerType == SpanMarkerType.start ? 's' : 'e',
-        });
-      }
-    }
-
-    for (final span in preservedSpans) {
-      final attrs = <Attribution>[];
-      if (span['a'] == 'bold') {
-        attrs.add(boldAttribution);
-      } else if (span['a'] == 'italics') {
-        attrs.add(italicsAttribution);
-      } else if (span['a'] == 'strikethrough') {
-        attrs.add(strikethroughAttribution);
-      } else if (span['a'] == 'underline') {
-        attrs.add(underlineAttribution);
-      } else if (span['a'] == 'link') {
-        continue;
-      } else {
-        continue;
-      }
-
-      for (final attr in attrs) {
-        spans.addAttribution(
-          newAttribution: attr,
-          start: span['o'] as int,
-          end: span['o'] as int,
-        );
-      }
-    }
-
-    return AttributedText(plainText, spans);
-  }
-
-  DocumentNode _replaceTextNode(TextNode oldNode, AttributedText newText) {
-    if (oldNode is ParagraphNode) {
-      return ParagraphNode(
-        id: oldNode.id,
-        text: newText,
-        metadata: Map<String, dynamic>.from(oldNode.metadata),
-      );
-    }
-    if (oldNode is ListItemNode) {
-      return ListItemNode(
-        id: oldNode.id,
-        itemType: oldNode.type,
-        text: newText,
-        indent: oldNode.indent,
-      );
-    }
-    if (oldNode is TaskNode) {
-      return TaskNode(
-        id: oldNode.id,
-        text: newText,
-        isComplete: oldNode.isComplete,
-        indent: oldNode.indent,
-      );
-    }
-    return ParagraphNode(id: oldNode.id, text: newText);
   }
 
   void _applyCreateBlock(Operation op) {
@@ -574,18 +639,14 @@ class NoteOperationAdapter {
 
     final type = payload['type'] as String? ?? 'paragraph';
     final delta = payload['delta'] as List<dynamic>?;
-    final text = _textFromDelta(delta);
     final afterBlockId = payload['afterBlockId'] as String?;
 
-    DocumentNode newNode;
-    if (type == 'divider') {
-      newNode = HorizontalRuleNode(id: nodeId);
-    } else {
-      final attributedText = text.isEmpty
-          ? AttributedText()
-          : AttributedText(text);
-      newNode = ParagraphNode(id: nodeId, text: attributedText);
-    }
+    final attributedText = _codec.attributedFromDelta(delta);
+    final newNode = _codec.createNodeFromBlockType(
+      nodeId: nodeId,
+      type: type,
+      text: attributedText,
+    );
 
     int targetIndex;
     if (afterBlockId == null) {
@@ -639,31 +700,75 @@ class NoteOperationAdapter {
     if (blockId == null) return;
 
     final node = _document.getNodeById(blockId);
-    if (node is! ParagraphNode) return;
+    if (node == null) return;
+
+    if (blockTypeStr == null || blockTypeStr == 'paragraph') {
+      _replaceWithParagraph(node);
+      return;
+    }
+
+    if (blockTypeStr == 'bulletList') {
+      _replaceWithListItem(node, ListItemType.unordered);
+      return;
+    }
+    if (blockTypeStr == 'orderedList') {
+      _replaceWithListItem(node, ListItemType.ordered);
+      return;
+    }
+    if (blockTypeStr == 'task') {
+      _replaceWithTask(node);
+      return;
+    }
 
     final attribution = _attributionFromName(blockTypeStr);
+    if (node is ParagraphNode) {
+      _editor.execute([
+        ChangeParagraphBlockTypeRequest(nodeId: blockId, blockType: attribution),
+      ]);
+    } else {
+      _replaceWithParagraph(node);
+      if (attribution != null) {
+        final newNode = _document.getNodeById(blockId);
+        if (newNode is ParagraphNode) {
+          _editor.execute([
+            ChangeParagraphBlockTypeRequest(nodeId: blockId, blockType: attribution),
+          ]);
+        }
+      }
+    }
+  }
+
+  void _replaceWithParagraph(DocumentNode node) {
+    final text = node is TextNode ? node.text : AttributedText();
     _editor.execute([
-      ChangeParagraphBlockTypeRequest(nodeId: blockId, blockType: attribution),
+      ReplaceNodeRequest(
+        existingNodeId: node.id,
+        newNode: ParagraphNode(id: node.id, text: text),
+      ),
     ]);
   }
 
-  String _textFromDelta(List<dynamic>? delta) {
-    if (delta == null) return '';
-    final buf = StringBuffer();
-    for (final op in delta) {
-      if (op is Map<String, dynamic> && op.containsKey('insert')) {
-        buf.write(op['insert'] as String);
-      }
-    }
-    return buf.toString();
+  void _replaceWithListItem(DocumentNode node, ListItemType itemType) {
+    final text = node is TextNode ? node.text : AttributedText();
+    _editor.execute([
+      ReplaceNodeRequest(
+        existingNodeId: node.id,
+        newNode: ListItemNode(id: node.id, itemType: itemType, text: text),
+      ),
+    ]);
+  }
+
+  void _replaceWithTask(DocumentNode node) {
+    final text = node is TextNode ? node.text : AttributedText();
+    _editor.execute([
+      ReplaceNodeRequest(
+        existingNodeId: node.id,
+        newNode: TaskNode(id: node.id, text: text, isComplete: false),
+      ),
+    ]);
   }
 
   Attribution? _attributionFromName(String? name) {
-    if (name == null) return null;
-    if (name == 'header1') return header1Attribution;
-    if (name == 'header2') return header2Attribution;
-    if (name == 'header3') return header3Attribution;
-    if (name == 'quote') return blockquoteAttribution;
-    return null;
+    return _codec.attributionFromName(name);
   }
 }

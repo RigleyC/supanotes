@@ -128,6 +128,7 @@ final noteOperationsSyncServiceProvider =
     api: ref.watch(noteOperationsApiClientProvider),
     dao: ref.watch(noteOperationsDaoProvider),
     clientId: clientId,
+    actorId: ref.watch(currentUserIdProvider)!,
   );
 });
 

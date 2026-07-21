@@ -110,18 +110,18 @@ func TestApplyCreateBlock(t *testing.T) {
 	assert.Equal(t, "b2", doc.Blocks[1].ID)
 }
 
-func TestApplyCreateBlockAppendEnd(t *testing.T) {
+func TestApplyCreateBlockPrependBeginning(t *testing.T) {
 	doc := NewEmptyDocument()
 	payload, _ := json.Marshal(CreateBlockPayload{
 		ID:    "b2",
 		Type:  string(BlockParagraph),
-		Delta: []delta.Op{{Insert: []rune("end")}},
+		Delta: []delta.Op{{Insert: []rune("beginning")}},
 	})
 
 	err := doc.ApplyOperation(KindCreateBlock, "", payload)
 	require.NoError(t, err)
 	assert.Len(t, doc.Blocks, 2)
-	assert.Equal(t, "b2", doc.Blocks[1].ID)
+	assert.Equal(t, "b2", doc.Blocks[0].ID)
 }
 
 func TestApplyCreateBlockAnchorNotFound(t *testing.T) {
@@ -175,6 +175,23 @@ func TestApplyMoveBlock(t *testing.T) {
 	assert.Equal(t, "b2", doc.Blocks[0].ID)
 	assert.Equal(t, "b3", doc.Blocks[1].ID)
 	assert.Equal(t, "b1", doc.Blocks[2].ID)
+}
+
+func TestApplyMoveBlockToBeginning(t *testing.T) {
+	doc := Document{
+		SchemaVersion: 1,
+		Blocks: []Block{
+			{ID: "b1", Type: string(BlockParagraph), Metadata: map[string]any{}},
+			{ID: "b2", Type: string(BlockParagraph), Metadata: map[string]any{}},
+		},
+	}
+
+	payload, _ := json.Marshal(MoveBlockPayload{BlockID: "b2", AfterBlockID: ""})
+	err := doc.ApplyOperation(KindMoveBlock, "", payload)
+	require.NoError(t, err)
+	assert.Len(t, doc.Blocks, 2)
+	assert.Equal(t, "b2", doc.Blocks[0].ID)
+	assert.Equal(t, "b1", doc.Blocks[1].ID)
 }
 
 func TestApplySetBlockType(t *testing.T) {

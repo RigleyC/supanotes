@@ -12,6 +12,7 @@ import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
 import 'package:supanotes/features/notes/domain/node_codec.dart';
+import 'package:supanotes/features/notes/domain/note_operation_adapter.dart';
 import 'package:supanotes/features/notes/domain/yjs_doc_editor_bridge.dart';
 import 'package:supanotes/features/notes/domain/yjs_node_codec.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
@@ -37,9 +38,22 @@ class NoteEditorController extends ChangeNotifier {
 
   EditorDocumentSyncManager? _coordinator;
   YjsDocEditorBridge? _bridge;
+  NoteOperationAdapter? operationAdapter;
   String? _noteId;
 
   bool get hasDocument => document != null;
+
+  void initOtOnly({required String noteId}) {
+    document = NodeCodec.documentFromNodes([]);
+    _noteId = noteId;
+    _setupEditor();
+    _coordinator = EditorDocumentSyncManager(
+      document: document!,
+      editor: editor!,
+    );
+    document!.addListener(_onDocChanged);
+    notifyListeners();
+  }
 
   void initFromDoc({
     required Doc doc,
@@ -192,6 +206,8 @@ class NoteEditorController extends ChangeNotifier {
   Future<void> dispose() async {
     document?.removeListener(_onDocChanged);
     onHasContentChanged = null;
+    await operationAdapter?.flushNow();
+    operationAdapter?.dispose();
     await _coordinator?.dispose();
     _bridge?.dispose();
     _bridge = null;

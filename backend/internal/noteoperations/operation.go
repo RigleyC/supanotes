@@ -52,15 +52,15 @@ var ValidBlockTypes = map[BlockType]bool{
 }
 
 type Operation struct {
-	NoteID       pgtype.UUID        `json:"note_id"`
+	NoteID       pgtype.UUID        `json:"noteId"`
 	Revision     int64              `json:"revision"`
-	OperationID  pgtype.UUID        `json:"operation_id"`
-	ActorID      pgtype.UUID        `json:"actor_id"`
-	BaseRevision int64              `json:"base_revision"`
+	OperationID  pgtype.UUID        `json:"operationId"`
+	ActorID      pgtype.UUID        `json:"actorId"`
+	BaseRevision int64              `json:"baseRevision"`
 	Kind         string             `json:"kind"`
-	BlockID      pgtype.Text        `json:"block_id"`
+	BlockID      pgtype.Text        `json:"blockId"`
 	Payload      json.RawMessage    `json:"payload"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	CreatedAt    pgtype.Timestamptz `json:"createdAt"`
 }
 
 type OperationRequest struct {
@@ -85,10 +85,11 @@ type AcceptedOperation struct {
 }
 
 type SyncResponse struct {
-	Accepted        []AcceptedOperation `json:"accepted"`
-	FinalRevision   int64               `json:"finalRevision"`
-	RemoteOperations []Operation        `json:"remoteOperations"`
-	ServerTime      time.Time           `json:"serverTime"`
+	Accepted          []AcceptedOperation `json:"accepted"`
+	FinalRevision     int64               `json:"finalRevision"`
+	RemoteOperations  []Operation         `json:"remoteOperations"`
+	CanonicalDocument json.RawMessage     `json:"canonicalDocument"`
+	ServerTime        time.Time           `json:"serverTime"`
 }
 
 type DocumentResponse struct {
@@ -99,7 +100,9 @@ type DocumentResponse struct {
 }
 
 type OperationsListResponse struct {
-	Operations []Operation `json:"operations"`
+	Operations []Operation      `json:"operations"`
+	Document   json.RawMessage  `json:"document,omitempty"`
+	Revision   int64            `json:"revision,omitempty"`
 }
 
 func parseDeltaFromPayload(payload json.RawMessage) (*delta.Delta, error) {

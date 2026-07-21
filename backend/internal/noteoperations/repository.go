@@ -47,6 +47,7 @@ type Repository interface {
 	LockNote(ctx context.Context, noteID pgtype.UUID) (LockNoteResult, error)
 	InsertOperation(ctx context.Context, arg InsertOperationParams) (Operation, error)
 	GetOperationsSince(ctx context.Context, noteID pgtype.UUID, afterRevision int64) ([]Operation, error)
+	GetOperationsRange(ctx context.Context, noteID pgtype.UUID, afterRevision int64, upToRevision int64) ([]Operation, error)
 	GetLastOperation(ctx context.Context, noteID pgtype.UUID) (Operation, error)
 	UpdateNoteDocument(ctx context.Context, arg UpdateNoteDocumentParams) error
 	GetNoteOperationByOpID(ctx context.Context, noteID pgtype.UUID, operationID pgtype.UUID) (Operation, error)
@@ -126,6 +127,30 @@ func (r *repository) GetOperationsSince(ctx context.Context, noteID pgtype.UUID,
 	return ops, rows.Err()
 }
 
+const getOperationsRangeSQL = `SELECT note_id, revision, operation_id, actor_id, base_revision, kind, block_id, payload, created_at
+FROM note_operations WHERE note_id = $1 AND revision > $2 AND revision <= $3 ORDER BY revision`
+
+func (r *repository) GetOperationsRange(ctx context.Context, noteID pgtype.UUID, afterRevision int64, upToRevision int64) ([]Operation, error) {
+	rows, err := r.db.Query(ctx, getOperationsRangeSQL, noteID, afterRevision, upToRevision)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ops []Operation
+	for rows.Next() {
+		var op Operation
+		if err := rows.Scan(
+			&op.NoteID, &op.Revision, &op.OperationID, &op.ActorID,
+			&op.BaseRevision, &op.Kind, &op.BlockID, &op.Payload, &op.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		ops = append(ops, op)
+	}
+	return ops, rows.Err()
+}
+
 const getLastOperationSQL = `SELECT note_id, revision, operation_id, actor_id, base_revision, kind, block_id, payload, created_at
 FROM note_operations WHERE note_id = $1 ORDER BY revision DESC LIMIT 1`
 
@@ -164,7 +189,7 @@ func (r *repository) GetNoteOperationByOpID(ctx context.Context, noteID pgtype.U
 
 const checkNotePermissionSQL = `SELECT COALESCE(
   (SELECT 'owner'::text FROM notes WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL),
-  (SELECT permission::text FROM note_shares WHERE note_id = $1 AND user_id = $2),
+  (SELECT permission::text FROM note_shares ns JOIN notes n ON n.id = ns.note_id WHERE ns.note_id = $1 AND ns.user_id = $2 AND n.deleted_at IS NULL),
   'none'::text
 ) AS permission`
 

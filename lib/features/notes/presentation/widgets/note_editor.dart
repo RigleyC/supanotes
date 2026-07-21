@@ -55,11 +55,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   @override
   void initState() {
     super.initState();
-    _controller = ref.read(noteEditorControllerProvider(widget.noteId));
-    _controller!.addListener(_onControllerReady);
-    _controller!.onHasContentChanged = (hasContent) {
-      widget.delegate.onHasContentChanged?.call(hasContent);
-    };
   }
 
   void _initControls() {
@@ -151,79 +146,90 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(noteEditorControllerProvider(widget.noteId));
-    final controller = _controller;
-    if (controller == null || !controller.hasDocument) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (controller.document == null ||
-        controller.editor == null ||
-        controller.composer == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    final controllerAsync = ref.watch(noteEditorControllerProvider(widget.noteId));
 
-    _initControls();
-    _initStableBuilders();
+    return controllerAsync.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, _) => Scaffold(body: Center(child: Text('Erro: $error'))),
+      data: (controller) {
+        if (_controller != controller) {
+          _controller?.removeListener(_onControllerReady);
+          _controller = controller;
+          _controller!.addListener(_onControllerReady);
+          _controller!.onHasContentChanged = (hasContent) {
+            widget.delegate.onHasContentChanged?.call(hasContent);
+          };
+        }
 
-    final theme = Theme.of(context);
+        if (!controller.hasDocument ||
+            controller.document == null ||
+            controller.editor == null ||
+            controller.composer == null) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
 
-    final topPadding = Scaffold.maybeOf(context)?.appBarMaxHeight ??
-        (MediaQuery.paddingOf(context).top + kToolbarHeight);
+        _initControls();
+        _initStableBuilders();
 
-    final docPadding = EdgeInsets.only(
-      left: 24,
-      right: 24,
-      top: topPadding,
-      bottom: 24,
-    );
+        final theme = Theme.of(context);
+        final topPadding = Scaffold.maybeOf(context)?.appBarMaxHeight ??
+            (MediaQuery.paddingOf(context).top + kToolbarHeight);
+        final docPadding = EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: topPadding,
+          bottom: 24,
+        );
 
-    if (_cachedStylesheet == null ||
-        !identical(_cachedColorScheme, theme.colorScheme) ||
-        _cachedStylesheet!.documentPadding != docPadding) {
-      _cachedColorScheme = theme.colorScheme;
-      _cachedStylesheet = noteStylesheet(
-        context,
-        documentPadding: docPadding,
-      );
-    }
+        if (_cachedStylesheet == null ||
+            !identical(_cachedColorScheme, theme.colorScheme) ||
+            _cachedStylesheet!.documentPadding != docPadding) {
+          _cachedColorScheme = theme.colorScheme;
+          _cachedStylesheet = noteStylesheet(
+            context,
+            documentPadding: docPadding,
+          );
+        }
 
-    return Column(
-        children: [
-          Expanded(
-            child: SuperEditorAndroidControlsScope(
-              controller: _controls!.androidController,
-              child: SuperEditorIosControlsScope(
-                controller: _controls!.iosController,
-                child: SuperEditor(
-                  editor: controller.editor!,
-                  focusNode: widget.isReadOnly ? null : controller.focusNode,
-                  documentLayoutKey: _docLayoutKey,
-                  stylesheet: _cachedStylesheet!,
-                  selectionStyle: editorSelectionStyle(theme.colorScheme),
-                  contentTapDelegateFactories: _contentTapDelegateFactories,
-                  keyboardActions: editorKeyboardActions(),
-                  componentBuilders: _componentBuilders!,
+        return Column(
+          children: [
+            Expanded(
+              child: SuperEditorAndroidControlsScope(
+                controller: _controls!.androidController,
+                child: SuperEditorIosControlsScope(
+                  controller: _controls!.iosController,
+                  child: SuperEditor(
+                    editor: controller.editor!,
+                    focusNode: widget.isReadOnly ? null : controller.focusNode,
+                    documentLayoutKey: _docLayoutKey,
+                    stylesheet: _cachedStylesheet!,
+                    selectionStyle: editorSelectionStyle(theme.colorScheme),
+                    contentTapDelegateFactories: _contentTapDelegateFactories,
+                    keyboardActions: editorKeyboardActions(),
+                    componentBuilders: _componentBuilders!,
+                  ),
                 ),
               ),
             ),
-          ),
-          if (!widget.isReadOnly)
-            NoteSuggestionOverlay(
-              editor: controller.editor!,
-              composer: controller.composer!,
-              currentNoteId: widget.noteId,
-              onPersist: () async {},
-            ),
-          if (!widget.isReadOnly)
-            NoteToolbar(
-              editor: controller.editor!,
-              composer: controller.composer!,
-              onAttachFile: () =>
-                  controller.pickAndAttachFile(imageOnly: false),
-              onAttachImage: () =>
-                  controller.pickAndAttachFile(imageOnly: true),
-            ),
-        ],
-      );
+            if (!widget.isReadOnly)
+              NoteSuggestionOverlay(
+                editor: controller.editor!,
+                composer: controller.composer!,
+                currentNoteId: widget.noteId,
+                onPersist: () async {},
+              ),
+            if (!widget.isReadOnly)
+              NoteToolbar(
+                editor: controller.editor!,
+                composer: controller.composer!,
+                onAttachFile: () =>
+                    controller.pickAndAttachFile(imageOnly: false),
+                onAttachImage: () =>
+                    controller.pickAndAttachFile(imageOnly: true),
+              ),
+          ],
+        );
+      },
+    );
   }
 }
