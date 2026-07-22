@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/di/providers.dart';
@@ -64,7 +65,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final isGridView = ref.watch(isGridViewProvider);
     final notesAsync = ref.watch(activeNotesProvider);
     final trimmedSearchQuery = _searchQuery.trim();
-
 
     final headerSlivers = [
       SliverToBoxAdapter(
@@ -139,20 +139,22 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
               : notes.where((n) {
                   final q = trimmedSearchQuery.toLowerCase();
                   final bodyText = (n.excerpt ?? n.content ?? '').toLowerCase();
-                  return n.title.toLowerCase().contains(q) || bodyText.contains(q);
+                  return n.title.toLowerCase().contains(q) ||
+                      bodyText.contains(q);
                 }).toList();
           return CustomScrollView(
-            slivers: [...headerSlivers, _buildNotesBody(filteredNotes, isGridView)],
+            slivers: [
+              ...headerSlivers,
+              _buildNotesBody(filteredNotes, isGridView),
+            ],
           );
         },
       ),
 
-      floatingActionButton: FloatingActionButton(
-        key: const ValueKey('home-create-note-fab'),
-        heroTag: 'home-create-note-fab',
-        tooltip: 'Criar nota',
+      floatingActionButton: AppButton(
+        variant: AppButtonVariant.fab,
         onPressed: () => _openNewNote(context),
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
       ),
     );
   }

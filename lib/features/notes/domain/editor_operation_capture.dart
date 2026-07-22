@@ -307,6 +307,11 @@ class EditorOperationCapture {
         final otherOldMeta = Map<String, dynamic>.from(mirror.metadata)
           ..remove('completions');
         if (!mapEquals(otherCurMeta, otherOldMeta)) {
+          for (final key in otherOldMeta.keys) {
+            if (!otherCurMeta.containsKey(key)) {
+              otherCurMeta[key] = null;
+            }
+          }
           requests.add(
             OperationRequestData(
               operationId: _generateOpId(),

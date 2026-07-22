@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -223,18 +225,63 @@ class AttachmentFilePill extends StatelessWidget {
 }
 
 class AttachmentExpandedImage extends StatelessWidget {
-  const AttachmentExpandedImage({super.key, required this.url});
+  const AttachmentExpandedImage({
+    super.key,
+    required this.url,
+    this.localPath,
+  });
 
   final String url;
+  final String? localPath;
 
   @override
   Widget build(BuildContext context) {
+    Widget imageWidget;
+    final file = localPath != null ? File(localPath!) : null;
+    if (file != null && file.existsSync()) {
+      imageWidget = Image.file(
+        file,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _buildNetworkImage(context),
+      );
+    } else {
+      imageWidget = _buildNetworkImage(context);
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
+      child: imageWidget,
+    );
+  }
+
+  Widget _buildNetworkImage(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          height: 180,
+          color: cs.surfaceContainerHighest,
+          child: Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: cs.primary,
+              ),
+            ),
+          ),
+        );
+      },
+      errorBuilder: (_, _, _) => Container(
+        height: 120,
+        color: cs.surfaceContainerHighest,
+        child: Center(
+          child: Icon(Icons.broken_image, color: cs.onSurfaceVariant),
+        ),
       ),
     );
   }

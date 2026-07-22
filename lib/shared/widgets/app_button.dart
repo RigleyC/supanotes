@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-enum AppButtonVariant { primary, secondary, tonal, danger, text }
+enum AppButtonVariant { primary, secondary, tonal, danger, text, fab }
 
 class AppButton extends StatelessWidget {
   const AppButton({
     super.key,
-    required this.text,
+    this.text,
     this.onPressed,
     this.isLoading = false,
     this.variant = AppButtonVariant.primary,
@@ -13,7 +13,7 @@ class AppButton extends StatelessWidget {
     this.icon,
   });
 
-  final String text;
+  final String? text;
   final VoidCallback? onPressed;
   final bool isLoading;
   final AppButtonVariant variant;
@@ -22,7 +22,13 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final fabBgColor = isDark ? Colors.white : Colors.black;
+    final fabFgColor = isDark ? Colors.black : Colors.white;
+
     final Widget child;
     if (isLoading) {
       child = SizedBox(
@@ -30,16 +36,22 @@ class AppButton extends StatelessWidget {
         width: 20,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: _foregroundColor(scheme),
+          color: variant == AppButtonVariant.fab
+              ? fabFgColor
+              : _foregroundColor(scheme),
         ),
       );
-    } else if (icon != null) {
+    } else if (variant == AppButtonVariant.fab) {
+      child = icon ?? Icon(Icons.add, color: fabFgColor);
+    } else if (icon != null && text != null && text!.isNotEmpty) {
       child = Row(
         mainAxisSize: MainAxisSize.min,
-        children: [icon!, const SizedBox(width: 8), Text(text)],
+        children: [icon!, const SizedBox(width: 8), Text(text!)],
       );
+    } else if (icon != null) {
+      child = icon!;
     } else {
-      child = Text(text);
+      child = Text(text ?? '');
     }
 
     const size = Size(0, 48);
@@ -74,7 +86,24 @@ class AppButton extends StatelessWidget {
         style: TextButton.styleFrom(minimumSize: size),
         child: child,
       ),
+      AppButtonVariant.fab => FloatingActionButton(
+        shape: const CircleBorder(),
+        backgroundColor: fabBgColor,
+        foregroundColor: fabFgColor,
+        onPressed: isLoading ? null : onPressed,
+        child: IconTheme(
+          data: IconThemeData(color: fabFgColor),
+          child: child,
+        ),
+      ),
     };
+
+    if (variant == AppButtonVariant.fab) {
+      if (width != null) {
+        return SizedBox(width: width, child: button);
+      }
+      return button;
+    }
 
     return SizedBox(width: width ?? double.infinity, child: button);
   }
@@ -91,6 +120,8 @@ class AppButton extends StatelessWidget {
         return scheme.onError;
       case AppButtonVariant.text:
         return scheme.primary;
+      case AppButtonVariant.fab:
+        return scheme.onPrimary;
     }
   }
 }

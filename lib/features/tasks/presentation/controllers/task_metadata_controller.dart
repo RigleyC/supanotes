@@ -89,7 +89,9 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
   void setReminder(TaskReminderOption? reminder) {
     final current = state;
     state = (
-      dueDate: current.dueDate,
+      dueDate:
+          current.dueDate ??
+          (reminder == null ? null : DateTime.now().startOfDay),
       hasTime: current.hasTime,
       recurrence: current.recurrence,
       reminder: reminder,

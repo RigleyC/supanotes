@@ -147,6 +147,7 @@ class NoteEditorController extends ChangeNotifier {
       final updatedMeta = Map<String, dynamic>.from(node.metadata);
       if (clearDueDate) {
         updatedMeta.remove('dueDate');
+        updatedMeta.remove('hasTime');
       } else if (dueDate != null) {
         updatedMeta['dueDate'] = dueDate.toIso8601String();
       }

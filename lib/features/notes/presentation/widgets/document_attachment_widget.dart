@@ -32,7 +32,12 @@ class DocumentAttachmentWidget extends ConsumerWidget {
 
     final Widget child = attachmentAsync.when(
       data: (model) {
-        if (model == null) return const SizedBox.shrink();
+        if (model == null) {
+          return AttachmentUploadingCapsule(
+            fileName: '...',
+            onCancel: onDelete,
+          );
+        }
 
         switch (model.status) {
           case AttachmentStatus.uploading:
@@ -59,7 +64,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
                   onTap: () => launchUrl(Uri.parse(url)),
                 );
               }
-              return AttachmentExpandedImage(url: url);
+              return AttachmentExpandedImage(url: url, localPath: model.localPath);
             }
 
             return AttachmentFilePill(

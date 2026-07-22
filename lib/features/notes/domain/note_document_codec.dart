@@ -317,11 +317,10 @@ class NoteDocumentCodec {
       type = 'task';
       text = node.text;
       metadata['isCompleted'] = node.isComplete;
-      if (node.metadata.containsKey('dueDate')) {
-        metadata['dueDate'] = node.metadata['dueDate'];
-      }
-      if (node.metadata.containsKey('recurrenceRule')) {
-        metadata['recurrenceRule'] = node.metadata['recurrenceRule'];
+      for (final entry in node.metadata.entries) {
+        if (entry.key != 'isCompleted') {
+          metadata[entry.key] = entry.value;
+        }
       }
     } else if (node is HorizontalRuleNode) {
       type = 'divider';

@@ -112,7 +112,7 @@ class TaskMetadataSheetBody extends ConsumerWidget {
               hasTime: state.hasTime,
               onTap: () => FamilyModalSheet.of(context).pushPage(
                 TaskMetadataTimePage(
-                  currentDueDate: state.dueDate!,
+                  currentDueDate: state.dueDate ?? DateTime.now(),
                   hasTime: state.hasTime,
                   onSelected: (date, {required bool hasTime}) {
                     controller.setTime(date, hasTime: hasTime);
@@ -226,7 +226,6 @@ class _TimeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = dueDate != null;
     final hasValue = hasTime && dueDate != null;
     final scheme = Theme.of(context).colorScheme;
     return ListTile(
@@ -240,9 +239,7 @@ class _TimeTile extends StatelessWidget {
       title: Text(
         hasValue ? DateFormat('h:mm a').format(dueDate!) : 'Adicionar horário',
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-          color: enabled
-              ? (hasValue ? scheme.primary : scheme.onSurface)
-              : scheme.onSurfaceVariant,
+          color: hasValue ? scheme.primary : scheme.onSurface,
           fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
         ),
       ),
@@ -252,8 +249,7 @@ class _TimeTile extends StatelessWidget {
               onPressed: onClear,
             )
           : null,
-      enabled: enabled,
-      onTap: enabled ? onTap : null,
+      onTap: onTap,
     );
   }
 }

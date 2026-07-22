@@ -245,5 +245,57 @@ void main() {
       final metadata = operation.payload['metadata'] as Map<String, dynamic>;
       expect(metadata['isCompleted'], true);
     });
+
+    test('captures metadata deletions as explicit null values in set_block_metadata payload', () {
+      final doc = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 't1',
+            text: AttributedText('Task with metadata'),
+            isComplete: false,
+            metadata: {
+              'dueDate': '2026-07-25T14:30:00.000',
+              'hasTime': true,
+              'recurrenceRule': 'weekly',
+              'reminder': '15m_before',
+            },
+          ),
+        ],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      final capture = EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-1',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      );
+      capture.start();
+
+      // Remove all task metadata keys
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 't1',
+          newNode: TaskNode(
+            id: 't1',
+            text: AttributedText('Task with metadata'),
+            isComplete: false,
+            metadata: {},
+          ),
+        ),
+      ]);
+
+      final operation = capturedOps.singleWhere(
+        (op) => op.kind == 'set_block_metadata',
+      );
+      final metadata = operation.payload['metadata'] as Map<String, dynamic>;
+      expect(metadata['dueDate'], null);
+      expect(metadata['hasTime'], null);
+      expect(metadata['recurrenceRule'], null);
+      expect(metadata['reminder'], null);
+    });
   });
 }

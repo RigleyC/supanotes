@@ -118,6 +118,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     super.didUpdateWidget(oldWidget);
 
     if (widget.hideCompleted != oldWidget.hideCompleted ||
+        widget.collapseImages != oldWidget.collapseImages ||
         widget.isReadOnly != oldWidget.isReadOnly) {
       _componentBuilders = null;
       _contentTapDelegateFactories = null;

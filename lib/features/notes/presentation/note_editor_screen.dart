@@ -4,7 +4,6 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
@@ -127,21 +126,25 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         actions: [
           if (note != null) ...[
             AdaptivePopupMenuButton.icon<String>(
-              icon: Icons.more_vert,
+              icon: PlatformInfo.isIOS26OrHigher() ? 'ellipsis' : Icons.more_vert,
               items: [
                 if (note.isOwner)
-                  const AdaptivePopupMenuItem<String>(
+                  AdaptivePopupMenuItem<String>(
                     label: NoteStrings.shareLabel,
-                    icon: CupertinoIcons.share,
+                    icon: PlatformInfo.isIOS26OrHigher()
+                        ? 'square.and.arrow.up'
+                        : Icons.share_outlined,
                     value: 'share',
                   ),
                 AdaptivePopupMenuItem<String>(
                   label: note.hideCompleted
                       ? NoteStrings.showCompleted
                       : NoteStrings.hideCompleted,
-                  icon: note.hideCompleted
-                      ? CupertinoIcons.eye_solid
-                      : CupertinoIcons.eye_slash_fill,
+                  icon: PlatformInfo.isIOS26OrHigher()
+                      ? (note.hideCompleted ? 'eye' : 'eye.slash')
+                      : (note.hideCompleted
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
                   value: 'hide_completed',
                 ),
                 if (note.isOwner)
@@ -149,8 +152,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     label: note.collapseImages
                         ? 'Expandir imagens'
                         : 'Colapsar imagens',
-                    icon: note.collapseImages
-                        ? Icons.image
+                    icon: PlatformInfo.isIOS26OrHigher()
+                        ? 'photo'
                         : Icons.image_outlined,
                     value: 'collapse_images',
                   ),

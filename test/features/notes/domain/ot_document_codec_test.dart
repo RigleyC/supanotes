@@ -61,6 +61,30 @@ void main() {
       expect((encoded['metadata'] as Map)['custom'], 'task');
     });
 
+    test('encodes TaskNode metadata including hasTime, reminder, and dueDate', () {
+      final taskNode = TaskNode(
+        id: 'task-123',
+        text: AttributedText('Call doctor'),
+        isComplete: false,
+        metadata: {
+          'dueDate': '2026-07-25T14:30:00.000',
+          'hasTime': true,
+          'reminder': '15m_before',
+          'recurrenceRule': 'weekly',
+        },
+      );
+
+      final encoded = codec.encodeNode(taskNode);
+
+      expect(encoded['type'], 'task');
+      final metadata = encoded['metadata'] as Map<String, dynamic>;
+      expect(metadata['isCompleted'], false);
+      expect(metadata['dueDate'], '2026-07-25T14:30:00.000');
+      expect(metadata['hasTime'], true);
+      expect(metadata['reminder'], '15m_before');
+      expect(metadata['recurrenceRule'], 'weekly');
+    });
+
     test('decodes string blockType metadata as an attribution', () {
       final node =
           codec.decodeNode({
