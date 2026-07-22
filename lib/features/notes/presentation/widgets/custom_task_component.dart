@@ -289,7 +289,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   ) +
                   _taskCheckboxTouchTarget +
                   _taskCheckboxGap,
-              height: _taskCheckboxTouchTarget,
               child: Semantics(
                 button: true,
                 checked: _isComplete,
@@ -303,7 +302,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 11),
+                      padding: const EdgeInsets.only(left: 11, top: 3),
                       child: AppTaskCheckbox(
                         value: _isComplete,
                         accentColor: taskColor,
