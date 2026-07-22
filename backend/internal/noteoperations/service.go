@@ -37,11 +37,29 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 	defer tx.Rollback(ctx)
 
 	txRepo := s.repo.WithTx(tx)
-	if err := txRepo.EnsureNote(ctx, noteID, userID); err != nil {
+	response, err := syncOperationsInRepository(ctx, txRepo, noteID, userID, req)
+	if err != nil {
+		return SyncResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return SyncResponse{}, fmt.Errorf("commit tx: %w", err)
+	}
+	return response, nil
+}
+
+func syncOperationsInRepository(
+	ctx context.Context,
+	repo Repository,
+	noteID pgtype.UUID,
+	userID pgtype.UUID,
+	req SyncRequest,
+) (SyncResponse, error) {
+	if err := repo.EnsureNote(ctx, noteID, userID); err != nil {
 		return SyncResponse{}, fmt.Errorf("ensure note: %w", err)
 	}
 
-	locked, err := txRepo.LockNote(ctx, noteID)
+	locked, err := repo.LockNote(ctx, noteID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return SyncResponse{}, ErrNoteNotFound
@@ -49,7 +67,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 		return SyncResponse{}, fmt.Errorf("lock note: %w", err)
 	}
 
-	perm, err := txRepo.CheckNotePermission(ctx, noteID, userID)
+	perm, err := repo.CheckNotePermission(ctx, noteID, userID)
 	if err != nil {
 		return SyncResponse{}, fmt.Errorf("check permission: %w", err)
 	}
@@ -68,7 +86,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 	for _, opReq := range req.Operations {
 		opID := mustParseUUID(opReq.OperationID)
 
-		dedupOp, err := txRepo.GetNoteOperationByOpID(ctx, noteID, opID)
+		dedupOp, err := repo.GetNoteOperationByOpID(ctx, noteID, opID)
 		if err == nil {
 			accepted = append(accepted, AcceptedOperation{
 				OperationID: opReq.OperationID,
@@ -82,7 +100,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 			return SyncResponse{}, fmt.Errorf("dedup check: %w", err)
 		}
 
-		if err := validateAndTransform(ctx, txRepo, &opReq, userID, opID, &doc, noteID, currentRevision); err != nil {
+		if err := validateAndTransform(ctx, repo, &opReq, userID, opID, &doc, noteID, currentRevision); err != nil {
 			return SyncResponse{}, err
 		}
 
@@ -97,7 +115,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 			blockID = pgtype.Text{String: *opReq.BlockID, Valid: true}
 		}
 
-		_, err = txRepo.InsertOperation(ctx, InsertOperationParams{
+		_, err = repo.InsertOperation(ctx, InsertOperationParams{
 			NoteID:       noteID,
 			Revision:     currentRevision,
 			OperationID:  opID,
@@ -125,7 +143,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 	}
 
 	content, excerpt := DeriveContentFromDocument(doc)
-	if err := txRepo.UpdateNoteDocument(ctx, UpdateNoteDocumentParams{
+	if err := repo.UpdateNoteDocument(ctx, UpdateNoteDocumentParams{
 		NoteID:           noteID,
 		Revision:         currentRevision,
 		Document:         docJSON,
@@ -136,7 +154,7 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 		return SyncResponse{}, fmt.Errorf("update note document: %w", err)
 	}
 
-	remoteOps, err := txRepo.GetOperationsRange(ctx, noteID, req.KnownRevision, currentRevision)
+	remoteOps, err := repo.GetOperationsRange(ctx, noteID, req.KnownRevision, currentRevision)
 	if err != nil {
 		return SyncResponse{}, fmt.Errorf("fetch remote ops: %w", err)
 	}
@@ -151,10 +169,6 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 		if !acceptedSet[opIDToString(op.OperationID)] {
 			filteredRemote = append(filteredRemote, op)
 		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return SyncResponse{}, fmt.Errorf("commit tx: %w", err)
 	}
 
 	return SyncResponse{

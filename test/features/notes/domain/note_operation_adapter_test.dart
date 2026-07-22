@@ -167,6 +167,46 @@ void main() {
       );
     });
 
+    test('keeps text when creating task and bullet blocks', () async {
+      final adapter = createAdapter();
+      List<OperationRequest>? capturedOps;
+      adapter.onLocalOperations = (ops) {
+        capturedOps = ops;
+      };
+
+      await adapter.start();
+      editor.execute([
+        InsertNodeAtIndexRequest(
+          nodeIndex: 1,
+          newNode: TaskNode(
+            id: 'task-1',
+            text: AttributedText('Task pasted text'),
+            isComplete: false,
+          ),
+        ),
+        InsertNodeAtIndexRequest(
+          nodeIndex: 2,
+          newNode: ListItemNode.unordered(
+            id: 'bullet-1',
+            text: AttributedText('Bullet pasted text'),
+          ),
+        ),
+      ]);
+
+      await adapter.flushNow();
+
+      final createOps = capturedOps!
+          .where((operation) => operation.kind == 'create_block')
+          .toList();
+      expect(createOps, hasLength(2));
+      expect(createOps[0].payload['delta'], [
+        {'insert': 'Task pasted text'},
+      ]);
+      expect(createOps[1].payload['delta'], [
+        {'insert': 'Bullet pasted text'},
+      ]);
+    });
+
     test('captures text changes after a created task as text_delta', () async {
       final adapter = createAdapter();
       final capturedBatches = <List<OperationRequest>>[];

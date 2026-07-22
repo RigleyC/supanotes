@@ -2,6 +2,9 @@ package noteoperations
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/fmpwizard/go-quilljs-delta/delta"
@@ -130,6 +133,44 @@ func TestApplyCreateBlock(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, doc.Blocks, 2)
 	assert.Equal(t, "b2", doc.Blocks[1].ID)
+}
+
+func TestApplySharedCreateBlockContractFixture(t *testing.T) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	fixturePath := filepath.Join(filepath.Dir(currentFile), "../../../test/fixtures/ot_create_blocks_contract.json")
+	data, err := os.ReadFile(fixturePath)
+	require.NoError(t, err)
+
+	var fixture struct {
+		Blocks []CreateBlockPayload `json:"blocks"`
+	}
+	require.NoError(t, json.Unmarshal(data, &fixture))
+
+	doc := NewEmptyDocument()
+	for _, block := range fixture.Blocks {
+		payload, err := json.Marshal(block)
+		require.NoError(t, err)
+		require.NoError(t, doc.ApplyOperation(KindCreateBlock, block.ID, payload))
+	}
+
+	for _, expected := range fixture.Blocks {
+		var actual *Block
+		for i := range doc.Blocks {
+			if doc.Blocks[i].ID == expected.ID {
+				actual = &doc.Blocks[i]
+				break
+			}
+		}
+		require.NotNil(t, actual, expected.ID)
+		assert.Equal(t, expected.Type, actual.Type)
+		assert.Equal(t, deltaText(expected.Delta), deltaText(actual.Delta))
+		expectedMetadata := expected.Metadata
+		if expectedMetadata == nil {
+			expectedMetadata = map[string]any{}
+		}
+		assert.Equal(t, expectedMetadata, actual.Metadata)
+	}
 }
 
 func TestApplyCreateBlockIsIdempotentForExistingBlockID(t *testing.T) {

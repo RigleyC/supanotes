@@ -18,6 +18,7 @@ type mockRepository struct {
 	getOperationsSinceFn     func(ctx context.Context, noteID pgtype.UUID, afterRevision int64) ([]Operation, error)
 	getOperationsRangeFn     func(ctx context.Context, noteID pgtype.UUID, afterRevision int64, upToRevision int64) ([]Operation, error)
 	updateNoteDocumentFn     func(ctx context.Context, arg UpdateNoteDocumentParams) error
+	insertOperationFn        func(ctx context.Context, arg InsertOperationParams) (Operation, error)
 	getNoteOperationByOpIDFn func(ctx context.Context, noteID pgtype.UUID, operationID pgtype.UUID) (Operation, error)
 	checkNotePermissionFn    func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (string, error)
 	getNoteDocumentFn        func(ctx context.Context, noteID pgtype.UUID) (GetNoteDocumentResult, error)
@@ -38,6 +39,9 @@ func (m *mockRepository) LockNote(ctx context.Context, noteID pgtype.UUID) (Lock
 }
 
 func (m *mockRepository) InsertOperation(ctx context.Context, arg InsertOperationParams) (Operation, error) {
+	if m.insertOperationFn != nil {
+		return m.insertOperationFn(ctx, arg)
+	}
 	return Operation{}, nil
 }
 

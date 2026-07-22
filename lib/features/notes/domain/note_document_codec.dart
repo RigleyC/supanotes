@@ -371,7 +371,7 @@ class NoteDocumentCodec {
     final result = <String, dynamic>{
       'id': blockId,
       'type': type,
-      'content': deltaOps,
+      'delta': deltaOps,
     };
     if (metadata.isNotEmpty) {
       result['metadata'] = _toJsonValue(metadata);
@@ -403,9 +403,7 @@ class NoteDocumentCodec {
         }
       }
 
-      final Map<String, dynamic> op = {
-        'insert': plainText.substring(pos, end),
-      };
+      final Map<String, dynamic> op = {'insert': plainText.substring(pos, end)};
       if (attrs.isNotEmpty) {
         op['attributes'] = attrs;
       }
@@ -447,7 +445,8 @@ class NoteDocumentCodec {
     node.metadata.addAll(metadata);
 
     if (node is ParagraphNode) {
-      final blockTypeAttr = attributionFromName(type) ??
+      final blockTypeAttr =
+          attributionFromName(type) ??
           (metadata['blockType'] is String
               ? attributionFromName(metadata['blockType'] as String)
               : null);
@@ -458,7 +457,8 @@ class NoteDocumentCodec {
     return node;
   }
 
-  DocumentNode decodeBlock(Map<String, dynamic> blockData) => decodeNode(blockData);
+  DocumentNode decodeBlock(Map<String, dynamic> blockData) =>
+      decodeNode(blockData);
 
   List<Map<String, dynamic>> encodeDocument(MutableDocument document) {
     final blocks = <Map<String, dynamic>>[];
@@ -490,10 +490,18 @@ class NoteDocumentCodec {
       return DocumentAttachmentNode(id: nodeId, metadata: metadata ?? {});
     }
     if (type == 'bulletList') {
-      return ListItemNode(id: nodeId, itemType: ListItemType.unordered, text: text);
+      return ListItemNode(
+        id: nodeId,
+        itemType: ListItemType.unordered,
+        text: text,
+      );
     }
     if (type == 'orderedList') {
-      return ListItemNode(id: nodeId, itemType: ListItemType.ordered, text: text);
+      return ListItemNode(
+        id: nodeId,
+        itemType: ListItemType.ordered,
+        text: text,
+      );
     }
     if (type == 'task') {
       return TaskNode(
@@ -755,11 +763,7 @@ class NoteDocumentCodec {
       for (final id in currentAttrs) {
         final attr = attributionFromId(id);
         if (attr != null) {
-          span.addAttribution(
-            newAttribution: attr,
-            start: pos,
-            end: end,
-          );
+          span.addAttribution(newAttribution: attr, start: pos, end: end);
         }
       }
       pos = end;

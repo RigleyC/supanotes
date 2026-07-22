@@ -1,0 +1,35 @@
+{
+  "blocks": [
+    {
+      "id": "paragraph",
+      "type": "paragraph",
+      "delta": [{"insert": "Body"}]
+    },
+    {
+      "id": "task",
+      "type": "task",
+      "delta": [{"insert": "Task text"}],
+      "metadata": {"isCompleted": false, "blockType": "task"}
+    },
+    {
+      "id": "bullet",
+      "type": "bulletList",
+      "delta": [{"insert": "Bullet text"}]
+    },
+    {
+      "id": "ordered",
+      "type": "orderedList",
+      "delta": [{"insert": "Ordered text"}]
+    },
+    {
+      "id": "header",
+      "type": "header1",
+      "delta": [{"insert": "Heading"}]
+    },
+    {
+      "id": "quote",
+      "type": "quote",
+      "delta": [{"insert": "Quoted text"}]
+    }
+  ]
+}
