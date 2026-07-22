@@ -9,7 +9,6 @@ class NoteModel {
     this.excerpt,
     required this.favorite,
     required this.archived,
-    required this.contextId,
     required this.createdAt,
     required this.updatedAt,
     this.hideCompleted = false,
@@ -26,7 +25,6 @@ class NoteModel {
   final String? excerpt;
   final bool favorite;
   final bool archived;
-  final String? contextId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool hideCompleted;
@@ -47,7 +45,6 @@ class NoteModel {
     String? excerpt,
     bool? favorite,
     bool? archived,
-    String? contextId,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? hideCompleted,
@@ -63,7 +60,6 @@ class NoteModel {
     excerpt: excerpt ?? this.excerpt,
     favorite: favorite ?? this.favorite,
     archived: archived ?? this.archived,
-    contextId: contextId ?? this.contextId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     hideCompleted: hideCompleted ?? this.hideCompleted,
@@ -82,7 +78,6 @@ class NoteModel {
       excerpt: qr.note.excerpt,
       favorite: qr.favorite,
       archived: qr.archived,
-      contextId: qr.note.contextId,
       createdAt: qr.note.createdAt,
       updatedAt: qr.note.updatedAt,
       hideCompleted: qr.hideCompleted,

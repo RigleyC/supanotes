@@ -7,6 +7,7 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +24,8 @@ import 'package:supanotes/features/notes/presentation/controllers/notes_provider
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
@@ -34,6 +37,43 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
+  TaskModel? _taskForMetadata(
+    String taskId,
+    Map<String, TaskModel> tasks,
+    NoteModel note,
+  ) {
+    final projected = tasks[taskId];
+    if (projected != null) return projected;
+
+    final controller = ref
+        .read(noteEditorControllerProvider(widget.noteId))
+        .value;
+    final node = controller?.document?.getNodeById(taskId);
+    if (node is! TaskNode) return null;
+
+    final dueDate = DateTime.tryParse(
+      node.metadata['dueDate'] as String? ?? '',
+    );
+    return TaskModel(
+      id: node.id,
+      userId: note.userId,
+      noteId: note.id,
+      title: node.text.toPlainText(),
+      status: node.isComplete ? 'done' : 'open',
+      position: '',
+      dueDate: dueDate,
+      hasTime: node.metadata['hasTime'] as bool? ?? false,
+      completedAt: null,
+      recurrence: TaskRecurrence.parse(
+        node.metadata['recurrenceRule'] as String? ??
+            node.metadata['recurrence'] as String?,
+      ),
+      reminder: node.metadata['reminder'] as String?,
+      createdAt: DateTime.now().toUtc(),
+      updatedAt: DateTime.now().toUtc(),
+    );
+  }
+
   Future<void> _handleMenuValue(
     BuildContext context,
     WidgetRef ref,
@@ -67,7 +107,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Widget build(BuildContext context) {
     final repo = ref.read(notesRepositoryProvider);
     final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
-    final controllerAsync = ref.watch(noteEditorControllerProvider(widget.noteId));
+    final controllerAsync = ref.watch(
+      noteEditorControllerProvider(widget.noteId),
+    );
     final note = noteWithTasksAsync.asData?.value.note;
 
     return Scaffold(
@@ -139,9 +181,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       icon: const Icon(Icons.check),
                       onPressed: () {
                         controller.focusNode.unfocus();
-                        SystemChannels.textInput.invokeMethod(
-                          'TextInput.hide',
-                        );
+                        SystemChannels.textInput.invokeMethod('TextInput.hide');
                       },
                     );
                   },
@@ -173,19 +213,46 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               delegate: NoteEditorDelegate(
                 onTaskLongPress: isReadOnly
                     ? null
-                    : (task, flushSnapshot) async {
-                        await flushSnapshot();
+                    : (taskId) async {
+                        final task = _taskForMetadata(
+                          taskId,
+                          tasksMap,
+                          noteData,
+                        );
                         if (!context.mounted || task == null) return;
                         await showTaskMetadataSheet(
                           context: context,
                           ref: ref,
                           noteId: noteData.id,
                           task: task,
+                          onSave:
+                              ({
+                                required dueDate,
+                                required hasTime,
+                                required recurrence,
+                                required reminder,
+                              }) async {
+                                final controller = ref
+                                    .read(
+                                      noteEditorControllerProvider(
+                                        widget.noteId,
+                                      ),
+                                    )
+                                    .value;
+                                controller?.updateTaskMetadataInYDoc(
+                                  taskId,
+                                  dueDate: dueDate,
+                                  clearDueDate: dueDate == null,
+                                  hasTime: hasTime,
+                                  recurrence: recurrence?.name,
+                                  clearRecurrence: recurrence == null,
+                                  reminder: reminder,
+                                  clearReminder: reminder == null,
+                                );
+                              },
                         );
                       },
                 onTaskComplete: (taskId) {
-                  final task = tasksMap[taskId];
-                  final isRecurring = task?.isRepeating ?? false;
                   return TaskSnackBarHelper.completeTaskWithFeedback(
                     onComplete: () async {
                       final controller = ref
@@ -214,14 +281,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       if (controller != null) {
                         // For recurring tasks, the template's dueDate is the
                         // anchor and never changes — only remove the completion.
-                        if (!isRecurring) {
-                          controller.updateTaskMetadataInYDoc(
-                            taskId,
-                            dueDate: previousDue,
-                            clearDueDate: previousDue == null,
-                            hasTime: previousHasTime,
-                          );
-                        }
                         controller.reopenTaskInYDoc(
                           taskId,
                           previousDue: previousDue,

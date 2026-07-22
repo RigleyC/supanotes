@@ -16,29 +16,20 @@ import 'auth_local_storage.dart';
 class SessionCache {
   const SessionCache({
     this.settings = const {},
-    this.soul = const {},
-    this.contexts = const [],
   });
 
   final Map<String, dynamic> settings;
-  final Map<String, dynamic> soul;
-  final List<dynamic> contexts;
 
-  bool get isEmpty =>
-      settings.isEmpty && soul.isEmpty && contexts.isEmpty;
+  bool get isEmpty => settings.isEmpty;
 
   factory SessionCache.fromJson(Map<String, dynamic> json) {
     return SessionCache(
       settings: json['settings'] as Map<String, dynamic>? ?? const {},
-      soul: json['soul'] as Map<String, dynamic>? ?? const {},
-      contexts: json['contexts'] as List<dynamic>? ?? const [],
     );
   }
 
   Map<String, dynamic> toJson() => {
     'settings': settings,
-    'soul': soul,
-    'contexts': contexts,
   };
 }
 
@@ -68,18 +59,6 @@ class SessionCacheNotifier extends Notifier<SessionCache> {
   Future<void> updateSettings(Map<String, dynamic> settings) async {
     final data = {
       'settings': settings,
-      'soul': state.soul,
-      'contexts': state.contexts,
-    };
-    state = SessionCache.fromJson(data);
-    await _storage.saveSessionData(data);
-  }
-
-  Future<void> updateSoul(Map<String, dynamic> soul) async {
-    final data = {
-      'settings': state.settings,
-      'soul': soul,
-      'contexts': state.contexts,
     };
     state = SessionCache.fromJson(data);
     await _storage.saveSessionData(data);

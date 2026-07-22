@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,11 +20,8 @@ import 'package:timezone/timezone.dart' as tz;
 /// Mock auth controller that returns a fixed user without storage/network deps.
 class _MockAuthController extends AuthController {
   @override
-  Future<User?> build() async => const User(
-    id: 'test-user',
-    email: 'test@example.com',
-    name: 'Test User',
-  );
+  Future<User?> build() async =>
+      const User(id: 'test-user', email: 'test@example.com', name: 'Test User');
 }
 
 class FakeFlutterLocalNotificationsPlugin extends Fake
@@ -42,7 +40,8 @@ class FakeFlutterLocalNotificationsPlugin extends Fake
   Future<bool?> initialize({
     required InitializationSettings settings,
     DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
-    DidReceiveBackgroundNotificationResponseCallback? onDidReceiveBackgroundNotificationResponse,
+    DidReceiveBackgroundNotificationResponseCallback?
+    onDidReceiveBackgroundNotificationResponse,
   }) async {
     initializedCount++;
     return true;
@@ -75,8 +74,6 @@ class FakeFlutterLocalNotificationsPlugin extends Fake
 
 class MockTasksLocalRepository extends Mock implements TasksLocalRepository {}
 
-
-
 void main() {
   late FakeFlutterLocalNotificationsPlugin fakePlugin;
   late MockTasksLocalRepository mockTasksRepo;
@@ -94,9 +91,7 @@ void main() {
           LocalNotificationService(plugin: fakePlugin),
         ),
         tasksLocalRepositoryProvider.overrideWithValue(mockTasksRepo),
-        authControllerProvider.overrideWith(
-          () => _MockAuthController(),
-        ),
+        authControllerProvider.overrideWith(() => _MockAuthController()),
       ],
     );
   });
@@ -108,7 +103,7 @@ void main() {
   test('schedules notifications for tasks with due date', () async {
     final now = DateTime.now();
     final tomorrow = now.add(const Duration(days: 1));
-    
+
     final openTasks = [
       TaskData(
         id: 'task-1',
@@ -150,51 +145,56 @@ void main() {
         reminder: 'at_time',
       ),
     ];
-    
-    when(() => mockTasksRepo.watchOpenTasks())
-        .thenAnswer((_) => Stream.multi((controller) => controller.add(openTasks)));
-        
+
+    when(() => mockTasksRepo.watchOpenTasks()).thenAnswer(
+      (_) => Stream.multi((controller) => controller.add(openTasks)),
+    );
+
     await container.read(authControllerProvider.future);
     final sub = container.listen(taskNotificationSchedulerProvider, (_, _) {});
-    
+
     // Wait for the scheduler to build and the stream to emit
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     expect(fakePlugin.initializedCount, greaterThan(0));
     expect(fakePlugin.schedules, hasLength(2));
-    
+
     // Use deterministic notification IDs matching the scheduler
     final t1Nid = notificationIdForTask('test-user', 'task-1');
     final t2Nid = notificationIdForTask('test-user', 'task-2');
     final t3Nid = notificationIdForTask('test-user', 'task-3');
-    
+
     // Task 1: Has time, should schedule at the exact time
     final schedule1 = fakePlugin.schedules.firstWhere((s) => s['id'] == t1Nid);
     expect(schedule1['title'], 'Has Time');
     expect(
       schedule1['scheduledDate'],
-      predicate((tz.TZDateTime d) => d.isAtSameMomentAs(tomorrow))
+      predicate((tz.TZDateTime d) => d.isAtSameMomentAs(tomorrow)),
     );
-    
+
     // Task 2: No time, should schedule at 9:00 AM
     final schedule2 = fakePlugin.schedules.firstWhere((s) => s['id'] == t2Nid);
     expect(schedule2['title'], 'No Time');
     expect(
       schedule2['scheduledDate'],
-      predicate((tz.TZDateTime d) => d.isAtSameMomentAs(DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0)))
+      predicate(
+        (tz.TZDateTime d) => d.isAtSameMomentAs(
+          DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0),
+        ),
+      ),
     );
-    
+
     // Task 3 should not be scheduled
     final hasTask3 = fakePlugin.schedules.any((s) => s['id'] == t3Nid);
     expect(hasTask3, isFalse);
-    
+
     sub.close();
   });
-  
+
   test('cancels notifications when a task is no longer open', () async {
     final now = DateTime.now();
     final tomorrow = now.add(const Duration(days: 1));
-    
+
     final task1 = TaskData(
       id: 'task-1',
       userId: 'test-user',
@@ -208,23 +208,84 @@ void main() {
       dueDate: tomorrow,
       reminder: 'at_time',
     );
-    
+
     final controller = StreamController<List<TaskData>>();
     addTearDown(controller.close);
-    when(() => mockTasksRepo.watchOpenTasks())
-        .thenAnswer((_) => controller.stream);
-            
+    when(
+      () => mockTasksRepo.watchOpenTasks(),
+    ).thenAnswer((_) => controller.stream);
+
     await container.read(authControllerProvider.future);
     final sub = container.listen(taskNotificationSchedulerProvider, (_, _) {});
-    
+
     controller.add([task1]);
     await Future.delayed(const Duration(milliseconds: 300));
     expect(fakePlugin.schedules, hasLength(1));
 
     controller.add([]);
     await Future.delayed(const Duration(milliseconds: 300));
-    expect(fakePlugin.cancelled, contains(notificationIdForTask('test-user', 'task-1')));
-    
+    expect(
+      fakePlugin.cancelled,
+      contains(notificationIdForTask('test-user', 'task-1')),
+    );
+
     sub.close();
   });
+
+  test(
+    'replaces an all-day reminder when its notification time changes',
+    () async {
+      final now = DateTime.now();
+      final dueDate = DateTime(now.year, now.month, now.day + 1);
+      final initialTask = TaskData(
+        id: 'task-1',
+        userId: 'test-user',
+        noteId: 'note-1',
+        title: 'All day',
+        status: 'open',
+        position: '1',
+        createdAt: now,
+        updatedAt: now,
+        hasTime: false,
+        dueDate: dueDate,
+        reminder: '9am',
+      );
+      final updatedTask = initialTask.copyWith(
+        reminder: const Value('12pm'),
+        updatedAt: now.add(const Duration(seconds: 1)),
+      );
+      final controller = StreamController<List<TaskData>>();
+      addTearDown(controller.close);
+      when(
+        () => mockTasksRepo.watchOpenTasks(),
+      ).thenAnswer((_) => controller.stream);
+
+      await container.read(authControllerProvider.future);
+      final sub = container.listen(
+        taskNotificationSchedulerProvider,
+        (_, _) {},
+      );
+      final notificationId = notificationIdForTask('test-user', 'task-1');
+
+      controller.add([initialTask]);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      controller.add([updatedTask]);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(fakePlugin.cancelled, contains(notificationId));
+      final latestSchedule = fakePlugin.schedules.lastWhere(
+        (schedule) => schedule['id'] == notificationId,
+      );
+      expect(
+        latestSchedule['scheduledDate'],
+        predicate(
+          (tz.TZDateTime date) => date.isAtSameMomentAs(
+            DateTime(dueDate.year, dueDate.month, dueDate.day, 12),
+          ),
+        ),
+      );
+
+      sub.close();
+    },
+  );
 }

@@ -17,7 +17,6 @@ import 'daos/tasks_dao.dart';
 import 'daos/user_note_preferences_dao.dart';
 import 'tables/attachments.dart';
 import 'tables/local_note_documents.dart';
-import 'tables/local_yjs_states.dart';
 import 'tables/note_links.dart';
 import 'tables/note_sync_errors.dart';
 import 'tables/sync_sessions.dart';
@@ -39,7 +38,6 @@ part 'database.g.dart';
     NoteLinks,
     Attachments,
     UserNotePreferences,
-    LocalYjsStates,
     LocalNoteDocuments,
     PendingNoteOperations,
     NoteSyncErrors,
@@ -72,7 +70,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 23;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -136,7 +134,7 @@ class AppDatabase extends _$AppDatabase {
         await customStatement('ALTER TABLE notes DROP COLUMN archived');
       }
       if (from < 13) {
-        // note_nodes table was historically created here; now dropped in favor of YDoc
+        // note_nodes table was historically created here; now dropped
       }
       if (from < 14) {
         // note_nodes position migration; now unnecessary
@@ -148,7 +146,7 @@ class AppDatabase extends _$AppDatabase {
         await customStatement('ALTER TABLE notes DROP COLUMN is_inbox;');
       }
       if (from < 16) {
-        await m.createTable(localYjsStates);
+        // legacy table migration
       }
       if (from < 17) {
         await m.addColumn(tasks, tasks.hasTime);
@@ -157,7 +155,7 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(tasks, tasks.reminder);
       }
       if (from < 19) {
-        await m.addColumn(localYjsStates, localYjsStates.syncedStateVector);
+        await customStatement('DROP TABLE IF EXISTS local_yjs_states;');
       }
       if (from < 20) {
         await customStatement(
@@ -183,6 +181,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 22) {
         await m.createTable(syncSessions);
+      }
+      if (from < 23) {
+        await customStatement('DROP TABLE IF EXISTS local_yjs_states;');
       }
     },
     beforeOpen: (details) async {

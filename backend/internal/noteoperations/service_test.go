@@ -13,6 +13,7 @@ import (
 )
 
 type mockRepository struct {
+	ensureNoteFn             func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) error
 	lockNoteFn               func(ctx context.Context, noteID pgtype.UUID) (LockNoteResult, error)
 	getOperationsSinceFn     func(ctx context.Context, noteID pgtype.UUID, afterRevision int64) ([]Operation, error)
 	getOperationsRangeFn     func(ctx context.Context, noteID pgtype.UUID, afterRevision int64, upToRevision int64) ([]Operation, error)
@@ -20,6 +21,13 @@ type mockRepository struct {
 	getNoteOperationByOpIDFn func(ctx context.Context, noteID pgtype.UUID, operationID pgtype.UUID) (Operation, error)
 	checkNotePermissionFn    func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (string, error)
 	getNoteDocumentFn        func(ctx context.Context, noteID pgtype.UUID) (GetNoteDocumentResult, error)
+}
+
+func (m *mockRepository) EnsureNote(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) error {
+	if m.ensureNoteFn != nil {
+		return m.ensureNoteFn(ctx, noteID, userID)
+	}
+	return nil
 }
 
 func (m *mockRepository) LockNote(ctx context.Context, noteID pgtype.UUID) (LockNoteResult, error) {

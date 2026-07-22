@@ -26,7 +26,7 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
       dueDate: task.dueDate,
       hasTime: task.hasTime,
       recurrence: task.recurrence,
-      reminder: TaskReminderOption.fromYjsValue(task.reminder),
+      reminder: TaskReminderOption.fromValue(task.reminder),
     );
   }
 

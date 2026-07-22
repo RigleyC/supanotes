@@ -29,16 +29,20 @@ abstract class ITasksRepository {
     TaskRecurrence? recurrence,
     String position = 'a0',
   });
-  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id);
+  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
+  completeTask(String id);
   Future<void> reopenTask(String id, {DateTime? originalDueDate});
   Future<void> updateTask(
     String id, {
     String? title,
     DateTime? dueDate,
+    bool? hasTime,
     TaskRecurrence? recurrence,
+    String? reminder,
     String? position,
     bool clearDueDate = false,
     bool clearRecurrence = false,
+    bool clearReminder = false,
   });
   Future<void> deleteTask(String id);
   Future<void> reorderTasks(String noteId, List<String> orderedIds);
@@ -106,17 +110,16 @@ class TasksRepository implements ITasksRepository {
     });
   }
 
-  /// Every task attached to [noteId], in their stable `position` order,
-  /// pending first then completed. Useful from the note editor.
+  /// All tasks belonging to [noteId], mapped to domain.
   @override
   Stream<List<TaskModel>> watchByNote(String noteId) {
-    return _local.watchNoteTasks(noteId).map((rows) {
-      return rows.map(TaskModel.fromData).toList();
-    });
+    return _local
+        .watchNoteTasks(noteId)
+        .map((list) => list.map(TaskModel.fromData).toList());
   }
 
   // ---------------------------------------------------------------------------
-  // Mutations
+  // Writes
   // ---------------------------------------------------------------------------
 
   /// Inserts a brand-new task. Generates the UUID, stamps `userId` from
@@ -135,8 +138,8 @@ class TasksRepository implements ITasksRepository {
       id: id,
       noteId: noteId,
       title: title,
-      recurrence: recurrence,
       dueDate: dueDate,
+      recurrence: recurrence,
       position: position,
     );
     return TaskModel(
@@ -160,11 +163,13 @@ class TasksRepository implements ITasksRepository {
   /// task is recurring, schedules the next occurrence in the same
   /// transaction.
   @override
-  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id) => _local.completeTask(id);
+  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
+  completeTask(String id) => _local.completeTask(id);
 
   /// Reverses a completion: clears `completedAt` and re-opens the task.
   @override
-  Future<void> reopenTask(String id, {DateTime? originalDueDate}) => _local.reopenTask(id, originalDueDate: originalDueDate);
+  Future<void> reopenTask(String id, {DateTime? originalDueDate}) =>
+      _local.reopenTask(id, originalDueDate: originalDueDate);
 
   /// Partial update of the task with [id]. Pass `null` for any field
   /// that should not change. An explicit `Value(null)` (via the
@@ -175,10 +180,13 @@ class TasksRepository implements ITasksRepository {
     String id, {
     String? title,
     DateTime? dueDate,
+    bool? hasTime,
     TaskRecurrence? recurrence,
+    String? reminder,
     String? position,
     bool clearDueDate = false,
     bool clearRecurrence = false,
+    bool clearReminder = false,
   }) async {
     final companion = TasksCompanion(
       id: Value(id),
@@ -186,9 +194,13 @@ class TasksRepository implements ITasksRepository {
       dueDate: clearDueDate
           ? const Value(null)
           : (dueDate == null ? const Value.absent() : Value(dueDate)),
+      hasTime: hasTime == null ? const Value.absent() : Value(hasTime),
       recurrence: clearRecurrence
           ? const Value(null)
           : (recurrence == null ? const Value.absent() : Value(recurrence)),
+      reminder: clearReminder
+          ? const Value(null)
+          : (reminder == null ? const Value.absent() : Value(reminder)),
       position: position == null ? const Value.absent() : Value(position),
     );
     await _local.updateTask(companion);

@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:drift/drift.dart';
+import 'package:super_editor/super_editor.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/features/notes/data/note_operations_api.dart';
 import 'package:supanotes/features/notes/domain/note_operation_rebaser.dart';
 
@@ -26,11 +28,11 @@ class SyncResult {
   });
 
   static SyncResult empty() => SyncResult(
-        acceptedCount: 0,
-        acceptedOperationIds: [],
-        finalRevision: 0,
-        remoteOperations: [],
-      );
+    acceptedCount: 0,
+    acceptedOperationIds: [],
+    finalRevision: 0,
+    remoteOperations: [],
+  );
 }
 
 class SyncError {
@@ -72,9 +74,9 @@ class NoteOperationsSyncService {
     required NoteOperationsDao dao,
     required String clientId,
     required String actorId,
-  })  : _api = api,
-        _dao = dao,
-        _clientId = clientId {
+  }) : _api = api,
+       _dao = dao,
+       _clientId = clientId {
     _rebaser = NoteOperationRebaser(localActorId: actorId);
   }
 
@@ -112,10 +114,7 @@ class NoteOperationsSyncService {
     });
   }
 
-  Future<void> enqueueOperation(
-    String noteId,
-    OperationRequest request,
-  ) {
+  Future<void> enqueueOperation(String noteId, OperationRequest request) {
     return _enqueueOperationInner(noteId, request);
   }
 
@@ -125,6 +124,19 @@ class NoteOperationsSyncService {
   ) async {
     final pending = await _dao.getPendingOperations(noteId);
     final ordinal = pending.isEmpty ? 0 : pending.last.ordinal + 1;
+    final payloadJson = encodePayload(request.payload);
+    NoteSyncDebug.log(
+      'sync.enqueue',
+      noteId: noteId,
+      fields: {
+        'operationId': request.operationId,
+        'baseRevision': request.baseRevision,
+        'ordinal': ordinal,
+        'kind': request.kind,
+        'blockId': request.blockId,
+        'payload': payloadJson,
+      },
+    );
 
     await _dao.insertPendingOperation(
       PendingNoteOperationsCompanion.insert(
@@ -134,7 +146,7 @@ class NoteOperationsSyncService {
         ordinal: ordinal,
         kind: request.kind,
         blockId: Value(request.blockId),
-        payloadJson: encodePayload(request.payload),
+        payloadJson: payloadJson,
         createdAt: DateTime.now().toUtc(),
       ),
     );
@@ -167,9 +179,7 @@ class NoteOperationsSyncService {
     return _dao.watchNoteDocument(noteId).first;
   }
 
-  Future<List<PendingNoteOperationData>> getPendingOperations(
-    String noteId,
-  ) {
+  Future<List<PendingNoteOperationData>> getPendingOperations(String noteId) {
     return _dao.getPendingOperations(noteId);
   }
 
@@ -181,9 +191,7 @@ class NoteOperationsSyncService {
     return _dao.getProjectedOutboxOperationCount(noteId);
   }
 
-  Stream<List<PendingNoteOperationData>> watchPendingOperations(
-    String noteId,
-  ) {
+  Stream<List<PendingNoteOperationData>> watchPendingOperations(String noteId) {
     return _dao.watchPendingOperations(noteId);
   }
 
@@ -199,6 +207,7 @@ class NoteOperationsSyncService {
 
     final ops = await _dao.getPendingOperations(noteId, status: 'pending');
     if (ops.isEmpty) {
+      NoteSyncDebug.log('sync.pending.empty', noteId: noteId);
       return SyncResult.empty();
     }
 
@@ -221,15 +230,30 @@ class NoteOperationsSyncService {
     final request = SyncRequest(
       knownRevision: knownRevision,
       operations: ops
-          .map((op) => OperationRequest(
-                operationId: op.operationId,
-                baseRevision: op.baseRevision,
-                kind: op.kind,
-                blockId: op.blockId,
-                payload: parsePayload(op.payloadJson),
-              ))
+          .map(
+            (op) => OperationRequest(
+              operationId: op.operationId,
+              baseRevision: op.baseRevision,
+              kind: op.kind,
+              blockId: op.blockId,
+              payload: parsePayload(op.payloadJson),
+            ),
+          )
           .toList(),
       clientId: _clientId,
+    );
+    NoteSyncDebug.log(
+      'sync.request',
+      noteId: noteId,
+      fields: {
+        'knownRevision': knownRevision,
+        'operations': request.operations
+            .map(
+              (op) =>
+                  '${op.operationId}:${op.baseRevision}:${op.kind}:${op.blockId}:${NoteSyncDebug.payloadSummary(op.payload)}',
+            )
+            .join('|'),
+      },
     );
 
     SyncResponse response;
@@ -238,6 +262,18 @@ class NoteOperationsSyncService {
     } catch (e) {
       rethrow;
     }
+    NoteSyncDebug.log(
+      'sync.response',
+      noteId: noteId,
+      fields: {
+        'accepted': response.accepted.map((op) => op.operationId).join(','),
+        'revision': response.finalRevision,
+        'remoteOperations': response.remoteOperations.length,
+        'canonical': response.canonicalDocument == null
+            ? 'null'
+            : NoteSyncDebug.documentSummary(response.canonicalDocument!),
+      },
+    );
 
     return _processSyncResponse(noteId, response, inFlightIds, ops);
   }
@@ -246,8 +282,9 @@ class NoteOperationsSyncService {
     String noteId,
     SyncSessionData session,
   ) async {
-    final operationIds =
-        List<String>.from(jsonDecode(session.operationIds) as List);
+    final operationIds = List<String>.from(
+      jsonDecode(session.operationIds) as List,
+    );
 
     final ops = await _dao.getPendingOperations(noteId, status: 'in_flight');
     final loadedIds = ops.map((o) => o.operationId).toSet();
@@ -260,13 +297,15 @@ class NoteOperationsSyncService {
     final request = SyncRequest(
       knownRevision: session.knownRevision,
       operations: ops
-          .map((op) => OperationRequest(
-                operationId: op.operationId,
-                baseRevision: op.baseRevision,
-                kind: op.kind,
-                blockId: op.blockId,
-                payload: parsePayload(op.payloadJson),
-              ))
+          .map(
+            (op) => OperationRequest(
+              operationId: op.operationId,
+              baseRevision: op.baseRevision,
+              kind: op.kind,
+              blockId: op.blockId,
+              payload: parsePayload(op.payloadJson),
+            ),
+          )
           .toList(),
       clientId: _clientId,
     );
@@ -285,9 +324,18 @@ class NoteOperationsSyncService {
     Set<String> expectedIds,
     List<PendingNoteOperationData> inFlight,
   ) async {
+    NoteSyncDebug.log(
+      'sync.process_response.begin',
+      noteId: noteId,
+      fields: {
+        'expectedOperationCount': expectedIds.length,
+        'inFlightCount': inFlight.length,
+        'remoteOperationCount': response.remoteOperations.length,
+        'revision': response.finalRevision,
+      },
+    );
     await _dao.runInTransaction(() async {
-      final acceptedIds =
-          response.accepted.map((a) => a.operationId).toSet();
+      final acceptedIds = response.accepted.map((a) => a.operationId).toSet();
       if (!_setEquals(acceptedIds, expectedIds)) {
         throw StateError(
           'Protocol error: accepted ${acceptedIds.length}/'
@@ -296,8 +344,10 @@ class NoteOperationsSyncService {
       }
 
       await _dao.deleteAccepted(expectedIds);
-      final remaining =
-          await _dao.getPendingOperations(noteId, status: 'pending');
+      final remaining = await _dao.getPendingOperations(
+        noteId,
+        status: 'pending',
+      );
 
       final canonical = response.canonicalDocument;
       if (canonical == null) {
@@ -312,6 +362,16 @@ class NoteOperationsSyncService {
         remote: response.remoteOperations,
         finalRevision: response.finalRevision,
         acceptedOps: response.accepted,
+      );
+      NoteSyncDebug.log(
+        'sync.rebase',
+        noteId: noteId,
+        fields: {
+          'remainingPending': remaining.length,
+          'rebased': rebased
+              .map((op) => '${op.operationId}:${op.kind}:${op.blockId}')
+              .join('|'),
+        },
       );
       await _dao.upsertNoteDocument(
         LocalNoteDocumentsCompanion.insert(
@@ -366,8 +426,16 @@ class NoteOperationsSyncService {
       return SyncResult.empty();
     }
 
-    final response =
-        await _api.getOperationsSince(noteId, confirmed.revision);
+    final response = await _api.getOperationsSince(noteId, confirmed.revision);
+    NoteSyncDebug.log(
+      'sync.poll.response',
+      noteId: noteId,
+      fields: {
+        'fromRevision': confirmed.revision,
+        'operations': response.operations.length,
+        'revision': response.revision,
+      },
+    );
 
     if (response.operations.isEmpty) {
       return SyncResult.empty();
@@ -425,7 +493,19 @@ class NoteOperationsSyncService {
   }
 
   static String encodePayload(Map<String, dynamic> payload) {
-    return jsonEncode(payload);
+    return jsonEncode(_toJsonValue(payload));
+  }
+
+  static dynamic _toJsonValue(dynamic value) {
+    if (value is Attribution) return value.id;
+    if (value is DateTime) return value.toUtc().toIso8601String();
+    if (value is Map) {
+      return value.map(
+        (key, entry) => MapEntry(key.toString(), _toJsonValue(entry)),
+      );
+    }
+    if (value is Iterable) return value.map(_toJsonValue).toList();
+    return value;
   }
 
   static String encodeDocument(Map<String, dynamic> document) {

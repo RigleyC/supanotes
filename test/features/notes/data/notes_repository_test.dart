@@ -159,10 +159,6 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   Stream<List<NoteQueryResult>> watchActiveNotes() => const Stream.empty();
 
   @override
-  Stream<List<NoteQueryResult>> watchNotesByContext(String contextId) =>
-      const Stream.empty();
-
-  @override
   Stream<List<NoteQueryResult>> watchFavorites() => const Stream.empty();
 
   @override

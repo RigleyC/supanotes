@@ -37,6 +37,9 @@ func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID
 	defer tx.Rollback(ctx)
 
 	txRepo := s.repo.WithTx(tx)
+	if err := txRepo.EnsureNote(ctx, noteID, userID); err != nil {
+		return SyncResponse{}, fmt.Errorf("ensure note: %w", err)
+	}
 
 	locked, err := txRepo.LockNote(ctx, noteID)
 	if err != nil {

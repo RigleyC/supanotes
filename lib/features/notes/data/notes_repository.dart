@@ -21,7 +21,6 @@ import 'local/notes_local_repository.dart';
 /// consistently maintained.
 abstract class INotesRepository {
   Stream<List<NoteModel>> watchNotes({
-    String? contextId,
     bool favoritesOnly = false,
   });
   Stream<NoteModel?> watchNoteById(String id);
@@ -30,13 +29,11 @@ abstract class INotesRepository {
   Future<NoteModel> upsertNote({
     required String id,
     String content = '',
-    String? contextId,
   });
   Future<void> updateNote(
     String id, {
     String? content,
     bool? collapseImages,
-    String? contextId,
   });
   Future<void> toggleFavorite(String noteId);
   Future<void> softDelete(String id);
@@ -60,20 +57,15 @@ class NotesRepository implements INotesRepository {
   final UserNotePreferencesDao _prefsDao;
   final NoteLinksDao? _noteLinksDao;
 
-  /// Streams active (non-archived, non-deleted, non-inbox) notes, mapped
+  /// Streams active (non-archived, non-deleted) notes, mapped
   /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
-  /// to favorite notes; when [contextId] is non-null, the result is
-  /// filtered to notes attached to that context. When both are set,
-  /// [contextId] wins because it is a more restrictive index.
+  /// to favorite notes.
   @override
   Stream<List<NoteModel>> watchNotes({
-    String? contextId,
     bool favoritesOnly = false,
   }) {
     final Stream<List<NoteQueryResult>> source;
-    if (contextId != null) {
-      source = _local.watchNotesByContext(contextId);
-    } else if (favoritesOnly) {
+    if (favoritesOnly) {
       source = _local.watchFavorites();
     } else {
       source = _local.watchActiveNotes();
@@ -116,14 +108,12 @@ class NotesRepository implements INotesRepository {
   Future<NoteModel> upsertNote({
     required String id,
     String content = '',
-    String? contextId,
   }) async {
     final now = DateTime.now().toUtc();
     final companion = NotesCompanion(
       id: Value(id),
       userId: Value(_local.userId),
       content: Value(content),
-      contextId: Value(contextId),
       excerpt: Value(_excerptFrom(content)),
       createdAt: Value(now),
       updatedAt: Value(now),
@@ -142,7 +132,6 @@ class NotesRepository implements INotesRepository {
     String id, {
     String? content,
     bool? collapseImages,
-    String? contextId,
   }) async {
     final current = await _local.getNoteById(id);
     if (current == null) return;
@@ -157,7 +146,6 @@ class NotesRepository implements INotesRepository {
       collapseImages: collapseImages == null
           ? const Value.absent()
           : Value(collapseImages),
-      contextId: contextId == null ? const Value.absent() : Value(contextId),
       updatedAt: Value(DateTime.now().toUtc()),
       isDirty: const Value(true),
     );

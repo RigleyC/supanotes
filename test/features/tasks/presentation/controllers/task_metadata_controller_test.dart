@@ -18,7 +18,7 @@ void main() {
 
   test('clearing time preserves metadata and converts relative reminders', () {
     final controller = container.read(taskMetadataProvider('task-1').notifier)
-      ..initialize(_task(reminder: TaskReminderOption.fiveMinsBefore.yjsValue));
+      ..initialize(_task(reminder: TaskReminderOption.fiveMinsBefore.value));
 
     controller.clearTime();
 
@@ -35,7 +35,7 @@ void main() {
 
   test('clearing due date resets dependent metadata', () {
     final controller = container.read(taskMetadataProvider('task-1').notifier)
-      ..initialize(_task(reminder: TaskReminderOption.atTime.yjsValue));
+      ..initialize(_task(reminder: TaskReminderOption.atTime.value));
 
     controller.clearDueDate();
 

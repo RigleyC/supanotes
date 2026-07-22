@@ -19,17 +19,21 @@ const int _dividerCount = 35;
 class NoteEditorController extends ChangeNotifier {
   NoteEditorController({
     required this.userId,
-    Future<void> Function(String id, String filePath, String mimeType)? onUploadFile,
+    Future<void> Function(String id, String filePath, String mimeType)?
+    onUploadFile,
   }) : _onUploadFile = onUploadFile;
 
   final String userId;
-  final Future<void> Function(String id, String filePath, String mimeType)? _onUploadFile;
+  final Future<void> Function(String id, String filePath, String mimeType)?
+  _onUploadFile;
 
   MutableDocument? document;
   Editor? editor;
   MutableDocumentComposer? composer;
   final FocusNode focusNode = FocusNode();
   void Function(bool)? onHasContentChanged;
+  Future<void> Function(MutableDocument document)? onProjectLocal;
+  Future<void> _projectionTail = Future.value();
 
   EditorDocumentSyncManager? _coordinator;
   NoteOperationAdapter? operationAdapter;
@@ -51,22 +55,34 @@ class NoteEditorController extends ChangeNotifier {
 
   void _onDocChanged(DocumentChangeLog _) {
     onHasContentChanged?.call(document != null && document!.isNotEmpty);
+    final projector = onProjectLocal;
+    final currentDocument = document;
+    if (projector != null && currentDocument != null) {
+      _projectionTail = _projectionTail.then((_) => projector(currentDocument));
+    }
   }
 
-  TaskCompletionResult? completeTaskInYDoc(String nodeId,
-      {DateTime? now, DateTime? scheduledAt}) {
+  TaskCompletionResult? completeTaskInYDoc(
+    String nodeId, {
+    DateTime? now,
+    DateTime? scheduledAt,
+  }) {
     final node = document?.getNodeById(nodeId);
     if (node is TaskNode) {
       final dueDateStr = node.metadata['dueDate'] as String?;
       final hasTime = node.metadata['hasTime'] as bool? ?? false;
-      final recurrenceStr = node.metadata['recurrenceRule'] as String? ?? node.metadata['recurrence'] as String?;
+      final recurrenceStr =
+          node.metadata['recurrenceRule'] as String? ??
+          node.metadata['recurrence'] as String?;
       final snapshot = TaskSnapshot(
         dueDate: dueDateStr != null ? DateTime.tryParse(dueDateStr) : null,
         hasTime: hasTime,
         recurrence: TaskRecurrence.parse(recurrenceStr),
       );
       final effectiveNow = now ?? DateTime.now();
-      final result = TaskCompletionCommand(() => effectiveNow).complete(snapshot, scheduledAt: scheduledAt);
+      final result = TaskCompletionCommand(
+        () => effectiveNow,
+      ).complete(snapshot, scheduledAt: scheduledAt);
 
       final updatedMeta = Map<String, dynamic>.from(node.metadata);
       bool isCompleted = false;
@@ -76,6 +92,9 @@ class NoteEditorController extends ChangeNotifier {
         updatedMeta.remove('dueDate');
       } else {
         isCompleted = false;
+        if (result.nextDue != null) {
+          updatedMeta['dueDate'] = result.nextDue!.toIso8601String();
+        }
         if (result.scheduledAt != null) {
           final completions = Map<String, dynamic>.from(
             updatedMeta['completions'] as Map? ?? {},
@@ -95,18 +114,18 @@ class NoteEditorController extends ChangeNotifier {
       );
 
       editor?.execute([
-        ReplaceNodeRequest(
-          existingNodeId: nodeId,
-          newNode: updatedNode,
-        ),
+        ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
       ]);
       return result;
     }
     return null;
   }
 
-  void reopenTaskInYDoc(String nodeId,
-      {DateTime? previousDue, DateTime? scheduledAt}) {
+  void reopenTaskInYDoc(
+    String nodeId, {
+    DateTime? previousDue,
+    DateTime? scheduledAt,
+  }) {
     final node = document?.getNodeById(nodeId);
     if (node is TaskNode) {
       final updatedMeta = Map<String, dynamic>.from(node.metadata);
@@ -128,10 +147,7 @@ class NoteEditorController extends ChangeNotifier {
         metadata: updatedMeta,
       );
       editor?.execute([
-        ReplaceNodeRequest(
-          existingNodeId: nodeId,
-          newNode: updatedNode,
-        ),
+        ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
       ]);
     }
   }
@@ -177,10 +193,7 @@ class NoteEditorController extends ChangeNotifier {
         metadata: updatedMeta,
       );
       editor?.execute([
-        ReplaceNodeRequest(
-          existingNodeId: nodeId,
-          newNode: updatedNode,
-        ),
+        ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
       ]);
     }
   }
@@ -220,7 +233,8 @@ class NoteEditorController extends ChangeNotifier {
     attachFileFromPath(
       filePath: path,
       mimeType: mimeType,
-      onUploadFile: (id, _, filePath, mimeType) => uploader(id, filePath, mimeType),
+      onUploadFile: (id, _, filePath, mimeType) =>
+          uploader(id, filePath, mimeType),
       onError: () => AppMessenger.showError('Falha ao enviar anexo'),
     );
   }
@@ -266,6 +280,8 @@ class NoteEditorController extends ChangeNotifier {
   Future<void> dispose() async {
     document?.removeListener(_onDocChanged);
     onHasContentChanged = null;
+    onProjectLocal = null;
+    await _projectionTail;
     await operationAdapter?.flushNow();
     operationAdapter?.dispose();
     await _coordinator?.dispose();
@@ -276,4 +292,3 @@ class NoteEditorController extends ChangeNotifier {
     super.dispose();
   }
 }
-

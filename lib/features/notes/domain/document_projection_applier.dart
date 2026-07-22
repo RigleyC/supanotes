@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'ot_document_codec.dart';
 
 class DocumentProjectionApplier {
@@ -13,9 +14,9 @@ class DocumentProjectionApplier {
     required MutableDocument document,
     required Editor editor,
     required OtDocumentCodec codec,
-  })  : _document = document,
-        _editor = editor,
-        _codec = codec;
+  }) : _document = document,
+       _editor = editor,
+       _codec = codec;
 
   Future<void> rebuildFromSnapshot({
     required Map<String, dynamic> snapshot,
@@ -24,12 +25,21 @@ class DocumentProjectionApplier {
     required void Function() resumeCapture,
     required void Function() rebuildMirror,
   }) async {
-    final composer = _editor.context.composer;
-    final oldSelection = composer.selection;
-
     suppressCapture();
+    final previousSelection = _editor.context
+        .find<MutableDocumentComposer>(Editor.composerKey)
+        .selection;
+    NoteSyncDebug.log(
+      'projection.rebuild.begin',
+      fields: {
+        'currentNodeCount': _document.nodeCount,
+        'pendingOperations': pendingOps?.length ?? 0,
+        'snapshot': NoteSyncDebug.documentSummary(snapshot),
+        'selection': previousSelection,
+      },
+    );
     try {
-      // Clear selection before deleting nodes so IME/layers don't dereference deleted nodes during rebuild
+      _editor.startTransaction();
       _editor.execute([
         const ChangeSelectionRequest(
           null,
@@ -48,6 +58,15 @@ class DocumentProjectionApplier {
       if (pendingOps != null) {
         for (final op in pendingOps) {
           final payload = jsonDecode(op.payloadJson) as Map<String, dynamic>;
+          NoteSyncDebug.log(
+            'projection.apply_pending',
+            fields: {
+              'operationId': op.operationId,
+              'kind': op.kind,
+              'blockId': op.blockId,
+              'payload': NoteSyncDebug.payloadSummary(payload),
+            },
+          );
           applyOperationPayload(
             kind: op.kind,
             blockId: op.blockId,
@@ -57,21 +76,20 @@ class DocumentProjectionApplier {
       }
 
       rebuildMirror();
-
-      // Restore selection if target node still exists
-      if (oldSelection != null) {
-        final node = _document.getNodeById(oldSelection.extent.nodeId);
-        if (node != null) {
-          _editor.execute([
-            ChangeSelectionRequest(
-              oldSelection,
-              SelectionChangeType.placeCaret,
-              SelectionReason.contentChange,
-            ),
-          ]);
-        }
-      }
     } finally {
+      final selection = _selectionAfterRebuild(previousSelection);
+      NoteSyncDebug.log(
+        'projection.rebuild.end',
+        fields: {'nodeCount': _document.nodeCount, 'selection': selection},
+      );
+      _editor.execute([
+        ChangeSelectionRequest(
+          selection,
+          SelectionChangeType.alteredContent,
+          SelectionReason.contentChange,
+        ),
+      ]);
+      _editor.endTransaction();
       resumeCapture();
     }
   }
@@ -88,15 +106,22 @@ class DocumentProjectionApplier {
       return;
     }
 
-    for (int i = 0; i < blocks.length; i++) {
-      final b = blocks[i] as Map<String, dynamic>;
+    final insertedNodeIds = <String>{};
+    var nodeIndex = 0;
+    for (final block in blocks) {
+      final b = block as Map<String, dynamic>;
       final node = _codec.decodeNode(b);
+      if (!insertedNodeIds.add(node.id)) {
+        NoteSyncDebug.log(
+          'projection.snapshot.duplicate_node_id',
+          fields: {'nodeId': node.id},
+        );
+        continue;
+      }
       _editor.execute([
-        InsertNodeAtIndexRequest(
-          newNode: node,
-          nodeIndex: i,
-        ),
+        InsertNodeAtIndexRequest(newNode: node, nodeIndex: nodeIndex),
       ]);
+      nodeIndex++;
     }
   }
 
@@ -117,10 +142,7 @@ class DocumentProjectionApplier {
             if (newText != null) {
               final newNode = _createNodeWithUpdatedText(node, newText);
               _editor.execute([
-                ReplaceNodeRequest(
-                  existingNodeId: blockId,
-                  newNode: newNode,
-                ),
+                ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
               ]);
             }
           }
@@ -128,6 +150,13 @@ class DocumentProjectionApplier {
         break;
       case 'create_block':
         final node = _codec.decodeNode(payload);
+        if (_document.getNodeById(node.id) != null) {
+          NoteSyncDebug.log(
+            'projection.create.skip_duplicate',
+            fields: {'nodeId': node.id},
+          );
+          return;
+        }
         final afterBlockId = payload['afterBlockId'] as String?;
         int insertIndex = _document.nodeCount;
         if (afterBlockId != null) {
@@ -139,10 +168,7 @@ class DocumentProjectionApplier {
           insertIndex = 0;
         }
         _editor.execute([
-          InsertNodeAtIndexRequest(
-            newNode: node,
-            nodeIndex: insertIndex,
-          ),
+          InsertNodeAtIndexRequest(newNode: node, nodeIndex: insertIndex),
         ]);
         break;
       case 'delete_block':
@@ -156,9 +182,10 @@ class DocumentProjectionApplier {
         final moveBlockId = payload['blockId'] as String? ?? blockId;
         if (moveBlockId == null) return;
         final node = _document.getNodeById(moveBlockId);
-        if (node == null) return;
+        if (node == null || _document.nodeCount <= 1) return;
 
         final afterBlockId = payload['afterBlockId'] as String?;
+        if (afterBlockId == moveBlockId) return;
         int targetIndex = _document.nodeCount - 1;
         if (afterBlockId == null) {
           targetIndex = 0;
@@ -169,10 +196,7 @@ class DocumentProjectionApplier {
           }
         }
         _editor.execute([
-          MoveNodeRequest(
-            nodeId: moveBlockId,
-            newIndex: targetIndex,
-          ),
+          MoveNodeRequest(nodeId: moveBlockId, newIndex: targetIndex),
         ]);
         break;
       case 'set_block_type':
@@ -189,10 +213,7 @@ class DocumentProjectionApplier {
             isTaskComplete: isComplete,
           );
           _editor.execute([
-            ReplaceNodeRequest(
-              existingNodeId: blockId,
-              newNode: newNode,
-            ),
+            ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
           ]);
         }
         break;
@@ -203,10 +224,7 @@ class DocumentProjectionApplier {
         if (node != null && meta != null) {
           final newNode = _createNodeWithUpdatedMetadata(node, meta);
           _editor.execute([
-            ReplaceNodeRequest(
-              existingNodeId: blockId,
-              newNode: newNode,
-            ),
+            ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
           ]);
         }
         break;
@@ -225,22 +243,46 @@ class DocumentProjectionApplier {
           } else {
             currentCompletions.remove(scheduledAt);
           }
-          final newNode = _createNodeWithUpdatedMetadata(
-            node,
-            {'completions': currentCompletions},
-          );
+          final newNode = _createNodeWithUpdatedMetadata(node, {
+            'completions': currentCompletions,
+          });
           _editor.execute([
-            ReplaceNodeRequest(
-              existingNodeId: targetId,
-              newNode: newNode,
-            ),
+            ReplaceNodeRequest(existingNodeId: targetId, newNode: newNode),
           ]);
         }
         break;
     }
   }
 
-  DocumentNode _createNodeWithUpdatedText(TextNode node, AttributedText newText) {
+  DocumentSelection? _selectionAfterRebuild(DocumentSelection? previous) {
+    if (previous == null) return null;
+
+    DocumentPosition? positionFor(DocumentPosition position) {
+      final node = _document.getNodeById(position.nodeId);
+      if (node is! TextNode || position.nodePosition is! TextNodePosition) {
+        return null;
+      }
+
+      final textPosition = position.nodePosition as TextNodePosition;
+      return DocumentPosition(
+        nodeId: node.id,
+        nodePosition: TextNodePosition(
+          offset: textPosition.offset.clamp(0, node.text.length),
+          affinity: textPosition.affinity,
+        ),
+      );
+    }
+
+    final base = positionFor(previous.base);
+    final extent = positionFor(previous.extent);
+    if (base == null || extent == null) return null;
+    return DocumentSelection(base: base, extent: extent);
+  }
+
+  DocumentNode _createNodeWithUpdatedText(
+    TextNode node,
+    AttributedText newText,
+  ) {
     if (node is TaskNode) {
       return TaskNode(
         id: node.id,
@@ -262,10 +304,7 @@ class DocumentProjectionApplier {
         metadata: Map.from(node.metadata),
       );
     }
-    return ParagraphNode(
-      id: node.id,
-      text: newText,
-    );
+    return ParagraphNode(id: node.id, text: newText);
   }
 
   DocumentNode _createNodeWithUpdatedMetadata(
@@ -292,11 +331,7 @@ class DocumentProjectionApplier {
         metadata: updatedMeta,
       );
     } else if (node is ParagraphNode) {
-      return ParagraphNode(
-        id: node.id,
-        text: node.text,
-        metadata: updatedMeta,
-      );
+      return ParagraphNode(id: node.id, text: node.text, metadata: updatedMeta);
     } else if (node is ListItemNode) {
       return ListItemNode(
         id: node.id,

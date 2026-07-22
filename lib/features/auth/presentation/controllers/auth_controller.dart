@@ -43,8 +43,6 @@ class AuthController extends AsyncNotifier<User?> {
       final result = await attempt();
       await _sessionCache.hydrate({
         'settings': result.session.settings,
-        'soul': result.session.soul,
-        'contexts': result.session.contexts,
       });
       state = AsyncValue.data(result.user);
       return result;

@@ -12,25 +12,24 @@ import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart'
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
 
-final openTasksStreamProvider = StreamProvider.autoDispose<List<TaskData>>(
-  (ref) {
-    try {
-      final repo = ref.watch(tasksLocalRepositoryProvider);
-      dev.log('[Scheduler] watchOpenTasks stream started');
-      return repo.watchOpenTasks();
-    } catch (e) {
-      dev.log('[Scheduler] watchOpenTasks error: $e');
-      return const Stream.empty();
-    }
-  },
-);
+final openTasksStreamProvider = StreamProvider.autoDispose<List<TaskData>>((
+  ref,
+) {
+  try {
+    final repo = ref.watch(tasksLocalRepositoryProvider);
+    dev.log('[Scheduler] watchOpenTasks stream started');
+    return repo.watchOpenTasks();
+  } catch (e) {
+    dev.log('[Scheduler] watchOpenTasks error: $e');
+    return const Stream.empty();
+  }
+});
 
-final taskNotificationSchedulerProvider = AsyncNotifierProvider.autoDispose<
-    TaskNotificationScheduler,
-    Map<String, DateTime>>(
-  TaskNotificationScheduler.new,
-);
-
+final taskNotificationSchedulerProvider =
+    AsyncNotifierProvider.autoDispose<
+      TaskNotificationScheduler,
+      Map<String, DateTime>
+    >(TaskNotificationScheduler.new);
 
 class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
   /// Returns a per-user cache key so notifications from one account never
@@ -81,7 +80,9 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     if (_previousUserId != null &&
         _previousUserId!.isNotEmpty &&
         _previousUserId != currentUserId) {
-      dev.log('[Scheduler] User switched from $_previousUserId to $currentUserId — cancelling all old notifications');
+      dev.log(
+        '[Scheduler] User switched from $_previousUserId to $currentUserId — cancelling all old notifications',
+      );
       final service = ref.read(localNotificationServiceProvider);
       await service.cancelAll();
       // Clear the old per-user cache
@@ -107,7 +108,9 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
       }
     }
 
-    dev.log('[Scheduler] Loaded ${cachedSchedule.length} cached schedules. Setting up task listener');
+    dev.log(
+      '[Scheduler] Loaded ${cachedSchedule.length} cached schedules. Setting up task listener',
+    );
 
     // ref.listen keeps the stream provider alive and reacts to data changes
     ref.listen(openTasksStreamProvider, (_, next) {
@@ -150,7 +153,9 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
 
   Future<void> _reschedule(List<TaskData> tasks) async {
     final now = DateTime.now();
-    dev.log('[Scheduler] _reschedule called. Total open tasks: ${tasks.length}. now=$now');
+    dev.log(
+      '[Scheduler] _reschedule called. Total open tasks: ${tasks.length}. now=$now',
+    );
 
     final service = ref.read(localNotificationServiceProvider);
     final currentUserId = _currentUserId();
@@ -186,7 +191,9 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     }
     for (final id in removedIds) {
       final nid = notificationIdForTask(currentUserId, id);
-      dev.log('[Scheduler] Cancelling notification for removed task id=$id nid=$nid');
+      dev.log(
+        '[Scheduler] Cancelling notification for removed task id=$id nid=$nid',
+      );
       await service.cancel(nid);
     }
 
@@ -212,17 +219,42 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
         }
       }
 
+      final shouldReplaceExisting =
+          !isUnchanged &&
+          (previous != null || currentState.containsKey(task.id));
+      if (shouldReplaceExisting) {
+        final nid = notificationIdForTask(currentUserId, task.id);
+        await service.cancel(nid);
+        dev.log(
+          '[Scheduler] Cancelled previous notification before rescheduling '
+          'task id=${task.id} nid=$nid',
+        );
+      }
+
       // Compute notification time for new or changed tasks
-      final notificationTime = _computeNotificationTime(due, task.hasTime, task.reminder);
+      final notificationTime = _computeNotificationTime(
+        due,
+        task.hasTime,
+        task.reminder,
+      );
 
       if (notificationTime != null && notificationTime.isAfter(now)) {
         newSchedule[task.id] = notificationTime;
-        dev.log('[Scheduler] Scheduling notification id=${task.id} at $notificationTime');
+        dev.log(
+          '[Scheduler] Scheduling notification id=${task.id} at $notificationTime',
+        );
         final body = formatDueDate(due, hasTime: task.hasTime);
         final nid = notificationIdForTask(currentUserId, task.id);
-        await service.scheduleTaskNotification(nid, task.title, body, notificationTime);
+        await service.scheduleTaskNotification(
+          nid,
+          task.title,
+          body,
+          notificationTime,
+        );
       } else {
-        dev.log('[Scheduler] Task id=${task.id} SKIPPED — notificationTime $notificationTime is in the past (now=$now)');
+        dev.log(
+          '[Scheduler] Task id=${task.id} SKIPPED — notificationTime $notificationTime is in the past (now=$now)',
+        );
       }
     }
 
@@ -236,9 +268,16 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
 
     // Reconcile against platform: list pending notifications from the OS
     // and cancel those that no longer belong.
-    await _reconcilePlatform(service, currentUserId, limitedSchedule, currentState);
+    await _reconcilePlatform(
+      service,
+      currentUserId,
+      limitedSchedule,
+      currentState,
+    );
 
-    dev.log('[Scheduler] Done. Scheduled: ${limitedSchedule.length} notifications');
+    dev.log(
+      '[Scheduler] Done. Scheduled: ${limitedSchedule.length} notifications',
+    );
     state = AsyncValue.data(limitedSchedule);
 
     try {
@@ -282,7 +321,9 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
       for (final pendingId in pendingIds) {
         if (!desiredIds.contains(pendingId)) {
           await service.cancel(pendingId);
-          dev.log('[Scheduler] Platform reconciliation: cancelled orphan nid=$pendingId');
+          dev.log(
+            '[Scheduler] Platform reconciliation: cancelled orphan nid=$pendingId',
+          );
         }
       }
     } catch (e) {
@@ -295,7 +336,11 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     return authState.asData?.value?.id ?? '';
   }
 
-  DateTime? _computeNotificationTime(DateTime due, bool hasTime, String? reminder) {
+  DateTime? _computeNotificationTime(
+    DateTime due,
+    bool hasTime,
+    String? reminder,
+  ) {
     if (reminder == null) return null;
 
     final base = hasTime ? due : DateTime(due.year, due.month, due.day, 9, 0);
@@ -323,5 +368,3 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     }
   }
 }
-
-

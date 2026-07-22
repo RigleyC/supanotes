@@ -25,10 +25,3 @@ primary_region = 'gru'
 [env]
   PORT = "8080"
   ENVIRONMENT = "production"
-  EMBEDDINGS_CRON_INTERVAL = "*/30 * * * * *"
-  AGENT_BASE_URL = "https://api.deepseek.com/v1/chat/completions"
-  AGENT_MODEL = "deepseek-v4-pro"
-  BRIEF_BASE_URL = "https://api.deepseek.com/chat/completions"
-  BRIEF_MODEL = "deepseek-chat"
-  EMBEDDINGS_MODEL = "text-embedding-3-small"
-  ORGANIZE_MODEL = "gpt-4o-mini"

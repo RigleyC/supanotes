@@ -114,6 +114,14 @@ func (d *Document) applyTextDelta(blockID string, payload json.RawMessage) error
 			return nil
 		}
 	}
+
+	if d.ensureMissingBlock(blockID) {
+		current := delta.New(d.Blocks[len(d.Blocks)-1].Delta)
+		result := current.Compose(*incoming)
+		d.Blocks[len(d.Blocks)-1].Delta = result.Ops
+		return nil
+	}
+
 	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
 }
 
@@ -121,6 +129,11 @@ func (d *Document) applyCreateBlock(payload json.RawMessage) error {
 	p, err := parseCreateBlockPayload(payload)
 	if err != nil {
 		return fmt.Errorf("parse create block payload: %w", err)
+	}
+	for _, block := range d.Blocks {
+		if block.ID == p.ID {
+			return nil
+		}
 	}
 
 	meta := p.Metadata
@@ -158,7 +171,7 @@ func (d *Document) applyDeleteBlock(blockID string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
+	return nil
 }
 
 func (d *Document) applyMoveBlock(payload json.RawMessage) error {
@@ -178,7 +191,7 @@ func (d *Document) applyMoveBlock(payload json.RawMessage) error {
 		}
 	}
 	if !removed {
-		return fmt.Errorf("%w: %s", ErrBlockNotFound, p.BlockID)
+		return nil
 	}
 
 	if p.AfterBlockID == "" {
@@ -213,6 +226,10 @@ func (d *Document) applySetBlockType(blockID string, payload json.RawMessage) er
 			return nil
 		}
 	}
+	if d.ensureMissingBlock(blockID) {
+		d.Blocks[len(d.Blocks)-1].Type = p.Type
+		return nil
+	}
 	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
 }
 
@@ -237,7 +254,37 @@ func (d *Document) applySetBlockMetadata(blockID string, payload json.RawMessage
 			return nil
 		}
 	}
+	if d.ensureMissingBlock(blockID) {
+		d.Blocks[len(d.Blocks)-1].Metadata = p.Metadata
+		return nil
+	}
 	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
+}
+
+// ensureMissingBlock recovers operations queued by clients that failed before
+// their create_block operation was persisted. It only supports mutations that
+// can safely initialize a blank block; delete and move remain strict.
+func (d *Document) ensureMissingBlock(blockID string) bool {
+	if blockID == "" {
+		return false
+	}
+	for _, block := range d.Blocks {
+		if block.ID == blockID {
+			return false
+		}
+	}
+	if len(d.Blocks) == 1 && d.Blocks[0].ID == "init" &&
+		deltaText(d.Blocks[0].Delta) == "" && len(d.Blocks[0].Metadata) == 0 {
+		d.Blocks[0].ID = blockID
+		return true
+	}
+	d.Blocks = append(d.Blocks, Block{
+		ID:       blockID,
+		Type:     string(BlockParagraph),
+		Delta:    []delta.Op{{Insert: []rune("")}},
+		Metadata: make(map[string]any),
+	})
+	return true
 }
 
 func DeriveContentFromDocument(doc Document) (content, excerpt string) {
@@ -308,7 +355,21 @@ func UnmarshalDocument(data []byte) (Document, error) {
 	if doc.SchemaVersion == 0 {
 		doc.SchemaVersion = 1
 	}
+	doc.removeDuplicateBlockIDs()
 	return doc, nil
+}
+
+func (d *Document) removeDuplicateBlockIDs() {
+	seen := make(map[string]struct{}, len(d.Blocks))
+	blocks := d.Blocks[:0]
+	for _, block := range d.Blocks {
+		if _, exists := seen[block.ID]; exists {
+			continue
+		}
+		seen[block.ID] = struct{}{}
+		blocks = append(blocks, block)
+	}
+	d.Blocks = blocks
 }
 
 func NewEmptyDocument() Document {

@@ -24,13 +24,13 @@ type GetNoteDocumentResult struct {
 }
 
 type InsertOperationParams struct {
-	NoteID       pgtype.UUID    `json:"note_id"`
-	Revision     int64          `json:"revision"`
-	OperationID  pgtype.UUID    `json:"operation_id"`
-	ActorID      pgtype.UUID    `json:"actor_id"`
-	BaseRevision int64          `json:"base_revision"`
-	Kind         string         `json:"kind"`
-	BlockID      pgtype.Text    `json:"block_id"`
+	NoteID       pgtype.UUID     `json:"note_id"`
+	Revision     int64           `json:"revision"`
+	OperationID  pgtype.UUID     `json:"operation_id"`
+	ActorID      pgtype.UUID     `json:"actor_id"`
+	BaseRevision int64           `json:"base_revision"`
+	Kind         string          `json:"kind"`
+	BlockID      pgtype.Text     `json:"block_id"`
 	Payload      json.RawMessage `json:"payload"`
 }
 
@@ -44,6 +44,7 @@ type UpdateNoteDocumentParams struct {
 }
 
 type Repository interface {
+	EnsureNote(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) error
 	LockNote(ctx context.Context, noteID pgtype.UUID) (LockNoteResult, error)
 	InsertOperation(ctx context.Context, arg InsertOperationParams) (Operation, error)
 	GetOperationsSince(ctx context.Context, noteID pgtype.UUID, afterRevision int64) ([]Operation, error)
@@ -64,6 +65,19 @@ type repository struct {
 
 func NewRepository(pool *pgxpool.Pool) Repository {
 	return &repository{db: pool, pool: pool}
+}
+
+const ensureNoteSQL = `INSERT INTO notes (id, user_id, content, excerpt, document, revision, snapshot_revision)
+VALUES ($1, $2, '', NULL, $3, 0, 0)
+ON CONFLICT (id) DO NOTHING`
+
+func (r *repository) EnsureNote(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) error {
+	document, err := json.Marshal(NewEmptyDocument())
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(ctx, ensureNoteSQL, noteID, userID, document)
+	return err
 }
 
 func (r *repository) WithQuerier(_ sqlcgen.Querier) Repository {

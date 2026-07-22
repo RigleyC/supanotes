@@ -152,8 +152,6 @@ void main() {
           refreshToken: 'r',
           session: SessionData(
             settings: {},
-            soul: {},
-            contexts: [],
           ),
         ));
 

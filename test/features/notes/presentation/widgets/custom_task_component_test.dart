@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
@@ -85,7 +86,12 @@ void main() {
 
     await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: vm)));
 
-    await tester.tap(find.byType(AppTaskCheckbox));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CustomTaskComponent),
+        matching: find.byType(AppTaskCheckbox),
+      ),
+    );
     await tester.pump();
 
     expect(completed, isTrue);
@@ -135,22 +141,14 @@ void main() {
   testWidgets('keeps text spaced from the checkbox icon', (tester) async {
     await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: viewModel())));
 
-    expect(
-      tester.getSize(find.byType(AppTaskCheckbox)),
-      const Size(22, 22),
-    );
+    expect(tester.getSize(find.byType(AppTaskCheckbox)), const Size(22, 22));
 
-    final checkboxLeft = tester
-        .getTopLeft(find.byType(AppTaskCheckbox))
-        .dx;
     final textLeft = tester.getTopLeft(find.byType(TextComponent)).dx;
 
     expect(textLeft, 44.0);
   });
 
-  testWidgets('places checkbox at the top of the row', (
-    tester,
-  ) async {
+  testWidgets('places checkbox at the top of the row', (tester) async {
     await tester.pumpWidget(wrap(CustomTaskComponent(viewModel: viewModel())));
 
     final checkboxTop = tester.getTopLeft(find.byType(AppTaskCheckbox)).dy;
@@ -159,9 +157,7 @@ void main() {
     expect(checkboxTop, closeTo(textTop, 2));
   });
 
-  testWidgets('keeps checkbox at the top for multiline text', (
-    tester,
-  ) async {
+  testWidgets('keeps checkbox at the top for multiline text', (tester) async {
     await tester.pumpWidget(
       wrap(CustomTaskComponent(viewModel: multilineViewModel())),
     );
@@ -281,16 +277,29 @@ void main() {
                   updatedAt: now,
                 ),
               },
-              onTaskComplete: (id) async { capturedCompleteId = id; return null; },
+              onTaskComplete: (id) async {
+                capturedCompleteId = id;
+                return null;
+              },
               onTaskReopen: (id) async => capturedReopenId = id,
             ),
-
           ],
         ),
       ),
     );
 
-    await tester.tap(find.byType(AppTaskCheckbox));
+    expect(
+      tester
+          .widget<CustomTaskComponent>(find.byType(CustomTaskComponent))
+          .isRecurring,
+      isTrue,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CustomTaskComponent),
+        matching: find.byType(AppTaskCheckbox),
+      ),
+    );
     await tester.pump();
 
     expect(capturedCompleteId, equals('task-1'));
@@ -325,7 +334,10 @@ void main() {
           componentBuilders: [
             ...defaultComponentBuilders,
             CustomTaskComponentBuilder(
-              onTaskComplete: (id) async { capturedCompleteId = id; return null; },
+              onTaskComplete: (id) async {
+                capturedCompleteId = id;
+                return null;
+              },
               onTaskReopen: (id) async => capturedReopenId = id,
             ),
           ],
@@ -340,7 +352,9 @@ void main() {
     expect(capturedCompleteId, isNull);
   });
 
-  testWidgets('builder wraps hidden completed tasks in TaskExitAnimator', (tester) async {
+  testWidgets('builder wraps hidden completed tasks in TaskExitAnimator', (
+    tester,
+  ) async {
     final document = MutableDocument(
       nodes: [
         TaskNode(id: 'task-1', text: AttributedText('Done'), isComplete: true),
@@ -351,18 +365,13 @@ void main() {
       document: document,
       composer: composer,
     );
-    final builder = CustomTaskComponentBuilder(
-      hideCompleted: true,
-    );
+    final builder = CustomTaskComponentBuilder(hideCompleted: true);
 
     await tester.pumpWidget(
       wrap(
         SuperEditor(
           editor: editor,
-          componentBuilders: [
-            builder,
-            ...defaultComponentBuilders,
-          ],
+          componentBuilders: [builder, ...defaultComponentBuilders],
         ),
       ),
     );
@@ -371,7 +380,93 @@ void main() {
     expect(find.byType(SizeTransition), findsOneWidget);
   });
 
-  testWidgets('un-checks recurring task after 400ms delay', (tester) async {
+  testWidgets('does not hide a recurring task after completion', (
+    tester,
+  ) async {
+    final document = MutableDocument(
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Recurring'),
+          isComplete: false,
+          metadata: const {'recurrenceRule': 'daily'},
+        ),
+      ],
+    );
+    final composer = MutableDocumentComposer();
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: composer,
+    );
+
+    await tester.pumpWidget(
+      wrap(
+        SuperEditor(
+          editor: editor,
+          componentBuilders: [
+            CustomTaskComponentBuilder(
+              hideCompleted: true,
+              onTaskComplete: (_) async => null,
+            ),
+            ...defaultComponentBuilders,
+          ],
+        ),
+      ),
+    );
+
+    expect(
+      tester
+          .widget<CustomTaskComponent>(find.byType(CustomTaskComponent))
+          .isRecurring,
+      isTrue,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CustomTaskComponent),
+        matching: find.byType(AppTaskCheckbox),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<AppTaskCheckbox>(
+            find.descendant(
+              of: find.byType(CustomTaskComponent),
+              matching: find.byType(AppTaskCheckbox),
+            ),
+          )
+          .value,
+      isTrue,
+    );
+    await tester.pump(const Duration(milliseconds: 301));
+    await tester.pump();
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextComponent && widget.text.toPlainText() == 'Recurring',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<AppTaskCheckbox>(
+            find.descendant(
+              of: find.byType(CustomTaskComponent),
+              matching: find.byType(AppTaskCheckbox),
+            ),
+          )
+          .value,
+      isFalse,
+    );
+    expect(
+      tester.getSize(find.byType(TaskExitAnimator)).height,
+      greaterThan(0),
+    );
+  });
+
+  testWidgets('un-checks a recurring task after completion', (tester) async {
     final document = MutableDocument(
       nodes: [
         TaskNode(
@@ -428,14 +523,42 @@ void main() {
     TaskNode taskNode() => document.first as TaskNode;
     expect(taskNode().isComplete, isFalse);
 
-    await tester.tap(find.byType(AppTaskCheckbox));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CustomTaskComponent),
+        matching: find.byType(AppTaskCheckbox),
+      ),
+    );
     await tester.pump();
 
-    // New behavior: no optimistic editor commands, document unchanged.
+    // Recurrence never persists the completed state in the document.
     expect(taskNode().isComplete, isFalse);
     expect(capturedCompleteId, equals('task-1'));
 
-    // Drain the 1s recurring delay timer so no pending timers remain.
-    await tester.pump(const Duration(seconds: 1));
+    expect(
+      tester
+          .widget<AppTaskCheckbox>(
+            find.descendant(
+              of: find.byType(CustomTaskComponent),
+              matching: find.byType(AppTaskCheckbox),
+            ),
+          )
+          .value,
+      isTrue,
+    );
+    await tester.pump(const Duration(milliseconds: 301));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<AppTaskCheckbox>(
+            find.descendant(
+              of: find.byType(CustomTaskComponent),
+              matching: find.byType(AppTaskCheckbox),
+            ),
+          )
+          .value,
+      isFalse,
+    );
   });
 }

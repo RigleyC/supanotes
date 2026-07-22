@@ -32,19 +32,13 @@ class User {
 class SessionData {
   const SessionData({
     required this.settings,
-    required this.soul,
-    required this.contexts,
   });
 
   final Map<String, dynamic> settings;
-  final Map<String, dynamic> soul;
-  final List<dynamic> contexts;
 
   factory SessionData.fromJson(Map<String, dynamic> json) {
     return SessionData(
       settings: json['settings'] as Map<String, dynamic>? ?? const {},
-      soul: json['soul'] as Map<String, dynamic>? ?? const {},
-      contexts: json['contexts'] as List<dynamic>? ?? const [],
     );
   }
 }

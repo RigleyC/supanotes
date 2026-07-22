@@ -11,13 +11,6 @@ class AppConstants {
   /// auto-save to local Drift storage.
   static const int autoSaveDebounceMs = 500;
 
-  /// Inactivity window after which the agent chat session is rotated.
-  static const int sessionTimeoutMinutes = 30;
-
-  /// Maximum number of consecutive tool calls the agent can issue before the
-  /// loop is halted server-side.
-  static const int maxToolIterations = 5;
-
   /// Maximum characters for the note excerpt preview shown in note cards.
   static const int noteExcerptMaxLength = 120;
 

@@ -35,10 +35,6 @@ class NotesLocalRepository {
     return _dao.watchAllActiveNotes(_userId);
   }
 
-  Stream<List<NoteQueryResult>> watchNotesByContext(String contextId) {
-    return _dao.watchNotesByContext(contextId, _userId);
-  }
-
   Stream<List<NoteQueryResult>> watchFavorites() {
     return _dao.watchFavorites(_userId);
   }

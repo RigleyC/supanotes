@@ -11,7 +11,6 @@ void main() {
       
       favorite: false,
       archived: false,
-      contextId: null,
       createdAt: DateTime(2026, 7, 6),
       updatedAt: DateTime(2026, 7, 6),
     );
@@ -28,7 +27,6 @@ void main() {
       
       favorite: false,
       archived: false,
-      contextId: null,
       createdAt: DateTime(2026, 7, 6),
       updatedAt: DateTime(2026, 7, 6),
     );

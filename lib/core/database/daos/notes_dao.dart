@@ -137,23 +137,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     });
   }
 
-  /// Streams every active note attached to the given [contextId] with
-  /// the user's preferences.
-  Stream<List<NoteQueryResult>> watchNotesByContext(
-    String contextId,
-    String userId,
-  ) {
-    return _watchWithPref(
-      '$_noteSelectColumns '
-      'FROM notes n '
-      'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
-      'WHERE n.context_id = ? AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
-      'ORDER BY n.updated_at DESC',
-      userId,
-      extraVariables: [Variable.withString(contextId)],
-    );
-  }
-
   /// Streams every favorite note with the user's preferences.
   Stream<List<NoteQueryResult>> watchFavorites(String userId) {
     return _watchWithPref(
@@ -172,10 +155,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     final note = NoteData(
       id: id,
       userId: row.read<String>('user_id'),
-      contextId: row.read<String?>('context_id'),
       content: row.read<String>('content'),
       excerpt: row.read<String?>('excerpt'),
-      embeddingStatus: row.read<String?>('embedding_status'),
       createdAt: row.read<DateTime>('created_at'),
       updatedAt: row.read<DateTime>('updated_at'),
       deletedAt: row.read<DateTime?>('deleted_at'),
@@ -260,7 +241,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       onConflict: DoUpdate.withExcluded(
         (old, excluded) => NotesCompanion.custom(
           content: excluded.content,
-          contextId: excluded.contextId,
           excerpt: excluded.excerpt,
           updatedAt: excluded.updatedAt,
           isDirty: excluded.isDirty,

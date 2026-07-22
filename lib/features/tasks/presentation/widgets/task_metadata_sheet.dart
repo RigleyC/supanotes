@@ -22,6 +22,13 @@ Future<void> showTaskMetadataSheet({
   required WidgetRef ref,
   required String noteId,
   required TaskModel task,
+  required Future<void> Function({
+    required DateTime? dueDate,
+    required bool hasTime,
+    required TaskRecurrence? recurrence,
+    required String? reminder,
+  })
+  onSave,
 }) async {
   final taskId = task.id;
 
@@ -40,22 +47,16 @@ Future<void> showTaskMetadataSheet({
   final state = ref.read(taskMetadataProvider(taskId));
 
   dev.log(
-    '[TaskMetadataSheet] Persisting: taskId=$taskId dueDate=${state.dueDate} hasTime=${state.hasTime} recurrence=${state.recurrence?.name} reminder=${state.reminder?.yjsValue}',
-    name: 'TaskMetadata',
+    '[TaskMetadataSheet] Persisting: taskId=$taskId dueDate=${state.dueDate} hasTime=${state.hasTime} recurrence=${state.recurrence?.name} reminder=${state.reminder?.value}',
+    name: 'TaskMetadataSheet',
   );
 
- /*  ref
-      .read(noteEditorControllerProvider(noteId))
-      .updateTaskMetadataInYDoc(
-        taskId,
-        dueDate: state.dueDate,
-        clearDueDate: state.dueDate == null,
-        recurrence: state.recurrence?.name,
-        clearRecurrence: state.recurrence == null,
-        hasTime: state.hasTime,
-        reminder: state.reminder?.yjsValue,
-        clearReminder: state.reminder == null,
-      ); */
+  await onSave(
+    dueDate: state.dueDate,
+    hasTime: state.hasTime,
+    recurrence: state.recurrence,
+    reminder: state.reminder?.value,
+  );
 
   if (state.reminder != null) {
     final scheduler = ref.read(taskNotificationSchedulerProvider.notifier);
@@ -185,7 +186,11 @@ class _DateTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      leading: const Icon(Icons.calendar_today_rounded, size: 20),
+      leading: Icon(
+        Icons.calendar_today_rounded,
+        size: 20,
+        color: hasDueDate ? scheme.primary : scheme.onSurface,
+      ),
       title: Text(
         hasDueDate
             ? formatDueDate(dueDate!, hasTime: hasTime)

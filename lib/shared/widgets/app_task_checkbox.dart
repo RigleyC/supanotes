@@ -10,6 +10,7 @@ class AppTaskCheckbox extends StatefulWidget {
     this.inactiveColor,
     this.size = 22.0,
     this.shape = AppTaskCheckboxShape.circle,
+    this.onCheckAnimationCompleted,
   });
 
   final bool value;
@@ -17,6 +18,7 @@ class AppTaskCheckbox extends StatefulWidget {
   final Color? inactiveColor;
   final double size;
   final AppTaskCheckboxShape shape;
+  final VoidCallback? onCheckAnimationCompleted;
 
   @override
   State<AppTaskCheckbox> createState() => _AppTaskCheckboxState();
@@ -44,6 +46,11 @@ class _AppTaskCheckboxState extends State<AppTaskCheckbox>
       curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
     );
     if (widget.value) _controller.value = 1.0;
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed && widget.value) {
+        widget.onCheckAnimationCompleted?.call();
+      }
+    });
   }
 
   @override
@@ -68,7 +75,8 @@ class _AppTaskCheckboxState extends State<AppTaskCheckbox>
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final accent = widget.accentColor ?? scheme.primary;
-    final inactive = widget.inactiveColor ?? scheme.outline.withValues(alpha: 0.6);
+    final inactive =
+        widget.inactiveColor ?? scheme.outline.withValues(alpha: 0.6);
 
     return Semantics(
       checked: widget.value,
@@ -118,7 +126,9 @@ class _CheckmarkPainter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(painter: _CheckmarkPaint(progress: progress, color: color));
+    return CustomPaint(
+      painter: _CheckmarkPaint(progress: progress, color: color),
+    );
   }
 }
 

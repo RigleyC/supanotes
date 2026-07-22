@@ -85,14 +85,36 @@ func TestApplyTextDelta(t *testing.T) {
 	assert.Equal(t, "hello world", text)
 }
 
-func TestApplyTextDeltaBlockNotFound(t *testing.T) {
-	doc := NewEmptyDocument()
+func TestApplyTextDeltaRecoversMissingBlock(t *testing.T) {
+	doc := Document{
+		SchemaVersion: 1,
+		Blocks: []Block{{
+			ID:       "existing",
+			Type:     string(BlockParagraph),
+			Delta:    []delta.Op{{Insert: []rune("")}},
+			Metadata: map[string]any{},
+		}},
+	}
 	payload, _ := json.Marshal(struct {
 		Ops []delta.Op `json:"ops"`
 	}{Ops: []delta.Op{{Insert: []rune("test")}}})
 
 	err := doc.ApplyOperation(KindTextDelta, "nonexistent", payload)
-	assert.ErrorIs(t, err, ErrBlockNotFound)
+	require.NoError(t, err)
+	assert.Equal(t, "nonexistent", doc.Blocks[1].ID)
+	assert.Equal(t, "test", deltaText(doc.Blocks[1].Delta))
+}
+
+func TestApplyTextDeltaAdoptsFirstLocalBlockID(t *testing.T) {
+	doc := NewEmptyDocument()
+	payload, _ := json.Marshal(struct {
+		Ops []delta.Op `json:"ops"`
+	}{Ops: []delta.Op{{Insert: []rune("test")}}})
+
+	err := doc.ApplyOperation(KindTextDelta, "local-block", payload)
+	require.NoError(t, err)
+	assert.Equal(t, "local-block", doc.Blocks[0].ID)
+	assert.Equal(t, "test", deltaText(doc.Blocks[0].Delta))
 }
 
 func TestApplyCreateBlock(t *testing.T) {
@@ -108,6 +130,41 @@ func TestApplyCreateBlock(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, doc.Blocks, 2)
 	assert.Equal(t, "b2", doc.Blocks[1].ID)
+}
+
+func TestApplyCreateBlockIsIdempotentForExistingBlockID(t *testing.T) {
+	doc := Document{
+		SchemaVersion: 1,
+		Blocks: []Block{{
+			ID:       "b1",
+			Type:     string(BlockTask),
+			Delta:    []delta.Op{{Insert: []rune("local text")}},
+			Metadata: map[string]any{},
+		}},
+	}
+	payload, _ := json.Marshal(CreateBlockPayload{
+		ID:    "b1",
+		Type:  string(BlockParagraph),
+		Delta: []delta.Op{{Insert: []rune("stale text")}},
+	})
+
+	err := doc.ApplyOperation(KindCreateBlock, "b1", payload)
+	require.NoError(t, err)
+	assert.Len(t, doc.Blocks, 1)
+	assert.Equal(t, "local text", deltaText(doc.Blocks[0].Delta))
+}
+
+func TestUnmarshalDocumentRemovesDuplicateBlockIDs(t *testing.T) {
+	doc, err := UnmarshalDocument([]byte(`{
+		"blocks":[
+			{"id":"b1","type":"task","delta":[{"insert":"current"}],"metadata":{}},
+			{"id":"b1","type":"paragraph","delta":[{"insert":"stale"}],"metadata":{}}
+		]
+	}`))
+
+	require.NoError(t, err)
+	require.Len(t, doc.Blocks, 1)
+	assert.Equal(t, "current", deltaText(doc.Blocks[0].Delta))
 }
 
 func TestApplyCreateBlockPrependBeginning(t *testing.T) {
@@ -155,7 +212,8 @@ func TestApplyDeleteBlock(t *testing.T) {
 func TestApplyDeleteBlockNotFound(t *testing.T) {
 	doc := NewEmptyDocument()
 	err := doc.ApplyOperation(KindDeleteBlock, "nonexistent", nil)
-	assert.ErrorIs(t, err, ErrBlockNotFound)
+	require.NoError(t, err)
+	assert.Len(t, doc.Blocks, 1)
 }
 
 func TestApplyMoveBlock(t *testing.T) {
@@ -194,6 +252,15 @@ func TestApplyMoveBlockToBeginning(t *testing.T) {
 	assert.Equal(t, "b1", doc.Blocks[1].ID)
 }
 
+func TestApplyMoveBlockMissingBlockIsNoOp(t *testing.T) {
+	doc := NewEmptyDocument()
+	payload, _ := json.Marshal(MoveBlockPayload{BlockID: "missing"})
+
+	err := doc.ApplyOperation(KindMoveBlock, "", payload)
+	require.NoError(t, err)
+	assert.Len(t, doc.Blocks, 1)
+}
+
 func TestApplySetBlockType(t *testing.T) {
 	doc := Document{
 		SchemaVersion: 1,
@@ -206,6 +273,16 @@ func TestApplySetBlockType(t *testing.T) {
 	err := doc.ApplyOperation(KindSetBlockType, "b1", payload)
 	require.NoError(t, err)
 	assert.Equal(t, string(BlockHeader1), doc.Blocks[0].Type)
+}
+
+func TestApplySetBlockTypeRecoversMissingBlock(t *testing.T) {
+	doc := NewEmptyDocument()
+	payload, _ := json.Marshal(SetBlockTypePayload{Type: string(BlockTask)})
+
+	err := doc.ApplyOperation(KindSetBlockType, "task-1", payload)
+	require.NoError(t, err)
+	assert.Equal(t, "task-1", doc.Blocks[0].ID)
+	assert.Equal(t, string(BlockTask), doc.Blocks[0].Type)
 }
 
 func TestDeriveContentFromDocument(t *testing.T) {

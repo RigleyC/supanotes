@@ -85,8 +85,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             (editContext) => NoteLinkTapHandler(
               editContext.document,
               editContext.composer,
-              onNoteTap: (targetId) =>
-                  context.push(AppRoutes.note(targetId)),
+              onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
             ),
             superEditorLaunchLinkTapHandlerFactory,
           ];
@@ -98,10 +97,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       hideCompleted: widget.hideCompleted,
       onTaskLongPress: widget.isReadOnly
           ? null
-          : (taskId) => widget.delegate.onTaskLongPress?.call(
-                _taskComponentBuilder?.taskMetadataById[taskId],
-                () async {},
-              ),
+          : widget.delegate.onTaskLongPress,
       onTaskComplete: widget.delegate.onTaskComplete,
       onTaskReopen: widget.delegate.onTaskReopen,
     );
@@ -146,10 +142,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final controllerAsync = ref.watch(noteEditorControllerProvider(widget.noteId));
+    final controllerAsync = ref.watch(
+      noteEditorControllerProvider(widget.noteId),
+    );
 
     return controllerAsync.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(body: Center(child: Text('Erro: $error'))),
       data: (controller) {
         if (_controller != controller) {
@@ -165,14 +164,17 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             controller.document == null ||
             controller.editor == null ||
             controller.composer == null) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         _initControls();
         _initStableBuilders();
 
         final theme = Theme.of(context);
-        final topPadding = Scaffold.maybeOf(context)?.appBarMaxHeight ??
+        final topPadding =
+            Scaffold.maybeOf(context)?.appBarMaxHeight ??
             (MediaQuery.paddingOf(context).top + kToolbarHeight);
         final docPadding = EdgeInsets.only(
           left: 24,

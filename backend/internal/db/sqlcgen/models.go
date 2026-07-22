@@ -6,7 +6,6 @@ package sqlcgen
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
 )
 
 type Attachment struct {
@@ -31,14 +30,6 @@ type Note struct {
 	Revision         int64              `json:"revision"`
 	Document         []byte             `json:"document"`
 	SnapshotRevision int64              `json:"snapshot_revision"`
-}
-
-type NoteEmbedding struct {
-	ID        pgtype.UUID        `json:"id"`
-	NoteID    pgtype.UUID        `json:"note_id"`
-	Embedding pgvector.Vector    `json:"embedding"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type NoteLink struct {
@@ -109,15 +100,6 @@ type TaskCompletion struct {
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	DueDate     pgtype.Date        `json:"due_date"`
 	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
-}
-
-type TelegramLinkCode struct {
-	ID        pgtype.UUID        `json:"id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	Code      string             `json:"code"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
-	UsedAt    pgtype.Timestamptz `json:"used_at"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type User struct {

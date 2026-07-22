@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
@@ -37,11 +38,7 @@ void main() {
       ),
     );
     registerFallbackValue(
-      SyncRequest(
-        knownRevision: 0,
-        operations: [],
-        clientId: 'fallback',
-      ),
+      SyncRequest(knownRevision: 0, operations: [], clientId: 'fallback'),
     );
     registerFallbackValue(
       SyncSessionsCompanion.insert(
@@ -64,37 +61,35 @@ void main() {
     );
 
     when(() => mockDao.getPendingOperations(any())).thenAnswer((_) async => []);
-    when(() => mockDao.getPendingOperations(any(), status: any(named: 'status')))
-        .thenAnswer((_) async => []);
-    when(() => mockDao.watchNoteDocument(any()))
-        .thenAnswer((_) => Stream.value(null));
-    when(() => mockDao.getSyncSession(any()))
-        .thenAnswer((_) async => null);
-    when(() => mockDao.markInFlight(any(), any()))
-        .thenAnswer((_) async {});
-    when(() => mockDao.upsertSyncSession(any()))
-        .thenAnswer((_) async {});
-    when(() => mockDao.deleteAccepted(any()))
-        .thenAnswer((_) async {});
-    when(() => mockDao.replacePendingOps(any(), any()))
-        .thenAnswer((_) async {});
-    when(() => mockDao.upsertNoteDocument(any()))
-        .thenAnswer((_) async {});
-    when(() => mockDao.deleteSyncSession(any()))
-        .thenAnswer((_) async {});
-    when(() => mockDao.runInTransaction(any()))
-        .thenAnswer((invocation) async {
+    when(
+      () => mockDao.getPendingOperations(any(), status: any(named: 'status')),
+    ).thenAnswer((_) async => []);
+    when(
+      () => mockDao.watchNoteDocument(any()),
+    ).thenAnswer((_) => Stream.value(null));
+    when(() => mockDao.getSyncSession(any())).thenAnswer((_) async => null);
+    when(() => mockDao.markInFlight(any(), any())).thenAnswer((_) async {});
+    when(() => mockDao.upsertSyncSession(any())).thenAnswer((_) async {});
+    when(() => mockDao.deleteAccepted(any())).thenAnswer((_) async {});
+    when(
+      () => mockDao.replacePendingOps(any(), any()),
+    ).thenAnswer((_) async {});
+    when(() => mockDao.upsertNoteDocument(any())).thenAnswer((_) async {});
+    when(() => mockDao.deleteSyncSession(any())).thenAnswer((_) async {});
+    when(() => mockDao.runInTransaction(any())).thenAnswer((invocation) async {
       final fn = invocation.positionalArguments[0] as Future<void> Function();
       await fn();
     });
-    when(() => mockDao.getProjectedOutboxOperationCount(any()))
-        .thenAnswer((_) async => 0);
+    when(
+      () => mockDao.getProjectedOutboxOperationCount(any()),
+    ).thenAnswer((_) async => 0);
   });
 
   group('enqueueOperation', () {
     test('inserts operation with correct ordinal', () async {
-      when(() => mockDao.getPendingOperations('note-1'))
-          .thenAnswer((_) async => []);
+      when(
+        () => mockDao.getPendingOperations('note-1'),
+      ).thenAnswer((_) async => []);
       when(
         () => mockDao.insertPendingOperation(any()),
       ).thenAnswer((_) async {});
@@ -132,8 +127,9 @@ void main() {
           lastAttemptAt: null,
         ),
       ];
-      when(() => mockDao.getPendingOperations('note-1'))
-          .thenAnswer((_) async => existing);
+      when(
+        () => mockDao.getPendingOperations('note-1'),
+      ).thenAnswer((_) async => existing);
       when(
         () => mockDao.insertPendingOperation(any()),
       ).thenAnswer((_) async {});
@@ -148,11 +144,13 @@ void main() {
         ),
       );
 
-      final captured = verify(
-        () => mockDao.insertPendingOperation(
-          captureAny(that: isA<PendingNoteOperationsCompanion>()),
-        ),
-      ).captured.first as PendingNoteOperationsCompanion;
+      final captured =
+          verify(
+                () => mockDao.insertPendingOperation(
+                  captureAny(that: isA<PendingNoteOperationsCompanion>()),
+                ),
+              ).captured.first
+              as PendingNoteOperationsCompanion;
 
       expect(captured.ordinal.value, 1);
     });
@@ -174,6 +172,14 @@ void main() {
     expect(id.length, greaterThan(0));
   });
 
+  test('encodePayload converts editor values to JSON', () {
+    final json = NoteOperationsSyncService.encodePayload({
+      'metadata': {'blockType': const NamedAttribution('task')},
+    });
+
+    expect(json, '{"metadata":{"blockType":"task"}}');
+  });
+
   test('getConfirmedDocument returns document from dao', () async {
     final doc = LocalNoteDocumentData(
       noteId: 'note-1',
@@ -181,8 +187,9 @@ void main() {
       documentJson: '{"blocks": []}',
       updatedAt: DateTime.utc(2026, 7, 20),
     );
-    when(() => mockDao.watchNoteDocument('note-1'))
-        .thenAnswer((_) => Stream.value(doc));
+    when(
+      () => mockDao.watchNoteDocument('note-1'),
+    ).thenAnswer((_) => Stream.value(doc));
 
     final result = await service.getConfirmedDocument('note-1');
 

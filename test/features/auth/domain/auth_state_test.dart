@@ -137,8 +137,6 @@ void main() {
             refreshToken: 'r',
             session: SessionData(
               settings: {},
-              soul: {},
-              contexts: [],
             ),
           ));
 
@@ -205,8 +203,6 @@ void main() {
             refreshToken: 'r',
             session: SessionData(
               settings: {},
-              soul: {},
-              contexts: [],
             ),
           ));
 

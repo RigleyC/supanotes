@@ -17,7 +17,6 @@ void main() {
         
         favorite: false,
         archived: false,
-        contextId: null,
         createdAt: DateTime(2026),
         updatedAt: DateTime(2026),
       );

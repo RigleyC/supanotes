@@ -16,7 +16,6 @@ void main() {
         
         favorite: false,
         archived: false,
-        contextId: null,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         sharedByEmail: null,
@@ -48,7 +47,6 @@ void main() {
         
         favorite: false,
         archived: false,
-        contextId: null,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         sharedByEmail: 'owner@example.com',
@@ -83,7 +81,6 @@ void main() {
         
         favorite: true,
         archived: false,
-        contextId: null,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         sharedByEmail: null,
@@ -117,7 +114,6 @@ void main() {
         
         favorite: false,
         archived: false,
-        contextId: null,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         sharedByEmail: null,

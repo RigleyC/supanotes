@@ -4,10 +4,8 @@ import 'package:drift/drift.dart';
 class Notes extends Table {
   TextColumn get id => text()();
   TextColumn get userId => text()();
-  TextColumn get contextId => text().nullable()();
   TextColumn get content => text()();
   TextColumn get excerpt => text().nullable()();
-  TextColumn get embeddingStatus => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();

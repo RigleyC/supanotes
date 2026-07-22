@@ -56,8 +56,6 @@ class AuthRepository implements IAuthRepository {
       );
       await _storage.saveSessionData({
         'settings': result.session.settings,
-        'soul': result.session.soul,
-        'contexts': result.session.contexts,
       });
       return result;
     } on DioException catch (e) {
@@ -90,8 +88,6 @@ class AuthRepository implements IAuthRepository {
       );
       await _storage.saveSessionData({
         'settings': result.session.settings,
-        'soul': result.session.soul,
-        'contexts': result.session.contexts,
       });
       return result;
     } on DioException catch (e) {

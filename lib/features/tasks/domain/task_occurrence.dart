@@ -40,8 +40,8 @@ List<TaskOccurrence> buildOccurrences({
         status: completedAt != null
             ? OccurrenceStatus.completed
             : _isOverdue(anchor, now, hasTime)
-                ? OccurrenceStatus.overdue
-                : OccurrenceStatus.pending,
+            ? OccurrenceStatus.overdue
+            : OccurrenceStatus.pending,
         completedAt: completedAt,
       ),
     ];
@@ -63,19 +63,28 @@ List<TaskOccurrence> buildOccurrences({
   final result = <TaskOccurrence>[];
   for (final date in allDates) {
     final completedAt = _findCompletion(date, completedScheduledAts);
-    result.add(TaskOccurrence(
-      taskId: taskId,
-      scheduledAt: date,
-      status: completedAt != null
-          ? OccurrenceStatus.completed
-          : _isOverdue(date, now, hasTime)
-              ? OccurrenceStatus.overdue
-              : OccurrenceStatus.pending,
-      completedAt: completedAt,
-    ));
+    result.add(
+      TaskOccurrence(
+        taskId: taskId,
+        scheduledAt: date,
+        status: completedAt != null
+            ? OccurrenceStatus.completed
+            : _isOverdue(date, now, hasTime)
+            ? OccurrenceStatus.overdue
+            : OccurrenceStatus.pending,
+        completedAt: completedAt,
+      ),
+    );
   }
 
   return result;
+}
+
+DateTime nextOccurrenceDate({
+  required DateTime from,
+  required TaskRecurrence recurrence,
+}) {
+  return _nextDueDate(from: from, recurrence: recurrence)!;
 }
 
 DateTime? _findCompletion(DateTime date, Set<DateTime> completedDates) {
@@ -149,14 +158,18 @@ DateTime _copyWith(DateTime date, {int? year, int? month, int? day}) {
   );
 }
 
-DateTime? _nextDueDate({required DateTime from, required TaskRecurrence recurrence}) {
+DateTime? _nextDueDate({
+  required DateTime from,
+  required TaskRecurrence recurrence,
+}) {
   DateTime? raw;
   switch (recurrence) {
     case TaskRecurrence.daily:
       raw = _copyWith(from, day: from.day + 1);
     case TaskRecurrence.weekdays:
       var day = _copyWith(from, day: from.day + 1);
-      while (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
+      while (day.weekday == DateTime.saturday ||
+          day.weekday == DateTime.sunday) {
         day = _copyWith(day, day: day.day + 1);
       }
       raw = day;

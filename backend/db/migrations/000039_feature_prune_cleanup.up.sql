@@ -16,7 +16,9 @@ DROP TABLE IF EXISTS tags;
 DROP TABLE IF EXISTS contexts;
 DROP TABLE IF EXISTS telegram_messages;
 DROP TABLE IF EXISTS telegram_sessions;
+DROP TABLE IF EXISTS telegram_link_codes;
 DROP TABLE IF EXISTS telegram_links;
+DROP TABLE IF EXISTS note_embeddings;
 
 -- Drop search/embedding columns from notes
 ALTER TABLE notes DROP COLUMN IF EXISTS search_vector;

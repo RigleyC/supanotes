@@ -1,4 +1,5 @@
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 
 class TaskSnapshot {
   final DateTime? dueDate;
@@ -45,15 +46,16 @@ class TaskCompletionCommand {
       );
     }
 
-    // For recurring tasks, the template stays open and its dueDate is
-    // not advanced. The completion records which occurrence was completed
-    // (scheduledAt). The occurrence date defaults to the task's dueDate
-    // or, if missing, today's start.
+    // A recurring task remains open, but its due date moves to the next
+    // occurrence. The completion history retains the completed occurrence.
     final occurrenceDate =
         scheduledAt ?? task.dueDate ?? DateTime(now.year, now.month, now.day);
     return TaskCompletionResult(
       completed: false,
-      nextDue: null,
+      nextDue: nextOccurrenceDate(
+        from: occurrenceDate,
+        recurrence: task.recurrence!,
+      ),
       completedAt: completedAt,
       previousDue: task.dueDate,
       previousHasTime: task.hasTime,

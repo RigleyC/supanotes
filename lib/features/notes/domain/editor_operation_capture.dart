@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'attachment_nodes.dart';
 import 'ot_document_codec.dart';
 
@@ -34,7 +35,8 @@ class EditorOperationCapture {
   final MutableDocument _document;
   final String Function() _generateOpId;
   final OtDocumentCodec _codec;
-  final void Function(List<OperationRequestData> requests) _onOperationsCaptured;
+  final void Function(List<OperationRequestData> requests)
+  _onOperationsCaptured;
 
   final Map<String, _BlockMirror> _mirrors = {};
   List<String> _orderedNodeIds = [];
@@ -45,11 +47,12 @@ class EditorOperationCapture {
     required MutableDocument document,
     required String Function() generateOpId,
     required OtDocumentCodec codec,
-    required void Function(List<OperationRequestData> requests) onOperationsCaptured,
-  })  : _document = document,
-        _generateOpId = generateOpId,
-        _codec = codec,
-        _onOperationsCaptured = onOperationsCaptured;
+    required void Function(List<OperationRequestData> requests)
+    onOperationsCaptured,
+  }) : _document = document,
+       _generateOpId = generateOpId,
+       _codec = codec,
+       _onOperationsCaptured = onOperationsCaptured;
 
   bool get isListening => _listening;
 
@@ -90,7 +93,9 @@ class EditorOperationCapture {
         bType = 'task';
         meta = {'isCompleted': node.isComplete, ...node.metadata};
       } else if (node is ListItemNode) {
-        bType = node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
+        bType = node.type == ListItemType.ordered
+            ? 'orderedList'
+            : 'bulletList';
       } else if (node is HorizontalRuleNode) {
         bType = 'divider';
       } else if (node is DocumentAttachmentNode) {
@@ -109,21 +114,31 @@ class EditorOperationCapture {
   }
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
-    if (_suppress) return;
+    if (_suppress) {
+      NoteSyncDebug.log(
+        'capture.suppressed',
+        fields: {'nodeCount': _document.nodeCount},
+      );
+      return;
+    }
 
     final requests = <OperationRequestData>[];
     final currentNodes = _document.toList();
     final currentIds = currentNodes.map((n) => n.id).toList();
 
     // 1. Deleted blocks
-    final deletedIds = _orderedNodeIds.where((id) => !currentIds.contains(id)).toList();
+    final deletedIds = _orderedNodeIds
+        .where((id) => !currentIds.contains(id))
+        .toList();
     for (final delId in deletedIds) {
-      requests.add(OperationRequestData(
-        operationId: _generateOpId(),
-        kind: 'delete_block',
-        blockId: delId,
-        payload: {'blockId': delId},
-      ));
+      requests.add(
+        OperationRequestData(
+          operationId: _generateOpId(),
+          kind: 'delete_block',
+          blockId: delId,
+          payload: {'blockId': delId},
+        ),
+      );
       _mirrors.remove(delId);
     }
 
@@ -135,34 +150,37 @@ class EditorOperationCapture {
       if (!_mirrors.containsKey(node.id)) {
         // Created block
         final blockJson = _codec.encodeNode(node);
-        requests.add(OperationRequestData(
-          operationId: _generateOpId(),
-          kind: 'create_block',
-          blockId: node.id,
-          payload: {
-            'id': node.id,
-            'type': blockJson['type'],
-            'delta': blockJson['delta'],
-            'metadata': blockJson['metadata'],
-            'afterBlockId': afterBlockId,
-          },
-        ));
+        requests.add(
+          OperationRequestData(
+            operationId: _generateOpId(),
+            kind: 'create_block',
+            blockId: node.id,
+            payload: {
+              'id': node.id,
+              'type': blockJson['type'],
+              'delta': blockJson['delta'],
+              'metadata': blockJson['metadata'],
+              'afterBlockId': afterBlockId,
+            },
+          ),
+        );
       } else {
         // Moved block
         final prevIndexInOld = _orderedNodeIds.indexOf(node.id);
         final expectedAfterId = i == 0 ? null : currentNodes[i - 1].id;
-        final actualOldAfterId = prevIndexInOld <= 0 ? null : _orderedNodeIds[prevIndexInOld - 1];
+        final actualOldAfterId = prevIndexInOld <= 0
+            ? null
+            : _orderedNodeIds[prevIndexInOld - 1];
 
         if (prevIndexInOld != -1 && expectedAfterId != actualOldAfterId) {
-          requests.add(OperationRequestData(
-            operationId: _generateOpId(),
-            kind: 'move_block',
-            blockId: node.id,
-            payload: {
-              'blockId': node.id,
-              'afterBlockId': expectedAfterId,
-            },
-          ));
+          requests.add(
+            OperationRequestData(
+              operationId: _generateOpId(),
+              kind: 'move_block',
+              blockId: node.id,
+              payload: {'blockId': node.id, 'afterBlockId': expectedAfterId},
+            ),
+          );
         }
       }
     }
@@ -187,7 +205,9 @@ class EditorOperationCapture {
         currentBType = 'task';
         currentMeta = {'isCompleted': node.isComplete, ...node.metadata};
       } else if (node is ListItemNode) {
-        currentBType = node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
+        currentBType = node.type == ListItemType.ordered
+            ? 'orderedList'
+            : 'bulletList';
       } else if (node is HorizontalRuleNode) {
         currentBType = 'divider';
       } else if (node is DocumentAttachmentNode) {
@@ -200,26 +220,33 @@ class EditorOperationCapture {
 
       // Check attributed text change
       if (currentAttrText != mirror.attributedText) {
-        final deltaOps = _computeAttributedTextDelta(mirror.attributedText, currentAttrText);
+        final deltaOps = _computeAttributedTextDelta(
+          mirror.attributedText,
+          currentAttrText,
+        );
         if (deltaOps.isNotEmpty) {
-          requests.add(OperationRequestData(
-            operationId: _generateOpId(),
-            kind: 'text_delta',
-            blockId: node.id,
-            payload: {'ops': deltaOps},
-          ));
+          requests.add(
+            OperationRequestData(
+              operationId: _generateOpId(),
+              kind: 'text_delta',
+              blockId: node.id,
+              payload: {'ops': deltaOps},
+            ),
+          );
         }
         mirror.attributedText = currentAttrText;
       }
 
       // Check type change
       if (currentBType != mirror.blockType && currentBType != null) {
-        requests.add(OperationRequestData(
-          operationId: _generateOpId(),
-          kind: 'set_block_type',
-          blockId: node.id,
-          payload: {'type': currentBType},
-        ));
+        requests.add(
+          OperationRequestData(
+            operationId: _generateOpId(),
+            kind: 'set_block_type',
+            blockId: node.id,
+            payload: {'type': currentBType},
+          ),
+        );
         mirror.blockType = currentBType;
       }
 
@@ -234,52 +261,74 @@ class EditorOperationCapture {
 
         for (final entry in curCompletions.entries) {
           if (oldCompletions[entry.key] != entry.value) {
-            requests.add(OperationRequestData(
-              operationId: _generateOpId(),
-              kind: 'complete_task_occurrence',
-              blockId: node.id,
-              payload: {
-                'taskId': node.id,
-                'scheduledAt': entry.key,
-                'completedAt': entry.value,
-              },
-            ));
+            requests.add(
+              OperationRequestData(
+                operationId: _generateOpId(),
+                kind: 'complete_task_occurrence',
+                blockId: node.id,
+                payload: {
+                  'taskId': node.id,
+                  'scheduledAt': entry.key,
+                  'completedAt': entry.value,
+                },
+              ),
+            );
           }
         }
 
         for (final key in oldCompletions.keys) {
           if (!curCompletions.containsKey(key)) {
-            requests.add(OperationRequestData(
-              operationId: _generateOpId(),
-              kind: 'complete_task_occurrence',
-              blockId: node.id,
-              payload: {
-                'taskId': node.id,
-                'scheduledAt': key,
-                'completedAt': null,
-              },
-            ));
+            requests.add(
+              OperationRequestData(
+                operationId: _generateOpId(),
+                kind: 'complete_task_occurrence',
+                blockId: node.id,
+                payload: {
+                  'taskId': node.id,
+                  'scheduledAt': key,
+                  'completedAt': null,
+                },
+              ),
+            );
           }
         }
 
-        final otherCurMeta = Map<String, dynamic>.from(currentMeta)..remove('completions');
-        final otherOldMeta = Map<String, dynamic>.from(mirror.metadata)..remove('completions');
+        final otherCurMeta = Map<String, dynamic>.from(currentMeta)
+          ..remove('completions');
+        final otherOldMeta = Map<String, dynamic>.from(mirror.metadata)
+          ..remove('completions');
         if (!mapEquals(otherCurMeta, otherOldMeta)) {
-          requests.add(OperationRequestData(
-            operationId: _generateOpId(),
-            kind: 'set_block_metadata',
-            blockId: node.id,
-            payload: {'metadata': otherCurMeta},
-          ));
+          requests.add(
+            OperationRequestData(
+              operationId: _generateOpId(),
+              kind: 'set_block_metadata',
+              blockId: node.id,
+              payload: {'metadata': otherCurMeta},
+            ),
+          );
         }
 
         mirror.metadata = currentMeta;
       }
     }
 
-    _orderedNodeIds = currentIds;
+    // A created node must enter the mirror before the next keystroke.
+    // Otherwise each text change is incorrectly captured as another create_block.
+    buildMirror();
 
     if (requests.isNotEmpty) {
+      NoteSyncDebug.log(
+        'capture.operations',
+        fields: {
+          'nodeCount': currentNodes.length,
+          'operations': requests
+              .map(
+                (request) =>
+                    '${request.kind}:${request.blockId}:${NoteSyncDebug.payloadSummary(request.payload)}',
+              )
+              .join('|'),
+        },
+      );
       _onOperationsCaptured(requests);
     }
   }
@@ -375,7 +424,10 @@ class EditorOperationCapture {
 
     // Insert
     if (insertedStr.isNotEmpty) {
-      final insertSub = newText.copyText(prefixLen, prefixLen + insertedStr.length);
+      final insertSub = newText.copyText(
+        prefixLen,
+        prefixLen + insertedStr.length,
+      );
       final insertOps = _codec.encodeAttributedTextToDelta(insertSub);
       ops.addAll(insertOps);
     }
@@ -386,7 +438,8 @@ class EditorOperationCapture {
   Set<String> _getAttributionsAt(AttributedText text, int offset) {
     final attrs = <String>{};
     for (final marker in text.spans.markers) {
-      if (marker.markerType == SpanMarkerType.start && marker.offset <= offset) {
+      if (marker.markerType == SpanMarkerType.start &&
+          marker.offset <= offset) {
         final end = _codec.findSpanEnd(text.spans.markers, marker);
         if (end > offset && marker.attribution.id != 'composing') {
           attrs.add(marker.attribution.id);
@@ -396,7 +449,10 @@ class EditorOperationCapture {
     return attrs;
   }
 
-  Map<String, dynamic> _diffAttributes(Set<String> oldAttrs, Set<String> newAttrs) {
+  Map<String, dynamic> _diffAttributes(
+    Set<String> oldAttrs,
+    Set<String> newAttrs,
+  ) {
     final diff = <String, dynamic>{};
     for (final a in newAttrs) {
       if (!oldAttrs.contains(a)) {

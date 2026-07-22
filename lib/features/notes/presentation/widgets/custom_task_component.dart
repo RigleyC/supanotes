@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
@@ -33,8 +33,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
 
-  final Set<String> _completingIds = {};
   final Map<String, Future<void> Function(bool)> _completionHandlers = {};
+  final Set<String> _recurringTaskIds = {};
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -44,37 +44,27 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     if (node is! TaskNode) return null;
 
     final metadata = taskMetadataById[node.id];
+    final isRecurring =
+        TaskRecurrence.parse(
+              node.metadata['recurrenceRule'] as String? ??
+                  node.metadata['recurrence'] as String?,
+            ) !=
+            null ||
+        metadata?.recurrence != null;
+    if (isRecurring) {
+      _recurringTaskIds.add(node.id);
+    } else {
+      _recurringTaskIds.remove(node.id);
+    }
 
     Future<void> updateCompletion(bool isComplete) async {
-      final isRecurring = taskMetadataById[node.id]?.recurrence != null;
-
-      final shouldUpdateDoc = !isComplete || !isRecurring;
-      if (shouldUpdateDoc) {
-        editor?.execute([
-          ChangeTaskCompletionRequest(nodeId: node.id, isComplete: isComplete),
-        ]);
-      }
-
       if (isComplete) {
-        if (isRecurring) {
-          _completingIds.add(node.id);
-        }
-
-        if (hideCompleted) {
+        if (hideCompleted && !isRecurring) {
           FocusManager.instance.primaryFocus?.unfocus();
           composer?.clearSelection();
         }
 
-        try {
-          await onTaskComplete?.call(node.id);
-          if (isRecurring) {
-            await Future.delayed(const Duration(seconds: 1));
-          }
-        } finally {
-          if (isRecurring) {
-            _completingIds.remove(node.id);
-          }
-        }
+        await onTaskComplete?.call(node.id);
       } else {
         await onTaskReopen?.call(node.id);
       }
@@ -87,7 +77,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt],
       padding: EdgeInsets.zero,
       indent: node.indent,
-      isComplete: _completingIds.contains(node.id) || node.isComplete,
+      isComplete: node.isComplete,
       setComplete: (isComplete) => unawaited(updateCompletion(isComplete)),
       text: node.text,
       textDirection: getParagraphDirection(node.text.toPlainText()),
@@ -112,6 +102,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       key: componentContext.componentKey,
       viewModel: componentViewModel,
       taskMetadata: taskMetadataById[nodeId],
+      isRecurring: _recurringTaskIds.contains(nodeId),
       onCompletionChange: _completionHandlers[nodeId],
       hideCompleted: hideCompleted,
       onLongPress: onTaskLongPress == null
@@ -157,6 +148,7 @@ class CustomTaskComponent extends StatefulWidget {
   const CustomTaskComponent({
     super.key,
     required this.viewModel,
+    this.isRecurring = false,
     this.taskMetadata,
     this.hideCompleted = false,
     this.onLongPress,
@@ -164,6 +156,7 @@ class CustomTaskComponent extends StatefulWidget {
   });
 
   final TaskComponentViewModel viewModel;
+  final bool isRecurring;
   final TaskModel? taskMetadata;
   final bool hideCompleted;
   final VoidCallback? onLongPress;
@@ -181,6 +174,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   bool _isAnimating = false;
   bool _isUpdatingCompletion = false;
 
+  bool get _isRecurring => widget.isRecurring;
+
   @override
   void initState() {
     super.initState();
@@ -190,6 +185,12 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   @override
   void didUpdateWidget(covariant CustomTaskComponent oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_isRecurring) {
+      if (widget.viewModel.isComplete) {
+        _isComplete = false;
+      }
+      return;
+    }
     if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
       _isComplete = widget.viewModel.isComplete;
     }
@@ -205,11 +206,10 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     setState(() {
       _isComplete = newComplete;
       _isUpdatingCompletion = true;
-      if (widget.hideCompleted && newComplete) {
+      if (widget.hideCompleted && newComplete && !_isRecurring) {
         _isAnimating = true;
       }
     });
-
     try {
       if (widget.onCompletionChange != null) {
         await widget.onCompletionChange!(newComplete);
@@ -229,6 +229,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
         setState(() => _isUpdatingCompletion = false);
       }
     }
+  }
+
+  void _onCheckAnimationCompleted() {
+    if (!_isRecurring || !_isComplete || !mounted) return;
+    setState(() => _isComplete = false);
   }
 
   @override
@@ -304,6 +309,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                         accentColor: taskColor,
                         inactiveColor: colorScheme.outline,
                         shape: AppTaskCheckboxShape.rounded,
+                        onCheckAnimationCompleted: _isRecurring
+                            ? _onCheckAnimationCompleted
+                            : null,
                       ),
                     ),
                   ),
@@ -315,7 +323,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  //Porque isso aqui não é apenas um Text()?
                   TextComponent(
                     key: _textKey,
                     text: widget.viewModel.text,
@@ -356,7 +363,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     );
 
     return TaskExitAnimator(
-      hideCompleted: widget.hideCompleted,
+      hideCompleted: widget.hideCompleted && !_isRecurring,
       isComplete: _isComplete,
       onAnimationComplete: _isAnimating
           ? () => setState(() => _isAnimating = false)
