@@ -8,7 +8,8 @@ workflows:
         - $FLUTTER_ROOT/.pub-cache
         - $HOME/.pub-cache
         - $HOME/Library/Caches/CocoaPods
-        - DerivedData
+        - ios/Pods
+        - ios/DerivedData
     environment:
       groups:
         - api_config
@@ -24,6 +25,7 @@ workflows:
       branch_patterns:
         - pattern: 'master'
           include: true
+      cancel_previous_builds: true
     scripts:
       - name: Decode GoogleService-Info.plist
         script: |
@@ -96,6 +98,7 @@ workflows:
       branch_patterns:
         - pattern: 'release/*'
           include: true
+      cancel_previous_builds: true
     scripts:
       - name: Decode GoogleService-Info.plist
         script: |
