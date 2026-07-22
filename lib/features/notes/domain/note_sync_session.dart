@@ -6,6 +6,10 @@ import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'note_operation_adapter.dart';
 
 class NoteSyncSession {
+  static final Set<String> _activeNoteIds = <String>{};
+
+  static bool isActive(String noteId) => _activeNoteIds.contains(noteId);
+
   final String noteId;
   final NoteOperationsSyncService syncService;
   final NoteOperationAdapter adapter;
@@ -27,12 +31,17 @@ class NoteSyncSession {
        );
 
   Future<void> start() async {
+    _activeNoteIds.add(noteId);
     adapter.onLocalOperations = (_) {
       unawaited(_onLocalOps());
     };
-
-    await adapter.start();
-    _startPolling();
+    try {
+      await adapter.start();
+      _startPolling();
+    } catch (_) {
+      _activeNoteIds.remove(noteId);
+      rethrow;
+    }
   }
 
   Future<void> _onLocalOps() async {
@@ -86,6 +95,7 @@ class NoteSyncSession {
 
   void dispose() {
     _disposed = true;
+    _activeNoteIds.remove(noteId);
     _pollTimer?.cancel();
     adapter.dispose();
   }

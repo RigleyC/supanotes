@@ -88,6 +88,42 @@ void main() {
       ]);
     });
 
+    test('does not inherit accidental bold on inserted text', () {
+      final boldSpans = AttributedSpans()
+        ..addAttribution(newAttribution: boldAttribution, start: 0, end: 6);
+      final doc = MutableDocument(
+        nodes: [ParagraphNode(id: 'n1', text: AttributedText('Hello'))],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      final capture = EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-1',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      );
+      capture.start();
+
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 'n1',
+          newNode: ParagraphNode(
+            id: 'n1',
+            text: AttributedText('Hello!', boldSpans),
+          ),
+        ),
+      ]);
+
+      final ops = capturedOps.single.payload['ops'] as List<dynamic>;
+      expect(ops, [
+        {'retain': 5},
+        {'insert': '!'},
+      ]);
+    });
+
     test('emits complete_task_occurrence on task completion and reopening', () {
       final doc = MutableDocument(
         nodes: [

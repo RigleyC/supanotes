@@ -9,6 +9,7 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/data/note_operations_api.dart';
 import 'package:supanotes/features/notes/domain/ot_document_codec.dart';
 import 'package:supanotes/features/notes/domain/ot_local_projection.dart';
+import 'package:supanotes/features/notes/domain/note_sync_session.dart';
 
 class NoteCatalogSync {
   NoteCatalogSync({
@@ -51,6 +52,10 @@ class NoteCatalogSync {
     required OtDocumentCodec codec,
   }) async {
     final id = json['id'] as String;
+    if (NoteSyncSession.isActive(id)) {
+      dev.log('[NoteCatalogSync] Skipping active note $id');
+      return;
+    }
     final existing = await _database.notesDao.getNoteById(id);
     final localDocument = await (_database.select(
       _database.localNoteDocuments,

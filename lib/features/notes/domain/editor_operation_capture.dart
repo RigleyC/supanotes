@@ -415,6 +415,23 @@ class EditorOperationCapture {
         prefixLen + insertedStr.length,
       );
       final insertOps = _codec.encodeAttributedTextToDelta(insertSub);
+      final insertionWasBold =
+          prefixLen > 0 &&
+          _getAttributionsAt(oldText, prefixLen - 1).contains('bold');
+      if (!insertionWasBold) {
+        for (final op in insertOps) {
+          final attributes = op['attributes'];
+          if (attributes is Map && attributes.containsKey('bold')) {
+            final cleaned = Map<String, dynamic>.from(attributes)
+              ..remove('bold');
+            if (cleaned.isEmpty) {
+              op.remove('attributes');
+            } else {
+              op['attributes'] = cleaned;
+            }
+          }
+        }
+      }
       ops.addAll(insertOps);
     }
 
