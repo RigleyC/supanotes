@@ -26,6 +26,7 @@ import 'tables/task_completions.dart';
 import 'tables/tasks.dart';
 import 'tables/user_note_preferences.dart';
 
+import '../../features/tasks/domain/projected_task.dart';
 import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNameConverter in tasks.dart
 
 part 'database.g.dart';
@@ -66,6 +67,29 @@ class AppDatabase extends _$AppDatabase {
           await delete(entity).go();
         }
       }
+    });
+  }
+
+  /// Saves note content/excerpt projection and synced tasks in a single atomic transaction.
+  /// [saveProjectedDocument] is the sole owner opening the transaction.
+  Future<void> saveProjectedDocument({
+    required String noteId,
+    required String content,
+    String? excerpt,
+    required List<ProjectedTask> tasks,
+    String userId = '',
+  }) {
+    return transaction(() async {
+      await notesDao.updateNoteProjection(
+        id: noteId,
+        content: content,
+        excerpt: excerpt,
+      );
+      await tasksDao.syncProjectedTasksForNoteTyped(
+        noteId,
+        tasks,
+        userId: userId,
+      );
     });
   }
 

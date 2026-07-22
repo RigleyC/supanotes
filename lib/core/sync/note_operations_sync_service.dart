@@ -9,7 +9,7 @@ import 'package:uuid/uuid.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
-import 'package:supanotes/features/notes/data/note_operations_api.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
 import 'package:supanotes/features/notes/domain/note_operation_rebaser.dart';
 
 class SyncResult {
@@ -62,7 +62,7 @@ class _NoteSyncQueue {
 }
 
 class NoteOperationsSyncService {
-  final NoteOperationsApiClient _api;
+  final NoteSyncClient _syncClient;
   final NoteOperationsDao _dao;
   final String _clientId;
   final Uuid _uuid = const Uuid();
@@ -70,11 +70,11 @@ class NoteOperationsSyncService {
   late final NoteOperationRebaser _rebaser;
 
   NoteOperationsSyncService({
-    required NoteOperationsApiClient api,
+    required NoteSyncClient syncClient,
     required NoteOperationsDao dao,
     required String clientId,
     required String actorId,
-  }) : _api = api,
+  }) : _syncClient = syncClient,
        _dao = dao,
        _clientId = clientId {
     _rebaser = NoteOperationRebaser(localActorId: actorId);
@@ -165,7 +165,7 @@ class NoteOperationsSyncService {
 
   Future<NoteDocumentResponse?> fetchDocument(String noteId) async {
     try {
-      return await _api.getDocument(noteId);
+      return await _syncClient.getDocument(noteId);
     } on NoteOperationsException catch (e) {
       dev.log(
         '[NoteOperationsSyncService] fetchDocument failed for note=$noteId: $e',
@@ -258,7 +258,7 @@ class NoteOperationsSyncService {
 
     SyncResponse response;
     try {
-      response = await _api.syncOperations(noteId, request);
+      response = await _syncClient.syncOperations(noteId, request);
     } catch (e) {
       rethrow;
     }
@@ -311,7 +311,7 @@ class NoteOperationsSyncService {
     );
 
     try {
-      final response = await _api.syncOperations(noteId, request);
+      final response = await _syncClient.syncOperations(noteId, request);
       return _processSyncResponse(noteId, response, operationIds.toSet(), ops);
     } catch (e) {
       rethrow;
@@ -426,7 +426,7 @@ class NoteOperationsSyncService {
       return SyncResult.empty();
     }
 
-    final response = await _api.getOperationsSince(noteId, confirmed.revision);
+    final response = await _syncClient.getOperationsSince(noteId, confirmed.revision);
     NoteSyncDebug.log(
       'sync.poll.response',
       noteId: noteId,

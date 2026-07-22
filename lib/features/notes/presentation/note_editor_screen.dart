@@ -239,7 +239,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                                       ),
                                     )
                                     .value;
-                                controller?.updateTaskMetadataInYDoc(
+                                controller?.updateTaskMetadataInEditor(
                                   taskId,
                                   dueDate: dueDate,
                                   clearDueDate: dueDate == null,
@@ -266,7 +266,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           scheduledAt: null,
                         );
                       }
-                      final result = controller.completeTaskInYDoc(taskId);
+                      final result = controller.completeTaskInEditor(taskId);
                       return (
                         nextDue: result?.nextDue,
                         previousDue: result?.previousDue,
@@ -281,7 +281,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       if (controller != null) {
                         // For recurring tasks, the template's dueDate is the
                         // anchor and never changes — only remove the completion.
-                        controller.reopenTaskInYDoc(
+                        controller.reopenTaskInEditor(
                           taskId,
                           previousDue: previousDue,
                           scheduledAt: scheduledAt,
@@ -295,7 +295,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       .read(noteEditorControllerProvider(widget.noteId))
                       .value;
                   if (controller != null) {
-                    controller.reopenTaskInYDoc(taskId);
+                    controller.reopenTaskInEditor(taskId);
                   }
                 },
               ),

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/domain/node_codec.dart';
+import 'package:supanotes/features/notes/domain/note_document_codec.dart';
 import 'package:supanotes/features/notes/domain/note_node.dart';
 
 void main() {
@@ -14,9 +14,9 @@ void main() {
         text: AttributedText('Negrito', spans),
       );
 
-      final data = NodeCodec.nodeData(source);
+      final data = NoteDocumentCodec.nodeData(source);
       final restored =
-          NodeCodec.createNodeFromSchema(
+          NoteDocumentCodec.createNodeFromSchema(
                 NoteNode(
                   id: source.id,
                   noteId: 'note-1',
@@ -50,7 +50,7 @@ void main() {
     'reads legacy inclusive span ends without truncating the final character',
     () {
       final restored =
-          NodeCodec.createNodeFromSchema(
+          NoteDocumentCodec.createNodeFromSchema(
                 NoteNode(
                   id: 'paragraph-1',
                   noteId: 'note-1',

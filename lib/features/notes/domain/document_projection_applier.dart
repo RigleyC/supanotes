@@ -3,17 +3,17 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
-import 'ot_document_codec.dart';
+import 'note_document_codec.dart';
 
 class DocumentProjectionApplier {
   final MutableDocument _document;
   final Editor _editor;
-  final OtDocumentCodec _codec;
+  final NoteDocumentCodec _codec;
 
   DocumentProjectionApplier({
     required MutableDocument document,
     required Editor editor,
-    required OtDocumentCodec codec,
+    required NoteDocumentCodec codec,
   }) : _document = document,
        _editor = editor,
        _codec = codec;

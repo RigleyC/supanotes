@@ -5,16 +5,15 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_operations_api.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
 
 class MockNoteOperationsDao extends Mock implements NoteOperationsDao {}
 
-class MockNoteOperationsApiClient extends Mock
-    implements NoteOperationsApiClient {}
+class MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
 void main() {
   late MockNoteOperationsDao mockDao;
-  late MockNoteOperationsApiClient mockApi;
+  late MockNoteSyncClient mockSyncClient;
   late NoteOperationsSyncService service;
 
   setUpAll(() {
@@ -52,9 +51,9 @@ void main() {
 
   setUp(() {
     mockDao = MockNoteOperationsDao();
-    mockApi = MockNoteOperationsApiClient();
+    mockSyncClient = MockNoteSyncClient();
     service = NoteOperationsSyncService(
-      api: mockApi,
+      syncClient: mockSyncClient,
       dao: mockDao,
       clientId: 'test-client',
       actorId: 'test-actor',

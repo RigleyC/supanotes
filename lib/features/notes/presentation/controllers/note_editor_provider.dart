@@ -7,7 +7,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/domain/note_sync_session.dart';
-import 'package:supanotes/features/notes/domain/ot_local_projection.dart';
+import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 import 'note_editor_controller.dart';
 
 final noteEditorControllerProvider = FutureProvider.autoDispose
@@ -25,13 +25,9 @@ final noteEditorControllerProvider = FutureProvider.autoDispose
       );
 
       controller.initOtOnly(noteId: noteId);
-      final projection = OtLocalProjection(
-        database: ref.read(appDatabaseProvider),
-        userId: userId,
-      );
-      controller.onProjectLocal = (document) =>
-          projection.project(noteId, document);
 
+      final database = ref.read(appDatabaseProvider);
+      final taskProjectionEngine = TaskProjectionEngine(database: database);
       final syncService = ref.read(noteOperationsSyncServiceProvider);
 
       final session = NoteSyncSession(
@@ -39,14 +35,14 @@ final noteEditorControllerProvider = FutureProvider.autoDispose
         syncService: syncService,
         document: controller.document!,
         editor: controller.editor!,
+        taskProjectionEngine: taskProjectionEngine,
+        userId: userId,
       );
 
       await session.start();
-      controller.operationAdapter = session.adapter;
 
       ref.onDispose(() {
-        session.dispose();
-        unawaited(controller.dispose());
+        unawaited(session.dispose().then((_) => controller.dispose()));
       });
       return controller;
     });

@@ -3,36 +3,32 @@ import 'dart:developer' as dev;
 
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/notes/data/note_operations_api.dart';
-import 'package:supanotes/features/notes/domain/ot_document_codec.dart';
-import 'package:supanotes/features/notes/domain/ot_local_projection.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
 import 'package:supanotes/features/notes/domain/note_sync_session.dart';
+import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 
 class NoteCatalogSync {
   NoteCatalogSync({
-    required NoteOperationsApiClient operationsApi,
+    required NoteSyncClient syncClient,
     required AppDatabase database,
-  }) : _operationsApi = operationsApi,
-       _database = database;
+  }) : _syncClient = syncClient,
+       _database = database,
+       _taskProjectionEngine = TaskProjectionEngine(database: database);
 
-  final NoteOperationsApiClient _operationsApi;
+  final NoteSyncClient _syncClient;
   final AppDatabase _database;
+  final TaskProjectionEngine _taskProjectionEngine;
 
   Future<void> pullRemoteNotes(String userId) async {
-    final rows = await _operationsApi.listNotes();
-    final projection = OtLocalProjection(database: _database, userId: userId);
-    final codec = OtDocumentCodec();
+    final rows = await _syncClient.listNotes();
 
     for (final raw in rows) {
       try {
         await _pullRemoteNote(
           userId: userId,
           json: raw,
-          projection: projection,
-          codec: codec,
         );
       } catch (error, stackTrace) {
         dev.log(
@@ -48,8 +44,6 @@ class NoteCatalogSync {
   Future<void> _pullRemoteNote({
     required String userId,
     required Map<String, dynamic> json,
-    required OtLocalProjection projection,
-    required OtDocumentCodec codec,
   }) async {
     final id = json['id'] as String;
     if (NoteSyncSession.isActive(id)) {
@@ -82,20 +76,13 @@ class NoteCatalogSync {
               createdAt: createdAt,
               updatedAt: updatedAt,
               isDirty: const Value(false),
-              // This is only a projection target. It must be retried until the
-              // remote document is decoded and stored locally.
               hasRemoteCopy: const Value(false),
               collapseImages: Value(json['collapse_images'] as bool? ?? false),
             ),
           );
     }
 
-    final remote = await _operationsApi.getDocument(id);
-    final blocks = remote.document['blocks'] as List<dynamic>? ?? const [];
-    final nodes = blocks
-        .whereType<Map>()
-        .map((block) => codec.decodeNode(Map<String, dynamic>.from(block)))
-        .toList();
+    final remote = await _syncClient.getDocument(id);
     await _database.noteOperationsDao.upsertNoteDocument(
       LocalNoteDocumentsCompanion.insert(
         noteId: remote.noteId,
@@ -104,7 +91,11 @@ class NoteCatalogSync {
         updatedAt: remote.serverTime,
       ),
     );
-    await projection.project(id, MutableDocument(nodes: nodes));
+    await _taskProjectionEngine.projectTasksFromSnapshot(
+      noteId: id,
+      snapshot: remote.document,
+      userId: userId,
+    );
     await (_database.update(
       _database.notes,
     )..where((note) => note.id.equals(id))).write(
@@ -116,7 +107,7 @@ class NoteCatalogSync {
         collapseImages: Value(json['collapse_images'] as bool? ?? false),
       ),
     );
-    dev.log('[NoteCatalogSync] Hydrated $id with ${nodes.length} blocks');
+    dev.log('[NoteCatalogSync] Hydrated $id from remote snapshot');
   }
 }
 
@@ -125,7 +116,7 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
   if (user == null) return;
 
   final sync = NoteCatalogSync(
-    operationsApi: ref.watch(noteOperationsApiClientProvider),
+    syncClient: ref.watch(noteSyncClientProvider),
     database: ref.watch(appDatabaseProvider),
   );
   while (true) {

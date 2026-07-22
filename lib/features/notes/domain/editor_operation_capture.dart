@@ -3,7 +3,7 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'attachment_nodes.dart';
-import 'ot_document_codec.dart';
+import 'note_document_codec.dart';
 
 class OperationRequestData {
   final String operationId;
@@ -34,7 +34,7 @@ class _BlockMirror {
 class EditorOperationCapture {
   final MutableDocument _document;
   final String Function() _generateOpId;
-  final OtDocumentCodec _codec;
+  final NoteDocumentCodec _codec;
   final void Function(List<OperationRequestData> requests)
   _onOperationsCaptured;
 
@@ -46,7 +46,7 @@ class EditorOperationCapture {
   EditorOperationCapture({
     required MutableDocument document,
     required String Function() generateOpId,
-    required OtDocumentCodec codec,
+    required NoteDocumentCodec codec,
     required void Function(List<OperationRequestData> requests)
     onOperationsCaptured,
   }) : _document = document,
@@ -91,7 +91,8 @@ class EditorOperationCapture {
         meta = Map<String, dynamic>.from(node.metadata);
       } else if (node is TaskNode) {
         bType = 'task';
-        meta = {'isCompleted': node.isComplete, ...node.metadata};
+        meta = Map<String, dynamic>.from(node.metadata)
+          ..['isCompleted'] = node.isComplete;
       } else if (node is ListItemNode) {
         bType = node.type == ListItemType.ordered
             ? 'orderedList'
@@ -210,7 +211,8 @@ class EditorOperationCapture {
         currentMeta = Map<String, dynamic>.from(node.metadata);
       } else if (node is TaskNode) {
         currentBType = 'task';
-        currentMeta = {'isCompleted': node.isComplete, ...node.metadata};
+        currentMeta = Map<String, dynamic>.from(node.metadata)
+          ..['isCompleted'] = node.isComplete;
       } else if (node is ListItemNode) {
         currentBType = node.type == ListItemType.ordered
             ? 'orderedList'

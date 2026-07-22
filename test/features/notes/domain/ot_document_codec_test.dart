@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'dart:convert';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/domain/ot_document_codec.dart';
+import 'package:supanotes/features/notes/domain/note_document_codec.dart';
 
 void main() {
   group('OtDocumentCodec Delta Suffix & Attribution Tests', () {
-    const codec = OtDocumentCodec();
+    const codec = NoteDocumentCodec();
 
     test(
       'retains unconsumed source text suffix after mid-text insert delta',

@@ -2,11 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/domain/editor_operation_capture.dart';
-import 'package:supanotes/features/notes/domain/ot_document_codec.dart';
+import 'package:supanotes/features/notes/domain/note_document_codec.dart';
 
 void main() {
   group('EditorOperationCapture Formatting & Attributed Text Tests', () {
-    const codec = OtDocumentCodec();
+    const codec = NoteDocumentCodec();
 
     test('captures bold formatting change on identical text', () {
       final doc = MutableDocument(
@@ -49,7 +49,7 @@ void main() {
       expect(textDeltaOp.blockId, 'n1');
 
       final opsList = textDeltaOp.payload['ops'] as List<dynamic>;
-      expect(opsList.first['retain'], 5);
+      expect(opsList.first['retain'], 4);
       expect(opsList.first['attributes'], {'bold': true});
     });
 
@@ -201,6 +201,49 @@ void main() {
       expect(reopenOp.payload['taskId'], 't1');
       expect(reopenOp.payload['scheduledAt'], schedAt);
       expect(reopenOp.payload['completedAt'], null);
+    });
+
+    test('captures non-recurring task completion despite stale metadata', () {
+      final doc = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 't1',
+            text: AttributedText('Task'),
+            isComplete: false,
+            metadata: {'isCompleted': false},
+          ),
+        ],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      final capture = EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-1',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      );
+      capture.start();
+
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 't1',
+          newNode: TaskNode(
+            id: 't1',
+            text: AttributedText('Task'),
+            isComplete: true,
+            metadata: {'isCompleted': false},
+          ),
+        ),
+      ]);
+
+      final operation = capturedOps.singleWhere(
+        (op) => op.kind == 'set_block_metadata',
+      );
+      final metadata = operation.payload['metadata'] as Map<String, dynamic>;
+      expect(metadata['isCompleted'], true);
     });
   });
 }

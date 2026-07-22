@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
-import 'package:supanotes/features/notes/data/note_operations_api.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
@@ -11,11 +11,11 @@ class MockResponse<T> extends Mock implements Response<T> {}
 
 void main() {
   late MockApiClient apiClient;
-  late NoteOperationsApiClient noteApi;
+  late NoteSyncClient noteApi;
 
   setUp(() {
     apiClient = MockApiClient();
-    noteApi = NoteOperationsApiClient(client: apiClient);
+    noteApi = NoteSyncClient(client: apiClient);
   });
 
   group('getDocument', () {

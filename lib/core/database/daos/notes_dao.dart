@@ -253,6 +253,22 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     await (update(notes)..where((t) => t.id.equals(note.id.value))).write(note);
   }
 
+  /// Updates content, excerpt and updatedAt for a projected note in SQLite.
+  Future<void> updateNoteProjection({
+    required String id,
+    required String content,
+    String? excerpt,
+  }) async {
+    final now = DateTime.now();
+    await (update(notes)..where((t) => t.id.equals(id))).write(
+      NotesCompanion(
+        content: Value(content),
+        excerpt: Value(excerpt),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
   /// Marks [id] as soft-deleted (sets [NotesTable.deletedAt] to "now" and
   /// flips [NotesTable.isDirty] on so the next sync round propagates the
   /// tombstone). The row stays in the table — sync is the only thing that

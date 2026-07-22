@@ -22,7 +22,7 @@ import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
-import 'package:supanotes/features/notes/data/note_operations_api.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
 
 // ---------------------------------------------------------------------------
 // API client
@@ -94,12 +94,12 @@ final noteOperationsDaoProvider = Provider.autoDispose<NoteOperationsDao>((ref) 
 });
 
 // ---------------------------------------------------------------------------
-// Note operations API client
+// Note sync client
 // ---------------------------------------------------------------------------
 
-final noteOperationsApiClientProvider = Provider.autoDispose<NoteOperationsApiClient>(
+final noteSyncClientProvider = Provider.autoDispose<NoteSyncClient>(
   (ref) {
-    return NoteOperationsApiClient(client: ref.watch(apiClientProvider));
+    return NoteSyncClient(client: ref.watch(apiClientProvider));
   },
 );
 
@@ -116,7 +116,7 @@ final noteOperationsSyncServiceProvider =
     prefs.setString('note_ops_client_id', clientId);
   }
   return NoteOperationsSyncService(
-    api: ref.watch(noteOperationsApiClientProvider),
+    syncClient: ref.watch(noteSyncClientProvider),
     dao: ref.watch(noteOperationsDaoProvider),
     clientId: clientId,
     actorId: ref.watch(currentUserIdProvider)!,

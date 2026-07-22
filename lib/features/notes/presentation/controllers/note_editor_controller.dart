@@ -7,9 +7,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
-import 'package:supanotes/features/notes/domain/editor_document_sync_manager.dart';
-import 'package:supanotes/features/notes/domain/node_codec.dart';
-import 'package:supanotes/features/notes/domain/note_operation_adapter.dart';
+import 'package:supanotes/features/notes/domain/note_document_codec.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -32,37 +30,19 @@ class NoteEditorController extends ChangeNotifier {
   MutableDocumentComposer? composer;
   final FocusNode focusNode = FocusNode();
   void Function(bool)? onHasContentChanged;
-  Future<void> Function(MutableDocument document)? onProjectLocal;
-  Future<void> _projectionTail = Future.value();
 
-  EditorDocumentSyncManager? _coordinator;
-  NoteOperationAdapter? operationAdapter;
   String? _noteId;
 
   bool get hasDocument => document != null;
 
   void initOtOnly({required String noteId}) {
-    document = NodeCodec.documentFromNodes([]);
+    document = NoteDocumentCodec.documentFromNodes([]);
     _noteId = noteId;
     _setupEditor();
-    _coordinator = EditorDocumentSyncManager(
-      document: document!,
-      editor: editor!,
-    );
-    document!.addListener(_onDocChanged);
     notifyListeners();
   }
 
-  void _onDocChanged(DocumentChangeLog _) {
-    onHasContentChanged?.call(document != null && document!.isNotEmpty);
-    final projector = onProjectLocal;
-    final currentDocument = document;
-    if (projector != null && currentDocument != null) {
-      _projectionTail = _projectionTail.then((_) => projector(currentDocument));
-    }
-  }
-
-  TaskCompletionResult? completeTaskInYDoc(
+  TaskCompletionResult? completeTaskInEditor(
     String nodeId, {
     DateTime? now,
     DateTime? scheduledAt,
@@ -121,7 +101,7 @@ class NoteEditorController extends ChangeNotifier {
     return null;
   }
 
-  void reopenTaskInYDoc(
+  void reopenTaskInEditor(
     String nodeId, {
     DateTime? previousDue,
     DateTime? scheduledAt,
@@ -152,7 +132,7 @@ class NoteEditorController extends ChangeNotifier {
     }
   }
 
-  void updateTaskMetadataInYDoc(
+  void updateTaskMetadataInEditor(
     String nodeId, {
     DateTime? dueDate,
     String? recurrence,
@@ -268,23 +248,13 @@ class NoteEditorController extends ChangeNotifier {
     });
   }
 
-  void suspendSync() {
-    _coordinator?.suspendSync();
-  }
+  void suspendSync() {}
 
-  void resumeSync() {
-    _coordinator?.resumeSync();
-  }
+  void resumeSync() {}
 
   @override
   Future<void> dispose() async {
-    document?.removeListener(_onDocChanged);
     onHasContentChanged = null;
-    onProjectLocal = null;
-    await _projectionTail;
-    await operationAdapter?.flushNow();
-    operationAdapter?.dispose();
-    await _coordinator?.dispose();
     editor?.dispose();
     document?.dispose();
     composer?.dispose();

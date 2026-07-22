@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
-
 import 'package:supanotes/core/api/api_client.dart';
+import 'package:supanotes/features/notes/domain/note_sync_session.dart';
 
 class NoteDocumentResponse {
   final String noteId;
@@ -203,10 +204,10 @@ class NoteOperationsException implements Exception {
   String toString() => 'NoteOperationsException($errorCode): $message';
 }
 
-class NoteOperationsApiClient {
+class NoteSyncClient {
   final ApiClient _client;
 
-  NoteOperationsApiClient({required ApiClient client}) : _client = client;
+  NoteSyncClient({required ApiClient client}) : _client = client;
 
   Future<NoteDocumentResponse> getDocument(String noteId) async {
     try {
@@ -219,6 +220,10 @@ class NoteOperationsApiClient {
     } on DioException catch (e) {
       throw _mapError(e);
     }
+  }
+
+  Future<NoteDocumentResponse?> fetchDocument(String noteId) async {
+    return getDocument(noteId);
   }
 
   Future<List<Map<String, dynamic>>> listNotes() async {
@@ -262,6 +267,10 @@ class NoteOperationsApiClient {
     } on DioException catch (e) {
       throw _mapError(e);
     }
+  }
+
+  bool isNoteActiveLocally(String noteId) {
+    return NoteSyncSession.isActive(noteId);
   }
 
   NoteOperationsException _mapError(DioException e) {

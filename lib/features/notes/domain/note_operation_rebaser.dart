@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/data/note_operations_api.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
 
 class NoteOp {
   final String operationId;

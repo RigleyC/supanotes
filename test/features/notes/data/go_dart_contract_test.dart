@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/features/notes/data/note_operations_api.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
-import 'package:supanotes/features/notes/domain/ot_document_codec.dart';
+import 'package:supanotes/features/notes/domain/note_document_codec.dart';
 
 void main() {
   group('Go-to-Dart Contract Integration Test', () {
-    const codec = OtDocumentCodec();
+    const codec = NoteDocumentCodec();
 
     test('deserializes Go document snapshot with task, attachment, divider and metadata', () {
       // Representation matching Go backend json.Marshal(Document)

@@ -6,10 +6,10 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_operations_api.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
 import 'document_projection_applier.dart';
 import 'editor_operation_capture.dart';
-import 'ot_document_codec.dart';
+import 'note_document_codec.dart';
 
 class _RebuildRequest {
   final Map<String, dynamic> snapshot;
@@ -23,7 +23,7 @@ class NoteOperationAdapter {
     required NoteOperationsSyncService syncService,
     required String noteId,
     required Editor editor,
-    OtDocumentCodec codec = const OtDocumentCodec(),
+    NoteDocumentCodec codec = const NoteDocumentCodec(),
   }) : _syncService = syncService,
        _noteId = noteId,
        _codec = codec {
@@ -42,7 +42,7 @@ class NoteOperationAdapter {
 
   final NoteOperationsSyncService _syncService;
   final String _noteId;
-  final OtDocumentCodec _codec;
+  final NoteDocumentCodec _codec;
 
   late final DocumentProjectionApplier _applier;
   late final EditorOperationCapture _capture;
