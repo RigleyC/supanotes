@@ -12,17 +12,17 @@ import 'shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
 import 'core/router/app_router.dart';
 
-
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:timezone/data/latest.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
+import 'package:supanotes/features/notes/data/note_catalog_sync.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initializeTimeZones();
-  
+
   try {
     final timeZone = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(timeZone.identifier));
@@ -33,9 +33,7 @@ void main() async {
   final sharedPreferences = await SharedPreferences.getInstance();
 
   final container = ProviderContainer(
-    overrides: [
-      sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-    ],
+    overrides: [sharedPreferencesProvider.overrideWithValue(sharedPreferences)],
   );
 
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
@@ -59,8 +57,13 @@ class SupaNotesApp extends ConsumerWidget {
     // We must listen to it (not just read) so Riverpod keeps it active and
     // forces it to rebuild when its internal dependencies (like auth) change.
     ref.listen(taskNotificationSchedulerProvider, (_, _) {});
-
-
+    ref.listen(noteCatalogSyncProvider, (_, next) {
+      next.whenOrNull(
+        error: (error, _) {
+          debugPrint('Note catalog sync failed: $error');
+        },
+      );
+    });
 
     final router = ref.watch(goRouterProvider);
 
@@ -73,10 +76,7 @@ class SupaNotesApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('pt', 'BR'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('pt', 'BR'), Locale('en', 'US')],
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       builder: (context, child) {
@@ -86,10 +86,7 @@ class SupaNotesApp extends ConsumerWidget {
           final themeData = brightness == Brightness.dark
               ? AppTheme.darkTheme
               : AppTheme.lightTheme;
-          result = Theme(
-            data: themeData,
-            child: result,
-          );
+          result = Theme(data: themeData, child: result);
         }
         result = SnackOverlay(child: result);
         return result;
