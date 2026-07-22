@@ -20,11 +20,11 @@ class NoteSyncSession {
     required MutableDocument document,
     required Editor editor,
   }) : adapter = NoteOperationAdapter(
-          document: document,
-          syncService: syncService,
-          noteId: noteId,
-          editor: editor,
-        );
+         document: document,
+         syncService: syncService,
+         noteId: noteId,
+         editor: editor,
+       );
 
   Future<void> start() async {
     adapter.onLocalOperations = (_) {
@@ -56,7 +56,7 @@ class NoteSyncSession {
   }
 
   void _startPolling() {
-    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
       if (_disposed || _isPolling) return;
       _isPolling = true;
       try {

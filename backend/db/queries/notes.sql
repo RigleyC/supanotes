@@ -39,7 +39,7 @@ SELECT
   n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
   n.collapse_images,
-  NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
+  COALESCE(NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
@@ -57,7 +57,7 @@ SELECT
   n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
   n.collapse_images,
-  NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
+  COALESCE(NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n
