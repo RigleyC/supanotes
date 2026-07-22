@@ -10,12 +10,7 @@ void main() {
 
     test('captures bold formatting change on identical text', () {
       final doc = MutableDocument(
-        nodes: [
-          ParagraphNode(
-            id: 'n1',
-            text: AttributedText('Hello World'),
-          ),
-        ],
+        nodes: [ParagraphNode(id: 'n1', text: AttributedText('Hello World'))],
       );
       final editor = createDefaultDocumentEditor(
         document: doc,
@@ -48,12 +43,49 @@ void main() {
       ]);
 
       expect(capturedOps.isNotEmpty, true);
-      final textDeltaOp = capturedOps.firstWhere((op) => op.kind == 'text_delta');
+      final textDeltaOp = capturedOps.firstWhere(
+        (op) => op.kind == 'text_delta',
+      );
       expect(textDeltaOp.blockId, 'n1');
 
       final opsList = textDeltaOp.payload['ops'] as List<dynamic>;
       expect(opsList.first['retain'], 5);
       expect(opsList.first['attributes'], {'bold': true});
+    });
+
+    test('does not emit formatting changes with a text insertion', () {
+      final oldSpans = AttributedSpans()
+        ..addAttribution(newAttribution: boldAttribution, start: 0, end: 4);
+      final doc = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'n1', text: AttributedText('Hello', oldSpans)),
+        ],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      final capture = EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-1',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      );
+      capture.start();
+
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 'n1',
+          newNode: ParagraphNode(id: 'n1', text: AttributedText('Hello!')),
+        ),
+      ]);
+
+      final ops = capturedOps.single.payload['ops'] as List<dynamic>;
+      expect(ops, [
+        {'retain': 5},
+        {'insert': '!'},
+      ]);
     });
 
     test('emits complete_task_occurrence on task completion and reopening', () {
@@ -104,7 +136,9 @@ void main() {
 
       expect(capturedOps.isNotEmpty, true);
       expect(capturedOps.any((op) => op.kind == 'set_block_metadata'), false);
-      final occurrenceOp = capturedOps.firstWhere((op) => op.kind == 'complete_task_occurrence');
+      final occurrenceOp = capturedOps.firstWhere(
+        (op) => op.kind == 'complete_task_occurrence',
+      );
       expect(occurrenceOp.payload['taskId'], 't1');
       expect(occurrenceOp.payload['scheduledAt'], schedAt);
       expect(occurrenceOp.payload['completedAt'], compAt);
@@ -119,16 +153,15 @@ void main() {
             id: 't1',
             text: AttributedText('Recurring Task'),
             isComplete: false,
-            metadata: {
-              'recurrenceRule': 'FREQ=DAILY',
-              'completions': {},
-            },
+            metadata: {'recurrenceRule': 'FREQ=DAILY', 'completions': {}},
           ),
         ),
       ]);
 
       expect(capturedOps.isNotEmpty, true);
-      final reopenOp = capturedOps.firstWhere((op) => op.kind == 'complete_task_occurrence');
+      final reopenOp = capturedOps.firstWhere(
+        (op) => op.kind == 'complete_task_occurrence',
+      );
       expect(reopenOp.payload['taskId'], 't1');
       expect(reopenOp.payload['scheduledAt'], schedAt);
       expect(reopenOp.payload['completedAt'], null);

@@ -126,6 +126,13 @@ class EditorOperationCapture {
     final currentNodes = _document.toList();
     final currentIds = currentNodes.map((n) => n.id).toList();
 
+    if (currentNodes.any(
+      (node) => node is TextNode && _hasComposingAttribution(node.text),
+    )) {
+      NoteSyncDebug.log('capture.deferred_composing');
+      return;
+    }
+
     // 1. Deleted blocks
     final deletedIds = _orderedNodeIds
         .where((id) => !currentIds.contains(id))
@@ -390,31 +397,10 @@ class EditorOperationCapture {
 
     final ops = <Map<String, dynamic>>[];
 
-    // Retain prefix
+    // A text edit must not also rewrite attributes in unchanged text. IMEs
+    // can transiently change those attributes while they compose input.
     if (prefixLen > 0) {
-      int pPos = 0;
-      while (pPos < prefixLen) {
-        final oldAttrs = _getAttributionsAt(oldText, pPos);
-        final newAttrs = _getAttributionsAt(newText, pPos);
-        final attrDiff = _diffAttributes(oldAttrs, newAttrs);
-
-        int runEnd = pPos + 1;
-        while (runEnd < prefixLen) {
-          final nextOld = _getAttributionsAt(oldText, runEnd);
-          final nextNew = _getAttributionsAt(newText, runEnd);
-          final nextDiff = _diffAttributes(nextOld, nextNew);
-          if (!mapEquals(attrDiff, nextDiff)) break;
-          runEnd++;
-        }
-
-        final retainLength = runEnd - pPos;
-        final op = <String, dynamic>{'retain': retainLength};
-        if (attrDiff.isNotEmpty) {
-          op['attributes'] = attrDiff;
-        }
-        ops.add(op);
-        pPos = runEnd;
-      }
+      ops.add({'retain': prefixLen});
     }
 
     // Delete
@@ -447,6 +433,14 @@ class EditorOperationCapture {
       }
     }
     return attrs;
+  }
+
+  bool _hasComposingAttribution(AttributedText text) {
+    return text.spans.markers.any(
+      (marker) =>
+          marker.markerType == SpanMarkerType.start &&
+          marker.attribution.id == 'composing',
+    );
   }
 
   Map<String, dynamic> _diffAttributes(
