@@ -289,24 +289,20 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   ) +
                   _taskCheckboxTouchTarget +
                   _taskCheckboxGap,
-              child: OverflowBox(
-                minHeight: _taskCheckboxTouchTarget,
-                maxHeight: _taskCheckboxTouchTarget,
-                alignment: Alignment.topLeft,
-                child: Semantics(
-                  button: true,
-                  checked: _isComplete,
-                  enabled: !_isUpdatingCompletion,
-                  label: _isComplete
-                      ? 'Marcar tarefa como pendente'
-                      : 'Concluir tarefa',
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _isUpdatingCompletion ? null : _onCheckboxTap,
-                    child: Container(
-                      width: _taskCheckboxTouchTarget,
-                      height: _taskCheckboxTouchTarget,
-                      alignment: Alignment.centerLeft,
+              height: 24.0,
+              child: Semantics(
+                button: true,
+                checked: _isComplete,
+                enabled: !_isUpdatingCompletion,
+                label: _isComplete
+                    ? 'Marcar tarefa como pendente'
+                    : 'Concluir tarefa',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _isUpdatingCompletion ? null : _onCheckboxTap,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
                       padding: const EdgeInsets.only(left: 11),
                       child: AppTaskCheckbox(
                         value: _isComplete,
