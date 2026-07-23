@@ -123,7 +123,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
             ),
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.sm,
-              vertical: 6,
+              vertical: 8,
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
