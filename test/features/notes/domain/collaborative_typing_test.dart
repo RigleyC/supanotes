@@ -84,198 +84,201 @@ void main() {
       return buffer.toString();
     }
 
-    test('Duas pessoas digitando simultaneamente no mesmo ponto da nota preservam todas as palavras', () {
-      // Texto inicial da nota compartilhada: "Nota compartilhada:"
-      const initialText = 'Nota compartilhada:';
-      const blockId = 'block-header';
+    test(
+      'Duas pessoas digitando simultaneamente no mesmo ponto da nota preservam todas as palavras',
+      () {
+        // Texto inicial da nota compartilhada: "Nota compartilhada:"
+        const initialText = 'Nota compartilhada:';
+        const blockId = 'block-header';
 
-      // Pessoa 1 digita " ABACAXI" no final (índice 19)
-      final opPessoa1 = makePending(
-        operationId: 'op-p1',
-        blockId: blockId,
-        ops: [
-          {'retain': 19},
-          {'insert': ' ABACAXI'},
-        ],
-      );
+        // Pessoa 1 digita " ABACAXI" no final (índice 19)
+        final opPessoa1 = makePending(
+          operationId: 'op-p1',
+          blockId: blockId,
+          ops: [
+            {'retain': 19},
+            {'insert': ' ABACAXI'},
+          ],
+        );
 
-      // Pessoa 2 digita " BANANA" simultaneamente no mesmo índice 19
-      final opPessoa2 = makePending(
-        operationId: 'op-p2',
-        blockId: blockId,
-        ops: [
-          {'retain': 19},
-          {'insert': ' BANANA'},
-        ],
-      );
+        // A operacao da Pessoa 2 chega ao servidor primeiro (Revision 1)
+        final remoteOpPessoa2 = makeRemote(
+          operationId: 'op-p2',
+          actorId: 'user-2',
+          blockId: blockId,
+          ops: [
+            {'retain': 19},
+            {'insert': ' BANANA'},
+          ],
+          revision: 1,
+        );
 
-      // A operacao da Pessoa 2 chega ao servidor primeiro (Revision 1)
-      final remoteOpPessoa2 = makeRemote(
-        operationId: 'op-p2',
-        actorId: 'user-2',
-        blockId: blockId,
-        ops: [
-          {'retain': 19},
-          {'insert': ' BANANA'},
-        ],
-        revision: 1,
-      );
+        // Pessoa 1 recebe a operacao remota da Pessoa 2 e faz o rebase da sua operacao pendente
+        final rebasedPessoa1 = rebaserUser1.rebase(
+          pending: [opPessoa1],
+          remote: [remoteOpPessoa2],
+          finalRevision: 1,
+        );
 
-      // Pessoa 1 recebe a operacao remota da Pessoa 2 e faz o rebase da sua operacao pendente
-      final rebasedPessoa1 = rebaserUser1.rebase(
-        pending: [opPessoa1],
-        remote: [remoteOpPessoa2],
-        finalRevision: 1,
-      );
+        expect(rebasedPessoa1.length, 1);
+        final opsRebasedPessoa1 =
+            (jsonDecode(rebasedPessoa1[0].payloadJson)['ops'] as List);
 
-      expect(rebasedPessoa1.length, 1);
-      final opsRebasedPessoa1 = (jsonDecode(rebasedPessoa1[0].payloadJson)['ops'] as List);
+        // Aplica as edicoes ao documento inicial:
+        var docDelta = quill.Delta()..insert(initialText);
 
-      // Aplica as edicoes ao documento inicial:
-      var docDelta = quill.Delta()..insert(initialText);
+        // 1. Aplica alteracao da Pessoa 2
+        final deltaP2 = deltaFromOps(remoteOpPessoa2.payload['ops'] as List);
+        docDelta = docDelta.compose(deltaP2);
 
-      // 1. Aplica alteracao da Pessoa 2
-      final deltaP2 = deltaFromOps(remoteOpPessoa2.payload['ops'] as List);
-      docDelta = docDelta.compose(deltaP2);
+        // 2. Aplica alteracao rebaseada da Pessoa 1
+        final deltaP1Rebased = deltaFromOps(opsRebasedPessoa1);
+        docDelta = docDelta.compose(deltaP1Rebased);
 
-      // 2. Aplica alteracao rebaseada da Pessoa 1
-      final deltaP1Rebased = deltaFromOps(opsRebasedPessoa1);
-      docDelta = docDelta.compose(deltaP1Rebased);
+        final finalText = deltaToPlainText(docDelta);
 
-      final finalText = deltaToPlainText(docDelta);
+        // Verifica se AMBAS as palavras "ABACAXI" e "BANANA" estao presentes e inteiras sem corrupcao
+        expect(
+          finalText.contains('ABACAXI'),
+          isTrue,
+          reason: 'Palavra da Pessoa 1 deve ser preservada na integra',
+        );
+        expect(
+          finalText.contains('BANANA'),
+          isTrue,
+          reason: 'Palavra da Pessoa 2 deve ser preservada na integra',
+        );
+        expect(finalText, equals('Nota compartilhada: BANANA ABACAXI'));
+      },
+    );
 
-      // Verifica se AMBAS as palavras "ABACAXI" e "BANANA" estao presentes e inteiras sem corrupcao
-      expect(finalText.contains('ABACAXI'), isTrue, reason: 'Palavra da Pessoa 1 deve ser preservada na integra');
-      expect(finalText.contains('BANANA'), isTrue, reason: 'Palavra da Pessoa 2 deve ser preservada na integra');
-      expect(finalText, equals('Nota compartilhada: BANANA ABACAXI'));
-    });
+    test(
+      'Duas pessoas digitando simultaneamente em posicoes diferentes da nota',
+      () {
+        // Texto inicial: "O rato roeu a roupa do rei de Roma"
+        const initialText = 'O rato roeu a roupa do rei de Roma';
+        const blockId = 'block-body';
 
-    test('Duas pessoas digitando simultaneamente em posicoes diferentes da nota', () {
-      // Texto inicial: "O rato roeu a roupa do rei de Roma"
-      const initialText = 'O rato roeu a roupa do rei de Roma';
-      const blockId = 'block-body';
+        final posRato =
+            initialText.indexOf('rato') +
+            'rato'.length; // Posicao logo apos "rato" (index 6)
+        final posRoma = initialText.indexOf(
+          'Roma',
+        ); // Posicao antes de "Roma" (index 30)
 
-      final posRato = initialText.indexOf('rato') + 'rato'.length; // Posicao logo apos "rato" (index 6)
-      final posRoma = initialText.indexOf('Roma'); // Posicao antes de "Roma" (index 30)
+        // Pessoa 2 insere "muito " antes de "Roma"
+        final opPessoa2 = makePending(
+          operationId: 'op-p2-diff',
+          blockId: blockId,
+          ops: [
+            {'retain': posRoma},
+            {'insert': 'muito '},
+          ],
+        );
 
-      // Pessoa 1 insere " grande" apos "rato"
-      final opPessoa1 = makePending(
-        operationId: 'op-p1-diff',
-        blockId: blockId,
-        ops: [
-          {'retain': posRato},
-          {'insert': ' grande'},
-        ],
-      );
+        final remoteOpPessoa1 = makeRemote(
+          operationId: 'op-p1-diff',
+          actorId: 'user-1',
+          blockId: blockId,
+          ops: [
+            {'retain': posRato},
+            {'insert': ' grande'},
+          ],
+          revision: 1,
+        );
 
-      // Pessoa 2 insere "muito " antes de "Roma"
-      final opPessoa2 = makePending(
-        operationId: 'op-p2-diff',
-        blockId: blockId,
-        ops: [
-          {'retain': posRoma},
-          {'insert': 'muito '},
-        ],
-      );
+        // Pessoa 2 rebaseia sua edicao em relacao a Pessoa 1
+        final rebasedPessoa2 = rebaserUser2.rebase(
+          pending: [opPessoa2],
+          remote: [remoteOpPessoa1],
+          finalRevision: 1,
+        );
 
-      final remoteOpPessoa1 = makeRemote(
-        operationId: 'op-p1-diff',
-        actorId: 'user-1',
-        blockId: blockId,
-        ops: [
-          {'retain': posRato},
-          {'insert': ' grande'},
-        ],
-        revision: 1,
-      );
+        final opsRebasedPessoa2 =
+            (jsonDecode(rebasedPessoa2[0].payloadJson)['ops'] as List);
 
-      // Pessoa 2 rebaseia sua edicao em relacao a Pessoa 1
-      final rebasedPessoa2 = rebaserUser2.rebase(
-        pending: [opPessoa2],
-        remote: [remoteOpPessoa1],
-        finalRevision: 1,
-      );
+        // O retain da Pessoa 2 deve ter sido deslocado de 30 para 30 + length(" grande") = 37
+        expect(
+          opsRebasedPessoa2[0]['retain'],
+          equals(posRoma + ' grande'.length),
+        );
 
-      final opsRebasedPessoa2 = (jsonDecode(rebasedPessoa2[0].payloadJson)['ops'] as List);
+        // Aplica as edicoes na ordem de resolucao
+        var docDelta = quill.Delta()..insert(initialText);
+        docDelta = docDelta.compose(
+          deltaFromOps(remoteOpPessoa1.payload['ops'] as List),
+        );
+        docDelta = docDelta.compose(deltaFromOps(opsRebasedPessoa2));
 
-      // O retain da Pessoa 2 deve ter sido deslocado de 30 para 30 + length(" grande") = 37
-      expect(opsRebasedPessoa2[0]['retain'], equals(posRoma + ' grande'.length));
+        final finalText = deltaToPlainText(docDelta);
 
-      // Aplica as edicoes na ordem de resolucao
-      var docDelta = quill.Delta()..insert(initialText);
-      docDelta = docDelta.compose(deltaFromOps(remoteOpPessoa1.payload['ops'] as List));
-      docDelta = docDelta.compose(deltaFromOps(opsRebasedPessoa2));
+        expect(finalText.contains('rato grande'), isTrue);
+        expect(finalText.contains('muito Roma'), isTrue);
+        expect(
+          finalText,
+          equals('O rato grande roeu a roupa do rei de muito Roma'),
+        );
+      },
+    );
 
-      final finalText = deltaToPlainText(docDelta);
+    test(
+      'Uma pessoa substituindo texto enquanto outra digita simultaneamente',
+      () {
+        // Texto inicial: "Texto antigo na nota"
+        const initialText = 'Texto antigo na nota';
+        const blockId = 'block-replace';
 
-      expect(finalText.contains('rato grande'), isTrue);
-      expect(finalText.contains('muito Roma'), isTrue);
-      expect(finalText, equals('O rato grande roeu a roupa do rei de muito Roma'));
-    });
+        final posAntigo = initialText.indexOf('antigo'); // index 6
 
-    test('Uma pessoa substituindo texto enquanto outra digita simultaneamente', () {
-      // Texto inicial: "Texto antigo na nota"
-      const initialText = 'Texto antigo na nota';
-      const blockId = 'block-replace';
+        final posFinal = initialText.length; // index 20 (final da nota)
 
-      final posAntigo = initialText.indexOf('antigo'); // index 6
+        // Pessoa 2 digita " incrível" no final simultaneamente
+        final opPessoa2 = makePending(
+          operationId: 'op-p2-replace',
+          blockId: blockId,
+          ops: [
+            {'retain': posFinal},
+            {'insert': ' incrível'},
+          ],
+        );
 
-      // Pessoa 1 substitui "antigo" por "novo" (retain 6, delete 6, insert "novo")
-      final opPessoa1 = makePending(
-        operationId: 'op-p1-replace',
-        blockId: blockId,
-        ops: [
-          {'retain': posAntigo},
-          {'delete': 6},
-          {'insert': 'novo'},
-        ],
-      );
+        final remoteOpPessoa1 = makeRemote(
+          operationId: 'op-p1-replace',
+          actorId: 'user-1',
+          blockId: blockId,
+          ops: [
+            {'retain': posAntigo},
+            {'delete': 6},
+            {'insert': 'novo'},
+          ],
+          revision: 1,
+        );
 
-      final posFinal = initialText.length; // index 20 (final da nota)
+        // Pessoa 2 rebaseia sua operacao remota da Pessoa 1
+        final rebasedPessoa2 = rebaserUser2.rebase(
+          pending: [opPessoa2],
+          remote: [remoteOpPessoa1],
+          finalRevision: 1,
+        );
 
-      // Pessoa 2 digita " incrível" no final simultaneamente
-      final opPessoa2 = makePending(
-        operationId: 'op-p2-replace',
-        blockId: blockId,
-        ops: [
-          {'retain': posFinal},
-          {'insert': ' incrível'},
-        ],
-      );
+        final opsRebasedPessoa2 =
+            (jsonDecode(rebasedPessoa2[0].payloadJson)['ops'] as List);
 
-      final remoteOpPessoa1 = makeRemote(
-        operationId: 'op-p1-replace',
-        actorId: 'user-1',
-        blockId: blockId,
-        ops: [
-          {'retain': posAntigo},
-          {'delete': 6},
-          {'insert': 'novo'},
-        ],
-        revision: 1,
-      );
+        // O retain da Pessoa 2 desloca: -6 (delete) + 4 (insert "novo") = -2
+        // retain inicial era 20 -> passa a ser 18
+        expect(opsRebasedPessoa2[0]['retain'], equals(posFinal - 2));
 
-      // Pessoa 2 rebaseia sua operacao remota da Pessoa 1
-      final rebasedPessoa2 = rebaserUser2.rebase(
-        pending: [opPessoa2],
-        remote: [remoteOpPessoa1],
-        finalRevision: 1,
-      );
+        // Aplica as edicoes na ordem de resolucao
+        var docDelta = quill.Delta()..insert(initialText);
+        docDelta = docDelta.compose(
+          deltaFromOps(remoteOpPessoa1.payload['ops'] as List),
+        );
+        docDelta = docDelta.compose(deltaFromOps(opsRebasedPessoa2));
 
-      final opsRebasedPessoa2 = (jsonDecode(rebasedPessoa2[0].payloadJson)['ops'] as List);
+        final finalText = deltaToPlainText(docDelta);
 
-      // O retain da Pessoa 2 desloca: -6 (delete) + 4 (insert "novo") = -2
-      // retain inicial era 20 -> passa a ser 18
-      expect(opsRebasedPessoa2[0]['retain'], equals(posFinal - 2));
-
-      // Aplica as edicoes na ordem de resolucao
-      var docDelta = quill.Delta()..insert(initialText);
-      docDelta = docDelta.compose(deltaFromOps(remoteOpPessoa1.payload['ops'] as List));
-      docDelta = docDelta.compose(deltaFromOps(opsRebasedPessoa2));
-
-      final finalText = deltaToPlainText(docDelta);
-
-      expect(finalText, equals('Texto novo na nota incrível'));
-    });
+        expect(finalText, equals('Texto novo na nota incrível'));
+      },
+    );
   });
 }

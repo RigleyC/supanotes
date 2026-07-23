@@ -102,9 +102,9 @@ class NoteDocumentCodec {
     }
     if (node is HorizontalRuleNode) {
       final dividerIndex = node.metadata['dividerIndex'];
-      return <String, dynamic>{
-        if (dividerIndex != null) 'dividerIndex': dividerIndex,
-      };
+      return dividerIndex == null
+          ? <String, dynamic>{}
+          : <String, dynamic>{'dividerIndex': dividerIndex};
     }
     if (node is DocumentAttachmentNode) {
       return {'id': node.id};
@@ -169,13 +169,11 @@ class NoteDocumentCodec {
     }
     if (type == 'divider') {
       final dividerIndex = data['dividerIndex'] as int?;
-      return HorizontalRuleNode(
-        id: id,
-        metadata: {
-          if (dividerIndex != null) 'dividerIndex': dividerIndex,
-          ...data,
-        },
-      );
+      final metadata = Map<String, dynamic>.from(data);
+      if (dividerIndex != null) {
+        metadata['dividerIndex'] = dividerIndex;
+      }
+      return HorizontalRuleNode(id: id, metadata: metadata);
     }
     if (type == 'corrupted') {
       return ParagraphNode(
