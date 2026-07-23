@@ -28,9 +28,7 @@ void main() {
   group('selectedNodes', () {
     test('returns the node at caret for collapsed selection', () {
       final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('Hello')),
-        ],
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
       );
       final selection = caretSelection('node-1');
 
@@ -81,7 +79,11 @@ void main() {
         composer: composer,
       );
 
-      NoteEditorCommands.toggleInlineAttribution(editor, composer, boldAttribution);
+      NoteEditorCommands.toggleInlineAttribution(
+        editor,
+        composer,
+        boldAttribution,
+      );
 
       final node = document.first as TextNode;
       final spans = node.text.getAttributionSpansInRange(
@@ -105,9 +107,7 @@ void main() {
   group('setBlockType', () {
     test('converts paragraph to H1', () {
       final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('Heading')),
-        ],
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Heading'))],
       );
       final composer = MutableDocumentComposer(
         initialSelection: caretSelection('node-1'),
@@ -172,14 +172,38 @@ void main() {
       final para = document.first as ParagraphNode;
       expect(para.getMetadataValue('blockType'), blockquoteAttribution);
     });
+
+    test('applies H1 to every selected node when the selection is mixed', () {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(
+            id: 'node-1',
+            text: AttributedText('Existing heading'),
+            metadata: {'blockType': header1Attribution},
+          ),
+          ParagraphNode(id: 'node-2', text: AttributedText('Paragraph')),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: rangeSelection('node-1', 'node-2'),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      NoteEditorCommands.setBlockType(editor, composer, header1Attribution);
+
+      for (final node in document.whereType<ParagraphNode>()) {
+        expect(node.getMetadataValue('blockType'), header1Attribution);
+      }
+    });
   });
 
   group('convertToListItem', () {
     test('converts paragraph to unordered list', () {
       final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('Item')),
-        ],
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Item'))],
       );
       final composer = MutableDocumentComposer(
         initialSelection: caretSelection('node-1'),
@@ -189,7 +213,11 @@ void main() {
         composer: composer,
       );
 
-      NoteEditorCommands.convertToListItem(editor, composer, ListItemType.unordered);
+      NoteEditorCommands.convertToListItem(
+        editor,
+        composer,
+        ListItemType.unordered,
+      );
 
       expect(document.first, isA<ListItemNode>());
       expect((document.first as ListItemNode).type, ListItemType.unordered);
@@ -213,7 +241,11 @@ void main() {
         composer: composer,
       );
 
-      NoteEditorCommands.convertToListItem(editor, composer, ListItemType.ordered);
+      NoteEditorCommands.convertToListItem(
+        editor,
+        composer,
+        ListItemType.ordered,
+      );
 
       expect(document.first, isA<ListItemNode>());
       expect((document.first as ListItemNode).type, ListItemType.ordered);
@@ -236,19 +268,54 @@ void main() {
         composer: composer,
       );
 
-      NoteEditorCommands.convertToListItem(editor, composer, ListItemType.ordered);
+      NoteEditorCommands.convertToListItem(
+        editor,
+        composer,
+        ListItemType.ordered,
+      );
 
       expect(document.first, isA<ListItemNode>());
       expect((document.first as ListItemNode).type, ListItemType.ordered);
     });
+
+    test(
+      'applies a list type to every selected node when the selection is mixed',
+      () {
+        final document = MutableDocument(
+          nodes: [
+            ListItemNode.unordered(id: 'node-1', text: AttributedText('List')),
+            ParagraphNode(id: 'node-2', text: AttributedText('Paragraph')),
+          ],
+        );
+        final composer = MutableDocumentComposer(
+          initialSelection: rangeSelection('node-1', 'node-2'),
+        );
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+        );
+
+        NoteEditorCommands.convertToListItem(
+          editor,
+          composer,
+          ListItemType.unordered,
+        );
+
+        expect(document.whereType<ListItemNode>(), hasLength(2));
+        expect(
+          document.whereType<ListItemNode>().every(
+            (node) => node.type == ListItemType.unordered,
+          ),
+          isTrue,
+        );
+      },
+    );
   });
 
   group('convertToTask', () {
     test('converts paragraph to task', () {
       final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('Buy milk')),
-        ],
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Buy milk'))],
       );
       final composer = MutableDocumentComposer(
         initialSelection: caretSelection('node-1'),
@@ -310,16 +377,40 @@ void main() {
       expect(document.first, isA<ParagraphNode>());
       expect((document.first as ParagraphNode).text.toPlainText(), 'Buy milk');
     });
+
+    test(
+      'converts every selected node to a task when the selection is mixed',
+      () {
+        final document = MutableDocument(
+          nodes: [
+            TaskNode(
+              id: 'node-1',
+              text: AttributedText('Existing task'),
+              isComplete: false,
+            ),
+            ParagraphNode(id: 'node-2', text: AttributedText('Paragraph')),
+          ],
+        );
+        final composer = MutableDocumentComposer(
+          initialSelection: rangeSelection('node-1', 'node-2'),
+        );
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+        );
+
+        NoteEditorCommands.convertToTask(editor, composer);
+
+        expect(document.whereType<TaskNode>(), hasLength(2));
+      },
+    );
   });
 
   group('indentListItems', () {
     test('indents a list item', () {
       final document = MutableDocument(
         nodes: [
-          ListItemNode.unordered(
-            id: 'node-1',
-            text: AttributedText('Item'),
-          ),
+          ListItemNode.unordered(id: 'node-1', text: AttributedText('Item')),
         ],
       );
       final composer = MutableDocumentComposer(
@@ -366,9 +457,7 @@ void main() {
   group('convertDividerShortcut', () {
     test('converts a paragraph that only contains dashes into a divider', () {
       final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('---')),
-        ],
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('---'))],
       );
       final composer = MutableDocumentComposer(
         initialSelection: DocumentSelection.collapsed(

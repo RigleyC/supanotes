@@ -20,7 +20,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
-class NoteToolbar extends StatelessWidget {
+class NoteToolbar extends StatefulWidget {
   const NoteToolbar({
     super.key,
     required this.editor,
@@ -35,260 +35,302 @@ class NoteToolbar extends StatelessWidget {
   final VoidCallback? onAttachImage;
 
   @override
+  State<NoteToolbar> createState() => _NoteToolbarState();
+}
+
+class _NoteToolbarState extends State<NoteToolbar> {
+  Editor get editor => widget.editor;
+  MutableDocumentComposer get composer => widget.composer;
+  VoidCallback? get onAttachFile => widget.onAttachFile;
+  VoidCallback? get onAttachImage => widget.onAttachImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _attachListeners(widget);
+  }
+
+  @override
+  void didUpdateWidget(NoteToolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.editor != widget.editor ||
+        oldWidget.composer != widget.composer) {
+      _detachListeners(oldWidget);
+      _attachListeners(widget);
+    }
+  }
+
+  @override
+  void dispose() {
+    _detachListeners(widget);
+    super.dispose();
+  }
+
+  void _attachListeners(NoteToolbar toolbar) {
+    toolbar.composer.selectionNotifier.addListener(_onEditorStateChanged);
+    toolbar.editor.context.document.addListener(_onDocumentChanged);
+  }
+
+  void _detachListeners(NoteToolbar toolbar) {
+    toolbar.composer.selectionNotifier.removeListener(_onEditorStateChanged);
+    toolbar.editor.context.document.removeListener(_onDocumentChanged);
+  }
+
+  void _onEditorStateChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onDocumentChanged(DocumentChangeLog changeLog) =>
+      _onEditorStateChanged();
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return ValueListenableBuilder<DocumentSelection?>(
-      valueListenable: composer.selectionNotifier,
-      builder: (context, selection, child) {
-        final activeNodeId = _activeNodeId(selection);
-        final blockType = _activeBlockType(activeNodeId);
-        final selectedListType = _selectedListType(selection);
-        final isListItem = selectedListType != null;
-        final activeNode = activeNodeId != null
-            ? editor.context.document.getNodeById(activeNodeId)
-            : null;
-        final isTask = activeNode is TaskNode;
-        final hasSelection = selection != null && !selection.isCollapsed;
+    final selection = composer.selection;
+    final selectedNodes = _selectedNodes(selection);
+    final blockType = _selectedBlockType(selectedNodes);
+    final selectedListType = _selectedListType(selectedNodes);
+    final isListItem = selectedNodes.any((node) => node is ListItemNode);
+    final isTask =
+        selectedNodes.isNotEmpty &&
+        selectedNodes.every((node) => node is TaskNode);
+    final hasSelection = selection != null && !selection.isCollapsed;
 
-        final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-        final bottomPadding = bottomInset > 0 ? 6.0 : 16.0;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomPadding = bottomInset > 0 ? 6.0 : 16.0;
 
-        return Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.surface.withValues(alpha: 0.78),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.shadow.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: 6,
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ClipRect(
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.centerLeft,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 180),
+                        opacity: hasSelection ? 1.0 : 0.0,
+                        curve: Curves.easeInOut,
+                        child: hasSelection
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _ToolbarButton(
+                                    icon: Icons.format_bold,
+                                    isActive: _selectionHasAttribution(
+                                      selection,
+                                      boldAttribution,
+                                    ),
+                                    onPressed: () =>
+                                        _toggleInline(boldAttribution),
+                                  ),
+                                  _ToolbarButton(
+                                    icon: Icons.format_italic,
+                                    isActive: _selectionHasAttribution(
+                                      selection,
+                                      italicsAttribution,
+                                    ),
+                                    onPressed: () =>
+                                        _toggleInline(italicsAttribution),
+                                  ),
+                                  _ToolbarButton(
+                                    icon: Icons.format_strikethrough,
+                                    isActive: _selectionHasAttribution(
+                                      selection,
+                                      strikethroughAttribution,
+                                    ),
+                                    onPressed: () =>
+                                        _toggleInline(strikethroughAttribution),
+                                  ),
+                                  const _ToolbarDivider(),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                     ),
-                  ],
-                  border: Border.all(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.35),
                   ),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: 6,
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ClipRect(
-                        child: AnimatedSize(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          alignment: Alignment.centerLeft,
-                          child: AnimatedOpacity(
-                            duration: const Duration(milliseconds: 180),
-                            opacity: hasSelection ? 1.0 : 0.0,
-                            curve: Curves.easeInOut,
-                            child: hasSelection
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      _ToolbarButton(
-                                        icon: Icons.format_bold,
-                                        isActive: _selectionHasAttribution(
-                                          selection,
-                                          boldAttribution,
-                                        ),
-                                        onPressed: () =>
-                                            _toggleInline(boldAttribution),
-                                      ),
-                                      _ToolbarButton(
-                                        icon: Icons.format_italic,
-                                        isActive: _selectionHasAttribution(
-                                          selection,
-                                          italicsAttribution,
-                                        ),
-                                        onPressed: () =>
-                                            _toggleInline(italicsAttribution),
-                                      ),
-                                      _ToolbarButton(
-                                        icon: Icons.format_strikethrough,
-                                        isActive: _selectionHasAttribution(
-                                          selection,
-                                          strikethroughAttribution,
-                                        ),
-                                        onPressed: () => _toggleInline(
-                                          strikethroughAttribution,
-                                        ),
-                                      ),
-                                      const _ToolbarDivider(),
-                                    ],
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        ),
-                      ),
-                      _ToolbarButton(
-                        svgAsset: 'assets/icons/h1_icon.svg',
-                        isActive: blockType == header1Attribution,
-                        onPressed: () => _setBlockType(header1Attribution),
-                      ),
-                      _ToolbarButton(
-                        svgAsset: 'assets/icons/h2_icon.svg',
-                        isActive: blockType == header2Attribution,
-                        onPressed: () => _setBlockType(header2Attribution),
-                      ),
-                      _ToolbarButton(
-                        svgAsset: 'assets/icons/h3_icon.svg',
-                        isActive: blockType == header3Attribution,
-                        onPressed: () => _setBlockType(header3Attribution),
-                      ),
-                      _ToolbarButton(
-                        icon: Icons.format_quote,
-                        isActive: blockType == blockquoteAttribution,
-                        onPressed: () => _setBlockType(blockquoteAttribution),
-                      ),
-                      const _ToolbarDivider(),
-                      _ToolbarButton(
-                        icon: Icons.check_box_outlined,
-                        isActive: isTask,
-                        onPressed: _convertToTask,
-                      ),
-                      _ToolbarButton(
-                        icon: Icons.format_list_bulleted,
-                        isActive: selectedListType == ListItemType.unordered,
-                        onPressed: () =>
-                            _convertToListItem(ListItemType.unordered),
-                      ),
-                      _ToolbarButton(
-                        icon: Icons.format_list_numbered,
-                        isActive: selectedListType == ListItemType.ordered,
-                        onPressed: () =>
-                            _convertToListItem(ListItemType.ordered),
-                      ),
-                      ClipRect(
-                        child: AnimatedSize(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          alignment: Alignment.centerLeft,
-                          child: AnimatedOpacity(
-                            duration: const Duration(milliseconds: 180),
-                            opacity: isListItem ? 1.0 : 0.0,
-                            curve: Curves.easeInOut,
-                            child: isListItem
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      _ToolbarButton(
-                                        icon: Icons.format_indent_increase,
-                                        isActive: false,
-                                        onPressed: _indentListItem,
-                                      ),
-                                      _ToolbarButton(
-                                        icon: Icons.format_indent_decrease,
-                                        isActive: false,
-                                        onPressed: _unindentListItem,
-                                      ),
-                                    ],
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        ),
-                      ),
-                      const _ToolbarDivider(),
-                      _ToolbarButton(
-                        icon: Icons.horizontal_rule,
-                        isActive: false,
-                        onPressed: _insertDivider,
-                      ),
-                      const _ToolbarDivider(),
-                      _ToolbarButton(
-                        icon: Icons.image,
-                        isActive: false,
-                        onPressed: onAttachImage,
-                      ),
-                      _ToolbarButton(
-                        icon: Icons.attach_file,
-                        isActive: false,
-                        onPressed: onAttachFile,
-                      ),
-                    ],
+                  _ToolbarButton(
+                    svgAsset: 'assets/icons/h1_icon.svg',
+                    isActive: blockType == header1Attribution,
+                    onPressed: () => _setBlockType(header1Attribution),
                   ),
-                ),
+                  _ToolbarButton(
+                    svgAsset: 'assets/icons/h2_icon.svg',
+                    isActive: blockType == header2Attribution,
+                    onPressed: () => _setBlockType(header2Attribution),
+                  ),
+                  _ToolbarButton(
+                    svgAsset: 'assets/icons/h3_icon.svg',
+                    isActive: blockType == header3Attribution,
+                    onPressed: () => _setBlockType(header3Attribution),
+                  ),
+                  _ToolbarButton(
+                    icon: Icons.format_quote,
+                    isActive: blockType == blockquoteAttribution,
+                    onPressed: () => _setBlockType(blockquoteAttribution),
+                  ),
+                  const _ToolbarDivider(),
+                  _ToolbarButton(
+                    icon: Icons.check_box_outlined,
+                    isActive: isTask,
+                    onPressed: _convertToTask,
+                  ),
+                  _ToolbarButton(
+                    icon: Icons.format_list_bulleted,
+                    isActive: selectedListType == ListItemType.unordered,
+                    onPressed: () => _convertToListItem(ListItemType.unordered),
+                  ),
+                  _ToolbarButton(
+                    icon: Icons.format_list_numbered,
+                    isActive: selectedListType == ListItemType.ordered,
+                    onPressed: () => _convertToListItem(ListItemType.ordered),
+                  ),
+                  ClipRect(
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.centerLeft,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 180),
+                        opacity: isListItem ? 1.0 : 0.0,
+                        curve: Curves.easeInOut,
+                        child: isListItem
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _ToolbarButton(
+                                    icon: Icons.format_indent_increase,
+                                    isActive: false,
+                                    onPressed: _indentListItem,
+                                  ),
+                                  _ToolbarButton(
+                                    icon: Icons.format_indent_decrease,
+                                    isActive: false,
+                                    onPressed: _unindentListItem,
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                  const _ToolbarDivider(),
+                  _ToolbarButton(
+                    icon: Icons.horizontal_rule,
+                    isActive: false,
+                    onPressed: _insertDivider,
+                  ),
+                  const _ToolbarDivider(),
+                  _ToolbarButton(
+                    icon: Icons.image,
+                    isActive: false,
+                    onPressed: onAttachImage,
+                  ),
+                  _ToolbarButton(
+                    icon: Icons.attach_file,
+                    isActive: false,
+                    onPressed: onAttachFile,
+                  ),
+                ],
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  String? _activeNodeId(DocumentSelection? selection) {
-    if (selection == null) return null;
-    if (selection.isCollapsed) return selection.extent.nodeId;
-    return selection.start.nodeId;
+  List<DocumentNode> _selectedNodes(DocumentSelection? selection) {
+    if (selection == null) return const [];
+    final document = editor.context.document;
+    if (document.getNodeById(selection.start.nodeId) == null ||
+        document.getNodeById(selection.end.nodeId) == null) {
+      return const [];
+    }
+    return NoteEditorCommands.selectedNodes(document, selection);
   }
 
-  Attribution? _activeBlockType(String? nodeId) {
-    if (nodeId == null) return null;
-    final node = editor.context.document.getNodeById(nodeId);
-    if (node is ParagraphNode) {
-      return node.getMetadataValue('blockType') as Attribution?;
-    }
-    if (node is ListItemNode) {
-      return listItemAttribution;
-    }
-    return null;
-  }
-
-  ListItemType? _selectedListType(DocumentSelection? selection) {
-    if (selection == null) return null;
-    try {
-      for (final node in NoteEditorCommands.selectedNodes(
-        editor.context.document,
-        selection,
-      )) {
-        if (node is ListItemNode) return node.type;
-      }
-    } catch (_) {
+  Attribution? _selectedBlockType(List<DocumentNode> nodes) {
+    if (nodes.isEmpty || nodes.any((node) => node is! ParagraphNode)) {
       return null;
     }
-    return null;
+    final blockTypes = nodes
+        .cast<ParagraphNode>()
+        .map((node) => node.getMetadataValue('blockType'))
+        .whereType<Attribution>()
+        .toSet();
+    return blockTypes.length == 1 && blockTypes.length == nodes.length
+        ? blockTypes.single
+        : null;
+  }
+
+  ListItemType? _selectedListType(List<DocumentNode> nodes) {
+    if (nodes.isEmpty || nodes.any((node) => node is! ListItemNode)) {
+      return null;
+    }
+    final listTypes = nodes
+        .cast<ListItemNode>()
+        .map((node) => node.type)
+        .toSet();
+    return listTypes.length == 1 ? listTypes.single : null;
   }
 
   bool _selectionHasAttribution(
-    DocumentSelection? sel,
+    DocumentSelection? selection,
     Attribution attribution,
   ) {
-    if (sel == null || sel.isCollapsed) return false;
-    try {
-      final nodes = editor.context.document
-          .getNodesInside(sel.start, sel.end)
-          .whereType<TextNode>();
-      for (final node in nodes) {
-        final start = (sel.start.nodeId == node.id)
-            ? (sel.start.nodePosition as TextNodePosition).offset
-            : 0;
-        final end = (sel.end.nodeId == node.id)
-            ? (sel.end.nodePosition as TextNodePosition).offset
-            : node.text.length;
-        if (start >= end) continue;
-        if (node.text
-            .getAttributionSpansInRange(
-              attributionFilter: (a) => a == attribution,
-              range: SpanRange(start, end),
-            )
-            .isNotEmpty) {
-          return true;
+    if (selection == null || selection.isCollapsed) return false;
+    var containsText = false;
+    for (final node in _selectedNodes(selection).whereType<TextNode>()) {
+      final startPosition = selection.start.nodeId == node.id
+          ? selection.start.nodePosition
+          : null;
+      final endPosition = selection.end.nodeId == node.id
+          ? selection.end.nodePosition
+          : null;
+      final start = startPosition is TextNodePosition
+          ? startPosition.offset
+          : 0;
+      final end = endPosition is TextNodePosition
+          ? endPosition.offset
+          : node.text.length;
+      final safeStart = start.clamp(0, node.text.length);
+      final safeEnd = end.clamp(safeStart, node.text.length);
+      for (var index = safeStart; index < safeEnd; index++) {
+        containsText = true;
+        if (!node.text.hasAttributionAt(index, attribution: attribution)) {
+          return false;
         }
       }
-    } catch (_) {
-      return false;
     }
-    return false;
+    return containsText;
   }
 
   void _toggleInline(Attribution attribution) {

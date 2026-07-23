@@ -724,12 +724,12 @@ void main() {
       expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
     });
 
-    testWidgets('indent button is not present on a non-list item', (tester) async {
+    testWidgets('indent button is not present on a non-list item', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         buildEditorHarness(
-          nodes: [
-            ParagraphNode(id: 'node-1', text: AttributedText('Para')),
-          ],
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Para'))],
           selection: const DocumentSelection.collapsed(
             position: DocumentPosition(
               nodeId: 'node-1',
@@ -770,9 +770,7 @@ void main() {
     ) async {
       await tester.pumpWidget(
         buildEditorHarness(
-          nodes: [
-            ParagraphNode(id: 'node-1', text: AttributedText('Para')),
-          ],
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Para'))],
           selection: const DocumentSelection.collapsed(
             position: DocumentPosition(
               nodeId: 'node-1',
@@ -846,33 +844,104 @@ void main() {
 
   group('Contextual Selection Toolbar', () {
     testWidgets(
-      'hides bold/italic/strikethrough when selection is collapsed',
+      'updates task state after a document change without moving the cursor',
       (tester) async {
+        final document = MutableDocument(
+          nodes: [
+            ParagraphNode(id: 'node-1', text: AttributedText('Task text')),
+          ],
+        );
+        final composer = MutableDocumentComposer(
+          initialSelection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        );
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+        );
+
         await tester.pumpWidget(
-          buildEditorHarness(
-            nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-            selection: const DocumentSelection.collapsed(
-              position: DocumentPosition(
-                nodeId: 'node-1',
-                nodePosition: TextNodePosition(offset: 0),
-              ),
+          MaterialApp(
+            home: Scaffold(
+              body: NoteToolbar(editor: editor, composer: composer),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        expect(find.byIcon(Icons.format_bold), findsNothing);
-        expect(find.byIcon(Icons.format_italic), findsNothing);
-        expect(find.byIcon(Icons.format_strikethrough), findsNothing);
+        final taskButton = iconButtonWithIcon(Icons.check_box_outlined);
+        expect((tester.widget(taskButton) as dynamic).isActive, isFalse);
+
+        editor.execute([ConvertParagraphToTaskRequest(nodeId: 'node-1')]);
+        await tester.pumpAndSettle();
+
+        expect((tester.widget(taskButton) as dynamic).isActive, isTrue);
       },
     );
 
+    testWidgets('hides bold/italic/strikethrough when selection is collapsed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.format_bold), findsNothing);
+      expect(find.byIcon(Icons.format_italic), findsNothing);
+      expect(find.byIcon(Icons.format_strikethrough), findsNothing);
+    });
+
+    testWidgets('shows bold/italic/strikethrough when text is selected', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection(
+            base: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            extent: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.format_bold), findsOneWidget);
+      expect(find.byIcon(Icons.format_italic), findsOneWidget);
+      expect(find.byIcon(Icons.format_strikethrough), findsOneWidget);
+    });
+
     testWidgets(
-      'shows bold/italic/strikethrough when text is selected',
+      'does not mark bold active when it starts after the selection',
       (tester) async {
+        final spans = AttributedSpans()
+          ..addAttribution(newAttribution: boldAttribution, start: 5, end: 5);
         await tester.pumpWidget(
           buildEditorHarness(
-            nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+            nodes: [
+              ParagraphNode(
+                id: 'node-1',
+                text: AttributedText('Hello!', spans),
+              ),
+            ],
             selection: const DocumentSelection(
               base: DocumentPosition(
                 nodeId: 'node-1',
@@ -887,9 +956,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.byIcon(Icons.format_bold), findsOneWidget);
-        expect(find.byIcon(Icons.format_italic), findsOneWidget);
-        expect(find.byIcon(Icons.format_strikethrough), findsOneWidget);
+        final boldButton = iconButtonWithIcon(Icons.format_bold);
+        expect((tester.widget(boldButton) as dynamic).isActive, isFalse);
       },
     );
   });

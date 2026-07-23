@@ -45,23 +45,34 @@ class NoteEditorCommands {
     DocumentComposer composer,
     Attribution? blockType,
   ) {
-    final requests = <EditRequest>[];
-    for (final node in selectedNodes(
+    final nodes = _selectedEditableNodes(
       editor.context.document,
       composer.selection,
-    )) {
+    );
+    if (nodes.isEmpty) return;
+    final shouldClear =
+        blockType != null &&
+        nodes.every(
+          (node) =>
+              node is ParagraphNode &&
+              node.getMetadataValue('blockType') == blockType,
+        );
+    final targetBlockType = shouldClear ? null : blockType;
+    final requests = <EditRequest>[];
+    for (final node in nodes) {
       if (node is ParagraphNode) {
-        final current = node.getMetadataValue('blockType') as Attribution?;
-        final newType = current == blockType ? null : blockType;
         requests.add(
-          ChangeParagraphBlockTypeRequest(nodeId: node.id, blockType: newType),
+          ChangeParagraphBlockTypeRequest(
+            nodeId: node.id,
+            blockType: targetBlockType,
+          ),
         );
       } else if (node is ListItemNode) {
         requests.add(
           ConvertListItemToParagraphRequest(
             nodeId: node.id,
-            paragraphMetadata: blockType != null
-                ? {'blockType': blockType}
+            paragraphMetadata: targetBlockType != null
+                ? {'blockType': targetBlockType}
                 : <String, dynamic>{},
           ),
         );
@@ -72,8 +83,8 @@ class NoteEditorCommands {
             newNode: ParagraphNode(
               id: node.id,
               text: node.text,
-              metadata: blockType != null
-                  ? {'blockType': blockType}
+              metadata: targetBlockType != null
+                  ? {'blockType': targetBlockType}
                   : <String, dynamic>{},
             ),
           ),
@@ -90,14 +101,18 @@ class NoteEditorCommands {
     DocumentComposer composer,
     ListItemType type,
   ) {
-    final requests = <EditRequest>[];
-    for (final node in selectedNodes(
+    final nodes = _selectedEditableNodes(
       editor.context.document,
       composer.selection,
-    )) {
+    );
+    if (nodes.isEmpty) return;
+    final shouldClear = nodes.every(
+      (node) => node is ListItemNode && node.type == type,
+    );
+    final requests = <EditRequest>[];
+    for (final node in nodes) {
       if (node is ListItemNode) {
-        if (node.type == type) {
-          // Already this list type — toggle back to paragraph.
+        if (shouldClear) {
           requests.add(ConvertListItemToParagraphRequest(nodeId: node.id));
         } else {
           requests.add(
@@ -127,18 +142,23 @@ class NoteEditorCommands {
 
   /// Converts selected nodes to/from tasks.
   static void convertToTask(Editor editor, DocumentComposer composer) {
-    final requests = <EditRequest>[];
-    for (final node in selectedNodes(
+    final nodes = _selectedEditableNodes(
       editor.context.document,
       composer.selection,
-    )) {
+    );
+    if (nodes.isEmpty) return;
+    final shouldClear = nodes.every((node) => node is TaskNode);
+    final requests = <EditRequest>[];
+    for (final node in nodes) {
       if (node is ParagraphNode) {
         requests.add(ConvertParagraphToTaskRequest(nodeId: node.id));
       } else if (node is ListItemNode) {
         requests.add(ConvertListItemToParagraphRequest(nodeId: node.id));
         requests.add(ConvertParagraphToTaskRequest(nodeId: node.id));
       } else if (node is TaskNode) {
-        requests.add(ConvertTaskToParagraphRequest(nodeId: node.id));
+        if (shouldClear) {
+          requests.add(ConvertTaskToParagraphRequest(nodeId: node.id));
+        }
       }
     }
     if (requests.isNotEmpty) editor.execute(requests);
@@ -146,27 +166,33 @@ class NoteEditorCommands {
 
   /// Indents all selected list items.
   static void indentListItems(Editor editor, DocumentComposer composer) {
-    for (final node in selectedNodes(
-      editor.context.document,
-      composer.selection,
-    )) {
-      if (node is ListItemNode) {
-        editor.execute([IndentListItemRequest(nodeId: node.id)]);
-      }
-    }
+    final requests =
+        _selectedEditableNodes(editor.context.document, composer.selection)
+            .whereType<ListItemNode>()
+            .map((node) => IndentListItemRequest(nodeId: node.id));
+    final requestList = requests.toList();
+    if (requestList.isNotEmpty) editor.execute(requestList);
   }
 
   /// Unindents all selected list items.
   static void unindentListItems(Editor editor, DocumentComposer composer) {
-    for (final node in selectedNodes(
-      editor.context.document,
-      composer.selection,
-    )) {
-      if (node is ListItemNode) {
-        editor.execute([UnIndentListItemRequest(nodeId: node.id)]);
-      }
-    }
+    final requests =
+        _selectedEditableNodes(editor.context.document, composer.selection)
+            .whereType<ListItemNode>()
+            .map((node) => UnIndentListItemRequest(nodeId: node.id));
+    final requestList = requests.toList();
+    if (requestList.isNotEmpty) editor.execute(requestList);
   }
+
+  static List<DocumentNode> _selectedEditableNodes(
+    Document document,
+    DocumentSelection? selection,
+  ) => selectedNodes(document, selection)
+      .where(
+        (node) =>
+            node is ParagraphNode || node is ListItemNode || node is TaskNode,
+      )
+      .toList();
 
   /// Inserts a horizontal rule at the caret.
   static void insertDivider(Editor editor, {required int dividerCount}) {

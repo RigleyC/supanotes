@@ -252,9 +252,16 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
           notificationTime,
         );
       } else {
-        dev.log(
-          '[Scheduler] Task id=${task.id} SKIPPED — notificationTime $notificationTime is in the past (now=$now)',
-        );
+        if (notificationTime == null) {
+          dev.log(
+            '[Scheduler] Task id=${task.id} skipped: no notification time',
+          );
+        } else {
+          dev.log(
+            '[Scheduler] Task id=${task.id} skipped: notification time '
+            '$notificationTime is in the past (now=$now)',
+          );
+        }
       }
     }
 

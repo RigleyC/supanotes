@@ -105,6 +105,56 @@ void main() {
       expect(node.getMetadataValue('blockType'), header1Attribution);
     });
 
+    test(
+      'does not let JSON metadata override the paragraph block attribution',
+      () {
+        final node =
+            codec.createNodeFromBlockType(
+                  nodeId: 'paragraph-1',
+                  type: 'header1',
+                  text: AttributedText('Text'),
+                  metadata: {'blockType': 'header1'},
+                )
+                as ParagraphNode;
+
+        expect(node.getMetadataValue('blockType'), header1Attribution);
+      },
+    );
+
+    test(
+      'round trips inline attribution boundaries through the Delta contract',
+      () {
+        final spans = AttributedSpans()
+          ..addAttribution(newAttribution: boldAttribution, start: 0, end: 3);
+        final source = AttributedText('bold plain', spans);
+
+        final delta = codec.encodeAttributedTextToDelta(source);
+        final restored = codec.attributedFromDelta(delta);
+
+        expect(delta, [
+          {
+            'insert': 'bold',
+            'attributes': {'bold': true},
+          },
+          {'insert': ' plain'},
+        ]);
+        expect(
+          restored.getAttributionSpansInRange(
+            attributionFilter: (attribution) => attribution == boldAttribution,
+            range: const SpanRange(0, 3),
+          ),
+          isNotEmpty,
+        );
+        expect(
+          restored.getAttributionSpansInRange(
+            attributionFilter: (attribution) => attribution == boldAttribution,
+            range: const SpanRange(4, 4),
+          ),
+          isEmpty,
+        );
+      },
+    );
+
     test('round trips text block types through the OT delta contract', () {
       final cases = <Map<String, dynamic>>[
         {
@@ -169,6 +219,30 @@ void main() {
         expect((decoded as TextNode).text.toPlainText(), testCase['text']);
         expect(codec.encodeNode(decoded)['type'], testCase['type']);
       }
+    });
+
+    test('round trips list and task indentation through the OT contract', () {
+      final nodes = <DocumentNode>[
+        ListItemNode.unordered(
+          id: 'list-1',
+          text: AttributedText('Nested list'),
+          indent: 2,
+        ),
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Nested task'),
+          isComplete: false,
+          indent: 3,
+        ),
+      ];
+
+      final restored = nodes
+          .map(codec.encodeNode)
+          .map(codec.decodeNode)
+          .toList();
+
+      expect((restored[0] as ListItemNode).indent, 2);
+      expect((restored[1] as TaskNode).indent, 3);
     });
 
     test('matches the shared create block contract fixture', () {

@@ -287,7 +287,12 @@ class NoteDocumentCodec {
 
   static String? nodeType(DocumentNode node) {
     if (node is ParagraphNode) {
-      final blockType = node.getMetadataValue('blockType') as Attribution?;
+      final rawBlockType = node.getMetadataValue('blockType');
+      final blockType = rawBlockType is Attribution
+          ? rawBlockType
+          : (rawBlockType is String
+                ? attributionFromNameStatic(rawBlockType)
+                : null);
       if (blockType == corruptedAttribution) return 'corrupted';
       if (blockType == null || blockType.id == 'paragraph') return 'paragraph';
       if (blockType == blockquoteAttribution) return 'blockquote';
@@ -327,6 +332,9 @@ class NoteDocumentCodec {
       type = 'task';
       text = node.text;
       metadata['isCompleted'] = node.isComplete;
+      if (node.indent != 0) {
+        metadata['indent'] = node.indent;
+      }
       for (final entry in node.metadata.entries) {
         if (entry.key != 'isCompleted') {
           metadata[entry.key] = entry.value;
@@ -340,6 +348,14 @@ class NoteDocumentCodec {
     } else if (node is ListItemNode) {
       type = node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
       text = node.text;
+      if (node.indent != 0) {
+        metadata['indent'] = node.indent;
+      }
+      for (final entry in node.metadata.entries) {
+        if (entry.key != 'blockType') {
+          metadata[entry.key] = entry.value;
+        }
+      }
     } else if (node is ParagraphNode) {
       text = node.text;
       final blockType = node.metadata['blockType'];
@@ -435,10 +451,18 @@ class NoteDocumentCodec {
     final Map<String, dynamic> metadata = Map<String, dynamic>.from(
       blockData['metadata'] as Map? ?? {},
     );
-    if (type == 'paragraph' && metadata.containsKey('blockType')) {
-      final rawBType = metadata['blockType'];
-      if (rawBType is String) {
-        type = rawBType;
+    if (type == 'paragraph') {
+      final rawBlockType = metadata['blockType'];
+      final blockType = rawBlockType is Attribution
+          ? rawBlockType
+          : (rawBlockType is String ? attributionFromName(rawBlockType) : null);
+      if (blockType != null) {
+        type = blockType.id == blockquoteAttribution.id
+            ? 'quote'
+            : blockType.id;
+        metadata['blockType'] = blockType;
+      } else {
+        metadata.remove('blockType');
       }
     }
 
@@ -454,22 +478,6 @@ class NoteDocumentCodec {
       isTaskComplete: isTaskComplete,
       metadata: metadata,
     );
-
-    node.metadata.addAll(metadata);
-
-    if (node is ParagraphNode) {
-      final rawBType = metadata['blockType'];
-      final blockTypeAttr = rawBType is Attribution
-          ? rawBType
-          : (rawBType is String
-              ? attributionFromName(rawBType)
-              : attributionFromName(type));
-      if (blockTypeAttr != null) {
-        node.metadata['blockType'] = blockTypeAttr;
-      } else {
-        node.metadata.remove('blockType');
-      }
-    }
     return node;
   }
 
@@ -499,6 +507,15 @@ class NoteDocumentCodec {
     ListItemType itemType = ListItemType.unordered,
     Map<String, dynamic>? metadata,
   }) {
+    Map<String, dynamic> paragraphMetadata(Attribution? blockType) {
+      final normalized = Map<String, dynamic>.from(metadata ?? {});
+      normalized.remove('blockType');
+      if (blockType != null) {
+        normalized['blockType'] = blockType;
+      }
+      return normalized;
+    }
+
     if (type == 'divider') {
       return HorizontalRuleNode(id: nodeId, metadata: metadata ?? {});
     }
@@ -510,6 +527,8 @@ class NoteDocumentCodec {
         id: nodeId,
         itemType: ListItemType.unordered,
         text: text,
+        indent: metadata?['indent'] as int? ?? 0,
+        metadata: metadata ?? {},
       );
     }
     if (type == 'orderedList') {
@@ -517,6 +536,8 @@ class NoteDocumentCodec {
         id: nodeId,
         itemType: ListItemType.ordered,
         text: text,
+        indent: metadata?['indent'] as int? ?? 0,
+        metadata: metadata ?? {},
       );
     }
     if (type == 'task') {
@@ -524,6 +545,7 @@ class NoteDocumentCodec {
         id: nodeId,
         text: text,
         isComplete: isTaskComplete,
+        indent: metadata?['indent'] as int? ?? 0,
         metadata: metadata ?? {},
       );
     }
@@ -531,54 +553,36 @@ class NoteDocumentCodec {
       return ParagraphNode(
         id: nodeId,
         text: text,
-        metadata: {
-          'blockType': header1Attribution,
-          if (metadata != null) ...metadata,
-        },
+        metadata: paragraphMetadata(header1Attribution),
       );
     }
     if (type == 'header2') {
       return ParagraphNode(
         id: nodeId,
         text: text,
-        metadata: {
-          'blockType': header2Attribution,
-          if (metadata != null) ...metadata,
-        },
+        metadata: paragraphMetadata(header2Attribution),
       );
     }
     if (type == 'header3') {
       return ParagraphNode(
         id: nodeId,
         text: text,
-        metadata: {
-          'blockType': header3Attribution,
-          if (metadata != null) ...metadata,
-        },
+        metadata: paragraphMetadata(header3Attribution),
       );
     }
     if (type == 'quote') {
       return ParagraphNode(
         id: nodeId,
         text: text,
-        metadata: {
-          'blockType': blockquoteAttribution,
-          if (metadata != null) ...metadata,
-        },
+        metadata: paragraphMetadata(blockquoteAttribution),
       );
     }
     final blockTypeAttr = attributionFromName(type);
     final ParagraphNode paragraph = ParagraphNode(
       id: nodeId,
       text: text,
-      metadata: {
-        if (blockTypeAttr != null) 'blockType': blockTypeAttr,
-        if (metadata != null) ...metadata,
-      },
+      metadata: paragraphMetadata(blockTypeAttr),
     );
-    if (blockTypeAttr == null) {
-      paragraph.metadata.remove('blockType');
-    }
     return paragraph;
   }
 
@@ -601,7 +605,7 @@ class NoteDocumentCodec {
               span.addAttribution(
                 newAttribution: attr,
                 start: start,
-                end: buf.length,
+                end: buf.length - 1,
               );
             }
           }
@@ -774,7 +778,7 @@ class NoteDocumentCodec {
           active.add(attrId);
         }
       } else if (marker.markerType == SpanMarkerType.end) {
-        if (marker.offset <= pos) {
+        if (marker.offset < pos) {
           active.remove(attrId);
         }
       }
