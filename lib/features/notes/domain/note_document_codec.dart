@@ -699,18 +699,23 @@ class NoteDocumentCodec {
 
   String? blockTypeName(DocumentNode node) {
     if (node is ParagraphNode) {
-      final blockType = node.getMetadataValue('blockType') as Attribution?;
-      if (blockType == header1Attribution) return 'header1';
-      if (blockType == header2Attribution) return 'header2';
-      if (blockType == header3Attribution) return 'header3';
-      if (blockType == blockquoteAttribution) return 'quote';
-      return null;
+      final raw = node.getMetadataValue('blockType');
+      final blockType = raw is Attribution
+          ? raw
+          : (raw is String ? attributionFromName(raw) : null);
+      if (blockType == header1Attribution || raw == 'header1') return 'header1';
+      if (blockType == header2Attribution || raw == 'header2') return 'header2';
+      if (blockType == header3Attribution || raw == 'header3') return 'header3';
+      if (blockType == blockquoteAttribution || raw == 'quote') return 'quote';
+      return 'paragraph';
     }
     if (node is ListItemNode) {
       return node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
     }
     if (node is TaskNode) return 'task';
     if (node is HorizontalRuleNode) return 'divider';
+    if (node is DocumentAttachmentNode) return 'attachment';
+    if (node is RichLinkNode) return 'rich_link';
     return null;
   }
 
