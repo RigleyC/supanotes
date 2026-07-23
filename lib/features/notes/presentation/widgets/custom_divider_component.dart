@@ -124,7 +124,9 @@ class CustomDividerComponent extends StatelessWidget {
             child: SizedBox(
               height: 16,
               width: double.infinity,
-              child: SvgPicture.asset(assetPath, fit: BoxFit.fitWidth),
+              child: RepaintBoundary(
+                child: SvgPicture.asset(assetPath, fit: BoxFit.fitWidth),
+              ),
             ),
           ),
         ),

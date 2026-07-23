@@ -101,7 +101,10 @@ class NoteDocumentCodec {
       return {'url': node.imageUrl, 'alt': node.altText};
     }
     if (node is HorizontalRuleNode) {
-      return <String, dynamic>{};
+      final dividerIndex = node.metadata['dividerIndex'];
+      return <String, dynamic>{
+        if (dividerIndex != null) 'dividerIndex': dividerIndex,
+      };
     }
     if (node is DocumentAttachmentNode) {
       return {'id': node.id};
@@ -165,7 +168,14 @@ class NoteDocumentCodec {
       );
     }
     if (type == 'divider') {
-      return HorizontalRuleNode(id: id);
+      final dividerIndex = data['dividerIndex'] as int?;
+      return HorizontalRuleNode(
+        id: id,
+        metadata: {
+          if (dividerIndex != null) 'dividerIndex': dividerIndex,
+          ...data,
+        },
+      );
     }
     if (type == 'corrupted') {
       return ParagraphNode(
@@ -324,6 +334,9 @@ class NoteDocumentCodec {
       }
     } else if (node is HorizontalRuleNode) {
       type = 'divider';
+      for (final entry in node.metadata.entries) {
+        metadata[entry.key] = entry.value;
+      }
     } else if (node is ListItemNode) {
       type = node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
       text = node.text;
@@ -445,13 +458,16 @@ class NoteDocumentCodec {
     node.metadata.addAll(metadata);
 
     if (node is ParagraphNode) {
-      final blockTypeAttr =
-          attributionFromName(type) ??
-          (metadata['blockType'] is String
-              ? attributionFromName(metadata['blockType'] as String)
-              : null);
+      final rawBType = metadata['blockType'];
+      final blockTypeAttr = rawBType is Attribution
+          ? rawBType
+          : (rawBType is String
+              ? attributionFromName(rawBType)
+              : attributionFromName(type));
       if (blockTypeAttr != null) {
         node.metadata['blockType'] = blockTypeAttr;
+      } else {
+        node.metadata.remove('blockType');
       }
     }
     return node;
@@ -484,7 +500,7 @@ class NoteDocumentCodec {
     Map<String, dynamic>? metadata,
   }) {
     if (type == 'divider') {
-      return HorizontalRuleNode(id: nodeId);
+      return HorizontalRuleNode(id: nodeId, metadata: metadata ?? {});
     }
     if (type == 'attachment') {
       return DocumentAttachmentNode(id: nodeId, metadata: metadata ?? {});
@@ -508,20 +524,6 @@ class NoteDocumentCodec {
         id: nodeId,
         text: text,
         isComplete: isTaskComplete,
-        metadata: metadata,
-      );
-    }
-    if (type == 'header1') {
-      return ParagraphNode(
-        id: nodeId,
-        text: text,
-        metadata: {'blockType': header1Attribution},
-      );
-    }
-    if (type == 'header2') {
-      return ParagraphNode(
-        id: nodeId,
-        text: text,
         metadata: {'blockType': header2Attribution},
       );
     }
@@ -719,18 +721,22 @@ class NoteDocumentCodec {
   }
 
   Set<String> _getAttrIdsAt(AttributedText text, int pos) {
-    final ids = <String>{};
+    if (text.toPlainText().isEmpty) return const {};
+    final active = <String>{};
     for (final marker in text.spans.markers) {
-      if (marker.markerType == SpanMarkerType.start &&
-          marker.offset <= pos &&
-          marker.attribution.id != 'composing') {
-        final spanEnd = findSpanEnd(text.spans.markers, marker);
-        if (spanEnd > pos) {
-          ids.add(marker.attribution.id);
+      if (marker.attribution.id == 'composing') continue;
+      final attrId = attributionToName(marker.attribution);
+      if (marker.markerType == SpanMarkerType.start) {
+        if (marker.offset <= pos) {
+          active.add(attrId);
+        }
+      } else if (marker.markerType == SpanMarkerType.end) {
+        if (marker.offset <= pos) {
+          active.remove(attrId);
         }
       }
     }
-    return ids;
+    return active;
   }
 
   void _applyAttrOverride(Set<String> dest, Map<String, dynamic> attrs) {

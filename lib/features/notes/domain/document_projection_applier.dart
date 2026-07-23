@@ -320,6 +320,20 @@ class DocumentProjectionApplier {
       }
     }
 
+    if (updatedMeta.containsKey('blockType')) {
+      final rawBType = updatedMeta['blockType'];
+      if (rawBType is String) {
+        final attr = _codec.attributionFromName(rawBType);
+        if (attr != null) {
+          updatedMeta['blockType'] = attr;
+        } else {
+          updatedMeta.remove('blockType');
+        }
+      } else if (rawBType == null) {
+        updatedMeta.remove('blockType');
+      }
+    }
+
     if (node is TaskNode) {
       final isComp = meta.containsKey('isCompleted')
           ? meta['isCompleted'] as bool

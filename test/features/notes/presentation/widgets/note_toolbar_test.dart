@@ -31,11 +31,13 @@ DocumentSelection caretSelection(String nodeId) {
   );
 }
 
-/// Finds the [IconButton] that contains the given [IconData].
+/// Finds the toolbar button that contains the given [IconData].
 Finder iconButtonWithIcon(IconData icon) {
   return find.ancestor(
     of: find.byIcon(icon),
-    matching: find.byType(IconButton),
+    matching: find.byWidgetPredicate(
+      (w) => w.runtimeType.toString() == '_ToolbarButton',
+    ),
   );
 }
 
@@ -91,8 +93,8 @@ void main() {
       final checkbox = iconButtonWithIcon(Icons.check_box_outlined);
       expect(checkbox, findsOneWidget);
 
-      final iconButton = tester.widget<IconButton>(checkbox);
-      expect(iconButton.isSelected, isFalse);
+      final button = tester.widget(checkbox);
+      expect((button as dynamic).isActive, isFalse);
     });
 
     testWidgets('is active when cursor is on a TaskNode', (tester) async {
@@ -118,8 +120,8 @@ void main() {
       final checkbox = iconButtonWithIcon(Icons.check_box_outlined);
       expect(checkbox, findsOneWidget);
 
-      final iconButton = tester.widget<IconButton>(checkbox);
-      expect(iconButton.isSelected, isTrue);
+      final button = tester.widget(checkbox);
+      expect((button as dynamic).isActive, isTrue);
     });
   });
 
@@ -458,7 +460,21 @@ void main() {
   });
 
   group('_setBlockType', () {
+    Future<void> openFormatPopup(WidgetTester tester) async {}
+
+    // The format popup opens above the toolbar and is tall (heading previews
+    // use headline-sized fonts). The default 800×600 test surface is shorter
+    // than any real phone in portrait, so the popup's H1 item can end up
+    // above the viewport. Use a realistic mobile viewport for these tests.
+
     testWidgets('converts ListItemNode to H1', (tester) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       final document = MutableDocument(
         nodes: [
           ListItemNode.unordered(
@@ -483,15 +499,20 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: Column(
+            body: Stack(
               children: [
-                Expanded(
+                Positioned.fill(
                   child: SuperEditor(
                     editor: editor,
                     componentBuilders: defaultComponentBuilders,
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: NoteToolbar(editor: editor, composer: composer),
+                ),
               ],
             ),
           ),
@@ -499,7 +520,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('H1'));
+      await openFormatPopup(tester);
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) =>
+              w.runtimeType.toString() == '_ToolbarButton' &&
+              (w as dynamic).svgAsset == 'assets/icons/h1_icon.svg',
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
@@ -553,7 +581,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('H2'));
+      await openFormatPopup(tester);
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) =>
+              w.runtimeType.toString() == '_ToolbarButton' &&
+              (w as dynamic).svgAsset == 'assets/icons/h2_icon.svg',
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
@@ -607,6 +642,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openFormatPopup(tester);
       await tester.tap(find.byIcon(Icons.format_quote));
       await tester.pumpAndSettle();
 
@@ -636,8 +672,8 @@ void main() {
 
       final numberedBtn = iconButtonWithIcon(Icons.format_list_numbered);
       expect(numberedBtn, findsOneWidget);
-      final btnWidget = tester.widget<IconButton>(numberedBtn);
-      expect(btnWidget.isSelected, isTrue);
+      final btnWidget = tester.widget(numberedBtn);
+      expect((btnWidget as dynamic).isActive, isTrue);
     });
 
     testWidgets('is inactive on unordered list item', (tester) async {
@@ -661,8 +697,8 @@ void main() {
 
       final numberedBtn = iconButtonWithIcon(Icons.format_list_numbered);
       expect(numberedBtn, findsOneWidget);
-      final btnWidget = tester.widget<IconButton>(numberedBtn);
-      expect(btnWidget.isSelected, isFalse);
+      final btnWidget = tester.widget(numberedBtn);
+      expect((btnWidget as dynamic).isActive, isFalse);
     });
   });
 
@@ -685,10 +721,10 @@ void main() {
 
       final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
       expect(indentBtn, findsOneWidget);
-      expect(tester.widget<IconButton>(indentBtn).onPressed, isNotNull);
+      expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
     });
 
-    testWidgets('indent button is disabled on a non-list item', (tester) async {
+    testWidgets('indent button is not present on a non-list item', (tester) async {
       await tester.pumpWidget(
         buildEditorHarness(
           nodes: [
@@ -705,8 +741,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
-      expect(indentBtn, findsOneWidget);
-      expect(tester.widget<IconButton>(indentBtn).onPressed, isNull);
+      expect(indentBtn, findsNothing);
     });
 
     testWidgets('unindent button is enabled on a list item', (tester) async {
@@ -727,10 +762,10 @@ void main() {
 
       final unindentBtn = iconButtonWithIcon(Icons.format_indent_decrease);
       expect(unindentBtn, findsOneWidget);
-      expect(tester.widget<IconButton>(unindentBtn).onPressed, isNotNull);
+      expect((tester.widget(unindentBtn) as dynamic).onPressed, isNotNull);
     });
 
-    testWidgets('unindent button is disabled on a non-list item', (
+    testWidgets('unindent button is not present on a non-list item', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -749,8 +784,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final unindentBtn = iconButtonWithIcon(Icons.format_indent_decrease);
-      expect(unindentBtn, findsOneWidget);
-      expect(tester.widget<IconButton>(unindentBtn).onPressed, isNull);
+      expect(unindentBtn, findsNothing);
     });
 
     testWidgets('indent works with multi-node selection of list items', (
@@ -800,7 +834,7 @@ void main() {
 
       final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
       expect(indentBtn, findsOneWidget);
-      expect(tester.widget<IconButton>(indentBtn).onPressed, isNotNull);
+      expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
 
       await tester.tap(indentBtn);
       await tester.pumpAndSettle();
@@ -808,5 +842,55 @@ void main() {
       final node1 = document.getNodeById('node-1') as ListItemNode;
       expect(node1.indent, greaterThan(0));
     });
+  });
+
+  group('Contextual Selection Toolbar', () {
+    testWidgets(
+      'hides bold/italic/strikethrough when selection is collapsed',
+      (tester) async {
+        await tester.pumpWidget(
+          buildEditorHarness(
+            nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+            selection: const DocumentSelection.collapsed(
+              position: DocumentPosition(
+                nodeId: 'node-1',
+                nodePosition: TextNodePosition(offset: 0),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(Icons.format_bold), findsNothing);
+        expect(find.byIcon(Icons.format_italic), findsNothing);
+        expect(find.byIcon(Icons.format_strikethrough), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'shows bold/italic/strikethrough when text is selected',
+      (tester) async {
+        await tester.pumpWidget(
+          buildEditorHarness(
+            nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+            selection: const DocumentSelection(
+              base: DocumentPosition(
+                nodeId: 'node-1',
+                nodePosition: TextNodePosition(offset: 0),
+              ),
+              extent: DocumentPosition(
+                nodeId: 'node-1',
+                nodePosition: TextNodePosition(offset: 5),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(Icons.format_bold), findsOneWidget);
+        expect(find.byIcon(Icons.format_italic), findsOneWidget);
+        expect(find.byIcon(Icons.format_strikethrough), findsOneWidget);
+      },
+    );
   });
 }

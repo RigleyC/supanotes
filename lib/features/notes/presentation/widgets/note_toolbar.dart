@@ -14,11 +14,11 @@ library;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/theme/app_typography.dart';
 
 class NoteToolbar extends StatelessWidget {
   const NoteToolbar({
@@ -48,9 +48,13 @@ class NoteToolbar extends StatelessWidget {
             ? editor.context.document.getNodeById(activeNodeId)
             : null;
         final isTask = activeNode is TaskNode;
+        final hasSelection = selection != null && !selection.isCollapsed;
+
+        final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+        final bottomPadding = bottomInset > 0 ? 6.0 : 16.0;
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
             child: BackdropFilter(
@@ -77,112 +81,150 @@ class NoteToolbar extends StatelessWidget {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ToolbarButton(
-                  icon: Icons.format_bold,
-                  tooltip: 'Negrito',
-                  isActive: _selectionHasAttribution(selection, boldAttribution),
-                  onPressed: () => _toggleInline(boldAttribution),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ClipRect(
+                        child: AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.centerLeft,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 180),
+                            opacity: hasSelection ? 1.0 : 0.0,
+                            curve: Curves.easeInOut,
+                            child: hasSelection
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _ToolbarButton(
+                                        icon: Icons.format_bold,
+                                        isActive: _selectionHasAttribution(
+                                          selection,
+                                          boldAttribution,
+                                        ),
+                                        onPressed: () =>
+                                            _toggleInline(boldAttribution),
+                                      ),
+                                      _ToolbarButton(
+                                        icon: Icons.format_italic,
+                                        isActive: _selectionHasAttribution(
+                                          selection,
+                                          italicsAttribution,
+                                        ),
+                                        onPressed: () =>
+                                            _toggleInline(italicsAttribution),
+                                      ),
+                                      _ToolbarButton(
+                                        icon: Icons.format_strikethrough,
+                                        isActive: _selectionHasAttribution(
+                                          selection,
+                                          strikethroughAttribution,
+                                        ),
+                                        onPressed: () => _toggleInline(
+                                          strikethroughAttribution,
+                                        ),
+                                      ),
+                                      const _ToolbarDivider(),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                      _ToolbarButton(
+                        svgAsset: 'assets/icons/h1_icon.svg',
+                        isActive: blockType == header1Attribution,
+                        onPressed: () => _setBlockType(header1Attribution),
+                      ),
+                      _ToolbarButton(
+                        svgAsset: 'assets/icons/h2_icon.svg',
+                        isActive: blockType == header2Attribution,
+                        onPressed: () => _setBlockType(header2Attribution),
+                      ),
+                      _ToolbarButton(
+                        svgAsset: 'assets/icons/h3_icon.svg',
+                        isActive: blockType == header3Attribution,
+                        onPressed: () => _setBlockType(header3Attribution),
+                      ),
+                      _ToolbarButton(
+                        icon: Icons.format_quote,
+                        isActive: blockType == blockquoteAttribution,
+                        onPressed: () => _setBlockType(blockquoteAttribution),
+                      ),
+                      const _ToolbarDivider(),
+                      _ToolbarButton(
+                        icon: Icons.check_box_outlined,
+                        isActive: isTask,
+                        onPressed: _convertToTask,
+                      ),
+                      _ToolbarButton(
+                        icon: Icons.format_list_bulleted,
+                        isActive: selectedListType == ListItemType.unordered,
+                        onPressed: () =>
+                            _convertToListItem(ListItemType.unordered),
+                      ),
+                      _ToolbarButton(
+                        icon: Icons.format_list_numbered,
+                        isActive: selectedListType == ListItemType.ordered,
+                        onPressed: () =>
+                            _convertToListItem(ListItemType.ordered),
+                      ),
+                      ClipRect(
+                        child: AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.centerLeft,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 180),
+                            opacity: isListItem ? 1.0 : 0.0,
+                            curve: Curves.easeInOut,
+                            child: isListItem
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _ToolbarButton(
+                                        icon: Icons.format_indent_increase,
+                                        isActive: false,
+                                        onPressed: _indentListItem,
+                                      ),
+                                      _ToolbarButton(
+                                        icon: Icons.format_indent_decrease,
+                                        isActive: false,
+                                        onPressed: _unindentListItem,
+                                      ),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                      const _ToolbarDivider(),
+                      _ToolbarButton(
+                        icon: Icons.horizontal_rule,
+                        isActive: false,
+                        onPressed: _insertDivider,
+                      ),
+                      const _ToolbarDivider(),
+                      _ToolbarButton(
+                        icon: Icons.image,
+                        isActive: false,
+                        onPressed: onAttachImage,
+                      ),
+                      _ToolbarButton(
+                        icon: Icons.attach_file,
+                        isActive: false,
+                        onPressed: onAttachFile,
+                      ),
+                    ],
+                  ),
                 ),
-                _ToolbarButton(
-                  icon: Icons.format_italic,
-                  tooltip: 'Itálico',
-                  isActive: _selectionHasAttribution(selection, italicsAttribution),
-                  onPressed: () => _toggleInline(italicsAttribution),
-                ),
-                _ToolbarButton(
-                  icon: Icons.format_strikethrough,
-                  tooltip: 'Tachado',
-                  isActive: _selectionHasAttribution(selection, strikethroughAttribution),
-                  onPressed: () => _toggleInline(strikethroughAttribution),
-                ),
-                const _ToolbarDivider(),
-                _LabeledToolbarButton(
-                  label: 'H1',
-                  isActive: blockType == header1Attribution,
-                  onPressed: () => _setBlockType(header1Attribution),
-                ),
-                _LabeledToolbarButton(
-                  label: 'H2',
-                  isActive: blockType == header2Attribution,
-                  onPressed: () => _setBlockType(header2Attribution),
-                ),
-                _LabeledToolbarButton(
-                  label: 'H3',
-                  isActive: blockType == header3Attribution,
-                  onPressed: () => _setBlockType(header3Attribution),
-                ),
-                const _ToolbarDivider(),
-                _ToolbarButton(
-                  icon: Icons.format_list_bulleted,
-                  tooltip: 'Lista',
-                  isActive: selectedListType == ListItemType.unordered,
-                  onPressed: () => _convertToListItem(ListItemType.unordered),
-                ),
-                _ToolbarButton(
-                  icon: Icons.format_list_numbered,
-                  tooltip: 'Lista numerada',
-                  isActive: selectedListType == ListItemType.ordered,
-                  onPressed: () => _convertToListItem(ListItemType.ordered),
-                ),
-                // Indent/unindent: enabled whenever the current node is a list
-                // item. The actual indent cap is enforced by super_editor's
-                // IndentListItemCommand — we don't duplicate that knowledge here.
-                _ToolbarButton(
-                  icon: Icons.format_indent_increase,
-                  tooltip: 'Aumentar indentação',
-                  isActive: false,
-                  onPressed: isListItem ? _indentListItem : null,
-                ),
-                _ToolbarButton(
-                  icon: Icons.format_indent_decrease,
-                  tooltip: 'Diminuir indentação',
-                  isActive: false,
-                  onPressed: isListItem ? _unindentListItem : null,
-                ),
-                _ToolbarButton(
-                  icon: Icons.check_box_outlined,
-                  tooltip: 'Tarefa',
-                  isActive: isTask,
-                  onPressed: _convertToTask,
-                ),
-                _ToolbarButton(
-                  icon: Icons.format_quote,
-                  tooltip: 'Citação',
-                  isActive: blockType == blockquoteAttribution,
-                  onPressed: () => _setBlockType(blockquoteAttribution),
-                ),
-                const _ToolbarDivider(),
-                _ToolbarButton(
-                  icon: Icons.horizontal_rule,
-                  tooltip: 'Divisor',
-                  isActive: false,
-                  onPressed: _insertDivider,
-                ),
-                const _ToolbarDivider(),
-                _ToolbarButton(
-                  icon: Icons.image,
-                  tooltip: 'Anexar imagem',
-                  isActive: false,
-                  onPressed: onAttachImage,
-                ),
-                _ToolbarButton(
-                  icon: Icons.attach_file,
-                  tooltip: 'Anexar arquivo',
-                  isActive: false,
-                  onPressed: onAttachFile,
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    ),
-  );
-},
-);
-}
+        );
+      },
+    );
+  }
 
   String? _activeNodeId(DocumentSelection? selection) {
     if (selection == null) return null;
@@ -202,42 +244,6 @@ class NoteToolbar extends StatelessWidget {
     return null;
   }
 
-  bool _selectionHasAttribution(
-    DocumentSelection? selection,
-    Attribution attribution,
-  ) {
-    if (selection == null) return false;
-    try {
-      final nodes = editor.context.document
-          .getNodesInside(selection.start, selection.end)
-          .whereType<TextNode>();
-      for (final node in nodes) {
-        final start = (selection.start.nodeId == node.id)
-            ? (selection.start.nodePosition as TextNodePosition).offset
-            : 0;
-        final end = (selection.end.nodeId == node.id)
-            ? (selection.end.nodePosition as TextNodePosition).offset
-            : node.text.length;
-        if (start >= end) continue;
-        if (node.text
-            .getAttributionSpansInRange(
-              attributionFilter: (a) => a == attribution,
-              range: SpanRange(start, end),
-            )
-            .isNotEmpty) {
-          return true;
-        }
-      }
-    } catch (_) {
-      // Ignoring errors if nodes were concurrently deleted by sync operations.
-      return false;
-    }
-    return false;
-  }
-
-  void _toggleInline(Attribution attribution) =>
-      NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
-
   ListItemType? _selectedListType(DocumentSelection? selection) {
     if (selection == null) return null;
     try {
@@ -253,10 +259,44 @@ class NoteToolbar extends StatelessWidget {
     return null;
   }
 
+  bool _selectionHasAttribution(
+    DocumentSelection? sel,
+    Attribution attribution,
+  ) {
+    if (sel == null || sel.isCollapsed) return false;
+    try {
+      final nodes = editor.context.document
+          .getNodesInside(sel.start, sel.end)
+          .whereType<TextNode>();
+      for (final node in nodes) {
+        final start = (sel.start.nodeId == node.id)
+            ? (sel.start.nodePosition as TextNodePosition).offset
+            : 0;
+        final end = (sel.end.nodeId == node.id)
+            ? (sel.end.nodePosition as TextNodePosition).offset
+            : node.text.length;
+        if (start >= end) continue;
+        if (node.text
+            .getAttributionSpansInRange(
+              attributionFilter: (a) => a == attribution,
+              range: SpanRange(start, end),
+            )
+            .isNotEmpty) {
+          return true;
+        }
+      }
+    } catch (_) {
+      return false;
+    }
+    return false;
+  }
 
+  void _toggleInline(Attribution attribution) {
+    NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
+  }
 
-  void _setBlockType(Attribution? blockType) {
-    NoteEditorCommands.setBlockType(editor, composer, blockType);
+  void _setBlockType(Attribution? attribution) {
+    NoteEditorCommands.setBlockType(editor, composer, attribution);
   }
 
   void _convertToListItem(ListItemType type) {
@@ -279,74 +319,50 @@ class NoteToolbar extends StatelessWidget {
 
 class _ToolbarButton extends StatelessWidget {
   const _ToolbarButton({
-    required this.icon,
-    required this.tooltip,
+    this.icon,
+    this.svgAsset,
     required this.isActive,
     this.onPressed,
-  });
+  }) : assert(
+         icon != null || svgAsset != null,
+         'Provide either an icon or an svgAsset.',
+       );
 
-  final IconData icon;
-  final String tooltip;
+  final IconData? icon;
+  final String? svgAsset;
   final bool isActive;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return IconButton(
-      icon: Icon(icon),
-      tooltip: tooltip,
-      iconSize: 26,
-      visualDensity: VisualDensity.comfortable,
-      isSelected: isActive,
-      color: colorScheme.onSurface,
-      selectedIcon: Icon(icon, color: colorScheme.primary),
-      onPressed: onPressed,
-    );
-  }
-}
+    final fg = isActive
+        ? colorScheme.primary
+        : (onPressed == null
+              ? colorScheme.onSurface.withValues(alpha: 0.38)
+              : colorScheme.onSurface);
 
-class _LabeledToolbarButton extends StatelessWidget {
-  const _LabeledToolbarButton({
-    required this.label,
-    required this.isActive,
-    required this.onPressed,
-  });
-
-  final String label;
-  final bool isActive;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final fg = isActive ? colorScheme.primary : colorScheme.onSurface;
-    return Tooltip(
-      message: 'Cabeçalho $label',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        onTap: onPressed,
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
-          ),
-          decoration: BoxDecoration(
-            color: isActive
-                ? colorScheme.primary.withValues(alpha: 0.12)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          ),
-          child: Text(
-            label,
-            style: AppTypography.textTheme.labelLarge?.copyWith(
-              color: fg,
-              fontWeight: AppTypography.semibold,
-            ),
-          ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      onTap: onPressed,
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(AppSpacing.xs),
+        decoration: BoxDecoration(
+          color: isActive
+              ? colorScheme.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
         ),
+        child: icon != null
+            ? Icon(icon, size: 26, color: fg)
+            : SvgPicture.asset(
+                svgAsset!,
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+              ),
       ),
     );
   }

@@ -85,25 +85,11 @@ class EditorOperationCapture {
       if (node is TextNode) {
         attrText = node.text;
       }
-      if (node is ParagraphNode) {
-        final bt = node.metadata['blockType'];
-        if (bt is Attribution) bType = bt.id;
-        meta = Map<String, dynamic>.from(node.metadata);
-      } else if (node is TaskNode) {
-        bType = 'task';
+      bType = _codec.blockTypeName(node);
+      if (node is TaskNode) {
         meta = Map<String, dynamic>.from(node.metadata)
           ..['isCompleted'] = node.isComplete;
-      } else if (node is ListItemNode) {
-        bType = node.type == ListItemType.ordered
-            ? 'orderedList'
-            : 'bulletList';
-      } else if (node is HorizontalRuleNode) {
-        bType = 'divider';
-      } else if (node is DocumentAttachmentNode) {
-        bType = 'attachment';
-        meta = Map<String, dynamic>.from(node.metadata);
-      } else if (node is RichLinkNode) {
-        bType = 'rich_link';
+      } else {
         meta = Map<String, dynamic>.from(node.metadata);
       }
       _mirrors[node.id] = _BlockMirror(
@@ -205,25 +191,11 @@ class EditorOperationCapture {
       if (node is TextNode) {
         currentAttrText = node.text;
       }
-      if (node is ParagraphNode) {
-        final bt = node.metadata['blockType'];
-        if (bt is Attribution) currentBType = bt.id;
-        currentMeta = Map<String, dynamic>.from(node.metadata);
-      } else if (node is TaskNode) {
-        currentBType = 'task';
+      currentBType = _codec.blockTypeName(node);
+      if (node is TaskNode) {
         currentMeta = Map<String, dynamic>.from(node.metadata)
           ..['isCompleted'] = node.isComplete;
-      } else if (node is ListItemNode) {
-        currentBType = node.type == ListItemType.ordered
-            ? 'orderedList'
-            : 'bulletList';
-      } else if (node is HorizontalRuleNode) {
-        currentBType = 'divider';
-      } else if (node is DocumentAttachmentNode) {
-        currentBType = 'attachment';
-        currentMeta = Map<String, dynamic>.from(node.metadata);
-      } else if (node is RichLinkNode) {
-        currentBType = 'rich_link';
+      } else {
         currentMeta = Map<String, dynamic>.from(node.metadata);
       }
 
@@ -446,17 +418,22 @@ class EditorOperationCapture {
   }
 
   Set<String> _getAttributionsAt(AttributedText text, int offset) {
-    final attrs = <String>{};
+    if (text.toPlainText().isEmpty) return const {};
+    final active = <String>{};
     for (final marker in text.spans.markers) {
-      if (marker.markerType == SpanMarkerType.start &&
-          marker.offset <= offset) {
-        final end = _codec.findSpanEnd(text.spans.markers, marker);
-        if (end > offset && marker.attribution.id != 'composing') {
-          attrs.add(marker.attribution.id);
+      final attrId = marker.attribution.id;
+      if (attrId == 'composing') continue;
+      if (marker.markerType == SpanMarkerType.start) {
+        if (marker.offset <= offset) {
+          active.add(attrId);
+        }
+      } else if (marker.markerType == SpanMarkerType.end) {
+        if (marker.offset <= offset) {
+          active.remove(attrId);
         }
       }
     }
-    return attrs;
+    return active;
   }
 
   bool _hasComposingAttribution(AttributedText text) {

@@ -171,27 +171,13 @@ See `backend/.env.example` for all required variables.
 4. Implement and update `task.md` as you go.
 5. Create `walkthrough.md` after completion.
 
-## Known Tech Debt
+## System Invariants & Avoidance Rules
 
-### yjs_dart Local Fork (A2 Fix)
+### REST/OT Document Snapshot as Single Source of Truth
 
-The `packages/yjs_dart` dependency is a local fork, not the `^1.1.15` pub.dev version.
-This is because the `yjs_dart` protocol decoder has a bug where unknown root shared types (e.g., `YText` nodes that haven't been proactively requested yet) are silently decoded as `YMap`. 
-If we didn't use this fork, the Flutter app would experience silent data loss (turning paragraphs into empty tasks) or crash with type cast errors (`YMap is not a subtype of YText`).
-**Do not** remove the local path override in `pubspec.yaml` until the upstream `yjs_dart` package correctly infers binary root types without relying on `.getText()` or `.getMap()` pre-registration.
+The REST/OT canonical document snapshot (`notes.document` JSONB) is the single source of truth for note content and task metadata (dueDate, dueTime, recurrence, checked state).
 
-*Update (PendingStructs Retry Patch):* We also patched `lib/src/utils/updates.dart` inside the local fork to move the `pendingStructs` retry logic *outside* the `transact` block. This prevents an unbounded recursion bug during `yjsReadUpdate` that causes severe ANRs in Flutter Debug mode when connecting to large notes with unresolved dependencies.
+- **Task Projections**: `TaskProjectionEngine` projects task blocks from the canonical REST/OT document snapshot into the local Drift SQLite `tasks` table.
+- **UI Editing**: The Flutter UI writes block operations strictly through `NoteSyncSession` / `EditorOperationCapture` / `NoteOperationAdapter`.
+- **Relational Isolation**: Direct, non-projection writes to SQLite `tasks` table are strictly prohibited for task content and metadata changes. All task updates flow through document block operations first.
 
-### Dual-write avoidance document (061)
-
-The YDoc is the single source of truth for task metadata (dueDate, recurrence).
-`YjsSyncManager.projectNodes` propagates these to the SQLite `tasks` table.
-The UI writes ONLY to the YDoc via `NoteEditorController.updateTaskMetadataInYDoc` —
-no separate SQLite update is needed. The projection handles SQLite automatically.
-
-If you add a new metadata field to tasks:
-1. Add it to `YjsTaskEntry` model (`lib/features/notes/domain/yjs_task_entry.dart`)
-2. Write it to the YDoc via the bridge (the bridge's `updateTaskMetadataInYDoc` already uses `YjsTaskEntry.copyWith`)
-3. Optionally propagate it in `YjsSyncManager.projectNodes` if the SQLite table needs it for queries
-
-The SQLite update path (`TaskController.updateTaskMetadata` + `TasksRepository.updateTask`) is the *legacy* code path and should NOT be called from the UI for metadata-only changes. It exists for batch operations and catch-up scenarios. New features should go through YDoc first.

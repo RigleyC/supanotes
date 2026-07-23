@@ -14,8 +14,8 @@ import 'package:supanotes/features/notes/presentation/widgets/attachment_compone
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor_config.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
+import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 
@@ -194,6 +194,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           );
         }
 
+        final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
         return Stack(
           children: [
             Positioned.fill(
@@ -218,7 +220,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 0,
+                bottom: bottomInset,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
