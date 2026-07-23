@@ -12,6 +12,7 @@ class NoteOp {
   final String kind;
   final String? blockId;
   final Map<String, dynamic> payload;
+  final quill.Delta? cachedDelta;
 
   NoteOp({
     required this.operationId,
@@ -20,7 +21,35 @@ class NoteOp {
     required this.kind,
     required this.blockId,
     required this.payload,
+    this.cachedDelta,
   });
+
+  factory NoteOp.fromData({
+    required String operationId,
+    required String actorId,
+    int? revision,
+    required String kind,
+    required String? blockId,
+    required Map<String, dynamic> payload,
+    quill.Delta? cachedDelta,
+  }) {
+    quill.Delta? delta = cachedDelta;
+    if (delta == null && kind == 'text_delta' && payload.containsKey('ops')) {
+      final ops = payload['ops'];
+      if (ops is List) {
+        delta = quill.Delta.fromJson(ops);
+      }
+    }
+    return NoteOp(
+      operationId: operationId,
+      actorId: actorId,
+      revision: revision,
+      kind: kind,
+      blockId: blockId,
+      payload: payload,
+      cachedDelta: delta,
+    );
+  }
 }
 
 class NoteOperationRebaser {
@@ -46,7 +75,7 @@ class NoteOperationRebaser {
 
     var currentRemote = remote
         .map(
-          (r) => NoteOp(
+          (r) => NoteOp.fromData(
             operationId: r.operationId,
             actorId: r.actorId,
             revision: r.revision,
@@ -59,12 +88,13 @@ class NoteOperationRebaser {
 
     if (inFlight != null && inFlight.isNotEmpty) {
       for (final inFlightData in inFlight) {
-        final inFlightOp = NoteOp(
+        final payload = jsonDecode(inFlightData.payloadJson) as Map<String, dynamic>;
+        final inFlightOp = NoteOp.fromData(
           operationId: inFlightData.operationId,
           actorId: localActorId,
           kind: inFlightData.kind,
           blockId: inFlightData.blockId,
-          payload: jsonDecode(inFlightData.payloadJson) as Map<String, dynamic>,
+          payload: payload,
         );
 
         final acceptedRev = acceptedRevisions[inFlightOp.operationId];
@@ -90,9 +120,15 @@ class NoteOperationRebaser {
     }
 
     final result = <PendingNoteOperationData>[];
+    var activeRemote = currentRemote;
+
     for (int i = 0; i < pending.length; i++) {
       final pendingData = pending[i];
-      var pOp = NoteOp(
+      if (acceptedRevisions.containsKey(pendingData.operationId)) {
+        continue;
+      }
+
+      var pOp = NoteOp.fromData(
         operationId: pendingData.operationId,
         actorId: localActorId,
         kind: pendingData.kind,
@@ -101,20 +137,29 @@ class NoteOperationRebaser {
       );
 
       bool dropped = false;
-      for (final r in currentRemote) {
+      final nextRemote = <NoteOp>[];
+
+      for (final r in activeRemote) {
         final localKey = '$localActorId:${pOp.operationId}';
         final remoteKey = '${r.actorId}:${r.operationId}';
         final pHasPriority = localKey.compareTo(remoteKey) > 0;
 
-        final transformed = _transformOp(pOp, r, pHasPriority);
-        if (transformed == null) {
+        final transformedP = _transformOp(pOp, r, pHasPriority);
+        if (transformedP == null) {
           dropped = true;
           break;
         }
-        pOp = transformed;
+
+        final transformedR = _transformOp(r, pOp, !pHasPriority);
+        if (transformedR != null) {
+          nextRemote.add(transformedR);
+        }
+
+        pOp = transformedP;
       }
 
       if (dropped) continue;
+      activeRemote = nextRemote;
 
       result.add(
         PendingNoteOperationData(
@@ -163,10 +208,10 @@ class NoteOperationRebaser {
       final appliedOps = appliedOp.payload['ops'];
       if (opToTransformOps == null || appliedOps == null) return opToTransform;
 
-      final opToTransformDelta = quill.Delta.fromJson(
-        opToTransformOps as List<dynamic>,
-      );
-      final appliedDelta = quill.Delta.fromJson(appliedOps as List<dynamic>);
+      final opToTransformDelta = opToTransform.cachedDelta ??
+          quill.Delta.fromJson(opToTransformOps as List<dynamic>);
+      final appliedDelta = appliedOp.cachedDelta ??
+          quill.Delta.fromJson(appliedOps as List<dynamic>);
 
       final transformedDelta = appliedDelta.transform(
         opToTransformDelta,
@@ -176,13 +221,14 @@ class NoteOperationRebaser {
       final newPayload = Map<String, dynamic>.from(opToTransform.payload);
       newPayload['ops'] = transformedDelta.toJson();
 
-      return NoteOp(
+      return NoteOp.fromData(
         operationId: opToTransform.operationId,
         actorId: opToTransform.actorId,
         revision: opToTransform.revision,
         kind: opToTransform.kind,
         blockId: opToTransform.blockId,
         payload: newPayload,
+        cachedDelta: transformedDelta,
       );
     }
 

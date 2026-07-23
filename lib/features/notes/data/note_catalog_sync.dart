@@ -124,6 +124,10 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
       await sync.pullRemoteNotes(user.id);
       yield null;
     } catch (error, stackTrace) {
+      if (error is NoteOperationsException && error.statusCode == 401) {
+        dev.log('[NoteCatalogSync] Stopped (unauthenticated 401)');
+        break;
+      }
       dev.log(
         '[NoteCatalogSync] Pull failed',
         error: error,

@@ -233,11 +233,41 @@ func seedUserDefaults(ctx context.Context, q sqlcgen.Querier, userID pgtype.UUID
 	}
 
 	content := "# Boas-vindas\n\nBem-vindo ao SupaNotes!"
-	if _, err := q.CreateNote(ctx, sqlcgen.CreateNoteParams{
+	note, err := q.CreateNote(ctx, sqlcgen.CreateNoteParams{
 		UserID:  userID,
 		Content: content,
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("auth: seed welcome note: %w", err)
+	}
+
+	docJSON := []byte(`{
+		"schemaVersion": 1,
+		"blocks": [
+			{
+				"id": "welcome-header",
+				"type": "header1",
+				"delta": [{"insert": "Boas-vindas"}],
+				"metadata": {}
+			},
+			{
+				"id": "welcome-para",
+				"type": "paragraph",
+				"delta": [{"insert": "Bem-vindo ao SupaNotes!"}],
+				"metadata": {}
+			}
+		]
+	}`)
+
+	if err := q.UpdateNoteDocument(ctx, sqlcgen.UpdateNoteDocumentParams{
+		ID:               note.ID,
+		Document:         docJSON,
+		Revision:         0,
+		Content:          content,
+		Excerpt:          pgtype.Text{String: "Bem-vindo ao SupaNotes!", Valid: true},
+		SnapshotRevision: 0,
+	}); err != nil {
+		return fmt.Errorf("auth: update welcome note document: %w", err)
 	}
 
 	return nil
