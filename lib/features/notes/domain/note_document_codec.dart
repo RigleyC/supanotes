@@ -524,24 +524,62 @@ class NoteDocumentCodec {
         id: nodeId,
         text: text,
         isComplete: isTaskComplete,
-        metadata: {'blockType': header2Attribution},
+        metadata: metadata ?? {},
+      );
+    }
+    if (type == 'header1') {
+      return ParagraphNode(
+        id: nodeId,
+        text: text,
+        metadata: {
+          'blockType': header1Attribution,
+          if (metadata != null) ...metadata,
+        },
+      );
+    }
+    if (type == 'header2') {
+      return ParagraphNode(
+        id: nodeId,
+        text: text,
+        metadata: {
+          'blockType': header2Attribution,
+          if (metadata != null) ...metadata,
+        },
       );
     }
     if (type == 'header3') {
       return ParagraphNode(
         id: nodeId,
         text: text,
-        metadata: {'blockType': header3Attribution},
+        metadata: {
+          'blockType': header3Attribution,
+          if (metadata != null) ...metadata,
+        },
       );
     }
     if (type == 'quote') {
       return ParagraphNode(
         id: nodeId,
         text: text,
-        metadata: {'blockType': blockquoteAttribution},
+        metadata: {
+          'blockType': blockquoteAttribution,
+          if (metadata != null) ...metadata,
+        },
       );
     }
-    return ParagraphNode(id: nodeId, text: text);
+    final blockTypeAttr = attributionFromName(type);
+    final ParagraphNode paragraph = ParagraphNode(
+      id: nodeId,
+      text: text,
+      metadata: {
+        if (blockTypeAttr != null) 'blockType': blockTypeAttr,
+        if (metadata != null) ...metadata,
+      },
+    );
+    if (blockTypeAttr == null) {
+      paragraph.metadata.remove('blockType');
+    }
+    return paragraph;
   }
 
   AttributedText attributedFromDelta(List<dynamic>? delta) {
