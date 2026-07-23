@@ -49,7 +49,7 @@ void main() {
       expect(textDeltaOp.blockId, 'n1');
 
       final opsList = textDeltaOp.payload['ops'] as List<dynamic>;
-      expect(opsList.first['retain'], 4);
+      expect(opsList.first['retain'], 5);
       expect(opsList.first['attributes'], {'bold': true});
     });
 

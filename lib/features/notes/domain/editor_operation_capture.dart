@@ -427,7 +427,7 @@ class EditorOperationCapture {
           active.add(attrId);
         }
       } else if (marker.markerType == SpanMarkerType.end) {
-        if (marker.offset <= offset) {
+        if (marker.offset < offset) {
           active.remove(attrId);
         }
       }
