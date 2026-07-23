@@ -14,6 +14,7 @@ library;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -334,29 +335,39 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   void _toggleInline(Attribution attribution) {
+    HapticFeedback.selectionClick();
     NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
   }
 
   void _setBlockType(Attribution? attribution) {
+    HapticFeedback.selectionClick();
     NoteEditorCommands.setBlockType(editor, composer, attribution);
   }
 
   void _convertToListItem(ListItemType type) {
+    HapticFeedback.selectionClick();
     NoteEditorCommands.convertToListItem(editor, composer, type);
   }
 
   void _convertToTask() {
+    HapticFeedback.selectionClick();
     NoteEditorCommands.convertToTask(editor, composer);
   }
 
-  void _indentListItem() =>
-      NoteEditorCommands.indentListItems(editor, composer);
+  void _indentListItem() {
+    HapticFeedback.selectionClick();
+    NoteEditorCommands.indentListItems(editor, composer);
+  }
 
-  void _unindentListItem() =>
-      NoteEditorCommands.unindentListItems(editor, composer);
+  void _unindentListItem() {
+    HapticFeedback.selectionClick();
+    NoteEditorCommands.unindentListItems(editor, composer);
+  }
 
-  void _insertDivider() =>
-      NoteEditorCommands.insertDivider(editor, dividerCount: 35);
+  void _insertDivider() {
+    HapticFeedback.selectionClick();
+    NoteEditorCommands.insertDivider(editor, dividerCount: 35);
+  }
 }
 
 class _ToolbarButton extends StatelessWidget {

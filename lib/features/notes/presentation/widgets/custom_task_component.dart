@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/notes/presentation/widgets/task_text_style_resolver.dart';
@@ -58,6 +59,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     }
 
     Future<void> updateCompletion(bool isComplete) async {
+      HapticFeedback.lightImpact();
       if (isComplete) {
         if (hideCompleted && !isRecurring) {
           FocusManager.instance.primaryFocus?.unfocus();
@@ -107,7 +109,10 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       hideCompleted: hideCompleted,
       onLongPress: onTaskLongPress == null
           ? null
-          : () => onTaskLongPress!(nodeId),
+          : () {
+              HapticFeedback.mediumImpact();
+              onTaskLongPress!(nodeId);
+            },
     );
   }
 }
@@ -302,7 +307,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 11, top: 3),
+                      padding: const EdgeInsets.only(left: 11),
                       child: AppTaskCheckbox(
                         value: _isComplete,
                         accentColor: taskColor,

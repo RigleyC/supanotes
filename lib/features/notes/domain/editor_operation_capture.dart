@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/debug/note_sync_debug.dart';
-import 'attachment_nodes.dart';
 import 'note_document_codec.dart';
 
 class OperationRequestData {

@@ -4,6 +4,8 @@ import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
+import 'package:flutter/services.dart';
+
 import '../../domain/task_model.dart';
 
 class TaskTile extends StatelessWidget {
@@ -40,8 +42,16 @@ class TaskTile extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onToggleComplete == null
             ? null
-            : () => onToggleComplete!(!isCompleted),
-        onLongPress: onOpenMetadata,
+            : () {
+                HapticFeedback.lightImpact();
+                onToggleComplete!(!isCompleted);
+              },
+        onLongPress: onOpenMetadata == null
+            ? null
+            : () {
+                HapticFeedback.mediumImpact();
+                onOpenMetadata!();
+              },
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
