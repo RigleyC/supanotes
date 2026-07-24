@@ -80,6 +80,8 @@ dependencies:
   file_picker: ^8.0.0
   flutter_markdown_plus: ^1.0.7
   super_clipboard: ^0.9.1
+  super_context_menu: ^0.9.1
+  window_manager: ^0.4.3
 
   # Motion
   motor: ^1.1.0

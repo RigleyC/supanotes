@@ -18,9 +18,24 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 import 'package:supanotes/features/notes/data/note_catalog_sync.dart';
+import 'package:window_manager/window_manager.dart';
+import 'core/utils/platform_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (isDesktopPlatform()) {
+    await windowManager.ensureInitialized();
+    const windowOptions = WindowOptions(
+      size: Size(1280, 720),
+      minimumSize: Size(800, 600),
+      center: true,
+      title: AppConstants.appName,
+    );
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
   initializeTimeZones();
 
   try {
