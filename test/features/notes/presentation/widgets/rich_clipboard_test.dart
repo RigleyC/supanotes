@@ -7,6 +7,7 @@ import 'package:super_native_extensions/src/native/context.dart';
 import 'package:irondash_message_channel/irondash_message_channel.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
+import 'package:supanotes/features/notes/presentation/widgets/slash_command_overlay.dart';
 
 class MockEditor extends Mock implements Editor {}
 class MockDocumentLayout extends Mock implements DocumentLayout {}
@@ -52,11 +53,12 @@ void main() {
 
       final richActions = buildRichKeyboardActions(baseActions: baseActions);
 
-      expect(richActions.length, equals(4));
-      expect(richActions[0], equals(copyAsRichTextWhenCmdCOrCtrlCIsPressed));
-      expect(richActions[1], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
-      expect(richActions[2], equals(pastePreprocessedRichText));
-      expect(richActions[3], equals(doNothingWhenThereIsNoSelection));
+      expect(richActions.length, equals(5));
+      expect(richActions[0], equals(handleSlashMenuKeyboard));
+      expect(richActions[1], equals(copyAsRichTextWhenCmdCOrCtrlCIsPressed));
+      expect(richActions[2], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
+      expect(richActions[3], equals(pastePreprocessedRichText));
+      expect(richActions[4], equals(doNothingWhenThereIsNoSelection));
     });
   });
 
