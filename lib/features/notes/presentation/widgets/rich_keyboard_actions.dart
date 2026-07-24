@@ -5,6 +5,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 
 import 'clipboard_preprocessor.dart';
+import 'slash_command_overlay.dart';
 
 /// A [SuperEditor] keyboard action that cuts the document selection as rich text
 /// with plain text fallback when CMD + X (Mac) or CTRL + X (Windows/Linux) is pressed.
@@ -66,6 +67,7 @@ List<SuperEditorKeyboardAction> buildRichKeyboardActions({
   required List<SuperEditorKeyboardAction> baseActions,
 }) {
   return [
+    handleSlashMenuKeyboard,
     copyAsRichTextWhenCmdCOrCtrlCIsPressed,
     cutAsRichTextWhenCmdXOrCtrlXIsPressed,
     pastePreprocessedRichText,

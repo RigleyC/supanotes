@@ -13,6 +13,8 @@ import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
 import 'package:supanotes/features/notes/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/core/utils/platform_utils.dart';
+import 'package:supanotes/features/notes/presentation/widgets/slash_command_overlay.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor_config.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_overlay.dart';
@@ -196,6 +198,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
         final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
+        final isDesktop = isDesktopLayout(context);
+
         return Stack(
           children: [
             Positioned.fill(
@@ -216,31 +220,43 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                 ),
               ),
             ),
-            if (!widget.isReadOnly)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: bottomInset,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    NoteSuggestionOverlay(
-                      editor: controller.editor!,
-                      composer: controller.composer!,
-                      currentNoteId: widget.noteId,
-                      onPersist: () async {},
-                    ),
-                    NoteToolbar(
-                      editor: controller.editor!,
-                      composer: controller.composer!,
-                      onAttachFile: () =>
-                          controller.pickAndAttachFile(imageOnly: false),
-                      onAttachImage: () =>
-                          controller.pickAndAttachFile(imageOnly: true),
-                    ),
-                  ],
-                ),
+            if (!widget.isReadOnly) ...[
+              SlashCommandOverlay(
+                editor: controller.editor!,
+                composer: controller.composer!,
+                documentLayoutResolver: () =>
+                    _docLayoutKey.currentState as DocumentLayout,
+                onAttachFile: () =>
+                    controller.pickAndAttachFile(imageOnly: false),
+                onAttachImage: () =>
+                    controller.pickAndAttachFile(imageOnly: true),
               ),
+              if (!isDesktop)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: bottomInset,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      NoteSuggestionOverlay(
+                        editor: controller.editor!,
+                        composer: controller.composer!,
+                        currentNoteId: widget.noteId,
+                        onPersist: () async {},
+                      ),
+                      NoteToolbar(
+                        editor: controller.editor!,
+                        composer: controller.composer!,
+                        onAttachFile: () =>
+                            controller.pickAndAttachFile(imageOnly: false),
+                        onAttachImage: () =>
+                            controller.pickAndAttachFile(imageOnly: true),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ],
         );
       },
