@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:super_context_menu/super_context_menu.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
@@ -241,63 +242,82 @@ class _SidebarNoteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Material(
-        color: isSelected
-            ? scheme.secondaryContainer
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
+    return ContextMenuWidget(
+      menuProvider: (request) {
+        return Menu(
+          children: [
+            MenuAction(
+              title: note.favorite ? 'Remover favorito' : 'Favoritar',
+              image: MenuImage.icon(
+                note.favorite ? Icons.star_border : Icons.star,
+              ),
+              callback: onToggleFavorite,
+            ),
+            MenuAction(
+              title: 'Excluir nota',
+              attributes: const MenuActionAttributes(destructive: true),
+              image: MenuImage.icon(Icons.delete_outline),
+              callback: onDelete,
+            ),
+          ],
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Material(
+          color: isSelected ? scheme.secondaryContainer : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        note.title.isEmpty ? 'Sem título' : note.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.w500,
-                          color: isSelected
-                              ? scheme.onSecondaryContainer
-                              : scheme.onSurface,
-                        ),
-                      ),
-                      if (note.excerpt != null && note.excerpt!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            note.excerpt!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isSelected
-                                  ? scheme.onSecondaryContainer
-                                      .withValues(alpha: 0.7)
-                                  : scheme.onSurfaceVariant,
-                            ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          note.title.isEmpty ? 'Sem título' : note.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight:
+                                isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected
+                                ? scheme.onSecondaryContainer
+                                : scheme.onSurface,
                           ),
                         ),
-                    ],
+                        if (note.excerpt != null && note.excerpt!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              note.excerpt!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isSelected
+                                    ? scheme.onSecondaryContainer
+                                        .withValues(alpha: 0.7)
+                                    : scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                if (note.favorite)
-                  Icon(
-                    Icons.star_rate_rounded,
-                    size: 16,
-                    color: scheme.tertiary,
-                  ),
-              ],
+                  if (note.favorite)
+                    Icon(
+                      Icons.star_rate_rounded,
+                      size: 16,
+                      color: scheme.tertiary,
+                    ),
+                ],
+              ),
             ),
           ),
         ),

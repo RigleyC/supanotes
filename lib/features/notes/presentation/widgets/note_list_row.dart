@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:super_context_menu/super_context_menu.dart';
 
 import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../domain/note_model.dart';
@@ -23,7 +24,27 @@ class NoteListRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final title = note.title;
 
-    return Dismissible(
+    return ContextMenuWidget(
+      menuProvider: (request) {
+        return Menu(
+          children: [
+            MenuAction(
+              title: note.favorite ? 'Remover favorito' : 'Favoritar',
+              image: MenuImage.icon(
+                note.favorite ? Icons.star_border : Icons.star,
+              ),
+              callback: onToggleFavorite,
+            ),
+            MenuAction(
+              title: 'Apagar',
+              attributes: const MenuActionAttributes(destructive: true),
+              image: MenuImage.icon(Icons.delete_outline),
+              callback: onDelete,
+            ),
+          ],
+        );
+      },
+      child: Dismissible(
       key: ValueKey('note-${note.id}'),
       direction: DismissDirection.horizontal,
       background: Container(
@@ -101,10 +122,11 @@ class NoteListRow extends StatelessWidget {
               ),
               if (note.favorite)
                 Icon(Icons.star_rate_rounded, size: 18, color: scheme.tertiary),
-            ],
-          ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+    ),
+  );
+}
 }

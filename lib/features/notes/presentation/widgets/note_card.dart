@@ -1,5 +1,6 @@
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:super_context_menu/super_context_menu.dart';
 
 import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../domain/note_model.dart';
@@ -29,8 +30,28 @@ class NoteCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return GestureDetector(
-      onTap: onTap,
+    return ContextMenuWidget(
+      menuProvider: (request) {
+        return Menu(
+          children: [
+            MenuAction(
+              title: note.favorite ? 'Remover favorito' : 'Favoritar',
+              image: MenuImage.icon(
+                note.favorite ? Icons.star_border : Icons.star,
+              ),
+              callback: onToggleFavorite,
+            ),
+            MenuAction(
+              title: 'Apagar',
+              attributes: const MenuActionAttributes(destructive: true),
+              image: MenuImage.icon(Icons.delete_outline),
+              callback: () => _confirmDelete(context),
+            ),
+          ],
+        );
+      },
+      child: GestureDetector(
+        onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -125,8 +146,9 @@ class NoteCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _confirmDelete(BuildContext context) async {
     final confirmed = await showConfirmDialog(
