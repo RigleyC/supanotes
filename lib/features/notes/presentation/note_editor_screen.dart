@@ -26,6 +26,8 @@ import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
+import 'package:supanotes/core/utils/platform_utils.dart';
+
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
 
@@ -114,6 +116,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
+        automaticallyImplyLeading: !isDesktopLayout(context),
         flexibleSpace: ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),

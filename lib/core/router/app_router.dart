@@ -13,6 +13,7 @@ import 'package:supanotes/features/auth/presentation/login_screen.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/features/auth/presentation/splash_screen.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
+import 'package:supanotes/features/notes/presentation/adaptive_notes_shell.dart';
 import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
 import 'package:supanotes/features/settings/presentation/mcp_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
@@ -38,11 +39,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.register,
         builder: (_, _) => const RegisterScreen(),
       ),
-      GoRoute(path: AppRoutes.home, builder: (_, _) => const NotesListScreen()),
-      GoRoute(
-        path: AppRoutes.note(':id'),
-        builder: (_, state) =>
-            NoteEditorScreen(noteId: state.pathParameters['id']!),
+      ShellRoute(
+        builder: (context, state, child) => AdaptiveNotesShell(child: child),
+        routes: [
+          GoRoute(
+            path: AppRoutes.home,
+            builder: (_, _) => const NotesListScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.note(':id'),
+            builder: (_, state) =>
+                NoteEditorScreen(noteId: state.pathParameters['id']!),
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutes.settings,

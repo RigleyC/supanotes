@@ -23,6 +23,9 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/features/notes/presentation/widgets/notes_more_menu.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
+import 'package:supanotes/core/utils/platform_utils.dart';
+import 'package:supanotes/shared/widgets/empty_state.dart';
+
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
 
@@ -62,6 +65,16 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isDesktopLayout(context)) {
+      return const Scaffold(
+        body: EmptyState(
+          icon: Icons.edit_note_outlined,
+          title: 'Selecione uma nota',
+          subtitle: 'Escolha uma nota na lista ao lado ou crie uma nova.',
+        ),
+      );
+    }
+
     final isGridView = ref.watch(isGridViewProvider);
     final notesAsync = ref.watch(activeNotesProvider);
     final trimmedSearchQuery = _searchQuery.trim();
