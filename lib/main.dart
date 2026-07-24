@@ -27,7 +27,7 @@ void main() async {
     await windowManager.ensureInitialized();
     const windowOptions = WindowOptions(
       size: Size(1280, 720),
-      minimumSize: Size(800, 600),
+      minimumSize: Size(360, 480),
       center: true,
       title: AppConstants.appName,
     );
