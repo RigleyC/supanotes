@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/fmpwizard/go-quilljs-delta/delta"
 	"github.com/stretchr/testify/assert"
@@ -357,6 +359,21 @@ func TestDeriveContentExcerptTruncated(t *testing.T) {
 
 	_, excerpt := DeriveContentFromDocument(doc)
 	assert.LessOrEqual(t, len(excerpt), 200)
+}
+
+func TestDeriveContentExcerptDoesNotSplitUTF8Character(t *testing.T) {
+	content := strings.Repeat("a", 199) + "á"
+	doc := Document{
+		SchemaVersion: 1,
+		Blocks: []Block{
+			{ID: "b1", Type: string(BlockParagraph), Delta: []delta.Op{{Insert: []rune(content)}}, Metadata: map[string]any{}},
+		},
+	}
+
+	_, excerpt := DeriveContentFromDocument(doc)
+
+	assert.True(t, utf8.ValidString(excerpt))
+	assert.Equal(t, content, excerpt)
 }
 
 func TestApplyInvalidKind(t *testing.T) {

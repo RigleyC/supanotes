@@ -297,8 +297,9 @@ func DeriveContentFromDocument(doc Document) (content, excerpt string) {
 		}
 	}
 	content = strings.Join(parts, "\n")
-	if len(content) > 200 {
-		excerpt = content[:200]
+	runes := []rune(content)
+	if len(runes) > 200 {
+		excerpt = string(runes[:200])
 	} else {
 		excerpt = content
 	}
