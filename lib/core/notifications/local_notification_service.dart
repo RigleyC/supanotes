@@ -11,8 +11,10 @@ class LocalNotificationService {
   LocalNotificationService({FlutterLocalNotificationsPlugin? plugin})
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
+  bool get isSupportedPlatform => Platform.isAndroid || Platform.isIOS;
+
   Future<void> initialize() async {
-    if (_initialized) return;
+    if (_initialized || !isSupportedPlatform) return;
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       iOS: DarwinInitializationSettings(
@@ -26,6 +28,7 @@ class LocalNotificationService {
   }
 
   Future<void> requestPermissions() async {
+    if (!isSupportedPlatform) return;
     await initialize();
     if (Platform.isIOS) {
       final granted = await _plugin
@@ -48,6 +51,7 @@ class LocalNotificationService {
     String body,
     DateTime date,
   ) async {
+    if (!isSupportedPlatform) return;
     await initialize();
     final tzDate = tz.TZDateTime.from(date, tz.local);
     dev.log('[Notifications] Scheduling "$title" at $tzDate (local=${tz.local.name})');
@@ -74,15 +78,18 @@ class LocalNotificationService {
   }
 
   Future<void> cancel(int id) async {
+    if (!isSupportedPlatform) return;
     await _plugin.cancel(id: id);
   }
 
   Future<void> cancelAll() async {
+    if (!isSupportedPlatform) return;
     await _plugin.cancelAll();
   }
 
   /// Returns the list of pending notification requests from the platform.
   Future<List<PendingNotificationRequest>> getPendingNotificationRequests() async {
+    if (!isSupportedPlatform) return [];
     await initialize();
     return await _plugin.pendingNotificationRequests();
   }
