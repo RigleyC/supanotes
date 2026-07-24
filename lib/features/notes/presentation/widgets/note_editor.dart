@@ -227,6 +227,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                   composer: controller.composer!,
                   documentLayoutResolver: () =>
                       _docLayoutKey.currentState as DocumentLayout,
+                  documentLayoutContextResolver: () =>
+                      _docLayoutKey.currentContext,
                   onAttachFile: () =>
                       controller.pickAndAttachFile(imageOnly: false),
                   onAttachImage: () =>

@@ -118,6 +118,7 @@ class SlashCommandOverlay extends StatefulWidget {
   final Editor editor;
   final DocumentComposer composer;
   final DocumentLayout Function() documentLayoutResolver;
+  final BuildContext? Function() documentLayoutContextResolver;
   final VoidCallback? onAttachImage;
   final VoidCallback? onAttachFile;
 
@@ -126,6 +127,7 @@ class SlashCommandOverlay extends StatefulWidget {
     required this.editor,
     required this.composer,
     required this.documentLayoutResolver,
+    required this.documentLayoutContextResolver,
     this.onAttachImage,
     this.onAttachFile,
   });
@@ -200,11 +202,11 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
       return;
     }
 
-    // Resolve caret position in local overlay coordinate space
+    // Resolve caret position in local overlay coordinate space safely
     try {
       final docLayout = widget.documentLayoutResolver();
-      final docBox =
-          (docLayout as State).context.findRenderObject() as RenderBox?;
+      final docContext = widget.documentLayoutContextResolver();
+      final docBox = docContext?.findRenderObject() as RenderBox?;
       if (docBox != null && docBox.attached) {
         final caretInDoc = docLayout.getRectForPosition(position);
         if (caretInDoc != null) {

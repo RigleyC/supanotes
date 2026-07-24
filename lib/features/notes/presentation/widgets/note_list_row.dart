@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:super_context_menu/super_context_menu.dart';
 
 import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../domain/note_model.dart';
 import '../../domain/note_strings.dart';
+import 'note_context_menu.dart';
 
 class NoteListRow extends StatelessWidget {
   const NoteListRow({
@@ -24,26 +24,10 @@ class NoteListRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final title = note.title;
 
-    return ContextMenuWidget(
-      menuProvider: (request) {
-        return Menu(
-          children: [
-            MenuAction(
-              title: note.favorite ? 'Remover favorito' : 'Favoritar',
-              image: MenuImage.icon(
-                note.favorite ? Icons.star_border : Icons.star,
-              ),
-              callback: onToggleFavorite,
-            ),
-            MenuAction(
-              title: 'Apagar',
-              attributes: const MenuActionAttributes(destructive: true),
-              image: MenuImage.icon(Icons.delete_outline),
-              callback: onDelete,
-            ),
-          ],
-        );
-      },
+    return NoteContextMenuWidget(
+      note: note,
+      onToggleFavorite: onToggleFavorite,
+      onDelete: onDelete,
       child: Dismissible(
       key: ValueKey('note-${note.id}'),
       direction: DismissDirection.horizontal,

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:super_context_menu/super_context_menu.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'note_context_menu.dart';
 
 enum NoteFilterTab { all, favorites }
 
@@ -31,6 +31,23 @@ class NotesSidebar extends ConsumerStatefulWidget {
 class _NotesSidebarState extends ConsumerState<NotesSidebar> {
   String _searchQuery = '';
   NoteFilterTab _activeTab = NoteFilterTab.all;
+
+  List<NoteModel> _filterNotes(List<NoteModel> notes) {
+    var result = notes;
+    if (_activeTab == NoteFilterTab.favorites) {
+      result = result.where((n) => n.favorite).toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      result = result.where((n) {
+        final titleMatch = n.title.toLowerCase().contains(q);
+        final bodyMatch =
+            (n.excerpt ?? n.content ?? '').toLowerCase().contains(q);
+        return titleMatch || bodyMatch;
+      }).toList();
+    }
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,19 +152,7 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
                 subtitle: e.toString(),
               ),
               data: (notes) {
-                var filtered = notes;
-                if (_activeTab == NoteFilterTab.favorites) {
-                  filtered = filtered.where((n) => n.favorite).toList();
-                }
-                if (_searchQuery.isNotEmpty) {
-                  final q = _searchQuery.toLowerCase();
-                  filtered = filtered.where((n) {
-                    final titleMatch = n.title.toLowerCase().contains(q);
-                    final bodyMatch =
-                        (n.excerpt ?? n.content ?? '').toLowerCase().contains(q);
-                    return titleMatch || bodyMatch;
-                  }).toList();
-                }
+                final filtered = _filterNotes(notes);
 
                 if (filtered.isEmpty) {
                   return Center(
@@ -242,26 +247,10 @@ class _SidebarNoteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return ContextMenuWidget(
-      menuProvider: (request) {
-        return Menu(
-          children: [
-            MenuAction(
-              title: note.favorite ? 'Remover favorito' : 'Favoritar',
-              image: MenuImage.icon(
-                note.favorite ? Icons.star_border : Icons.star,
-              ),
-              callback: onToggleFavorite,
-            ),
-            MenuAction(
-              title: 'Excluir nota',
-              attributes: const MenuActionAttributes(destructive: true),
-              image: MenuImage.icon(Icons.delete_outline),
-              callback: onDelete,
-            ),
-          ],
-        );
-      },
+    return NoteContextMenuWidget(
+      note: note,
+      onToggleFavorite: onToggleFavorite,
+      onDelete: onDelete,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         child: Material(
