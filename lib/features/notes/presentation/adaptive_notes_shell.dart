@@ -57,7 +57,7 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
           ResizeDragHandle(
             onDrag: (delta) {
               setState(() {
-                _sidebarWidth = (_sidebarWidth + delta).clamp(260.0, 480.0);
+                _sidebarWidth = (_sidebarWidth + delta).clamp(180.0, 550.0);
               });
             },
           ),

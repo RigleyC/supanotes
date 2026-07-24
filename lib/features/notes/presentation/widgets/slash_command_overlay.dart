@@ -357,22 +357,27 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
 
         double left = 32.0;
         double top = 80.0;
+        const menuWidth = 260.0;
+        const estimatedMenuHeight = 240.0;
 
         if (caretRect != null && overlaySize != null) {
           left = caretRect.left;
-          top = caretRect.bottom + 4; // Below caret line
+          top = caretRect.bottom + 6.0; // Place below caret by default
 
-          // Prevent right edge overflow
-          if (left + 260 > overlaySize.width - 16) {
-            left = overlaySize.width - 260 - 16;
-          }
-          if (left < 16) left = 16;
+          final spaceBelow = overlaySize.height - caretRect.bottom;
+          final spaceAbove = caretRect.top;
 
-          // Prevent bottom edge overflow (flip above caret if needed)
-          if (top + 280 > overlaySize.height - 16) {
-            top =
-                (caretRect.top - 280 - 4).clamp(16.0, overlaySize.height - 280);
+          // Flip above ONLY if space below is insufficient and space above is greater
+          if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
+            top = (caretRect.top - estimatedMenuHeight - 6.0)
+                .clamp(16.0, overlaySize.height - 60.0);
           }
+
+          // Clamp horizontally to stay inside visible bounds
+          left = left.clamp(
+            16.0,
+            (overlaySize.width - menuWidth - 16.0).clamp(16.0, double.infinity),
+          );
         }
 
         return Stack(
@@ -389,7 +394,7 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
   }
 }
 
-class _SlashMenuCard extends StatelessWidget {
+class _SlashMenuCard extends StatefulWidget {
   final List<SlashCommandOption> options;
   final int selectedIndex;
   final ValueChanged<SlashCommandOption> onSelect;
@@ -399,6 +404,51 @@ class _SlashMenuCard extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelect,
   });
+
+  @override
+  State<_SlashMenuCard> createState() => _SlashMenuCardState();
+}
+
+class _SlashMenuCardState extends State<_SlashMenuCard> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(_SlashMenuCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedIndex != oldWidget.selectedIndex) {
+      _scrollToIndex(widget.selectedIndex);
+    }
+  }
+
+  void _scrollToIndex(int index) {
+    if (!_scrollController.hasClients) return;
+    const itemExtent = 40.0;
+    final targetTop = index * itemExtent;
+    final targetBottom = targetTop + itemExtent;
+
+    final currentOffset = _scrollController.offset;
+    final viewportHeight = _scrollController.position.viewportDimension;
+
+    if (targetTop < currentOffset) {
+      _scrollController.animateTo(
+        targetTop,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+      );
+    } else if (targetBottom > currentOffset + viewportHeight) {
+      _scrollController.animateTo(
+        targetBottom - viewportHeight + 12,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -417,14 +467,15 @@ class _SlashMenuCard extends StatelessWidget {
           border: Border.all(color: scheme.outlineVariant),
         ),
         child: ListView.builder(
+          controller: _scrollController,
           shrinkWrap: true,
           padding: const EdgeInsets.symmetric(vertical: 6),
-          itemCount: options.length,
+          itemCount: widget.options.length,
           itemBuilder: (context, index) {
-            final option = options[index];
-            final isSelected = index == selectedIndex;
+            final option = widget.options[index];
+            final isSelected = index == widget.selectedIndex;
             return InkWell(
-              onTap: () => onSelect(option),
+              onTap: () => widget.onSelect(option),
               child: Container(
                 color: isSelected
                     ? scheme.primary.withValues(alpha: 0.12)

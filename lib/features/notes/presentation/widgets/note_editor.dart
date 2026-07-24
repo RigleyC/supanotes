@@ -213,6 +213,14 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                     documentLayoutKey: _docLayoutKey,
                     stylesheet: _cachedStylesheet!,
                     selectionStyle: editorSelectionStyle(theme.colorScheme),
+                    documentOverlayBuilders: [
+                      DefaultCaretOverlayBuilder(
+                        caretStyle: CaretStyle(
+                          color: theme.colorScheme.primary,
+                          width: 2.5,
+                        ),
+                      ),
+                    ],
                     contentTapDelegateFactories: _contentTapDelegateFactories,
                     keyboardActions: editorKeyboardActions(),
                     componentBuilders: _componentBuilders!,
