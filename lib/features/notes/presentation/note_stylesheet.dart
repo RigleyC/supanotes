@@ -7,10 +7,17 @@ import 'package:super_editor/super_editor.dart';
 Stylesheet noteStylesheet(
   BuildContext context, {
   EdgeInsets documentPadding = const EdgeInsets.symmetric(horizontal: 24),
+  bool isDesktop = false,
 }) {
   final colorScheme = Theme.of(context).colorScheme;
   final onSurface = colorScheme.onSurface;
   final onSurfaceVariant = colorScheme.onSurfaceVariant;
+
+  final bodySize = isDesktop ? 15.0 : 18.0;
+  final h1Size = isDesktop ? 28.0 : 38.0;
+  final h2Size = isDesktop ? 22.0 : 26.0;
+  final h3Size = isDesktop ? 18.0 : 22.0;
+  final quoteSize = isDesktop ? 16.0 : 20.0;
 
   return defaultStylesheet.copyWith(
     documentPadding: documentPadding,
@@ -35,7 +42,7 @@ Stylesheet noteStylesheet(
         (doc, docNode) => {
           Styles.textStyle: TextStyle(
             color: onSurface,
-            fontSize: 18,
+            fontSize: bodySize,
             height: 1.4,
           ),
         },
@@ -48,7 +55,7 @@ Stylesheet noteStylesheet(
           Styles.padding: const CascadingPadding.only(bottom: 12),
           Styles.textStyle: TextStyle(
             color: onSurface,
-            fontSize: 38,
+            fontSize: h1Size,
             fontWeight: FontWeight.bold,
           ),
         },
@@ -59,7 +66,7 @@ Stylesheet noteStylesheet(
           Styles.padding: const CascadingPadding.only(top: 24, bottom: 12),
           Styles.textStyle: TextStyle(
             color: onSurface,
-            fontSize: 38,
+            fontSize: h1Size,
             fontWeight: FontWeight.bold,
           ),
         },
@@ -70,7 +77,7 @@ Stylesheet noteStylesheet(
           Styles.padding: const CascadingPadding.only(top: 20, bottom: 12),
           Styles.textStyle: TextStyle(
             color: onSurface,
-            fontSize: 26,
+            fontSize: h2Size,
             fontWeight: FontWeight.bold,
           ),
         },
@@ -81,7 +88,7 @@ Stylesheet noteStylesheet(
           Styles.padding: const CascadingPadding.only(top: 16, bottom: 8),
           Styles.textStyle: TextStyle(
             color: onSurface,
-            fontSize: 22,
+            fontSize: h3Size,
             fontWeight: FontWeight.bold,
           ),
         },
@@ -104,7 +111,7 @@ Stylesheet noteStylesheet(
           Styles.padding: const CascadingPadding.only(top: 8, bottom: 8),
           Styles.textStyle: TextStyle(
             color: onSurfaceVariant,
-            fontSize: 20,
+            fontSize: quoteSize,
             fontWeight: FontWeight.bold,
             height: 1.4,
           ),
@@ -125,7 +132,7 @@ Stylesheet noteStylesheet(
           return {
             Styles.textStyle: TextStyle(
               color: onSurface,
-              fontSize: 18,
+              fontSize: bodySize,
               height: 1.4,
             ),
           };
@@ -147,7 +154,7 @@ Stylesheet noteStylesheet(
             background: Paint()
               ..color = colorScheme.errorContainer
               ..style = PaintingStyle.fill,
-            fontSize: 18,
+            fontSize: bodySize,
             fontWeight: FontWeight.bold,
             height: 1.4,
           ),

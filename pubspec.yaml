@@ -82,6 +82,7 @@ dependencies:
   super_clipboard: ^0.9.1
   super_context_menu: ^0.9.1
   window_manager: ^0.4.3
+  local_notifier: ^0.1.6
 
   # Motion
   motor: ^1.1.0

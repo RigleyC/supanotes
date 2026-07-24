@@ -186,6 +186,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           bottom: widget.isReadOnly ? 24 : 140,
         );
 
+        final isDesktop = isDesktopPlatform() || isDesktopLayout(context);
+
         if (_cachedStylesheet == null ||
             !identical(_cachedColorScheme, theme.colorScheme) ||
             _cachedStylesheet!.documentPadding != docPadding) {
@@ -193,12 +195,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           _cachedStylesheet = noteStylesheet(
             context,
             documentPadding: docPadding,
+            isDesktop: isDesktop,
           );
         }
 
         final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
-        final isDesktop = isDesktopPlatform() || isDesktopLayout(context);
 
         return Stack(
           children: [
@@ -237,6 +238,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                       _docLayoutKey.currentState as DocumentLayout,
                   documentLayoutContextResolver: () =>
                       _docLayoutKey.currentContext,
+                  focusNode: controller.focusNode,
                   onAttachFile: () =>
                       controller.pickAndAttachFile(imageOnly: false),
                   onAttachImage: () =>

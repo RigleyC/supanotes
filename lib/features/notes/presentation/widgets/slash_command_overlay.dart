@@ -119,6 +119,7 @@ class SlashCommandOverlay extends StatefulWidget {
   final DocumentComposer composer;
   final DocumentLayout Function() documentLayoutResolver;
   final BuildContext? Function() documentLayoutContextResolver;
+  final FocusNode? focusNode;
   final VoidCallback? onAttachImage;
   final VoidCallback? onAttachFile;
 
@@ -128,6 +129,7 @@ class SlashCommandOverlay extends StatefulWidget {
     required this.composer,
     required this.documentLayoutResolver,
     required this.documentLayoutContextResolver,
+    this.focusNode,
     this.onAttachImage,
     this.onAttachFile,
   });
@@ -325,6 +327,27 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
         widget.onAttachImage?.call();
       case SlashOptionType.file:
         widget.onAttachFile?.call();
+    }
+
+    // 3. Place caret at end of current node text and restore focus
+    final node = widget.editor.context.document.getNodeById(match.nodeId);
+    final textOffset = node is TextNode ? node.text.toPlainText().length : 0;
+    widget.editor.execute([
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: match.nodeId,
+            nodePosition: TextNodePosition(offset: textOffset),
+          ),
+        ),
+        SelectionChangeType.placeCaret,
+        SelectionReason.userInteraction,
+      ),
+    ]);
+
+    final focus = widget.focusNode;
+    if (focus != null && !focus.hasFocus) {
+      focus.requestFocus();
     }
 
     _clearMatch();
