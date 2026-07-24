@@ -198,7 +198,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
         final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-        final isDesktop = isDesktopLayout(context);
+        final isDesktop = isDesktopPlatform() || isDesktopLayout(context);
 
         return Stack(
           children: [

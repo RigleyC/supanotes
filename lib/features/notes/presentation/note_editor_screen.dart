@@ -10,7 +10,9 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
@@ -113,10 +115,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
     final note = noteWithTasksAsync.asData?.value.note;
 
+    final isDesktop = isDesktopLayout(context);
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        automaticallyImplyLeading: !isDesktopLayout(context),
+        automaticallyImplyLeading: false,
+        leading: !isDesktop
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(AppRoutes.home);
+                  }
+                },
+              )
+            : null,
         flexibleSpace: ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),

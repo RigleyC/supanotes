@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:follow_the_leader/follow_the_leader.dart';
 import 'package:super_editor/super_editor.dart';
 
 import '../../domain/note_editor_commands.dart';
@@ -137,7 +136,6 @@ class SlashCommandOverlay extends StatefulWidget {
 
 class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
   _SlashMatch? _match;
-  final _leaderLink = LeaderLink();
   Rect? _caretRect;
 
   @override
@@ -202,11 +200,29 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
       return;
     }
 
-    // Resolve caret rect for leader positioning
+    // Resolve caret position in local overlay coordinate space
     try {
-      final layout = widget.documentLayoutResolver();
-      final rect = layout.getRectForPosition(position);
-      _caretRect = rect;
+      final docLayout = widget.documentLayoutResolver();
+      final docBox =
+          (docLayout as State).context.findRenderObject() as RenderBox?;
+      if (docBox != null && docBox.attached) {
+        final caretInDoc = docLayout.getRectForPosition(position);
+        if (caretInDoc != null) {
+          final globalCaretTopLeft =
+              docBox.localToGlobal(caretInDoc.topLeft);
+          final overlayBox = context.findRenderObject() as RenderBox?;
+          if (overlayBox != null && overlayBox.attached) {
+            final overlayTopLeft =
+                overlayBox.globalToLocal(globalCaretTopLeft);
+            _caretRect = Rect.fromLTWH(
+              overlayTopLeft.dx,
+              overlayTopLeft.dy,
+              caretInDoc.width,
+              caretInDoc.height,
+            );
+          }
+        }
+      }
     } catch (_) {
       _caretRect = null;
     }
@@ -333,32 +349,37 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
           onSelect: _applyOption,
         );
 
+        final overlayBox = context.findRenderObject() as RenderBox?;
+        final overlaySize =
+            overlayBox?.hasSize == true ? overlayBox!.size : null;
+
+        double left = 32.0;
+        double top = 80.0;
+
+        if (caretRect != null && overlaySize != null) {
+          left = caretRect.left;
+          top = caretRect.bottom + 4; // Below caret line
+
+          // Prevent right edge overflow
+          if (left + 260 > overlaySize.width - 16) {
+            left = overlaySize.width - 260 - 16;
+          }
+          if (left < 16) left = 16;
+
+          // Prevent bottom edge overflow (flip above caret if needed)
+          if (top + 280 > overlaySize.height - 16) {
+            top =
+                (caretRect.top - 280 - 4).clamp(16.0, overlaySize.height - 280);
+          }
+        }
+
         return Stack(
           children: [
-            if (caretRect != null) ...[
-              Positioned(
-                left: caretRect.left,
-                top: caretRect.top,
-                child: Leader(
-                  link: _leaderLink,
-                  child: SizedBox(
-                    width: caretRect.width.clamp(1.0, 100.0),
-                    height: caretRect.height.clamp(1.0, 40.0),
-                  ),
-                ),
-              ),
-              Follower.withOffset(
-                link: _leaderLink,
-                offset: const Offset(0, 24),
-                child: menuCard,
-              ),
-            ] else ...[
-              Positioned(
-                left: 32,
-                bottom: 80,
-                child: menuCard,
-              ),
-            ],
+            Positioned(
+              left: left,
+              top: top,
+              child: menuCard,
+            ),
           ],
         );
       },
