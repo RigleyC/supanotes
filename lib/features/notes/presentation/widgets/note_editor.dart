@@ -221,15 +221,17 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
               ),
             ),
             if (!widget.isReadOnly) ...[
-              SlashCommandOverlay(
-                editor: controller.editor!,
-                composer: controller.composer!,
-                documentLayoutResolver: () =>
-                    _docLayoutKey.currentState as DocumentLayout,
-                onAttachFile: () =>
-                    controller.pickAndAttachFile(imageOnly: false),
-                onAttachImage: () =>
-                    controller.pickAndAttachFile(imageOnly: true),
+              Positioned.fill(
+                child: SlashCommandOverlay(
+                  editor: controller.editor!,
+                  composer: controller.composer!,
+                  documentLayoutResolver: () =>
+                      _docLayoutKey.currentState as DocumentLayout,
+                  onAttachFile: () =>
+                      controller.pickAndAttachFile(imageOnly: false),
+                  onAttachImage: () =>
+                      controller.pickAndAttachFile(imageOnly: true),
+                ),
               ),
               if (!isDesktop)
                 Positioned(

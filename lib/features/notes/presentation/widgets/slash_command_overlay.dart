@@ -333,9 +333,9 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
           onSelect: _applyOption,
         );
 
-        if (caretRect != null) {
-          return Stack(
-            children: [
+        return Stack(
+          children: [
+            if (caretRect != null) ...[
               Positioned(
                 left: caretRect.left,
                 top: caretRect.top,
@@ -352,14 +352,14 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
                 offset: const Offset(0, 24),
                 child: menuCard,
               ),
+            ] else ...[
+              Positioned(
+                left: 32,
+                bottom: 80,
+                child: menuCard,
+              ),
             ],
-          );
-        }
-
-        return Positioned(
-          left: 32,
-          bottom: 80,
-          child: menuCard,
+          ],
         );
       },
     );
