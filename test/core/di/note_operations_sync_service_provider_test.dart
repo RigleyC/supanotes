@@ -11,6 +11,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
 
 final _testUserIdProvider = StateProvider<String?>((ref) => 'user-a');
 
@@ -185,4 +186,28 @@ void main() {
       expect(service, same(container.read(noteOperationsSyncServiceProvider)));
     },
   );
+
+  test('note session coordinator belongs to the authenticated user scope', () {
+    final userACoordinator = container.read(noteSessionCoordinatorProvider);
+
+    expect(userACoordinator, isA<NoteSessionCoordinator>());
+    expect(
+      userACoordinator,
+      same(container.read(noteSessionCoordinatorProvider)),
+    );
+
+    container.read(_testUserIdProvider.notifier).state = 'user-b';
+
+    final userBCoordinator = container.read(noteSessionCoordinatorProvider);
+    expect(identical(userACoordinator, userBCoordinator), isFalse);
+
+    container.read(_testUserIdProvider.notifier).state = null;
+
+    expect(
+      () => container.read(noteSessionCoordinatorProvider),
+      throwsA(
+        predicate((error) => error.toString().contains('authenticated user')),
+      ),
+    );
+  });
 }

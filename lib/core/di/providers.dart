@@ -7,6 +7,8 @@
 /// declaring them inline within feature modules.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +25,7 @@ import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
 
 // ---------------------------------------------------------------------------
 // API client
@@ -129,6 +132,26 @@ final noteOperationsSyncServiceProvider = Provider<NoteOperationsSyncService>((
     actorId: userId,
   );
 });
+
+// ---------------------------------------------------------------------------
+// Note session coordinator
+// ---------------------------------------------------------------------------
+
+final noteSessionCoordinatorProvider =
+    Provider<NoteSessionCoordinator<NoteSyncSessionHandle>>((ref) {
+      final userId = ref.watch(currentUserIdProvider);
+      if (userId == null || userId.isEmpty) {
+        throw StateError(
+          'NoteSessionCoordinator requires an authenticated user',
+        );
+      }
+
+      final coordinator = NoteSessionCoordinator<NoteSyncSessionHandle>();
+      ref.onDispose(() {
+        unawaited(coordinator.closeAll());
+      });
+      return coordinator;
+    });
 
 // ---------------------------------------------------------------------------
 // Shared preferences
