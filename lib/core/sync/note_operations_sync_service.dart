@@ -47,6 +47,20 @@ class SyncError {
   });
 }
 
+class NoteSyncTelemetrySnapshot {
+  const NoteSyncTelemetrySnapshot({
+    required this.noteId,
+    required this.outboxOperationCount,
+    required this.syncErrorCount,
+    required this.hasPersistedSession,
+  });
+
+  final String noteId;
+  final int outboxOperationCount;
+  final int syncErrorCount;
+  final bool hasPersistedSession;
+}
+
 class _NoteSyncQueue {
   final Map<String, Future<void>> _tails = {};
 
@@ -189,6 +203,18 @@ class NoteOperationsSyncService {
 
   Future<int> getProjectedOutboxOperationCount(String noteId) {
     return _dao.getProjectedOutboxOperationCount(noteId);
+  }
+
+  Future<NoteSyncTelemetrySnapshot> telemetrySnapshot(String noteId) async {
+    final outboxCount = await _dao.getProjectedOutboxOperationCount(noteId);
+    final errorCount = await _dao.getSyncErrorCount(noteId);
+    final session = await _dao.getSyncSession(noteId);
+    return NoteSyncTelemetrySnapshot(
+      noteId: noteId,
+      outboxOperationCount: outboxCount,
+      syncErrorCount: errorCount,
+      hasPersistedSession: session != null,
+    );
   }
 
   Stream<List<PendingNoteOperationData>> watchPendingOperations(String noteId) {
@@ -426,7 +452,10 @@ class NoteOperationsSyncService {
       return SyncResult.empty();
     }
 
-    final response = await _syncClient.getOperationsSince(noteId, confirmed.revision);
+    final response = await _syncClient.getOperationsSince(
+      noteId,
+      confirmed.revision,
+    );
     NoteSyncDebug.log(
       'sync.poll.response',
       noteId: noteId,

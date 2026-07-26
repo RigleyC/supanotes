@@ -272,6 +272,44 @@ void main() {
     });
 
     test(
+      'telemetry snapshot exposes outbox, persisted session and failures',
+      () async {
+        await seedConfirmedDocument(db, 'note-observe', revision: 4);
+        await seedPendingOperation(
+          db,
+          'note-observe',
+          'op-observe',
+          baseRevision: 4,
+        );
+        await db.noteOperationsDao.upsertSyncSession(
+          SyncSessionsCompanion.insert(
+            noteId: 'note-observe',
+            knownRevision: 4,
+            operationIds: '["op-observe"]',
+            startedAt: DateTime.utc(2026, 7, 26).toIso8601String(),
+          ),
+        );
+        await db.noteOperationsDao.insertSyncError(
+          NoteSyncErrorsCompanion.insert(
+            noteId: 'note-observe',
+            operationId: 'op-observe',
+            errorCode: 'NETWORK',
+            message: 'network unavailable',
+            payloadJson: '{}',
+            createdAt: DateTime.utc(2026, 7, 26),
+          ),
+        );
+
+        final snapshot = await service.telemetrySnapshot('note-observe');
+
+        expect(snapshot.noteId, 'note-observe');
+        expect(snapshot.outboxOperationCount, 1);
+        expect(snapshot.syncErrorCount, 1);
+        expect(snapshot.hasPersistedSession, isTrue);
+      },
+    );
+
+    test(
       'two edit clients with independent databases converge through sync and poll',
       () async {
         const noteId = 'shared-note';

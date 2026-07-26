@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -44,14 +45,22 @@ type Preview struct {
 
 type Service interface {
 	Fetch(ctx context.Context, rawURL string) (*Preview, error)
+	Metrics() Metrics
+}
+
+type Metrics struct {
+	CacheEntries   int
+	CacheCapacity  int
+	BlockedFetches int64
 }
 
 type service struct {
-	client       *http.Client
-	cache        *previewCache
-	group        singleflight.Group
-	maxBodyBytes int64
-	normalizeURL func(string) (*url.URL, string, error)
+	client         *http.Client
+	cache          *previewCache
+	group          singleflight.Group
+	maxBodyBytes   int64
+	normalizeURL   func(string) (*url.URL, string, error)
+	blockedFetches atomic.Int64
 }
 
 type serviceOptions struct {
@@ -142,6 +151,7 @@ var (
 func (s *service) Fetch(ctx context.Context, rawURL string) (*Preview, error) {
 	parsedURL, cacheKey, err := s.normalizeURL(rawURL)
 	if err != nil {
+		s.blockedFetches.Add(1)
 		return nil, err
 	}
 	if preview, ok := s.cache.get(cacheKey); ok {
@@ -163,6 +173,26 @@ func (s *service) Fetch(ctx context.Context, rawURL string) (*Preview, error) {
 		return nil, err
 	}
 	return value.(*Preview), nil
+}
+
+func (s *service) Metrics() Metrics {
+	cacheEntries, cacheCapacity := s.cache.stats()
+	return Metrics{
+		CacheEntries:   cacheEntries,
+		CacheCapacity:  cacheCapacity,
+		BlockedFetches: s.blockedFetches.Load(),
+	}
+}
+
+func SafeURLSummary(rawURL string) string {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil || parsedURL.Hostname() == "" {
+		return "invalid-url"
+	}
+	if parsedURL.Scheme == "" {
+		return parsedURL.Hostname()
+	}
+	return strings.ToLower(parsedURL.Scheme) + "://" + strings.ToLower(parsedURL.Hostname())
 }
 
 func (s *service) fetch(ctx context.Context, parsedURL *url.URL, canonicalURL string) (*Preview, error) {
@@ -398,4 +428,11 @@ func (c *previewCache) removeOrderKey(key string) {
 			return
 		}
 	}
+}
+
+func (c *previewCache) stats() (entries int, capacity int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return len(c.items), c.capacity
 }

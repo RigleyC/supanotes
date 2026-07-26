@@ -117,3 +117,10 @@ func (s *fakeUploadService) Upload(_ context.Context, noteID pgtype.UUID, userID
 func (s *fakeUploadService) ListByNote(context.Context, pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return nil, nil
 }
+
+func (s *fakeUploadService) Metrics() Metrics {
+	if s.err == nil {
+		return Metrics{}
+	}
+	return Metrics{RejectedUploads: 1}
+}

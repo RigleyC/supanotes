@@ -113,6 +113,7 @@ func TestFetchParsesHTMLAndCachesByNormalizedURL(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Title", preview.Title)
 	require.Equal(t, int32(1), requests.Load())
+	require.Equal(t, Metrics{CacheEntries: 1, CacheCapacity: defaultCacheCapacity}, svc.Metrics())
 }
 
 func TestCacheExpiresAndEvictsOldestEntry(t *testing.T) {
@@ -132,6 +133,21 @@ func TestCacheExpiresAndEvictsOldestEntry(t *testing.T) {
 	time.Sleep(2 * time.Millisecond)
 	_, ok = cache.get("second")
 	require.False(t, ok)
+}
+
+func TestMetricsExposeBlockedFetchesAndCacheOccupancy(t *testing.T) {
+	t.Parallel()
+
+	svc := newService(serviceOptions{})
+
+	_, err := svc.Fetch(context.Background(), "http://127.0.0.1/private?token=secret")
+	require.Error(t, err)
+
+	metrics := svc.Metrics()
+	require.Equal(t, int64(1), metrics.BlockedFetches)
+	require.Equal(t, 0, metrics.CacheEntries)
+	require.Equal(t, defaultCacheCapacity, metrics.CacheCapacity)
+	require.Equal(t, "http://127.0.0.1", SafeURLSummary("http://127.0.0.1/private?token=secret"))
 }
 
 func TestFetchRejectsNonHTMLAndOversizedResponses(t *testing.T) {

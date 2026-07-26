@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
 
@@ -171,6 +172,42 @@ void main() {
       expect(first.status, NoteSessionStatus.closed);
       expect(second.status, NoteSessionStatus.ready);
       expect(coordinator.statusOf('note-1'), NoteSessionStatus.ready);
+    });
+
+    test('snapshots active sessions and logs sanitized transitions', () async {
+      final events = <Map<String, Object?>>[];
+      NoteSyncDebug.logSink = (event, noteId, fields) {
+        events.add({'event': event, 'noteId': noteId, ...fields});
+      };
+      addTearDown(() => NoteSyncDebug.logSink = null);
+      final tracker = NoteSessionActivityTracker();
+      final coordinator = NoteSessionCoordinator<_FakeSessionHandle>(
+        activityTracker: tracker,
+      );
+
+      final session = await coordinator.open(
+        'note-1',
+        () => _FakeSessionHandle(),
+      );
+      final opened = coordinator.snapshot();
+
+      expect(opened.activeCount, 1);
+      expect(opened.sessionsByStatus[NoteSessionStatus.ready], 1);
+      expect(tracker.activeNoteIds, {'note-1'});
+
+      await session.flushNow();
+      await coordinator.close('note-1');
+
+      expect(
+        events.any((event) => event['event'] == 'session.transition'),
+        isTrue,
+      );
+      expect(
+        events.any(
+          (event) => event['noteId'] == 'note-1' && event['to'] == 'closed',
+        ),
+        isTrue,
+      );
     });
   });
 }

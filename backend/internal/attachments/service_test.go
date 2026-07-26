@@ -64,6 +64,7 @@ func TestUploadRejectsViewNoAccessAndDeletedBeforeStorage(t *testing.T) {
 			require.ErrorIs(t, err, tc.wantErr)
 			require.Equal(t, 0, storage.uploadCalls)
 			require.Equal(t, 0, repo.insertCalls)
+			require.Equal(t, int64(1), svc.Metrics().RejectedUploads)
 		})
 	}
 }
@@ -80,6 +81,7 @@ func TestUploadRejectsUnsafeSizeBeforeStorage(t *testing.T) {
 
 		require.Error(t, err)
 		require.Equal(t, 0, storage.uploadCalls)
+		require.Equal(t, int64(1), svc.Metrics().RejectedUploads)
 	}
 }
 
@@ -95,6 +97,7 @@ func TestUploadReaderStopsAboveLimit(t *testing.T) {
 	require.ErrorIs(t, err, ErrFileTooLarge)
 	require.Equal(t, 1, storage.uploadCalls)
 	require.Equal(t, 0, repo.insertCalls)
+	require.Equal(t, int64(1), svc.Metrics().RejectedUploads)
 }
 
 func TestUploadLimitReaderAllowsExactLimitEOF(t *testing.T) {

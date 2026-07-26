@@ -1,9 +1,20 @@
 import 'dart:async';
 
+import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/domain/note_sync_session.dart';
 
 enum NoteSessionStatus { opening, ready, syncing, closing, closed, error }
+
+class NoteSessionSnapshot {
+  const NoteSessionSnapshot({
+    required this.activeCount,
+    required this.sessionsByStatus,
+  });
+
+  final int activeCount;
+  final Map<NoteSessionStatus, int> sessionsByStatus;
+}
 
 abstract interface class NoteSessionHandle {
   Future<void> start();
@@ -72,6 +83,19 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     return _entries[noteId]?.status ?? NoteSessionStatus.closed;
   }
 
+  NoteSessionSnapshot snapshot() {
+    final counts = <NoteSessionStatus, int>{
+      for (final status in NoteSessionStatus.values) status: 0,
+    };
+    for (final entry in _entries.values) {
+      counts[entry.status] = counts[entry.status]! + 1;
+    }
+    return NoteSessionSnapshot(
+      activeCount: _activityTracker?.activeCount ?? _entries.length,
+      sessionsByStatus: Map.unmodifiable(counts),
+    );
+  }
+
   Future<CoordinatedNoteSession<T>> open(
     String noteId,
     NoteSessionFactory<T> create,
@@ -96,6 +120,11 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     final generation = ++_nextGeneration;
     final handle = create();
     _activityTracker?.markActive(noteId);
+    NoteSyncDebug.log(
+      'session.open',
+      noteId: noteId,
+      fields: {'generation': generation, 'activeCount': snapshot().activeCount},
+    );
     late final _SessionEntry<T> entry;
     entry = _SessionEntry<T>(
       noteId: noteId,
@@ -136,6 +165,14 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
       );
     } catch (error) {
       _setStatus(noteId, generation, NoteSessionStatus.error);
+      NoteSyncDebug.log(
+        'session.open.error',
+        noteId: noteId,
+        fields: {
+          'generation': generation,
+          'errorClass': NoteSyncDebug.errorClass(error),
+        },
+      );
       await handle.dispose();
       rethrow;
     }
@@ -152,7 +189,18 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
   void _setStatus(String noteId, int generation, NoteSessionStatus status) {
     final entry = _entries[noteId];
     if (entry == null || entry.generation != generation) return;
+    final previous = entry.status;
     entry.status = status;
+    NoteSyncDebug.log(
+      'session.transition',
+      noteId: noteId,
+      fields: {
+        'generation': generation,
+        'from': previous.name,
+        'to': status.name,
+        'activeCount': snapshot().activeCount,
+      },
+    );
     if (status == NoteSessionStatus.closed && entry.generation == generation) {
       _entries.remove(noteId);
       _activityTracker?.markInactive(noteId);

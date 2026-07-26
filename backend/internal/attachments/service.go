@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -27,11 +28,17 @@ var (
 type Service interface {
 	Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID, filename string, r io.Reader, size int64) (sqlcgen.Attachment, error)
 	ListByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error)
+	Metrics() Metrics
+}
+
+type Metrics struct {
+	RejectedUploads int64
 }
 
 type service struct {
-	repo    Repository
-	storage StorageService
+	repo            Repository
+	storage         StorageService
+	rejectedUploads atomic.Int64
 }
 
 func NewService(repo Repository, storage StorageService) Service {
@@ -40,9 +47,11 @@ func NewService(repo Repository, storage StorageService) Service {
 
 func (s *service) Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID, filename string, r io.Reader, size int64) (sqlcgen.Attachment, error) {
 	if size < 0 {
+		s.rejectedUploads.Add(1)
 		return sqlcgen.Attachment{}, ErrInvalidFileSize
 	}
 	if size > maxUploadBytes {
+		s.rejectedUploads.Add(1)
 		return sqlcgen.Attachment{}, ErrFileTooLarge
 	}
 
@@ -51,9 +60,11 @@ func (s *service) Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.
 		return sqlcgen.Attachment{}, fmt.Errorf("check note permission: %w", err)
 	}
 	if permission == "not_found" {
+		s.rejectedUploads.Add(1)
 		return sqlcgen.Attachment{}, ErrNoteNotFound
 	}
 	if permission != "owner" && permission != "edit" {
+		s.rejectedUploads.Add(1)
 		return sqlcgen.Attachment{}, ErrNoPermission
 	}
 
@@ -67,6 +78,9 @@ func (s *service) Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.
 
 	object, err := s.storage.Upload(ctx, key, limited, mimeType, size)
 	if err != nil {
+		if errors.Is(err, ErrFileTooLarge) {
+			s.rejectedUploads.Add(1)
+		}
 		return sqlcgen.Attachment{}, fmt.Errorf("upload to storage: %w", err)
 	}
 	attachment, err := s.repo.Insert(ctx, noteID, filename, object.PublicURL, mimeType, size)
@@ -81,6 +95,10 @@ func (s *service) Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.
 
 func (s *service) ListByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return s.repo.ListByNote(ctx, noteID)
+}
+
+func (s *service) Metrics() Metrics {
+	return Metrics{RejectedUploads: s.rejectedUploads.Load()}
 }
 
 type uploadLimitReader struct {
