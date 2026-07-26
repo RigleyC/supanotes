@@ -279,6 +279,102 @@ void main() {
       await projectionDb.close();
     },
   );
+
+  test(
+    'View session receives remote polling updates without emitting mutations',
+    () async {
+      const noteId = 'note-view-shared';
+      final session = NoteSyncSession(
+        noteId: noteId,
+        syncService: mockSyncService,
+        document: document,
+        editor: editor,
+        captureLocalOperations: false,
+      );
+      final remoteResult = SyncResult(
+        acceptedCount: 0,
+        acceptedOperationIds: const [],
+        finalRevision: 2,
+        remoteOperations: [
+          Operation(
+            operationId: 'remote-op',
+            noteId: noteId,
+            revision: 2,
+            baseRevision: 1,
+            actorId: 'editor-user',
+            kind: 'text_delta',
+            blockId: 'block-1',
+            payload: const {
+              'ops': [
+                {'retain': 12},
+                {'insert': ' from editor-user'},
+              ],
+            },
+            createdAt: DateTime.utc(2026, 7, 26),
+          ),
+        ],
+        canonicalDocument: NoteDocumentResponse(
+          noteId: noteId,
+          revision: 2,
+          document: const {
+            'schemaVersion': 1,
+            'blocks': [
+              {
+                'id': 'block-1',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'Remote visible'},
+                ],
+              },
+            ],
+          },
+          serverTime: DateTime.utc(2026, 7, 26),
+        ),
+      );
+      when(
+        () => mockSyncService.pollAndReconcile(
+          noteId,
+          onReconcile: any(named: 'onReconcile'),
+        ),
+      ).thenAnswer((invocation) async {
+        final callback =
+            invocation.namedArguments[#onReconcile]
+                as Future<void> Function(SyncResult)?;
+        if (callback != null) {
+          await callback(remoteResult);
+        }
+        return remoteResult;
+      });
+
+      await session.start();
+      clearInteractions(mockSyncService);
+
+      editor.execute([
+        InsertTextRequest(
+          documentPosition: DocumentPosition(
+            nodeId: 'block-1',
+            nodePosition: const TextNodePosition(offset: 12),
+          ),
+          textToInsert: ' local view edit',
+          attributions: const {},
+        ),
+      ]);
+      await session.flushNow();
+      await session.pollNow();
+
+      final node = document.getNodeAt(0)! as TextNode;
+      expect(node.text.toPlainText(), 'Remote visible');
+      verifyNever(() => mockSyncService.enqueueOperation(noteId, any()));
+      verifyNever(
+        () => mockSyncService.syncPending(
+          noteId,
+          onReconcile: any(named: 'onReconcile'),
+        ),
+      );
+
+      await session.dispose();
+    },
+  );
 }
 
 class RecordingTaskProjectionEngine extends TaskProjectionEngine {

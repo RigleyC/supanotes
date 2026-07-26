@@ -270,6 +270,260 @@ void main() {
       expect(secondResult.acceptedCount, 0);
       expect(client.syncOperationCalls, 1);
     });
+
+    test(
+      'two edit clients with independent databases converge through sync and poll',
+      () async {
+        const noteId = 'shared-note';
+        final dbA = AppDatabase.test();
+        final dbB = AppDatabase.test();
+        final backend = SharedOtBackend();
+        final serviceA = NoteOperationsSyncService(
+          syncClient: SharedBackendNoteSyncClient(
+            backend: backend,
+            actorId: 'user-a',
+          ),
+          dao: dbA.noteOperationsDao,
+          clientId: 'client-a',
+          actorId: 'user-a',
+        );
+        final serviceB = NoteOperationsSyncService(
+          syncClient: SharedBackendNoteSyncClient(
+            backend: backend,
+            actorId: 'user-b',
+          ),
+          dao: dbB.noteOperationsDao,
+          clientId: 'client-b',
+          actorId: 'user-b',
+        );
+        addTearDown(dbA.close);
+        addTearDown(dbB.close);
+
+        await seedConfirmedDocument(dbA, noteId, revision: 0);
+        await seedConfirmedDocument(dbB, noteId, revision: 0);
+        await serviceA.enqueueOperation(
+          noteId,
+          OperationRequest(
+            operationId: 'op-a',
+            baseRevision: 0,
+            kind: 'text_delta',
+            blockId: 'b1',
+            payload: const {'label': 'edit-a'},
+          ),
+        );
+        await serviceB.enqueueOperation(
+          noteId,
+          OperationRequest(
+            operationId: 'op-b',
+            baseRevision: 0,
+            kind: 'text_delta',
+            blockId: 'b1',
+            payload: const {'label': 'edit-b'},
+          ),
+        );
+
+        await serviceA.syncPending(noteId);
+        await serviceB.syncPending(noteId);
+        await serviceA.pollAndReconcile(noteId);
+
+        final docA = await dbA.noteOperationsDao
+            .watchNoteDocument(noteId)
+            .first;
+        final docB = await dbB.noteOperationsDao
+            .watchNoteDocument(noteId)
+            .first;
+        expect(docA!.revision, 2);
+        expect(docB!.revision, 2);
+        expect(docA.documentJson, contains('edit-a'));
+        expect(docA.documentJson, contains('edit-b'));
+        expect(docB.documentJson, contains('edit-a'));
+        expect(docB.documentJson, contains('edit-b'));
+        expect(
+          await dbA.noteOperationsDao.getPendingOperations(noteId),
+          isEmpty,
+        );
+        expect(
+          await dbB.noteOperationsDao.getPendingOperations(noteId),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'offline clients keep outbox, then restart and reconnect to canonical state',
+      () async {
+        const noteId = 'offline-shared-note';
+        final dbA = AppDatabase.test();
+        final dbB = AppDatabase.test();
+        final backend = SharedOtBackend();
+        final clientA = SharedBackendNoteSyncClient(
+          backend: backend,
+          actorId: 'user-a',
+          online: false,
+        );
+        final clientB = SharedBackendNoteSyncClient(
+          backend: backend,
+          actorId: 'user-b',
+          online: false,
+        );
+        final serviceA = NoteOperationsSyncService(
+          syncClient: clientA,
+          dao: dbA.noteOperationsDao,
+          clientId: 'client-a',
+          actorId: 'user-a',
+        );
+        final serviceB = NoteOperationsSyncService(
+          syncClient: clientB,
+          dao: dbB.noteOperationsDao,
+          clientId: 'client-b',
+          actorId: 'user-b',
+        );
+        addTearDown(dbA.close);
+        addTearDown(dbB.close);
+
+        await seedConfirmedDocument(dbA, noteId, revision: 0);
+        await seedConfirmedDocument(dbB, noteId, revision: 0);
+        await serviceA.enqueueOperation(
+          noteId,
+          OperationRequest(
+            operationId: 'op-offline-a',
+            baseRevision: 0,
+            kind: 'text_delta',
+            blockId: 'b1',
+            payload: const {'label': 'offline-a'},
+          ),
+        );
+        await serviceB.enqueueOperation(
+          noteId,
+          OperationRequest(
+            operationId: 'op-offline-b',
+            baseRevision: 0,
+            kind: 'text_delta',
+            blockId: 'b1',
+            payload: const {'label': 'offline-b'},
+          ),
+        );
+
+        await expectLater(
+          serviceA.syncPending(noteId),
+          throwsA(isA<StateError>()),
+        );
+        await expectLater(
+          serviceB.syncPending(noteId),
+          throwsA(isA<StateError>()),
+        );
+        expect(
+          await dbA.noteOperationsDao.getPendingOperations(noteId),
+          hasLength(1),
+        );
+        expect(
+          await dbB.noteOperationsDao.getPendingOperations(noteId),
+          hasLength(1),
+        );
+        expect(await dbA.noteOperationsDao.getSyncSession(noteId), isNotNull);
+        expect(await dbB.noteOperationsDao.getSyncSession(noteId), isNotNull);
+
+        clientA.online = true;
+        clientB.online = true;
+        final restartedServiceA = NoteOperationsSyncService(
+          syncClient: clientA,
+          dao: dbA.noteOperationsDao,
+          clientId: 'client-a',
+          actorId: 'user-a',
+        );
+        await restartedServiceA.syncPending(noteId);
+        await serviceB.syncPending(noteId);
+        await restartedServiceA.pollAndReconcile(noteId);
+
+        final docA = await dbA.noteOperationsDao
+            .watchNoteDocument(noteId)
+            .first;
+        final docB = await dbB.noteOperationsDao
+            .watchNoteDocument(noteId)
+            .first;
+        expect(docA!.documentJson, contains('offline-a'));
+        expect(docA.documentJson, contains('offline-b'));
+        expect(docB!.documentJson, contains('offline-a'));
+        expect(docB.documentJson, contains('offline-b'));
+        expect(await dbA.noteOperationsDao.getSyncSession(noteId), isNull);
+        expect(await dbB.noteOperationsDao.getSyncSession(noteId), isNull);
+      },
+    );
+
+    test(
+      'task occurrence reopen sync keeps a different client occurrence intact',
+      () async {
+        const noteId = 'task-occurrence-shared-note';
+        final dbA = AppDatabase.test();
+        final dbB = AppDatabase.test();
+        final backend = SharedOtBackend();
+        final serviceA = NoteOperationsSyncService(
+          syncClient: SharedBackendNoteSyncClient(
+            backend: backend,
+            actorId: 'user-a',
+          ),
+          dao: dbA.noteOperationsDao,
+          clientId: 'client-a',
+          actorId: 'user-a',
+        );
+        final serviceB = NoteOperationsSyncService(
+          syncClient: SharedBackendNoteSyncClient(
+            backend: backend,
+            actorId: 'user-b',
+          ),
+          dao: dbB.noteOperationsDao,
+          clientId: 'client-b',
+          actorId: 'user-b',
+        );
+        addTearDown(dbA.close);
+        addTearDown(dbB.close);
+
+        await seedConfirmedDocument(dbA, noteId, revision: 0);
+        await seedConfirmedDocument(dbB, noteId, revision: 0);
+        await serviceA.enqueueOperation(
+          noteId,
+          OperationRequest(
+            operationId: 'reopen-occurrence-a',
+            baseRevision: 0,
+            kind: 'complete_task_occurrence',
+            payload: const {
+              'taskId': 'task-1',
+              'scheduledAt': '2026-07-26T09:00:00.000Z',
+              'completedAt': null,
+            },
+          ),
+        );
+        await serviceB.enqueueOperation(
+          noteId,
+          OperationRequest(
+            operationId: 'complete-occurrence-b',
+            baseRevision: 0,
+            kind: 'complete_task_occurrence',
+            payload: const {
+              'taskId': 'task-1',
+              'scheduledAt': '2026-07-27T09:00:00.000Z',
+              'completedAt': '2026-07-27T10:00:00.000Z',
+            },
+          ),
+        );
+
+        await serviceA.syncPending(noteId);
+        await serviceB.syncPending(noteId);
+        await serviceA.pollAndReconcile(noteId);
+
+        final docA = await dbA.noteOperationsDao
+            .watchNoteDocument(noteId)
+            .first;
+        final docB = await dbB.noteOperationsDao
+            .watchNoteDocument(noteId)
+            .first;
+        expect(docA!.documentJson, contains('2026-07-26T09:00:00.000Z'));
+        expect(docA.documentJson, contains('reopened'));
+        expect(docA.documentJson, contains('2026-07-27T09:00:00.000Z'));
+        expect(docA.documentJson, contains('2026-07-27T10:00:00.000Z'));
+        expect(docB!.documentJson, docA.documentJson);
+      },
+    );
   });
 }
 
@@ -374,5 +628,140 @@ class CharacterizationNoteSyncClient implements NoteSyncClient {
       return handler(noteId, request);
     }
     return syncResponses.removeAt(0);
+  }
+}
+
+class SharedOtBackend {
+  int _revision = 0;
+  final List<Operation> _operations = [];
+
+  SyncResponse sync({
+    required String noteId,
+    required String actorId,
+    required SyncRequest request,
+  }) {
+    final accepted = <AcceptedOperation>[];
+    for (final op in request.operations) {
+      _revision++;
+      _operations.add(
+        Operation(
+          operationId: op.operationId,
+          noteId: noteId,
+          revision: _revision,
+          baseRevision: op.baseRevision,
+          actorId: actorId,
+          kind: op.kind,
+          blockId: op.blockId,
+          payload: op.payload,
+          createdAt: DateTime.utc(2026, 7, 26),
+        ),
+      );
+      accepted.add(
+        AcceptedOperation(
+          operationId: op.operationId,
+          revision: _revision,
+          kind: op.kind,
+          blockId: op.blockId,
+        ),
+      );
+    }
+    return SyncResponse(
+      accepted: accepted,
+      finalRevision: _revision,
+      remoteOperations: _operations
+          .where((op) => op.revision > request.knownRevision)
+          .toList(),
+      canonicalDocument: _document(noteId),
+      serverTime: DateTime.utc(2026, 7, 26),
+    );
+  }
+
+  OperationsListResponse operationsSince(String noteId, int afterRevision) {
+    final operations = _operations
+        .where((op) => op.noteId == noteId && op.revision > afterRevision)
+        .toList();
+    if (operations.isEmpty) {
+      return OperationsListResponse(operations: const []);
+    }
+    return OperationsListResponse(
+      operations: operations,
+      document: _document(noteId),
+      revision: _revision,
+    );
+  }
+
+  Map<String, dynamic> _document(String noteId) {
+    final text = _operations
+        .where((op) => op.noteId == noteId)
+        .map(_operationLabel)
+        .join(' ');
+    return {
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': 'b1',
+          'type': 'paragraph',
+          'delta': [
+            {'insert': text},
+          ],
+        },
+      ],
+    };
+  }
+
+  String _operationLabel(Operation op) {
+    if (op.kind == 'complete_task_occurrence') {
+      return [
+        op.payload['taskId'],
+        op.payload['scheduledAt'],
+        op.payload['completedAt'] ?? 'reopened',
+      ].join(':');
+    }
+    return op.payload['label'] as String? ?? op.operationId;
+  }
+}
+
+class SharedBackendNoteSyncClient implements NoteSyncClient {
+  SharedBackendNoteSyncClient({
+    required this.backend,
+    required this.actorId,
+    this.online = true,
+  });
+
+  final SharedOtBackend backend;
+  final String actorId;
+  bool online;
+
+  @override
+  Future<NoteDocumentResponse> getDocument(String noteId) {
+    throw UnimplementedError('getDocument is not used by these tests');
+  }
+
+  @override
+  Future<NoteDocumentResponse?> fetchDocument(String noteId) {
+    throw UnimplementedError('fetchDocument is not used by these tests');
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> listNotes() {
+    throw UnimplementedError('listNotes is not used by these tests');
+  }
+
+  @override
+  Future<OperationsListResponse> getOperationsSince(
+    String noteId,
+    int afterRevision,
+  ) async {
+    if (!online) throw StateError('offline');
+    return backend.operationsSince(noteId, afterRevision);
+  }
+
+  @override
+  Future<SyncResponse> syncOperations(
+    String noteId,
+    SyncRequest request,
+  ) async {
+    if (!online) throw StateError('offline');
+    return backend.sync(noteId: noteId, actorId: actorId, request: request);
   }
 }

@@ -95,30 +95,36 @@ class NoteSyncSession {
 
   void _startPolling() {
     _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
-      if (_disposed || _isPolling) return;
-      _isPolling = true;
-      try {
-        // Retry the persistent outbox after connectivity is restored.
-        await _onLocalOps();
-        await syncService.pollAndReconcile(
-          noteId,
-          onReconcile: (result) async {
-            if (!_disposed && result.canonicalDocument != null) {
-              await adapter.reconcile(result);
-              await _triggerLocalProjection();
-            }
-          },
-        );
-      } catch (error, stackTrace) {
-        dev.log(
-          'NoteSyncSession poll failed for $noteId',
-          error: error,
-          stackTrace: stackTrace,
-        );
-      } finally {
-        _isPolling = false;
-      }
+      unawaited(pollNow());
     });
+  }
+
+  Future<void> pollNow() async {
+    if (_disposed || _isPolling) return;
+    _isPolling = true;
+    try {
+      // Retry the persistent outbox after connectivity is restored.
+      if (captureLocalOperations) {
+        await _onLocalOps();
+      }
+      await syncService.pollAndReconcile(
+        noteId,
+        onReconcile: (result) async {
+          if (!_disposed && result.canonicalDocument != null) {
+            await adapter.reconcile(result);
+            await _triggerLocalProjection();
+          }
+        },
+      );
+    } catch (error, stackTrace) {
+      dev.log(
+        'NoteSyncSession poll failed for $noteId',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _isPolling = false;
+    }
   }
 
   Future<void> flushNow() async {
