@@ -14,13 +14,11 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
-import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/features/notes/data/notes_repository.dart';
-import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_preferences_mutation_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
@@ -89,8 +87,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     String value,
     NoteModel note,
     bool hideCompleted,
-    INotesRepository repo,
   ) async {
+    final mutationController = ref.read(
+      notePreferenceMutationControllerProvider(widget.noteId).notifier,
+    );
     switch (value) {
       case 'share':
         await showAppBottomSheet(
@@ -98,25 +98,25 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           builder: (_) => ShareNoteSheet(noteId: widget.noteId),
         );
       case 'hide_completed':
-        final userId = ref.read(currentUserIdProvider);
-        if (userId != null) {
-          await ref
-              .read(userNotePreferencesRepositoryProvider)
-              .setHideCompleted(userId, widget.noteId, !hideCompleted);
-        }
+        await mutationController.setHideCompleted(
+          current: note,
+          value: !hideCompleted,
+        );
       case 'collapse_images':
-        await repo.updateNote(
-          widget.noteId,
-          collapseImages: !note.collapseImages,
+        await mutationController.setCollapseImages(
+          current: note,
+          value: !note.collapseImages,
         );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final repo = ref.read(notesRepositoryProvider);
     final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
     final note = noteWithTasksAsync.asData?.value.note;
+    final preferenceMutation = ref.watch(
+      notePreferenceMutationControllerProvider(widget.noteId),
+    );
     final sessionAsync = ref.watch(
       noteEditorSessionProvider((
         noteId: widget.noteId,
@@ -197,11 +197,23 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     value,
                     note,
                     note.hideCompleted,
-                    repo,
                   );
                 }
               },
             ),
+            if (preferenceMutation.status ==
+                NotePreferenceMutationStatus.saving)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: Padding(
+                  padding: EdgeInsets.all(4),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (preferenceMutation.status ==
+                NotePreferenceMutationStatus.error)
+              const Icon(Icons.error_outline),
             if (!note.isReadOnly)
               sessionAsync.when(
                 data: (session) => AnimatedBuilder(
