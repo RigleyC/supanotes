@@ -23,9 +23,11 @@ class NoteOperationAdapter {
     required NoteOperationsSyncService syncService,
     required String noteId,
     required Editor editor,
+    bool captureLocalOperations = true,
     NoteDocumentCodec codec = const NoteDocumentCodec(),
   }) : _syncService = syncService,
        _noteId = noteId,
+       _captureLocalOperations = captureLocalOperations,
        _codec = codec {
     _applier = DocumentProjectionApplier(
       document: document,
@@ -42,6 +44,7 @@ class NoteOperationAdapter {
 
   final NoteOperationsSyncService _syncService;
   final String _noteId;
+  final bool _captureLocalOperations;
   final NoteDocumentCodec _codec;
 
   late final DocumentProjectionApplier _applier;
@@ -80,10 +83,12 @@ class NoteOperationAdapter {
     _capture.setSuppress(true);
     _capture.buildMirror();
     await _loadConfirmedState();
-    _capture.start();
+    if (_captureLocalOperations) {
+      _capture.start();
+    }
     await _hydrateFromServer();
     _capture.buildMirror();
-    _capture.setSuppress(false);
+    _capture.setSuppress(!_captureLocalOperations);
   }
 
   Future<void> _loadConfirmedState() async {
@@ -103,7 +108,7 @@ class NoteOperationAdapter {
           snapshot: snapshot,
           pendingOps: pending,
           suppressCapture: () => _capture.setSuppress(true),
-          resumeCapture: () => _capture.setSuppress(true),
+          resumeCapture: () => _capture.setSuppress(!_captureLocalOperations),
           rebuildMirror: _capture.buildMirror,
         );
         _confirmedRevision = doc.revision;

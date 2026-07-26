@@ -15,12 +15,15 @@ import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
+import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/notes/presentation/widgets/slash_command_overlay.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_session.dart';
 import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
 
 NoteEditorController _createTestController(List<DocumentNode> nodes) {
@@ -36,9 +39,20 @@ NoteEditorController _createTestController(List<DocumentNode> nodes) {
   return controller;
 }
 
+NoteEditorSession _createTestSession(List<DocumentNode> nodes) {
+  return NoteEditorSession(
+    noteId: 'note-1',
+    controller: _createTestController(nodes),
+  );
+}
+
+NoteEditorSession _sessionFor(NoteEditorController controller) {
+  return NoteEditorSession(noteId: 'note-1', controller: controller);
+}
+
 class _FakeNotesRepository implements INotesRepository {
   _FakeNotesRepository(this.controller, [this.tasks = const []])
-      : _broadcast = controller.stream.asBroadcastStream();
+    : _broadcast = controller.stream.asBroadcastStream();
 
   final StreamController<NoteModel?> controller;
   final Stream<NoteModel?> _broadcast;
@@ -69,8 +83,13 @@ class _MockTasksRepository extends Mock implements ITasksRepository {}
 _MockTasksRepository _defaultMockTasksRepo() {
   final mock = _MockTasksRepository();
   when(() => mock.watchByNote(any())).thenAnswer((_) => Stream.value([]));
-  when(() => mock.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null, previousHasTime: false));
-  when(() => mock.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
+  when(() => mock.completeTask(any())).thenAnswer(
+    (_) async => (nextDue: null, previousDue: null, previousHasTime: false),
+  );
+  when(
+    () =>
+        mock.reopenTask(any(), originalDueDate: any(named: 'originalDueDate')),
+  ).thenAnswer((_) async {});
   return mock;
 }
 
@@ -102,7 +121,7 @@ void main() {
           title: 'Persisted note',
           favorite: false,
           archived: false,
-          
+
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 11),
           hideCompleted: false,
@@ -121,7 +140,7 @@ void main() {
           title: 'Persisted note',
           favorite: false,
           archived: false,
-          
+
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 12),
           hideCompleted: false,
@@ -149,9 +168,11 @@ void main() {
           tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-          noteEditorControllerProvider.overrideWith((ref, id) async => _createTestController([
-            ParagraphNode(id: '1', text: AttributedText('Dark content')),
-          ])),
+          noteEditorSessionProvider.overrideWith(
+            (ref, id) async => _createTestSession([
+              ParagraphNode(id: '1', text: AttributedText('Dark content')),
+            ]),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,
@@ -170,7 +191,7 @@ void main() {
         title: 'Dark content',
         favorite: false,
         archived: false,
-        
+
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
         hideCompleted: false,
@@ -206,10 +227,16 @@ void main() {
         overrides: [
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-          noteEditorControllerProvider.overrideWith((ref, id) async => _createTestController([
-            TaskNode(id: '1', text: AttributedText('tarefa concluida'), isComplete: true),
-            ParagraphNode(id: '2', text: AttributedText('texto visivel')),
-          ])),
+          noteEditorSessionProvider.overrideWith(
+            (ref, id) async => _createTestSession([
+              TaskNode(
+                id: '1',
+                text: AttributedText('tarefa concluida'),
+                isComplete: true,
+              ),
+              ParagraphNode(id: '2', text: AttributedText('texto visivel')),
+            ]),
+          ),
         ],
         child: MaterialApp(
           home: Scaffold(
@@ -245,10 +272,16 @@ void main() {
         overrides: [
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-          noteEditorControllerProvider.overrideWith((ref, id) async => _createTestController([
-            TaskNode(id: '1', text: AttributedText('tarefa concluida'), isComplete: true),
-            ParagraphNode(id: '2', text: AttributedText('texto visivel')),
-          ])),
+          noteEditorSessionProvider.overrideWith(
+            (ref, id) async => _createTestSession([
+              TaskNode(
+                id: '1',
+                text: AttributedText('tarefa concluida'),
+                isComplete: true,
+              ),
+              ParagraphNode(id: '2', text: AttributedText('texto visivel')),
+            ]),
+          ),
         ],
         child: MaterialApp(
           home: StatefulBuilder(
@@ -321,7 +354,7 @@ void main() {
         title: 'Plain content',
         favorite: false,
         archived: false,
-        
+
         createdAt: DateTime(2026, 6, 17),
         updatedAt: DateTime(2026, 6, 17),
         hideCompleted: false,
@@ -364,13 +397,24 @@ void main() {
         ),
       ]),
     );
-    when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null, previousHasTime: false));
-    when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
+    when(() => mockTasksRepo.completeTask(any())).thenAnswer(
+      (_) async => (nextDue: null, previousDue: null, previousHasTime: false),
+    );
+    when(
+      () => mockTasksRepo.reopenTask(
+        any(),
+        originalDueDate: any(named: 'originalDueDate'),
+      ),
+    ).thenAnswer((_) async {});
 
     const noteContent = '# Test note\n\n- [ ] buy milk <!-- task:task-1 -->\n';
 
     final testController = _createTestController([
-      TaskNode(id: 'task-1', text: AttributedText('buy milk'), isComplete: false),
+      TaskNode(
+        id: 'task-1',
+        text: AttributedText('buy milk'),
+        isComplete: false,
+      ),
     ]);
 
     await tester.pumpWidget(
@@ -382,7 +426,9 @@ void main() {
           tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-          noteEditorControllerProvider.overrideWith((ref, id) async => testController),
+          noteEditorSessionProvider.overrideWith(
+            (ref, id) async => _sessionFor(testController),
+          ),
         ],
         child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
       ),
@@ -396,7 +442,7 @@ void main() {
         title: 'Test note',
         favorite: false,
         archived: false,
-        
+
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
         hideCompleted: false,
@@ -409,7 +455,10 @@ void main() {
     await tester.tap(checkbox);
     await tester.pumpAndSettle();
 
-    expect((testController.document!.getNodeById('task-1') as TaskNode).isComplete, isTrue);
+    expect(
+      (testController.document!.getNodeById('task-1') as TaskNode).isComplete,
+      isTrue,
+    );
   });
 
   testWidgets(
@@ -435,17 +484,28 @@ void main() {
         updatedAt: DateTime.now(),
       );
 
-      when(() => mockTasksRepo.watchByNote(any())).thenAnswer(
-        (_) => Stream.value([task1]),
+      when(
+        () => mockTasksRepo.watchByNote(any()),
+      ).thenAnswer((_) => Stream.value([task1]));
+      when(() => mockTasksRepo.completeTask(any())).thenAnswer(
+        (_) async => (nextDue: null, previousDue: null, previousHasTime: false),
       );
-      when(() => mockTasksRepo.completeTask(any())).thenAnswer((_) async => (nextDue: null, previousDue: null, previousHasTime: false));
-      when(() => mockTasksRepo.reopenTask(any(), originalDueDate: any(named: 'originalDueDate'))).thenAnswer((_) async {});
+      when(
+        () => mockTasksRepo.reopenTask(
+          any(),
+          originalDueDate: any(named: 'originalDueDate'),
+        ),
+      ).thenAnswer((_) async {});
 
       const noteContent =
           '# Test note\n\n- [x] buy milk <!-- task:task-1 -->\n';
 
       final testController = _createTestController([
-        TaskNode(id: 'task-1', text: AttributedText('buy milk'), isComplete: true),
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('buy milk'),
+          isComplete: true,
+        ),
       ]);
 
       await tester.pumpWidget(
@@ -457,34 +517,126 @@ void main() {
             tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
             currentUserIdProvider.overrideWithValue('test-user'),
             appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-            noteEditorControllerProvider.overrideWith((ref, id) async => testController),
+            noteEditorSessionProvider.overrideWith(
+              (ref, id) async => _sessionFor(testController),
+            ),
           ],
           child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
         ),
       );
 
-        streamController.add(
-          NoteModel(
-            id: 'note-1',
-            userId: 'u-1',
-            content: noteContent,
-            title: 'Test note',
-            favorite: false,
-            archived: false,
-            
-              createdAt: DateTime(2026, 6, 11),
-            updatedAt: DateTime(2026, 6, 11),
-            hideCompleted: false,
-          ),
-        );
-        await tester.pumpAndSettle();
+      streamController.add(
+        NoteModel(
+          id: 'note-1',
+          userId: 'u-1',
+          content: noteContent,
+          title: 'Test note',
+          favorite: false,
+          archived: false,
 
-        final checkbox = find.byType(AppTaskCheckbox);
-        expect(checkbox, findsOneWidget);
-        await tester.tap(checkbox);
-        await tester.pumpAndSettle();
+          createdAt: DateTime(2026, 6, 11),
+          updatedAt: DateTime(2026, 6, 11),
+          hideCompleted: false,
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        expect((testController.document!.getNodeById('task-1') as TaskNode).isComplete, isFalse);
+      final checkbox = find.byType(AppTaskCheckbox);
+      expect(checkbox, findsOneWidget);
+      await tester.tap(checkbox);
+      await tester.pumpAndSettle();
+
+      expect(
+        (testController.document!.getNodeById('task-1') as TaskNode).isComplete,
+        isFalse,
+      );
     },
   );
+
+  testWidgets('NoteEditor shows loading while the session is opening', (
+    tester,
+  ) async {
+    final sessionCompleter = Completer<NoteEditorSession>();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          noteEditorSessionProvider.overrideWith(
+            (ref, id) => sessionCompleter.future,
+          ),
+        ],
+        child: MaterialApp(
+          home: NoteEditor(
+            noteId: 'note-1',
+            taskMetadata: const {},
+            isReadOnly: true,
+            delegate: NoteEditorDelegate(),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    sessionCompleter.complete(
+      _createTestSession([
+        ParagraphNode(id: '1', text: AttributedText('ready')),
+      ]),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('NoteEditor exposes recoverable session errors', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          noteEditorSessionProvider.overrideWith(
+            (ref, id) async => throw StateError('network failed'),
+          ),
+        ],
+        child: MaterialApp(
+          home: NoteEditor(
+            noteId: 'note-1',
+            taskMetadata: const {},
+            delegate: NoteEditorDelegate(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('network failed'), findsOneWidget);
+  });
+
+  testWidgets('NoteEditor read-only mode does not install mutation UI', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          noteEditorSessionProvider.overrideWith(
+            (ref, id) async => _createTestSession([
+              ParagraphNode(id: '1', text: AttributedText('read only')),
+            ]),
+          ),
+        ],
+        child: MaterialApp(
+          home: NoteEditor(
+            noteId: 'note-1',
+            taskMetadata: const {},
+            isReadOnly: true,
+            delegate: NoteEditorDelegate(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SlashCommandOverlay), findsNothing);
+    expect(find.byType(NoteToolbar), findsNothing);
+  });
 }

@@ -145,15 +145,19 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final controllerAsync = ref.watch(
-      noteEditorControllerProvider(widget.noteId),
+    final sessionAsync = ref.watch(
+      noteEditorSessionProvider((
+        noteId: widget.noteId,
+        isReadOnly: widget.isReadOnly,
+      )),
     );
 
-    return controllerAsync.when(
+    return sessionAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(body: Center(child: Text('Erro: $error'))),
-      data: (controller) {
+      data: (session) {
+        final controller = session.controller;
         if (_controller != controller) {
           _controller?.removeListener(_onControllerReady);
           _controller = controller;

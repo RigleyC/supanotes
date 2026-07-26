@@ -17,6 +17,7 @@ import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_session.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 class _MockTasksRepository extends Mock implements ITasksRepository {}
@@ -32,6 +33,13 @@ NoteEditorController _createTestController(List<DocumentNode> nodes) {
     composer: controller.composer!,
   );
   return controller;
+}
+
+NoteEditorSession _createTestSession(List<DocumentNode> nodes) {
+  return NoteEditorSession(
+    noteId: 'note-1',
+    controller: _createTestController(nodes),
+  );
 }
 
 void main() {
@@ -122,9 +130,15 @@ void main() {
             tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
             currentUserIdProvider.overrideWithValue('user-1'),
             appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-            noteEditorControllerProvider.overrideWith((ref, id) async => _createTestController([
-              TaskNode(id: 'task-1', text: AttributedText('Tarefa recorrente'), isComplete: false),
-            ])),
+            noteEditorSessionProvider.overrideWith(
+              (ref, id) async => _createTestSession([
+                TaskNode(
+                  id: 'task-1',
+                  text: AttributedText('Tarefa recorrente'),
+                  isComplete: false,
+                ),
+              ]),
+            ),
           ],
           child: MaterialApp(
             scaffoldMessengerKey: AppMessenger.key,
@@ -142,8 +156,10 @@ void main() {
                           previousHasTime: task.hasTime,
                           scheduledAt: task.dueDate,
                         ),
-                        onUndo: (previousDue, _, _) => mockTasksRepo
-                            .reopenTask(taskId, originalDueDate: previousDue),
+                        onUndo: (previousDue, _, _) => mockTasksRepo.reopenTask(
+                          taskId,
+                          originalDueDate: previousDue,
+                        ),
                       ),
                   onTaskReopen: (taskId) => mockTasksRepo.reopenTask(taskId),
                 ),

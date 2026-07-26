@@ -17,6 +17,7 @@ class NoteSyncSession {
   final TaskProjectionEngine? taskProjectionEngine;
   final MutableDocument document;
   final String userId;
+  final bool captureLocalOperations;
 
   Timer? _pollTimer;
   bool _isPolling = false;
@@ -29,24 +30,30 @@ class NoteSyncSession {
     required Editor editor,
     this.taskProjectionEngine,
     this.userId = '',
+    this.captureLocalOperations = true,
   }) : adapter = NoteOperationAdapter(
          document: document,
          syncService: syncService,
          noteId: noteId,
          editor: editor,
+         captureLocalOperations: captureLocalOperations,
        );
 
   Future<void> start() async {
     _activeSessions[noteId] = this;
     adapter.onLocalOperations = (_) {
-      unawaited(_triggerLocalProjection());
-      unawaited(_onLocalOps());
+      if (captureLocalOperations) {
+        unawaited(_triggerLocalProjection());
+        unawaited(_onLocalOps());
+      }
     };
     try {
       await adapter.start();
       await _triggerLocalProjection();
-      // Drain operations persisted by an earlier offline session before polling.
-      await _onLocalOps();
+      if (captureLocalOperations) {
+        // Drain operations persisted by an earlier offline session before polling.
+        await _onLocalOps();
+      }
       _startPolling();
     } catch (_) {
       if (_activeSessions[noteId] == this) {
@@ -124,7 +131,9 @@ class NoteSyncSession {
 
   Future<void> flushNow() async {
     await adapter.flushNow();
-    await _onLocalOps();
+    if (captureLocalOperations) {
+      await _onLocalOps();
+    }
   }
 
   Future<void> dispose() async {
@@ -135,15 +144,17 @@ class NoteSyncSession {
     _pollTimer?.cancel();
     try {
       await adapter.flushNow();
-      await syncService.syncPending(
-        noteId,
-        onReconcile: (result) async {
-          if (!_disposed && result.canonicalDocument != null) {
-            await adapter.reconcile(result);
-            await _triggerLocalProjection();
-          }
-        },
-      );
+      if (captureLocalOperations) {
+        await syncService.syncPending(
+          noteId,
+          onReconcile: (result) async {
+            if (!_disposed && result.canonicalDocument != null) {
+              await adapter.reconcile(result);
+              await _triggerLocalProjection();
+            }
+          },
+        );
+      }
     } catch (error, stackTrace) {
       dev.log(
         'NoteSyncSession flush on dispose failed for $noteId',

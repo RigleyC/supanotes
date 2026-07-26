@@ -10,9 +10,13 @@ import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/domain/note_sync_session.dart';
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 import 'note_editor_controller.dart';
+import 'note_editor_session.dart';
 
-final noteEditorControllerProvider = FutureProvider.autoDispose
-    .family<NoteEditorController, String>((ref, noteId) async {
+typedef NoteEditorSessionRequest = ({String noteId, bool isReadOnly});
+
+final noteEditorSessionProvider = FutureProvider.autoDispose
+    .family<NoteEditorSession, NoteEditorSessionRequest>((ref, request) async {
+      final noteId = request.noteId;
       final userId = ref.watch(currentUserIdProvider)!;
       final attachmentsRepo = ref.read(attachmentsRepositoryProvider);
       final controller = NoteEditorController(
@@ -38,7 +42,7 @@ final noteEditorControllerProvider = FutureProvider.autoDispose
         );
       });
 
-      await sessionCoordinator.open(
+      final session = await sessionCoordinator.open(
         noteId,
         () => NoteSyncSessionHandle(
           NoteSyncSession(
@@ -48,8 +52,21 @@ final noteEditorControllerProvider = FutureProvider.autoDispose
             editor: controller.editor!,
             taskProjectionEngine: taskProjectionEngine,
             userId: userId,
+            captureLocalOperations: !request.isReadOnly,
           ),
         ),
       );
-      return controller;
+      return NoteEditorSession(
+        noteId: noteId,
+        controller: controller,
+        syncSession: session,
+      );
+    });
+
+final noteEditorControllerProvider = FutureProvider.autoDispose
+    .family<NoteEditorController, String>((ref, noteId) async {
+      final session = await ref.watch(
+        noteEditorSessionProvider((noteId: noteId, isReadOnly: false)).future,
+      );
+      return session.controller;
     });
