@@ -39,10 +39,10 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
     setState(() => _validationError = null);
 
     await ref
-        .read(shareNoteControllerProvider.notifier)
-        .share(noteId: widget.noteId, email: email, permission: _permission);
+        .read(shareNoteControllerProvider(widget.noteId).notifier)
+        .share(email: email, permission: _permission);
 
-    final state = ref.read(shareNoteControllerProvider);
+    final state = ref.read(shareNoteControllerProvider(widget.noteId));
     if (state.hasValue && mounted) {
       ref.invalidate(shareListProvider(widget.noteId));
       _emailCtrl.clear();
@@ -51,7 +51,7 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final shareState = ref.watch(shareNoteControllerProvider);
+    final shareState = ref.watch(shareNoteControllerProvider(widget.noteId));
 
     return Column(
       mainAxisSize: MainAxisSize.min,

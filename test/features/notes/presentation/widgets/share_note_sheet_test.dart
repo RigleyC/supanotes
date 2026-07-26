@@ -12,7 +12,8 @@ import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.d
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 
 class _FakeSharesRepository implements SharesRepository {
-  final List<({String noteId, String email, SharePermission permission})> shareCalls = [];
+  final List<({String noteId, String email, SharePermission permission})>
+  shareCalls = [];
 
   Future<void> Function()? shareNoteFunc;
 
@@ -32,7 +33,10 @@ class _FakeSharesRepository implements SharesRepository {
   }
 
   @override
-  Future<void> deleteShare({required String noteId, required String userId}) async {}
+  Future<void> deleteShare({
+    required String noteId,
+    required String userId,
+  }) async {}
 }
 
 Widget _buildTestHarness({
@@ -70,7 +74,9 @@ void main() {
   });
 
   Future<void> openDialog(WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestHarness(repo: fakeRepo, noteId: 'note-1'));
+    await tester.pumpWidget(
+      _buildTestHarness(repo: fakeRepo, noteId: 'note-1'),
+    );
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
   }
@@ -109,27 +115,30 @@ void main() {
       expect(fakeRepo.shareCalls[0].permission, SharePermission.view);
     });
 
-    testWidgets('shows loading indicator during submission and clears on success', (tester) async {
-      final completer = Completer<void>();
-      fakeRepo.shareNoteFunc = () => completer.future;
+    testWidgets(
+      'shows loading indicator during submission and clears on success',
+      (tester) async {
+        final completer = Completer<void>();
+        fakeRepo.shareNoteFunc = () => completer.future;
 
-      await openDialog(tester);
+        await openDialog(tester);
 
-      await tester.enterText(find.byType(TextField), 'user@example.com');
-      await tester.tap(find.text(NoteStrings.addLabel));
-      await tester.pump();
+        await tester.enterText(find.byType(TextField), 'user@example.com');
+        await tester.tap(find.text(NoteStrings.addLabel));
+        await tester.pump();
 
-      expect(find.byType(CircularProgressIndicator), findsWidgets);
+        expect(find.byType(CircularProgressIndicator), findsWidgets);
 
-      completer.complete();
-      await tester.pumpAndSettle();
+        completer.complete();
+        await tester.pumpAndSettle();
 
-      expect(find.byType(ShareNoteSheet), findsOneWidget);
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller?.text,
-        isEmpty,
-      );
-    });
+        expect(find.byType(ShareNoteSheet), findsOneWidget);
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).controller?.text,
+          isEmpty,
+        );
+      },
+    );
 
     testWidgets('stays open on success and clears email', (tester) async {
       fakeRepo.shareNoteFunc = () async {};
@@ -161,12 +170,12 @@ void main() {
   });
 
   group('share list', () {
-    testWidgets('shows share list section with title and empty state', (tester) async {
-      await tester.pumpWidget(_buildTestHarness(
-        repo: fakeRepo,
-        noteId: 'note-1',
-        shares: [],
-      ));
+    testWidgets('shows share list section with title and empty state', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _buildTestHarness(repo: fakeRepo, noteId: 'note-1', shares: []),
+      );
       await tester.tap(find.text('Open'));
       await tester.pump();
       await tester.pump();
@@ -195,11 +204,9 @@ void main() {
         ),
       ];
 
-      await tester.pumpWidget(_buildTestHarness(
-        repo: fakeRepo,
-        noteId: 'note-1',
-        shares: shares,
-      ));
+      await tester.pumpWidget(
+        _buildTestHarness(repo: fakeRepo, noteId: 'note-1', shares: shares),
+      );
       await tester.tap(find.text('Open'));
       await tester.pump();
       await tester.pump();
