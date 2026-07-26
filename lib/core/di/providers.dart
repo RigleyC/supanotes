@@ -80,8 +80,9 @@ final sessionResetProvider = StateProvider<int>((ref) => 0);
 // Local notification service
 // ---------------------------------------------------------------------------
 
-final localNotificationServiceProvider =
-    Provider<LocalNotificationService>((ref) {
+final localNotificationServiceProvider = Provider<LocalNotificationService>((
+  ref,
+) {
   return LocalNotificationService();
 });
 
@@ -89,7 +90,7 @@ final localNotificationServiceProvider =
 // Note operations DAO
 // ---------------------------------------------------------------------------
 
-final noteOperationsDaoProvider = Provider.autoDispose<NoteOperationsDao>((ref) {
+final noteOperationsDaoProvider = Provider<NoteOperationsDao>((ref) {
   return ref.watch(appDatabaseProvider).noteOperationsDao;
 });
 
@@ -97,18 +98,24 @@ final noteOperationsDaoProvider = Provider.autoDispose<NoteOperationsDao>((ref) 
 // Note sync client
 // ---------------------------------------------------------------------------
 
-final noteSyncClientProvider = Provider.autoDispose<NoteSyncClient>(
-  (ref) {
-    return NoteSyncClient(client: ref.watch(apiClientProvider));
-  },
-);
+final noteSyncClientProvider = Provider<NoteSyncClient>((ref) {
+  return NoteSyncClient(client: ref.watch(apiClientProvider));
+});
 
 // ---------------------------------------------------------------------------
 // Note operations sync service
 // ---------------------------------------------------------------------------
 
-final noteOperationsSyncServiceProvider =
-    Provider.autoDispose<NoteOperationsSyncService>((ref) {
+final noteOperationsSyncServiceProvider = Provider<NoteOperationsSyncService>((
+  ref,
+) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null || userId.isEmpty) {
+    throw StateError(
+      'NoteOperationsSyncService requires an authenticated user',
+    );
+  }
+
   final prefs = ref.watch(sharedPreferencesProvider);
   String clientId = prefs.getString('note_ops_client_id') ?? '';
   if (clientId.isEmpty) {
@@ -119,11 +126,9 @@ final noteOperationsSyncServiceProvider =
     syncClient: ref.watch(noteSyncClientProvider),
     dao: ref.watch(noteOperationsDaoProvider),
     clientId: clientId,
-    actorId: ref.watch(currentUserIdProvider)!,
+    actorId: userId,
   );
 });
-
-
 
 // ---------------------------------------------------------------------------
 // Shared preferences
