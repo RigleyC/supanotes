@@ -34,36 +34,20 @@ Future<void> showTaskMetadataSheet({
 
   ref.read(taskMetadataProvider(taskId).notifier).initialize(task);
 
-  await FamilyModalSheet.show<void>(
-    context: context,
-    isDismissible: true,
-    enableDrag: true,
-    contentBackgroundColor: Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF333333)
-        : Theme.of(context).colorScheme.surface,
-    builder: (ctx) => TaskMetadataSheetBody(noteId: noteId, taskId: taskId),
-  );
-
-  final state = ref.read(taskMetadataProvider(taskId));
-
-  dev.log(
-    '[TaskMetadataSheet] Persisting: taskId=$taskId dueDate=${state.dueDate} hasTime=${state.hasTime} recurrence=${state.recurrence?.name} reminder=${state.reminder?.value}',
-    name: 'TaskMetadataSheet',
-  );
-
-  await onSave(
-    dueDate: state.dueDate,
-    hasTime: state.hasTime,
-    recurrence: state.recurrence,
-    reminder: state.reminder?.value,
-  );
-
-  if (state.reminder != null) {
-    final scheduler = ref.read(taskNotificationSchedulerProvider.notifier);
-    await scheduler.requestPermissionForReminder();
+  try {
+    await FamilyModalSheet.show<void>(
+      context: context,
+      isDismissible: true,
+      enableDrag: true,
+      contentBackgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF333333)
+          : Theme.of(context).colorScheme.surface,
+      builder: (ctx) =>
+          TaskMetadataSheetBody(noteId: noteId, taskId: taskId, onSave: onSave),
+    );
+  } finally {
+    ref.invalidate(taskMetadataProvider(taskId));
   }
-
-  ref.invalidate(taskMetadataProvider(taskId));
 }
 
 class TaskMetadataSheetBody extends ConsumerWidget {
@@ -71,15 +55,58 @@ class TaskMetadataSheetBody extends ConsumerWidget {
     super.key,
     required this.noteId,
     required this.taskId,
+    this.onSave,
   });
 
   final String noteId;
   final String taskId;
+  final Future<void> Function({
+    required DateTime? dueDate,
+    required bool hasTime,
+    required TaskRecurrence? recurrence,
+    required String? reminder,
+  })?
+  onSave;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(taskMetadataProvider(taskId));
     final controller = ref.read(taskMetadataProvider(taskId).notifier);
+    Future<void> saveAndClose() async {
+      final save = onSave;
+      if (save == null) return;
+      final saved = await controller.save((state) async {
+        dev.log(
+          '[TaskMetadataSheet] Persisting: taskId=$taskId dueDate=${state.dueDate} hasTime=${state.hasTime} recurrence=${state.recurrence?.name} reminder=${state.reminder?.value}',
+          name: 'TaskMetadataSheet',
+        );
+        await save(
+          dueDate: state.dueDate,
+          hasTime: state.hasTime,
+          recurrence: state.recurrence,
+          reminder: state.reminder?.value,
+        );
+      });
+      if (!saved || !context.mounted) return;
+      if (ref.read(taskMetadataProvider(taskId)).reminder != null) {
+        try {
+          final scheduler = ref.read(
+            taskNotificationSchedulerProvider.notifier,
+          );
+          await scheduler.requestPermissionForReminder();
+        } catch (error, stackTrace) {
+          dev.log(
+            '[TaskMetadataSheet] Notification permission failed',
+            name: 'TaskMetadataSheet',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
+      }
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+    }
 
     return Material(
       type: MaterialType.transparency,
@@ -158,6 +185,39 @@ class TaskMetadataSheetBody extends ConsumerWidget {
                 ),
               ),
               onClear: () => controller.setReminder(null),
+            ),
+            if (state.error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: Text(
+                  state.error.toString(),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: state.isSaving
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                FilledButton(
+                  onPressed: state.isSaving ? null : saveAndClose,
+                  child: state.isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Salvar'),
+                ),
+              ],
             ),
           ],
         ),

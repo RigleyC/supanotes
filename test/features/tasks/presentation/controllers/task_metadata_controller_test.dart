@@ -39,7 +39,50 @@ void main() {
 
     controller.clearDueDate();
 
-    expect(container.read(taskMetadataProvider('task-1')), _emptyTaskMetadata);
+    final state = container.read(taskMetadataProvider('task-1'));
+    expect(state.dueDate, isNull);
+    expect(state.hasTime, isFalse);
+    expect(state.recurrence, isNull);
+    expect(state.reminder, isNull);
+  });
+
+  test('save persists once and returns success', () async {
+    final controller = container.read(taskMetadataProvider('task-1').notifier)
+      ..initialize(_task(reminder: TaskReminderOption.atTime.value));
+    var saveCalls = 0;
+
+    final saved = await controller.save((state) async {
+      saveCalls++;
+      expect(state.reminder, TaskReminderOption.atTime);
+    });
+
+    expect(saved, isTrue);
+    expect(saveCalls, 1);
+    expect(container.read(taskMetadataProvider('task-1')).isSaving, isFalse);
+    expect(container.read(taskMetadataProvider('task-1')).error, isNull);
+  });
+
+  test('save failure keeps values and retry can succeed', () async {
+    final controller = container.read(taskMetadataProvider('task-1').notifier)
+      ..initialize(_task(reminder: TaskReminderOption.atTime.value));
+    var shouldFail = true;
+
+    final failed = await controller.save((_) async {
+      if (shouldFail) throw StateError('failed');
+    });
+
+    expect(failed, isFalse);
+    var state = container.read(taskMetadataProvider('task-1'));
+    expect(state.reminder, TaskReminderOption.atTime);
+    expect(state.error.toString(), contains('failed'));
+
+    shouldFail = false;
+    final retried = await controller.save((_) async {});
+
+    expect(retried, isTrue);
+    state = container.read(taskMetadataProvider('task-1'));
+    expect(state.error, isNull);
+    expect(state.reminder, TaskReminderOption.atTime);
   });
 }
 
@@ -61,10 +104,3 @@ TaskModel _task({String? reminder}) {
     updatedAt: now,
   );
 }
-
-const _emptyTaskMetadata = (
-  dueDate: null,
-  hasTime: false,
-  recurrence: null,
-  reminder: null,
-);

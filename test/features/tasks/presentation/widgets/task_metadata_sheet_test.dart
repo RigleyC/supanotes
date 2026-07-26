@@ -130,18 +130,126 @@ void main() {
 
     expect(find.text('Mensalmente, em 15'), findsOneWidget);
   });
+
+  testWidgets('cancel does not persist metadata changes', (tester) async {
+    final task = _task(id: 'task-cancel');
+    var saveCalls = 0;
+
+    await tester.pumpWidget(
+      _buildSheetForTask(
+        task,
+        onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {
+          saveCalls++;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+
+    expect(saveCalls, 0);
+  });
+
+  testWidgets('save persists once and closes after success', (tester) async {
+    final task = _task(id: 'task-save');
+    var saveCalls = 0;
+
+    await tester.pumpWidget(
+      _buildSheetForTask(
+        task,
+        onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {
+          saveCalls++;
+          expect(dueDate, task.dueDate);
+          expect(recurrence, task.recurrence);
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+
+    expect(saveCalls, 1);
+    expect(find.byType(TaskMetadataSheetBody), findsNothing);
+  });
+
+  testWidgets('save failure keeps modal open and retry can succeed', (
+    tester,
+  ) async {
+    final task = _task(id: 'task-retry');
+    var saveCalls = 0;
+    var shouldFail = true;
+
+    await tester.pumpWidget(
+      _buildSheetForTask(
+        task,
+        onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {
+          saveCalls++;
+          if (shouldFail) throw StateError('save failed');
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+
+    expect(saveCalls, 1);
+    expect(find.byType(TaskMetadataSheetBody), findsOneWidget);
+    expect(find.textContaining('save failed'), findsOneWidget);
+
+    shouldFail = false;
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+
+    expect(saveCalls, 2);
+    expect(find.byType(TaskMetadataSheetBody), findsNothing);
+  });
 }
 
-Widget _buildSheetForTask(TaskModel task) {
+Widget _buildSheetForTask(
+  TaskModel task, {
+  Future<void> Function({
+    required DateTime? dueDate,
+    required bool hasTime,
+    required TaskRecurrence? recurrence,
+    required String? reminder,
+  })?
+  onSave,
+}) {
   return ProviderScope(
     child: _ProviderInitializer(
       task: task,
       child: MaterialApp(
         home: Scaffold(
-          body: TaskMetadataSheetBody(noteId: task.noteId, taskId: task.id),
+          body: TaskMetadataSheetBody(
+            noteId: task.noteId,
+            taskId: task.id,
+            onSave: onSave,
+          ),
         ),
       ),
     ),
+  );
+}
+
+TaskModel _task({String id = 'task-1'}) {
+  final now = DateTime.utc(2026, 6, 11);
+  return TaskModel(
+    id: id,
+    userId: 'user-1',
+    noteId: 'note-1',
+    title: 'Comprar cafe',
+    status: 'open',
+    position: '0',
+    dueDate: now,
+    completedAt: null,
+    recurrence: TaskRecurrence.daily,
+    hasTime: false,
+    reminder: null,
+    createdAt: now,
+    updatedAt: now,
   );
 }
 
