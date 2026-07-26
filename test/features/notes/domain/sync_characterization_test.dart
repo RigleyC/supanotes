@@ -71,10 +71,9 @@ void main() {
   });
 
   test(
-    'NoteSyncSession lifecycle: start, track active state, and dispose',
+    'NoteSyncSession lifecycle starts sync resources and disposes them',
     () async {
       const noteId = 'note-characterization-1';
-      expect(NoteSyncSession.isActive(noteId), isFalse);
 
       final session = NoteSyncSession(
         noteId: noteId,
@@ -84,10 +83,17 @@ void main() {
       );
 
       await session.start();
-      expect(NoteSyncSession.isActive(noteId), isTrue);
+      verify(
+        () => mockSyncService.getConfirmedDocument(noteId),
+      ).called(greaterThanOrEqualTo(1));
 
       await session.dispose();
-      expect(NoteSyncSession.isActive(noteId), isFalse);
+      verify(
+        () => mockSyncService.syncPending(
+          noteId,
+          onReconcile: any(named: 'onReconcile'),
+        ),
+      ).called(greaterThanOrEqualTo(1));
     },
   );
 
@@ -160,12 +166,11 @@ void main() {
           onReconcile: any(named: 'onReconcile'),
         ),
       ).called(1);
-      expect(NoteSyncSession.isActive(noteId), isFalse);
     },
   );
 
   test(
-    'Re-opening a note while old session dispose is in flight preserves new session active state',
+    'Delayed dispose reconciliation does not affect a newer direct session',
     () async {
       const noteId = 'note-reopen-test';
       final session1 = NoteSyncSession(
@@ -175,7 +180,6 @@ void main() {
         editor: editor,
       );
       await session1.start();
-      expect(NoteSyncSession.isActive(noteId), isTrue);
 
       final syncCompleter = Completer<SyncResult>();
       var delaySync = false;
@@ -209,11 +213,11 @@ void main() {
       syncCompleter.complete(SyncResult.empty());
       await disposeFuture;
 
-      // session2 must still be active!
-      expect(NoteSyncSession.isActive(noteId), isTrue);
+      verify(
+        () => mockSyncService.getConfirmedDocument(noteId),
+      ).called(greaterThanOrEqualTo(1));
 
       await session2.dispose();
-      expect(NoteSyncSession.isActive(noteId), isFalse);
     },
   );
 

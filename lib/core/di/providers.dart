@@ -25,6 +25,7 @@ import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
 
 // ---------------------------------------------------------------------------
@@ -146,12 +147,26 @@ final noteSessionCoordinatorProvider =
         );
       }
 
-      final coordinator = NoteSessionCoordinator<NoteSyncSessionHandle>();
+      final coordinator = NoteSessionCoordinator<NoteSyncSessionHandle>(
+        activityTracker: ref.watch(noteSessionActivityTrackerProvider),
+      );
       ref.onDispose(() {
         unawaited(coordinator.closeAll());
       });
       return coordinator;
     });
+
+final noteSessionActivityTrackerProvider = Provider<NoteSessionActivityTracker>(
+  (ref) {
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      throw StateError(
+        'NoteSessionActivityTracker requires an authenticated user',
+      );
+    }
+    return NoteSessionActivityTracker();
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Shared preferences

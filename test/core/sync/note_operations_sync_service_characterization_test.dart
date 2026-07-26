@@ -375,7 +375,4 @@ class CharacterizationNoteSyncClient implements NoteSyncClient {
     }
     return syncResponses.removeAt(0);
   }
-
-  @override
-  bool isNoteActiveLocally(String noteId) => false;
 }

@@ -27,16 +27,11 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_se
 import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
 
 NoteEditorController _createTestController(List<DocumentNode> nodes) {
-  final controller = NoteEditorController(userId: 'test-user');
-  final doc = MutableDocument(nodes: nodes);
-  controller.document = doc;
-  controller.bind('note-1');
-  controller.composer = MutableDocumentComposer();
-  controller.editor = createDefaultDocumentEditor(
-    document: doc,
-    composer: controller.composer!,
+  return NoteEditorController(
+    userId: 'test-user',
+    noteId: 'note-1',
+    nodes: nodes,
   );
-  return controller;
 }
 
 NoteEditorSession _createTestSession(List<DocumentNode> nodes) {
@@ -456,7 +451,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      (testController.document!.getNodeById('task-1') as TaskNode).isComplete,
+      (testController.document.getNodeById('task-1') as TaskNode).isComplete,
       isTrue,
     );
   });
@@ -547,7 +542,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        (testController.document!.getNodeById('task-1') as TaskNode).isComplete,
+        (testController.document.getNodeById('task-1') as TaskNode).isComplete,
         isFalse,
       );
     },

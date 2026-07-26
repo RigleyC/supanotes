@@ -6,19 +6,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_sync_session.dart';
+import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 
 class NoteCatalogSync {
   NoteCatalogSync({
     required NoteSyncClient syncClient,
     required AppDatabase database,
+    required NoteSessionActivityTracker activityTracker,
   }) : _syncClient = syncClient,
        _database = database,
+       _activityTracker = activityTracker,
        _taskProjectionEngine = TaskProjectionEngine(database: database);
 
   final NoteSyncClient _syncClient;
   final AppDatabase _database;
+  final NoteSessionActivityTracker _activityTracker;
   final TaskProjectionEngine _taskProjectionEngine;
 
   Future<void> pullRemoteNotes(String userId) async {
@@ -26,10 +29,7 @@ class NoteCatalogSync {
 
     for (final raw in rows) {
       try {
-        await _pullRemoteNote(
-          userId: userId,
-          json: raw,
-        );
+        await _pullRemoteNote(userId: userId, json: raw);
       } catch (error, stackTrace) {
         dev.log(
           '[NoteCatalogSync] Failed to hydrate ${raw['id']}',
@@ -46,7 +46,7 @@ class NoteCatalogSync {
     required Map<String, dynamic> json,
   }) async {
     final id = json['id'] as String;
-    if (NoteSyncSession.isActive(id)) {
+    if (_activityTracker.isActive(id)) {
       dev.log('[NoteCatalogSync] Skipping active note $id');
       return;
     }
@@ -118,6 +118,7 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
   final sync = NoteCatalogSync(
     syncClient: ref.watch(noteSyncClientProvider),
     database: ref.watch(appDatabaseProvider),
+    activityTracker: ref.watch(noteSessionActivityTrackerProvider),
   );
   while (true) {
     try {

@@ -1,12 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
 
 void main() {
   group('NoteSessionCoordinator', () {
     test('reuses the same pending session for duplicate opens', () async {
-      final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
+      final tracker = NoteSessionActivityTracker();
+      final coordinator = NoteSessionCoordinator<_FakeSessionHandle>(
+        activityTracker: tracker,
+      );
       final start = Completer<void>();
       var created = 0;
 
@@ -21,10 +25,14 @@ void main() {
 
       expect(created, 1);
       expect(coordinator.statusOf('note-1'), NoteSessionStatus.opening);
+      expect(tracker.isActive('note-1'), isTrue);
 
       start.complete();
       expect(identical(await first, await second), isTrue);
       expect(coordinator.statusOf('note-1'), NoteSessionStatus.ready);
+
+      await coordinator.close('note-1');
+      expect(tracker.isActive('note-1'), isFalse);
     });
 
     test('reuses a ready session for duplicate opens', () async {

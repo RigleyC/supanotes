@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/domain/note_sync_session.dart';
 
 enum NoteSessionStatus { opening, ready, syncing, closing, closed, error }
@@ -59,6 +60,10 @@ class CoordinatedNoteSession<T extends NoteSessionHandle> {
 }
 
 class NoteSessionCoordinator<T extends NoteSessionHandle> {
+  NoteSessionCoordinator({NoteSessionActivityTracker? activityTracker})
+    : _activityTracker = activityTracker;
+
+  final NoteSessionActivityTracker? _activityTracker;
   final Map<String, _SessionEntry<T>> _entries = {};
   int _nextGeneration = 0;
   bool _disposed = false;
@@ -90,6 +95,7 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
 
     final generation = ++_nextGeneration;
     final handle = create();
+    _activityTracker?.markActive(noteId);
     late final _SessionEntry<T> entry;
     entry = _SessionEntry<T>(
       noteId: noteId,
@@ -149,6 +155,7 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     entry.status = status;
     if (status == NoteSessionStatus.closed && entry.generation == generation) {
       _entries.remove(noteId);
+      _activityTracker?.markInactive(noteId);
     }
   }
 

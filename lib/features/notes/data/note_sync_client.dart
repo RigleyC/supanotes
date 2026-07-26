@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:supanotes/core/api/api_client.dart';
-import 'package:supanotes/features/notes/domain/note_sync_session.dart';
 
 class NoteDocumentResponse {
   final String noteId;
@@ -267,10 +266,6 @@ class NoteSyncClient {
     } on DioException catch (e) {
       throw _mapError(e);
     }
-  }
-
-  bool isNoteActiveLocally(String noteId) {
-    return NoteSyncSession.isActive(noteId);
   }
 
   NoteOperationsException _mapError(DioException e) {

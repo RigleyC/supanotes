@@ -7,7 +7,6 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
-import 'package:supanotes/features/notes/domain/note_document_codec.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
     show RandomDividerConversionReaction;
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -17,37 +16,34 @@ const int _dividerCount = 35;
 class NoteEditorController extends ChangeNotifier {
   NoteEditorController({
     required this.userId,
+    required String noteId,
+    List<DocumentNode> nodes = const [],
     Future<void> Function(String id, String filePath, String mimeType)?
     onUploadFile,
-  }) : _onUploadFile = onUploadFile;
+  }) : _onUploadFile = onUploadFile,
+       _noteId = noteId,
+       document = MutableDocument(nodes: nodes) {
+    _setupEditor();
+  }
 
   final String userId;
   final Future<void> Function(String id, String filePath, String mimeType)?
   _onUploadFile;
 
-  MutableDocument? document;
-  Editor? editor;
-  MutableDocumentComposer? composer;
+  final MutableDocument document;
+  late final Editor editor;
+  late final MutableDocumentComposer composer;
   final FocusNode focusNode = FocusNode();
   void Function(bool)? onHasContentChanged;
 
-  String? _noteId;
-
-  bool get hasDocument => document != null;
-
-  void initOtOnly({required String noteId}) {
-    document = NoteDocumentCodec.documentFromNodes([]);
-    _noteId = noteId;
-    _setupEditor();
-    notifyListeners();
-  }
+  final String _noteId;
 
   TaskCompletionResult? completeTaskInEditor(
     String nodeId, {
     DateTime? now,
     DateTime? scheduledAt,
   }) {
-    final node = document?.getNodeById(nodeId);
+    final node = document.getNodeById(nodeId);
     if (node is TaskNode) {
       final dueDateStr = node.metadata['dueDate'] as String?;
       final hasTime = node.metadata['hasTime'] as bool? ?? false;
@@ -93,7 +89,7 @@ class NoteEditorController extends ChangeNotifier {
         metadata: updatedMeta,
       );
 
-      editor?.execute([
+      editor.execute([
         ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
       ]);
       return result;
@@ -106,7 +102,7 @@ class NoteEditorController extends ChangeNotifier {
     DateTime? previousDue,
     DateTime? scheduledAt,
   }) {
-    final node = document?.getNodeById(nodeId);
+    final node = document.getNodeById(nodeId);
     if (node is TaskNode) {
       final updatedMeta = Map<String, dynamic>.from(node.metadata);
       if (previousDue != null) {
@@ -126,7 +122,7 @@ class NoteEditorController extends ChangeNotifier {
         isComplete: false,
         metadata: updatedMeta,
       );
-      editor?.execute([
+      editor.execute([
         ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
       ]);
     }
@@ -142,7 +138,7 @@ class NoteEditorController extends ChangeNotifier {
     String? reminder,
     bool clearReminder = false,
   }) {
-    final node = document?.getNodeById(nodeId);
+    final node = document.getNodeById(nodeId);
     if (node is TaskNode) {
       final updatedMeta = Map<String, dynamic>.from(node.metadata);
       if (clearDueDate) {
@@ -173,7 +169,7 @@ class NoteEditorController extends ChangeNotifier {
         isComplete: node.isComplete,
         metadata: updatedMeta,
       );
-      editor?.execute([
+      editor.execute([
         ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
       ]);
     }
@@ -182,19 +178,15 @@ class NoteEditorController extends ChangeNotifier {
   void _setupEditor() {
     composer = MutableDocumentComposer();
     editor = createDefaultDocumentEditor(
-      document: document!,
-      composer: composer!,
+      document: document,
+      composer: composer,
     );
-    editor!.reactionPipeline.removeWhere(
+    editor.reactionPipeline.removeWhere(
       (r) => r is HorizontalRuleConversionReaction,
     );
-    editor!.reactionPipeline.add(
+    editor.reactionPipeline.add(
       const RandomDividerConversionReaction(dividerCount: _dividerCount),
     );
-  }
-
-  void bind(String noteId) {
-    _noteId = noteId;
   }
 
   Future<void> pickAndAttachFile({bool imageOnly = false}) async {
@@ -232,16 +224,12 @@ class NoteEditorController extends ChangeNotifier {
     onUploadFile,
     required void Function() onError,
   }) {
-    final noteId = _noteId;
-    final editor = this.editor;
-    if (noteId == null || editor == null) return;
-
     final id = Editor.createNodeId();
     editor.execute([
       InsertNodeAtCaretRequest(node: DocumentAttachmentNode(id: id)),
     ]);
 
-    onUploadFile(id, noteId, filePath, mimeType).catchError((_) {
+    onUploadFile(id, _noteId, filePath, mimeType).catchError((_) {
       if (editor.document.getNodeById(id) != null) {
         editor.execute([DeleteNodeRequest(nodeId: id)]);
       }
@@ -249,16 +237,12 @@ class NoteEditorController extends ChangeNotifier {
     });
   }
 
-  void suspendSync() {}
-
-  void resumeSync() {}
-
   @override
   Future<void> dispose() async {
     onHasContentChanged = null;
-    editor?.dispose();
-    document?.dispose();
-    composer?.dispose();
+    editor.dispose();
+    document.dispose();
+    composer.dispose();
     focusNode.dispose();
     super.dispose();
   }

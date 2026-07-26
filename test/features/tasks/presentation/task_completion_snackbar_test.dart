@@ -23,16 +23,11 @@ import 'package:intl/date_symbol_data_local.dart';
 class _MockTasksRepository extends Mock implements ITasksRepository {}
 
 NoteEditorController _createTestController(List<DocumentNode> nodes) {
-  final controller = NoteEditorController(userId: 'test-user');
-  final doc = MutableDocument(nodes: nodes);
-  controller.document = doc;
-  controller.bind('note-1');
-  controller.composer = MutableDocumentComposer();
-  controller.editor = createDefaultDocumentEditor(
-    document: doc,
-    composer: controller.composer!,
+  return NoteEditorController(
+    userId: 'test-user',
+    noteId: 'note-1',
+    nodes: nodes,
   );
-  return controller;
 }
 
 NoteEditorSession _createTestSession(List<DocumentNode> nodes) {

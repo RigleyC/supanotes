@@ -21,6 +21,7 @@ final noteEditorSessionProvider = FutureProvider.autoDispose
       final attachmentsRepo = ref.read(attachmentsRepositoryProvider);
       final controller = NoteEditorController(
         userId: userId,
+        noteId: noteId,
         onUploadFile: (id, filePath, mimeType) => attachmentsRepo.upload(
           id: id,
           noteId: noteId,
@@ -28,8 +29,6 @@ final noteEditorSessionProvider = FutureProvider.autoDispose
           mimeType: mimeType,
         ),
       );
-
-      controller.initOtOnly(noteId: noteId);
 
       final database = ref.read(appDatabaseProvider);
       final taskProjectionEngine = TaskProjectionEngine(database: database);
@@ -48,8 +47,8 @@ final noteEditorSessionProvider = FutureProvider.autoDispose
           NoteSyncSession(
             noteId: noteId,
             syncService: syncService,
-            document: controller.document!,
-            editor: controller.editor!,
+            document: controller.document,
+            editor: controller.editor,
             taskProjectionEngine: taskProjectionEngine,
             userId: userId,
             captureLocalOperations: !request.isReadOnly,

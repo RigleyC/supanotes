@@ -57,7 +57,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         )
         .value
         ?.controller;
-    final node = controller?.document?.getNodeById(taskId);
+    final node = controller?.document.getNodeById(taskId);
     if (node is! TaskNode) return null;
 
     final dueDate = DateTime.tryParse(

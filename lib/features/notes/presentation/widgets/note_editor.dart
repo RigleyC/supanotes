@@ -62,12 +62,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   void _initControls() {
     if (_controls != null) return;
     final controller = _controller!;
-    if (controller.editor == null || controller.composer == null) return;
 
     final editorControlsColor = Theme.of(context).colorScheme.primary;
     _controls = createEditorControls(
-      editor: controller.editor!,
-      composer: controller.composer!,
+      editor: controller.editor,
+      composer: controller.composer,
       documentLayoutResolver: () =>
           _docLayoutKey.currentState as DocumentLayout,
       handleColor: editorControlsColor,
@@ -79,7 +78,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   void _initStableBuilders() {
     if (_componentBuilders != null) return;
     final controller = _controller!;
-    if (controller.editor == null || controller.composer == null) return;
 
     _contentTapDelegateFactories = widget.isReadOnly
         ? null
@@ -108,7 +106,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       const CustomDividerComponentBuilder(),
       _taskComponentBuilder!,
       AttachmentComponentBuilder(
-        editor: controller.editor!,
+        editor: controller.editor,
         collapseImages: widget.collapseImages,
       ),
       ...defaultComponentBuilders,
@@ -167,15 +165,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           };
         }
 
-        if (!controller.hasDocument ||
-            controller.document == null ||
-            controller.editor == null ||
-            controller.composer == null) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
         _initControls();
         _initStableBuilders();
 
@@ -213,7 +202,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                 child: SuperEditorIosControlsScope(
                   controller: _controls!.iosController,
                   child: SuperEditor(
-                    editor: controller.editor!,
+                    editor: controller.editor,
                     focusNode: widget.isReadOnly ? null : controller.focusNode,
                     documentLayoutKey: _docLayoutKey,
                     stylesheet: _cachedStylesheet!,
@@ -236,8 +225,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             if (!widget.isReadOnly) ...[
               Positioned.fill(
                 child: SlashCommandOverlay(
-                  editor: controller.editor!,
-                  composer: controller.composer!,
+                  editor: controller.editor,
+                  composer: controller.composer,
                   documentLayoutResolver: () =>
                       _docLayoutKey.currentState as DocumentLayout,
                   documentLayoutContextResolver: () =>
@@ -258,14 +247,14 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       NoteSuggestionOverlay(
-                        editor: controller.editor!,
-                        composer: controller.composer!,
+                        editor: controller.editor,
+                        composer: controller.composer,
                         currentNoteId: widget.noteId,
                         onPersist: () async {},
                       ),
                       NoteToolbar(
-                        editor: controller.editor!,
-                        composer: controller.composer!,
+                        editor: controller.editor,
+                        composer: controller.composer,
                         onAttachFile: () =>
                             controller.pickAndAttachFile(imageOnly: false),
                         onAttachImage: () =>

@@ -7,10 +7,6 @@ import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 import 'note_operation_adapter.dart';
 
 class NoteSyncSession {
-  static final Map<String, NoteSyncSession> _activeSessions = {};
-
-  static bool isActive(String noteId) => _activeSessions.containsKey(noteId);
-
   final String noteId;
   final NoteOperationsSyncService syncService;
   final NoteOperationAdapter adapter;
@@ -40,7 +36,6 @@ class NoteSyncSession {
        );
 
   Future<void> start() async {
-    _activeSessions[noteId] = this;
     adapter.onLocalOperations = (_) {
       if (captureLocalOperations) {
         unawaited(_triggerLocalProjection());
@@ -56,9 +51,6 @@ class NoteSyncSession {
       }
       _startPolling();
     } catch (_) {
-      if (_activeSessions[noteId] == this) {
-        _activeSessions.remove(noteId);
-      }
       rethrow;
     }
   }
@@ -138,9 +130,6 @@ class NoteSyncSession {
 
   Future<void> dispose() async {
     _disposed = true;
-    if (_activeSessions[noteId] == this) {
-      _activeSessions.remove(noteId);
-    }
     _pollTimer?.cancel();
     try {
       await adapter.flushNow();
