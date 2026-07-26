@@ -29,9 +29,18 @@ func NewHandler(svc Service) *Handler {
 }
 
 func (h *Handler) Upload(c echo.Context) error {
-	_, err := web.UserID(c)
+	userID, err := web.UserID(c)
 	if err != nil {
 		return err
+	}
+
+	c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, maxUploadBytes+1024*1024)
+	if err := c.Request().ParseMultipartForm(32 << 20); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return web.JSONError(c, http.StatusRequestEntityTooLarge, "O arquivo excede o limite de 200 MB")
+		}
+		return web.JSONError(c, http.StatusBadRequest, "invalid multipart form")
 	}
 
 	noteIDStr := c.FormValue("note_id")
@@ -51,10 +60,16 @@ func (h *Handler) Upload(c echo.Context) error {
 	}
 	defer src.Close()
 
-	attachment, err := h.svc.Upload(c.Request().Context(), noteID, file.Filename, src, file.Size)
+	attachment, err := h.svc.Upload(c.Request().Context(), noteID, userID, file.Filename, src, file.Size)
 	if err != nil {
-		if errors.Is(err, ErrFileTooLarge) {
+		if errors.Is(err, ErrFileTooLarge) || errors.Is(err, ErrInvalidFileSize) {
 			return web.JSONError(c, http.StatusRequestEntityTooLarge, "O arquivo excede o limite de 200 MB")
+		}
+		if errors.Is(err, ErrNoPermission) {
+			return web.JSONError(c, http.StatusForbidden, "sem permissão para anexar arquivos nesta nota")
+		}
+		if errors.Is(err, ErrNoteNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "nota não encontrada")
 		}
 		c.Logger().Errorf("attachment upload failed: %v", err)
 		return web.JSONError(c, http.StatusInternalServerError, "upload failed")

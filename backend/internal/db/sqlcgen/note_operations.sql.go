@@ -14,7 +14,8 @@ import (
 const checkNotePermission = `-- name: CheckNotePermission :one
 SELECT COALESCE(
   (SELECT 'owner'::text FROM notes WHERE notes.id = $1 AND notes.user_id = $2 AND notes.deleted_at IS NULL),
-  (SELECT permission::text FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2),
+  (SELECT permission::text FROM note_shares JOIN notes ON notes.id = note_shares.note_id WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND notes.deleted_at IS NULL),
+  (SELECT 'not_found'::text FROM notes WHERE notes.id = $1),
   'none'::text
 ) AS permission
 `
