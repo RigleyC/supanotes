@@ -88,7 +88,10 @@ void main() {
     container = ProviderContainer(
       overrides: [
         localNotificationServiceProvider.overrideWithValue(
-          LocalNotificationService(plugin: fakePlugin),
+          LocalNotificationService(
+            plugin: fakePlugin,
+            supportedPlatform: true,
+          ),
         ),
         tasksLocalRepositoryProvider.overrideWithValue(mockTasksRepo),
         authControllerProvider.overrideWith(() => _MockAuthController()),

@@ -18,6 +18,10 @@ class SplashScreen extends StatelessWidget {
                     : 'assets/brand/splash.png',
                 width: 120,
                 height: 120,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(
+                  width: 120,
+                  height: 120,
+                ),
               ),
               const SizedBox(height: 32),
               const SizedBox(

@@ -6,12 +6,17 @@ import 'package:timezone/timezone.dart' as tz;
 
 class LocalNotificationService {
   final FlutterLocalNotificationsPlugin _plugin;
+  final bool? _supportedPlatformOverride;
   bool _initialized = false;
 
-  LocalNotificationService({FlutterLocalNotificationsPlugin? plugin})
-    : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+  LocalNotificationService({
+    FlutterLocalNotificationsPlugin? plugin,
+    bool? supportedPlatform,
+  }) : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+       _supportedPlatformOverride = supportedPlatform;
 
-  bool get isSupportedPlatform => Platform.isAndroid || Platform.isIOS;
+  bool get isSupportedPlatform =>
+      _supportedPlatformOverride ?? (Platform.isAndroid || Platform.isIOS);
 
   Future<void> initialize() async {
     if (_initialized || !isSupportedPlatform) return;
