@@ -69,6 +69,7 @@ type serviceOptions struct {
 	cacheCap     int
 	maxBodyBytes int64
 	normalizeURL func(string) (*url.URL, string, error)
+	now          func() time.Time
 }
 
 func NewService() Service {
@@ -96,10 +97,14 @@ func newService(opts serviceOptions) *service {
 	if client == nil {
 		client = newSafeHTTPClient()
 	}
+	now := opts.now
+	if now == nil {
+		now = time.Now
+	}
 
 	return &service{
 		client:       client,
-		cache:        newPreviewCache(cacheCap, cacheTTL),
+		cache:        newPreviewCache(cacheCap, cacheTTL, now),
 		maxBodyBytes: maxBodyBytes,
 		normalizeURL: normalizeURLFn,
 	}
@@ -138,13 +143,20 @@ var (
 	titleTagRe = regexp.MustCompile(`(?i)<title[^>]*>([^<]+)</title>`)
 
 	reservedPrefixes = mustParsePrefixes(
+		"0.0.0.0/8",
 		"100.64.0.0/10",
 		"192.0.0.0/24",
 		"192.0.2.0/24",
 		"198.18.0.0/15",
 		"198.51.100.0/24",
 		"203.0.113.0/24",
+		"240.0.0.0/4",
+		"255.255.255.255/32",
+		"::/128",
+		"64:ff9b:1::/48",
+		"100::/64",
 		"2001:db8::/32",
+		"2002::/16",
 	)
 )
 
@@ -376,13 +388,15 @@ type previewCache struct {
 	order    []string
 	capacity int
 	ttl      time.Duration
+	now      func() time.Time
 }
 
-func newPreviewCache(capacity int, ttl time.Duration) *previewCache {
+func newPreviewCache(capacity int, ttl time.Duration, now func() time.Time) *previewCache {
 	return &previewCache{
 		items:    make(map[string]cacheEntry),
 		capacity: capacity,
 		ttl:      ttl,
+		now:      now,
 	}
 }
 
@@ -394,7 +408,7 @@ func (c *previewCache) get(key string) (*Preview, bool) {
 	if !ok {
 		return nil, false
 	}
-	if time.Now().After(entry.expiresAt) {
+	if c.now().After(entry.expiresAt) {
 		delete(c.items, key)
 		c.removeOrderKey(key)
 		return nil, false
@@ -411,7 +425,7 @@ func (c *previewCache) set(key string, preview *Preview) {
 	}
 	c.items[key] = cacheEntry{
 		preview:   preview,
-		expiresAt: time.Now().Add(c.ttl),
+		expiresAt: c.now().Add(c.ttl),
 	}
 
 	for len(c.items) > c.capacity && len(c.order) > 0 {

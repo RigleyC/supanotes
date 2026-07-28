@@ -41,9 +41,7 @@ class AuthController extends AsyncNotifier<User?> {
     state = const AsyncValue.loading();
     try {
       final result = await attempt();
-      await _sessionCache.hydrate({
-        'settings': result.session.settings,
-      });
+      await _sessionCache.hydrate({'settings': result.session.settings});
       state = AsyncValue.data(result.user);
       return result;
     } catch (e, st) {
@@ -64,9 +62,10 @@ class AuthController extends AsyncNotifier<User?> {
   );
 
   Future<void> _clearSession() async {
+    await _closeActiveNoteSessions();
     await _storage.clear();
     _sessionCache.clear();
-    
+
     // Clear last synced time to force a full pull next time
     try {
       final prefs = ref.read(sharedPreferencesProvider);
@@ -88,6 +87,14 @@ class AuthController extends AsyncNotifier<User?> {
     // across involuntary session expiry lets the user land back where they were
     // after re-login. See: logout() for the explicit-logout path.
     state = const AsyncValue.data(null);
+  }
+
+  Future<void> _closeActiveNoteSessions() async {
+    try {
+      await ref.read(noteSessionCoordinatorProvider).closeAll();
+    } catch (e) {
+      debugPrint('Error closing note sessions: $e');
+    }
   }
 
   Future<void> logout() async {

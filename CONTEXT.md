@@ -40,3 +40,9 @@ _Avoid_: Materialized view, cache, index
 The entirety of a user's data — all notes, tasks, attachments, and preferences.
 _Avoid_: Account, workspace, library
 
+**Drawing Block**:
+A block within a note document (`type: "drawing"`) that contains vector stroke data and rendering properties for freehand drawings and sketches embedded within the block sequence. Edited inline directly inside the note with an explicit drawing-mode activation toggle to avoid gesture conflicts with document scrolling.
+_Avoid_: Canvas overlay, sketch file, scribbles
+
+
+

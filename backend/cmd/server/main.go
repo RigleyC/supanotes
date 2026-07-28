@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
+	"github.com/RigleyC/supanotes/internal/alexa"
 	"github.com/RigleyC/supanotes/internal/attachments"
 	"github.com/RigleyC/supanotes/internal/auth"
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
@@ -29,6 +30,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/settings"
 	"github.com/RigleyC/supanotes/internal/shares"
+	"github.com/RigleyC/supanotes/internal/shoppinglist"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/config"
 	"github.com/RigleyC/supanotes/pkg/db"
@@ -223,6 +225,17 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	noteOpsSvc := noteoperations.NewService(noteoperations.NewRepository(pool), pool)
 	noteOpsH := noteoperations.NewHandler(noteOpsSvc)
 	noteOpsH.RegisterRoutes(protected)
+
+	// External command adapters
+	shoppingListSvc := shoppinglist.NewService(notesSvc, noteOpsSvc)
+	shoppingListH := shoppinglist.NewHandler(shoppingListSvc)
+	protected.POST("/integrations/shopping-list/items", shoppingListH.AddItem)
+	alexaH := alexa.NewHandler(shoppingListSvc, cfg.JWTSecret, cfg.AlexaApplicationID)
+	api.POST("/integrations/alexa", alexaH.Handle)
+	oauthH := alexa.NewOAuthHandler(authSvc, pool, cfg)
+	api.GET("/integrations/alexa/oauth/authorize", oauthH.Authorize)
+	api.POST("/integrations/alexa/oauth/authorize", oauthH.AuthorizeSubmit)
+	api.POST("/integrations/alexa/oauth/token", oauthH.Token)
 
 	// GC cron for hard-deleting old notes
 	cronJob := cron.New(cron.WithSeconds())

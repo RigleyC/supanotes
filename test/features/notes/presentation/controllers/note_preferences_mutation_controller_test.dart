@@ -42,7 +42,8 @@ void main() {
       await first;
 
       expect(notes.note.hideCompleted, isFalse);
-      expect(controller.state.status, NotePreferenceMutationStatus.error);
+      expect(controller.state.status, NotePreferenceMutationStatus.idle);
+      expect(controller.state.error, isNull);
     },
   );
 
@@ -90,6 +91,39 @@ void main() {
       expect(notes.note.hideCompleted, isTrue);
       expect(controller.state.status, NotePreferenceMutationStatus.idle);
       expect(controller.state.error, isNull);
+    },
+  );
+
+  test(
+    'concurrent mutations where first fails and second succeeds end with idle status and no error',
+    () async {
+      final notes = _FakeNotesRepository(
+        _note(hideCompleted: false, collapseImages: false),
+      );
+      final preferences = _FakePreferencesRepository(notes);
+      final controller = _controller(notes, preferences);
+      final secondWrite = Completer<void>();
+
+      preferences.nextHideCompletedWrite = (_) async {
+        throw StateError('hide failed');
+      };
+      notes.nextUpdateNoteWrite = (_) async {
+        await secondWrite.future;
+      };
+
+      final op1 = controller.setHideCompleted(current: notes.note, value: true);
+      final op2 = controller.setCollapseImages(current: notes.note, value: true);
+
+      await op1; // op1 fails immediately
+      expect(controller.state.status, NotePreferenceMutationStatus.error);
+      expect(controller.state.inFlightCount, 1);
+
+      secondWrite.complete();
+      await op2; // op2 succeeds after op1 failed
+
+      expect(controller.state.status, NotePreferenceMutationStatus.idle);
+      expect(controller.state.error, isNull);
+      expect(controller.state.inFlightCount, 0);
     },
   );
 }
@@ -149,6 +183,7 @@ class _FakeNotesRepository implements INotesRepository {
   _FakeNotesRepository(this.note);
 
   NoteModel note;
+  Future<void> Function(bool? collapseImages)? nextUpdateNoteWrite;
 
   void applyHideCompleted(bool value) {
     note = note.copyWith(hideCompleted: value);
@@ -160,6 +195,11 @@ class _FakeNotesRepository implements INotesRepository {
     String? content,
     bool? collapseImages,
   }) async {
+    final write = nextUpdateNoteWrite;
+    nextUpdateNoteWrite = null;
+    if (write != null) {
+      await write(collapseImages);
+    }
     if (collapseImages != null) {
       note = note.copyWith(collapseImages: collapseImages);
     }

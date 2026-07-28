@@ -1,9 +1,1 @@
-enum SharePermission {
-  view,
-  edit;
-
-  String toJson() => name;
-  factory SharePermission.fromJson(String value) {
-    return SharePermission.values.byName(value);
-  }
-}
+export 'package:supanotes/features/notes/sharing/model/share_permission.dart';

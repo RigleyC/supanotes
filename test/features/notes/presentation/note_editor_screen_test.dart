@@ -10,6 +10,7 @@ import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/data/notes_repository.dart';
 import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/domain/note_session_handle.dart';
 import 'package:supanotes/features/notes/domain/note_strings.dart';
 import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
@@ -34,15 +35,48 @@ NoteEditorController _createTestController(List<DocumentNode> nodes) {
   );
 }
 
-NoteEditorSession _createTestSession(List<DocumentNode> nodes) {
+Future<NoteEditorSession> _createTestSession(List<DocumentNode> nodes) async {
   return NoteEditorSession(
     noteId: 'note-1',
     controller: _createTestController(nodes),
+    syncSession: _FakeEditorSyncHandle(),
   );
 }
 
-NoteEditorSession _sessionFor(NoteEditorController controller) {
-  return NoteEditorSession(noteId: 'note-1', controller: controller);
+Future<NoteEditorSession> _sessionFor(NoteEditorController controller) async {
+  return NoteEditorSession(
+    noteId: 'note-1',
+    controller: controller,
+    syncSession: _FakeEditorSyncHandle(),
+  );
+}
+
+class _FakeEditorSyncHandle implements NoteEditorSyncHandle {
+  bool _captureLocalOperations = true;
+
+  @override
+  NoteSessionStatus get status => NoteSessionStatus.ready;
+
+  @override
+  Stream<NoteSessionStatus> get statusChanges =>
+      Stream.value(NoteSessionStatus.ready);
+
+  @override
+  bool get captureLocalOperations => _captureLocalOperations;
+
+  @override
+  void setCaptureLocalOperations(bool captureLocalOperations) {
+    _captureLocalOperations = captureLocalOperations;
+  }
+
+  @override
+  Future<void> start() async {}
+
+  @override
+  Future<void> flushNow() async {}
+
+  @override
+  Future<void> dispose() async {}
 }
 
 class _FakeNotesRepository implements INotesRepository {
@@ -164,7 +198,7 @@ void main() {
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
           noteEditorSessionProvider.overrideWith(
-            (ref, id) async => _createTestSession([
+            (ref, noteId) async => _createTestSession([
               ParagraphNode(id: '1', text: AttributedText('Dark content')),
             ]),
           ),
@@ -208,7 +242,7 @@ void main() {
 
   test('NoteEditor wires the custom note stylesheet', () {
     final source = File(
-      'lib/features/notes/presentation/widgets/note_editor.dart',
+      'lib/features/notes/editor/presentation/widgets/note_editor.dart',
     ).readAsStringSync();
 
     expect(source, contains('noteStylesheet'));
@@ -223,7 +257,7 @@ void main() {
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
           noteEditorSessionProvider.overrideWith(
-            (ref, id) async => _createTestSession([
+            (ref, noteId) async => _createTestSession([
               TaskNode(
                 id: '1',
                 text: AttributedText('tarefa concluida'),
@@ -268,7 +302,7 @@ void main() {
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
           noteEditorSessionProvider.overrideWith(
-            (ref, id) async => _createTestSession([
+            (ref, noteId) async => _createTestSession([
               TaskNode(
                 id: '1',
                 text: AttributedText('tarefa concluida'),
@@ -422,7 +456,7 @@ void main() {
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
           noteEditorSessionProvider.overrideWith(
-            (ref, id) async => _sessionFor(testController),
+            (ref, noteId) async => _sessionFor(testController),
           ),
         ],
         child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
@@ -557,7 +591,7 @@ void main() {
       ProviderScope(
         overrides: [
           noteEditorSessionProvider.overrideWith(
-            (ref, id) => sessionCompleter.future,
+            (ref, noteId) => sessionCompleter.future,
           ),
         ],
         child: MaterialApp(
@@ -588,7 +622,7 @@ void main() {
       ProviderScope(
         overrides: [
           noteEditorSessionProvider.overrideWith(
-            (ref, id) async => throw StateError('network failed'),
+            (ref, noteId) async => throw StateError('network failed'),
           ),
         ],
         child: MaterialApp(
@@ -613,7 +647,7 @@ void main() {
       ProviderScope(
         overrides: [
           noteEditorSessionProvider.overrideWith(
-            (ref, id) async => _createTestSession([
+            (ref, noteId) async => _createTestSession([
               ParagraphNode(id: '1', text: AttributedText('read only')),
             ]),
           ),

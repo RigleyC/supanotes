@@ -21,31 +21,60 @@ var (
 )
 
 type Service struct {
-	repo Repository
-	pool *pgxpool.Pool
+	repo     Repository
+	pool     *pgxpool.Pool
+	txRunner TransactionRunner
 }
 
 func NewService(repo Repository, pool *pgxpool.Pool) *Service {
-	return &Service{repo: repo, pool: pool}
+	var runner TransactionRunner
+	if pool != nil {
+		runner = pgxPoolTransactionRunner{pool: pool}
+	}
+	return &Service{repo: repo, pool: pool, txRunner: runner}
 }
 
-func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID, req SyncRequest) (SyncResponse, error) {
-	tx, err := s.pool.Begin(ctx)
+type TransactionRunner interface {
+	InTx(ctx context.Context, repo Repository, fn func(Repository) error) error
+}
+
+type pgxPoolTransactionRunner struct {
+	pool *pgxpool.Pool
+}
+
+func (r pgxPoolTransactionRunner) InTx(ctx context.Context, repo Repository, fn func(Repository) error) error {
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return SyncResponse{}, fmt.Errorf("begin tx: %w", err)
+		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
-	txRepo := s.repo.WithTx(tx)
-	response, err := syncOperationsInRepository(ctx, txRepo, noteID, userID, req)
-	if err != nil {
-		return SyncResponse{}, err
+	if err := fn(repo.WithTx(tx)); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return SyncResponse{}, fmt.Errorf("commit tx: %w", err)
+		return fmt.Errorf("commit tx: %w", err)
 	}
-	return response, nil
+	return nil
+}
+
+func NewServiceWithTransactionRunner(repo Repository, txRunner TransactionRunner) *Service {
+	return &Service{repo: repo, txRunner: txRunner}
+}
+
+func (s *Service) SyncOperations(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID, req SyncRequest) (SyncResponse, error) {
+	if s.txRunner == nil {
+		return SyncResponse{}, errors.New("sync operations require transaction runner")
+	}
+
+	var response SyncResponse
+	err := s.txRunner.InTx(ctx, s.repo, func(txRepo Repository) error {
+		var err error
+		response, err = syncOperationsInRepository(ctx, txRepo, noteID, userID, req)
+		return err
+	})
+	return response, err
 }
 
 func syncOperationsInRepository(

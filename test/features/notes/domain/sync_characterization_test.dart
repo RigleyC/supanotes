@@ -375,6 +375,141 @@ void main() {
       await session.dispose();
     },
   );
+
+  test('transient sync errors do not become protocol errors', () async {
+    const noteId = 'note-transient-error';
+    final syncErrors = <Object>[];
+    final protocolErrors = <Object>[];
+    var readyCalls = 0;
+    final session = NoteSyncSession(
+      noteId: noteId,
+      syncService: mockSyncService,
+      document: document,
+      editor: editor,
+      onTransientError: syncErrors.add,
+      onProtocolError: protocolErrors.add,
+    );
+
+    await session.start();
+    final readyCallsAfterStart = readyCalls;
+    when(
+      () => mockSyncService.pollAndReconcile(
+        noteId,
+        onReconcile: any(named: 'onReconcile'),
+      ),
+    ).thenThrow(Exception('socket closed'));
+
+    await session.pollNow();
+
+    expect(syncErrors, hasLength(1));
+    expect(protocolErrors, isEmpty);
+    expect(readyCalls, readyCallsAfterStart);
+
+    await session.dispose();
+  });
+
+  test('protocol sync errors are reported as protocol errors', () async {
+    const noteId = 'note-protocol-error';
+    final protocolErrors = <Object>[];
+    final session = NoteSyncSession(
+      noteId: noteId,
+      syncService: mockSyncService,
+      document: document,
+      editor: editor,
+      onProtocolError: protocolErrors.add,
+    );
+
+    await session.start();
+    when(
+      () => mockSyncService.pollAndReconcile(
+        noteId,
+        onReconcile: any(named: 'onReconcile'),
+      ),
+    ).thenThrow(StateError('protocol mismatch'));
+
+    await session.pollNow();
+
+    expect(protocolErrors, hasLength(1));
+    await session.pollNow();
+    verify(
+      () => mockSyncService.pollAndReconcile(
+        noteId,
+        onReconcile: any(named: 'onReconcile'),
+      ),
+    ).called(1);
+
+    await session.dispose();
+  });
+
+  test(
+    'overlapping sync requests stay syncing until the queue drains',
+    () async {
+      const noteId = 'note-overlapping-status';
+      final events = <String>[];
+      final firstSync = Completer<SyncResult>();
+      var calls = 0;
+      when(
+        () => mockSyncService.syncPending(
+          noteId,
+          onReconcile: any(named: 'onReconcile'),
+        ),
+      ).thenAnswer((_) {
+        calls++;
+        if (calls == 2) return firstSync.future;
+        return Future.value(SyncResult.empty());
+      });
+      final session = NoteSyncSession(
+        noteId: noteId,
+        syncService: mockSyncService,
+        document: document,
+        editor: editor,
+      );
+      session.statusChanges.listen((status) => events.add(status.name));
+
+      await session.start();
+      events.clear();
+      session.adapter.onLocalOperations?.call(const []);
+      session.adapter.onLocalOperations?.call(const []);
+      await pumpEventQueue();
+
+      expect(events.where((e) => e == 'syncing').toList(), ['syncing']);
+      firstSync.complete(SyncResult.empty());
+      await pumpEventQueue();
+      expect(events.last, 'ready');
+
+      await session.dispose();
+    },
+  );
+
+  test('task projections for one session never overlap', () async {
+    const noteId = 'note-serialized-projection';
+    final projectionDb = AppDatabase.test();
+    final projection = BlockingTaskProjectionEngine(database: projectionDb);
+    final session = NoteSyncSession(
+      noteId: noteId,
+      syncService: mockSyncService,
+      document: document,
+      editor: editor,
+      taskProjectionEngine: projection,
+      userId: 'user-1',
+    );
+
+    await session.start();
+    session.adapter.onLocalOperations?.call(const []);
+    session.adapter.onLocalOperations?.call(const []);
+    await pumpEventQueue();
+
+    expect(projection.callCount, 2);
+    expect(projection.maxConcurrent, 1);
+
+    projection.release.complete();
+    await pumpEventQueue();
+    expect(projection.callCount, 3);
+    expect(projection.maxConcurrent, 1);
+
+    await session.dispose();
+    await projectionDb.close();
+  });
 }
 
 class RecordingTaskProjectionEngine extends TaskProjectionEngine {
@@ -389,5 +524,27 @@ class RecordingTaskProjectionEngine extends TaskProjectionEngine {
     String userId = '',
   }) async {
     userIds.add(userId);
+  }
+}
+
+class BlockingTaskProjectionEngine extends TaskProjectionEngine {
+  BlockingTaskProjectionEngine({required super.database});
+
+  final Completer<void> release = Completer<void>();
+  int callCount = 0;
+  int concurrent = 0;
+  int maxConcurrent = 0;
+
+  @override
+  Future<void> projectTasksFromDocument({
+    required String noteId,
+    required MutableDocument document,
+    String userId = '',
+  }) async {
+    callCount++;
+    concurrent++;
+    if (concurrent > maxConcurrent) maxConcurrent = concurrent;
+    if (callCount > 1) await release.future;
+    concurrent--;
   }
 }

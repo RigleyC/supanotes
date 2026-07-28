@@ -153,6 +153,59 @@ void main() {
 
       expect(captured.ordinal.value, 1);
     });
+
+    test('serializes concurrent outbox appends for the same note', () async {
+      final stored = <PendingNoteOperationData>[];
+      when(
+        () => mockDao.getPendingOperations('note-1'),
+      ).thenAnswer((_) async => List.of(stored));
+      when(() => mockDao.insertPendingOperation(any())).thenAnswer((
+        invocation,
+      ) async {
+        final op =
+            invocation.positionalArguments.single
+                as PendingNoteOperationsCompanion;
+        stored.add(
+          PendingNoteOperationData(
+            operationId: op.operationId.value,
+            noteId: op.noteId.value,
+            baseRevision: op.baseRevision.value,
+            ordinal: op.ordinal.value,
+            kind: op.kind.value,
+            blockId: op.blockId.value,
+            payloadJson: op.payloadJson.value,
+            createdAt: op.createdAt.value,
+            lastAttemptAt: null,
+            attemptCount: 0,
+            status: 'pending',
+          ),
+        );
+      });
+
+      await Future.wait([
+        service.enqueueOperation(
+          'note-1',
+          OperationRequest(
+            operationId: 'op-1',
+            baseRevision: 0,
+            kind: 'create_block',
+            payload: const {},
+          ),
+        ),
+        service.enqueueOperation(
+          'note-1',
+          OperationRequest(
+            operationId: 'op-2',
+            baseRevision: 1,
+            kind: 'text_delta',
+            payload: const {'ops': []},
+          ),
+        ),
+      ]);
+
+      expect(stored.map((op) => op.ordinal), [0, 1]);
+      expect(stored.map((op) => op.operationId), ['op-1', 'op-2']);
+    });
   });
 
   group('syncPending', () {

@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 0.6 seconds
+Output:
 # Plano de Implementacao: recorrencias por ocorrencia e historico esparso
 
 ## Objetivo
@@ -204,3 +207,4 @@ Arquivos iniciais:
   isso.
 - Remodelacao visual do modal de data/recorrencia. Ela deve ser tratada depois
   que o contrato de recorrencia estiver estabilizado.
+

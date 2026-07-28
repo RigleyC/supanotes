@@ -17,6 +17,7 @@ import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
+import 'package:supanotes/features/notes/domain/note_session_handle.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_session.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -30,11 +31,40 @@ NoteEditorController _createTestController(List<DocumentNode> nodes) {
   );
 }
 
-NoteEditorSession _createTestSession(List<DocumentNode> nodes) {
+Future<NoteEditorSession> _createTestSession(List<DocumentNode> nodes) async {
   return NoteEditorSession(
     noteId: 'note-1',
     controller: _createTestController(nodes),
+    syncSession: _FakeEditorSyncHandle(),
   );
+}
+
+class _FakeEditorSyncHandle implements NoteEditorSyncHandle {
+  bool _captureLocalOperations = true;
+
+  @override
+  NoteSessionStatus get status => NoteSessionStatus.ready;
+
+  @override
+  Stream<NoteSessionStatus> get statusChanges =>
+      Stream.value(NoteSessionStatus.ready);
+
+  @override
+  bool get captureLocalOperations => _captureLocalOperations;
+
+  @override
+  void setCaptureLocalOperations(bool captureLocalOperations) {
+    _captureLocalOperations = captureLocalOperations;
+  }
+
+  @override
+  Future<void> start() async {}
+
+  @override
+  Future<void> flushNow() async {}
+
+  @override
+  Future<void> dispose() async {}
 }
 
 void main() {

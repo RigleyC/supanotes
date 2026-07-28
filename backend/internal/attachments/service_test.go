@@ -24,7 +24,7 @@ func TestUploadAllowsOwnerAndEditor(t *testing.T) {
 			t.Parallel()
 
 			repo := &fakeAttachmentRepo{permission: permission}
-			storage := &fakeStorage{}
+			storage := &fakeStorage{readUpload: true}
 			svc := NewService(repo, storage)
 
 			attachment, err := svc.Upload(context.Background(), testUUID(1), testUUID(2), "file.txt", bytes.NewReader([]byte("hello")), 5)
@@ -115,7 +115,7 @@ func TestUploadDeletesObjectWhenMetadataInsertFails(t *testing.T) {
 
 	insertErr := errors.New("insert failed")
 	repo := &fakeAttachmentRepo{permission: "owner", insertErr: insertErr}
-	storage := &fakeStorage{}
+	storage := &fakeStorage{readUpload: true}
 	svc := NewService(repo, storage)
 
 	_, err := svc.Upload(context.Background(), testUUID(1), testUUID(2), "file.txt", bytes.NewReader([]byte("hello")), 5)
@@ -123,6 +123,36 @@ func TestUploadDeletesObjectWhenMetadataInsertFails(t *testing.T) {
 	require.ErrorContains(t, err, "insert attachment metadata")
 	require.Equal(t, 1, storage.uploadCalls)
 	require.Equal(t, []string{"attachments/00000000-0000-0000-0000-000000000001"}, storage.deletedKeyPrefixes())
+}
+
+func TestUploadRejectsDeclaredSizeMismatch(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeAttachmentRepo{permission: "owner"}
+	storage := &fakeStorage{readUpload: true}
+	svc := NewService(repo, storage)
+
+	_, err := svc.Upload(context.Background(), testUUID(1), testUUID(2), "file.txt", bytes.NewReader([]byte("hello")), 6)
+
+	require.ErrorIs(t, err, ErrInvalidFileSize)
+	require.Equal(t, 1, storage.uploadCalls)
+	require.Equal(t, 0, repo.insertCalls)
+	require.Equal(t, int64(1), svc.Metrics().RejectedUploads)
+	require.Len(t, storage.deleteCalls, 1)
+}
+
+func TestUploadRejectsContentLargerThanDeclaredSize(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeAttachmentRepo{permission: "owner"}
+	storage := &fakeStorage{readUpload: true}
+	svc := NewService(repo, storage)
+
+	_, err := svc.Upload(context.Background(), testUUID(1), testUUID(2), "file.txt", bytes.NewReader([]byte("longer")), 5)
+
+	require.ErrorIs(t, err, ErrInvalidFileSize)
+	require.Equal(t, 0, repo.insertCalls)
+	require.Len(t, storage.deleteCalls, 1)
 }
 
 type fakeAttachmentRepo struct {

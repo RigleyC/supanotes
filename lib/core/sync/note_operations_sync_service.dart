@@ -81,6 +81,7 @@ class NoteOperationsSyncService {
   final String _clientId;
   final Uuid _uuid = const Uuid();
   final _NoteSyncQueue _syncQueue = _NoteSyncQueue();
+  final _NoteSyncQueue _outboxQueue = _NoteSyncQueue();
   late final NoteOperationRebaser _rebaser;
 
   NoteOperationsSyncService({
@@ -129,7 +130,10 @@ class NoteOperationsSyncService {
   }
 
   Future<void> enqueueOperation(String noteId, OperationRequest request) {
-    return _enqueueOperationInner(noteId, request);
+    return _outboxQueue.run(
+      noteId,
+      () => _enqueueOperationInner(noteId, request),
+    );
   }
 
   Future<void> _enqueueOperationInner(

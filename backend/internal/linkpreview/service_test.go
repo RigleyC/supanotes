@@ -28,9 +28,15 @@ func TestNormalizePreviewURLRejectsUnsafeURLs(t *testing.T) {
 		"http://192.168.1.2/",
 		"http://169.254.1.1/",
 		"http://0.0.0.0/",
+		"http://0.1.2.3/",
 		"http://224.0.0.1/",
+		"http://240.0.0.1/",
+		"http://255.255.255.255/",
 		"http://[::1]/",
+		"http://[::]/",
 		"http://[fc00::1]/",
+		"http://[100::1]/",
+		"http://[2002::1]/",
 	}
 
 	for _, rawURL := range cases {
@@ -119,7 +125,8 @@ func TestFetchParsesHTMLAndCachesByNormalizedURL(t *testing.T) {
 func TestCacheExpiresAndEvictsOldestEntry(t *testing.T) {
 	t.Parallel()
 
-	cache := newPreviewCache(1, time.Millisecond)
+	now := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
+	cache := newPreviewCache(1, time.Minute, func() time.Time { return now })
 	cache.set("first", &Preview{Title: "first"})
 	cache.set("second", &Preview{Title: "second"})
 
@@ -130,7 +137,7 @@ func TestCacheExpiresAndEvictsOldestEntry(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "second", second.Title)
 
-	time.Sleep(2 * time.Millisecond)
+	now = now.Add(time.Minute + time.Nanosecond)
 	_, ok = cache.get("second")
 	require.False(t, ok)
 }

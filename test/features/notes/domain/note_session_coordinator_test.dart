@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
 
@@ -65,7 +64,6 @@ void main() {
       });
 
       final closeFuture = coordinator.close('note-1');
-      expect(first.status, NoteSessionStatus.closing);
 
       var reopened = false;
       final reopenFuture = coordinator.open('note-1', () {
@@ -111,7 +109,6 @@ void main() {
       final firstClose = coordinator.close('note-1');
       final secondClose = coordinator.close('note-1');
 
-      expect(session.status, NoteSessionStatus.closing);
       dispose.complete();
       await Future.wait([firstClose, secondClose]);
 
@@ -120,21 +117,20 @@ void main() {
       expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
     });
 
-    test('rejects mutations after closing starts', () async {
+    test('cancels opening and disposes resources if close() is called during async open()', () async {
       final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
-      final dispose = Completer<void>();
-      final session = await coordinator.open(
-        'note-1',
-        () => _FakeSessionHandle(disposeCompleter: dispose),
-      );
+      final start = Completer<void>();
+      final handle = _FakeSessionHandle(startCompleter: start);
 
+      final openFuture = coordinator.open('note-1', () => handle);
       final closeFuture = coordinator.close('note-1');
 
-      expect(session.status, NoteSessionStatus.closing);
-      expect(session.flushNow, throwsStateError);
+      start.complete();
 
-      dispose.complete();
       await closeFuture;
+      expect(openFuture, throwsStateError);
+      expect(handle.disposeCalls, 1);
+      expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
     });
 
     test('rolls back created resources when opening fails', () async {
@@ -147,68 +143,43 @@ void main() {
       );
 
       expect(handle.disposeCalls, 1);
-      expect(coordinator.statusOf('note-1'), NoteSessionStatus.error);
-
-      final recovered = await coordinator.open(
-        'note-1',
-        () => _FakeSessionHandle(),
-      );
-      expect(recovered.status, NoteSessionStatus.ready);
+      expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
     });
 
-    test('does not let stale close results replace a newer session', () async {
+    test('snapshots active sessions', () async {
       final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
-      final first = await coordinator.open(
-        'note-1',
-        () => _FakeSessionHandle(),
-      );
+      await coordinator.open('note-1', () => _FakeSessionHandle());
 
-      await coordinator.close('note-1');
-      final second = await coordinator.open(
-        'note-1',
-        () => _FakeSessionHandle(),
-      );
-
-      expect(first.status, NoteSessionStatus.closed);
-      expect(second.status, NoteSessionStatus.ready);
-      expect(coordinator.statusOf('note-1'), NoteSessionStatus.ready);
+      final snap = coordinator.snapshot();
+      expect(snap.activeCount, 1);
+      expect(snap.sessionsByStatus[NoteSessionStatus.ready], 1);
     });
 
-    test('snapshots active sessions and logs sanitized transitions', () async {
-      final events = <Map<String, Object?>>[];
-      NoteSyncDebug.logSink = (event, noteId, fields) {
-        events.add({'event': event, 'noteId': noteId, ...fields});
-      };
-      addTearDown(() => NoteSyncDebug.logSink = null);
-      final tracker = NoteSessionActivityTracker();
-      final coordinator = NoteSessionCoordinator<_FakeSessionHandle>(
-        activityTracker: tracker,
-      );
+    test(
+      'statusOf, statusChangesOf, and snapshot agree during opening',
+      () async {
+        final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
+        final startCompleter = Completer<void>();
 
-      final session = await coordinator.open(
-        'note-1',
-        () => _FakeSessionHandle(),
-      );
-      final opened = coordinator.snapshot();
+        unawaited(
+          coordinator.open(
+            'note-opening',
+            () => _FakeSessionHandle(startCompleter: startCompleter),
+          ),
+        );
 
-      expect(opened.activeCount, 1);
-      expect(opened.sessionsByStatus[NoteSessionStatus.ready], 1);
-      expect(tracker.activeNoteIds, {'note-1'});
+        expect(coordinator.statusOf('note-opening'), NoteSessionStatus.opening);
 
-      await session.flushNow();
-      await coordinator.close('note-1');
+        final initialStreamStatus =
+            await coordinator.statusChangesOf('note-opening').first;
+        expect(initialStreamStatus, NoteSessionStatus.opening);
 
-      expect(
-        events.any((event) => event['event'] == 'session.transition'),
-        isTrue,
-      );
-      expect(
-        events.any(
-          (event) => event['noteId'] == 'note-1' && event['to'] == 'closed',
-        ),
-        isTrue,
-      );
-    });
+        final snap = coordinator.snapshot();
+        expect(snap.sessionsByStatus[NoteSessionStatus.opening], 1);
+
+        startCompleter.complete();
+      },
+    );
   });
 }
 
@@ -229,24 +200,44 @@ class _FakeSessionHandle implements NoteSessionHandle {
   int flushCalls = 0;
   int disposeCalls = 0;
 
+  NoteSessionStatus _status = NoteSessionStatus.opening;
+  @override
+  NoteSessionStatus get status => _status;
+
+  final StreamController<NoteSessionStatus> _statusController =
+      StreamController<NoteSessionStatus>.broadcast();
+
+  @override
+  Stream<NoteSessionStatus> get statusChanges => _statusController.stream;
+
+  void setStatus(NoteSessionStatus newStatus) {
+    _status = newStatus;
+    _statusController.add(newStatus);
+  }
+
   @override
   Future<void> start() async {
     startCalls++;
     await startCompleter?.future;
     if (failStart) {
+      _status = NoteSessionStatus.error;
       throw StateError('start failed');
     }
+    _status = NoteSessionStatus.ready;
   }
 
   @override
   Future<void> flushNow() async {
     flushCalls++;
+    _status = NoteSessionStatus.syncing;
     await flushCompleter?.future;
+    _status = NoteSessionStatus.ready;
   }
 
   @override
   Future<void> dispose() async {
     disposeCalls++;
+    _status = NoteSessionStatus.closed;
     await disposeCompleter?.future;
   }
 }

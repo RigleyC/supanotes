@@ -1,0 +1,283 @@
+import 'package:drift/drift.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/daos/note_links_dao.dart';
+import 'package:supanotes/core/database/daos/notes_dao.dart';
+import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
+import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
+import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'local/notes_local_repository.dart';
+
+/// Presentation-facing facade over the local notes database.
+///
+/// Wraps the lower-level [NotesLocalRepository] and exposes operations
+/// in terms of [NoteModel] so widgets never have to import Drift types.
+/// Every mutation goes through here so the `isDirty` flag, the
+/// `updatedAt` timestamp, and the inbox singleton invariant are
+/// consistently maintained.
+abstract class INotesRepository {
+  Stream<List<NoteModel>> watchNotes({
+    bool favoritesOnly = false,
+  });
+  Stream<NoteModel?> watchNoteById(String id);
+  Stream<NoteWithTasks> watchNoteWithTasks(String noteId);
+  Future<NoteModel?> getNoteById(String id);
+  Future<NoteModel> upsertNote({
+    required String id,
+    String content = '',
+  });
+  Future<void> updateNote(
+    String id, {
+    String? content,
+    bool? collapseImages,
+  });
+  Future<void> toggleFavorite(String noteId);
+  Future<void> softDelete(String id);
+  Future<NoteModel> createLocalNote({required String id});
+  Future<void> saveNoteSnapshot({required String id, required String content});
+  Future<void> deleteIfEmptyOrTombstone(String id);
+  Future<void> markHasRemoteCopy(String id);
+}
+
+class NotesRepository implements INotesRepository {
+  NotesRepository(
+    this._local,
+    this._tasksLocal,
+    this._prefsDao,
+    [
+    this._noteLinksDao,
+  ]);
+
+  final NotesLocalRepository _local;
+  final TasksLocalRepository _tasksLocal;
+  final UserNotePreferencesDao _prefsDao;
+  final NoteLinksDao? _noteLinksDao;
+
+  /// Streams active (non-archived, non-deleted) notes, mapped
+  /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
+  /// to favorite notes.
+  @override
+  Stream<List<NoteModel>> watchNotes({
+    bool favoritesOnly = false,
+  }) {
+    final Stream<List<NoteQueryResult>> source;
+    if (favoritesOnly) {
+      source = _local.watchFavorites();
+    } else {
+      source = _local.watchActiveNotes();
+    }
+    return source.map(
+      (rows) => rows.map((qr) => NoteModel.fromQueryResult(qr)).toList(),
+    );
+  }
+
+  /// Streams a single note by id.
+  @override
+  Stream<NoteModel?> watchNoteById(String id) {
+    return _local
+        .watchNoteById(id)
+        .map((qr) => qr == null ? null : NoteModel.fromQueryResult(qr));
+  }
+
+  @override
+  Stream<NoteWithTasks> watchNoteWithTasks(String noteId) {
+    return _local.watchNoteWithTasks(noteId).map((result) {
+      if (result == null) return const NoteWithTasks(note: null, tasks: []);
+      return NoteWithTasks(
+        note: NoteModel.fromQueryResult(result.note),
+        tasks: result.tasks.map(TaskModel.fromData).toList(),
+      );
+    });
+  }
+
+  @override
+  Future<NoteModel?> getNoteById(String id) async {
+    final qr = await _local.getNoteById(id);
+    return qr == null ? null : NoteModel.fromQueryResult(qr);
+  }
+
+  /// Insert-or-update a note by [id]. When the row does not exist (lazy
+  /// creation), a new row is created. When it does, only the provided
+  /// fields are overwritten. Always marks the row as dirty so the next
+  /// sync round pushes changes to the backend.
+  @override
+  Future<NoteModel> upsertNote({
+    required String id,
+    String content = '',
+  }) async {
+    final now = DateTime.now().toUtc();
+    final companion = NotesCompanion(
+      id: Value(id),
+      userId: Value(_local.userId),
+      content: Value(content),
+      excerpt: Value(_excerptFrom(content)),
+      createdAt: Value(now),
+      updatedAt: Value(now),
+      isDirty: const Value(true),
+    );
+    await _local.upsertNoteRaw(companion);
+    final saved = await _local.getNoteById(id);
+    return NoteModel.fromQueryResult(saved!);
+  }
+
+  /// Applies a partial update to the note with [id]. Only non-null
+  /// arguments are written. Bumps `updatedAt` and re-flips `isDirty`
+  /// so the change reaches the backend on the next sync round.
+  @override
+  Future<void> updateNote(
+    String id, {
+    String? content,
+    bool? collapseImages,
+  }) async {
+    final current = await _local.getNoteById(id);
+    if (current == null) return;
+
+    final nextContent = content ?? current.note.content;
+    final companion = NotesCompanion(
+      id: Value(id),
+      content: content == null ? const Value.absent() : Value(nextContent),
+      excerpt: content == null
+          ? const Value.absent()
+          : Value(_excerptFrom(nextContent)),
+      collapseImages: collapseImages == null
+          ? const Value.absent()
+          : Value(collapseImages),
+      updatedAt: Value(DateTime.now().toUtc()),
+      isDirty: const Value(true),
+    );
+    await _local.updateNoteRaw(companion);
+  }
+
+  /// Flips the favorite flag on the given note using the per-user
+  /// preferences table. No-op if the row no longer exists.
+  @override
+  Future<void> toggleFavorite(String noteId) async {
+    final current = await _local.getNoteById(noteId);
+    if (current == null) return;
+    await _prefsDao.setFavorite(_local.userId, noteId, !current.favorite);
+  }
+
+  /// Soft-deletes the note. The row stays in the database with
+  /// `deletedAt` set so the tombstone reaches the backend on the next
+  /// sync round; sync is the only thing that ever hard-deletes a row.
+  @override
+  Future<void> softDelete(String id) async {
+    await _local.softDeleteNote(id);
+  }
+
+  @override
+  Future<NoteModel> createLocalNote({required String id}) async {
+    final existing = await _local.getNoteById(id);
+    if (existing != null) return NoteModel.fromQueryResult(existing);
+    final created = await _local.createNoteWithId(id);
+    return NoteModel.fromQueryResult(created);
+  }
+
+  @override
+  Future<void> saveNoteSnapshot({
+    required String id,
+    required String content,
+  }) async {
+    final current = await _local.getNoteById(id);
+    if (current == null) return;
+
+    await updateNote(id, content: content);
+    await _syncNoteLinks(id, content);
+  }
+
+  Future<void> _syncNoteLinks(String sourceId, String content) async {
+    final dao = _noteLinksDao;
+    if (dao == null) return;
+
+    final linkRegex = RegExp(
+      r'note:\/\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
+    );
+    final matches = linkRegex.allMatches(content);
+    final targetIds = matches.map((m) => m.group(1)!).toSet();
+
+    final existingLinks = await dao.getLinksForNote(sourceId);
+    final outboundLinks = existingLinks
+        .where((l) => l.sourceId == sourceId)
+        .toList();
+    final currentTargets = outboundLinks.map((l) => l.targetId).toSet();
+
+    final toAdd = targetIds.difference(currentTargets);
+    for (final targetId in toAdd) {
+      await dao.createLink(sourceId: sourceId, targetId: targetId);
+    }
+
+    final toRemove = outboundLinks.where(
+      (l) => !targetIds.contains(l.targetId),
+    );
+    for (final link in toRemove) {
+      await dao.deleteLink(link.id);
+    }
+  }
+
+  @override
+  Future<void> deleteIfEmptyOrTombstone(String id) async {
+    final qr = await _local.getNoteById(id);
+    if (qr == null) return;
+    if (!_isTextEmpty(qr.note)) return;
+
+    final tasks = await _tasksLocal.getNoteTasks(id);
+    if (tasks.isNotEmpty) return;
+
+    if (qr.note.hasRemoteCopy) {
+      await _local.softDeleteNote(id);
+    } else {
+      await _local.hardDeleteNote(id);
+    }
+  }
+
+  @override
+  Future<void> markHasRemoteCopy(String id) {
+    return _local.markHasRemoteCopy(id);
+  }
+
+  String? _excerptFrom(String content) {
+    if (content.isEmpty) return null;
+    final lines = content.split('\n');
+    int firstNonEmptyIdx = -1;
+    for (int i = 0; i < lines.length; i++) {
+      if (lines[i].trim().isNotEmpty) {
+        firstNonEmptyIdx = i;
+        break;
+      }
+    }
+    if (firstNonEmptyIdx == -1) return null;
+    final restOfLines = lines.skip(firstNonEmptyIdx + 1).join('\n');
+    final flat = restOfLines.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (flat.isEmpty) return null;
+    if (flat.length <= 120) return flat;
+    return '${flat.substring(0, 120)}…';
+  }
+
+  bool _isTextEmpty(NoteData note) {
+    return note.content.trim().isEmpty;
+  }
+}
+
+/// Riverpod entry point for the feature-level [NotesRepository].
+///
+/// Reads [currentUserIdProvider] and [appDatabaseProvider] directly instead
+/// of chaining through [notesLocalRepositoryProvider]. This avoids the
+/// 3-level autoDispose cascade that triggers setState() during build when
+/// [NotesListScreen] first mounts and the intermediate provider is dirty.
+final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) throw StateError('notesRepositoryProvider: unauthenticated');
+  final db = ref.watch(appDatabaseProvider);
+  final local = NotesLocalRepository(db.notesDao, userId);
+  final tasksLocal = TasksLocalRepository(db.tasksDao, userId);
+  return NotesRepository(
+    local,
+    tasksLocal,
+    db.userNotePreferencesDao,
+  
+  );
+});

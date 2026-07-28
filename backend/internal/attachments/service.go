@@ -74,16 +74,40 @@ func (s *service) Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.
 		mimeType = "application/octet-stream"
 	}
 	key := fmt.Sprintf("attachments/%s/%d%s", uid.UUIDToString(noteID), time.Now().UnixNano(), ext)
-	limited := &uploadLimitReader{r: r, remaining: maxUploadBytes}
+	declaredLimit := size
+	if declaredLimit < maxUploadBytes {
+		declaredLimit++
+	}
+	limited := &uploadLimitReader{r: r, remaining: declaredLimit}
+	counted := &uploadCountReader{r: limited}
 
-	object, err := s.storage.Upload(ctx, key, limited, mimeType, size)
+	object, err := s.storage.Upload(ctx, key, counted, mimeType, size)
 	if err != nil {
 		if errors.Is(err, ErrFileTooLarge) {
 			s.rejectedUploads.Add(1)
 		}
 		return sqlcgen.Attachment{}, fmt.Errorf("upload to storage: %w", err)
 	}
-	attachment, err := s.repo.Insert(ctx, noteID, filename, object.PublicURL, mimeType, size)
+	contentTooLarge := false
+	if counted.bytesRead == size {
+		var probe [1]byte
+		_, probeErr := counted.Read(probe[:])
+		contentTooLarge = errors.Is(probeErr, ErrFileTooLarge)
+		if probeErr != nil && !errors.Is(probeErr, io.EOF) && !errors.Is(probeErr, ErrFileTooLarge) {
+			if deleteErr := s.storage.Delete(ctx, object.Key); deleteErr != nil {
+				return sqlcgen.Attachment{}, fmt.Errorf("verify upload size: %w; cleanup uploaded object: %v", probeErr, deleteErr)
+			}
+			return sqlcgen.Attachment{}, fmt.Errorf("verify upload size: %w", probeErr)
+		}
+	}
+	if contentTooLarge || counted.bytesRead != size {
+		s.rejectedUploads.Add(1)
+		if deleteErr := s.storage.Delete(ctx, object.Key); deleteErr != nil {
+			return sqlcgen.Attachment{}, fmt.Errorf("verify upload size: %w; cleanup uploaded object: %v", ErrInvalidFileSize, deleteErr)
+		}
+		return sqlcgen.Attachment{}, ErrInvalidFileSize
+	}
+	attachment, err := s.repo.Insert(ctx, noteID, filename, object.PublicURL, mimeType, counted.bytesRead)
 	if err != nil {
 		if deleteErr := s.storage.Delete(ctx, object.Key); deleteErr != nil {
 			return sqlcgen.Attachment{}, fmt.Errorf("insert attachment metadata: %w; cleanup uploaded object: %v", err, deleteErr)
@@ -99,6 +123,17 @@ func (s *service) ListByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen
 
 func (s *service) Metrics() Metrics {
 	return Metrics{RejectedUploads: s.rejectedUploads.Load()}
+}
+
+type uploadCountReader struct {
+	r         io.Reader
+	bytesRead int64
+}
+
+func (r *uploadCountReader) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	r.bytesRead += int64(n)
+	return n, err
 }
 
 type uploadLimitReader struct {

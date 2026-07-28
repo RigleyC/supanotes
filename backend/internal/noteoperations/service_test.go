@@ -24,6 +24,12 @@ type mockRepository struct {
 	getNoteDocumentFn        func(ctx context.Context, noteID pgtype.UUID) (GetNoteDocumentResult, error)
 }
 
+type immediateTransactionRunner struct{}
+
+func (immediateTransactionRunner) InTx(ctx context.Context, repo Repository, fn func(Repository) error) error {
+	return fn(repo)
+}
+
 func (m *mockRepository) EnsureNote(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) error {
 	if m.ensureNoteFn != nil {
 		return m.ensureNoteFn(ctx, noteID, userID)

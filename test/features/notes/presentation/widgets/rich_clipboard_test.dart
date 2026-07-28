@@ -10,13 +10,17 @@ import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor
 import 'package:supanotes/features/notes/presentation/widgets/slash_command_overlay.dart';
 
 class MockEditor extends Mock implements Editor {}
+
 class MockDocumentLayout extends Mock implements DocumentLayout {}
 
 void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
-    final mockContext = superNativeExtensionsContext as MockMessageChannelContext;
-    mockContext.registerMockMethodCallHandler('DataProviderManager', (call) async {
+    final mockContext =
+        superNativeExtensionsContext as MockMessageChannelContext;
+    mockContext.registerMockMethodCallHandler('DataProviderManager', (
+      call,
+    ) async {
       if (call.method == 'registerDataProvider') {
         return 1;
       }
@@ -30,10 +34,7 @@ void main() {
     });
     mockContext.registerMockMethodCallHandler('ClipboardReader', (call) async {
       if (call.method == 'newClipboardReader') {
-        return {
-          'handle': 1,
-          'finalizableHandle': 0,
-        };
+        return {'handle': 1, 'finalizableHandle': 0};
       }
       return null;
     });
@@ -46,20 +47,41 @@ void main() {
   });
 
   group('Rich Keyboard Actions', () {
-    test('buildRichKeyboardActions prepends rich clipboard actions at the start of actions list', () {
+    test('buildRichKeyboardActions prepends rich clipboard actions', () {
       final baseActions = <SuperEditorKeyboardAction>[
         doNothingWhenThereIsNoSelection,
       ];
 
       final richActions = buildRichKeyboardActions(baseActions: baseActions);
 
-      expect(richActions.length, equals(5));
-      expect(richActions[0], equals(handleSlashMenuKeyboard));
-      expect(richActions[1], equals(copyAsRichTextWhenCmdCOrCtrlCIsPressed));
-      expect(richActions[2], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
-      expect(richActions[3], equals(pastePreprocessedRichText));
-      expect(richActions[4], equals(doNothingWhenThereIsNoSelection));
+      expect(richActions.length, equals(4));
+      expect(richActions[0], equals(copyAsRichTextWhenCmdCOrCtrlCIsPressed));
+      expect(richActions[1], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
+      expect(richActions[2], equals(pastePreprocessedRichText));
+      expect(richActions[3], equals(doNothingWhenThereIsNoSelection));
     });
+
+    test(
+      'buildRichKeyboardActions injects slash handler when scoped controller exists',
+      () {
+        final baseActions = <SuperEditorKeyboardAction>[
+          doNothingWhenThereIsNoSelection,
+        ];
+        final slashController = SlashCommandController();
+        addTearDown(slashController.dispose);
+
+        final richActions = buildRichKeyboardActions(
+          baseActions: baseActions,
+          slashCommandController: slashController,
+        );
+
+        expect(richActions.length, equals(5));
+        expect(richActions[1], equals(copyAsRichTextWhenCmdCOrCtrlCIsPressed));
+        expect(richActions[2], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
+        expect(richActions[3], equals(pastePreprocessedRichText));
+        expect(richActions[4], equals(doNothingWhenThereIsNoSelection));
+      },
+    );
   });
 
   group('RichCommonEditorOperations', () {
@@ -70,9 +92,11 @@ void main() {
 
     setUp(() {
       editor = MockEditor();
-      document = MutableDocument(nodes: [
-        ParagraphNode(id: 'node-1', text: AttributedText('Hello World')),
-      ]);
+      document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'node-1', text: AttributedText('Hello World')),
+        ],
+      );
       composer = MutableDocumentComposer();
 
       final editContext = EditContext({

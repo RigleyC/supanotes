@@ -27,6 +27,7 @@ import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/notes/data/note_sync_client.dart';
 import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
+import 'package:supanotes/features/notes/presentation/controllers/note_editor_session.dart';
 
 // ---------------------------------------------------------------------------
 // API client
@@ -139,7 +140,7 @@ final noteOperationsSyncServiceProvider = Provider<NoteOperationsSyncService>((
 // ---------------------------------------------------------------------------
 
 final noteSessionCoordinatorProvider =
-    Provider<NoteSessionCoordinator<NoteSyncSessionHandle>>((ref) {
+    Provider<NoteSessionCoordinator<NoteEditorSession>>((ref) {
       final userId = ref.watch(currentUserIdProvider);
       if (userId == null || userId.isEmpty) {
         throw StateError(
@@ -147,7 +148,7 @@ final noteSessionCoordinatorProvider =
         );
       }
 
-      final coordinator = NoteSessionCoordinator<NoteSyncSessionHandle>(
+      final coordinator = NoteSessionCoordinator<NoteEditorSession>(
         activityTracker: ref.watch(noteSessionActivityTrackerProvider),
       );
       ref.onDispose(() {
