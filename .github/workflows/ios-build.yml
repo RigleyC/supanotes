@@ -71,10 +71,9 @@ jobs:
         id: cache-deriveddata
         with:
           path: DerivedData
-          key: deriveddata-v4-${{ hashFiles('lib/**', 'pubspec.lock') }}-${{ github.run_id }}
+          key: deriveddata-v5-${{ runner.os }}-${{ hashFiles('lib/**', 'pubspec.yaml', 'pubspec.lock', 'ios/Podfile.lock', 'ios/Runner.xcodeproj/project.pbxproj') }}
           restore-keys: |
-            deriveddata-v4-${{ hashFiles('lib/**', 'pubspec.lock') }}-
-            deriveddata-v4-
+            deriveddata-v5-${{ runner.os }}-
 
       - name: Detect project type
         id: detect
@@ -187,9 +186,6 @@ jobs:
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           echo "Certificate and provisioning profile installed"
 
-      - name: Clean SPM cache
-        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
-
       - name: Build IPA
         env:
           BUILD_ID: ${{ inputs.build_id || github.run_id }}
@@ -212,7 +208,7 @@ jobs:
           # Install pods if Podfile exists (always run to ensure sync with Podfile.lock)
           if [ -f "Podfile" ]; then
             echo "Running pod install..."
-            pod install
+            pod install --no-repo-update
             WORKSPACE=$(find . -maxdepth 1 -name "*.xcworkspace" | head -1)
           fi
 
@@ -287,7 +283,7 @@ jobs:
                 BUILD_CMD="$BUILD_CMD FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS=\"--dart-define=API_BASE_URL=$API_BASE_URL\""
               fi
 
-              BUILD_CMD="$BUILD_CMD clean build"
+              BUILD_CMD="$BUILD_CMD build"
 
               echo "Running: $BUILD_CMD"
               eval $BUILD_CMD
@@ -347,7 +343,7 @@ jobs:
               BUILD_CMD="$BUILD_CMD -archivePath ../build/App.xcarchive clean archive"
             else
               # For unsigned builds, use faster 'build' action
-              BUILD_CMD="$BUILD_CMD CODE_SIGNING_ALLOWED=NO clean build"
+              BUILD_CMD="$BUILD_CMD CODE_SIGNING_ALLOWED=NO build"
             fi
 
             echo "Running: $BUILD_CMD"
@@ -402,19 +398,19 @@ jobs:
           fi
 
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: ipa
-          path: build/*.ipa
+          path: build/${{ inputs.build_id || github.run_id }}.ipa
+          archive: false
           retention-days: 7
           if-no-files-found: error
 
       - name: Save DerivedData cache
         uses: actions/cache/save@v4
-        if: always()
+        if: success() && steps.cache-deriveddata.outputs.cache-hit != 'true'
         with:
           path: DerivedData
-          key: deriveddata-v4-${{ hashFiles('lib/**', 'pubspec.lock') }}-${{ github.run_id }}
+          key: deriveddata-v5-${{ runner.os }}-${{ hashFiles('lib/**', 'pubspec.yaml', 'pubspec.lock', 'ios/Podfile.lock', 'ios/Runner.xcodeproj/project.pbxproj') }}
 
       - name: Cleanup signing
         if: always() && inputs.use_signing
