@@ -108,17 +108,17 @@ func (d *Document) applyTextDelta(blockID string, payload json.RawMessage) error
 
 	for i := range d.Blocks {
 		if d.Blocks[i].ID == blockID {
-			current := delta.New(d.Blocks[i].Delta)
+			current := delta.New(opsToUTF16(d.Blocks[i].Delta))
 			result := current.Compose(*incoming)
-			d.Blocks[i].Delta = result.Ops
+			d.Blocks[i].Delta = opsFromUTF16(result.Ops)
 			return nil
 		}
 	}
 
 	if d.ensureMissingBlock(blockID) {
-		current := delta.New(d.Blocks[len(d.Blocks)-1].Delta)
+		current := delta.New(opsToUTF16(d.Blocks[len(d.Blocks)-1].Delta))
 		result := current.Compose(*incoming)
-		d.Blocks[len(d.Blocks)-1].Delta = result.Ops
+		d.Blocks[len(d.Blocks)-1].Delta = opsFromUTF16(result.Ops)
 		return nil
 	}
 

@@ -832,6 +832,21 @@ void main() {
       },
     );
 
+    test('propagates hydration failures', () async {
+      when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
+        (_) async => LocalNoteDocumentData(
+          noteId: 'note-1',
+          revision: 1,
+          documentJson: '{"blocks":[null]}',
+          updatedAt: DateTime.utc(2026, 7, 20),
+        ),
+      );
+
+      final adapter = createAdapter();
+
+      await expectLater(adapter.start(), throwsA(isA<TypeError>()));
+    });
+
     test('loads confirmed revision from sync service', () async {
       when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
         (_) async => LocalNoteDocumentData(

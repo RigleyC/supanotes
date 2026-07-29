@@ -54,8 +54,9 @@ class ApiClient {
           final newRefresh = data['refresh_token'] as String?;
           if (newAccess == null || newRefresh == null) return null;
           return (accessToken: newAccess, refreshToken: newRefresh);
-        } on DioException {
-          return null;
+        } on DioException catch (error) {
+          if (error.response?.statusCode == 401) return null;
+          rethrow;
         }
       },
       replay: (options) => _dio.fetch<dynamic>(options),

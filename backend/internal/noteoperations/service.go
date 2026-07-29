@@ -229,7 +229,7 @@ func validateAndTransform(
 			return fmt.Errorf("fetch concurrent ops: %w", err)
 		}
 
-		clientDelta, err := delta.FromJSON(opReq.Payload)
+		clientDelta, err := parseDeltaFromPayload(opReq.Payload)
 		if err != nil {
 			return fmt.Errorf("parse client delta: %w", err)
 		}
@@ -239,7 +239,7 @@ func validateAndTransform(
 				continue
 			}
 
-			serverDelta, err := delta.FromJSON(co.Payload)
+			serverDelta, err := parseDeltaFromPayload(co.Payload)
 			if err != nil {
 				return fmt.Errorf("parse concurrent delta: %w", err)
 			}
@@ -248,7 +248,7 @@ func validateAndTransform(
 			clientDelta = serverDelta.Transform(*clientDelta, pri)
 		}
 
-		transformedPayload, err := json.Marshal(clientDelta)
+		transformedPayload, err := json.Marshal(delta.New(opsFromUTF16(clientDelta.Ops)))
 		if err != nil {
 			return fmt.Errorf("marshal transformed delta: %w", err)
 		}

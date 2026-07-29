@@ -46,6 +46,7 @@ Future<void> showTaskMetadataSheet({
           TaskMetadataSheetBody(noteId: noteId, taskId: taskId, onSave: onSave),
     );
   } finally {
+    ref.read(taskMetadataProvider(taskId).notifier).releaseSheet();
     ref.invalidate(taskMetadataProvider(taskId));
   }
 }

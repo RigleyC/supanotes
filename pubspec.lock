@@ -672,7 +672,7 @@ packages:
     source: hosted
     version: "0.15.6"
   html2md:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: html2md
       sha256: "465cf8ffa1b510fe0e97941579bf5b22e2d575f2cecb500a9c0254efe33a8036"

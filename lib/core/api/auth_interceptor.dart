@@ -33,6 +33,8 @@ typedef RefreshHandler =
       String refreshToken,
     );
 
+typedef _TokenPair = ({String accessToken, String refreshToken});
+
 /// Signature for replaying a failed request after a successful refresh.
 typedef ReplayHandler =
     Future<Response<dynamic>> Function(RequestOptions options);
@@ -66,15 +68,16 @@ class AuthInterceptor extends Interceptor {
   final RefreshHandler _onRefresh;
   final ReplayHandler _replay;
 
-  Future<bool>? _refreshing;
+  Future<_TokenPair?>? _refreshing;
   Future<void>? _notifyingFailure;
+  String? _latestAccessToken;
 
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = await _getAccessToken();
+    final token = _latestAccessToken ?? await _getAccessToken();
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -100,21 +103,22 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    final refreshed = await _refreshOnce();
-    if (!refreshed) {
+    late final _TokenPair? refreshedTokens;
+    try {
+      refreshedTokens = await _refreshOnce();
+    } on DioException {
+      // A temporary refresh outage must not destroy a valid local session.
+      handler.next(err);
+      return;
+    }
+    if (refreshedTokens == null) {
       await _notifyFailureOnce();
       handler.next(err);
       return;
     }
 
-    final newToken = await _getAccessToken();
-    if (newToken == null) {
-      await _notifyFailureOnce();
-      handler.next(err);
-      return;
-    }
-
-    err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+    err.requestOptions.headers['Authorization'] =
+        'Bearer ${refreshedTokens.accessToken}';
     err.requestOptions.extra['retry'] = true;
 
     try {
@@ -125,10 +129,10 @@ class AuthInterceptor extends Interceptor {
     }
   }
 
-  Future<bool> _refreshOnce() {
+  Future<_TokenPair?> _refreshOnce() {
     final cached = _refreshing;
     if (cached != null) return cached;
-    late Future<bool> future;
+    late Future<_TokenPair?> future;
     future = _doRefresh().whenComplete(() {
       if (identical(_refreshing, future)) {
         _refreshing = null;
@@ -151,17 +155,18 @@ class AuthInterceptor extends Interceptor {
     return future;
   }
 
-  Future<bool> _doRefresh() async {
+  Future<_TokenPair?> _doRefresh() async {
     final refreshToken = await _getRefreshToken();
-    if (refreshToken == null) return false;
+    if (refreshToken == null) return null;
 
     final tokens = await _onRefresh(refreshToken);
-    if (tokens == null) return false;
+    if (tokens == null) return null;
 
     await _saveTokens(
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     );
-    return true;
+    _latestAccessToken = tokens.accessToken;
+    return tokens;
   }
 }

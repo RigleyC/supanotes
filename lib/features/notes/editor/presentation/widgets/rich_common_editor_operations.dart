@@ -5,6 +5,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 
 import 'clipboard_preprocessor.dart';
+import 'rich_clipboard_serializers.dart';
 
 class RichCommonEditorOperations extends CommonEditorOperations {
   RichCommonEditorOperations({
@@ -18,7 +19,8 @@ class RichCommonEditorOperations extends CommonEditorOperations {
   void copy() {
     final selection = composer.selection;
     if (selection != null && !selection.isCollapsed) {
-      document.copyAsRichTextWithPlainTextFallback(selection: selection);
+      configureRichClipboardSerializers();
+      document.copyAsRichTextWithMarkdownFallback(selection: selection);
     }
   }
 
@@ -26,7 +28,8 @@ class RichCommonEditorOperations extends CommonEditorOperations {
   void cut() {
     final selection = composer.selection;
     if (selection != null && !selection.isCollapsed) {
-      document.copyAsRichTextWithPlainTextFallback(selection: selection);
+      configureRichClipboardSerializers();
+      document.copyAsRichTextWithMarkdownFallback(selection: selection);
       deleteSelection(TextAffinity.downstream);
     }
   }

@@ -43,39 +43,42 @@ class TaskMetadataDatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const TaskMetadataPageHeader(title: 'Escolher data'),
-        ListView.builder(
-          shrinkWrap: true,
-          itemCount: QuickDueDate.values.length,
-          itemBuilder: (context, index) {
-            final option = QuickDueDate.values[index];
-            final date = option.compute(now);
-            return AppSelectionTile(
-              label: option.label,
-              icon: option.icon,
-              isSelected: selected != null && selected!.isSameDayAs(date),
-              onTap: () {
-                onSelected(date);
-                FamilyModalSheet.of(context).popPage();
-              },
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        CalendarDatePicker(
-          initialDate: selected ?? now.startOfDay,
-          firstDate: DateTime(now.year - 1),
-          lastDate: DateTime(now.year + 5),
-          onDateChanged: (date) {
-            onSelected(date);
-            FamilyModalSheet.of(context).popPage();
-          },
-        ),
-      ],
+    return Material(
+      type: MaterialType.transparency,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const TaskMetadataPageHeader(title: 'Escolher data'),
+          ListView.builder(
+            shrinkWrap: true,
+            itemCount: QuickDueDate.values.length,
+            itemBuilder: (context, index) {
+              final option = QuickDueDate.values[index];
+              final date = option.compute(now);
+              return AppSelectionTile(
+                label: option.label,
+                icon: option.icon,
+                isSelected: selected != null && selected!.isSameDayAs(date),
+                onTap: () {
+                  onSelected(date);
+                  FamilyModalSheet.of(context).popPage();
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          CalendarDatePicker(
+            initialDate: selected ?? now.startOfDay,
+            firstDate: DateTime(now.year - 1),
+            lastDate: DateTime(now.year + 5),
+            onDateChanged: (date) {
+              onSelected(date);
+              FamilyModalSheet.of(context).popPage();
+            },
+          ),
+        ],
+      ),
     );
   }
 }

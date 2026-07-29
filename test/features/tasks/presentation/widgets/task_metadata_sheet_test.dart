@@ -206,6 +206,53 @@ void main() {
     expect(saveCalls, 2);
     expect(find.byType(TaskMetadataSheetBody), findsNothing);
   });
+
+  testWidgets('modal selections persist date and recurrence on desktop', (
+    tester,
+  ) async {
+    final task = _taskWithoutMetadata(id: 'task-modal-selection');
+    DateTime? savedDueDate;
+    TaskRecurrence? savedRecurrence;
+    var savedHasTime = false;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: _MetadataSheetLauncher(
+            task: task,
+            onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {
+              savedDueDate = dueDate;
+              savedRecurrence = recurrence;
+              savedHasTime = hasTime;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Abrir metadados'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Adicionar data'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hoje'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Adicionar horário'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmar'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Adicionar recorrência'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Diariamente'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+
+    expect(savedDueDate, isNotNull);
+    expect(savedHasTime, isTrue);
+    expect(savedRecurrence, TaskRecurrence.daily);
+  });
 }
 
 Widget _buildSheetForTask(
@@ -253,6 +300,25 @@ TaskModel _task({String id = 'task-1'}) {
   );
 }
 
+TaskModel _taskWithoutMetadata({required String id}) {
+  final now = DateTime.utc(2026, 6, 11);
+  return TaskModel(
+    id: id,
+    userId: 'user-1',
+    noteId: 'note-1',
+    title: 'Comprar cafe',
+    status: 'open',
+    position: '0',
+    dueDate: null,
+    completedAt: null,
+    recurrence: null,
+    hasTime: false,
+    reminder: null,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
 class _ProviderInitializer extends ConsumerWidget {
   const _ProviderInitializer({required this.task, required this.child});
   final TaskModel task;
@@ -264,5 +330,34 @@ class _ProviderInitializer extends ConsumerWidget {
       ref.read(taskMetadataProvider(task.id).notifier).initialize(task);
     });
     return child;
+  }
+}
+
+class _MetadataSheetLauncher extends ConsumerWidget {
+  const _MetadataSheetLauncher({required this.task, required this.onSave});
+
+  final TaskModel task;
+  final Future<void> Function({
+    required DateTime? dueDate,
+    required bool hasTime,
+    required TaskRecurrence? recurrence,
+    required String? reminder,
+  })
+  onSave;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      body: TextButton(
+        onPressed: () => showTaskMetadataSheet(
+          context: context,
+          ref: ref,
+          noteId: task.noteId,
+          task: task,
+          onSave: onSave,
+        ),
+        child: const Text('Abrir metadados'),
+      ),
+    );
   }
 }

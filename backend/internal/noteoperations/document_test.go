@@ -90,6 +90,24 @@ func TestApplyTextDelta(t *testing.T) {
 	assert.Equal(t, "hello world", text)
 }
 
+func TestApplyTextDeltaUsesFlutterUTF16Offsets(t *testing.T) {
+	doc := Document{
+		SchemaVersion: 1,
+		Blocks: []Block{{
+			ID:       "b1",
+			Type:     string(BlockParagraph),
+			Delta:    []delta.Op{{Insert: []rune("A😀B")}},
+			Metadata: map[string]any{},
+		}},
+	}
+
+	// Flutter string offsets count the emoji as two UTF-16 code units.
+	payload := json.RawMessage(`{"ops":[{"retain":3},{"insert":"X"}]}`)
+
+	require.NoError(t, doc.ApplyOperation(KindTextDelta, "b1", payload))
+	assert.Equal(t, "A😀XB", deltaText(doc.Blocks[0].Delta))
+}
+
 func TestApplyTextDeltaRecoversMissingBlock(t *testing.T) {
 	doc := Document{
 		SchemaVersion: 1,

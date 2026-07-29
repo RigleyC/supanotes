@@ -7,6 +7,8 @@ import 'package:super_native_extensions/src/native/context.dart';
 import 'package:irondash_message_channel/irondash_message_channel.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_clipboard_serializers.dart';
+import 'package:supanotes/features/notes/presentation/widgets/clipboard_preprocessor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/slash_command_overlay.dart';
 
 class MockEditor extends Mock implements Editor {}
@@ -46,6 +48,117 @@ void main() {
     });
   });
 
+  group('clipboard serialization', () {
+    test('normalizes spaces after plain-text list markers', () {
+      expect(
+        preprocessClipboardText('-    Texto colado aqui'),
+        '- Texto colado aqui',
+      );
+      expect(preprocessClipboardText('*   Outro item'), '* Outro item');
+      expect(preprocessClipboardText('1.   Item ordenado'), '1. Item ordenado');
+    });
+
+    test('rich HTML includes headings, lists, and tasks', () {
+      configureRichClipboardSerializers();
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(
+            id: 'heading',
+            text: AttributedText('Título'),
+            metadata: {'blockType': header1Attribution},
+          ),
+          ListItemNode.unordered(id: 'list-item', text: AttributedText('Item')),
+          TaskNode(
+            id: 'task',
+            text: AttributedText('Tarefa'),
+            isComplete: false,
+          ),
+        ],
+      );
+
+      final html = document.toHtml(
+        nodeSerializers: SuperEditorClipboardConfig.nodeHtmlSerializers,
+        inlineSerializers: SuperEditorClipboardConfig.inlineHtmlSerializers,
+      );
+
+      expect(html, contains('<h1>'));
+      expect(html, contains('<ul>'));
+      expect(html, contains('type="checkbox"'));
+      expect(html, contains('Tarefa'));
+    });
+
+    test('task copied as HTML pastes back as a task', () {
+      configureRichClipboardSerializers();
+      final source = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'task',
+            text: AttributedText('Tarefa'),
+            isComplete: false,
+          ),
+        ],
+      );
+      final markdown = clipboardHtmlToMarkdown(
+        source.toHtml(
+          nodeSerializers: SuperEditorClipboardConfig.nodeHtmlSerializers,
+          inlineSerializers: SuperEditorClipboardConfig.inlineHtmlSerializers,
+        ),
+      );
+      expect(markdown, matches(RegExp(r'[-*] \[ \] Tarefa')));
+      final target = MutableDocument(
+        nodes: [ParagraphNode(id: 'target', text: AttributedText())],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'target',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: target,
+        composer: composer,
+      );
+
+      editor.pasteMarkdown(editor, markdown);
+
+      final pastedTasks = target.toList().whereType<TaskNode>().toList();
+      expect(pastedTasks, hasLength(1));
+      expect(pastedTasks.single.text.toPlainText(), 'Tarefa');
+    });
+
+    test('single-line text pasted inside a task stays in the task', () {
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'task',
+            text: AttributedText('Comprar '),
+            isComplete: false,
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'task',
+            nodePosition: TextNodePosition(offset: 8),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      expect(pastePlainTextAtCurrentSelection(editor, 'leite'), isTrue);
+
+      expect(document.nodeCount, 1);
+      expect(document.first, isA<TaskNode>());
+      expect((document.first as TaskNode).text.toPlainText(), 'Comprar leite');
+    });
+  });
+
   group('Rich Keyboard Actions', () {
     test('buildRichKeyboardActions prepends rich clipboard actions', () {
       final baseActions = <SuperEditorKeyboardAction>[
@@ -55,7 +168,10 @@ void main() {
       final richActions = buildRichKeyboardActions(baseActions: baseActions);
 
       expect(richActions.length, equals(4));
-      expect(richActions[0], equals(copyAsRichTextWhenCmdCOrCtrlCIsPressed));
+      expect(
+        richActions[0],
+        equals(copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed),
+      );
       expect(richActions[1], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
       expect(richActions[2], equals(pastePreprocessedRichText));
       expect(richActions[3], equals(doNothingWhenThereIsNoSelection));
@@ -76,7 +192,10 @@ void main() {
         );
 
         expect(richActions.length, equals(5));
-        expect(richActions[1], equals(copyAsRichTextWhenCmdCOrCtrlCIsPressed));
+        expect(
+          richActions[1],
+          equals(copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed),
+        );
         expect(richActions[2], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
         expect(richActions[3], equals(pastePreprocessedRichText));
         expect(richActions[4], equals(doNothingWhenThereIsNoSelection));

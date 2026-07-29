@@ -5,7 +5,29 @@ import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 
 import 'clipboard_preprocessor.dart';
+import 'rich_clipboard_serializers.dart';
 import 'slash_command_overlay.dart';
+
+ExecutionInstruction copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed({
+  required SuperEditorContext editContext,
+  required KeyEvent keyEvent,
+}) {
+  if (keyEvent is! KeyDownEvent && keyEvent is! KeyRepeatEvent) {
+    return ExecutionInstruction.continueExecution;
+  }
+  if (!keyEvent.isPrimaryShortcutKeyPressed ||
+      keyEvent.logicalKey != LogicalKeyboardKey.keyC) {
+    return ExecutionInstruction.continueExecution;
+  }
+
+  final selection = editContext.composer.selection;
+  if (selection == null) return ExecutionInstruction.continueExecution;
+  if (selection.isCollapsed) return ExecutionInstruction.haltExecution;
+
+  configureRichClipboardSerializers();
+  editContext.document.copyAsRichTextWithMarkdownFallback(selection: selection);
+  return ExecutionInstruction.haltExecution;
+}
 
 /// A [SuperEditor] keyboard action that cuts the document selection as rich text
 /// with plain text fallback when CMD + X (Mac) or CTRL + X (Windows/Linux) is pressed.
@@ -29,6 +51,7 @@ ExecutionInstruction cutAsRichTextWhenCmdXOrCtrlXIsPressed({
     return ExecutionInstruction.haltExecution;
   }
 
+  configureRichClipboardSerializers();
   editContext.document.copyAsRichTextWithPlainTextFallback(
     selection: selection,
   );
@@ -67,10 +90,11 @@ List<SuperEditorKeyboardAction> buildRichKeyboardActions({
   required List<SuperEditorKeyboardAction> baseActions,
   SlashCommandController? slashCommandController,
 }) {
+  configureRichClipboardSerializers();
   return [
     if (slashCommandController != null)
       slashMenuKeyboardHandler(slashCommandController),
-    copyAsRichTextWhenCmdCOrCtrlCIsPressed,
+    copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed,
     cutAsRichTextWhenCmdXOrCtrlXIsPressed,
     pastePreprocessedRichText,
     ...baseActions,

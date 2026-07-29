@@ -3,6 +3,7 @@ package noteoperations
 import (
 	"encoding/json"
 	"time"
+	"unicode/utf16"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -12,11 +13,11 @@ import (
 type Kind string
 
 const (
-	KindTextDelta        Kind = "text_delta"
-	KindCreateBlock      Kind = "create_block"
-	KindDeleteBlock      Kind = "delete_block"
-	KindMoveBlock        Kind = "move_block"
-	KindSetBlockType     Kind = "set_block_type"
+	KindTextDelta              Kind = "text_delta"
+	KindCreateBlock            Kind = "create_block"
+	KindDeleteBlock            Kind = "delete_block"
+	KindMoveBlock              Kind = "move_block"
+	KindSetBlockType           Kind = "set_block_type"
 	KindSetBlockMetadata       Kind = "set_block_metadata"
 	KindCompleteTaskOccurrence Kind = "complete_task_occurrence"
 )
@@ -116,9 +117,9 @@ type DocumentResponse struct {
 }
 
 type OperationsListResponse struct {
-	Operations []Operation      `json:"operations"`
-	Document   json.RawMessage  `json:"document,omitempty"`
-	Revision   int64            `json:"revision,omitempty"`
+	Operations []Operation     `json:"operations"`
+	Document   json.RawMessage `json:"document,omitempty"`
+	Revision   int64           `json:"revision,omitempty"`
 }
 
 func parseDeltaFromPayload(payload json.RawMessage) (*delta.Delta, error) {
@@ -128,7 +129,39 @@ func parseDeltaFromPayload(payload json.RawMessage) (*delta.Delta, error) {
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return nil, err
 	}
-	return delta.New(p.Ops), nil
+	return delta.New(opsToUTF16(p.Ops)), nil
+}
+
+func opsToUTF16(ops []delta.Op) []delta.Op {
+	converted := make([]delta.Op, len(ops))
+	for i, op := range ops {
+		converted[i] = op
+		if len(op.Insert) == 0 {
+			continue
+		}
+		units := utf16.Encode(op.Insert)
+		converted[i].Insert = make([]rune, len(units))
+		for j, unit := range units {
+			converted[i].Insert[j] = rune(unit)
+		}
+	}
+	return converted
+}
+
+func opsFromUTF16(ops []delta.Op) []delta.Op {
+	converted := make([]delta.Op, len(ops))
+	for i, op := range ops {
+		converted[i] = op
+		if len(op.Insert) == 0 {
+			continue
+		}
+		units := make([]uint16, len(op.Insert))
+		for j, unit := range op.Insert {
+			units[j] = uint16(unit)
+		}
+		converted[i].Insert = utf16.Decode(units)
+	}
+	return converted
 }
 
 func parseCreateBlockPayload(payload json.RawMessage) (*CreateBlockPayload, error) {

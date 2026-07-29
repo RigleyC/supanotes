@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:html2md/html2md.dart' as html2md;
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
@@ -23,12 +24,44 @@ String preprocessClipboardText(String text) {
   result = result.replaceAll(RegExp(r'^\[\s\] ', multiLine: true), '- [ ] ');
   result = result.replaceAll(RegExp(r'^\[[xX]\] ', multiLine: true), '- [x] ');
 
+  // Rich-text sources often use multiple spaces or a tab after list markers.
+  result = result.replaceAllMapped(
+    RegExp(r'^(\s*)([-*+]|\d+[.)])[\t ]+', multiLine: true),
+    (match) => '${match.group(1)}${match.group(2)} ',
+  );
+
   return result;
+}
+
+String preprocessClipboardHtml(String html) {
+  final withTaskMarkers = html.replaceAllMapped(
+    RegExp(
+      r'''<input\b[^>]*\btype=["']?checkbox["']?[^>]*>''',
+      caseSensitive: false,
+    ),
+    (match) =>
+        RegExp(
+          r'''\bchecked(?:\s*=\s*(?:["']checked["']|["']true["']|checked|true))?''',
+          caseSensitive: false,
+        ).hasMatch(match.group(0)!)
+        ? '[x]'
+        : '[ ]',
+  );
+  return preprocessClipboardText(withTaskMarkers);
+}
+
+String clipboardHtmlToMarkdown(String html) {
+  final markdown = html2md
+      .convert(preprocessClipboardHtml(html))
+      .replaceAll(r'\[ \]', '[ ]')
+      .replaceAll(r'\[x\]', '[x]')
+      .replaceAll(r'\[X\]', '[x]');
+  return preprocessClipboardText(markdown);
 }
 
 bool _isMarkdown(String text) {
   return RegExp(
-    r'^(?:-|\*|\d+\.) |^#+ |^> |^```',
+    r'^\s*(?:[-*+]|\d+[.)])\s+|^#+ |^> |^```',
     multiLine: true,
   ).hasMatch(text);
 }
@@ -37,12 +70,29 @@ Future<void> pasteWithPreprocessing(Editor editor) async {
   await pasteIntoEditorFromNativeClipboard(
     editor,
     customInserter: (editor, reader) async {
+      if (_selectionIsInsideTask(editor) &&
+          reader.canProvide(Formats.plainText)) {
+        final text = await reader.readValue(Formats.plainText);
+        if (text != null && !text.contains(RegExp(r'[\r\n]'))) {
+          return pastePlainTextAtCurrentSelection(
+            editor,
+            preprocessClipboardText(text),
+          );
+        }
+      }
+
       // 1. Try html
       if (reader.canProvide(Formats.htmlText)) {
         final html = await reader.readValue(Formats.htmlText);
         if (html != null) {
-          final preprocessedHtml = preprocessClipboardText(html);
-          editor.pasteHtml(editor, preprocessedHtml);
+          if (RegExp(
+            r'''<input\b[^>]*\btype=["']?checkbox''',
+            caseSensitive: false,
+          ).hasMatch(html)) {
+            editor.pasteMarkdown(editor, clipboardHtmlToMarkdown(html));
+          } else {
+            editor.pasteHtml(editor, preprocessClipboardHtml(html));
+          }
           return true;
         }
       }
@@ -78,7 +128,6 @@ Future<void> pasteWithPreprocessing(Editor editor) async {
         final text = await reader.readValue(Formats.plainText);
         if (text != null) {
           final preprocessedText = preprocessClipboardText(text);
-          
           final isLikelyMarkdown = _isMarkdown(preprocessedText);
 
           if (isLikelyMarkdown) {
@@ -88,37 +137,7 @@ Future<void> pasteWithPreprocessing(Editor editor) async {
 
           final selection = editor.composer.selection;
           if (selection != null) {
-            DocumentPosition? pastePosition = selection.extent;
-
-            if (!selection.isCollapsed) {
-              pastePosition = CommonEditorOperations.getDocumentPositionAfterExpandedDeletion(
-                document: editor.document,
-                selection: editor.composer.selection!,
-              );
-
-              if (pastePosition == null) {
-                return false;
-              }
-
-              // Delete the selected content.
-              editor.execute([
-                DeleteContentRequest(documentRange: editor.composer.selection!),
-                ChangeSelectionRequest(
-                  DocumentSelection.collapsed(position: pastePosition),
-                  SelectionChangeType.deleteContent,
-                  SelectionReason.userInteraction,
-                ),
-              ]);
-            }
-
-            // Paste clipboard text.
-            editor.execute([
-              PasteEditorRequest(
-                content: preprocessedText,
-                pastePosition: pastePosition,
-              ),
-            ]);
-            return true;
+            return pastePlainTextAtCurrentSelection(editor, preprocessedText);
           }
         }
       }
@@ -126,4 +145,39 @@ Future<void> pasteWithPreprocessing(Editor editor) async {
       return false;
     },
   );
+}
+
+bool _selectionIsInsideTask(Editor editor) {
+  final selection = editor.composer.selection;
+  if (selection == null) return false;
+  return editor.document.getNodeById(selection.extent.nodeId) is TaskNode;
+}
+
+bool pastePlainTextAtCurrentSelection(Editor editor, String text) {
+  final selection = editor.composer.selection;
+  if (selection == null) return false;
+
+  DocumentPosition? pastePosition = selection.extent;
+  if (!selection.isCollapsed) {
+    pastePosition =
+        CommonEditorOperations.getDocumentPositionAfterExpandedDeletion(
+          document: editor.document,
+          selection: selection,
+        );
+    if (pastePosition == null) return false;
+
+    editor.execute([
+      DeleteContentRequest(documentRange: selection),
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(position: pastePosition),
+        SelectionChangeType.deleteContent,
+        SelectionReason.userInteraction,
+      ),
+    ]);
+  }
+
+  editor.execute([
+    PasteEditorRequest(content: text, pastePosition: pastePosition),
+  ]);
+  return true;
 }

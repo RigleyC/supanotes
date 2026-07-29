@@ -31,26 +31,29 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
       FamilyModalSheet.of(context).popPage();
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TaskMetadataPageHeader(title: title),
-        AppSelectionTile(
-          label: noneLabel,
-          icon: Icons.do_not_disturb_on_outlined,
-          isSelected: selected == null,
-          onTap: () => select(null),
-        ),
-        for (final option in options)
+    return Material(
+      type: MaterialType.transparency,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TaskMetadataPageHeader(title: title),
           AppSelectionTile(
-            label: optionLabel(option),
-            icon: optionIcon(option),
-            isSelected: selected == option,
-            onTap: () => select(option),
+            label: noneLabel,
+            icon: Icons.do_not_disturb_on_outlined,
+            isSelected: selected == null,
+            onTap: () => select(null),
           ),
-        const SizedBox(height: 24),
-      ],
+          for (final option in options)
+            AppSelectionTile(
+              label: optionLabel(option),
+              icon: optionIcon(option),
+              isSelected: selected == option,
+              onTap: () => select(option),
+            ),
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 }

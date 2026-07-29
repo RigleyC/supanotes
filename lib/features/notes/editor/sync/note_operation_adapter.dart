@@ -132,6 +132,7 @@ class NoteOperationAdapter {
         error: e,
         stackTrace: stackTrace,
       );
+      rethrow;
     }
   }
 

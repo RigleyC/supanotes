@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
@@ -133,6 +134,28 @@ void main() {
     );
 
     await tester.longPress(find.byType(TextComponent), warnIfMissed: false);
+    await tester.pump();
+
+    expect(openedActions, isTrue);
+  });
+
+  testWidgets('secondary click on text opens task actions', (tester) async {
+    var openedActions = false;
+
+    await tester.pumpWidget(
+      wrap(
+        CustomTaskComponent(
+          viewModel: viewModel(),
+          onLongPress: () => openedActions = true,
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.byType(TextComponent),
+      buttons: kSecondaryMouseButton,
+      warnIfMissed: false,
+    );
     await tester.pump();
 
     expect(openedActions, isTrue);

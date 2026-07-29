@@ -22,7 +22,7 @@ class NoteEditorController extends ChangeNotifier {
     onUploadFile,
   }) : _onUploadFile = onUploadFile,
        _noteId = noteId,
-       document = MutableDocument(nodes: nodes) {
+       document = MutableDocument(nodes: List<DocumentNode>.of(nodes)) {
     _setupEditor();
   }
 

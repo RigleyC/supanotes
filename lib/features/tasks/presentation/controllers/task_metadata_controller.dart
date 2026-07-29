@@ -48,6 +48,7 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
   TaskMetadataController(this.taskId);
 
   final String taskId;
+  void Function()? _releaseSheetKeepAlive;
 
   @override
   TaskMetadataState build() {
@@ -55,6 +56,7 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
   }
 
   void initialize(TaskModel task) {
+    _releaseSheetKeepAlive ??= ref.keepAlive().close;
     state = TaskMetadataState(
       dueDate: task.dueDate,
       hasTime: task.hasTime,
@@ -62,6 +64,11 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
       reminder: TaskReminderOption.fromValue(task.reminder),
       isSaving: false,
     );
+  }
+
+  void releaseSheet() {
+    _releaseSheetKeepAlive?.call();
+    _releaseSheetKeepAlive = null;
   }
 
   void setDueDate(DateTime dueDate) {
