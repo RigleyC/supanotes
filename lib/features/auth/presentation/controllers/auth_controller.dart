@@ -61,24 +61,26 @@ class AuthController extends AsyncNotifier<User?> {
     () => _repository.register(email: email, password: password, name: name),
   );
 
-  Future<void> _clearSession() async {
+  Future<void> _clearSession({required bool clearLocalData}) async {
     await _closeActiveNoteSessions();
     await _storage.clear();
     _sessionCache.clear();
 
-    // Clear last synced time to force a full pull next time
-    try {
-      final prefs = ref.read(sharedPreferencesProvider);
-      await prefs.remove('last_synced_at');
-    } catch (e) {
-      debugPrint('Error clearing last_synced_at: $e');
-    }
+    if (clearLocalData) {
+      // Clear last synced time to force a full pull next time
+      try {
+        final prefs = ref.read(sharedPreferencesProvider);
+        await prefs.remove('last_synced_at');
+      } catch (e) {
+        debugPrint('Error clearing last_synced_at: $e');
+      }
 
-    // Wipe local SQLite data
-    try {
-      await ref.read(appDatabaseProvider).clearAllData();
-    } catch (e) {
-      debugPrint('Error clearing local database: $e');
+      // Explicit logout is the user-confirmed data-clearing operation.
+      try {
+        await ref.read(appDatabaseProvider).clearAllData();
+      } catch (e) {
+        debugPrint('Error clearing local database: $e');
+      }
     }
 
     // Note: lastRouteStore is intentionally NOT cleared here.
@@ -104,14 +106,16 @@ class AuthController extends AsyncNotifier<User?> {
     } catch (e) {
       debugPrint('logout error: $e');
     }
-    await _clearSession();
+    await _clearSession(clearLocalData: true);
 
     ref.read(sessionResetProvider.notifier).update((state) => state + 1);
   }
 
   /// Called by the [AuthInterceptor] when a refresh has failed.
   Future<void> onSessionExpired() async {
-    await _clearSession();
+    // Keep local notes and the outbox. A failed refresh must not destroy
+    // changes that have not reached the server yet.
+    await _clearSession(clearLocalData: false);
     ref.read(sessionResetProvider.notifier).update((state) => state + 1);
   }
 }
