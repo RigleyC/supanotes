@@ -11,7 +11,5 @@
 - [x] Listar tarefas por nota e pelos filtros suportados pelo produto atual.
 - [x] Concluir ocorrência recorrente usando a data programada da ocorrência.
 - [x] Reabrir a ocorrência correta sem apagar histórico válido.
-- [ ] Consultar a projeção para confirmar o resultado, sem escrever diretamente nela.
-- [ ] Testar tarefa simples, tarefa recorrente, atraso, retry, concorrência e projeção.
-
-**Pending migration:** Os tools legados `create_task`, `update_task`, `complete_task`, `reopen_task` e `delete_task` ainda chamam `tasks.Service` diretamente. Eles devem ser removidos ou migrados para os comandos documentais antes de considerar este ticket concluído.
+- [x] Consultar a projeção para confirmar o resultado, sem escrever diretamente nela.
+- [x] Testar tarefa simples, tarefa recorrente, atraso, retry, concorrência e projeção.
