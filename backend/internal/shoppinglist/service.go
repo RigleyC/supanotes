@@ -24,10 +24,10 @@ var (
 
 type Service struct {
 	notes *notes.Service
-	ops   *noteoperations.Service
+	ops   noteoperations.DocumentService
 }
 
-func NewService(notesSvc *notes.Service, opsSvc *noteoperations.Service) *Service {
+func NewService(notesSvc *notes.Service, opsSvc noteoperations.DocumentService) *Service {
 	return &Service{notes: notesSvc, ops: opsSvc}
 }
 
