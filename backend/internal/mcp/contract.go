@@ -22,6 +22,10 @@ var CurrentToolNames = []string{
 	"delete_block",
 	"set_block_type",
 	"set_block_metadata",
+	"create_task_block",
+	"update_task_metadata",
+	"complete_task_occurrence",
+	"reopen_task_occurrence",
 }
 
 var removedToolNames = []string{

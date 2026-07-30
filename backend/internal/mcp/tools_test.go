@@ -86,9 +86,11 @@ func TestRegisterTools(t *testing.T) {
 func TestCurrentToolNames_areRetainedProductContract(t *testing.T) {
 	expected := []string{
 		"complete_task",
+		"complete_task_occurrence",
 		"create_block",
 		"create_note",
 		"create_task",
+		"create_task_block",
 		"delete_block",
 		"delete_note",
 		"delete_task",
@@ -99,11 +101,13 @@ func TestCurrentToolNames_areRetainedProductContract(t *testing.T) {
 		"list_tasks",
 		"move_block",
 		"reopen_task",
+		"reopen_task_occurrence",
 		"set_block_metadata",
 		"set_block_type",
 		"update_block_text",
 		"update_note",
 		"update_task",
+		"update_task_metadata",
 	}
 
 	actual := append([]string(nil), CurrentToolNames...)

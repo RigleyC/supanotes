@@ -49,6 +49,19 @@ var blockMutationSchema = map[string]any{
 	"required": []any{"note_id", "base_revision"},
 }
 
+var taskOccurrenceSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"note_id":       map[string]any{"type": "string"},
+		"block_id":      map[string]any{"type": "string"},
+		"base_revision": map[string]any{"type": "integer", "minimum": 0},
+		"scheduled_at":  map[string]any{"type": "string", "description": "Scheduled occurrence timestamp"},
+		"completed_at":  map[string]any{"type": "string", "description": "Completion timestamp; omit to reopen"},
+		"operation_id":  map[string]any{"type": "string"},
+	},
+	"required": []any{"note_id", "block_id", "base_revision", "scheduled_at"},
+}
+
 var idParamSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
@@ -236,6 +249,69 @@ func addBlockMutationTool(
 	)
 }
 
+func addTaskOccurrenceTool(server *mcp.Server, name string, commands noteoperations.DocumentCommandService, reopen bool) {
+	server.AddTool(&mcp.Tool{Name: name, Description: "Complete or reopen a task occurrence in the canonical document", InputSchema: taskOccurrenceSchema},
+		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if commands == nil {
+				return asError(fmt.Errorf("document command service is not configured"))
+			}
+			args := parseArgs(request)
+			userID, err := UserIDFromContext(ctx)
+			if err != nil {
+				return asError(err)
+			}
+			noteID, err := getUUID(args, "note_id")
+			if err != nil {
+				return asError(err)
+			}
+			blockID := getStr(args, "block_id")
+			if blockID == "" {
+				return asError(fmt.Errorf("block_id is required"))
+			}
+			baseRevision := int64(getInt(args, "base_revision", -1))
+			if baseRevision < 0 {
+				return asError(fmt.Errorf("base_revision is required"))
+			}
+			scheduledAt := getStr(args, "scheduled_at")
+			if scheduledAt == "" {
+				return asError(fmt.Errorf("scheduled_at is required"))
+			}
+			operationID := getStr(args, "operation_id")
+			if operationID == "" {
+				operationID = uuid.NewString()
+			}
+			if _, err := uuid.Parse(operationID); err != nil {
+				return asError(fmt.Errorf("operation_id must be a UUID: %w", err))
+			}
+			var completedAt *string
+			if !reopen {
+				value := getStr(args, "completed_at")
+				if value == "" {
+					value = time.Now().UTC().Format(time.RFC3339)
+				}
+				completedAt = &value
+			}
+			payload, err := json.Marshal(noteoperations.CompleteTaskOccurrencePayload{
+				TaskID: blockID, ScheduledAt: scheduledAt, CompletedAt: completedAt,
+			})
+			if err != nil {
+				return asError(err)
+			}
+			result, err := commands.SyncOperations(ctx, noteID, userID, noteoperations.SyncRequest{
+				KnownRevision: baseRevision, ClientID: "mcp",
+				Operations: []noteoperations.OperationRequest{{
+					OperationID: operationID, BaseRevision: baseRevision,
+					Kind: string(noteoperations.KindCompleteTaskOccurrence), BlockID: &blockID, Payload: payload,
+				}},
+			})
+			if err != nil {
+				return asError(err)
+			}
+			return &mcp.CallToolResult{Content: asText(result)}, nil
+		},
+	)
+}
+
 func RegisterTools(
 	server *mcp.Server,
 	notesSvc *notes.Service,
@@ -244,11 +320,15 @@ func RegisterTools(
 	documentCommands noteoperations.DocumentCommandService,
 ) {
 	addBlockMutationTool(server, "create_block", noteoperations.KindCreateBlock, documentCommands)
+	addBlockMutationTool(server, "create_task_block", noteoperations.KindCreateBlock, documentCommands)
 	addBlockMutationTool(server, "update_block_text", noteoperations.KindTextDelta, documentCommands)
 	addBlockMutationTool(server, "move_block", noteoperations.KindMoveBlock, documentCommands)
 	addBlockMutationTool(server, "delete_block", noteoperations.KindDeleteBlock, documentCommands)
 	addBlockMutationTool(server, "set_block_type", noteoperations.KindSetBlockType, documentCommands)
 	addBlockMutationTool(server, "set_block_metadata", noteoperations.KindSetBlockMetadata, documentCommands)
+	addBlockMutationTool(server, "update_task_metadata", noteoperations.KindSetBlockMetadata, documentCommands)
+	addTaskOccurrenceTool(server, "complete_task_occurrence", documentCommands, false)
+	addTaskOccurrenceTool(server, "reopen_task_occurrence", documentCommands, true)
 
 	// Notes
 	server.AddTool(&mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: listNotesSchema},
