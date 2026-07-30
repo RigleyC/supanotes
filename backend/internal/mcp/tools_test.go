@@ -3,6 +3,7 @@ package mcpapp
 import (
 	"encoding/json"
 	"errors"
+	"sort"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -60,6 +61,32 @@ func TestRegisterTools(t *testing.T) {
 	require.NotPanics(t, func() {
 		RegisterTools(server, nil, nil)
 	})
+}
+
+func TestCurrentToolNames_areRetainedProductContract(t *testing.T) {
+	expected := []string{
+		"complete_task",
+		"create_note",
+		"create_task",
+		"delete_note",
+		"delete_task",
+		"get_note",
+		"list_notes",
+		"list_tasks",
+		"reopen_task",
+		"update_note",
+		"update_task",
+	}
+
+	actual := append([]string(nil), CurrentToolNames...)
+	sort.Strings(actual)
+	assert.Equal(t, expected, actual)
+}
+
+func TestRemovedToolNames_areNotPartOfContract(t *testing.T) {
+	for _, removed := range removedToolNames {
+		assert.NotContains(t, CurrentToolNames, removed)
+	}
 }
 
 func TestParseArgs(t *testing.T) {

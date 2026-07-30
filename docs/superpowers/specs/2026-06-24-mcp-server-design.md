@@ -1,6 +1,8 @@
-# Spec: MCP Server Integration in SupaNotes
+# Spec: MCP Server Integration in SupaNotes (Historical, Superseded)
 
-Introduce a Model Context Protocol (MCP) Server endpoint in the SupaNotes Go backend to expose Notes, Tasks, Memories, Tags, and Soul to external LLM clients (such as Claude Desktop, Cursor, or MCP Inspector) using Server-Sent Events (SSE).
+This document records the first MCP proposal and is retained for history only. It is superseded by the current MCP contract and implementation tickets. The retained product scope is notes, REST/OT documents, blocks, tasks, task recurrence, attachments, sharing, and preferences.
+
+The current MCP must not expose or reintroduce memories, soul, tags, contexts, embeddings, routines, Telegram, agent-loop features, or Yjs/YDoc paths.
 
 ## User Review Required
 
@@ -31,7 +33,7 @@ Introduce a Model Context Protocol (MCP) Server endpoint in the SupaNotes Go bac
 
 #### [NEW] [server.go](file:///c:/Users/rigleyc/projects/supanotes/backend/internal/mcp/server.go)
 * Initialize `mcp.Server` with the package implementation metadata.
-* Set up the dependency injection for supanotes services (`NotesService`, `TasksService`, `MemoriesService`, `TagsService`, `SoulService`).
+* Set up dependency injection only for retained SupaNotes services.
 * Create a helper function `UserIDFromContext(ctx context.Context) (pgtype.UUID, error)` to retrieve the authenticated user ID inside MCP tool callbacks.
 * Build and configure the `mcp.NewStreamableHTTPHandler`.
 
@@ -45,9 +47,7 @@ Introduce a Model Context Protocol (MCP) Server endpoint in the SupaNotes Go bac
 * Register tools with `mcp.AddTool`:
   * **Notes**: `list_notes`, `get_note`, `create_note`, `update_note`, `delete_note`.
   * **Tasks**: `list_tasks`, `create_task`, `update_task`, `complete_task`, `reopen_task`, `delete_task`.
-  * **Memories**: `list_memories`, `create_memory`, `delete_memory`.
-  * **Tags**: `list_tags`, `create_tag`, `add_tag_to_note`, `remove_tag_from_note`.
-  * **Soul**: `get_soul`, `update_soul`.
+  * **Removed legacy areas**: memories, tags, and soul are not MCP capabilities.
 * Inside each tool callback:
   1. Retrieve `user_id` from the request context.
   2. Map arguments, invoke the corresponding service, and format the output as `mcp.CallToolResult`.
@@ -82,4 +82,4 @@ Introduce a Model Context Protocol (MCP) Server endpoint in the SupaNotes Go bac
 * Connect using the MCP inspector tool:
   `npx -y @modelcontextprotocol/inspector http://localhost:8080/api/v1/mcp`
   Passing the HTTP Header `Authorization: Bearer <generated-token>`.
-* Verify that notes, tasks, memories, tags, and soul can be read, searched, and updated successfully via the inspector UI.
+* Verify only retained capabilities via the inspector UI. Full document editing must use the REST/OT command seam before it is exposed through MCP.
