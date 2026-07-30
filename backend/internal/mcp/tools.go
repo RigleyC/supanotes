@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -33,6 +34,19 @@ var noteRevisionSchema = map[string]any{
 		"after_revision": map[string]any{"type": "integer", "minimum": 0, "description": "Return operations after this revision"},
 	},
 	"required": []any{"note_id"},
+}
+
+var blockMutationSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"note_id":       map[string]any{"type": "string", "description": "Note ID"},
+		"block_id":      map[string]any{"type": "string", "description": "Block ID"},
+		"base_revision": map[string]any{"type": "integer", "minimum": 0, "description": "Document revision used as the operation base"},
+		"payload":       map[string]any{"type": "object", "description": "Operation-specific payload"},
+		"operation_id":  map[string]any{"type": "string", "description": "Optional UUID used for idempotent retries"},
+		"client_id":     map[string]any{"type": "string", "description": "Optional caller identifier"},
+	},
+	"required": []any{"note_id", "base_revision"},
 }
 
 var idParamSchema = map[string]any{
@@ -150,12 +164,92 @@ func getOptionalTime(args map[string]any, key string) (*time.Time, error) {
 	return &parsed, nil
 }
 
+func operationPayload(args map[string]any) (json.RawMessage, error) {
+	payload, ok := args["payload"]
+	if !ok {
+		return json.RawMessage(`{}`), nil
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
+	}
+	return encoded, nil
+}
+
+func addBlockMutationTool(
+	server *mcp.Server,
+	name string,
+	kind noteoperations.Kind,
+	documentCommands noteoperations.DocumentCommandService,
+) {
+	server.AddTool(&mcp.Tool{Name: name, Description: "Apply a REST/OT block operation", InputSchema: blockMutationSchema},
+		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if documentCommands == nil {
+				return asError(fmt.Errorf("document command service is not configured"))
+			}
+			args := parseArgs(request)
+			userID, err := UserIDFromContext(ctx)
+			if err != nil {
+				return asError(err)
+			}
+			noteID, err := getUUID(args, "note_id")
+			if err != nil {
+				return asError(err)
+			}
+			baseRevision := int64(getInt(args, "base_revision", -1))
+			if baseRevision < 0 {
+				return asError(fmt.Errorf("base_revision is required"))
+			}
+			operationID := getStr(args, "operation_id")
+			if operationID == "" {
+				operationID = uuid.NewString()
+			}
+			if _, err := uuid.Parse(operationID); err != nil {
+				return asError(fmt.Errorf("operation_id must be a UUID: %w", err))
+			}
+			payload, err := operationPayload(args)
+			if err != nil {
+				return asError(err)
+			}
+			blockID := getStr(args, "block_id")
+			var blockIDPtr *string
+			if blockID != "" {
+				blockIDPtr = &blockID
+			}
+			clientID := getStr(args, "client_id")
+			if clientID == "" {
+				clientID = "mcp"
+			}
+			result, err := documentCommands.SyncOperations(ctx, noteID, userID, noteoperations.SyncRequest{
+				KnownRevision: baseRevision,
+				ClientID:      clientID,
+				Operations: []noteoperations.OperationRequest{{
+					OperationID: operationID, BaseRevision: baseRevision,
+					Kind: string(kind), BlockID: blockIDPtr, Payload: payload,
+				}},
+			})
+			if err != nil {
+				return asError(err)
+			}
+			return &mcp.CallToolResult{Content: asText(result)}, nil
+		},
+	)
+}
+
 func RegisterTools(
 	server *mcp.Server,
 	notesSvc *notes.Service,
 	tasksSvc *tasks.Service,
 	documentReader noteoperations.DocumentReader,
+	documentCommands noteoperations.DocumentCommandService,
 ) {
+	addBlockMutationTool(server, "create_block", noteoperations.KindCreateBlock, documentCommands)
+	addBlockMutationTool(server, "update_block_text", noteoperations.KindTextDelta, documentCommands)
+	addBlockMutationTool(server, "move_block", noteoperations.KindMoveBlock, documentCommands)
+	addBlockMutationTool(server, "delete_block", noteoperations.KindDeleteBlock, documentCommands)
+	addBlockMutationTool(server, "set_block_type", noteoperations.KindSetBlockType, documentCommands)
+	addBlockMutationTool(server, "set_block_metadata", noteoperations.KindSetBlockMetadata, documentCommands)
+
 	// Notes
 	server.AddTool(&mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: listNotesSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {

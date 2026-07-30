@@ -12,13 +12,14 @@ func NewServer(
 	notesSvc *notes.Service,
 	tasksSvc *tasks.Service,
 	documentReader noteoperations.DocumentReader,
+	documentCommands noteoperations.DocumentCommandService,
 ) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "SupaNotes MCP",
 		Version: "1.0.0",
 	}, nil)
 
-	RegisterTools(server, notesSvc, tasksSvc, documentReader)
+	RegisterTools(server, notesSvc, tasksSvc, documentReader, documentCommands)
 
 	return server
 }

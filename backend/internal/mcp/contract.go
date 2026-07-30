@@ -16,6 +16,12 @@ var CurrentToolNames = []string{
 	"delete_task",
 	"get_note_document",
 	"list_note_operations",
+	"create_block",
+	"update_block_text",
+	"move_block",
+	"delete_block",
+	"set_block_type",
+	"set_block_metadata",
 }
 
 var removedToolNames = []string{
