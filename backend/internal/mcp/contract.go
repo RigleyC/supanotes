@@ -14,6 +14,8 @@ var CurrentToolNames = []string{
 	"complete_task",
 	"reopen_task",
 	"delete_task",
+	"get_note_document",
+	"list_note_operations",
 }
 
 var removedToolNames = []string{

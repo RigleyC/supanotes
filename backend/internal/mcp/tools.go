@@ -3,16 +3,37 @@ package mcpapp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/RigleyC/supanotes/internal/noteoperations"
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 var noParamSchema = map[string]any{"type": "object", "properties": map[string]any{}}
+
+var listNotesSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"limit":             map[string]any{"type": "integer", "description": "Maximum number of notes to return (1-100)"},
+		"cursor_updated_at": map[string]any{"type": "string", "description": "RFC3339 cursor timestamp"},
+		"cursor_id":         map[string]any{"type": "string", "description": "Cursor note ID, required with cursor_updated_at"},
+	},
+}
+
+var noteRevisionSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"note_id":        map[string]any{"type": "string", "description": "Note ID"},
+		"after_revision": map[string]any{"type": "integer", "minimum": 0, "description": "Return operations after this revision"},
+	},
+	"required": []any{"note_id"},
+}
 
 var idParamSchema = map[string]any{
 	"type": "object",
@@ -102,23 +123,107 @@ func getStr(args map[string]any, key string) string {
 	return ""
 }
 
+func getInt(args map[string]any, key string, fallback int32) int32 {
+	if value, ok := args[key].(float64); ok {
+		return int32(value)
+	}
+	return fallback
+}
+
+func getUUID(args map[string]any, key string) (pgtype.UUID, error) {
+	id := getStr(args, key)
+	if id == "" {
+		return pgtype.UUID{}, fmt.Errorf("%s is required", key)
+	}
+	return uid.UUIDFromString(id)
+}
+
+func getOptionalTime(args map[string]any, key string) (*time.Time, error) {
+	value := getStr(args, key)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be RFC3339: %w", key, err)
+	}
+	return &parsed, nil
+}
+
 func RegisterTools(
 	server *mcp.Server,
 	notesSvc *notes.Service,
 	tasksSvc *tasks.Service,
+	documentReader noteoperations.DocumentReader,
 ) {
 	// Notes
-	server.AddTool(&mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: noParamSchema},
+	server.AddTool(&mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: listNotesSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
 				return asError(err)
 			}
-			res, err := notesSvc.GetNotes(ctx, userID, nil, 50, nil, nil)
+			limit := getInt(args, "limit", 50)
+			if limit < 1 || limit > 100 {
+				return asError(fmt.Errorf("limit must be between 1 and 100"))
+			}
+			cursorTime, err := getOptionalTime(args, "cursor_updated_at")
+			if err != nil {
+				return asError(err)
+			}
+			var cursorID *pgtype.UUID
+			if getStr(args, "cursor_id") != "" {
+				parsed, parseErr := getUUID(args, "cursor_id")
+				if parseErr != nil {
+					return asError(parseErr)
+				}
+				cursorID = &parsed
+			}
+			if (cursorTime == nil) != (cursorID == nil) {
+				return asError(fmt.Errorf("cursor_updated_at and cursor_id must be provided together"))
+			}
+			res, err := notesSvc.GetNotes(ctx, userID, nil, limit, cursorTime, cursorID)
 			if err != nil {
 				return asError(err)
 			}
 			return &mcp.CallToolResult{Content: asText(res)}, nil
+		},
+	)
+	server.AddTool(&mcp.Tool{Name: "get_note_document", Description: "Get the canonical REST/OT document for a note", InputSchema: idParamSchema},
+		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			args := parseArgs(request)
+			userID, err := UserIDFromContext(ctx)
+			if err != nil {
+				return asError(err)
+			}
+			noteID, err := getUUID(args, "id")
+			if err != nil {
+				return asError(err)
+			}
+			res, err := documentReader.GetDocument(ctx, noteID, userID)
+			if err != nil {
+				return asError(err)
+			}
+			return &mcp.CallToolResult{Content: asText(res)}, nil
+		},
+	)
+	server.AddTool(&mcp.Tool{Name: "list_note_operations", Description: "List REST/OT operations for a note", InputSchema: noteRevisionSchema},
+		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			args := parseArgs(request)
+			userID, err := UserIDFromContext(ctx)
+			if err != nil {
+				return asError(err)
+			}
+			noteID, err := getUUID(args, "note_id")
+			if err != nil {
+				return asError(err)
+			}
+			operations, err := documentReader.GetOperationsSince(ctx, noteID, userID, int64(getInt(args, "after_revision", 0)))
+			if err != nil {
+				return asError(err)
+			}
+			return &mcp.CallToolResult{Content: asText(operations)}, nil
 		},
 	)
 	server.AddTool(&mcp.Tool{Name: "get_note", Description: "Get note", InputSchema: idParamSchema},

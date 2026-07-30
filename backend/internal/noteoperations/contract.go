@@ -15,6 +15,7 @@ type DocumentCommandService interface {
 // DocumentReader is the read seam paired with DocumentCommandService.
 type DocumentReader interface {
 	GetDocument(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (DocumentResponse, error)
+	GetOperationsSince(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID, afterRevision int64) (OperationsListResponse, error)
 }
 
 // DocumentService groups the read and mutation seams used by integrations.

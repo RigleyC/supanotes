@@ -17,7 +17,9 @@ func TestSchemas_haveCorrectType(t *testing.T) {
 		s    map[string]any
 	}{
 		{"noParamSchema", noParamSchema},
+		{"listNotesSchema", listNotesSchema},
 		{"idParamSchema", idParamSchema},
+		{"noteRevisionSchema", noteRevisionSchema},
 		{"noteContentSchema", noteContentSchema},
 		{"updateNoteSchema", updateNoteSchema},
 		{"taskTitleSchema", taskTitleSchema},
@@ -45,6 +47,24 @@ func TestSchemas_idParam(t *testing.T) {
 	assert.Equal(t, []any{"id"}, required)
 }
 
+func TestSchemas_noteRevisionRequiresNoteID(t *testing.T) {
+	required, ok := noteRevisionSchema["required"].([]any)
+	require.True(t, ok)
+	assert.Equal(t, []any{"note_id"}, required)
+}
+
+func TestGetOptionalTime(t *testing.T) {
+	parsed, err := getOptionalTime(map[string]any{"cursor_updated_at": "2026-07-30T12:00:00Z"}, "cursor_updated_at")
+	require.NoError(t, err)
+	require.NotNil(t, parsed)
+	assert.Equal(t, 2026, parsed.Year())
+}
+
+func TestGetOptionalTime_rejectsInvalidValue(t *testing.T) {
+	_, err := getOptionalTime(map[string]any{"cursor_updated_at": "not-a-time"}, "cursor_updated_at")
+	require.Error(t, err)
+}
+
 func TestSchemas_updateNote(t *testing.T) {
 	props, ok := updateNoteSchema["properties"].(map[string]any)
 	require.True(t, ok)
@@ -59,7 +79,7 @@ func TestSchemas_updateNote(t *testing.T) {
 func TestRegisterTools(t *testing.T) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "Test"}, nil)
 	require.NotPanics(t, func() {
-		RegisterTools(server, nil, nil)
+		RegisterTools(server, nil, nil, nil)
 	})
 }
 
@@ -71,6 +91,8 @@ func TestCurrentToolNames_areRetainedProductContract(t *testing.T) {
 		"delete_note",
 		"delete_task",
 		"get_note",
+		"get_note_document",
+		"list_note_operations",
 		"list_notes",
 		"list_tasks",
 		"reopen_task",
