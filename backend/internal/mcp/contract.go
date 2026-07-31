@@ -24,6 +24,11 @@ var CurrentToolNames = []string{
 	"upload_attachment",
 	"list_note_attachments",
 	"delete_attachment",
+	"list_note_shares",
+	"share_note",
+	"remove_note_share",
+	"get_user_settings",
+	"update_user_settings",
 }
 
 var removedToolNames = []string{

@@ -79,7 +79,7 @@ func TestSchemas_updateNote(t *testing.T) {
 func TestRegisterTools(t *testing.T) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "Test"}, nil)
 	require.NotPanics(t, func() {
-		RegisterTools(server, nil, nil, nil, nil, nil)
+		RegisterTools(server, nil, nil, nil, nil, nil, nil, nil)
 	})
 }
 
@@ -94,17 +94,22 @@ func TestCurrentToolNames_areRetainedProductContract(t *testing.T) {
 		"delete_note",
 		"get_note",
 		"get_note_document",
+		"get_user_settings",
 		"list_note_attachments",
 		"list_note_operations",
+		"list_note_shares",
 		"list_notes",
 		"list_tasks",
 		"move_block",
+		"remove_note_share",
 		"reopen_task_occurrence",
 		"set_block_metadata",
 		"set_block_type",
+		"share_note",
 		"update_block_text",
 		"update_note",
 		"update_task_metadata",
+		"update_user_settings",
 		"upload_attachment",
 	}
 

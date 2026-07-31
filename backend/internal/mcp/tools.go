@@ -9,12 +9,15 @@ import (
 	"time"
 
 	"github.com/RigleyC/supanotes/internal/attachments"
+	"github.com/RigleyC/supanotes/internal/dto"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/RigleyC/supanotes/internal/noteoperations"
 	"github.com/RigleyC/supanotes/internal/notes"
+	"github.com/RigleyC/supanotes/internal/settings"
+	"github.com/RigleyC/supanotes/internal/shares"
 	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
@@ -406,6 +409,105 @@ func addAttachmentTools(server *mcp.Server, service attachments.Service, reader 
 	)
 }
 
+func addSharingAndSettingsTools(server *mcp.Server, sharesSvc *shares.Service, settingsSvc *settings.Service) {
+	server.AddTool(&mcp.Tool{Name: "list_note_shares", Description: "List shares for a note", InputSchema: idParamSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if sharesSvc == nil {
+			return asError(fmt.Errorf("shares service is not configured"))
+		}
+		args := parseArgs(request)
+		userID, err := UserIDFromContext(ctx)
+		if err != nil {
+			return asError(err)
+		}
+		noteID, err := getUUID(args, "id")
+		if err != nil {
+			return asError(err)
+		}
+		result, err := sharesSvc.ListNoteShares(ctx, userID, noteID)
+		if err != nil {
+			return asError(err)
+		}
+		return &mcp.CallToolResult{Content: asText(result)}, nil
+	})
+	shareSchema := map[string]any{"type": "object", "properties": map[string]any{"note_id": map[string]any{"type": "string"}, "email": map[string]any{"type": "string"}, "permission": map[string]any{"type": "string", "enum": []any{"view", "edit"}}}, "required": []any{"note_id", "email", "permission"}}
+	server.AddTool(&mcp.Tool{Name: "share_note", Description: "Share a note with a user", InputSchema: shareSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if sharesSvc == nil {
+			return asError(fmt.Errorf("shares service is not configured"))
+		}
+		args := parseArgs(request)
+		userID, err := UserIDFromContext(ctx)
+		if err != nil {
+			return asError(err)
+		}
+		noteID, err := getUUID(args, "note_id")
+		if err != nil {
+			return asError(err)
+		}
+		result, err := sharesSvc.ShareNote(ctx, userID, noteID, getStr(args, "email"), getStr(args, "permission"))
+		if err != nil {
+			return asError(err)
+		}
+		return &mcp.CallToolResult{Content: asText(result)}, nil
+	})
+	removeSchema := map[string]any{"type": "object", "properties": map[string]any{"note_id": map[string]any{"type": "string"}, "user_id": map[string]any{"type": "string"}}, "required": []any{"note_id", "user_id"}}
+	server.AddTool(&mcp.Tool{Name: "remove_note_share", Description: "Remove a note share", InputSchema: removeSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if sharesSvc == nil {
+			return asError(fmt.Errorf("shares service is not configured"))
+		}
+		args := parseArgs(request)
+		ownerID, err := UserIDFromContext(ctx)
+		if err != nil {
+			return asError(err)
+		}
+		noteID, err := getUUID(args, "note_id")
+		if err != nil {
+			return asError(err)
+		}
+		targetID, err := getUUID(args, "user_id")
+		if err != nil {
+			return asError(err)
+		}
+		if err := sharesSvc.DeleteNoteShare(ctx, ownerID, noteID, targetID); err != nil {
+			return asError(err)
+		}
+		return &mcp.CallToolResult{Content: asText("deleted")}, nil
+	})
+	server.AddTool(&mcp.Tool{Name: "get_user_settings", Description: "Get current user settings", InputSchema: noParamSchema}, func(ctx context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if settingsSvc == nil {
+			return asError(fmt.Errorf("settings service is not configured"))
+		}
+		userID, err := UserIDFromContext(ctx)
+		if err != nil {
+			return asError(err)
+		}
+		result, err := settingsSvc.Get(ctx, userID)
+		if err != nil {
+			return asError(err)
+		}
+		return &mcp.CallToolResult{Content: asText(result)}, nil
+	})
+	settingsSchema := map[string]any{"type": "object", "properties": map[string]any{"timezone": map[string]any{"type": "string"}, "preferences": map[string]any{"type": "object"}}}
+	server.AddTool(&mcp.Tool{Name: "update_user_settings", Description: "Update supported user settings", InputSchema: settingsSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if settingsSvc == nil {
+			return asError(fmt.Errorf("settings service is not configured"))
+		}
+		args := parseArgs(request)
+		userID, err := UserIDFromContext(ctx)
+		if err != nil {
+			return asError(err)
+		}
+		prefs := map[string]any{}
+		if value, ok := args["preferences"].(map[string]any); ok {
+			prefs = value
+		}
+		result, err := settingsSvc.Update(ctx, userID, dto.UpdateSettingsRequest{Timezone: getStr(args, "timezone"), Preferences: prefs})
+		if err != nil {
+			return asError(err)
+		}
+		return &mcp.CallToolResult{Content: asText(result)}, nil
+	})
+}
+
 func RegisterTools(
 	server *mcp.Server,
 	notesSvc *notes.Service,
@@ -413,8 +515,11 @@ func RegisterTools(
 	documentReader noteoperations.DocumentReader,
 	documentCommands noteoperations.DocumentCommandService,
 	attachmentsSvc attachments.Service,
+	sharesSvc *shares.Service,
+	settingsSvc *settings.Service,
 ) {
 	addAttachmentTools(server, attachmentsSvc, documentReader)
+	addSharingAndSettingsTools(server, sharesSvc, settingsSvc)
 	addBlockMutationTool(server, "create_block", noteoperations.KindCreateBlock, documentCommands)
 	addBlockMutationTool(server, "create_task_block", noteoperations.KindCreateBlock, documentCommands)
 	addBlockMutationTool(server, "update_block_text", noteoperations.KindTextDelta, documentCommands)
