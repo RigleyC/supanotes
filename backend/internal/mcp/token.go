@@ -104,6 +104,13 @@ func HasScope(ctx context.Context, scope string) bool {
 	}
 	return false
 }
+
+func requireWriteScope(ctx context.Context) error {
+	if !HasScope(ctx, "write") {
+		return errors.New("MCP token lacks write scope")
+	}
+	return nil
+}
 func PropagateUserContext(next http.Handler) echo.HandlerFunc {
 	return func(c echo.Context) error { next.ServeHTTP(c.Response(), c.Request()); return nil }
 }

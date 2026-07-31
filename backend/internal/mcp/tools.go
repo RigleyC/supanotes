@@ -214,6 +214,9 @@ func addBlockMutationTool(
 ) {
 	server.AddTool(&mcp.Tool{Name: name, Description: "Apply a REST/OT block operation", InputSchema: blockMutationSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireWriteScope(ctx); err != nil {
+				return asError(err)
+			}
 			if documentCommands == nil {
 				return asError(fmt.Errorf("document command service is not configured"))
 			}
@@ -269,6 +272,9 @@ func addBlockMutationTool(
 func addTaskOccurrenceTool(server *mcp.Server, name string, commands noteoperations.DocumentCommandService, reopen bool) {
 	server.AddTool(&mcp.Tool{Name: name, Description: "Complete or reopen a task occurrence in the canonical document", InputSchema: taskOccurrenceSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireWriteScope(ctx); err != nil {
+				return asError(err)
+			}
 			if commands == nil {
 				return asError(fmt.Errorf("document command service is not configured"))
 			}
@@ -332,6 +338,9 @@ func addTaskOccurrenceTool(server *mcp.Server, name string, commands noteoperati
 func addAttachmentTools(server *mcp.Server, service attachments.Service, reader noteoperations.DocumentReader) {
 	server.AddTool(&mcp.Tool{Name: "upload_attachment", Description: "Upload an attachment to a note", InputSchema: attachmentSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireWriteScope(ctx); err != nil {
+				return asError(err)
+			}
 			if service == nil {
 				return asError(fmt.Errorf("attachment service is not configured"))
 			}
@@ -362,6 +371,9 @@ func addAttachmentTools(server *mcp.Server, service attachments.Service, reader 
 	)
 	server.AddTool(&mcp.Tool{Name: "list_note_attachments", Description: "List attachments for a note", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireWriteScope(ctx); err != nil {
+				return asError(err)
+			}
 			if service == nil {
 				return asError(fmt.Errorf("attachment service is not configured"))
 			}
