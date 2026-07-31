@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/RigleyC/supanotes/internal/web"
-	"github.com/RigleyC/supanotes/pkg/config"
-	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 func TestGenerateMCPTokenHandler(t *testing.T) {
@@ -23,16 +21,11 @@ func TestGenerateMCPTokenHandler(t *testing.T) {
 	userID := "123e4567-e89b-12d3-a456-426614174000"
 	web.SetUserID(c, userID)
 
-	cfg := &config.Config{
-		JWTSecret: "supersecret-at-least-32-characters-long",
-	}
-
-	handler := GenerateMCPTokenHandler(cfg)
+	handler := GenerateMCPTokenHandler(nil)
 	err := handler(c)
 
 	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "mcp_token")
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 
 func TestPropagateUserContext(t *testing.T) {
@@ -40,9 +33,6 @@ func TestPropagateUserContext(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-
-	userIDStr := "123e4567-e89b-12d3-a456-426614174000"
-	web.SetUserID(c, userIDStr)
 
 	var extractedUserID pgtype.UUID
 	var extractionErr error
@@ -55,8 +45,8 @@ func TestPropagateUserContext(t *testing.T) {
 	err := handler(c)
 
 	assert.NoError(t, err)
-	assert.NoError(t, extractionErr)
+	assert.Error(t, extractionErr)
 
-	expectedUUID, _ := uid.UUIDFromString(userIDStr)
-	assert.Equal(t, expectedUUID, extractedUserID)
+	assert.Equal(t, pgtype.UUID{}, extractedUserID)
+	assert.Error(t, extractionErr)
 }

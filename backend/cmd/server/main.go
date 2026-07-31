@@ -274,11 +274,11 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	mcpHandler := mcpsdk.NewStreamableHTTPHandler(func(req *http.Request) *mcpsdk.Server { return mcpServer }, nil)
 
 	// Personal Token Generation Route
-	protected.POST("/auth/mcp-token", mcpapp.GenerateMCPTokenHandler(cfg))
+	protected.POST("/auth/mcp-token", mcpapp.GenerateMCPTokenHandler(pool))
 
 	// MCP HTTP/SSE Route
 	mcpWrapped := http.StripPrefix("/api/v1/mcp", mcpHandler)
-	protected.Any("/mcp/*", mcpapp.PropagateUserContext(mcpWrapped))
+	api.Any("/mcp/*", mcpapp.MCPAuth(pool), mcpapp.PropagateUserContext(mcpWrapped))
 
 	// Settings
 	settingsSvc := settings.NewService(queries)
