@@ -39,7 +39,8 @@ String deriveNoteTitle(String content) {
   return NoteStrings.fallbackTitle;
 }
 
-const _noteSelectColumns = 'SELECT n.*, '
+const _noteSelectColumns =
+    'SELECT n.*, '
     'COALESCE(unp.favorite, 0) AS favorite, '
     'COALESCE(unp.archived, 0) AS archived, '
     'COALESCE(unp.hide_completed, 0) AS hide_completed, '
@@ -282,8 +283,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
   }
 
-
-
   /// Returns every note that has unsynced local changes and is eligible for
   /// sync (has a remote copy, is inbox, or has non-empty content).
   /// Locally-created-then-deleted notes without a remote copy are excluded
@@ -291,11 +290,38 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   Future<List<NoteData>> getDirtyNotes() {
     return (select(notes)
           ..where((t) => t.isDirty.equals(true))
-          ..where(
-            (t) =>
-                t.hasRemoteCopy.equals(true) |
-                t.deletedAt.isNull(),
-          ))
+          ..where((t) => t.hasRemoteCopy.equals(true) | t.deletedAt.isNull()))
+        .get();
+  }
+
+  /// Returns dirty tombstones for notes that are known to exist remotely.
+  Future<List<NoteData>> getDirtyDeletedNotes() {
+    return (select(notes)..where(
+          (t) =>
+              t.isDirty.equals(true) &
+              t.deletedAt.isNotNull() &
+              t.hasRemoteCopy.equals(true),
+        ))
+        .get();
+  }
+
+  /// Returns dirty tombstones for notes that only exist locally.
+  Future<List<NoteData>> getDirtyLocalOnlyDeletedNotes() {
+    return (select(notes)..where(
+          (t) =>
+              t.isDirty.equals(true) &
+              t.deletedAt.isNotNull() &
+              t.hasRemoteCopy.equals(false),
+        ))
+        .get();
+  }
+
+  /// Returns local rows that represent notes known to exist on the server.
+  /// Used by catalog reconciliation to remove notes deleted on another device.
+  Future<List<NoteData>> getRemoteNotes(String userId) {
+    return (select(
+          notes,
+        )..where((t) => t.userId.equals(userId) & t.hasRemoteCopy.equals(true)))
         .get();
   }
 

@@ -638,8 +638,17 @@ class CharacterizationNoteSyncClient implements NoteSyncClient {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> listNotes() {
+  Future<List<Map<String, dynamic>>> listNotes({
+    int limit = 100,
+    DateTime? cursorUpdatedAt,
+    String? cursorId,
+  }) {
     throw UnimplementedError('listNotes is not used by these tests');
+  }
+
+  @override
+  Future<void> deleteNote(String noteId) {
+    throw UnimplementedError('deleteNote is not used by these tests');
   }
 
   @override
@@ -781,8 +790,17 @@ class SharedBackendNoteSyncClient implements NoteSyncClient {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> listNotes() {
+  Future<List<Map<String, dynamic>>> listNotes({
+    int limit = 100,
+    DateTime? cursorUpdatedAt,
+    String? cursorId,
+  }) {
     throw UnimplementedError('listNotes is not used by these tests');
+  }
+
+  @override
+  Future<void> deleteNote(String noteId) {
+    throw UnimplementedError('deleteNote is not used by these tests');
   }
 
   @override

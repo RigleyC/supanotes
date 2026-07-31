@@ -70,6 +70,51 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// Removes all local projections and sync state for a deleted note.
+  ///
+  /// The note row is only the catalog entry. Its document, operations,
+  /// projected tasks, task completions, links, preferences and attachments
+  /// must be removed together so a deleted note cannot keep producing local
+  /// results or notifications.
+  Future<void> deleteNoteData(String noteId) async {
+    await transaction(() async {
+      final noteTasks = await (select(
+        tasks,
+      )..where((task) => task.noteId.equals(noteId))).get();
+      for (final task in noteTasks) {
+        await (delete(
+          localTaskCompletions,
+        )..where((completion) => completion.taskId.equals(task.id))).go();
+      }
+
+      await (delete(
+        attachments,
+      )..where((attachment) => attachment.noteId.equals(noteId))).go();
+      await (delete(noteLinks)..where(
+            (link) =>
+                link.sourceId.equals(noteId) | link.targetId.equals(noteId),
+          ))
+          .go();
+      await (delete(
+        userNotePreferences,
+      )..where((preference) => preference.noteId.equals(noteId))).go();
+      await (delete(tasks)..where((task) => task.noteId.equals(noteId))).go();
+      await (delete(
+        localNoteDocuments,
+      )..where((document) => document.noteId.equals(noteId))).go();
+      await (delete(
+        pendingNoteOperations,
+      )..where((operation) => operation.noteId.equals(noteId))).go();
+      await (delete(
+        noteSyncErrors,
+      )..where((error) => error.noteId.equals(noteId))).go();
+      await (delete(
+        syncSessions,
+      )..where((session) => session.noteId.equals(noteId))).go();
+      await (delete(notes)..where((note) => note.id.equals(noteId))).go();
+    });
+  }
+
   /// Saves note content/excerpt projection and synced tasks in a single atomic transaction.
   /// [saveProjectedDocument] is the sole owner opening the transaction.
   Future<void> saveProjectedDocument({

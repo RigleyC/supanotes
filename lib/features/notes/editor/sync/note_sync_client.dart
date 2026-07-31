@@ -225,12 +225,34 @@ class NoteSyncClient {
     return getDocument(noteId);
   }
 
-  Future<List<Map<String, dynamic>>> listNotes() async {
+  Future<List<Map<String, dynamic>>> listNotes({
+    int limit = 100,
+    DateTime? cursorUpdatedAt,
+    String? cursorId,
+  }) async {
     try {
-      final response = await _client.get<List<dynamic>>('/notes?limit=100');
+      final queryParameters = <String, dynamic>{'limit': limit};
+      if (cursorUpdatedAt case final cursor?) {
+        queryParameters['cursor_updated_at'] = cursor.toUtc().toIso8601String();
+      }
+      if (cursorId case final id?) {
+        queryParameters['cursor_id'] = id;
+      }
+      final response = await _client.get<List<dynamic>>(
+        '/notes',
+        queryParameters: queryParameters,
+      );
       return (response.data ?? const [])
           .map((note) => Map<String, dynamic>.from(note as Map))
           .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<void> deleteNote(String noteId) async {
+    try {
+      await _client.delete<void>('/notes/$noteId');
     } on DioException catch (e) {
       throw _mapError(e);
     }

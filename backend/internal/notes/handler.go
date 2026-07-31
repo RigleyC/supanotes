@@ -222,8 +222,8 @@ func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 		Favorite:       f.Favorite,
 		Archived:       f.Archived,
 		CollapseImages: f.CollapseImages,
-		CreatedAt:      f.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:      f.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:      f.CreatedAt.Time.Format(time.RFC3339Nano),
+		UpdatedAt:      f.UpdatedAt.Time.Format(time.RFC3339Nano),
 	}
 }
 
@@ -251,7 +251,7 @@ func mapToNoteResponseFields(n sqlcgen.GetNotesRow) NoteResponse {
 		Favorite:       n.Favorite,
 		Archived:       n.Archived,
 		CollapseImages: n.CollapseImages,
-		CreatedAt:      n.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:      n.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:      n.CreatedAt.Time.Format(time.RFC3339Nano),
+		UpdatedAt:      n.UpdatedAt.Time.Format(time.RFC3339Nano),
 	}
 }

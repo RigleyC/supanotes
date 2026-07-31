@@ -10,6 +10,8 @@ import 'package:supanotes/features/notes/domain/note_session_activity_tracker.da
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 
 class NoteCatalogSync {
+  static const _pageSize = 100;
+
   NoteCatalogSync({
     required NoteSyncClient syncClient,
     required AppDatabase database,
@@ -24,8 +26,35 @@ class NoteCatalogSync {
   final NoteSessionActivityTracker _activityTracker;
   final TaskProjectionEngine _taskProjectionEngine;
 
+  Future<void> pushDeletedNotes() async {
+    final localOnlyDeletedNotes = await _database.notesDao
+        .getDirtyLocalOnlyDeletedNotes();
+    for (final note in localOnlyDeletedNotes) {
+      if (_activityTracker.isActive(note.id)) {
+        continue;
+      }
+      await _database.deleteNoteData(note.id);
+      dev.log('[NoteCatalogSync] Removed local-only note ${note.id}');
+    }
+
+    final deletedNotes = await _database.notesDao.getDirtyDeletedNotes();
+    for (final note in deletedNotes) {
+      if (_activityTracker.isActive(note.id)) {
+        continue;
+      }
+
+      await _syncClient.deleteNote(note.id);
+      if (_activityTracker.isActive(note.id)) {
+        continue;
+      }
+      await _database.deleteNoteData(note.id);
+      dev.log('[NoteCatalogSync] Deleted ${note.id} remotely');
+    }
+  }
+
   Future<void> pullRemoteNotes(String userId) async {
-    final rows = await _syncClient.listNotes();
+    final rows = await _listAllRemoteNotes();
+    final remoteIds = rows.map((raw) => raw['id'] as String).toSet();
 
     for (final raw in rows) {
       try {
@@ -38,7 +67,50 @@ class NoteCatalogSync {
         );
       }
     }
+    await _removeMissingRemoteNotes(userId, remoteIds);
     dev.log('[NoteCatalogSync] Pulled ${rows.length} remote notes');
+  }
+
+  Future<List<Map<String, dynamic>>> _listAllRemoteNotes() async {
+    final rows = <Map<String, dynamic>>[];
+    DateTime? cursorUpdatedAt;
+    String? cursorId;
+
+    while (true) {
+      final page = await _syncClient.listNotes(
+        limit: _pageSize,
+        cursorUpdatedAt: cursorUpdatedAt,
+        cursorId: cursorId,
+      );
+      rows.addAll(page);
+      if (page.length < _pageSize) return rows;
+
+      final last = page.last;
+      final nextUpdatedAt = DateTime.parse(last['updated_at'] as String);
+      final nextId = last['id'] as String;
+      if (nextUpdatedAt == cursorUpdatedAt && nextId == cursorId) {
+        return rows;
+      }
+      cursorUpdatedAt = nextUpdatedAt;
+      cursorId = nextId;
+    }
+  }
+
+  Future<void> _removeMissingRemoteNotes(
+    String userId,
+    Set<String> remoteIds,
+  ) async {
+    final localRemoteNotes = await _database.notesDao.getRemoteNotes(userId);
+    for (final note in localRemoteNotes) {
+      if (remoteIds.contains(note.id)) {
+        continue;
+      }
+      if (_activityTracker.isActive(note.id)) {
+        continue;
+      }
+      await _database.deleteNoteData(note.id);
+      dev.log('[NoteCatalogSync] Removed locally deleted note ${note.id}');
+    }
   }
 
   Future<void> _pullRemoteNote({
@@ -122,6 +194,7 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
   );
   while (true) {
     try {
+      await sync.pushDeletedNotes();
       await sync.pullRemoteNotes(user.id);
       yield null;
     } catch (error, stackTrace) {
