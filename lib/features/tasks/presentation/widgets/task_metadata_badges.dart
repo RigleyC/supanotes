@@ -26,10 +26,11 @@ class TaskMetadataBadges extends StatelessWidget {
 
   bool get _hasRecurrence => recurrence != null;
   bool get _hasDueDate => dueDate != null;
+  bool get _hasActiveReminder => hasReminder && !isCompleted;
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasDueDate && !_hasRecurrence && !hasReminder) {
+    if (!_hasDueDate && !_hasRecurrence && !_hasActiveReminder) {
       return const SizedBox.shrink();
     }
 
@@ -58,7 +59,7 @@ class TaskMetadataBadges extends StatelessWidget {
             label: recurrence!.shortLabel,
             color: scheme.onSurfaceVariant,
           ),
-        if (hasReminder)
+        if (_hasActiveReminder)
           Icon(
             Icons.notifications_active_outlined,
             size: 14,

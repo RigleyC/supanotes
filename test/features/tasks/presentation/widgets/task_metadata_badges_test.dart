@@ -54,6 +54,14 @@ void main() {
     expect(find.textContaining('Atrasada'), findsNothing);
   });
 
+  testWidgets('hides reminder icon when task is completed', (tester) async {
+    await tester.pumpWidget(
+      wrap(const TaskMetadataBadges(hasReminder: true, isCompleted: true)),
+    );
+
+    expect(find.byIcon(Icons.notifications_active_outlined), findsNothing);
+  });
+
   testWidgets('shows short recurrence label when dueDate is set', (tester) async {
     final thursday = DateTime.utc(2026, 6, 11);
 
