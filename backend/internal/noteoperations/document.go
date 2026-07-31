@@ -44,6 +44,8 @@ type SetBlockTypePayload struct {
 var ErrBlockNotFound = fmt.Errorf("block not found")
 var ErrInvalidOperationKind = fmt.Errorf("invalid operation kind")
 
+const InitialBlockID = "init"
+
 func (d *Document) ApplyOperation(kind Kind, blockID string, payload json.RawMessage) error {
 	switch kind {
 	case KindTextDelta:
@@ -273,7 +275,7 @@ func (d *Document) ensureMissingBlock(blockID string) bool {
 			return false
 		}
 	}
-	if len(d.Blocks) == 1 && d.Blocks[0].ID == "init" &&
+	if len(d.Blocks) == 1 && d.Blocks[0].ID == InitialBlockID &&
 		deltaText(d.Blocks[0].Delta) == "" && len(d.Blocks[0].Metadata) == 0 {
 		d.Blocks[0].ID = blockID
 		return true
@@ -357,6 +359,9 @@ func UnmarshalDocument(data []byte) (Document, error) {
 		doc.SchemaVersion = 1
 	}
 	doc.removeDuplicateBlockIDs()
+	if len(doc.Blocks) == 0 {
+		doc = NewEmptyDocument()
+	}
 	return doc, nil
 }
 
@@ -378,7 +383,7 @@ func NewEmptyDocument() Document {
 		SchemaVersion: 1,
 		Blocks: []Block{
 			{
-				ID:       "init",
+				ID:       InitialBlockID,
 				Type:     string(BlockParagraph),
 				Delta:    []delta.Op{{Insert: []rune("")}},
 				Metadata: make(map[string]any),

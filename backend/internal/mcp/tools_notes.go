@@ -3,7 +3,9 @@ package mcpapp
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -13,7 +15,13 @@ import (
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
-func addNoteTools(server *mcp.Server, security SecurityStore, notesSvc *notes.Service, documentReader noteoperations.DocumentReader) {
+func addNoteTools(
+	server *mcp.Server,
+	security SecurityStore,
+	notesSvc *notes.Service,
+	documentReader noteoperations.DocumentReader,
+	documentCommands noteoperations.DocumentCommandService,
+) {
 	addTool(server, security, &mcp.Tool{Name: toolListNotes, Description: "List notes", InputSchema: listNotesSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if err := requireReadScope(ctx); err != nil {
@@ -138,11 +146,16 @@ func addNoteTools(server *mcp.Server, security SecurityStore, notesSvc *notes.Se
 			if err != nil {
 				return asError(err)
 			}
-			res, err := notesSvc.CreateNote(ctx, userID, getStr(args, "content"), false)
+			content := getStr(args, "content")
+			if strings.TrimSpace(content) == "" {
+				return asError(notes.ErrEmptyNote)
+			}
+			noteID := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+			res, err := syncNoteContent(ctx, documentCommands, noteID, userID, 0, noteoperations.NewEmptyDocument(), content)
 			if err != nil {
 				return asError(err)
 			}
-			return asTextResult(res)
+			return asTextResult(noteContentMutationResult{NoteID: uid.UUIDToString(noteID), Sync: res})
 		},
 	)
 	addTool(server, security, &mcp.Tool{Name: toolUpdateNote, Description: "Update note", InputSchema: updateNoteSchema},
@@ -163,11 +176,19 @@ func addNoteTools(server *mcp.Server, security SecurityStore, notesSvc *notes.Se
 				return asError(err)
 			}
 			content := getStr(args, "content")
-			res, err := notesSvc.UpdateNote(ctx, userID, id, &content, nil)
+			documentResponse, err := documentReader.GetDocument(ctx, id, userID)
 			if err != nil {
 				return asError(err)
 			}
-			return asTextResult(res)
+			doc, err := noteoperations.UnmarshalDocument(documentResponse.Document)
+			if err != nil {
+				return asError(fmt.Errorf("decode canonical note document: %w", err))
+			}
+			res, err := syncNoteContent(ctx, documentCommands, id, userID, documentResponse.Revision, doc, content)
+			if err != nil {
+				return asError(err)
+			}
+			return asTextResult(noteContentMutationResult{NoteID: uid.UUIDToString(id), Sync: res})
 		},
 	)
 	addTool(server, security, &mcp.Tool{Name: toolDeleteNote, Description: "Delete note", InputSchema: destructiveIDSchema},
@@ -198,6 +219,32 @@ func addNoteTools(server *mcp.Server, security SecurityStore, notesSvc *notes.Se
 			return asTextResultWithWarning("deleted", confirmationErr)
 		},
 	)
+}
+
+type noteContentMutationResult struct {
+	NoteID string                      `json:"noteId"`
+	Sync   noteoperations.SyncResponse `json:"sync"`
+}
+
+func syncNoteContent(
+	ctx context.Context,
+	commands noteoperations.DocumentCommandService,
+	noteID pgtype.UUID,
+	userID pgtype.UUID,
+	knownRevision int64,
+	doc noteoperations.Document,
+	content string,
+) (noteoperations.SyncResponse, error) {
+	operations, err := noteoperations.BuildReplaceContentOperations(doc, content, knownRevision)
+	if err != nil {
+		return noteoperations.SyncResponse{}, fmt.Errorf("build canonical note content operations: %w", err)
+	}
+
+	return commands.SyncOperations(ctx, noteID, userID, noteoperations.SyncRequest{
+		KnownRevision: knownRevision,
+		Operations:    operations,
+		ClientID:      "mcp",
+	})
 }
 
 func addTaskTools(server *mcp.Server, security SecurityStore, tasksSvc *tasks.Service) {

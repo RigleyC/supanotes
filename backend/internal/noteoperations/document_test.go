@@ -41,6 +41,19 @@ func TestUnmarshalDocumentDefaultsSchemaVersion(t *testing.T) {
 	assert.Equal(t, 1, doc.SchemaVersion)
 }
 
+func TestUnmarshalDocumentNormalizesEmptyBlocks(t *testing.T) {
+	for _, input := range []string{
+		`{"schemaVersion":1,"blocks":[]}`,
+		`{"schemaVersion":1}`,
+	} {
+		doc, err := UnmarshalDocument([]byte(input))
+		require.NoError(t, err)
+		require.Len(t, doc.Blocks, 1)
+		assert.Equal(t, "init", doc.Blocks[0].ID)
+		assert.Equal(t, string(BlockParagraph), doc.Blocks[0].Type)
+	}
+}
+
 func TestDocumentMarshalRoundTrip(t *testing.T) {
 	doc := Document{
 		SchemaVersion: 1,

@@ -12,8 +12,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/RigleyC/supanotes/internal/noteoperations"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
+
+type captureDocumentCommands struct {
+	request noteoperations.SyncRequest
+}
+
+func (c *captureDocumentCommands) SyncOperations(
+	_ context.Context,
+	_ pgtype.UUID,
+	_ pgtype.UUID,
+	request noteoperations.SyncRequest,
+) (noteoperations.SyncResponse, error) {
+	c.request = request
+	return noteoperations.SyncResponse{FinalRevision: int64(len(request.Operations))}, nil
+}
 
 type auditTestSecurityStore struct {
 	auditCalls int
@@ -278,4 +293,42 @@ func TestAsError(t *testing.T) {
 	tc, ok := res.Content[0].(*mcp.TextContent)
 	require.True(t, ok)
 	assert.Equal(t, "something went wrong", tc.Text)
+}
+
+func TestSyncNoteContentUsesCanonicalReplaceOperations(t *testing.T) {
+	commands := &captureDocumentCommands{}
+	noteID, err := uid.UUIDFromString("123e4567-e89b-12d3-a456-426614174000")
+	require.NoError(t, err)
+	userID, err := uid.UUIDFromString("123e4567-e89b-12d3-a456-426614174001")
+	require.NoError(t, err)
+
+	response, err := syncNoteContent(
+		context.Background(),
+		commands,
+		noteID,
+		userID,
+		7,
+		noteoperations.NewEmptyDocument(),
+		"texto novo",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), response.FinalRevision)
+	require.Len(t, commands.request.Operations, 2)
+	assert.Equal(t, string(noteoperations.KindDeleteBlock), commands.request.Operations[0].Kind)
+	assert.Equal(t, "init", *commands.request.Operations[0].BlockID)
+	assert.Equal(t, string(noteoperations.KindCreateBlock), commands.request.Operations[1].Kind)
+	assert.Equal(t, int64(7), commands.request.KnownRevision)
+
+	var payload struct {
+		ID    string `json:"id"`
+		Type  string `json:"type"`
+		Delta []struct {
+			Insert string `json:"insert"`
+		} `json:"delta"`
+	}
+	require.NoError(t, json.Unmarshal(commands.request.Operations[1].Payload, &payload))
+	assert.Equal(t, "init", payload.ID)
+	assert.Equal(t, string(noteoperations.BlockParagraph), payload.Type)
+	require.Len(t, payload.Delta, 1)
+	assert.Equal(t, "texto novo", payload.Delta[0].Insert)
 }

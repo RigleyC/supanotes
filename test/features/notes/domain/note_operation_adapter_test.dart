@@ -832,6 +832,24 @@ void main() {
       },
     );
 
+    test('hydrates a migrated document even when its revision is zero', () async {
+      when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
+        (_) async => LocalNoteDocumentData(
+          noteId: 'note-1',
+          revision: 0,
+          documentJson:
+              '{"blocks":[{"id":"init","type":"paragraph","delta":[{"insert":"Legacy"}],"metadata":{}}]}',
+          updatedAt: DateTime.utc(2026, 7, 20),
+        ),
+      );
+
+      final adapter = createAdapter();
+      await adapter.start();
+
+      expect(document.nodeCount, 1);
+      expect((document.first as TextNode).text.toPlainText(), 'Legacy');
+    });
+
     test('propagates hydration failures', () async {
       when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
         (_) async => LocalNoteDocumentData(

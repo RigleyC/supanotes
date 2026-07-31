@@ -114,7 +114,7 @@ class NoteOperationAdapter {
   Future<void> _hydrateFromServer() async {
     try {
       final doc = await _syncService.getConfirmedDocument(_noteId);
-      if (doc != null && doc.revision > 0) {
+      if (doc != null) {
         final snapshot = jsonDecode(doc.documentJson) as Map<String, dynamic>;
         final pending = await _syncService.loadPendingProjection(_noteId);
         await _applier.rebuildFromSnapshot(

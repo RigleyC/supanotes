@@ -5,24 +5,29 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 
 void main() {
-  test('default document accepts nodes during hydration', () async {
+  test('default document starts with the canonical init paragraph', () async {
     final controller = NoteEditorController(userId: 'user-1', noteId: 'note-1');
 
-    controller.editor.execute([
-      InsertNodeAtIndexRequest(
-        nodeIndex: 0,
-        newNode: ParagraphNode(id: 'remote-1', text: AttributedText('Remote')),
-      ),
-    ]);
-
     expect(controller.document.nodeCount, 1);
-    expect(
-      (controller.document.getNodeById('remote-1') as TextNode).text
-          .toPlainText(),
-      'Remote',
-    );
+    expect(controller.document.first, isA<ParagraphNode>());
+    expect(controller.document.first.id, 'init');
     await controller.dispose();
   });
+
+  test(
+    'an explicitly empty node list also receives the init paragraph',
+    () async {
+      final controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+        nodes: const [],
+      );
+
+      expect(controller.document.nodeCount, 1);
+      expect(controller.document.first.id, 'init');
+      await controller.dispose();
+    },
+  );
 
   test('stale upload failure does not mutate an inactive editor', () async {
     final upload = Completer<void>();

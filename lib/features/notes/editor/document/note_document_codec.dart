@@ -2,6 +2,7 @@ import 'package:super_editor/super_editor.dart';
 
 import 'attachment_nodes.dart';
 import 'note_node.dart';
+import 'note_document_constants.dart';
 
 const header4Attribution = NamedAttribution('header4');
 const header5Attribution = NamedAttribution('header5');
@@ -130,9 +131,7 @@ class NoteDocumentCodec {
     }
     if (documentNodes.isEmpty) {
       return MutableDocument(
-        nodes: [
-          ParagraphNode(id: Editor.createNodeId(), text: AttributedText()),
-        ],
+        nodes: [ParagraphNode(id: initialNoteBlockId, text: AttributedText())],
       );
     }
     return MutableDocument(nodes: documentNodes);

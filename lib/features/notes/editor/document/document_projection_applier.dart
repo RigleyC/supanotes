@@ -4,6 +4,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'note_document_codec.dart';
+import 'note_document_constants.dart';
 
 class DocumentProjectionApplier {
   final MutableDocument _document;
@@ -99,7 +100,10 @@ class DocumentProjectionApplier {
     if (blocks.isEmpty) {
       _editor.execute([
         InsertNodeAtIndexRequest(
-          newNode: ParagraphNode(id: 'init', text: AttributedText()),
+          newNode: ParagraphNode(
+            id: initialNoteBlockId,
+            text: AttributedText(),
+          ),
           nodeIndex: 0,
         ),
       ]);
