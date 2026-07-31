@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — Expor leitura canônica de notas e documentos pelo MCP; 04 — Expor edição completa de blocos pelo MCP.
 
-**Status:** ready-for-agent
+**Status:** completed
 
 - [x] Criar fluxo de upload compatível com o storage e as validações existentes.
 - [x] Associar o anexo à nota e, quando aplicável, ao bloco de anexo correspondente.

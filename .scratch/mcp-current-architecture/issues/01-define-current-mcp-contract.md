@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** completed
 
 - [x] Registrar a matriz de capacidades MCP atuais e seus limites.
 - [x] Remover do contrato e da documentação referências runtime a memories, souls, tags, contexts, embeddings, routines, Telegram, agent loop e Yjs.

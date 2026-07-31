@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — Expor edição completa de blocos pelo MCP.
 
-**Status:** ready-for-agent
+**Status:** completed
 
 - [x] Criar tarefa somente dentro de uma nota e como bloco documental.
 - [x] Editar texto e metadados de tarefa: data, hora, recorrência, lembrete e estado permitido.

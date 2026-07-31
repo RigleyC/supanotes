@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Definir o contrato MCP atual e remover o escopo legado.
 
-**Status:** ready-for-agent
+**Status:** completed
 
 - [x] Reutilizar `backend/internal/noteoperations` como dono da aplicação e persistência das operações.
 - [x] Criar uma interface de aplicação reutilizável para comandos documentais.

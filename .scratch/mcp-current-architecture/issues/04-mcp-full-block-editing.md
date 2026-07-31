@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — Criar o comando documental compartilhado entre app e MCP; 03 — Expor leitura canônica de notas e documentos pelo MCP.
 
-**Status:** ready-for-agent
+**Status:** completed
 
 - [x] Expor criação de bloco com tipo, identificador, posição, texto e metadados válidos.
 - [x] Expor edição de texto de bloco.

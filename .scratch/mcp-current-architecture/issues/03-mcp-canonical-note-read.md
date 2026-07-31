@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Definir o contrato MCP atual e remover o escopo legado; 02 — Criar o comando documental compartilhado entre app e MCP.
 
-**Status:** ready-for-agent
+**Status:** completed
 
 - [x] Implementar listagem paginada de notas.
 - [x] Implementar leitura de nota por identificador.

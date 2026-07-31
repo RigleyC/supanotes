@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — Expor leitura canônica de notas e documentos pelo MCP.
 
-**Status:** ready-for-agent
+**Status:** completed
 
 - [x] Listar compartilhamentos de uma nota.
 - [x] Criar ou atualizar compartilhamento com permissão válida.
