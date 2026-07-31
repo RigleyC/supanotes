@@ -12,6 +12,8 @@ import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
+import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
@@ -103,11 +105,38 @@ Widget _wrapRouter(ProviderContainer container) {
 
 
 void main() {
+  test('note route keeps transient editor options out of the URL', () {
+    expect(AppRoutes.note('note-1'), '/notes/note-1');
+  });
+
   Future<void> settleRedirect(WidgetTester tester) async {
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
   }
+
+  testWidgets('note route receives transient initial-focus intent', (
+    tester,
+  ) async {
+    final container = await _makeContainer(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    router.push(
+      AppRoutes.note('note-1'),
+      extra: const NoteEditorOpenOptions.newNote(),
+    );
+    await settleRedirect(tester);
+
+    final editorScreen = tester.widget<NoteEditorScreen>(
+      find.byType(NoteEditorScreen),
+    );
+    expect(editorScreen.requestInitialFocus, isTrue);
+  });
 
   testWidgets('starting with loading auth lands on /splash', (tester) async {
     final container = await _makeLoadingContainer();

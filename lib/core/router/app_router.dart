@@ -12,9 +12,10 @@ import 'package:supanotes/core/router/auth_guard.dart';
 import 'package:supanotes/features/auth/presentation/login_screen.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/features/auth/presentation/splash_screen.dart';
-import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
-import 'package:supanotes/features/notes/presentation/adaptive_notes_shell.dart';
-import 'package:supanotes/features/notes/presentation/notes_list_screen.dart';
+import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
+import 'package:supanotes/features/notes/catalog/presentation/adaptive_notes_shell.dart';
+import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/settings/presentation/mcp_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 
@@ -48,8 +49,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: AppRoutes.note(':id'),
-            builder: (_, state) =>
-                NoteEditorScreen(noteId: state.pathParameters['id']!),
+            builder: (_, state) {
+              final openOptions = state.extra;
+              return NoteEditorScreen(
+                noteId: state.pathParameters['id']!,
+                requestInitialFocus:
+                    openOptions is NoteEditorOpenOptions &&
+                    openOptions.requestInitialFocus,
+              );
+            },
           ),
         ],
       ),

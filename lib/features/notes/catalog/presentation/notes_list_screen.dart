@@ -10,17 +10,18 @@ import 'package:uuid/uuid.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
-import 'package:supanotes/features/notes/data/notes_repository.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
-import 'package:supanotes/features/notes/presentation/widgets/notes_grid_view.dart';
-import 'package:supanotes/features/notes/presentation/widgets/notes_list_view.dart';
+import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_grid_view.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_list_view.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
-import 'package:supanotes/features/notes/presentation/widgets/notes_more_menu.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_more_menu.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 import 'package:supanotes/core/utils/platform_utils.dart';
@@ -178,7 +179,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final id = const Uuid().v4();
     await ref.read(notesRepositoryProvider).createLocalNote(id: id);
     if (!context.mounted) return;
-    context.push(AppRoutes.note(id));
+    context.push(
+      AppRoutes.note(id),
+      extra: const NoteEditorOpenOptions.newNote(),
+    );
   }
 
   void _deleteNote(NoteModel note) {

@@ -8,24 +8,24 @@ import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/data/notes_repository.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/notes/domain/note_session_handle.dart';
-import 'package:supanotes/features/notes/domain/note_strings.dart';
-import 'package:supanotes/features/notes/domain/note_with_tasks.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
-import 'package:supanotes/features/notes/presentation/note_editor_screen.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
-import 'package:supanotes/features/notes/presentation/widgets/slash_command_overlay.dart';
+import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
+import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
+import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/slash_command_overlay.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_session.dart';
-import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 
 NoteEditorController _createTestController(List<DocumentNode> nodes) {
   return NoteEditorController(
@@ -246,6 +246,95 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('noteStylesheet'));
+  });
+
+  testWidgets('requests initial focus for a newly created empty note', (
+    tester,
+  ) async {
+    final controller = _createTestController([]);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _sessionFor(controller),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: NoteEditor(
+              noteId: 'note-1',
+              taskMetadata: const {},
+              requestInitialFocus: true,
+              delegate: const NoteEditorDelegate(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.focusNode.hasFocus, isTrue);
+    expect(
+      tester.widget<SuperEditor>(find.byType(SuperEditor)).autofocus,
+      isTrue,
+    );
+    final selection = controller.composer.selection;
+    expect(selection, isNotNull);
+    expect(selection!.extent.nodeId, controller.document.first.id);
+    expect((selection.extent.nodePosition as TextNodePosition).offset, 0);
+
+    // Flutter's widget-test binding cannot send platform IME text to
+    // SuperEditor. InsertTextRequest is the operation emitted by its IME and
+    // keyboard handlers, so this verifies the same insertion path at the
+    // caret that the initial-focus request placed.
+    controller.editor.execute([
+      InsertTextRequest(
+        documentPosition: selection.extent,
+        textToInsert: 'digitação imediata',
+        attributions: const {},
+      ),
+    ]);
+    await tester.pump();
+
+    expect(
+      (controller.document.first as ParagraphNode).text.toPlainText(),
+      'digitação imediata',
+    );
+  });
+
+  testWidgets('does not request initial focus for an existing empty note', (
+    tester,
+  ) async {
+    final controller = _createTestController([]);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _sessionFor(controller),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: NoteEditor(
+              noteId: 'note-1',
+              taskMetadata: const {},
+              delegate: const NoteEditorDelegate(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.focusNode.hasFocus, isFalse);
+    expect(
+      tester.widget<SuperEditor>(find.byType(SuperEditor)).autofocus,
+      isFalse,
+    );
   });
 
   testWidgets('hideCompleted removes completed task components', (

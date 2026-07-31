@@ -6,19 +6,19 @@ import 'package:go_router/go_router.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/router/app_routes.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
-import 'package:supanotes/features/notes/presentation/note_stylesheet.dart';
-import 'package:supanotes/features/notes/presentation/widgets/attachment_components.dart';
-import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
-import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
+import 'package:supanotes/features/notes/editor/presentation/note_stylesheet.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/core/utils/platform_utils.dart';
-import 'package:supanotes/features/notes/presentation/widgets/slash_command_overlay.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_editor_config.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_overlay.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/slash_command_overlay.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_config.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
@@ -27,6 +27,7 @@ class NoteEditor extends ConsumerStatefulWidget {
   final bool hideCompleted;
   final bool collapseImages;
   final bool isReadOnly;
+  final bool requestInitialFocus;
   final NoteEditorDelegate delegate;
 
   const NoteEditor({
@@ -36,6 +37,7 @@ class NoteEditor extends ConsumerStatefulWidget {
     this.hideCompleted = false,
     this.collapseImages = false,
     this.isReadOnly = false,
+    this.requestInitialFocus = false,
     required this.delegate,
   });
 
@@ -55,7 +57,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   CustomTaskComponentBuilder? _taskComponentBuilder;
   List<ComponentBuilder>? _componentBuilders;
   List<SuperEditorContentTapDelegateFactory>? _contentTapDelegateFactories;
-  bool _didRequestInitialFocus = false;
 
   @override
   void initState() {
@@ -157,13 +158,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         final controller = session.controller;
         if (_controller != controller) {
           _controller?.removeListener(_onControllerReady);
-          _didRequestInitialFocus = false;
           _controller = controller;
           _controller!.addListener(_onControllerReady);
           _controller!.onHasContentChanged = (hasContent) {
             widget.delegate.onHasContentChanged?.call(hasContent);
           };
-          _requestInitialFocus(controller);
         }
 
         _initControls();
@@ -205,6 +204,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                   child: SuperEditor(
                     editor: controller.editor,
                     focusNode: widget.isReadOnly ? null : controller.focusNode,
+                    autofocus: widget.requestInitialFocus && !widget.isReadOnly,
                     documentLayoutKey: _docLayoutKey,
                     stylesheet: _cachedStylesheet!,
                     selectionStyle: editorSelectionStyle(theme.colorScheme),
@@ -274,38 +274,5 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         );
       },
     );
-  }
-
-  void _requestInitialFocus(NoteEditorController controller) {
-    if (_didRequestInitialFocus || widget.isReadOnly) return;
-    if (controller.document.nodeCount != 1) return;
-    final node = controller.document.first;
-    if (node is! TextNode || node.text.toPlainText().isNotEmpty) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _didRequestInitialFocus || widget.isReadOnly) return;
-      if (controller.document.nodeCount != 1) return;
-      final currentNode = controller.document.first;
-      if (currentNode is! TextNode ||
-          currentNode.text.toPlainText().isNotEmpty) {
-        return;
-      }
-
-      final position = DocumentPosition(
-        nodeId: currentNode.id,
-        nodePosition: TextNodePosition(
-          offset: currentNode.text.toPlainText().length,
-        ),
-      );
-      controller.editor.execute([
-        ChangeSelectionRequest(
-          DocumentSelection.collapsed(position: position),
-          SelectionChangeType.placeCaret,
-          SelectionReason.userInteraction,
-        ),
-      ]);
-      controller.focusNode.requestFocus();
-      _didRequestInitialFocus = true;
-    });
   }
 }

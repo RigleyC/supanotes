@@ -14,14 +14,14 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/notes/domain/note_strings.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_preferences_mutation_controller.dart';
-import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
-import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
+import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
@@ -30,8 +30,13 @@ import 'package:supanotes/core/utils/platform_utils.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
+  final bool requestInitialFocus;
 
-  const NoteEditorScreen({super.key, required this.noteId});
+  const NoteEditorScreen({
+    super.key,
+    required this.noteId,
+    this.requestInitialFocus = false,
+  });
 
   @override
   ConsumerState<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -241,6 +246,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             final isReadOnly = noteData.isReadOnly;
             return NoteEditor(
               noteId: widget.noteId,
+              requestInitialFocus: widget.requestInitialFocus,
               taskMetadata: tasksMap,
               hideCompleted: noteData.hideCompleted,
               collapseImages: noteData.collapseImages,

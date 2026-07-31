@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/utils/platform_utils.dart';
-import 'package:supanotes/features/notes/data/notes_repository.dart';
-import 'package:supanotes/features/notes/presentation/widgets/notes_sidebar.dart';
-import 'package:supanotes/features/notes/presentation/widgets/resize_drag_handle.dart';
+import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_sidebar.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/resize_drag_handle.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:uuid/uuid.dart';
 
 class AdaptiveNotesShell extends ConsumerStatefulWidget {
@@ -47,7 +48,10 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
                     .read(notesRepositoryProvider)
                     .createLocalNote(id: id);
                 if (!context.mounted) return;
-                context.go(AppRoutes.note(id));
+                context.go(
+                  AppRoutes.note(id),
+                  extra: const NoteEditorOpenOptions.newNote(),
+                );
               },
               onOpenSettings: () {
                 context.push(AppRoutes.settings);
