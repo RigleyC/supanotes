@@ -288,12 +288,14 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.DELETE("/auth/mcp-token/:id", mcpapp.RevokeMCPTokenHandler(pool))
 	protected.POST("/auth/mcp-token/:id/rotate", mcpapp.RotateMCPTokenHandler(pool))
 
-	// MCP HTTP/SSE Route
+	// MCP Streamable HTTP Route. Accept both forms because clients differ on
+	// whether they preserve the trailing slash from the configured endpoint.
 	mcpWrapped := http.StripPrefix("/api/v1/mcp", mcpHandler)
 	mcpEchoHandler := mcpapp.MCPAuth(pool)(func(c echo.Context) error {
 		mcpWrapped.ServeHTTP(c.Response(), c.Request())
 		return nil
 	})
+	api.Any("/mcp", mcpEchoHandler)
 	api.Any("/mcp/*", mcpEchoHandler)
 
 	// Settings

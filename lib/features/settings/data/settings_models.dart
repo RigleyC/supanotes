@@ -29,3 +29,19 @@ class UserSettings {
   }
 }
 
+/// The one-time MCP credential returned when a new token is issued.
+class McpTokenResponse {
+  static const missingTokenMessage = 'MCP token is missing from the response';
+
+  const McpTokenResponse({required this.token});
+
+  final String token;
+
+  factory McpTokenResponse.fromJson(Map<String, dynamic> json) {
+    final token = json['token'];
+    if (token is! String || token.isEmpty) {
+      throw const FormatException(McpTokenResponse.missingTokenMessage);
+    }
+    return McpTokenResponse(token: token);
+  }
+}

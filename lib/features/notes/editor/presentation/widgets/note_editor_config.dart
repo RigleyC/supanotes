@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -75,10 +74,9 @@ List<SuperEditorKeyboardAction> editorKeyboardActions({
 }) {
   return buildRichKeyboardActions(
     slashCommandController: slashCommandController,
-    baseActions:
-        defaultTargetPlatform == TargetPlatform.iOS ||
-            defaultTargetPlatform == TargetPlatform.android
-        ? defaultImeKeyboardActions
-        : defaultKeyboardActions,
+    // SuperEditor uses the IME by default on every supported platform. Keep
+    // the keyboard actions aligned with that input source instead of choosing
+    // a different list only because the platform is desktop.
+    baseActions: defaultImeKeyboardActions,
   );
 }

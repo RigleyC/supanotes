@@ -3,33 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
+import 'package:supanotes/features/settings/presentation/mcp_configuration.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-
-String _sseUrl() => '${ApiConstants.baseUrl}/mcp';
-
-String _buildClaudeConfigJson({required String sseUrl, String? token}) {
-  final buffer = StringBuffer()
-    ..writeln('{')
-    ..writeln('  "mcpServers": {')
-    ..writeln('    "supanotes": {')
-    ..writeln('      "type": "sse",')
-    ..writeln('      "url": "$sseUrl"');
-  if (token != null && token.isNotEmpty) {
-    buffer.writeln('      "headers": {');
-    buffer.writeln('        "Authorization": "Bearer $token"');
-    buffer.writeln('      }');
-  }
-  buffer
-    ..writeln('    }')
-    ..writeln('  }')
-    ..write('}');
-  return buffer.toString();
-}
 
 class McpScreen extends ConsumerStatefulWidget {
   const McpScreen({super.key});
@@ -203,8 +182,8 @@ class _ClaudeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sseUrl = _sseUrl();
-    final configJson = _buildClaudeConfigJson(sseUrl: sseUrl, token: token);
+    final mcpUrl = mcpEndpointUrl();
+    final configJson = buildClaudeMcpConfigJson(url: mcpUrl, token: token);
 
     return Card(
       child: Padding(
@@ -264,7 +243,7 @@ class _CursorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sseUrl = _sseUrl();
+    final mcpUrl = mcpEndpointUrl();
     final headerValue = token != null ? 'Bearer $token' : 'Bearer <seu_token>';
 
     return Card(
@@ -296,10 +275,10 @@ class _CursorCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('URL (SSE):', style: theme.textTheme.labelSmall),
+                  Text('URL (HTTP):', style: theme.textTheme.labelSmall),
                   const SizedBox(height: AppSpacing.xs),
                   SelectableText(
-                    sseUrl,
+                    mcpUrl,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontFamily: 'monospace',
                     ),

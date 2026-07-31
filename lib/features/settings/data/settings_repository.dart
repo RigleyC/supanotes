@@ -16,6 +16,9 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/settings/data/settings_models.dart';
 
+const _invalidMcpTokenResponseMessage =
+    'Resposta inválida do servidor ao gerar o token MCP';
+
 /// Paths used by the settings repository.
 ///
 /// Centralised so a backend rename only touches one place.
@@ -110,7 +113,14 @@ class SettingsRepository implements ISettingsRepository {
           statusCode: 500,
         );
       }
-      return body['mcp_token'] as String;
+      try {
+        return McpTokenResponse.fromJson(body).token;
+      } on FormatException {
+        throw const ServerException(
+          message: _invalidMcpTokenResponseMessage,
+          statusCode: 500,
+        );
+      }
     } on DioException catch (e) {
       throw fromDioError(e);
     }

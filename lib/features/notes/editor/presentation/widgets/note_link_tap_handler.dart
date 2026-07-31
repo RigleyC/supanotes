@@ -1,14 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class NoteLinkTapHandler extends ContentTapDelegate {
-  NoteLinkTapHandler(this.document, this.composer, {required this.onNoteTap}) {
+  NoteLinkTapHandler(
+    this.document,
+    this.composer, {
+    required this.onNoteTap,
+    this.allowExternalLinks = false,
+  }) {
     composer.isInInteractionMode.addListener(notifyListeners);
   }
 
   final Document document;
   final DocumentComposer composer;
   final void Function(String noteId) onNoteTap;
+  final bool allowExternalLinks;
 
   @override
   void dispose() {
@@ -18,8 +27,12 @@ class NoteLinkTapHandler extends ContentTapDelegate {
 
   @override
   MouseCursor? mouseCursorForContentHover(DocumentPosition hoverPosition) {
-    final noteId = _getNoteIdAtPosition(hoverPosition);
-    return noteId != null ? SystemMouseCursors.click : null;
+    final uri = _getLinkAtPosition(hoverPosition);
+    if (uri == null) return null;
+    if (uri.scheme == 'note' || allowExternalLinks) {
+      return SystemMouseCursors.click;
+    }
+    return null;
   }
 
   @override
@@ -30,16 +43,23 @@ class NoteLinkTapHandler extends ContentTapDelegate {
       return TapHandlingInstruction.continueHandling;
     }
 
-    final noteId = _getNoteIdAtPosition(tapPosition);
-    if (noteId != null) {
-      onNoteTap(noteId);
+    final uri = _getLinkAtPosition(tapPosition);
+    if (uri == null) return TapHandlingInstruction.continueHandling;
+
+    if (uri.scheme == 'note') {
+      onNoteTap(uri.toString().replaceFirst('note://', ''));
+      return TapHandlingInstruction.halt;
+    }
+
+    if (allowExternalLinks) {
+      unawaited(launchUrl(uri));
       return TapHandlingInstruction.halt;
     }
 
     return TapHandlingInstruction.continueHandling;
   }
 
-  String? _getNoteIdAtPosition(DocumentPosition position) {
+  Uri? _getLinkAtPosition(DocumentPosition position) {
     final nodePosition = position.nodePosition;
     if (nodePosition is! TextNodePosition) {
       return null;
@@ -56,9 +76,7 @@ class NoteLinkTapHandler extends ContentTapDelegate {
     for (final tappedAttribution in tappedAttributions) {
       if (tappedAttribution is LinkAttribution) {
         final uri = tappedAttribution.launchableUri;
-        if (uri.scheme == 'note') {
-          return uri.toString().replaceFirst('note://', '');
-        }
+        return uri;
       }
     }
 

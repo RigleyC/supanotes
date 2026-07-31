@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -148,6 +149,58 @@ func (r tokenLookupRow) Scan(...any) error { return r.err }
 type tokenLookupDB struct {
 	query string
 	err   error
+}
+
+type issueTokenRow struct {
+	id  pgtype.UUID
+	err error
+}
+
+func (r issueTokenRow) Scan(dest ...any) error {
+	if r.err != nil {
+		return r.err
+	}
+	if len(dest) != 1 {
+		return errors.New("unexpected issue token scan arguments")
+	}
+	target, ok := dest[0].(*pgtype.UUID)
+	if !ok {
+		return errors.New("unexpected issue token scan destination")
+	}
+	*target = r.id
+	return nil
+}
+
+type issueTokenDB struct {
+	id pgtype.UUID
+}
+
+func (d issueTokenDB) QueryRow(context.Context, string, ...any) pgx.Row {
+	return issueTokenRow{id: d.id}
+}
+
+func TestIssueMCPToken_returnsTheTokenFieldConsumedByClients(t *testing.T) {
+	userID, err := uid.UUIDFromString("123e4567-e89b-12d3-a456-426614174000")
+	require.NoError(t, err)
+	tokenID, err := uid.UUIDFromString("123e4567-e89b-12d3-a456-426614174001")
+	require.NoError(t, err)
+
+	result, err := issueMCPToken(
+		context.Background(),
+		issueTokenDB{id: tokenID},
+		userID,
+		"test client",
+		[]string{"read", "write"},
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, tokenID.String(), result["id"])
+	assert.Equal(t, "test client", result["name"])
+	assert.Equal(t, []string{"read", "write"}, result["scopes"])
+	token, ok := result["token"].(string)
+	require.True(t, ok)
+	assert.True(t, strings.HasPrefix(token, "sn_mcp_"))
+	assert.NotContains(t, result, "mcp_token")
 }
 
 func (d *tokenLookupDB) QueryRow(_ context.Context, query string, _ ...any) pgx.Row {

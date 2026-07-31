@@ -95,9 +95,7 @@ class NoteEditorController extends ChangeNotifier {
         }
       }
 
-      final updatedNode = TaskNode(
-        id: node.id,
-        text: node.text,
+      final updatedNode = node.copyTaskWith(
         isComplete: isCompleted,
         metadata: updatedMeta,
       );
@@ -130,9 +128,7 @@ class NoteEditorController extends ChangeNotifier {
         completions.remove(schedStr);
         updatedMeta['completions'] = completions;
       }
-      final updatedNode = TaskNode(
-        id: node.id,
-        text: node.text,
+      final updatedNode = node.copyTaskWith(
         isComplete: false,
         metadata: updatedMeta,
       );
@@ -178,12 +174,7 @@ class NoteEditorController extends ChangeNotifier {
         updatedMeta['reminder'] = reminder;
       }
 
-      final updatedNode = TaskNode(
-        id: node.id,
-        text: node.text,
-        isComplete: node.isComplete,
-        metadata: updatedMeta,
-      );
+      final updatedNode = node.copyTaskWith(metadata: updatedMeta);
       editor.execute([
         ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
       ]);

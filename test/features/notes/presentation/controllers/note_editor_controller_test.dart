@@ -29,6 +29,42 @@ void main() {
     },
   );
 
+  test('task metadata mutations preserve the task indentation', () async {
+    final controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        TaskNode(
+          id: 'task-parent',
+          text: AttributedText('Parent task'),
+          isComplete: false,
+          indent: 0,
+        ),
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Nested task'),
+          isComplete: false,
+          indent: 1,
+          metadata: {'dueDate': '2026-07-31T10:00:00.000Z'},
+        ),
+      ],
+    );
+
+    expect((controller.document.getNodeById('task-1') as TaskNode).indent, 1);
+    controller.updateTaskMetadataInEditor('task-1', reminder: '10m');
+    expect((controller.document.getNodeById('task-1') as TaskNode).indent, 1);
+
+    controller.completeTaskInEditor(
+      'task-1',
+      now: DateTime.utc(2026, 7, 31, 12),
+    );
+    expect((controller.document.getNodeById('task-1') as TaskNode).indent, 1);
+
+    controller.reopenTaskInEditor('task-1');
+    expect((controller.document.getNodeById('task-1') as TaskNode).indent, 1);
+    await controller.dispose();
+  });
+
   test('stale upload failure does not mutate an inactive editor', () async {
     final upload = Completer<void>();
     var active = true;

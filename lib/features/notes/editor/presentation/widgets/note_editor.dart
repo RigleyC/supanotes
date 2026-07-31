@@ -83,16 +83,15 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (_componentBuilders != null) return;
     final controller = _controller!;
 
-    _contentTapDelegateFactories = widget.isReadOnly
-        ? null
-        : [
-            (editContext) => NoteLinkTapHandler(
-              editContext.document,
-              editContext.composer,
-              onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
-            ),
-            superEditorLaunchLinkTapHandlerFactory,
-          ];
+    _contentTapDelegateFactories = [
+      (editContext) => NoteLinkTapHandler(
+        editContext.document,
+        editContext.composer,
+        allowExternalLinks: widget.isReadOnly,
+        onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
+      ),
+      if (!widget.isReadOnly) superEditorLaunchLinkTapHandlerFactory,
+    ];
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
       editor: controller.editor,
@@ -205,10 +204,14 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                     editor: controller.editor,
                     focusNode: widget.isReadOnly ? null : controller.focusNode,
                     autofocus: widget.requestInitialFocus && !widget.isReadOnly,
+                    inputSource: TextInputSource.ime,
                     documentLayoutKey: _docLayoutKey,
                     stylesheet: _cachedStylesheet!,
                     selectionStyle: editorSelectionStyle(theme.colorScheme),
                     documentOverlayBuilders: [
+                      ...defaultSuperEditorDocumentOverlayBuilders.where(
+                        (builder) => builder is! DefaultCaretOverlayBuilder,
+                      ),
                       DefaultCaretOverlayBuilder(
                         caretStyle: CaretStyle(
                           color: theme.colorScheme.primary,
