@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/router/app_routes.dart';
-import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
@@ -155,9 +154,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(body: Center(child: Text('Erro: $error'))),
       data: (session) {
-        final status = ref
-            .watch(noteEditorSessionStatusProvider(widget.noteId))
-            .maybeWhen(data: (value) => value, orElse: () => null);
         final controller = session.controller;
         if (_controller != controller) {
           _controller?.removeListener(_onControllerReady);
@@ -274,15 +270,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                   ),
                 ),
             ],
-            if (status == NoteSessionStatus.syncing ||
-                status == NoteSessionStatus.syncError ||
-                status == NoteSessionStatus.error)
-              Positioned(
-                top: 8,
-                left: 16,
-                right: 16,
-                child: _NoteSessionStatusBanner(status: status!),
-              ),
           ],
         );
       },
@@ -320,67 +307,5 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       controller.focusNode.requestFocus();
       _didRequestInitialFocus = true;
     });
-  }
-}
-
-class _NoteSessionStatusBanner extends StatelessWidget {
-  const _NoteSessionStatusBanner({required this.status});
-
-  final NoteSessionStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isError =
-        status == NoteSessionStatus.error ||
-        status == NoteSessionStatus.syncError;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: isError
-              ? theme.colorScheme.errorContainer
-              : theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: kElevationToShadow[1],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isError)
-                Icon(
-                  Icons.sync_problem,
-                  size: 18,
-                  color: theme.colorScheme.onErrorContainer,
-                )
-              else
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              const SizedBox(width: 8),
-              Text(
-                status == NoteSessionStatus.syncError
-                    ? 'Sem conexao. Alteracoes pendentes.'
-                    : isError
-                    ? 'Sincronizacao pausada'
-                    : 'Sincronizando',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: isError
-                      ? theme.colorScheme.onErrorContainer
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
