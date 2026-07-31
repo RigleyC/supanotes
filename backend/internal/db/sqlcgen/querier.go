@@ -25,13 +25,13 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserSettings(ctx context.Context, arg CreateUserSettingsParams) (UserSetting, error)
 	DeleteAttachment(ctx context.Context, id pgtype.UUID) error
-	GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attachment, error)
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteTaskByNodeID(ctx context.Context, arg DeleteTaskByNodeIDParams) error
 	DeleteTasksByNoteID(ctx context.Context, arg DeleteTasksByNoteIDParams) error
 	GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesForMigrationRow, error)
+	GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attachment, error)
 	GetLastOperation(ctx context.Context, noteID pgtype.UUID) (NoteOperation, error)
 	GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) ([]Note, error)
 	GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNoteByIDRow, error)

@@ -20,6 +20,26 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const getAttachmentByID = `-- name: GetAttachmentByID :one
+SELECT id, note_id, filename, url, mime_type, size_bytes, created_at FROM attachments
+WHERE id = $1
+`
+
+func (q *Queries) GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attachment, error) {
+	row := q.db.QueryRow(ctx, getAttachmentByID, id)
+	var i Attachment
+	err := row.Scan(
+		&i.ID,
+		&i.NoteID,
+		&i.Filename,
+		&i.Url,
+		&i.MimeType,
+		&i.SizeBytes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertAttachment = `-- name: InsertAttachment :one
 INSERT INTO attachments (note_id, filename, url, mime_type, size_bytes)
 VALUES ($1, $2, $3, $4, $5)
@@ -87,24 +107,4 @@ func (q *Queries) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID)
 		return nil, err
 	}
 	return items, nil
-}
-
-const getAttachmentByID = `-- name: GetAttachmentByID :one
-SELECT id, note_id, filename, url, mime_type, size_bytes, created_at FROM attachments
-WHERE id = $1
-`
-
-func (q *Queries) GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attachment, error) {
-	row := q.db.QueryRow(ctx, getAttachmentByID, id)
-	var item Attachment
-	err := row.Scan(
-		&item.ID,
-		&item.NoteID,
-		&item.Filename,
-		&item.Url,
-		&item.MimeType,
-		&item.SizeBytes,
-		&item.CreatedAt,
-	)
-	return item, err
 }

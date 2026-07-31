@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -45,12 +46,13 @@ var noteRevisionSchema = map[string]any{
 var blockMutationSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
-		"note_id":       map[string]any{"type": "string", "description": "Note ID"},
-		"block_id":      map[string]any{"type": "string", "description": "Block ID"},
-		"base_revision": map[string]any{"type": "integer", "minimum": 0, "description": "Document revision used as the operation base"},
-		"payload":       map[string]any{"type": "object", "description": "Operation-specific payload"},
-		"operation_id":  map[string]any{"type": "string", "description": "Optional UUID used for idempotent retries"},
-		"client_id":     map[string]any{"type": "string", "description": "Optional caller identifier"},
+		"note_id":         map[string]any{"type": "string", "description": "Note ID"},
+		"block_id":        map[string]any{"type": "string", "description": "Block ID"},
+		"base_revision":   map[string]any{"type": "integer", "minimum": 0, "description": "Document revision used as the operation base"},
+		"payload":         map[string]any{"type": "object", "description": "Operation-specific payload"},
+		"operation_id":    map[string]any{"type": "string", "description": "Optional UUID used for idempotent retries"},
+		"client_id":       map[string]any{"type": "string", "description": "Optional caller identifier"},
+		"confirmation_id": map[string]any{"type": "string", "description": "One-time confirmation ID for destructive operations"},
 	},
 	"required": []any{"note_id", "base_revision"},
 }
@@ -71,10 +73,11 @@ var taskOccurrenceSchema = map[string]any{
 var attachmentSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
-		"note_id":        map[string]any{"type": "string"},
-		"attachment_id":  map[string]any{"type": "string"},
-		"filename":       map[string]any{"type": "string"},
-		"content_base64": map[string]any{"type": "string", "description": "Base64 file content"},
+		"note_id":         map[string]any{"type": "string"},
+		"attachment_id":   map[string]any{"type": "string"},
+		"filename":        map[string]any{"type": "string"},
+		"content_base64":  map[string]any{"type": "string", "description": "Base64 file content"},
+		"confirmation_id": map[string]any{"type": "string", "description": "One-time confirmation ID for destructive operations"},
 	},
 	"required": []any{"note_id"},
 }
@@ -86,6 +89,7 @@ var idParamSchema = map[string]any{
 			"type":        "string",
 			"description": "ID",
 		},
+		"confirmation_id": map[string]any{"type": "string", "description": "One-time confirmation ID for destructive operations"},
 	},
 	"required": []any{"id"},
 }
@@ -140,6 +144,95 @@ var updateTaskSchema = map[string]any{
 		},
 	},
 	"required": []any{"id", "title"},
+}
+
+func addTool(server *mcp.Server, security SecurityStore, tool *mcp.Tool, handler mcp.ToolHandler) {
+	server.AddTool(tool, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		result, err := handler(ctx, request)
+		if security == nil {
+			return result, err
+		}
+		userID, userErr := UserIDFromContext(ctx)
+		if userErr != nil {
+			return result, err
+		}
+		status := "success"
+		if err != nil {
+			status = "error: " + err.Error()
+		} else if result != nil && result.IsError {
+			status = "tool_error"
+		}
+		if auditErr := security.Audit(ctx, AuditEvent{
+			TokenID:  TokenIDFromContext(ctx),
+			UserID:   userID,
+			Agent:    agentFromRequest(request),
+			ToolName: tool.Name,
+			Resource: resourceFromRequest(request),
+			Result:   status,
+		}); auditErr != nil {
+			return asError(fmt.Errorf("MCP audit failed: %w", auditErr))
+		}
+		return result, err
+	})
+}
+
+func agentFromRequest(request *mcp.CallToolRequest) string {
+	if request != nil {
+		if session, ok := request.GetSession().(*mcp.ServerSession); ok {
+			if params := session.InitializeParams(); params != nil && params.ClientInfo != nil {
+				if params.ClientInfo.Version == "" {
+					return params.ClientInfo.Name
+				}
+				return params.ClientInfo.Name + "/" + params.ClientInfo.Version
+			}
+		}
+	}
+	return "unknown-agent"
+}
+
+func resourceFromRequest(request *mcp.CallToolRequest) string {
+	args := parseArgs(request)
+	for _, key := range []string{"note_id", "block_id", "attachment_id", "id", "user_id"} {
+		if value := getStr(args, key); value != "" {
+			return key + ":" + value
+		}
+	}
+	return ""
+}
+
+func confirmationArguments(request *mcp.CallToolRequest) json.RawMessage {
+	args := parseArgs(request)
+	delete(args, "confirmation_id")
+	encoded, err := json.Marshal(args)
+	if err != nil {
+		return json.RawMessage(`{}`)
+	}
+	return encoded
+}
+
+func requireConfirmation(ctx context.Context, security SecurityStore, request *mcp.CallToolRequest, toolName, resource string) error {
+	if security == nil {
+		return errors.New("MCP security store is not configured")
+	}
+	userID, err := UserIDFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	args := parseArgs(request)
+	confirmationID := getStr(args, "confirmation_id")
+	arguments := confirmationArguments(request)
+	if confirmationID == "" {
+		confirmation, createErr := security.CreateConfirmation(ctx, userID, toolName, resource, arguments)
+		if createErr != nil {
+			return fmt.Errorf("failed to create MCP confirmation: %w", createErr)
+		}
+		return fmt.Errorf(`{"confirmation_required":true,"confirmation_id":%q,"expires_at":%q}`, confirmation.ID.String(), confirmation.ExpiresAt.UTC().Format(time.RFC3339))
+	}
+	id, err := uid.UUIDFromString(confirmationID)
+	if err != nil {
+		return ErrConfirmationDenied
+	}
+	return security.ConsumeConfirmation(ctx, userID, id, toolName, resource, arguments)
 }
 
 func asText(v any) []mcp.Content {
@@ -208,11 +301,13 @@ func operationPayload(args map[string]any) (json.RawMessage, error) {
 
 func addBlockMutationTool(
 	server *mcp.Server,
+	security SecurityStore,
 	name string,
 	kind noteoperations.Kind,
 	documentCommands noteoperations.DocumentCommandService,
+	destructive bool,
 ) {
-	server.AddTool(&mcp.Tool{Name: name, Description: "Apply a REST/OT block operation", InputSchema: blockMutationSchema},
+	addTool(server, security, &mcp.Tool{Name: name, Description: "Apply a REST/OT block operation", InputSchema: blockMutationSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if err := requireWriteScope(ctx); err != nil {
 				return asError(err)
@@ -249,6 +344,15 @@ func addBlockMutationTool(
 			if blockID != "" {
 				blockIDPtr = &blockID
 			}
+			if destructive {
+				resource := "note:" + noteID.String()
+				if blockID != "" {
+					resource = "block:" + blockID
+				}
+				if err := requireConfirmation(ctx, security, request, name, resource); err != nil {
+					return asError(err)
+				}
+			}
 			clientID := getStr(args, "client_id")
 			if clientID == "" {
 				clientID = "mcp"
@@ -269,8 +373,8 @@ func addBlockMutationTool(
 	)
 }
 
-func addTaskOccurrenceTool(server *mcp.Server, name string, commands noteoperations.DocumentCommandService, reopen bool) {
-	server.AddTool(&mcp.Tool{Name: name, Description: "Complete or reopen a task occurrence in the canonical document", InputSchema: taskOccurrenceSchema},
+func addTaskOccurrenceTool(server *mcp.Server, security SecurityStore, name string, commands noteoperations.DocumentCommandService, reopen bool) {
+	addTool(server, security, &mcp.Tool{Name: name, Description: "Complete or reopen a task occurrence in the canonical document", InputSchema: taskOccurrenceSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if err := requireWriteScope(ctx); err != nil {
 				return asError(err)
@@ -335,8 +439,8 @@ func addTaskOccurrenceTool(server *mcp.Server, name string, commands noteoperati
 	)
 }
 
-func addAttachmentTools(server *mcp.Server, service attachments.Service, reader noteoperations.DocumentReader) {
-	server.AddTool(&mcp.Tool{Name: "upload_attachment", Description: "Upload an attachment to a note", InputSchema: attachmentSchema},
+func addAttachmentTools(server *mcp.Server, security SecurityStore, service attachments.Service, reader noteoperations.DocumentReader) {
+	addTool(server, security, &mcp.Tool{Name: "upload_attachment", Description: "Upload an attachment to a note", InputSchema: attachmentSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if err := requireWriteScope(ctx); err != nil {
 				return asError(err)
@@ -369,9 +473,9 @@ func addAttachmentTools(server *mcp.Server, service attachments.Service, reader 
 			return &mcp.CallToolResult{Content: asText(attachment)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "list_note_attachments", Description: "List attachments for a note", InputSchema: idParamSchema},
+	addTool(server, security, &mcp.Tool{Name: "list_note_attachments", Description: "List attachments for a note", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if err := requireWriteScope(ctx); err != nil {
+			if err := requireReadScope(ctx); err != nil {
 				return asError(err)
 			}
 			if service == nil {
@@ -399,8 +503,11 @@ func addAttachmentTools(server *mcp.Server, service attachments.Service, reader 
 			return &mcp.CallToolResult{Content: asText(items)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "delete_attachment", Description: "Delete an attachment from a note", InputSchema: attachmentSchema},
+	addTool(server, security, &mcp.Tool{Name: "delete_attachment", Description: "Delete an attachment from a note", InputSchema: attachmentSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireWriteScope(ctx); err != nil {
+				return asError(err)
+			}
 			if service == nil {
 				return asError(fmt.Errorf("attachment service is not configured"))
 			}
@@ -413,6 +520,9 @@ func addAttachmentTools(server *mcp.Server, service attachments.Service, reader 
 			if err != nil {
 				return asError(err)
 			}
+			if err := requireConfirmation(ctx, security, request, "delete_attachment", "attachment:"+attachmentID.String()); err != nil {
+				return asError(err)
+			}
 			if err := service.Delete(ctx, userID, attachmentID); err != nil {
 				return asError(err)
 			}
@@ -421,8 +531,11 @@ func addAttachmentTools(server *mcp.Server, service attachments.Service, reader 
 	)
 }
 
-func addSharingAndSettingsTools(server *mcp.Server, sharesSvc *shares.Service, settingsSvc *settings.Service) {
-	server.AddTool(&mcp.Tool{Name: "list_note_shares", Description: "List shares for a note", InputSchema: idParamSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func addSharingAndSettingsTools(server *mcp.Server, security SecurityStore, sharesSvc *shares.Service, settingsSvc *settings.Service) {
+	addTool(server, security, &mcp.Tool{Name: "list_note_shares", Description: "List shares for a note", InputSchema: idParamSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := requireReadScope(ctx); err != nil {
+			return asError(err)
+		}
 		if sharesSvc == nil {
 			return asError(fmt.Errorf("shares service is not configured"))
 		}
@@ -441,8 +554,8 @@ func addSharingAndSettingsTools(server *mcp.Server, sharesSvc *shares.Service, s
 		}
 		return &mcp.CallToolResult{Content: asText(result)}, nil
 	})
-	shareSchema := map[string]any{"type": "object", "properties": map[string]any{"note_id": map[string]any{"type": "string"}, "email": map[string]any{"type": "string"}, "permission": map[string]any{"type": "string", "enum": []any{"view", "edit"}}}, "required": []any{"note_id", "email", "permission"}}
-	server.AddTool(&mcp.Tool{Name: "share_note", Description: "Share a note with a user", InputSchema: shareSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	shareSchema := map[string]any{"type": "object", "properties": map[string]any{"note_id": map[string]any{"type": "string"}, "email": map[string]any{"type": "string"}, "permission": map[string]any{"type": "string", "enum": []any{"view", "edit"}}, "confirmation_id": map[string]any{"type": "string"}}, "required": []any{"note_id", "email", "permission"}}
+	addTool(server, security, &mcp.Tool{Name: "share_note", Description: "Share a note with a user", InputSchema: shareSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if sharesSvc == nil {
 			return asError(fmt.Errorf("shares service is not configured"))
 		}
@@ -455,14 +568,20 @@ func addSharingAndSettingsTools(server *mcp.Server, sharesSvc *shares.Service, s
 		if err != nil {
 			return asError(err)
 		}
+		if err := requireWriteScope(ctx); err != nil {
+			return asError(err)
+		}
+		if err := requireConfirmation(ctx, security, request, "share_note", "note:"+noteID.String()); err != nil {
+			return asError(err)
+		}
 		result, err := sharesSvc.ShareNote(ctx, userID, noteID, getStr(args, "email"), getStr(args, "permission"))
 		if err != nil {
 			return asError(err)
 		}
 		return &mcp.CallToolResult{Content: asText(result)}, nil
 	})
-	removeSchema := map[string]any{"type": "object", "properties": map[string]any{"note_id": map[string]any{"type": "string"}, "user_id": map[string]any{"type": "string"}}, "required": []any{"note_id", "user_id"}}
-	server.AddTool(&mcp.Tool{Name: "remove_note_share", Description: "Remove a note share", InputSchema: removeSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	removeSchema := map[string]any{"type": "object", "properties": map[string]any{"note_id": map[string]any{"type": "string"}, "user_id": map[string]any{"type": "string"}, "confirmation_id": map[string]any{"type": "string"}}, "required": []any{"note_id", "user_id"}}
+	addTool(server, security, &mcp.Tool{Name: "remove_note_share", Description: "Remove a note share", InputSchema: removeSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if sharesSvc == nil {
 			return asError(fmt.Errorf("shares service is not configured"))
 		}
@@ -479,12 +598,21 @@ func addSharingAndSettingsTools(server *mcp.Server, sharesSvc *shares.Service, s
 		if err != nil {
 			return asError(err)
 		}
+		if err := requireWriteScope(ctx); err != nil {
+			return asError(err)
+		}
+		if err := requireConfirmation(ctx, security, request, "remove_note_share", "note:"+noteID.String()+"/user:"+targetID.String()); err != nil {
+			return asError(err)
+		}
 		if err := sharesSvc.DeleteNoteShare(ctx, ownerID, noteID, targetID); err != nil {
 			return asError(err)
 		}
 		return &mcp.CallToolResult{Content: asText("deleted")}, nil
 	})
-	server.AddTool(&mcp.Tool{Name: "get_user_settings", Description: "Get current user settings", InputSchema: noParamSchema}, func(ctx context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addTool(server, security, &mcp.Tool{Name: "get_user_settings", Description: "Get current user settings", InputSchema: noParamSchema}, func(ctx context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := requireReadScope(ctx); err != nil {
+			return asError(err)
+		}
 		if settingsSvc == nil {
 			return asError(fmt.Errorf("settings service is not configured"))
 		}
@@ -499,7 +627,10 @@ func addSharingAndSettingsTools(server *mcp.Server, sharesSvc *shares.Service, s
 		return &mcp.CallToolResult{Content: asText(result)}, nil
 	})
 	settingsSchema := map[string]any{"type": "object", "properties": map[string]any{"timezone": map[string]any{"type": "string"}, "preferences": map[string]any{"type": "object"}}}
-	server.AddTool(&mcp.Tool{Name: "update_user_settings", Description: "Update supported user settings", InputSchema: settingsSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addTool(server, security, &mcp.Tool{Name: "update_user_settings", Description: "Update supported user settings", InputSchema: settingsSchema}, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := requireWriteScope(ctx); err != nil {
+			return asError(err)
+		}
 		if settingsSvc == nil {
 			return asError(fmt.Errorf("settings service is not configured"))
 		}
@@ -522,6 +653,7 @@ func addSharingAndSettingsTools(server *mcp.Server, sharesSvc *shares.Service, s
 
 func RegisterTools(
 	server *mcp.Server,
+	security SecurityStore,
 	notesSvc *notes.Service,
 	tasksSvc *tasks.Service,
 	documentReader noteoperations.DocumentReader,
@@ -530,22 +662,25 @@ func RegisterTools(
 	sharesSvc *shares.Service,
 	settingsSvc *settings.Service,
 ) {
-	addAttachmentTools(server, attachmentsSvc, documentReader)
-	addSharingAndSettingsTools(server, sharesSvc, settingsSvc)
-	addBlockMutationTool(server, "create_block", noteoperations.KindCreateBlock, documentCommands)
-	addBlockMutationTool(server, "create_task_block", noteoperations.KindCreateBlock, documentCommands)
-	addBlockMutationTool(server, "update_block_text", noteoperations.KindTextDelta, documentCommands)
-	addBlockMutationTool(server, "move_block", noteoperations.KindMoveBlock, documentCommands)
-	addBlockMutationTool(server, "delete_block", noteoperations.KindDeleteBlock, documentCommands)
-	addBlockMutationTool(server, "set_block_type", noteoperations.KindSetBlockType, documentCommands)
-	addBlockMutationTool(server, "set_block_metadata", noteoperations.KindSetBlockMetadata, documentCommands)
-	addBlockMutationTool(server, "update_task_metadata", noteoperations.KindSetBlockMetadata, documentCommands)
-	addTaskOccurrenceTool(server, "complete_task_occurrence", documentCommands, false)
-	addTaskOccurrenceTool(server, "reopen_task_occurrence", documentCommands, true)
+	addAttachmentTools(server, security, attachmentsSvc, documentReader)
+	addSharingAndSettingsTools(server, security, sharesSvc, settingsSvc)
+	addBlockMutationTool(server, security, "create_block", noteoperations.KindCreateBlock, documentCommands, false)
+	addBlockMutationTool(server, security, "create_task_block", noteoperations.KindCreateBlock, documentCommands, false)
+	addBlockMutationTool(server, security, "update_block_text", noteoperations.KindTextDelta, documentCommands, false)
+	addBlockMutationTool(server, security, "move_block", noteoperations.KindMoveBlock, documentCommands, false)
+	addBlockMutationTool(server, security, "delete_block", noteoperations.KindDeleteBlock, documentCommands, true)
+	addBlockMutationTool(server, security, "set_block_type", noteoperations.KindSetBlockType, documentCommands, false)
+	addBlockMutationTool(server, security, "set_block_metadata", noteoperations.KindSetBlockMetadata, documentCommands, false)
+	addBlockMutationTool(server, security, "update_task_metadata", noteoperations.KindSetBlockMetadata, documentCommands, false)
+	addTaskOccurrenceTool(server, security, "complete_task_occurrence", documentCommands, false)
+	addTaskOccurrenceTool(server, security, "reopen_task_occurrence", documentCommands, true)
 
 	// Notes
-	server.AddTool(&mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: listNotesSchema},
+	addTool(server, security, &mcp.Tool{Name: "list_notes", Description: "List notes", InputSchema: listNotesSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireReadScope(ctx); err != nil {
+				return asError(err)
+			}
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -577,8 +712,11 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "get_note_document", Description: "Get the canonical REST/OT document for a note", InputSchema: idParamSchema},
+	addTool(server, security, &mcp.Tool{Name: "get_note_document", Description: "Get the canonical REST/OT document for a note", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireReadScope(ctx); err != nil {
+				return asError(err)
+			}
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -595,8 +733,11 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "list_note_operations", Description: "List REST/OT operations for a note", InputSchema: noteRevisionSchema},
+	addTool(server, security, &mcp.Tool{Name: "list_note_operations", Description: "List REST/OT operations for a note", InputSchema: noteRevisionSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireReadScope(ctx); err != nil {
+				return asError(err)
+			}
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -613,8 +754,11 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(operations)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "get_note", Description: "Get note", InputSchema: idParamSchema},
+	addTool(server, security, &mcp.Tool{Name: "get_note", Description: "Get note", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireReadScope(ctx); err != nil {
+				return asError(err)
+			}
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -632,8 +776,11 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "create_note", Description: "Create note", InputSchema: noteContentSchema},
+	addTool(server, security, &mcp.Tool{Name: "create_note", Description: "Create note", InputSchema: noteContentSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireWriteScope(ctx); err != nil {
+				return asError(err)
+			}
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -647,8 +794,11 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "update_note", Description: "Update note", InputSchema: updateNoteSchema},
+	addTool(server, security, &mcp.Tool{Name: "update_note", Description: "Update note", InputSchema: updateNoteSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireWriteScope(ctx); err != nil {
+				return asError(err)
+			}
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -667,8 +817,11 @@ func RegisterTools(
 			return &mcp.CallToolResult{Content: asText(res)}, nil
 		},
 	)
-	server.AddTool(&mcp.Tool{Name: "delete_note", Description: "Delete note", InputSchema: idParamSchema},
+	addTool(server, security, &mcp.Tool{Name: "delete_note", Description: "Delete note", InputSchema: idParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireWriteScope(ctx); err != nil {
+				return asError(err)
+			}
 			args := parseArgs(request)
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
@@ -677,6 +830,9 @@ func RegisterTools(
 			idStr := getStr(args, "id")
 			id, err := uid.UUIDFromString(idStr)
 			if err != nil {
+				return asError(err)
+			}
+			if err := requireConfirmation(ctx, security, request, "delete_note", "note:"+id.String()); err != nil {
 				return asError(err)
 			}
 			err = notesSvc.DeleteNote(ctx, userID, id)
@@ -688,8 +844,11 @@ func RegisterTools(
 	)
 
 	// Tasks
-	server.AddTool(&mcp.Tool{Name: "list_tasks", Description: "List tasks", InputSchema: noParamSchema},
+	addTool(server, security, &mcp.Tool{Name: "list_tasks", Description: "List tasks", InputSchema: noParamSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if err := requireReadScope(ctx); err != nil {
+				return asError(err)
+			}
 			userID, err := UserIDFromContext(ctx)
 			if err != nil {
 				return asError(err)

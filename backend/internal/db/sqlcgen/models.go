@@ -8,6 +8,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AlexaAuthorizationCode struct {
+	CodeHash         string             `json:"code_hash"`
+	UserID           pgtype.UUID        `json:"user_id"`
+	ClientID         string             `json:"client_id"`
+	RedirectUri      string             `json:"redirect_uri"`
+	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
+	RefreshTokenHash pgtype.Text        `json:"refresh_token_hash"`
+	RefreshExpiresAt pgtype.Timestamptz `json:"refresh_expires_at"`
+	UsedAt           pgtype.Timestamptz `json:"used_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
 type Attachment struct {
 	ID        pgtype.UUID        `json:"id"`
 	NoteID    pgtype.UUID        `json:"note_id"`
@@ -16,6 +28,40 @@ type Attachment struct {
 	MimeType  string             `json:"mime_type"`
 	SizeBytes int64              `json:"size_bytes"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type McpAuditLog struct {
+	ID        pgtype.UUID        `json:"id"`
+	TokenID   pgtype.UUID        `json:"token_id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	Agent     string             `json:"agent"`
+	ToolName  string             `json:"tool_name"`
+	Resource  string             `json:"resource"`
+	Result    string             `json:"result"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type McpConfirmation struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	ToolName   string             `json:"tool_name"`
+	Resource   string             `json:"resource"`
+	Arguments  []byte             `json:"arguments"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt pgtype.Timestamptz `json:"consumed_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type McpToken struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	TokenHash  string             `json:"token_hash"`
+	Name       string             `json:"name"`
+	Scopes     []string           `json:"scopes"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	LastUsedAt pgtype.Timestamptz `json:"last_used_at"`
 }
 
 type Note struct {

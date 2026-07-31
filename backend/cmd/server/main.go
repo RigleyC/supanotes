@@ -270,18 +270,24 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	cronJob.Start()
 
 	// MCP Server
-	mcpServer := mcpapp.NewServer(notesSvc, tasksSvc, noteOpsSvc, noteOpsSvc, attachmentsSvc, sharesSvc, settings.NewService(queries))
+	settingsSvc := settings.NewService(queries)
+	mcpServer := mcpapp.NewServer(mcpapp.NewSecurityStore(pool), notesSvc, tasksSvc, noteOpsSvc, noteOpsSvc, attachmentsSvc, sharesSvc, settingsSvc)
 	mcpHandler := mcpsdk.NewStreamableHTTPHandler(func(req *http.Request) *mcpsdk.Server { return mcpServer }, nil)
 
 	// Personal Token Generation Route
 	protected.POST("/auth/mcp-token", mcpapp.GenerateMCPTokenHandler(pool))
+	protected.DELETE("/auth/mcp-token/:id", mcpapp.RevokeMCPTokenHandler(pool))
+	protected.POST("/auth/mcp-token/:id/rotate", mcpapp.RotateMCPTokenHandler(pool))
 
 	// MCP HTTP/SSE Route
 	mcpWrapped := http.StripPrefix("/api/v1/mcp", mcpHandler)
-	api.Any("/mcp/*", mcpapp.MCPAuth(pool), mcpapp.PropagateUserContext(mcpWrapped))
+	mcpEchoHandler := mcpapp.MCPAuth(pool)(func(c echo.Context) error {
+		mcpWrapped.ServeHTTP(c.Response(), c.Request())
+		return nil
+	})
+	api.Any("/mcp/*", mcpEchoHandler)
 
 	// Settings
-	settingsSvc := settings.NewService(queries)
 	settingsH := settings.NewHandler(settingsSvc)
 	protected.GET("/settings", settingsH.Get)
 	protected.PUT("/settings", settingsH.Update)

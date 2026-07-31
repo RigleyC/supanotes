@@ -12,6 +12,7 @@ import (
 )
 
 func NewServer(
+	security SecurityStore,
 	notesSvc *notes.Service,
 	tasksSvc *tasks.Service,
 	documentReader noteoperations.DocumentReader,
@@ -25,7 +26,7 @@ func NewServer(
 		Version: "1.0.0",
 	}, nil)
 
-	RegisterTools(server, notesSvc, tasksSvc, documentReader, documentCommands, attachmentsSvc, sharesSvc, settingsSvc)
+	RegisterTools(server, security, notesSvc, tasksSvc, documentReader, documentCommands, attachmentsSvc, sharesSvc, settingsSvc)
 
 	return server
 }

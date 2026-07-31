@@ -79,7 +79,7 @@ func TestSchemas_updateNote(t *testing.T) {
 func TestRegisterTools(t *testing.T) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "Test"}, nil)
 	require.NotPanics(t, func() {
-		RegisterTools(server, nil, nil, nil, nil, nil, nil, nil)
+		RegisterTools(server, nil, nil, nil, nil, nil, nil, nil, nil)
 	})
 }
 
