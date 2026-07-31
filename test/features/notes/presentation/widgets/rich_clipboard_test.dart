@@ -1,4 +1,6 @@
 // ignore_for_file: depend_on_referenced_packages
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
@@ -167,14 +169,15 @@ void main() {
 
       final richActions = buildRichKeyboardActions(baseActions: baseActions);
 
-      expect(richActions.length, equals(4));
+      expect(richActions.length, equals(5));
       expect(
         richActions[0],
         equals(copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed),
       );
       expect(richActions[1], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
       expect(richActions[2], equals(pastePreprocessedRichText));
-      expect(richActions[3], equals(doNothingWhenThereIsNoSelection));
+      expect(richActions[3], equals(insertEmptyTaskBeforeMetadataTaskOnEnter));
+      expect(richActions[4], equals(doNothingWhenThereIsNoSelection));
     });
 
     test(
@@ -191,16 +194,88 @@ void main() {
           slashCommandController: slashController,
         );
 
-        expect(richActions.length, equals(5));
+        expect(richActions.length, equals(6));
         expect(
           richActions[1],
           equals(copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed),
         );
         expect(richActions[2], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
         expect(richActions[3], equals(pastePreprocessedRichText));
-        expect(richActions[4], equals(doNothingWhenThereIsNoSelection));
+        expect(
+          richActions[4],
+          equals(insertEmptyTaskBeforeMetadataTaskOnEnter),
+        );
+        expect(richActions[5], equals(doNothingWhenThereIsNoSelection));
       },
     );
+
+    test('enter at task start keeps metadata with the task text', () {
+      final original = TaskNode(
+        id: 'task-1',
+        text: AttributedText('Comprar leite'),
+        isComplete: false,
+        indent: 2,
+        metadata: {
+          'dueDate': '2026-07-30T10:00:00.000',
+          'hasTime': true,
+          'recurrenceRule': 'daily',
+          'reminder': '15m_before',
+        },
+      );
+      final document = MutableDocument(nodes: [original]);
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'task-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+      final layout = MockDocumentLayout();
+      final editContext = SuperEditorContext(
+        editorFocusNode: focusNode,
+        editor: editor,
+        document: document,
+        getDocumentLayout: () => layout,
+        composer: composer,
+        scroller: DocumentScroller(),
+        commonOps: CommonEditorOperations(
+          editor: editor,
+          document: document,
+          composer: composer,
+          documentLayoutResolver: () => layout,
+        ),
+      );
+
+      final result = insertEmptyTaskBeforeMetadataTaskOnEnter(
+        editContext: editContext,
+        keyEvent: const KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.enter,
+          logicalKey: LogicalKeyboardKey.enter,
+          timeStamp: Duration.zero,
+        ),
+      );
+
+      expect(result, ExecutionInstruction.haltExecution);
+      final tasks = document.toList().whereType<TaskNode>().toList();
+      expect(tasks, hasLength(2));
+      expect(tasks.first.text.toPlainText(), isEmpty);
+      expect(tasks.first.metadata.containsKey('dueDate'), isFalse);
+      expect(tasks.first.metadata.containsKey('hasTime'), isFalse);
+      expect(tasks.first.metadata.containsKey('recurrenceRule'), isFalse);
+      expect(tasks.first.metadata.containsKey('reminder'), isFalse);
+      expect(tasks.first.indent, 2);
+      expect(tasks.last.id, 'task-1');
+      expect(tasks.last.text.toPlainText(), 'Comprar leite');
+      expect(tasks.last.metadata, original.metadata);
+      expect(composer.selection!.extent.nodeId, tasks.first.id);
+    });
   });
 
   group('RichCommonEditorOperations', () {

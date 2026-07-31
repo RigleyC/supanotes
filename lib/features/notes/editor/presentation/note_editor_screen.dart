@@ -112,9 +112,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final preferenceMutation = ref.watch(
       notePreferenceMutationControllerProvider(widget.noteId),
     );
-    final sessionAsync = ref.watch(
-      noteEditorSessionProvider(widget.noteId),
-    );
+    final sessionAsync = ref.watch(noteEditorSessionProvider(widget.noteId));
 
     final isDesktop = isDesktopLayout(context);
 
@@ -260,7 +258,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         await showTaskMetadataSheet(
                           context: context,
                           ref: ref,
-                          noteId: noteData.id,
                           task: task,
                           onSave:
                               ({

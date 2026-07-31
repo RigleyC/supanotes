@@ -8,6 +8,58 @@ import 'clipboard_preprocessor.dart';
 import 'rich_clipboard_serializers.dart';
 import 'slash_command_overlay.dart';
 
+ExecutionInstruction insertEmptyTaskBeforeMetadataTaskOnEnter({
+  required SuperEditorContext editContext,
+  required KeyEvent keyEvent,
+}) {
+  if (keyEvent is! KeyDownEvent ||
+      (keyEvent.logicalKey != LogicalKeyboardKey.enter &&
+          keyEvent.logicalKey != LogicalKeyboardKey.numpadEnter) ||
+      HardwareKeyboard.instance.isShiftPressed ||
+      HardwareKeyboard.instance.isControlPressed ||
+      HardwareKeyboard.instance.isAltPressed ||
+      HardwareKeyboard.instance.isMetaPressed) {
+    return ExecutionInstruction.continueExecution;
+  }
+
+  final selection = editContext.composer.selection;
+  if (selection == null || !selection.isCollapsed) {
+    return ExecutionInstruction.continueExecution;
+  }
+  final position = selection.extent.nodePosition;
+  final node = editContext.document.getNodeById(selection.extent.nodeId);
+  if (position is! TextNodePosition ||
+      position.offset != 0 ||
+      node is! TaskNode ||
+      node.text.isEmpty) {
+    return ExecutionInstruction.continueExecution;
+  }
+
+  final emptyTask = TaskNode(
+    id: Editor.createNodeId(),
+    text: AttributedText(),
+    isComplete: false,
+    indent: node.indent,
+  );
+  editContext.editor.execute([
+    InsertNodeAtIndexRequest(
+      nodeIndex: editContext.document.getNodeIndexById(node.id),
+      newNode: emptyTask,
+    ),
+    ChangeSelectionRequest(
+      DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: emptyTask.id,
+          nodePosition: const TextNodePosition(offset: 0),
+        ),
+      ),
+      SelectionChangeType.insertContent,
+      SelectionReason.userInteraction,
+    ),
+  ]);
+  return ExecutionInstruction.haltExecution;
+}
+
 ExecutionInstruction copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed({
   required SuperEditorContext editContext,
   required KeyEvent keyEvent,
@@ -97,6 +149,7 @@ List<SuperEditorKeyboardAction> buildRichKeyboardActions({
     copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed,
     cutAsRichTextWhenCmdXOrCtrlXIsPressed,
     pastePreprocessedRichText,
+    insertEmptyTaskBeforeMetadataTaskOnEnter,
     ...baseActions,
   ];
 }
