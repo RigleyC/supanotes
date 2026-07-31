@@ -270,7 +270,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	cronJob.Start()
 
 	// MCP Server
-	mcpServer := mcpapp.NewServer(notesSvc, tasksSvc, noteOpsSvc, noteOpsSvc)
+	mcpServer := mcpapp.NewServer(notesSvc, tasksSvc, noteOpsSvc, noteOpsSvc, attachmentsSvc)
 	mcpHandler := mcpsdk.NewStreamableHTTPHandler(func(req *http.Request) *mcpsdk.Server { return mcpServer }, nil)
 
 	// Personal Token Generation Route

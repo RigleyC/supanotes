@@ -21,6 +21,9 @@ var CurrentToolNames = []string{
 	"update_task_metadata",
 	"complete_task_occurrence",
 	"reopen_task_occurrence",
+	"upload_attachment",
+	"list_note_attachments",
+	"delete_attachment",
 }
 
 var removedToolNames = []string{

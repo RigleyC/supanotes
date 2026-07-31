@@ -8,5 +8,9 @@ SELECT * FROM attachments
 WHERE note_id = $1
 ORDER BY created_at ASC;
 
+-- name: GetAttachmentByID :one
+SELECT * FROM attachments
+WHERE id = $1;
+
 -- name: DeleteAttachment :exec
 DELETE FROM attachments WHERE id = $1;

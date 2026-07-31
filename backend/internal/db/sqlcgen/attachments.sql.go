@@ -88,3 +88,23 @@ func (q *Queries) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID)
 	}
 	return items, nil
 }
+
+const getAttachmentByID = `-- name: GetAttachmentByID :one
+SELECT id, note_id, filename, url, mime_type, size_bytes, created_at FROM attachments
+WHERE id = $1
+`
+
+func (q *Queries) GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attachment, error) {
+	row := q.db.QueryRow(ctx, getAttachmentByID, id)
+	var item Attachment
+	err := row.Scan(
+		&item.ID,
+		&item.NoteID,
+		&item.Filename,
+		&item.Url,
+		&item.MimeType,
+		&item.SizeBytes,
+		&item.CreatedAt,
+	)
+	return item, err
+}

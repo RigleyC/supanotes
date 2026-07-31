@@ -118,6 +118,10 @@ func (s *fakeUploadService) ListByNote(context.Context, pgtype.UUID) ([]sqlcgen.
 	return nil, nil
 }
 
+func (s *fakeUploadService) Delete(context.Context, pgtype.UUID, pgtype.UUID) error {
+	return nil
+}
+
 func (s *fakeUploadService) Metrics() Metrics {
 	if s.err == nil {
 		return Metrics{}

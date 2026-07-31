@@ -159,6 +159,7 @@ type fakeAttachmentRepo struct {
 	permission  string
 	insertErr   error
 	insertCalls int
+	attachment  sqlcgen.Attachment
 }
 
 func (r *fakeAttachmentRepo) CheckNotePermission(_ context.Context, _ pgtype.UUID, _ pgtype.UUID) (string, error) {
@@ -186,6 +187,10 @@ func (r *fakeAttachmentRepo) Insert(_ context.Context, noteID pgtype.UUID, filen
 
 func (r *fakeAttachmentRepo) ListByNote(context.Context, pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return nil, nil
+}
+
+func (r *fakeAttachmentRepo) GetByID(context.Context, pgtype.UUID) (sqlcgen.Attachment, error) {
+	return r.attachment, nil
 }
 
 func (r *fakeAttachmentRepo) Delete(context.Context, pgtype.UUID) error {

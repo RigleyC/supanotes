@@ -1,11 +1,14 @@
 package mcpapp
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/RigleyC/supanotes/internal/attachments"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -60,6 +63,17 @@ var taskOccurrenceSchema = map[string]any{
 		"operation_id":  map[string]any{"type": "string"},
 	},
 	"required": []any{"note_id", "block_id", "base_revision", "scheduled_at"},
+}
+
+var attachmentSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"note_id":        map[string]any{"type": "string"},
+		"attachment_id":  map[string]any{"type": "string"},
+		"filename":       map[string]any{"type": "string"},
+		"content_base64": map[string]any{"type": "string", "description": "Base64 file content"},
+	},
+	"required": []any{"note_id"},
 }
 
 var idParamSchema = map[string]any{
@@ -312,13 +326,95 @@ func addTaskOccurrenceTool(server *mcp.Server, name string, commands noteoperati
 	)
 }
 
+func addAttachmentTools(server *mcp.Server, service attachments.Service, reader noteoperations.DocumentReader) {
+	server.AddTool(&mcp.Tool{Name: "upload_attachment", Description: "Upload an attachment to a note", InputSchema: attachmentSchema},
+		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if service == nil {
+				return asError(fmt.Errorf("attachment service is not configured"))
+			}
+			args := parseArgs(request)
+			userID, err := UserIDFromContext(ctx)
+			if err != nil {
+				return asError(err)
+			}
+			noteID, err := getUUID(args, "note_id")
+			if err != nil {
+				return asError(err)
+			}
+			filename := getStr(args, "filename")
+			encoded := getStr(args, "content_base64")
+			if filename == "" || encoded == "" {
+				return asError(fmt.Errorf("filename and content_base64 are required"))
+			}
+			content, err := base64.StdEncoding.DecodeString(encoded)
+			if err != nil {
+				return asError(fmt.Errorf("content_base64 is invalid: %w", err))
+			}
+			attachment, err := service.Upload(ctx, noteID, userID, filename, bytes.NewReader(content), int64(len(content)))
+			if err != nil {
+				return asError(err)
+			}
+			return &mcp.CallToolResult{Content: asText(attachment)}, nil
+		},
+	)
+	server.AddTool(&mcp.Tool{Name: "list_note_attachments", Description: "List attachments for a note", InputSchema: idParamSchema},
+		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if service == nil {
+				return asError(fmt.Errorf("attachment service is not configured"))
+			}
+			args := parseArgs(request)
+			userID, err := UserIDFromContext(ctx)
+			if err != nil {
+				return asError(err)
+			}
+			noteID, err := getUUID(args, "id")
+			if err != nil {
+				return asError(err)
+			}
+			if reader == nil {
+				return asError(fmt.Errorf("document reader is not configured"))
+			}
+			if _, err := reader.GetDocument(ctx, noteID, userID); err != nil {
+				return asError(err)
+			}
+			items, err := service.ListByNote(ctx, noteID)
+			if err != nil {
+				return asError(err)
+			}
+			return &mcp.CallToolResult{Content: asText(items)}, nil
+		},
+	)
+	server.AddTool(&mcp.Tool{Name: "delete_attachment", Description: "Delete an attachment from a note", InputSchema: attachmentSchema},
+		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if service == nil {
+				return asError(fmt.Errorf("attachment service is not configured"))
+			}
+			args := parseArgs(request)
+			userID, err := UserIDFromContext(ctx)
+			if err != nil {
+				return asError(err)
+			}
+			attachmentID, err := getUUID(args, "attachment_id")
+			if err != nil {
+				return asError(err)
+			}
+			if err := service.Delete(ctx, userID, attachmentID); err != nil {
+				return asError(err)
+			}
+			return &mcp.CallToolResult{Content: asText("deleted")}, nil
+		},
+	)
+}
+
 func RegisterTools(
 	server *mcp.Server,
 	notesSvc *notes.Service,
 	tasksSvc *tasks.Service,
 	documentReader noteoperations.DocumentReader,
 	documentCommands noteoperations.DocumentCommandService,
+	attachmentsSvc attachments.Service,
 ) {
+	addAttachmentTools(server, attachmentsSvc, documentReader)
 	addBlockMutationTool(server, "create_block", noteoperations.KindCreateBlock, documentCommands)
 	addBlockMutationTool(server, "create_task_block", noteoperations.KindCreateBlock, documentCommands)
 	addBlockMutationTool(server, "update_block_text", noteoperations.KindTextDelta, documentCommands)

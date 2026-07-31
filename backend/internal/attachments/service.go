@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +30,7 @@ var (
 type Service interface {
 	Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID, filename string, r io.Reader, size int64) (sqlcgen.Attachment, error)
 	ListByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error)
+	Delete(ctx context.Context, userID, attachmentID pgtype.UUID) error
 	Metrics() Metrics
 }
 
@@ -119,6 +122,51 @@ func (s *service) Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.
 
 func (s *service) ListByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error) {
 	return s.repo.ListByNote(ctx, noteID)
+}
+
+func (s *service) Delete(ctx context.Context, userID, attachmentID pgtype.UUID) error {
+	attachment, err := s.repo.GetByID(ctx, attachmentID)
+	if err != nil {
+		return err
+	}
+	permission, err := s.repo.CheckNotePermission(ctx, attachment.NoteID, userID)
+	if err != nil {
+		return fmt.Errorf("check note permission: %w", err)
+	}
+	if permission == "not_found" {
+		return ErrNoteNotFound
+	}
+	if permission != "owner" && permission != "edit" {
+		return ErrNoPermission
+	}
+	key, err := storageKeyFromURL(attachment.Url)
+	if err != nil {
+		return err
+	}
+	if err := s.storage.Delete(ctx, key); err != nil {
+		return fmt.Errorf("delete attachment object: %w", err)
+	}
+	if err := s.repo.Delete(ctx, attachmentID); err != nil {
+		return fmt.Errorf("delete attachment metadata: %w", err)
+	}
+	return nil
+}
+
+func storageKeyFromURL(raw string) (string, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("parse attachment URL: %w", err)
+	}
+	marker := "/attachments/"
+	index := strings.Index(parsed.Path, marker)
+	if index < 0 {
+		return "", fmt.Errorf("attachment URL does not contain storage key")
+	}
+	key, err := url.PathUnescape(strings.TrimPrefix(parsed.Path[index:], "/"))
+	if err != nil {
+		return "", fmt.Errorf("decode attachment storage key: %w", err)
+	}
+	return key, nil
 }
 
 func (s *service) Metrics() Metrics {
