@@ -3,6 +3,7 @@ package mcpapp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -39,7 +40,9 @@ func TestGenerateMCPTokenHandler(t *testing.T) {
 type confirmationStore struct {
 	confirmationID pgtype.UUID
 	created        bool
-	consumed       bool
+	reserved       bool
+	committed      bool
+	released       bool
 }
 
 func (s *confirmationStore) Audit(context.Context, AuditEvent) error { return nil }
@@ -49,15 +52,29 @@ func (s *confirmationStore) CreateConfirmation(context.Context, pgtype.UUID, str
 	return Confirmation{ID: s.confirmationID, ExpiresAt: time.Now().UTC().Add(time.Minute)}, nil
 }
 
-func (s *confirmationStore) ConsumeConfirmation(_ context.Context, _ pgtype.UUID, confirmationID pgtype.UUID, _ string, _ string, _ json.RawMessage) error {
-	if confirmationID != s.confirmationID {
-		return ErrConfirmationDenied
-	}
-	s.consumed = true
+type confirmationLease struct {
+	store *confirmationStore
+}
+
+func (l *confirmationLease) Commit(context.Context) error {
+	l.store.committed = true
 	return nil
 }
 
-func TestRequireConfirmation_requiresAndConsumesOneTimeID(t *testing.T) {
+func (l *confirmationLease) Release(context.Context) error {
+	l.store.released = true
+	return nil
+}
+
+func (s *confirmationStore) ReserveConfirmation(_ context.Context, _ pgtype.UUID, confirmationID pgtype.UUID, _ string, _ string, _ json.RawMessage) (ConfirmationLease, error) {
+	if confirmationID != s.confirmationID {
+		return nil, ErrConfirmationDenied
+	}
+	s.reserved = true
+	return &confirmationLease{store: s}, nil
+}
+
+func TestRequireConfirmation_requiresAndCommitsOneTimeID(t *testing.T) {
 	userID, err := uid.UUIDFromString("123e4567-e89b-12d3-a456-426614174000")
 	require.NoError(t, err)
 	confirmationID, err := uid.UUIDFromString("123e4567-e89b-12d3-a456-426614174001")
@@ -65,15 +82,19 @@ func TestRequireConfirmation_requiresAndConsumesOneTimeID(t *testing.T) {
 	store := &confirmationStore{confirmationID: confirmationID}
 	ctx := context.WithValue(context.Background(), userContextKey, userID)
 	first := &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{"id":"note-1"}`)}}
-	err = requireConfirmation(ctx, store, first, "delete_note", "note:note-1")
+	lease, err := requireConfirmation(ctx, store, first, "delete_note", "note:note-1")
+	assert.Nil(t, lease)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "confirmation_required")
 	assert.True(t, store.created)
 
 	second := &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{"id":"note-1","confirmation_id":"123e4567-e89b-12d3-a456-426614174001"}`)}}
-	err = requireConfirmation(ctx, store, second, "delete_note", "note:note-1")
+	lease, err = requireConfirmation(ctx, store, second, "delete_note", "note:note-1")
 	require.NoError(t, err)
-	assert.True(t, store.consumed)
+	assert.True(t, store.reserved)
+	require.NoError(t, finishConfirmation(ctx, lease, nil))
+	assert.True(t, store.committed)
+	assert.False(t, store.released)
 }
 
 func TestRequireConfirmation_rejectsUnknownID(t *testing.T) {
@@ -84,8 +105,20 @@ func TestRequireConfirmation_rejectsUnknownID(t *testing.T) {
 	store := &confirmationStore{confirmationID: knownID}
 	ctx := context.WithValue(context.Background(), userContextKey, userID)
 	request := &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{"id":"note-1","confirmation_id":"123e4567-e89b-12d3-a456-426614174002"}`)}}
-	err = requireConfirmation(ctx, store, request, "delete_note", "note:note-1")
+	_, err = requireConfirmation(ctx, store, request, "delete_note", "note:note-1")
 	assert.ErrorIs(t, err, ErrConfirmationDenied)
+}
+
+func TestFinishConfirmation_releasesLeaseWhenOperationFails(t *testing.T) {
+	store := &confirmationStore{}
+	lease := &confirmationLease{store: store}
+	operationErr := errors.New("side effect failed")
+
+	err := finishConfirmation(context.Background(), lease, operationErr)
+
+	assert.ErrorIs(t, err, operationErr)
+	assert.True(t, store.released)
+	assert.False(t, store.committed)
 }
 
 func TestRequestedMCPScopes_validatesIndependentReadAndWriteScopes(t *testing.T) {

@@ -50,6 +50,7 @@ type McpConfirmation struct {
 	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
 	ConsumedAt pgtype.Timestamptz `json:"consumed_at"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ReservedAt pgtype.Timestamptz `json:"reserved_at"`
 }
 
 type McpToken struct {

@@ -3,6 +3,7 @@ package mcpapp
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +21,11 @@ type inMemorySecurityStore struct {
 	audits []AuditEvent
 }
 
+type inMemoryConfirmationLease struct{}
+
+func (inMemoryConfirmationLease) Commit(context.Context) error  { return nil }
+func (inMemoryConfirmationLease) Release(context.Context) error { return nil }
+
 func (s *inMemorySecurityStore) Audit(_ context.Context, event AuditEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -31,8 +37,8 @@ func (s *inMemorySecurityStore) CreateConfirmation(_ context.Context, _ pgtype.U
 	return Confirmation{}, nil
 }
 
-func (s *inMemorySecurityStore) ConsumeConfirmation(context.Context, pgtype.UUID, pgtype.UUID, string, string, json.RawMessage) error {
-	return nil
+func (s *inMemorySecurityStore) ReserveConfirmation(context.Context, pgtype.UUID, pgtype.UUID, string, string, json.RawMessage) (ConfirmationLease, error) {
+	return inMemoryConfirmationLease{}, nil
 }
 
 type inMemoryDocumentService struct {
@@ -73,13 +79,22 @@ func (s *inMemoryDocumentService) GetOperationsSince(context.Context, pgtype.UUI
 	return noteoperations.OperationsListResponse{Document: s.document, Revision: 1}, nil
 }
 
-func TestMCPInMemoryFlow_listsContractAndUsesCanonicalCommandAndReadSeams(t *testing.T) {
+// TestMCPProtocolFlow_inMemoryUsesCanonicalCommandAndReadSeams verifies the
+// MCP transport, tool contract, audit lifecycle, and REST/OT command seams.
+// Persistence and external attachment storage are covered by their service
+// integration tests; this test does not pretend to be a full product E2E test.
+func TestMCPProtocolFlow_inMemoryUsesCanonicalCommandAndReadSeams(t *testing.T) {
 	userID, err := uid.UUIDFromString("123e4567-e89b-12d3-a456-426614174000")
 	require.NoError(t, err)
 	document := json.RawMessage(`{"blocks":[{"id":"block-1","type":"paragraph","text":"hello"}]}`)
 	security := &inMemorySecurityStore{}
 	documentService := &inMemoryDocumentService{document: document}
-	server := NewServer(security, nil, nil, documentService, documentService, nil, nil, nil)
+	server := mcp.NewServer(&mcp.Implementation{Name: "Test"}, nil)
+	RegisterTools(server, ServerDependencies{
+		Security:         security,
+		DocumentReader:   documentService,
+		DocumentCommands: documentService,
+	})
 
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 	ctx := context.WithValue(context.Background(), userContextKey, userID)
@@ -96,6 +111,14 @@ func TestMCPInMemoryFlow_listsContractAndUsesCanonicalCommandAndReadSeams(t *tes
 	tools, err := clientSession.ListTools(context.Background(), nil)
 	require.NoError(t, err)
 	require.Len(t, tools.Tools, len(CurrentToolNames))
+	actualNames := make([]string, 0, len(tools.Tools))
+	for _, tool := range tools.Tools {
+		actualNames = append(actualNames, tool.Name)
+	}
+	sort.Strings(actualNames)
+	expectedNames := append([]string(nil), CurrentToolNames...)
+	sort.Strings(expectedNames)
+	require.Equal(t, expectedNames, actualNames)
 
 	noteID := "123e4567-e89b-12d3-a456-426614174001"
 	operationID := "123e4567-e89b-12d3-a456-426614174002"
@@ -128,7 +151,9 @@ func TestMCPInMemoryFlow_listsContractAndUsesCanonicalCommandAndReadSeams(t *tes
 	require.NoError(t, err)
 	require.False(t, documentResult.IsError)
 	require.Len(t, documentService.commands, 1, "retry must remain idempotent at the document seam")
-	require.Len(t, security.audits, 3, "list and mutation calls must be audited")
+	require.Len(t, security.audits, 6, "each tool call must have start and final audit records")
 	require.Equal(t, "e2e-test-agent/1", security.audits[0].Agent)
+	require.Equal(t, "started", security.audits[0].Result)
+	require.Equal(t, "success", security.audits[1].Result)
 	require.Equal(t, document, documentService.document)
 }

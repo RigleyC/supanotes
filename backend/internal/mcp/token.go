@@ -49,12 +49,17 @@ type Confirmation struct {
 	ExpiresAt time.Time
 }
 
+type ConfirmationLease interface {
+	Commit(context.Context) error
+	Release(context.Context) error
+}
+
 // SecurityStore persists MCP audit events and one-time confirmations.
 // The interface keeps tool handlers testable without bypassing production controls.
 type SecurityStore interface {
 	Audit(context.Context, AuditEvent) error
 	CreateConfirmation(context.Context, pgtype.UUID, string, string, json.RawMessage) (Confirmation, error)
-	ConsumeConfirmation(context.Context, pgtype.UUID, pgtype.UUID, string, string, json.RawMessage) error
+	ReserveConfirmation(context.Context, pgtype.UUID, pgtype.UUID, string, string, json.RawMessage) (ConfirmationLease, error)
 }
 
 type databaseSecurityStore struct{ pool *pgxpool.Pool }
@@ -91,18 +96,55 @@ func (s *databaseSecurityStore) CreateConfirmation(ctx context.Context, userID p
 	return confirmation, err
 }
 
-func (s *databaseSecurityStore) ConsumeConfirmation(ctx context.Context, userID, confirmationID pgtype.UUID, toolName, resource string, arguments json.RawMessage) error {
-	var consumedID pgtype.UUID
+type databaseConfirmationLease struct {
+	store          *databaseSecurityStore
+	userID         pgtype.UUID
+	confirmationID pgtype.UUID
+}
+
+func (s *databaseSecurityStore) ReserveConfirmation(ctx context.Context, userID, confirmationID pgtype.UUID, toolName, resource string, arguments json.RawMessage) (ConfirmationLease, error) {
+	var reservedID pgtype.UUID
 	err := s.pool.QueryRow(ctx, `
 		UPDATE mcp_confirmations
-		SET consumed_at = NOW()
+		SET reserved_at = NOW()
 		WHERE id = $1 AND user_id = $2 AND tool_name = $3 AND resource = $4
-		  AND arguments = $5::jsonb AND consumed_at IS NULL AND expires_at > NOW()
-		RETURNING id`, confirmationID, userID, toolName, resource, arguments).Scan(&consumedID)
+		  AND arguments = $5::jsonb AND consumed_at IS NULL AND reserved_at IS NULL AND expires_at > NOW()
+		RETURNING id`, confirmationID, userID, toolName, resource, arguments).Scan(&reservedID)
 	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrConfirmationDenied
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &databaseConfirmationLease{store: s, userID: userID, confirmationID: reservedID}, nil
+}
+
+func (l *databaseConfirmationLease) Commit(ctx context.Context) error {
+	result, err := l.store.pool.Exec(ctx, `
+		UPDATE mcp_confirmations
+		SET consumed_at = NOW(), reserved_at = NULL
+		WHERE id = $1 AND user_id = $2 AND reserved_at IS NOT NULL AND consumed_at IS NULL`, l.confirmationID, l.userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
 		return ErrConfirmationDenied
 	}
-	return err
+	return nil
+}
+
+func (l *databaseConfirmationLease) Release(ctx context.Context) error {
+	result, err := l.store.pool.Exec(ctx, `
+		UPDATE mcp_confirmations
+		SET reserved_at = NULL
+		WHERE id = $1 AND user_id = $2 AND reserved_at IS NOT NULL AND consumed_at IS NULL`, l.confirmationID, l.userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrConfirmationDenied
+	}
+	return nil
 }
 
 func issueMCPToken(ctx context.Context, db interface {

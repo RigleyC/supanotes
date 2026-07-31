@@ -271,7 +271,16 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	// MCP Server
 	settingsSvc := settings.NewService(queries)
-	mcpServer := mcpapp.NewServer(mcpapp.NewSecurityStore(pool), notesSvc, tasksSvc, noteOpsSvc, noteOpsSvc, attachmentsSvc, sharesSvc, settingsSvc)
+	mcpServer := mcpapp.NewServer(mcpapp.ServerDependencies{
+		Security:         mcpapp.NewSecurityStore(pool),
+		Notes:            notesSvc,
+		Tasks:            tasksSvc,
+		DocumentReader:   noteOpsSvc,
+		DocumentCommands: noteOpsSvc,
+		Attachments:      attachmentsSvc,
+		Shares:           sharesSvc,
+		Settings:         settingsSvc,
+	})
 	mcpHandler := mcpsdk.NewStreamableHTTPHandler(func(req *http.Request) *mcpsdk.Server { return mcpServer }, nil)
 
 	// Personal Token Generation Route
