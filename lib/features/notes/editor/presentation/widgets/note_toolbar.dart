@@ -602,7 +602,7 @@ class _FormattingMenu extends StatelessWidget {
     final highContrast = MediaQuery.highContrastOf(context);
     final surface = Container(
       width: _ToolbarFormatPopoverState._menuWidth,
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: highContrast ? 1 : 0.86),
         borderRadius: borderRadius,
@@ -624,29 +624,37 @@ class _FormattingMenu extends StatelessWidget {
           children: [
             _FormattingMenuColumn(
               children: [
-                _ToolbarButton(
-                  svgAsset: 'assets/icons/h1_icon.svg',
-                  isActive: blockType == header1Attribution,
-                  onPressed: () => onBlockType(header1Attribution),
-                  semanticLabel: 'Título 1',
+                _FormattingMenuItem(
+                  child: _ToolbarButton(
+                    svgAsset: 'assets/icons/h1_icon.svg',
+                    isActive: blockType == header1Attribution,
+                    onPressed: () => onBlockType(header1Attribution),
+                    semanticLabel: 'Título 1',
+                  ),
                 ),
-                _ToolbarButton(
-                  svgAsset: 'assets/icons/h2_icon.svg',
-                  isActive: blockType == header2Attribution,
-                  onPressed: () => onBlockType(header2Attribution),
-                  semanticLabel: 'Título 2',
+                _FormattingMenuItem(
+                  child: _ToolbarButton(
+                    svgAsset: 'assets/icons/h2_icon.svg',
+                    isActive: blockType == header2Attribution,
+                    onPressed: () => onBlockType(header2Attribution),
+                    semanticLabel: 'Título 2',
+                  ),
                 ),
-                _ToolbarButton(
-                  svgAsset: 'assets/icons/h3_icon.svg',
-                  isActive: blockType == header3Attribution,
-                  onPressed: () => onBlockType(header3Attribution),
-                  semanticLabel: 'Título 3',
+                _FormattingMenuItem(
+                  child: _ToolbarButton(
+                    svgAsset: 'assets/icons/h3_icon.svg',
+                    isActive: blockType == header3Attribution,
+                    onPressed: () => onBlockType(header3Attribution),
+                    semanticLabel: 'Título 3',
+                  ),
                 ),
-                _ToolbarButton(
-                  icon: Icons.format_quote,
-                  isActive: blockType == blockquoteAttribution,
-                  onPressed: () => onBlockType(blockquoteAttribution),
-                  semanticLabel: 'Citação',
+                _FormattingMenuItem(
+                  child: _ToolbarButton(
+                    icon: Icons.format_quote,
+                    isActive: blockType == blockquoteAttribution,
+                    onPressed: () => onBlockType(blockquoteAttribution),
+                    semanticLabel: 'Citação',
+                  ),
                 ),
               ],
             ),
@@ -711,7 +719,7 @@ class _FormattingMenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(mainAxisAlignment: MainAxisAlignment.center, children: children);
+    return Row(mainAxisAlignment: MainAxisAlignment.start, children: children);
   }
 }
 
@@ -722,7 +730,26 @@ class _FormattingMenuColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(mainAxisSize: MainAxisSize.min, children: children);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
+    );
+  }
+}
+
+class _FormattingMenuItem extends StatelessWidget {
+  const _FormattingMenuItem({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: Align(alignment: Alignment.centerLeft, child: child),
+    );
   }
 }
 
