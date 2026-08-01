@@ -21,6 +21,7 @@ type Config struct {
 	AlexaApplicationID string
 	AlexaClientID      string
 	AlexaClientSecret  string
+	AlexaRedirectURIs  []string
 
 	// Storage (S3-compatible: AWS, MinIO, Supabase, GCS)
 	S3Endpoint        string // S3_ENDPOINT — e.g. https://s3.amazonaws.com or http://minio:9000
@@ -62,6 +63,7 @@ func Load() (*Config, error) {
 		AlexaApplicationID: strings.TrimSpace(os.Getenv("ALEXA_APPLICATION_ID")),
 		AlexaClientID:      strings.TrimSpace(os.Getenv("ALEXA_CLIENT_ID")),
 		AlexaClientSecret:  strings.TrimSpace(os.Getenv("ALEXA_CLIENT_SECRET")),
+		AlexaRedirectURIs:  parseList(os.Getenv("ALEXA_REDIRECT_URIS")),
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
 		JWTSecret:          jwtSecret,
 		JWTIssuer:          jwtIssuer,
@@ -101,6 +103,17 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+func parseList(raw string) []string {
+	parts := strings.Split(raw, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if value := strings.TrimSpace(part); value != "" {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 func (c *Config) Addr() string {

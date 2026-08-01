@@ -5,7 +5,7 @@ import (
 )
 
 func TestLoad_Defaults(t *testing.T) {
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "JWT_ISSUER", "JWT_AUDIENCE"} {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS"} {
 		t.Setenv(k, "")
 	}
 
@@ -29,6 +29,9 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.JWTIssuer != "supanotes-api" || cfg.JWTAudience != "supanotes-client" {
 		t.Errorf("JWT claims defaults: issuer=%q audience=%q", cfg.JWTIssuer, cfg.JWTAudience)
 	}
+	if len(cfg.AlexaRedirectURIs) != 0 {
+		t.Errorf("AlexaRedirectURIs: want empty by default, got %v", cfg.AlexaRedirectURIs)
+	}
 }
 
 func TestLoad_FromEnv(t *testing.T) {
@@ -38,6 +41,7 @@ func TestLoad_FromEnv(t *testing.T) {
 	t.Setenv("JWT_SECRET", "prod-secret-at-least-32-characters-long")
 	t.Setenv("JWT_ISSUER", "custom-api")
 	t.Setenv("JWT_AUDIENCE", "custom-client")
+	t.Setenv("ALEXA_REDIRECT_URIS", "https://example.com/one, https://example.com/two")
 
 	cfg, err := Load()
 	if err != nil {
@@ -59,10 +63,13 @@ func TestLoad_FromEnv(t *testing.T) {
 	if cfg.JWTIssuer != "custom-api" || cfg.JWTAudience != "custom-client" {
 		t.Errorf("JWT claims mismatch: issuer=%q audience=%q", cfg.JWTIssuer, cfg.JWTAudience)
 	}
+	if len(cfg.AlexaRedirectURIs) != 2 || cfg.AlexaRedirectURIs[0] != "https://example.com/one" || cfg.AlexaRedirectURIs[1] != "https://example.com/two" {
+		t.Errorf("AlexaRedirectURIs mismatch: %v", cfg.AlexaRedirectURIs)
+	}
 }
 
 func TestLoad_ProdRequiresJWTSecret(t *testing.T) {
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "JWT_ISSUER", "JWT_AUDIENCE"} {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS"} {
 		t.Setenv(k, "")
 	}
 	t.Setenv("ENVIRONMENT", "prod")
