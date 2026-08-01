@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -30,10 +31,14 @@ type httpCase struct {
 }
 
 func newTestServer(t *testing.T) (*echo.Echo, *mockQuerier) {
+	return newTestServerWithLimiter(t, nil)
+}
+
+func newTestServerWithLimiter(t *testing.T, limiter *AuthRateLimiter) (*echo.Echo, *mockQuerier) {
 	t.Helper()
 	q := newMockQuerier()
 	svc := NewService(q, testConfig(), nil)
-	h := NewHandler(svc)
+	h := NewHandler(svc, limiter)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -163,6 +168,20 @@ func TestHandler_Login_InvalidCredentials(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "invalid credentials") {
 		t.Errorf("body: %s", rec.Body.String())
+	}
+}
+
+func TestHandler_Login_RateLimited(t *testing.T) {
+	e, _ := newTestServerWithLimiter(t, newAuthRateLimiter(time.Now, time.Minute, 1, 10))
+	body := `{"email":"limited@example.com","password":"wrong-password"}`
+
+	first := do(t, e, http.MethodPost, "/api/v1/auth/login", body)
+	if first.Code != http.StatusUnauthorized {
+		t.Fatalf("first status: want 401, got %d", first.Code)
+	}
+	second := do(t, e, http.MethodPost, "/api/v1/auth/login", body)
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second status: want 429, got %d", second.Code)
 	}
 }
 

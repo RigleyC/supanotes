@@ -1,8 +1,14 @@
 package auth
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -65,11 +71,16 @@ type RefreshResponse struct {
 }
 
 type Handler struct {
-	svc *Service
+	svc         *Service
+	rateLimiter *AuthRateLimiter
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, limiter ...*AuthRateLimiter) *Handler {
+	rateLimiter := NewAuthRateLimiter()
+	if len(limiter) > 0 && limiter[0] != nil {
+		rateLimiter = limiter[0]
+	}
+	return &Handler{svc: svc, rateLimiter: rateLimiter}
 }
 
 func buildAuthResponse(session *SessionData, access, refresh string) AuthResponse {
@@ -87,6 +98,9 @@ func buildAuthResponse(session *SessionData, access, refresh string) AuthRespons
 }
 
 func (h *Handler) Register(c echo.Context) error {
+	if !h.allow(c, "register", requestIdentifier(c, "email")) {
+		return web.JSONError(c, http.StatusTooManyRequests, "too many authentication attempts")
+	}
 	var req RegisterRequest
 	if err := web.BindAndValidate(c, &req); err != nil {
 		return err
@@ -103,6 +117,9 @@ func (h *Handler) Register(c echo.Context) error {
 }
 
 func (h *Handler) Login(c echo.Context) error {
+	if !h.allow(c, "login", requestIdentifier(c, "email")) {
+		return web.JSONError(c, http.StatusTooManyRequests, "too many authentication attempts")
+	}
 	var req LoginRequest
 	if err := web.BindAndValidate(c, &req); err != nil {
 		return err
@@ -119,6 +136,9 @@ func (h *Handler) Login(c echo.Context) error {
 }
 
 func (h *Handler) Refresh(c echo.Context) error {
+	if !h.allow(c, "refresh", requestIdentifier(c, "refresh_token")) {
+		return web.JSONError(c, http.StatusTooManyRequests, "too many authentication attempts")
+	}
 	var req RefreshRequest
 	if err := web.BindAndValidate(c, &req); err != nil {
 		return err
@@ -133,6 +153,33 @@ func (h *Handler) Refresh(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, RefreshResponse{AccessToken: access, RefreshToken: refresh})
+}
+
+func (h *Handler) allow(c echo.Context, endpoint, identifier string) bool {
+	return h.rateLimiter.Allow(endpoint, c.RealIP(), identifier)
+}
+
+func requestIdentifier(c echo.Context, field string) string {
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return ""
+	}
+	c.Request().Body = io.NopCloser(bytes.NewReader(body))
+
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ""
+	}
+	value, ok := payload[field].(string)
+	if !ok {
+		return ""
+	}
+	value = strings.TrimSpace(strings.ToLower(value))
+	if field == "refresh_token" && value != "" {
+		digest := sha256.Sum256([]byte(value))
+		return hex.EncodeToString(digest[:])
+	}
+	return value
 }
 
 func (h *Handler) Logout(c echo.Context) error {
