@@ -380,8 +380,8 @@ class _ToolbarFormatPopover extends StatefulWidget {
 
 class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
     with TickerProviderStateMixin {
-  static const _menuWidth = 280.0;
-  static const _menuHeight = 176.0;
+  static const _menuWidth = 176.0;
+  static const _menuHeight = 260.0;
   static const _viewportMargin = 12.0;
 
   final _overlayController = OverlayPortalController();
@@ -555,7 +555,6 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
                   isBold: widget.isBold,
                   isItalic: widget.isItalic,
                   isStrikethrough: widget.isStrikethrough,
-                  onClose: _close,
                   onBlockType: _applyBlockType,
                   onToggleInline: _applyInline,
                 ),
@@ -584,7 +583,6 @@ class _FormattingMenu extends StatelessWidget {
     required this.isBold,
     required this.isItalic,
     required this.isStrikethrough,
-    required this.onClose,
     required this.onBlockType,
     required this.onToggleInline,
   });
@@ -594,7 +592,6 @@ class _FormattingMenu extends StatelessWidget {
   final bool isBold;
   final bool isItalic;
   final bool isStrikethrough;
-  final VoidCallback onClose;
   final ValueChanged<Attribution> onBlockType;
   final ValueChanged<Attribution> onToggleInline;
 
@@ -625,16 +622,7 @@ class _FormattingMenu extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: _ToolbarButton(
-                icon: Icons.close,
-                isActive: false,
-                onPressed: onClose,
-                semanticLabel: 'Fechar formatação',
-              ),
-            ),
-            _FormattingMenuRow(
+            _FormattingMenuColumn(
               children: [
                 _ToolbarButton(
                   svgAsset: 'assets/icons/h1_icon.svg',
@@ -664,7 +652,7 @@ class _FormattingMenu extends StatelessWidget {
             ),
             Container(
               height: 1,
-              margin: const EdgeInsets.symmetric(vertical: 4),
+              margin: const EdgeInsets.symmetric(vertical: 6),
               color: colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
             _FormattingMenuRow(
@@ -724,6 +712,17 @@ class _FormattingMenuRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(mainAxisAlignment: MainAxisAlignment.center, children: children);
+  }
+}
+
+class _FormattingMenuColumn extends StatelessWidget {
+  const _FormattingMenuColumn({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(mainAxisSize: MainAxisSize.min, children: children);
   }
 }
 
