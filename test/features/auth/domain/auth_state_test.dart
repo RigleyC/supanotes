@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/database/database.dart';
@@ -28,6 +31,7 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
 Future<ProviderContainer> makeContainer({
   required AuthLocalStorage storage,
   required AuthRepository repository,
+  AuthSessionResourceRegistry? sessionResources,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
@@ -36,6 +40,8 @@ Future<ProviderContainer> makeContainer({
       sharedPreferencesProvider.overrideWithValue(prefs),
       authLocalStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWithValue(repository),
+      if (sessionResources != null)
+        authSessionResourceRegistryProvider.overrideWithValue(sessionResources),
       appDatabaseProvider.overrideWithValue(AppDatabase.test()),
     ],
   );
@@ -212,7 +218,9 @@ void main() {
       );
       await waitForBuild(container);
 
-      await container.read(authControllerProvider.notifier).register(
+      await container
+          .read(authControllerProvider.notifier)
+          .register(
             email: 'b@c.com',
             password: 'hunter2hunter2',
             name: 'Bob',
@@ -276,11 +284,67 @@ void main() {
       );
       await waitForBuild(container);
 
-      await container
-          .read(authControllerProvider.notifier)
-          .onSessionExpired();
+      await container.read(authControllerProvider.notifier).onSessionExpired();
       final user = container.read(authControllerProvider).requireValue;
       expect(user, isNull);
+      verify(() => storage.clear()).called(1);
+    });
+
+    test(
+      'waits for authenticated resources before completing cleanup',
+      () async {
+        final storage = _MockAuthLocalStorage();
+        final repository = _MockAuthRepository();
+        final resources = AuthSessionResourceRegistry();
+        final closeStarted = Completer<void>();
+        final releaseClose = Completer<void>();
+        resources.register(() async {
+          closeStarted.complete();
+          await releaseClose.future;
+        });
+        _stubEmptySession(storage);
+
+        final container = await makeContainer(
+          storage: storage,
+          repository: repository,
+          sessionResources: resources,
+        );
+        await waitForBuild(container);
+
+        final expiration = container
+            .read(authControllerProvider.notifier)
+            .onSessionExpired();
+        await closeStarted.future;
+        verifyNever(() => storage.clear());
+
+        releaseClose.complete();
+        await expiration;
+
+        verify(() => storage.clear()).called(1);
+      },
+    );
+
+    test('does not resolve a coordinator during session cleanup', () async {
+      final storage = _MockAuthLocalStorage();
+      final repository = _MockAuthRepository();
+      when(() => storage.getAccessToken()).thenAnswer((_) async => 'access');
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'refresh');
+      when(() => storage.getUser()).thenAnswer(
+        (_) async => const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      );
+      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
+      when(() => storage.clear()).thenAnswer((_) async {});
+
+      final container = await makeContainer(
+        storage: storage,
+        repository: repository,
+      );
+      await waitForBuild(container);
+      container.read(noteSessionCoordinatorProvider);
+
+      await container.read(authControllerProvider.notifier).onSessionExpired();
+
+      expect(container.read(authControllerProvider).requireValue, isNull);
       verify(() => storage.clear()).called(1);
     });
   });

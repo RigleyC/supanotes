@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
@@ -62,7 +63,14 @@ class AuthController extends AsyncNotifier<User?> {
   );
 
   Future<void> _clearSession({required bool clearLocalData}) async {
-    await _closeActiveNoteSessions();
+    Object? cleanupError;
+    StackTrace? cleanupStack;
+    try {
+      await _closeActiveSessionResources();
+    } catch (error, stack) {
+      cleanupError = error;
+      cleanupStack = stack;
+    }
     await _storage.clear();
     _sessionCache.clear();
 
@@ -88,16 +96,15 @@ class AuthController extends AsyncNotifier<User?> {
     // blocks unauthenticated access to protected routes. Preserving the route
     // across involuntary session expiry lets the user land back where they were
     // after re-login. See: logout() for the explicit-logout path.
-    state = const AsyncValue.data(null);
-  }
-
-  Future<void> _closeActiveNoteSessions() async {
-    try {
-      await ref.read(noteSessionCoordinatorProvider).closeAll();
-    } catch (e) {
-      debugPrint('Error closing note sessions: $e');
+    if (cleanupError != null) {
+      state = AsyncValue.error(cleanupError, cleanupStack!);
+    } else {
+      state = const AsyncValue.data(null);
     }
   }
+
+  Future<void> _closeActiveSessionResources() =>
+      ref.read(authSessionResourceRegistryProvider).closeAll();
 
   Future<void> logout() async {
     state = const AsyncValue.loading();

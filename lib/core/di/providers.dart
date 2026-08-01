@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
+import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
@@ -49,7 +50,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
           refreshToken: refreshToken,
         ),
     onAuthFailure: () async {
-      ref.read(authControllerProvider.notifier).onSessionExpired();
+      await ref.read(authControllerProvider.notifier).onSessionExpired();
     },
   );
 });
@@ -151,7 +152,11 @@ final noteSessionCoordinatorProvider =
       final coordinator = NoteSessionCoordinator<NoteEditorSession>(
         activityTracker: ref.watch(noteSessionActivityTrackerProvider),
       );
+      final unregister = ref
+          .read(authSessionResourceRegistryProvider)
+          .register(coordinator.closeAll);
       ref.onDispose(() {
+        unregister();
         unawaited(coordinator.closeAll());
       });
       return coordinator;

@@ -134,7 +134,8 @@ Scaffold(
   fica no widget com `setState` ou `ValueNotifier` — não vira provider.
 - **`.autoDispose` por padrão**. Exceções: `authController`, `goRouter`,
   `appDatabase`, `apiClient`, `authLocalStorage`, `authRepository`,
-  `syncService`, `syncState`, `connectivityMonitor`, `sessionCache`.
+  `authSessionResourceRegistryProvider`, `syncService`, `syncState`,
+  `connectivityMonitor`, `sessionCache`.
 - Erros não podem ser engolidos. `catch (e) { return const EmptyState() }` é proibido —
   propague na UI via `AsyncValue.error`.
 - `AsyncValue` já cobre `loading`/`data`/`error`. Não crie campos `isLoading`/`error`
