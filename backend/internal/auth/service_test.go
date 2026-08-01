@@ -95,9 +95,43 @@ func (m *mockQuerier) CreateRefreshToken(ctx context.Context, arg sqlcgen.Create
 		UserID:    arg.UserID,
 		TokenHash: arg.TokenHash,
 		ExpiresAt: arg.ExpiresAt,
+		FamilyID:  pgUUID(uuid.New()),
 	}
 	m.refreshByID[rt.ID] = rt
 	return rt, nil
+}
+
+func (m *mockQuerier) CreateRotatedRefreshToken(ctx context.Context, arg sqlcgen.CreateRotatedRefreshTokenParams) (sqlcgen.RefreshToken, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.createRefreshErr != nil {
+		return sqlcgen.RefreshToken{}, m.createRefreshErr
+	}
+	rt := sqlcgen.RefreshToken{
+		ID:        pgUUID(uuid.New()),
+		UserID:    arg.UserID,
+		TokenHash: arg.TokenHash,
+		ExpiresAt: arg.ExpiresAt,
+		FamilyID:  arg.FamilyID,
+		ParentID:  arg.ParentID,
+	}
+	m.refreshByID[rt.ID] = rt
+	return rt, nil
+}
+
+func (m *mockQuerier) ConsumeRefreshToken(ctx context.Context, tokenHash string) (sqlcgen.RefreshToken, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := time.Now()
+	for id, rt := range m.refreshByID {
+		if rt.TokenHash != tokenHash || rt.RevokedAt.Valid || rt.ConsumedAt.Valid || !rt.ExpiresAt.Valid || !rt.ExpiresAt.Time.After(now) {
+			continue
+		}
+		rt.ConsumedAt = pgtype.Timestamptz{Time: now, Valid: true}
+		m.refreshByID[id] = rt
+		return rt, nil
+	}
+	return sqlcgen.RefreshToken{}, pgx.ErrNoRows
 }
 
 func (m *mockQuerier) GetRefreshToken(ctx context.Context, tokenHash string) (sqlcgen.RefreshToken, error) {
@@ -119,6 +153,17 @@ func (m *mockQuerier) GetRefreshToken(ctx context.Context, tokenHash string) (sq
 	return sqlcgen.RefreshToken{}, pgx.ErrNoRows
 }
 
+func (m *mockQuerier) GetRefreshTokenRecord(ctx context.Context, tokenHash string) (sqlcgen.RefreshToken, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, rt := range m.refreshByID {
+		if rt.TokenHash == tokenHash {
+			return rt, nil
+		}
+	}
+	return sqlcgen.RefreshToken{}, pgx.ErrNoRows
+}
+
 func (m *mockQuerier) RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -131,6 +176,24 @@ func (m *mockQuerier) RevokeRefreshToken(ctx context.Context, id pgtype.UUID) er
 	}
 	rt.RevokedAt = pgtype.Timestamptz{Time: time.Now(), Valid: true}
 	m.refreshByID[id] = rt
+	return nil
+}
+
+func (m *mockQuerier) RevokeRefreshTokenFamily(ctx context.Context, familyID pgtype.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.revokeRefreshErr != nil {
+		return m.revokeRefreshErr
+	}
+	now := time.Now()
+	for id, rt := range m.refreshByID {
+		if rt.FamilyID != familyID {
+			continue
+		}
+		rt.RevokedAt = pgtype.Timestamptz{Time: now, Valid: true}
+		rt.ReuseDetectedAt = pgtype.Timestamptz{Time: now, Valid: true}
+		m.refreshByID[id] = rt
+	}
 	return nil
 }
 
@@ -188,7 +251,7 @@ func (m *mockQuerier) CreateNoteLink(ctx context.Context, arg sqlcgen.CreateNote
 func (m *mockQuerier) GetAllNotesForMigration(ctx context.Context) ([]sqlcgen.GetAllNotesForMigrationRow, error) {
 	return nil, nil
 }
-func (m *mockQuerier) HardDeleteOldNotes(ctx context.Context) error { return nil }
+func (m *mockQuerier) HardDeleteOldNotes(ctx context.Context) error       { return nil }
 func (m *mockQuerier) TryAcquireGCLock(ctx context.Context) (bool, error) { return true, nil }
 func (m *mockQuerier) CreateNoteShare(ctx context.Context, arg sqlcgen.CreateNoteShareParams) (sqlcgen.NoteShare, error) {
 	return sqlcgen.NoteShare{}, nil
@@ -212,8 +275,12 @@ func (m *mockQuerier) CreateTaskCompletion(ctx context.Context, arg sqlcgen.Crea
 	return sqlcgen.TaskCompletion{}, nil
 }
 func (m *mockQuerier) DeleteTask(ctx context.Context, arg sqlcgen.DeleteTaskParams) error { return nil }
-func (m *mockQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error { return nil }
-func (m *mockQuerier) DeleteTasksByNoteID(ctx context.Context, arg sqlcgen.DeleteTasksByNoteIDParams) error { return nil }
+func (m *mockQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
+	return nil
+}
+func (m *mockQuerier) DeleteTasksByNoteID(ctx context.Context, arg sqlcgen.DeleteTasksByNoteIDParams) error {
+	return nil
+}
 func (m *mockQuerier) GetTaskByID(ctx context.Context, arg sqlcgen.GetTaskByIDParams) (sqlcgen.Task, error) {
 	return sqlcgen.Task{}, nil
 }
@@ -232,7 +299,9 @@ func (m *mockQuerier) GetTodayTasks(ctx context.Context, arg sqlcgen.GetTodayTas
 func (m *mockQuerier) UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
 	return sqlcgen.Task{}, nil
 }
-func (m *mockQuerier) UpsertTasksBatch(ctx context.Context, arg sqlcgen.UpsertTasksBatchParams) error { return nil }
+func (m *mockQuerier) UpsertTasksBatch(ctx context.Context, arg sqlcgen.UpsertTasksBatchParams) error {
+	return nil
+}
 func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
 	return nil, nil
 }
@@ -261,7 +330,9 @@ func (m *mockQuerier) CheckNotePermission(ctx context.Context, arg sqlcgen.Check
 func (m *mockQuerier) GetNoteDocument(ctx context.Context, id pgtype.UUID) (sqlcgen.GetNoteDocumentRow, error) {
 	return sqlcgen.GetNoteDocumentRow{}, nil
 }
-func (m *mockQuerier) UpdateNoteDocument(ctx context.Context, arg sqlcgen.UpdateNoteDocumentParams) error { return nil }
+func (m *mockQuerier) UpdateNoteDocument(ctx context.Context, arg sqlcgen.UpdateNoteDocumentParams) error {
+	return nil
+}
 func (m *mockQuerier) InsertOperation(ctx context.Context, arg sqlcgen.InsertOperationParams) (sqlcgen.NoteOperation, error) {
 	return sqlcgen.NoteOperation{}, nil
 }
@@ -397,16 +468,16 @@ func TestService_Refresh_RotatesToken(t *testing.T) {
 		t.Error("Refresh: empty access token")
 	}
 
-	// Old token is revoked: replay must fail.
+	// Reusing a consumed token revokes the whole family.
 	_, _, err = svc.Refresh(context.Background(), oldRefresh)
-	if !errors.Is(err, ErrInvalidRefreshToken) {
-		t.Fatalf("Refresh replay: want ErrInvalidRefreshToken, got %v", err)
+	if !errors.Is(err, ErrRefreshTokenReuse) {
+		t.Fatalf("Refresh replay: want ErrRefreshTokenReuse, got %v", err)
 	}
 
-	// New token still works.
+	// The rotated child is revoked with the family.
 	_, _, err = svc.Refresh(context.Background(), refresh1)
-	if err != nil {
-		t.Fatalf("Refresh #2: %v", err)
+	if !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("Refresh after family revoke: want ErrInvalidRefreshToken, got %v", err)
 	}
 }
 
@@ -523,4 +594,3 @@ func TestService_IssuedTokenIsValid(t *testing.T) {
 func (m *mockQuerier) UpdateUserSettings(ctx context.Context, arg sqlcgen.UpdateUserSettingsParams) (sqlcgen.UserSetting, error) {
 	return sqlcgen.UserSetting{}, nil
 }
-

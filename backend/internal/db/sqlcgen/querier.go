@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	CheckNotePermission(ctx context.Context, arg CheckNotePermissionParams) (interface{}, error)
+	ConsumeRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
@@ -20,6 +21,7 @@ type Querier interface {
 	CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) error
 	CreateNoteShare(ctx context.Context, arg CreateNoteShareParams) (NoteShare, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
+	CreateRotatedRefreshToken(ctx context.Context, arg CreateRotatedRefreshTokenParams) (RefreshToken, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
 	CreateTaskCompletion(ctx context.Context, arg CreateTaskCompletionParams) (TaskCompletion, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
@@ -45,6 +47,7 @@ type Querier interface {
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]GetRecentNotesRow, error)
 	GetRecentlyCompletedTasks(ctx context.Context, arg GetRecentlyCompletedTasksParams) ([]Task, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
+	GetRefreshTokenRecord(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
 	GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, error)
 	GetTasksByNodeID(ctx context.Context, id pgtype.UUID) ([]Task, error)
@@ -60,6 +63,7 @@ type Querier interface {
 	LockNote(ctx context.Context, id pgtype.UUID) (LockNoteRow, error)
 	RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error
+	RevokeRefreshTokenFamily(ctx context.Context, familyID pgtype.UUID) error
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Task, error)
 	TryAcquireGCLock(ctx context.Context) (bool, error)
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)

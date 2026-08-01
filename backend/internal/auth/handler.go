@@ -128,6 +128,7 @@ func (h *Handler) Refresh(c echo.Context) error {
 	if err != nil {
 		return respondError(c, err, []errResponse{
 			{ErrInvalidRefreshToken, http.StatusUnauthorized, "invalid refresh token"},
+			{ErrRefreshTokenReuse, http.StatusUnauthorized, "invalid refresh token"},
 		}, "refresh failed")
 	}
 

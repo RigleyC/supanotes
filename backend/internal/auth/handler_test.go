@@ -199,6 +199,31 @@ func TestHandler_Refresh_Invalid(t *testing.T) {
 	}
 }
 
+func TestHandler_Refresh_ReuseRevokesFamily(t *testing.T) {
+	e, _ := newTestServer(t)
+	rec := do(t, e, http.MethodPost, "/api/v1/auth/register",
+		`{"email":"reuse@example.com","password":"correct-horse","name":"R"}`)
+	var reg AuthResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &reg)
+
+	rec2 := do(t, e, http.MethodPost, "/api/v1/auth/refresh",
+		`{"refresh_token":"`+reg.RefreshToken+`"}`)
+	var rotated RefreshResponse
+	_ = json.Unmarshal(rec2.Body.Bytes(), &rotated)
+
+	reuse := do(t, e, http.MethodPost, "/api/v1/auth/refresh",
+		`{"refresh_token":"`+reg.RefreshToken+`"}`)
+	if reuse.Code != http.StatusUnauthorized {
+		t.Fatalf("reuse status: want 401, got %d", reuse.Code)
+	}
+
+	child := do(t, e, http.MethodPost, "/api/v1/auth/refresh",
+		`{"refresh_token":"`+rotated.RefreshToken+`"}`)
+	if child.Code != http.StatusUnauthorized {
+		t.Fatalf("child status after family revoke: want 401, got %d", child.Code)
+	}
+}
+
 func TestHandler_Refresh_MissingToken(t *testing.T) {
 	e, _ := newTestServer(t)
 	rec := do(t, e, http.MethodPost, "/api/v1/auth/refresh", `{}`)

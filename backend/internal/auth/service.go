@@ -24,6 +24,7 @@ var (
 	ErrEmailInUse          = errors.New("auth: email already in use")
 	ErrInvalidCredentials  = errors.New("auth: invalid credentials")
 	ErrInvalidRefreshToken = errors.New("auth: invalid refresh token")
+	ErrRefreshTokenReuse   = errors.New("auth: refresh token reuse detected")
 )
 
 const uniqueViolationCode = "23505"
@@ -137,16 +138,35 @@ func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, str
 	var access, refresh string
 
 	err := s.inTx(ctx, func(q sqlcgen.Querier) error {
-		row, err := q.GetRefreshToken(ctx, hashed)
+		row, err := q.ConsumeRefreshToken(ctx, hashed)
 		if err != nil {
-			return err
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+
+			record, lookupErr := q.GetRefreshTokenRecord(ctx, hashed)
+			if errors.Is(lookupErr, pgx.ErrNoRows) {
+				return ErrInvalidRefreshToken
+			}
+			if lookupErr != nil {
+				return lookupErr
+			}
+			if record.ConsumedAt.Valid {
+				if err := q.RevokeRefreshTokenFamily(ctx, record.FamilyID); err != nil {
+					return err
+				}
+				return ErrRefreshTokenReuse
+			}
+			return ErrInvalidRefreshToken
 		}
 
-		if err := q.RevokeRefreshToken(ctx, row.ID); err != nil {
-			return err
-		}
-
-		access, refresh, err = s.generateAuthResponse(ctx, q, row.UserID)
+		access, refresh, err = s.generateRotatedAuthResponse(
+			ctx,
+			q,
+			row.UserID,
+			row.FamilyID,
+			row.ID,
+		)
 		return err
 	})
 	if err != nil {
@@ -174,7 +194,42 @@ func (s *Service) Logout(ctx context.Context, refreshPlain string) error {
 	})
 }
 
-func (s *Service) generateAuthResponse(ctx context.Context, q sqlcgen.Querier, userID pgtype.UUID) (string, string, error) {
+func (s *Service) generateRotatedAuthResponse(
+	ctx context.Context,
+	q sqlcgen.Querier,
+	userID pgtype.UUID,
+	familyID pgtype.UUID,
+	parentID pgtype.UUID,
+) (string, string, error) {
+	access, err := authpkg.GenerateAccessToken(uid.UUIDToString(userID), s.cfg.JWTSecret, authpkg.AccessTokenTTL)
+	if err != nil {
+		return "", "", fmt.Errorf("auth: sign access token: %w", err)
+	}
+
+	plain, hash, err := authpkg.GenerateRefreshToken()
+	if err != nil {
+		return "", "", fmt.Errorf("auth: generate refresh: %w", err)
+	}
+
+	expires := pgtype.Timestamptz{Time: time.Now().Add(authpkg.RefreshTokenTTL), Valid: true}
+	if _, err := q.CreateRotatedRefreshToken(ctx, sqlcgen.CreateRotatedRefreshTokenParams{
+		UserID:    userID,
+		TokenHash: hash,
+		ExpiresAt: expires,
+		FamilyID:  familyID,
+		ParentID:  parentID,
+	}); err != nil {
+		return "", "", fmt.Errorf("auth: store refresh: %w", err)
+	}
+
+	return access, plain, nil
+}
+
+func (s *Service) generateAuthResponse(
+	ctx context.Context,
+	q sqlcgen.Querier,
+	userID pgtype.UUID,
+) (string, string, error) {
 	idStr := uid.UUIDToString(userID)
 
 	access, err := authpkg.GenerateAccessToken(idStr, s.cfg.JWTSecret, authpkg.AccessTokenTTL)

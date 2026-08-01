@@ -11,10 +11,38 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const consumeRefreshToken = `-- name: ConsumeRefreshToken :one
+UPDATE refresh_tokens
+SET consumed_at = NOW()
+WHERE token_hash = $1
+  AND revoked_at IS NULL
+  AND consumed_at IS NULL
+  AND expires_at > NOW()
+RETURNING id, user_id, token_hash, expires_at, created_at, revoked_at, family_id, parent_id, consumed_at, reuse_detected_at
+`
+
+func (q *Queries) ConsumeRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error) {
+	row := q.db.QueryRow(ctx, consumeRefreshToken, tokenHash)
+	var i RefreshToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.RevokedAt,
+		&i.FamilyID,
+		&i.ParentID,
+		&i.ConsumedAt,
+		&i.ReuseDetectedAt,
+	)
+	return i, err
+}
+
 const createRefreshToken = `-- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
 VALUES ($1, $2, $3)
-RETURNING id, user_id, token_hash, expires_at, created_at, revoked_at
+RETURNING id, user_id, token_hash, expires_at, created_at, revoked_at, family_id, parent_id, consumed_at, reuse_detected_at
 `
 
 type CreateRefreshTokenParams struct {
@@ -33,6 +61,54 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.RevokedAt,
+		&i.FamilyID,
+		&i.ParentID,
+		&i.ConsumedAt,
+		&i.ReuseDetectedAt,
+	)
+	return i, err
+}
+
+const createRotatedRefreshToken = `-- name: CreateRotatedRefreshToken :one
+INSERT INTO refresh_tokens (
+    user_id,
+    token_hash,
+    expires_at,
+    family_id,
+    parent_id
+)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, user_id, token_hash, expires_at, created_at, revoked_at, family_id, parent_id, consumed_at, reuse_detected_at
+`
+
+type CreateRotatedRefreshTokenParams struct {
+	UserID    pgtype.UUID        `json:"user_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	FamilyID  pgtype.UUID        `json:"family_id"`
+	ParentID  pgtype.UUID        `json:"parent_id"`
+}
+
+func (q *Queries) CreateRotatedRefreshToken(ctx context.Context, arg CreateRotatedRefreshTokenParams) (RefreshToken, error) {
+	row := q.db.QueryRow(ctx, createRotatedRefreshToken,
+		arg.UserID,
+		arg.TokenHash,
+		arg.ExpiresAt,
+		arg.FamilyID,
+		arg.ParentID,
+	)
+	var i RefreshToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.RevokedAt,
+		&i.FamilyID,
+		&i.ParentID,
+		&i.ConsumedAt,
+		&i.ReuseDetectedAt,
 	)
 	return i, err
 }
@@ -88,7 +164,7 @@ func (q *Queries) CreateUserSettings(ctx context.Context, arg CreateUserSettings
 }
 
 const getRefreshToken = `-- name: GetRefreshToken :one
-SELECT id, user_id, token_hash, expires_at, created_at, revoked_at FROM refresh_tokens
+SELECT id, user_id, token_hash, expires_at, created_at, revoked_at, family_id, parent_id, consumed_at, reuse_detected_at FROM refresh_tokens
 WHERE token_hash = $1
   AND revoked_at IS NULL
   AND expires_at > NOW()
@@ -104,6 +180,33 @@ func (q *Queries) GetRefreshToken(ctx context.Context, tokenHash string) (Refres
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.RevokedAt,
+		&i.FamilyID,
+		&i.ParentID,
+		&i.ConsumedAt,
+		&i.ReuseDetectedAt,
+	)
+	return i, err
+}
+
+const getRefreshTokenRecord = `-- name: GetRefreshTokenRecord :one
+SELECT id, user_id, token_hash, expires_at, created_at, revoked_at, family_id, parent_id, consumed_at, reuse_detected_at FROM refresh_tokens
+WHERE token_hash = $1
+`
+
+func (q *Queries) GetRefreshTokenRecord(ctx context.Context, tokenHash string) (RefreshToken, error) {
+	row := q.db.QueryRow(ctx, getRefreshTokenRecord, tokenHash)
+	var i RefreshToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.RevokedAt,
+		&i.FamilyID,
+		&i.ParentID,
+		&i.ConsumedAt,
+		&i.ReuseDetectedAt,
 	)
 	return i, err
 }
@@ -184,6 +287,19 @@ WHERE id = $1
 
 func (q *Queries) RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, revokeRefreshToken, id)
+	return err
+}
+
+const revokeRefreshTokenFamily = `-- name: RevokeRefreshTokenFamily :exec
+UPDATE refresh_tokens
+SET
+    revoked_at = COALESCE(revoked_at, NOW()),
+    reuse_detected_at = NOW()
+WHERE family_id = $1
+`
+
+func (q *Queries) RevokeRefreshTokenFamily(ctx context.Context, familyID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, revokeRefreshTokenFamily, familyID)
 	return err
 }
 

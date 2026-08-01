@@ -116,12 +116,16 @@ type NoteWsLease struct {
 }
 
 type RefreshToken struct {
-	ID        pgtype.UUID        `json:"id"`
-	UserID    pgtype.UUID        `json:"user_id"`
-	TokenHash string             `json:"token_hash"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+	ID              pgtype.UUID        `json:"id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	TokenHash       string             `json:"token_hash"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	RevokedAt       pgtype.Timestamptz `json:"revoked_at"`
+	FamilyID        pgtype.UUID        `json:"family_id"`
+	ParentID        pgtype.UUID        `json:"parent_id"`
+	ConsumedAt      pgtype.Timestamptz `json:"consumed_at"`
+	ReuseDetectedAt pgtype.Timestamptz `json:"reuse_detected_at"`
 }
 
 type Task struct {

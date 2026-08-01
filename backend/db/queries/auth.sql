@@ -40,6 +40,37 @@ WHERE token_hash = $1
   AND revoked_at IS NULL
   AND expires_at > NOW();
 
+-- name: GetRefreshTokenRecord :one
+SELECT * FROM refresh_tokens
+WHERE token_hash = $1;
+
+-- name: ConsumeRefreshToken :one
+UPDATE refresh_tokens
+SET consumed_at = NOW()
+WHERE token_hash = $1
+  AND revoked_at IS NULL
+  AND consumed_at IS NULL
+  AND expires_at > NOW()
+RETURNING *;
+
+-- name: CreateRotatedRefreshToken :one
+INSERT INTO refresh_tokens (
+    user_id,
+    token_hash,
+    expires_at,
+    family_id,
+    parent_id
+)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;
+
+-- name: RevokeRefreshTokenFamily :exec
+UPDATE refresh_tokens
+SET
+    revoked_at = COALESCE(revoked_at, NOW()),
+    reuse_detected_at = NOW()
+WHERE family_id = $1;
+
 -- name: RevokeRefreshToken :exec
 UPDATE refresh_tokens
 SET revoked_at = NOW()
