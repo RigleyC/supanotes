@@ -54,36 +54,6 @@ class AuthInterceptor extends Interceptor {
        _refreshSession = refreshSession,
        _replay = replay;
 
-  @Deprecated('Use AuthInterceptor with a RefreshSessionHandler.')
-  AuthInterceptor.legacy({
-    required Future<String?> Function() getAccessToken,
-    required Future<String?> Function() getRefreshToken,
-    required Future<void> Function({
-      required String accessToken,
-      required String refreshToken,
-    })
-    saveTokens,
-    required AuthFailureHandler onAuthFailure,
-    required RefreshHandler onRefresh,
-    required ReplayHandler replay,
-  }) : this(
-         getAccessToken: getAccessToken,
-         onAuthFailure: onAuthFailure,
-         onRefresh: onRefresh,
-         refreshSession: (refresh) async {
-           final refreshToken = await getRefreshToken();
-           if (refreshToken == null) return null;
-           final tokens = await refresh(refreshToken);
-           if (tokens == null) return null;
-           await saveTokens(
-             accessToken: tokens.accessToken,
-             refreshToken: tokens.refreshToken,
-           );
-           return tokens;
-         },
-         replay: replay,
-       );
-
   final Future<String?> Function() _getAccessToken;
   final AuthFailureHandler onAuthFailure;
   final RefreshHandler _onRefresh;

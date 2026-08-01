@@ -7,6 +7,7 @@ import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
+import '../../../helpers/auth_interceptor_test_helper.dart';
 
 class _StubAdapter implements HttpClientAdapter {
   _StubAdapter(this.response);
@@ -40,7 +41,7 @@ ResponseBody _jsonResponse(int status, Object body) {
 
 ApiClient _apiClient(_StubAdapter adapter) {
   final dio = Dio()..httpClientAdapter = adapter;
-  final interceptor = AuthInterceptor.legacy(
+  final interceptor = buildTestAuthInterceptor(
     getAccessToken: () async => null,
     getRefreshToken: () async => null,
     saveTokens: ({required accessToken, required refreshToken}) async {},

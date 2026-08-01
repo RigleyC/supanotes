@@ -11,9 +11,10 @@ leitura inicial contra leituras atrasadas, e o sync informa explicitamente uma
 sessao bloqueada por outra conta. O catalogo local grava o proprietario remoto
 da nota compartilhada. O `ApiClient` de producao usa somente o caminho de
 refresh do `AuthTokenManager`; os callbacks legados nao sao expostos pelo
-construtor de producao do cliente. O interceptor ainda os aceita para manter
-compatibilidade com testes antigos, mas o caminho de producao exige
-`RefreshSessionHandler`.
+construtor de producao do cliente. O `AuthInterceptor` tambem nao expoe mais o
+construtor legado: testes que precisam simular armazenamento usam um helper
+exclusivo de teste que adapta o contrato atual. Assim, o codigo de producao
+tem somente o caminho de refresh baseado em `RefreshSessionHandler`.
 
 O token manager agora serializa tambem a leitura do refresh token. Erros
 persistidos de sync passaram a carregar `ownerUserId`, e a telemetria e os

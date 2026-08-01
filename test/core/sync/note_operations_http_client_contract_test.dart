@@ -8,6 +8,7 @@ import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import '../../helpers/auth_interceptor_test_helper.dart';
 
 class _AllowLoopbackHttpOverrides extends HttpOverrides {}
 
@@ -223,7 +224,7 @@ ApiClient _createTestApiClient(String baseUrl, String userToken) {
     ),
   );
 
-  final authInterceptor = AuthInterceptor.legacy(
+  final authInterceptor = buildTestAuthInterceptor(
     getAccessToken: () async => userToken,
     getRefreshToken: () async => 'refresh-token',
     saveTokens: ({required accessToken, required refreshToken}) async {},

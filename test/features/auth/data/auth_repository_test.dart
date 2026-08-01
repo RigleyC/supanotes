@@ -11,6 +11,7 @@ import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
+import '../../../helpers/auth_interceptor_test_helper.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
@@ -66,7 +67,7 @@ ApiClient _apiClient(_StubAdapter adapter) {
   // We pass a no-op interceptor — this test exercises the repository, not
   // the auth flow. The interceptor must still be present because the
   // ApiClient constructor requires it.
-  final interceptor = AuthInterceptor.legacy(
+  final interceptor = buildTestAuthInterceptor(
     getAccessToken: () => _NoopStorage().getAccessToken(),
     getRefreshToken: () => _NoopStorage().getRefreshToken(),
     saveTokens: ({required accessToken, required refreshToken}) =>
