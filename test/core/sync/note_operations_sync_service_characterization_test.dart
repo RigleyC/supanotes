@@ -198,6 +198,8 @@ void main() {
         final result = await serviceB.syncPending('note-account-scope');
 
         expect(result.acceptedCount, 0);
+        expect(result.isBlocked, isTrue);
+        expect(result.blockedReason, 'foreign_sync_session');
         expect(clientB.syncOperationCalls, 0);
         expect(
           (await db.noteOperationsDao.getAnySyncSession(

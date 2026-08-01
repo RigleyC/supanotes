@@ -1,5 +1,7 @@
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,6 +19,7 @@ class AuthController extends AsyncNotifier<User?> {
   late final AuthLocalStorage _storage;
   late final AuthTokenManager _tokenManager;
   late final SessionCacheNotifier _sessionCache;
+  Future<void> _operationTail = Future<void>.value();
 
   @override
   Future<User?> build() async {
@@ -55,14 +58,20 @@ class AuthController extends AsyncNotifier<User?> {
   }
 
   Future<AuthResult> login({required String email, required String password}) =>
-      _authenticate(() => _repository.login(email: email, password: password));
+      _serialize(
+        () => _authenticate(
+          () => _repository.login(email: email, password: password),
+        ),
+      );
 
   Future<AuthResult> register({
     required String email,
     required String password,
     required String name,
-  }) => _authenticate(
-    () => _repository.register(email: email, password: password, name: name),
+  }) => _serialize(
+    () => _authenticate(
+      () => _repository.register(email: email, password: password, name: name),
+    ),
   );
 
   Future<void> _clearSession({required bool clearLocalData}) async {
@@ -109,7 +118,7 @@ class AuthController extends AsyncNotifier<User?> {
   Future<void> _closeActiveSessionResources() =>
       ref.read(authSessionResourceRegistryProvider).closeAll();
 
-  Future<void> logout() async {
+  Future<void> logout() => _serialize(() async {
     state = const AsyncValue.loading();
     try {
       await _repository.logout();
@@ -119,13 +128,26 @@ class AuthController extends AsyncNotifier<User?> {
     await _clearSession(clearLocalData: true);
 
     ref.read(sessionResetProvider.notifier).update((state) => state + 1);
-  }
+  });
 
   /// Called by the [AuthInterceptor] when a refresh has failed.
-  Future<void> onSessionExpired() async {
+  Future<void> onSessionExpired() => _serialize(() async {
     // Keep local notes and the outbox. A failed refresh must not destroy
     // changes that have not reached the server yet.
     await _clearSession(clearLocalData: false);
     ref.read(sessionResetProvider.notifier).update((state) => state + 1);
+  });
+
+  Future<T> _serialize<T>(Future<T> Function() operation) {
+    final previous = _operationTail;
+    final release = Completer<void>();
+    _operationTail = release.future;
+    return previous.then((_) async {
+      try {
+        return await operation();
+      } finally {
+        release.complete();
+      }
+    });
   }
 }

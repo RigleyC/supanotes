@@ -56,6 +56,11 @@ func (r *AuthRateLimiter) Allow(endpoint, source, identifier string) bool {
 }
 
 func allowRate(buckets map[string]rateLimitBucket, key string, now time.Time, window time.Duration, limit int) bool {
+	for existingKey, bucket := range buckets {
+		if now.Sub(bucket.started) >= window {
+			delete(buckets, existingKey)
+		}
+	}
 	bucket, ok := buckets[key]
 	if !ok || now.Sub(bucket.started) >= window {
 		bucket = rateLimitBucket{started: now}

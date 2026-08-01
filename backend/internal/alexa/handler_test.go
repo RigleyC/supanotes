@@ -44,11 +44,12 @@ func alexaRequest(t *testing.T, token, item string) *http.Request {
 
 func TestHandlerAddsItemAndSpeaksSuccess(t *testing.T) {
 	secret := "test-secret-with-at-least-32-characters"
+	options := auth.TokenOptions{Issuer: "supanotes-api", Audience: "supanotes-client"}
 	user := uuid.New()
-	token, err := auth.GenerateAccessToken(user.String(), secret, auth.AccessTokenTTL)
+	token, err := auth.GenerateAccessToken(user.String(), secret, auth.AccessTokenTTL, options)
 	require.NoError(t, err)
 	stub := &commandStub{}
-	h := NewHandler(stub, secret, "")
+	h := NewHandler(stub, secret, "", options)
 	e := echo.New()
 	rec := httptest.NewRecorder()
 	require.NoError(t, h.Handle(e.NewContext(alexaRequest(t, token, "café"), rec)))
@@ -60,7 +61,7 @@ func TestHandlerAddsItemAndSpeaksSuccess(t *testing.T) {
 
 func TestHandlerRequiresAccountLinking(t *testing.T) {
 	stub := &commandStub{}
-	h := NewHandler(stub, "test-secret-with-at-least-32-characters", "")
+	h := NewHandler(stub, "test-secret-with-at-least-32-characters", "", auth.TokenOptions{Issuer: "supanotes-api", Audience: "supanotes-client"})
 	e := echo.New()
 	rec := httptest.NewRecorder()
 	require.NoError(t, h.Handle(e.NewContext(alexaRequest(t, "", "café"), rec)))
@@ -83,9 +84,10 @@ func TestHandlerMapsCommandErrorsToVoice(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			secret := "test-secret-with-at-least-32-characters"
-			token, err := auth.GenerateAccessToken(uuid.NewString(), secret, auth.AccessTokenTTL)
+			options := auth.TokenOptions{Issuer: "supanotes-api", Audience: "supanotes-client"}
+			token, err := auth.GenerateAccessToken(uuid.NewString(), secret, auth.AccessTokenTTL, options)
 			require.NoError(t, err)
-			h := NewHandler(&commandStub{err: tc.err}, secret, "")
+			h := NewHandler(&commandStub{err: tc.err}, secret, "", options)
 			e := echo.New()
 			rec := httptest.NewRecorder()
 			require.NoError(t, h.Handle(e.NewContext(alexaRequest(t, token, "café"), rec)))

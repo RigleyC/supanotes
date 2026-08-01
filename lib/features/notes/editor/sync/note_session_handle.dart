@@ -5,6 +5,7 @@ enum NoteSessionStatus {
   ready,
   syncing,
   syncError,
+  blocked,
   closing,
   closed,
   error,

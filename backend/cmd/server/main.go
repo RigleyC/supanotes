@@ -163,7 +163,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	queries := sqlcgen.New(pool)
 	authSvc := auth.NewService(queries, cfg, pool)
-	authH := auth.NewHandler(authSvc)
+	authRateLimiter := auth.NewAuthRateLimiter()
+	authH := auth.NewHandler(authSvc, authRateLimiter)
 
 	api.POST("/auth/register", authH.Register)
 	api.POST("/auth/login", authH.Login)
@@ -238,7 +239,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 		authpkg.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
 	)
 	api.POST("/integrations/alexa", alexaH.Handle)
-	oauthH := alexa.NewOAuthHandler(authSvc, pool, cfg)
+	oauthH := alexa.NewOAuthHandler(authSvc, pool, cfg, authRateLimiter)
 	api.GET("/integrations/alexa/oauth/authorize", oauthH.Authorize)
 	api.POST("/integrations/alexa/oauth/authorize", oauthH.AuthorizeSubmit)
 	api.POST("/integrations/alexa/oauth/token", oauthH.Token)

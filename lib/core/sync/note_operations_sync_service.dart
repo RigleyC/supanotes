@@ -18,6 +18,7 @@ class SyncResult {
   final int finalRevision;
   final List<Operation> remoteOperations;
   final NoteDocumentResponse? canonicalDocument;
+  final String? blockedReason;
 
   SyncResult({
     required this.acceptedCount,
@@ -25,13 +26,24 @@ class SyncResult {
     required this.finalRevision,
     required this.remoteOperations,
     this.canonicalDocument,
+    this.blockedReason,
   });
+
+  bool get isBlocked => blockedReason != null;
 
   static SyncResult empty() => SyncResult(
     acceptedCount: 0,
     acceptedOperationIds: [],
     finalRevision: 0,
     remoteOperations: [],
+  );
+
+  static SyncResult blockedByForeignSession() => SyncResult(
+    acceptedCount: 0,
+    acceptedOperationIds: const [],
+    finalRevision: 0,
+    remoteOperations: const [],
+    blockedReason: 'foreign_sync_session',
   );
 }
 
@@ -268,7 +280,7 @@ class NoteOperationsSyncService {
         noteId: noteId,
         fields: {'sessionOwner': foreignSession.ownerUserId},
       );
-      return SyncResult.empty();
+      return SyncResult.blockedByForeignSession();
     }
 
     final ops = await _dao.getPendingOperations(
@@ -518,7 +530,7 @@ class NoteOperationsSyncService {
         noteId: noteId,
         fields: {'sessionOwner': foreignSession.ownerUserId},
       );
-      return SyncResult.empty();
+      return SyncResult.blockedByForeignSession();
     }
 
     final confirmed = await _dao.watchNoteDocument(noteId).first;

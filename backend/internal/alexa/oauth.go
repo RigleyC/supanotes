@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -23,13 +24,18 @@ import (
 )
 
 type OAuthHandler struct {
-	auth *internalauth.Service
-	pool *pgxpool.Pool
-	cfg  *config.Config
+	auth        *internalauth.Service
+	pool        *pgxpool.Pool
+	cfg         *config.Config
+	rateLimiter *internalauth.AuthRateLimiter
 }
 
-func NewOAuthHandler(authSvc *internalauth.Service, pool *pgxpool.Pool, cfg *config.Config) *OAuthHandler {
-	return &OAuthHandler{auth: authSvc, pool: pool, cfg: cfg}
+func NewOAuthHandler(authSvc *internalauth.Service, pool *pgxpool.Pool, cfg *config.Config, limiters ...*internalauth.AuthRateLimiter) *OAuthHandler {
+	rateLimiter := internalauth.NewAuthRateLimiter()
+	if len(limiters) > 0 && limiters[0] != nil {
+		rateLimiter = limiters[0]
+	}
+	return &OAuthHandler{auth: authSvc, pool: pool, cfg: cfg, rateLimiter: rateLimiter}
 }
 
 func (h *OAuthHandler) Authorize(c echo.Context) error {
@@ -52,7 +58,11 @@ func (h *OAuthHandler) AuthorizeSubmit(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
-	session, _, _, err := h.auth.Login(c.Request().Context(), c.FormValue("email"), c.FormValue("password"))
+	email := strings.ToLower(strings.TrimSpace(c.FormValue("email")))
+	if !h.rateLimiter.Allow("alexa_authorize", c.RealIP(), email) {
+		return c.String(http.StatusTooManyRequests, "muitas tentativas; tente novamente mais tarde")
+	}
+	session, _, _, err := h.auth.Login(c.Request().Context(), email, c.FormValue("password"))
 	if err != nil {
 		return c.String(http.StatusUnauthorized, "e-mail ou senha inválidos")
 	}

@@ -24,6 +24,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   bool _isPolling = false;
   bool _disposed = false;
   bool _protocolFailed = false;
+  bool _blockedByForeignSession = false;
   int _pendingSyncOperations = 0;
   Object? _lastError;
   Future<void> _projectionTail = Future<void>.value();
@@ -148,10 +149,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     await syncService.syncPending(
       noteId,
       onReconcile: (result) async {
-        if (!_disposed && result.canonicalDocument != null) {
-          await adapter.reconcile(result);
-          await _enqueueProjection();
-        }
+        await _handleSyncResult(result);
       },
     );
   }
@@ -173,10 +171,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         await syncService.pollAndReconcile(
           noteId,
           onReconcile: (result) async {
-            if (!_disposed && result.canonicalDocument != null) {
-              await adapter.reconcile(result);
-              await _enqueueProjection();
-            }
+            await _handleSyncResult(result);
           },
         );
       });
@@ -206,6 +201,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
             !_disposed &&
             !_protocolFailed &&
             _lastError == null &&
+            !_blockedByForeignSession &&
             _status != NoteSessionStatus.error) {
           _setStatus(NoteSessionStatus.ready);
         }
@@ -213,6 +209,20 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     });
     _syncTail = run;
     await run;
+  }
+
+  Future<void> _handleSyncResult(SyncResult result) async {
+    if (_disposed) return;
+    if (result.isBlocked) {
+      _blockedByForeignSession = true;
+      _setStatus(NoteSessionStatus.blocked);
+      return;
+    }
+    _blockedByForeignSession = false;
+    if (result.canonicalDocument != null) {
+      await adapter.reconcile(result);
+      await _enqueueProjection();
+    }
   }
 
   @override

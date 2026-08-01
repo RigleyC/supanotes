@@ -138,12 +138,13 @@ class NoteCatalogSync {
     }
 
     if (existing == null) {
+      final ownerUserId = json['user_id'] as String? ?? userId;
       await _database
           .into(_database.notes)
           .insert(
             NotesCompanion.insert(
               id: id,
-              userId: userId,
+              userId: ownerUserId,
               content: '',
               createdAt: createdAt,
               updatedAt: updatedAt,

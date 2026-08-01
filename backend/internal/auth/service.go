@@ -136,6 +136,7 @@ func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, str
 	hashed := authpkg.HashRefreshToken(refreshPlain)
 
 	var access, refresh string
+	var reuseDetected bool
 
 	err := s.inTx(ctx, func(q sqlcgen.Querier) error {
 		row, err := q.ConsumeRefreshToken(ctx, hashed)
@@ -155,7 +156,8 @@ func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, str
 				if err := q.RevokeRefreshTokenFamily(ctx, record.FamilyID); err != nil {
 					return err
 				}
-				return ErrRefreshTokenReuse
+				reuseDetected = true
+				return nil
 			}
 			return ErrInvalidRefreshToken
 		}
@@ -174,6 +176,9 @@ func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, str
 			return "", "", ErrInvalidRefreshToken
 		}
 		return "", "", fmt.Errorf("auth: refresh: %w", err)
+	}
+	if reuseDetected {
+		return "", "", ErrRefreshTokenReuse
 	}
 
 	return access, refresh, nil

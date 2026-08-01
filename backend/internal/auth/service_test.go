@@ -358,6 +358,8 @@ func testConfig() *config.Config {
 		Port:        "8080",
 		Environment: "dev",
 		JWTSecret:   "test-secret-at-least-32-characters-long-enough",
+		JWTIssuer:   "supanotes-api",
+		JWTAudience: "supanotes-client",
 	}
 }
 
@@ -582,7 +584,7 @@ func TestService_IssuedTokenIsValid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register: %v", err)
 	}
-	claims, err := auth.ParseAccessToken(access, cfg.JWTSecret)
+	claims, err := auth.ParseAccessToken(access, cfg.JWTSecret, auth.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience})
 	if err != nil {
 		t.Fatalf("ParseAccessToken: %v", err)
 	}

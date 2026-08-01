@@ -39,7 +39,7 @@ type TokenOptions struct {
 	Audience string
 }
 
-func GenerateAccessToken(userID, secret string, ttl time.Duration, options ...TokenOptions) (string, error) {
+func GenerateAccessToken(userID, secret string, ttl time.Duration, options TokenOptions) (string, error) {
 	if secret == "" {
 		return "", errors.New("auth: empty JWT secret")
 	}
@@ -49,12 +49,11 @@ func GenerateAccessToken(userID, secret string, ttl time.Duration, options ...To
 		IssuedAt:  now.Unix(),
 		ExpiresAt: now.Add(ttl).Unix(),
 	}
-	if len(options) > 0 {
-		claims.Issuer = options[0].Issuer
-		if options[0].Audience != "" {
-			claims.Audience = jwt.ClaimStrings{options[0].Audience}
-		}
+	if options.Issuer == "" || options.Audience == "" {
+		return "", errors.New("auth: JWT issuer and audience are required")
 	}
+	claims.Issuer = options.Issuer
+	claims.Audience = jwt.ClaimStrings{options.Audience}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := tok.SignedString([]byte(secret))
 	if err != nil {
@@ -63,7 +62,7 @@ func GenerateAccessToken(userID, secret string, ttl time.Duration, options ...To
 	return signed, nil
 }
 
-func ParseAccessToken(tokenStr, secret string, options ...TokenOptions) (*Claims, error) {
+func ParseAccessToken(tokenStr, secret string, options TokenOptions) (*Claims, error) {
 	if secret == "" {
 		return nil, errors.New("auth: empty JWT secret")
 	}
@@ -71,14 +70,10 @@ func ParseAccessToken(tokenStr, secret string, options ...TokenOptions) (*Claims
 	parserOptions := []jwt.ParserOption{
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 	}
-	if len(options) > 0 {
-		if options[0].Issuer != "" {
-			parserOptions = append(parserOptions, jwt.WithIssuer(options[0].Issuer))
-		}
-		if options[0].Audience != "" {
-			parserOptions = append(parserOptions, jwt.WithAudience(options[0].Audience))
-		}
+	if options.Issuer == "" || options.Audience == "" {
+		return nil, errors.New("auth: JWT issuer and audience are required")
 	}
+	parserOptions = append(parserOptions, jwt.WithIssuer(options.Issuer), jwt.WithAudience(options.Audience))
 	parsed, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
 		if t.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("%w: unexpected signing method %v", ErrInvalidToken, t.Header["alg"])

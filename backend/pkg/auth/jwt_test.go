@@ -8,9 +8,11 @@ import (
 
 const testSecret = "test-secret-must-be-at-least-32-bytes-long"
 
+var testOptions = TokenOptions{Issuer: "supanotes-api", Audience: "supanotes-client"}
+
 func TestGenerateAccessToken_RoundtripParse(t *testing.T) {
 	userID := "5f9b1c5d-1234-4d2c-8b7e-0011223344ff"
-	tok, err := GenerateAccessToken(userID, testSecret, AccessTokenTTL)
+	tok, err := GenerateAccessToken(userID, testSecret, AccessTokenTTL, testOptions)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken error: %v", err)
 	}
@@ -18,7 +20,7 @@ func TestGenerateAccessToken_RoundtripParse(t *testing.T) {
 		t.Fatalf("expected JWS with 3 segments, got %q", tok)
 	}
 
-	claims, err := ParseAccessToken(tok, testSecret)
+	claims, err := ParseAccessToken(tok, testSecret, testOptions)
 	if err != nil {
 		t.Fatalf("ParseAccessToken error: %v", err)
 	}
@@ -31,27 +33,27 @@ func TestGenerateAccessToken_RoundtripParse(t *testing.T) {
 }
 
 func TestParseAccessToken_ExpiredToken(t *testing.T) {
-	tok, err := GenerateAccessToken("user-1", testSecret, -1*time.Minute)
+	tok, err := GenerateAccessToken("user-1", testSecret, -1*time.Minute, testOptions)
 	if err != nil {
 		t.Fatalf("generate error: %v", err)
 	}
-	if _, err := ParseAccessToken(tok, testSecret); err == nil {
+	if _, err := ParseAccessToken(tok, testSecret, testOptions); err == nil {
 		t.Fatalf("expected error for expired token, got nil")
 	}
 }
 
 func TestParseAccessToken_BadSignature(t *testing.T) {
-	tok, err := GenerateAccessToken("user-1", testSecret, AccessTokenTTL)
+	tok, err := GenerateAccessToken("user-1", testSecret, AccessTokenTTL, testOptions)
 	if err != nil {
 		t.Fatalf("generate error: %v", err)
 	}
-	if _, err := ParseAccessToken(tok, "wrong-secret-which-is-also-32+chars"); err == nil {
+	if _, err := ParseAccessToken(tok, "wrong-secret-which-is-also-32+chars", testOptions); err == nil {
 		t.Fatalf("expected signature error, got nil")
 	}
 }
 
 func TestParseAccessToken_MalformedToken(t *testing.T) {
-	if _, err := ParseAccessToken("not.a.jwt", testSecret); err == nil {
+	if _, err := ParseAccessToken("not.a.jwt", testSecret, testOptions); err == nil {
 		t.Fatalf("expected error for malformed token, got nil")
 	}
 }

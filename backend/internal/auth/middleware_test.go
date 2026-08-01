@@ -80,7 +80,7 @@ func TestMiddleware_InvalidToken(t *testing.T) {
 
 func TestMiddleware_WrongSecret(t *testing.T) {
 	e, cfg := newProtectedRoute(t)
-	tok, err := authpkg.GenerateAccessToken("user-123", "different-secret-at-least-32-characters", time.Minute)
+	tok, err := authpkg.GenerateAccessToken("user-123", "different-secret-at-least-32-characters", time.Minute, authpkg.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience})
 	if err != nil {
 		t.Fatalf("GenerateAccessToken: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestMiddleware_WrongSecret(t *testing.T) {
 func TestMiddleware_HappyPath(t *testing.T) {
 	e, cfg := newProtectedRoute(t)
 	const uid = "11111111-1111-1111-1111-111111111111"
-	tok, err := authpkg.GenerateAccessToken(uid, cfg.JWTSecret, time.Minute)
+	tok, err := authpkg.GenerateAccessToken(uid, cfg.JWTSecret, time.Minute, authpkg.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience})
 	if err != nil {
 		t.Fatalf("GenerateAccessToken: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestMiddleware_HappyPath(t *testing.T) {
 
 func TestMiddleware_ExpiredToken(t *testing.T) {
 	e, cfg := newProtectedRoute(t)
-	tok, err := authpkg.GenerateAccessToken("u", cfg.JWTSecret, -time.Minute)
+	tok, err := authpkg.GenerateAccessToken("u", cfg.JWTSecret, -time.Minute, authpkg.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience})
 	if err != nil {
 		t.Fatalf("GenerateAccessToken: %v", err)
 	}

@@ -18,12 +18,31 @@ class AuthTokenManager {
   bool _loaded = false;
   bool _sessionCleared = false;
   Future<void>? _clearInFlight;
+  Future<void>? _loadInFlight;
+  int _sessionGeneration = 0;
 
   Future<String?> getAccessToken() async {
-    if (!_loaded) {
-      _accessToken = await _storage.getAccessToken();
-      _loaded = true;
+    if (_loaded) return _accessToken;
+    final cached = _loadInFlight;
+    if (cached != null) {
+      await cached;
+      return _accessToken;
     }
+    final generation = _sessionGeneration;
+    late final Future<void> load;
+    load = _storage
+        .getAccessToken()
+        .then((token) {
+          if (!_loaded && generation == _sessionGeneration) {
+            _accessToken = token;
+            _loaded = true;
+          }
+        })
+        .whenComplete(() {
+          if (identical(_loadInFlight, load)) _loadInFlight = null;
+        });
+    _loadInFlight = load;
+    await load;
     return _accessToken;
   }
 
@@ -59,6 +78,7 @@ class AuthTokenManager {
     _accessToken = tokens.accessToken;
     _loaded = true;
     _sessionCleared = false;
+    _sessionGeneration++;
   }
 
   /// Replaces credentials returned by a refresh operation.
@@ -76,6 +96,7 @@ class AuthTokenManager {
     _accessToken = null;
     _loaded = true;
     _sessionCleared = true;
+    _sessionGeneration++;
     late final Future<void> clear;
     clear =
         _exclusive(() async {
