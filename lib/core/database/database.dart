@@ -139,7 +139,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -253,6 +253,55 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 23) {
         await customStatement('DROP TABLE IF EXISTS local_yjs_states;');
+      }
+      if (from < 24) {
+        if (from >= 21) {
+          await m.addColumn(
+            pendingNoteOperations,
+            pendingNoteOperations.ownerUserId,
+          );
+          await customStatement('''
+            CREATE TABLE pending_note_operations_v24 (
+              operation_id TEXT NOT NULL,
+              note_id TEXT NOT NULL,
+              owner_user_id TEXT,
+              base_revision INTEGER NOT NULL,
+              ordinal INTEGER NOT NULL,
+              kind TEXT NOT NULL,
+              block_id TEXT,
+              payload_json TEXT NOT NULL,
+              created_at INTEGER NOT NULL,
+              last_attempt_at INTEGER,
+              attempt_count INTEGER NOT NULL DEFAULT 0,
+              status TEXT NOT NULL DEFAULT 'pending',
+              PRIMARY KEY (operation_id),
+              UNIQUE (note_id, owner_user_id, ordinal)
+            )
+          ''');
+          await customStatement('''
+            INSERT INTO pending_note_operations_v24 (
+              operation_id, note_id, owner_user_id, base_revision, ordinal,
+              kind, block_id, payload_json, created_at, last_attempt_at,
+              attempt_count, status
+            )
+            SELECT operation_id, note_id, owner_user_id, base_revision, ordinal,
+              kind, block_id, payload_json, created_at, last_attempt_at,
+              attempt_count, status
+            FROM pending_note_operations
+          ''');
+          await customStatement('DROP TABLE pending_note_operations');
+          await customStatement(
+            'ALTER TABLE pending_note_operations_v24 '
+            'RENAME TO pending_note_operations',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS '
+            'idx_pending_ops_note_ordinal ON pending_note_operations(note_id, ordinal)',
+          );
+        }
+        if (from >= 22) {
+          await m.addColumn(syncSessions, syncSessions.ownerUserId);
+        }
       }
     },
     beforeOpen: (details) async {

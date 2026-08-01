@@ -114,6 +114,104 @@ void main() {
       await db.close();
     });
 
+    test(
+      'account-scoped pending operations do not cross user boundaries',
+      () async {
+        final db = AppDatabase.test();
+        final now = DateTime.utc(2026, 7, 20);
+
+        await db.noteOperationsDao.insertPendingOperation(
+          PendingNoteOperationsCompanion.insert(
+            operationId: 'op-a',
+            noteId: 'shared-note',
+            ownerUserId: const Value('user-a'),
+            baseRevision: 0,
+            ordinal: 0,
+            kind: 'text_delta',
+            payloadJson: '{}',
+            createdAt: now,
+          ),
+        );
+        await db.noteOperationsDao.insertPendingOperation(
+          PendingNoteOperationsCompanion.insert(
+            operationId: 'op-b',
+            noteId: 'shared-note',
+            ownerUserId: const Value('user-b'),
+            baseRevision: 0,
+            ordinal: 0,
+            kind: 'text_delta',
+            payloadJson: '{}',
+            createdAt: now,
+          ),
+        );
+
+        final userA = await db.noteOperationsDao.getPendingOperations(
+          'shared-note',
+          ownerUserId: 'user-a',
+        );
+        final userB = await db.noteOperationsDao.getPendingOperations(
+          'shared-note',
+          ownerUserId: 'user-b',
+        );
+
+        expect(userA.map((op) => op.operationId), ['op-a']);
+        expect(userB.map((op) => op.operationId), ['op-b']);
+
+        await db.close();
+      },
+    );
+
+    test(
+      'legacy rows can be adopted only after local ownership is proven',
+      () async {
+        final db = AppDatabase.test();
+        final now = DateTime.utc(2026, 7, 20);
+
+        await db.notesDao.createNote(
+          NotesCompanion.insert(
+            id: 'owned-note',
+            userId: 'user-a',
+            content: 'local note',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await db.noteOperationsDao.insertPendingOperation(
+          PendingNoteOperationsCompanion.insert(
+            operationId: 'legacy-op',
+            noteId: 'owned-note',
+            baseRevision: 0,
+            ordinal: 0,
+            kind: 'text_delta',
+            payloadJson: '{}',
+            createdAt: now,
+          ),
+        );
+
+        expect(
+          await db.noteOperationsDao.getPendingOperations(
+            'owned-note',
+            ownerUserId: 'user-a',
+          ),
+          isEmpty,
+        );
+
+        expect(
+          await db.noteOperationsDao.getNoteOwnerId('owned-note'),
+          'user-a',
+        );
+        await db.noteOperationsDao.adoptLegacyRows('owned-note', 'user-a');
+
+        final adopted = await db.noteOperationsDao.getPendingOperations(
+          'owned-note',
+          ownerUserId: 'user-a',
+        );
+        expect(adopted.map((op) => op.operationId), ['legacy-op']);
+
+        await db.close();
+      },
+    );
+
     test('deletePendingOperation removes matching row', () async {
       final db = AppDatabase.test();
       final now = DateTime.utc(2026, 7, 20);
@@ -177,10 +275,14 @@ void main() {
 
       await db.noteOperationsDao.deletePendingOperationsForNote('note-1');
 
-      final opsNote1 = await db.noteOperationsDao.getPendingOperations('note-1');
+      final opsNote1 = await db.noteOperationsDao.getPendingOperations(
+        'note-1',
+      );
       expect(opsNote1, isEmpty);
 
-      final opsNote2 = await db.noteOperationsDao.getPendingOperations('note-2');
+      final opsNote2 = await db.noteOperationsDao.getPendingOperations(
+        'note-2',
+      );
       expect(opsNote2, hasLength(1));
 
       await db.close();
@@ -227,8 +329,7 @@ void main() {
         ),
       );
 
-      final errors =
-          await db.noteOperationsDao.watchSyncErrors('note-1').first;
+      final errors = await db.noteOperationsDao.watchSyncErrors('note-1').first;
       expect(errors, hasLength(1));
       expect(errors.single.errorCode, 'INVALID_DELTA');
 
@@ -251,8 +352,7 @@ void main() {
       );
       await db.noteOperationsDao.deleteSyncError('err-1');
 
-      final errors =
-          await db.noteOperationsDao.watchSyncErrors('note-1').first;
+      final errors = await db.noteOperationsDao.watchSyncErrors('note-1').first;
       expect(errors, isEmpty);
 
       await db.close();

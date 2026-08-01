@@ -4,6 +4,13 @@ import 'package:drift/drift.dart';
 class PendingNoteOperations extends Table {
   TextColumn get operationId => text()();
   TextColumn get noteId => text()();
+
+  /// Account that created the local operation.
+  ///
+  /// Nullable for rows created before account scoping was introduced. The
+  /// sync service only adopts such rows when it can prove that the local note
+  /// belongs to the current account.
+  TextColumn get ownerUserId => text().nullable()();
   IntColumn get baseRevision => integer()();
   IntColumn get ordinal => integer()();
   TextColumn get kind => text()();
@@ -19,6 +26,6 @@ class PendingNoteOperations extends Table {
 
   @override
   List<String> get customConstraints => const [
-    'UNIQUE(note_id, ordinal)',
+    'UNIQUE(note_id, owner_user_id, ordinal)',
   ];
 }

@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/local_note_documents.dart';
 import '../tables/note_sync_errors.dart';
+import '../tables/notes.dart';
 import '../tables/pending_note_operations.dart';
 import '../tables/sync_sessions.dart';
 
@@ -13,6 +14,7 @@ part 'note_operations_dao.g.dart';
     LocalNoteDocuments,
     PendingNoteOperations,
     NoteSyncErrors,
+    Notes,
     SyncSessions,
   ],
 )
@@ -44,24 +46,58 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     ).insert(op, mode: InsertMode.insertOrReplace);
   }
 
-  Stream<List<PendingNoteOperationData>> watchPendingOperations(String noteId) {
-    return (select(pendingNoteOperations)
-          ..where((t) => t.noteId.equals(noteId))
-          ..orderBy([(t) => OrderingTerm(expression: t.ordinal)]))
-        .watch();
+  Stream<List<PendingNoteOperationData>> watchPendingOperations(
+    String noteId, {
+    String? ownerUserId,
+  }) {
+    final query = select(pendingNoteOperations)
+      ..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    query.orderBy([(t) => OrderingTerm(expression: t.ordinal)]);
+    return query.watch();
   }
 
   Future<List<PendingNoteOperationData>> getPendingOperations(
     String noteId, {
     String? status,
+    String? ownerUserId,
   }) async {
     final query = select(pendingNoteOperations)
-      ..where((t) => t.noteId.equals(noteId))
-      ..orderBy([(t) => OrderingTerm(expression: t.ordinal)]);
+      ..where((t) => t.noteId.equals(noteId));
     if (status != null) {
       query.where((t) => t.status.equals(status));
     }
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    query.orderBy([(t) => OrderingTerm(expression: t.ordinal)]);
     return query.get();
+  }
+
+  Future<String?> getNoteOwnerId(String noteId) async {
+    final note = await (select(
+      notes,
+    )..where((t) => t.id.equals(noteId))).getSingleOrNull();
+    return note?.userId;
+  }
+
+  /// Assigns legacy unscoped rows only when the local note proves ownership.
+  ///
+  /// Shared-note rows and rows without a local ownership record remain
+  /// unscoped and are hidden from account-scoped sync.
+  Future<void> adoptLegacyRows(String noteId, String ownerUserId) async {
+    await transaction(() async {
+      await (update(
+        pendingNoteOperations,
+      )..where((t) => t.noteId.equals(noteId) & t.ownerUserId.isNull())).write(
+        PendingNoteOperationsCompanion(ownerUserId: Value(ownerUserId)),
+      );
+      await (update(syncSessions)
+            ..where((t) => t.noteId.equals(noteId) & t.ownerUserId.isNull()))
+          .write(SyncSessionsCompanion(ownerUserId: Value(ownerUserId)));
+    });
   }
 
   Future<void> deletePendingOperation(String operationId) async {
@@ -102,7 +138,18 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
 
   // ---- Sync session CRUD ----
 
-  Future<SyncSessionData?> getSyncSession(String noteId) {
+  Future<SyncSessionData?> getSyncSession(
+    String noteId, {
+    String? ownerUserId,
+  }) {
+    final query = select(syncSessions)..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    return query.getSingleOrNull();
+  }
+
+  Future<SyncSessionData?> getAnySyncSession(String noteId) {
     return (select(
       syncSessions,
     )..where((t) => t.noteId.equals(noteId))).getSingleOrNull();
@@ -114,8 +161,12 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     ).insert(session, onConflict: DoUpdate((_) => session));
   }
 
-  Future<void> deleteSyncSession(String noteId) async {
-    await (delete(syncSessions)..where((t) => t.noteId.equals(noteId))).go();
+  Future<void> deleteSyncSession(String noteId, {String? ownerUserId}) async {
+    final query = delete(syncSessions)..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    await query.go();
   }
 
   // ---- Outbox status ----
@@ -123,11 +174,15 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
   Future<void> updatePendingOpsStatus(
     String noteId,
     String fromStatus,
-    String toStatus,
-  ) async {
-    await (update(pendingNoteOperations)
-          ..where((t) => t.noteId.equals(noteId) & t.status.equals(fromStatus)))
-        .write(PendingNoteOperationsCompanion(status: Value(toStatus)));
+    String toStatus, {
+    String? ownerUserId,
+  }) async {
+    final query = update(pendingNoteOperations)
+      ..where((t) => t.noteId.equals(noteId) & t.status.equals(fromStatus));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    await query.write(PendingNoteOperationsCompanion(status: Value(toStatus)));
   }
 
   Future<void> markInFlight(String noteId, Set<String> operationIds) async {
@@ -142,12 +197,16 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
-  Future<int> getProjectedOutboxOperationCount(String noteId) async {
-    final count =
-        await (select(pendingNoteOperations)
-              ..where((t) => t.noteId.equals(noteId)))
-            .map((row) => row.operationId)
-            .get();
+  Future<int> getProjectedOutboxOperationCount(
+    String noteId, {
+    String? ownerUserId,
+  }) async {
+    final query = select(pendingNoteOperations)
+      ..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    final count = await query.map((row) => row.operationId).get();
     return count.length;
   }
 
@@ -161,18 +220,23 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
 
   Future<void> replacePendingOps(
     String noteId,
-    List<PendingNoteOperationData> ops,
-  ) async {
+    List<PendingNoteOperationData> ops, {
+    String? ownerUserId,
+  }) async {
     await transaction(() async {
-      await (delete(
-        pendingNoteOperations,
-      )..where((t) => t.noteId.equals(noteId))).go();
+      final deleteQuery = delete(pendingNoteOperations)
+        ..where((t) => t.noteId.equals(noteId));
+      if (ownerUserId != null) {
+        deleteQuery.where((t) => t.ownerUserId.equals(ownerUserId));
+      }
+      await deleteQuery.go();
       for (int i = 0; i < ops.length; i++) {
         final op = ops[i];
         await into(pendingNoteOperations).insert(
           PendingNoteOperationsCompanion(
             operationId: Value(op.operationId),
             noteId: Value(op.noteId),
+            ownerUserId: Value(ownerUserId ?? op.ownerUserId),
             baseRevision: Value(op.baseRevision),
             ordinal: Value(i),
             kind: Value(op.kind),
@@ -187,10 +251,17 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
-  Future<void> deletePendingOpsByStatus(String noteId, String status) async {
-    await (delete(
-      pendingNoteOperations,
-    )..where((t) => t.noteId.equals(noteId) & t.status.equals(status))).go();
+  Future<void> deletePendingOpsByStatus(
+    String noteId,
+    String status, {
+    String? ownerUserId,
+  }) async {
+    final query = delete(pendingNoteOperations)
+      ..where((t) => t.noteId.equals(noteId) & t.status.equals(status));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    await query.go();
   }
 
   Future<void> deleteAccepted(Set<String> operationIds) async {

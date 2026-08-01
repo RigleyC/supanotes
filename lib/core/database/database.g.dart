@@ -3955,6 +3955,17 @@ class $PendingNoteOperationsTable extends PendingNoteOperations
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _baseRevisionMeta = const VerificationMeta(
     'baseRevision',
   );
@@ -4057,6 +4068,7 @@ class $PendingNoteOperationsTable extends PendingNoteOperations
   List<GeneratedColumn> get $columns => [
     operationId,
     noteId,
+    ownerUserId,
     baseRevision,
     ordinal,
     kind,
@@ -4097,6 +4109,15 @@ class $PendingNoteOperationsTable extends PendingNoteOperations
       );
     } else if (isInserting) {
       context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
     }
     if (data.containsKey('base_revision')) {
       context.handle(
@@ -4194,6 +4215,10 @@ class $PendingNoteOperationsTable extends PendingNoteOperations
         DriftSqlType.string,
         data['${effectivePrefix}note_id'],
       )!,
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      ),
       baseRevision: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}base_revision'],
@@ -4243,6 +4268,13 @@ class PendingNoteOperationData extends DataClass
     implements Insertable<PendingNoteOperationData> {
   final String operationId;
   final String noteId;
+
+  /// Account that created the local operation.
+  ///
+  /// Nullable for rows created before account scoping was introduced. The
+  /// sync service only adopts such rows when it can prove that the local note
+  /// belongs to the current account.
+  final String? ownerUserId;
   final int baseRevision;
   final int ordinal;
   final String kind;
@@ -4255,6 +4287,7 @@ class PendingNoteOperationData extends DataClass
   const PendingNoteOperationData({
     required this.operationId,
     required this.noteId,
+    this.ownerUserId,
     required this.baseRevision,
     required this.ordinal,
     required this.kind,
@@ -4270,6 +4303,9 @@ class PendingNoteOperationData extends DataClass
     final map = <String, Expression>{};
     map['operation_id'] = Variable<String>(operationId);
     map['note_id'] = Variable<String>(noteId);
+    if (!nullToAbsent || ownerUserId != null) {
+      map['owner_user_id'] = Variable<String>(ownerUserId);
+    }
     map['base_revision'] = Variable<int>(baseRevision);
     map['ordinal'] = Variable<int>(ordinal);
     map['kind'] = Variable<String>(kind);
@@ -4290,6 +4326,9 @@ class PendingNoteOperationData extends DataClass
     return PendingNoteOperationsCompanion(
       operationId: Value(operationId),
       noteId: Value(noteId),
+      ownerUserId: ownerUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerUserId),
       baseRevision: Value(baseRevision),
       ordinal: Value(ordinal),
       kind: Value(kind),
@@ -4314,6 +4353,7 @@ class PendingNoteOperationData extends DataClass
     return PendingNoteOperationData(
       operationId: serializer.fromJson<String>(json['operationId']),
       noteId: serializer.fromJson<String>(json['noteId']),
+      ownerUserId: serializer.fromJson<String?>(json['ownerUserId']),
       baseRevision: serializer.fromJson<int>(json['baseRevision']),
       ordinal: serializer.fromJson<int>(json['ordinal']),
       kind: serializer.fromJson<String>(json['kind']),
@@ -4331,6 +4371,7 @@ class PendingNoteOperationData extends DataClass
     return <String, dynamic>{
       'operationId': serializer.toJson<String>(operationId),
       'noteId': serializer.toJson<String>(noteId),
+      'ownerUserId': serializer.toJson<String?>(ownerUserId),
       'baseRevision': serializer.toJson<int>(baseRevision),
       'ordinal': serializer.toJson<int>(ordinal),
       'kind': serializer.toJson<String>(kind),
@@ -4346,6 +4387,7 @@ class PendingNoteOperationData extends DataClass
   PendingNoteOperationData copyWith({
     String? operationId,
     String? noteId,
+    Value<String?> ownerUserId = const Value.absent(),
     int? baseRevision,
     int? ordinal,
     String? kind,
@@ -4358,6 +4400,7 @@ class PendingNoteOperationData extends DataClass
   }) => PendingNoteOperationData(
     operationId: operationId ?? this.operationId,
     noteId: noteId ?? this.noteId,
+    ownerUserId: ownerUserId.present ? ownerUserId.value : this.ownerUserId,
     baseRevision: baseRevision ?? this.baseRevision,
     ordinal: ordinal ?? this.ordinal,
     kind: kind ?? this.kind,
@@ -4378,6 +4421,9 @@ class PendingNoteOperationData extends DataClass
           ? data.operationId.value
           : this.operationId,
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
       baseRevision: data.baseRevision.present
           ? data.baseRevision.value
           : this.baseRevision,
@@ -4403,6 +4449,7 @@ class PendingNoteOperationData extends DataClass
     return (StringBuffer('PendingNoteOperationData(')
           ..write('operationId: $operationId, ')
           ..write('noteId: $noteId, ')
+          ..write('ownerUserId: $ownerUserId, ')
           ..write('baseRevision: $baseRevision, ')
           ..write('ordinal: $ordinal, ')
           ..write('kind: $kind, ')
@@ -4420,6 +4467,7 @@ class PendingNoteOperationData extends DataClass
   int get hashCode => Object.hash(
     operationId,
     noteId,
+    ownerUserId,
     baseRevision,
     ordinal,
     kind,
@@ -4436,6 +4484,7 @@ class PendingNoteOperationData extends DataClass
       (other is PendingNoteOperationData &&
           other.operationId == this.operationId &&
           other.noteId == this.noteId &&
+          other.ownerUserId == this.ownerUserId &&
           other.baseRevision == this.baseRevision &&
           other.ordinal == this.ordinal &&
           other.kind == this.kind &&
@@ -4451,6 +4500,7 @@ class PendingNoteOperationsCompanion
     extends UpdateCompanion<PendingNoteOperationData> {
   final Value<String> operationId;
   final Value<String> noteId;
+  final Value<String?> ownerUserId;
   final Value<int> baseRevision;
   final Value<int> ordinal;
   final Value<String> kind;
@@ -4464,6 +4514,7 @@ class PendingNoteOperationsCompanion
   const PendingNoteOperationsCompanion({
     this.operationId = const Value.absent(),
     this.noteId = const Value.absent(),
+    this.ownerUserId = const Value.absent(),
     this.baseRevision = const Value.absent(),
     this.ordinal = const Value.absent(),
     this.kind = const Value.absent(),
@@ -4478,6 +4529,7 @@ class PendingNoteOperationsCompanion
   PendingNoteOperationsCompanion.insert({
     required String operationId,
     required String noteId,
+    this.ownerUserId = const Value.absent(),
     required int baseRevision,
     required int ordinal,
     required String kind,
@@ -4498,6 +4550,7 @@ class PendingNoteOperationsCompanion
   static Insertable<PendingNoteOperationData> custom({
     Expression<String>? operationId,
     Expression<String>? noteId,
+    Expression<String>? ownerUserId,
     Expression<int>? baseRevision,
     Expression<int>? ordinal,
     Expression<String>? kind,
@@ -4512,6 +4565,7 @@ class PendingNoteOperationsCompanion
     return RawValuesInsertable({
       if (operationId != null) 'operation_id': operationId,
       if (noteId != null) 'note_id': noteId,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
       if (baseRevision != null) 'base_revision': baseRevision,
       if (ordinal != null) 'ordinal': ordinal,
       if (kind != null) 'kind': kind,
@@ -4528,6 +4582,7 @@ class PendingNoteOperationsCompanion
   PendingNoteOperationsCompanion copyWith({
     Value<String>? operationId,
     Value<String>? noteId,
+    Value<String?>? ownerUserId,
     Value<int>? baseRevision,
     Value<int>? ordinal,
     Value<String>? kind,
@@ -4542,6 +4597,7 @@ class PendingNoteOperationsCompanion
     return PendingNoteOperationsCompanion(
       operationId: operationId ?? this.operationId,
       noteId: noteId ?? this.noteId,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
       baseRevision: baseRevision ?? this.baseRevision,
       ordinal: ordinal ?? this.ordinal,
       kind: kind ?? this.kind,
@@ -4563,6 +4619,9 @@ class PendingNoteOperationsCompanion
     }
     if (noteId.present) {
       map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
     }
     if (baseRevision.present) {
       map['base_revision'] = Variable<int>(baseRevision.value);
@@ -4602,6 +4661,7 @@ class PendingNoteOperationsCompanion
     return (StringBuffer('PendingNoteOperationsCompanion(')
           ..write('operationId: $operationId, ')
           ..write('noteId: $noteId, ')
+          ..write('ownerUserId: $ownerUserId, ')
           ..write('baseRevision: $baseRevision, ')
           ..write('ordinal: $ordinal, ')
           ..write('kind: $kind, ')
@@ -5062,6 +5122,17 @@ class $SyncSessionsTable extends SyncSessions
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _knownRevisionMeta = const VerificationMeta(
     'knownRevision',
   );
@@ -5098,6 +5169,7 @@ class $SyncSessionsTable extends SyncSessions
   @override
   List<GeneratedColumn> get $columns => [
     noteId,
+    ownerUserId,
     knownRevision,
     operationIds,
     startedAt,
@@ -5121,6 +5193,15 @@ class $SyncSessionsTable extends SyncSessions
       );
     } else if (isInserting) {
       context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
     }
     if (data.containsKey('known_revision')) {
       context.handle(
@@ -5165,6 +5246,10 @@ class $SyncSessionsTable extends SyncSessions
         DriftSqlType.string,
         data['${effectivePrefix}note_id'],
       )!,
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      ),
       knownRevision: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}known_revision'],
@@ -5188,11 +5273,15 @@ class $SyncSessionsTable extends SyncSessions
 
 class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
   final String noteId;
+
+  /// Account that owns this resumable sync session.
+  final String? ownerUserId;
   final int knownRevision;
   final String operationIds;
   final String startedAt;
   const SyncSessionData({
     required this.noteId,
+    this.ownerUserId,
     required this.knownRevision,
     required this.operationIds,
     required this.startedAt,
@@ -5201,6 +5290,9 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['note_id'] = Variable<String>(noteId);
+    if (!nullToAbsent || ownerUserId != null) {
+      map['owner_user_id'] = Variable<String>(ownerUserId);
+    }
     map['known_revision'] = Variable<int>(knownRevision);
     map['operation_ids'] = Variable<String>(operationIds);
     map['started_at'] = Variable<String>(startedAt);
@@ -5210,6 +5302,9 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
   SyncSessionsCompanion toCompanion(bool nullToAbsent) {
     return SyncSessionsCompanion(
       noteId: Value(noteId),
+      ownerUserId: ownerUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerUserId),
       knownRevision: Value(knownRevision),
       operationIds: Value(operationIds),
       startedAt: Value(startedAt),
@@ -5223,6 +5318,7 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return SyncSessionData(
       noteId: serializer.fromJson<String>(json['noteId']),
+      ownerUserId: serializer.fromJson<String?>(json['ownerUserId']),
       knownRevision: serializer.fromJson<int>(json['knownRevision']),
       operationIds: serializer.fromJson<String>(json['operationIds']),
       startedAt: serializer.fromJson<String>(json['startedAt']),
@@ -5233,6 +5329,7 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'noteId': serializer.toJson<String>(noteId),
+      'ownerUserId': serializer.toJson<String?>(ownerUserId),
       'knownRevision': serializer.toJson<int>(knownRevision),
       'operationIds': serializer.toJson<String>(operationIds),
       'startedAt': serializer.toJson<String>(startedAt),
@@ -5241,11 +5338,13 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
 
   SyncSessionData copyWith({
     String? noteId,
+    Value<String?> ownerUserId = const Value.absent(),
     int? knownRevision,
     String? operationIds,
     String? startedAt,
   }) => SyncSessionData(
     noteId: noteId ?? this.noteId,
+    ownerUserId: ownerUserId.present ? ownerUserId.value : this.ownerUserId,
     knownRevision: knownRevision ?? this.knownRevision,
     operationIds: operationIds ?? this.operationIds,
     startedAt: startedAt ?? this.startedAt,
@@ -5253,6 +5352,9 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
   SyncSessionData copyWithCompanion(SyncSessionsCompanion data) {
     return SyncSessionData(
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
       knownRevision: data.knownRevision.present
           ? data.knownRevision.value
           : this.knownRevision,
@@ -5267,6 +5369,7 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
   String toString() {
     return (StringBuffer('SyncSessionData(')
           ..write('noteId: $noteId, ')
+          ..write('ownerUserId: $ownerUserId, ')
           ..write('knownRevision: $knownRevision, ')
           ..write('operationIds: $operationIds, ')
           ..write('startedAt: $startedAt')
@@ -5276,12 +5379,13 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
 
   @override
   int get hashCode =>
-      Object.hash(noteId, knownRevision, operationIds, startedAt);
+      Object.hash(noteId, ownerUserId, knownRevision, operationIds, startedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SyncSessionData &&
           other.noteId == this.noteId &&
+          other.ownerUserId == this.ownerUserId &&
           other.knownRevision == this.knownRevision &&
           other.operationIds == this.operationIds &&
           other.startedAt == this.startedAt);
@@ -5289,12 +5393,14 @@ class SyncSessionData extends DataClass implements Insertable<SyncSessionData> {
 
 class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
   final Value<String> noteId;
+  final Value<String?> ownerUserId;
   final Value<int> knownRevision;
   final Value<String> operationIds;
   final Value<String> startedAt;
   final Value<int> rowid;
   const SyncSessionsCompanion({
     this.noteId = const Value.absent(),
+    this.ownerUserId = const Value.absent(),
     this.knownRevision = const Value.absent(),
     this.operationIds = const Value.absent(),
     this.startedAt = const Value.absent(),
@@ -5302,6 +5408,7 @@ class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
   });
   SyncSessionsCompanion.insert({
     required String noteId,
+    this.ownerUserId = const Value.absent(),
     required int knownRevision,
     required String operationIds,
     required String startedAt,
@@ -5312,6 +5419,7 @@ class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
        startedAt = Value(startedAt);
   static Insertable<SyncSessionData> custom({
     Expression<String>? noteId,
+    Expression<String>? ownerUserId,
     Expression<int>? knownRevision,
     Expression<String>? operationIds,
     Expression<String>? startedAt,
@@ -5319,6 +5427,7 @@ class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
   }) {
     return RawValuesInsertable({
       if (noteId != null) 'note_id': noteId,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
       if (knownRevision != null) 'known_revision': knownRevision,
       if (operationIds != null) 'operation_ids': operationIds,
       if (startedAt != null) 'started_at': startedAt,
@@ -5328,6 +5437,7 @@ class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
 
   SyncSessionsCompanion copyWith({
     Value<String>? noteId,
+    Value<String?>? ownerUserId,
     Value<int>? knownRevision,
     Value<String>? operationIds,
     Value<String>? startedAt,
@@ -5335,6 +5445,7 @@ class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
   }) {
     return SyncSessionsCompanion(
       noteId: noteId ?? this.noteId,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
       knownRevision: knownRevision ?? this.knownRevision,
       operationIds: operationIds ?? this.operationIds,
       startedAt: startedAt ?? this.startedAt,
@@ -5347,6 +5458,9 @@ class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
     final map = <String, Expression>{};
     if (noteId.present) {
       map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
     }
     if (knownRevision.present) {
       map['known_revision'] = Variable<int>(knownRevision.value);
@@ -5367,6 +5481,7 @@ class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
   String toString() {
     return (StringBuffer('SyncSessionsCompanion(')
           ..write('noteId: $noteId, ')
+          ..write('ownerUserId: $ownerUserId, ')
           ..write('knownRevision: $knownRevision, ')
           ..write('operationIds: $operationIds, ')
           ..write('startedAt: $startedAt, ')
@@ -7600,6 +7715,7 @@ typedef $$PendingNoteOperationsTableCreateCompanionBuilder =
     PendingNoteOperationsCompanion Function({
       required String operationId,
       required String noteId,
+      Value<String?> ownerUserId,
       required int baseRevision,
       required int ordinal,
       required String kind,
@@ -7615,6 +7731,7 @@ typedef $$PendingNoteOperationsTableUpdateCompanionBuilder =
     PendingNoteOperationsCompanion Function({
       Value<String> operationId,
       Value<String> noteId,
+      Value<String?> ownerUserId,
       Value<int> baseRevision,
       Value<int> ordinal,
       Value<String> kind,
@@ -7643,6 +7760,11 @@ class $$PendingNoteOperationsTableFilterComposer
 
   ColumnFilters<String> get noteId => $composableBuilder(
     column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7711,6 +7833,11 @@ class $$PendingNoteOperationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get baseRevision => $composableBuilder(
     column: $table.baseRevision,
     builder: (column) => ColumnOrderings(column),
@@ -7773,6 +7900,11 @@ class $$PendingNoteOperationsTableAnnotationComposer
 
   GeneratedColumn<String> get noteId =>
       $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get baseRevision => $composableBuilder(
     column: $table.baseRevision,
@@ -7858,6 +7990,7 @@ class $$PendingNoteOperationsTableTableManager
               ({
                 Value<String> operationId = const Value.absent(),
                 Value<String> noteId = const Value.absent(),
+                Value<String?> ownerUserId = const Value.absent(),
                 Value<int> baseRevision = const Value.absent(),
                 Value<int> ordinal = const Value.absent(),
                 Value<String> kind = const Value.absent(),
@@ -7871,6 +8004,7 @@ class $$PendingNoteOperationsTableTableManager
               }) => PendingNoteOperationsCompanion(
                 operationId: operationId,
                 noteId: noteId,
+                ownerUserId: ownerUserId,
                 baseRevision: baseRevision,
                 ordinal: ordinal,
                 kind: kind,
@@ -7886,6 +8020,7 @@ class $$PendingNoteOperationsTableTableManager
               ({
                 required String operationId,
                 required String noteId,
+                Value<String?> ownerUserId = const Value.absent(),
                 required int baseRevision,
                 required int ordinal,
                 required String kind,
@@ -7899,6 +8034,7 @@ class $$PendingNoteOperationsTableTableManager
               }) => PendingNoteOperationsCompanion.insert(
                 operationId: operationId,
                 noteId: noteId,
+                ownerUserId: ownerUserId,
                 baseRevision: baseRevision,
                 ordinal: ordinal,
                 kind: kind,
@@ -8171,6 +8307,7 @@ typedef $$NoteSyncErrorsTableProcessedTableManager =
 typedef $$SyncSessionsTableCreateCompanionBuilder =
     SyncSessionsCompanion Function({
       required String noteId,
+      Value<String?> ownerUserId,
       required int knownRevision,
       required String operationIds,
       required String startedAt,
@@ -8179,6 +8316,7 @@ typedef $$SyncSessionsTableCreateCompanionBuilder =
 typedef $$SyncSessionsTableUpdateCompanionBuilder =
     SyncSessionsCompanion Function({
       Value<String> noteId,
+      Value<String?> ownerUserId,
       Value<int> knownRevision,
       Value<String> operationIds,
       Value<String> startedAt,
@@ -8196,6 +8334,11 @@ class $$SyncSessionsTableFilterComposer
   });
   ColumnFilters<String> get noteId => $composableBuilder(
     column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8229,6 +8372,11 @@ class $$SyncSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get knownRevision => $composableBuilder(
     column: $table.knownRevision,
     builder: (column) => ColumnOrderings(column),
@@ -8256,6 +8404,11 @@ class $$SyncSessionsTableAnnotationComposer
   });
   GeneratedColumn<String> get noteId =>
       $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get knownRevision => $composableBuilder(
     column: $table.knownRevision,
@@ -8303,12 +8456,14 @@ class $$SyncSessionsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> noteId = const Value.absent(),
+                Value<String?> ownerUserId = const Value.absent(),
                 Value<int> knownRevision = const Value.absent(),
                 Value<String> operationIds = const Value.absent(),
                 Value<String> startedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncSessionsCompanion(
                 noteId: noteId,
+                ownerUserId: ownerUserId,
                 knownRevision: knownRevision,
                 operationIds: operationIds,
                 startedAt: startedAt,
@@ -8317,12 +8472,14 @@ class $$SyncSessionsTableTableManager
           createCompanionCallback:
               ({
                 required String noteId,
+                Value<String?> ownerUserId = const Value.absent(),
                 required int knownRevision,
                 required String operationIds,
                 required String startedAt,
                 Value<int> rowid = const Value.absent(),
               }) => SyncSessionsCompanion.insert(
                 noteId: noteId,
+                ownerUserId: ownerUserId,
                 knownRevision: knownRevision,
                 operationIds: operationIds,
                 startedAt: startedAt,

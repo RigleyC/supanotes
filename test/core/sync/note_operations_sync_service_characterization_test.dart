@@ -44,6 +44,7 @@ void main() {
           PendingNoteOperationsCompanion.insert(
             operationId: 'op-pending',
             noteId: 'note-open',
+            ownerUserId: const Value('user-1'),
             baseRevision: 7,
             ordinal: 0,
             kind: 'text_delta',
@@ -160,6 +161,61 @@ void main() {
     );
 
     test(
+      'different account cannot overwrite a foreign persisted sync session',
+      () async {
+        await seedConfirmedDocument(db, 'note-account-scope', revision: 4);
+        await db.noteOperationsDao.insertPendingOperation(
+          PendingNoteOperationsCompanion.insert(
+            operationId: 'op-user-b',
+            noteId: 'note-account-scope',
+            ownerUserId: const Value('user-b'),
+            baseRevision: 4,
+            ordinal: 0,
+            kind: 'text_delta',
+            blockId: const Value('b1'),
+            payloadJson: '{"delta":[]}',
+            createdAt: DateTime.utc(2026, 7, 26),
+          ),
+        );
+        await db.noteOperationsDao.upsertSyncSession(
+          SyncSessionsCompanion.insert(
+            noteId: 'note-account-scope',
+            ownerUserId: const Value('user-a'),
+            knownRevision: 4,
+            operationIds: '["op-user-a"]',
+            startedAt: DateTime.utc(2026, 7, 26).toIso8601String(),
+          ),
+        );
+
+        final clientB = CharacterizationNoteSyncClient();
+        final serviceB = NoteOperationsSyncService(
+          syncClient: clientB,
+          dao: db.noteOperationsDao,
+          clientId: 'client-b',
+          actorId: 'user-b',
+        );
+
+        final result = await serviceB.syncPending('note-account-scope');
+
+        expect(result.acceptedCount, 0);
+        expect(clientB.syncOperationCalls, 0);
+        expect(
+          (await db.noteOperationsDao.getAnySyncSession(
+            'note-account-scope',
+          ))?.ownerUserId,
+          'user-a',
+        );
+        expect(
+          await db.noteOperationsDao.getPendingOperations(
+            'note-account-scope',
+            ownerUserId: 'user-b',
+          ),
+          hasLength(1),
+        );
+      },
+    );
+
+    test(
       'resume repairs mismatched persisted session before retrying pending work',
       () async {
         await seedConfirmedDocument(db, 'note-resume', revision: 4);
@@ -173,6 +229,7 @@ void main() {
         await db.noteOperationsDao.upsertSyncSession(
           SyncSessionsCompanion.insert(
             noteId: 'note-resume',
+            ownerUserId: const Value('user-1'),
             knownRevision: 4,
             operationIds: '["different-op"]',
             startedAt: DateTime.utc(2026, 7, 26).toIso8601String(),
@@ -284,6 +341,7 @@ void main() {
         await db.noteOperationsDao.upsertSyncSession(
           SyncSessionsCompanion.insert(
             noteId: 'note-observe',
+            ownerUserId: const Value('user-1'),
             knownRevision: 4,
             operationIds: '["op-observe"]',
             startedAt: DateTime.utc(2026, 7, 26).toIso8601String(),
@@ -592,6 +650,7 @@ Future<void> seedPendingOperation(
     PendingNoteOperationsCompanion.insert(
       operationId: operationId,
       noteId: noteId,
+      ownerUserId: const Value('user-1'),
       baseRevision: baseRevision,
       ordinal: 0,
       kind: 'text_delta',

@@ -59,35 +59,81 @@ void main() {
       actorId: 'test-actor',
     );
 
-    when(() => mockDao.getPendingOperations(any())).thenAnswer((_) async => []);
     when(
-      () => mockDao.getPendingOperations(any(), status: any(named: 'status')),
+      () => mockDao.getPendingOperations(
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((_) async => []);
+    when(
+      () => mockDao.getPendingOperations(
+        any(),
+        status: any(named: 'status'),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
     ).thenAnswer((_) async => []);
     when(
       () => mockDao.watchNoteDocument(any()),
     ).thenAnswer((_) => Stream.value(null));
-    when(() => mockDao.getSyncSession(any())).thenAnswer((_) async => null);
+    when(
+      () =>
+          mockDao.getSyncSession(any(), ownerUserId: any(named: 'ownerUserId')),
+    ).thenAnswer((_) async => null);
+    when(() => mockDao.getAnySyncSession(any())).thenAnswer((_) async => null);
+    when(() => mockDao.getNoteOwnerId(any())).thenAnswer((_) async => null);
+    when(() => mockDao.adoptLegacyRows(any(), any())).thenAnswer((_) async {});
     when(() => mockDao.markInFlight(any(), any())).thenAnswer((_) async {});
     when(() => mockDao.upsertSyncSession(any())).thenAnswer((_) async {});
     when(() => mockDao.deleteAccepted(any())).thenAnswer((_) async {});
     when(
       () => mockDao.replacePendingOps(any(), any()),
     ).thenAnswer((_) async {});
+    when(
+      () => mockDao.replacePendingOps(
+        any(),
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((_) async {});
     when(() => mockDao.upsertNoteDocument(any())).thenAnswer((_) async {});
     when(() => mockDao.deleteSyncSession(any())).thenAnswer((_) async {});
+    when(
+      () => mockDao.deleteSyncSession(
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockDao.updatePendingOpsStatus(
+        any(),
+        any(),
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockDao.deletePendingOpsByStatus(
+        any(),
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((_) async {});
     when(() => mockDao.runInTransaction(any())).thenAnswer((invocation) async {
       final fn = invocation.positionalArguments[0] as Future<void> Function();
       await fn();
     });
     when(
-      () => mockDao.getProjectedOutboxOperationCount(any()),
+      () => mockDao.getProjectedOutboxOperationCount(
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
     ).thenAnswer((_) async => 0);
   });
 
   group('enqueueOperation', () {
     test('inserts operation with correct ordinal', () async {
       when(
-        () => mockDao.getPendingOperations('note-1'),
+        () => mockDao.getPendingOperations('note-1', ownerUserId: 'test-actor'),
       ).thenAnswer((_) async => []);
       when(
         () => mockDao.insertPendingOperation(any()),
@@ -127,7 +173,7 @@ void main() {
         ),
       ];
       when(
-        () => mockDao.getPendingOperations('note-1'),
+        () => mockDao.getPendingOperations('note-1', ownerUserId: 'test-actor'),
       ).thenAnswer((_) async => existing);
       when(
         () => mockDao.insertPendingOperation(any()),
@@ -157,7 +203,7 @@ void main() {
     test('serializes concurrent outbox appends for the same note', () async {
       final stored = <PendingNoteOperationData>[];
       when(
-        () => mockDao.getPendingOperations('note-1'),
+        () => mockDao.getPendingOperations('note-1', ownerUserId: 'test-actor'),
       ).thenAnswer((_) async => List.of(stored));
       when(() => mockDao.insertPendingOperation(any())).thenAnswer((
         invocation,

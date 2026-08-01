@@ -79,6 +79,7 @@ class NoteOperationsSyncService {
   final NoteSyncClient _syncClient;
   final NoteOperationsDao _dao;
   final String _clientId;
+  final String _actorId;
   final Uuid _uuid = const Uuid();
   final _NoteSyncQueue _syncQueue = _NoteSyncQueue();
   final _NoteSyncQueue _outboxQueue = _NoteSyncQueue();
@@ -91,7 +92,8 @@ class NoteOperationsSyncService {
     required String actorId,
   }) : _syncClient = syncClient,
        _dao = dao,
-       _clientId = clientId {
+       _clientId = clientId,
+       _actorId = actorId {
     _rebaser = NoteOperationRebaser(localActorId: actorId);
   }
 
@@ -140,7 +142,11 @@ class NoteOperationsSyncService {
     String noteId,
     OperationRequest request,
   ) async {
-    final pending = await _dao.getPendingOperations(noteId);
+    await _prepareAccountScope(noteId);
+    final pending = await _dao.getPendingOperations(
+      noteId,
+      ownerUserId: _actorId,
+    );
     final ordinal = pending.isEmpty ? 0 : pending.last.ordinal + 1;
     final payloadJson = encodePayload(request.payload);
     NoteSyncDebug.log(
@@ -160,6 +166,7 @@ class NoteOperationsSyncService {
       PendingNoteOperationsCompanion.insert(
         operationId: request.operationId,
         noteId: noteId,
+        ownerUserId: Value(_actorId),
         baseRevision: request.baseRevision,
         ordinal: ordinal,
         kind: request.kind,
@@ -198,21 +205,29 @@ class NoteOperationsSyncService {
   }
 
   Future<List<PendingNoteOperationData>> getPendingOperations(String noteId) {
-    return _dao.getPendingOperations(noteId);
+    return _dao.getPendingOperations(noteId, ownerUserId: _actorId);
   }
 
   Future<List<PendingNoteOperationData>> loadPendingProjection(String noteId) {
-    return _dao.getPendingOperations(noteId, status: 'pending');
+    return _dao.getPendingOperations(
+      noteId,
+      status: 'pending',
+      ownerUserId: _actorId,
+    );
   }
 
   Future<int> getProjectedOutboxOperationCount(String noteId) {
-    return _dao.getProjectedOutboxOperationCount(noteId);
+    return _dao.getProjectedOutboxOperationCount(noteId, ownerUserId: _actorId);
   }
 
   Future<NoteSyncTelemetrySnapshot> telemetrySnapshot(String noteId) async {
-    final outboxCount = await _dao.getProjectedOutboxOperationCount(noteId);
+    await _prepareAccountScope(noteId);
+    final outboxCount = await _dao.getProjectedOutboxOperationCount(
+      noteId,
+      ownerUserId: _actorId,
+    );
     final errorCount = await _dao.getSyncErrorCount(noteId);
-    final session = await _dao.getSyncSession(noteId);
+    final session = await _dao.getSyncSession(noteId, ownerUserId: _actorId);
     return NoteSyncTelemetrySnapshot(
       noteId: noteId,
       outboxOperationCount: outboxCount,
@@ -222,20 +237,45 @@ class NoteOperationsSyncService {
   }
 
   Stream<List<PendingNoteOperationData>> watchPendingOperations(String noteId) {
-    return _dao.watchPendingOperations(noteId);
+    return _dao.watchPendingOperations(noteId, ownerUserId: _actorId);
   }
 
   String generateOperationId() => _uuid.v4();
 
   // ---- Internal ----
 
+  Future<void> _prepareAccountScope(String noteId) async {
+    final noteOwnerId = await _dao.getNoteOwnerId(noteId);
+    if (noteOwnerId == _actorId) {
+      await _dao.adoptLegacyRows(noteId, _actorId);
+    }
+  }
+
   Future<SyncResult> _syncPendingInner(String noteId) async {
-    final activeSession = await _dao.getSyncSession(noteId);
+    await _prepareAccountScope(noteId);
+    final activeSession = await _dao.getSyncSession(
+      noteId,
+      ownerUserId: _actorId,
+    );
     if (activeSession != null) {
       return _resumeSyncSession(noteId, activeSession);
     }
 
-    final ops = await _dao.getPendingOperations(noteId, status: 'pending');
+    final foreignSession = await _dao.getAnySyncSession(noteId);
+    if (foreignSession != null) {
+      NoteSyncDebug.log(
+        'sync.pending.blocked_foreign_session',
+        noteId: noteId,
+        fields: {'sessionOwner': foreignSession.ownerUserId},
+      );
+      return SyncResult.empty();
+    }
+
+    final ops = await _dao.getPendingOperations(
+      noteId,
+      status: 'pending',
+      ownerUserId: _actorId,
+    );
     if (ops.isEmpty) {
       NoteSyncDebug.log('sync.pending.empty', noteId: noteId);
       return SyncResult.empty();
@@ -250,6 +290,7 @@ class NoteOperationsSyncService {
       await _dao.upsertSyncSession(
         SyncSessionsCompanion.insert(
           noteId: noteId,
+          ownerUserId: Value(_actorId),
           knownRevision: knownRevision,
           operationIds: jsonEncode(inFlightIds.toList()),
           startedAt: DateTime.now().toUtc().toIso8601String(),
@@ -316,11 +357,20 @@ class NoteOperationsSyncService {
       jsonDecode(session.operationIds) as List,
     );
 
-    final ops = await _dao.getPendingOperations(noteId, status: 'in_flight');
+    final ops = await _dao.getPendingOperations(
+      noteId,
+      status: 'in_flight',
+      ownerUserId: _actorId,
+    );
     final loadedIds = ops.map((o) => o.operationId).toSet();
     if (!_setEquals(loadedIds, operationIds.toSet())) {
-      await _dao.updatePendingOpsStatus(noteId, 'in_flight', 'pending');
-      await _dao.deleteSyncSession(noteId);
+      await _dao.updatePendingOpsStatus(
+        noteId,
+        'in_flight',
+        'pending',
+        ownerUserId: _actorId,
+      );
+      await _dao.deleteSyncSession(noteId, ownerUserId: _actorId);
       return _syncPendingInner(noteId);
     }
 
@@ -377,6 +427,7 @@ class NoteOperationsSyncService {
       final remaining = await _dao.getPendingOperations(
         noteId,
         status: 'pending',
+        ownerUserId: _actorId,
       );
 
       final canonical = response.canonicalDocument;
@@ -411,13 +462,18 @@ class NoteOperationsSyncService {
           updatedAt: response.serverTime,
         ),
       );
-      await _dao.deletePendingOpsByStatus(noteId, 'pending');
+      await _dao.deletePendingOpsByStatus(
+        noteId,
+        'pending',
+        ownerUserId: _actorId,
+      );
       for (int i = 0; i < rebased.length; i++) {
         final op = rebased[i];
         await _dao.insertPendingOperation(
           PendingNoteOperationsCompanion(
             operationId: Value(op.operationId),
             noteId: Value(op.noteId),
+            ownerUserId: Value(_actorId),
             baseRevision: Value(op.baseRevision),
             ordinal: Value(i),
             kind: Value(op.kind),
@@ -428,7 +484,7 @@ class NoteOperationsSyncService {
           ),
         );
       }
-      await _dao.deleteSyncSession(noteId);
+      await _dao.deleteSyncSession(noteId, ownerUserId: _actorId);
     });
 
     return SyncResult(
@@ -446,9 +502,23 @@ class NoteOperationsSyncService {
   }
 
   Future<SyncResult> _pollAndReconcileInner(String noteId) async {
-    final activeSession = await _dao.getSyncSession(noteId);
+    await _prepareAccountScope(noteId);
+    final activeSession = await _dao.getSyncSession(
+      noteId,
+      ownerUserId: _actorId,
+    );
     if (activeSession != null) {
       return _resumeSyncSession(noteId, activeSession);
+    }
+
+    final foreignSession = await _dao.getAnySyncSession(noteId);
+    if (foreignSession != null) {
+      NoteSyncDebug.log(
+        'sync.poll.blocked_foreign_session',
+        noteId: noteId,
+        fields: {'sessionOwner': foreignSession.ownerUserId},
+      );
+      return SyncResult.empty();
     }
 
     final confirmed = await _dao.watchNoteDocument(noteId).first;
@@ -480,7 +550,11 @@ class NoteOperationsSyncService {
       throw StateError('Polling response must include document and revision');
     }
 
-    final pending = await _dao.getPendingOperations(noteId, status: 'pending');
+    final pending = await _dao.getPendingOperations(
+      noteId,
+      status: 'pending',
+      ownerUserId: _actorId,
+    );
     final rebased = _rebaser.rebase(
       pending: pending,
       remote: response.operations,
@@ -496,7 +570,7 @@ class NoteOperationsSyncService {
           updatedAt: DateTime.now().toUtc(),
         ),
       );
-      await _dao.replacePendingOps(noteId, rebased);
+      await _dao.replacePendingOps(noteId, rebased, ownerUserId: _actorId);
     });
 
     return SyncResult(
