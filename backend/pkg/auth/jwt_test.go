@@ -55,3 +55,26 @@ func TestParseAccessToken_MalformedToken(t *testing.T) {
 		t.Fatalf("expected error for malformed token, got nil")
 	}
 }
+
+func TestAccessToken_ValidatesIssuerAndAudience(t *testing.T) {
+	options := TokenOptions{Issuer: "supanotes-api", Audience: "supanotes-client"}
+	tok, err := GenerateAccessToken("user-1", testSecret, AccessTokenTTL, options)
+	if err != nil {
+		t.Fatalf("generate error: %v", err)
+	}
+
+	claims, err := ParseAccessToken(tok, testSecret, options)
+	if err != nil {
+		t.Fatalf("parse with matching claims: %v", err)
+	}
+	if claims.Issuer != options.Issuer || len(claims.Audience) != 1 || claims.Audience[0] != options.Audience {
+		t.Fatalf("claims: got issuer=%q audience=%v", claims.Issuer, claims.Audience)
+	}
+
+	if _, err := ParseAccessToken(tok, testSecret, TokenOptions{Issuer: "other-api", Audience: options.Audience}); err == nil {
+		t.Fatal("expected issuer mismatch to fail")
+	}
+	if _, err := ParseAccessToken(tok, testSecret, TokenOptions{Issuer: options.Issuer, Audience: "other-client"}); err == nil {
+		t.Fatal("expected audience mismatch to fail")
+	}
+}

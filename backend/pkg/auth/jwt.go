@@ -16,9 +16,11 @@ const (
 var ErrInvalidToken = errors.New("auth: invalid token")
 
 type Claims struct {
-	UserID    string `json:"sub"`
-	ExpiresAt int64  `json:"exp"`
-	IssuedAt  int64  `json:"iat"`
+	UserID    string           `json:"sub"`
+	ExpiresAt int64            `json:"exp"`
+	IssuedAt  int64            `json:"iat"`
+	Issuer    string           `json:"iss,omitempty"`
+	Audience  jwt.ClaimStrings `json:"aud,omitempty"`
 }
 
 func (c Claims) GetExpirationTime() (*jwt.NumericDate, error) {
@@ -28,11 +30,16 @@ func (c Claims) GetIssuedAt() (*jwt.NumericDate, error) {
 	return jwt.NewNumericDate(time.Unix(c.IssuedAt, 0)), nil
 }
 func (c Claims) GetNotBefore() (*jwt.NumericDate, error) { return nil, nil }
-func (c Claims) GetIssuer() (string, error)              { return "", nil }
+func (c Claims) GetIssuer() (string, error)              { return c.Issuer, nil }
 func (c Claims) GetSubject() (string, error)             { return c.UserID, nil }
-func (c Claims) GetAudience() (jwt.ClaimStrings, error)  { return nil, nil }
+func (c Claims) GetAudience() (jwt.ClaimStrings, error)  { return c.Audience, nil }
 
-func GenerateAccessToken(userID, secret string, ttl time.Duration) (string, error) {
+type TokenOptions struct {
+	Issuer   string
+	Audience string
+}
+
+func GenerateAccessToken(userID, secret string, ttl time.Duration, options ...TokenOptions) (string, error) {
 	if secret == "" {
 		return "", errors.New("auth: empty JWT secret")
 	}
@@ -42,6 +49,12 @@ func GenerateAccessToken(userID, secret string, ttl time.Duration) (string, erro
 		IssuedAt:  now.Unix(),
 		ExpiresAt: now.Add(ttl).Unix(),
 	}
+	if len(options) > 0 {
+		claims.Issuer = options[0].Issuer
+		if options[0].Audience != "" {
+			claims.Audience = jwt.ClaimStrings{options[0].Audience}
+		}
+	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := tok.SignedString([]byte(secret))
 	if err != nil {
@@ -50,17 +63,28 @@ func GenerateAccessToken(userID, secret string, ttl time.Duration) (string, erro
 	return signed, nil
 }
 
-func ParseAccessToken(tokenStr, secret string) (*Claims, error) {
+func ParseAccessToken(tokenStr, secret string, options ...TokenOptions) (*Claims, error) {
 	if secret == "" {
 		return nil, errors.New("auth: empty JWT secret")
 	}
 	claims := &Claims{}
+	parserOptions := []jwt.ParserOption{
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+	}
+	if len(options) > 0 {
+		if options[0].Issuer != "" {
+			parserOptions = append(parserOptions, jwt.WithIssuer(options[0].Issuer))
+		}
+		if options[0].Audience != "" {
+			parserOptions = append(parserOptions, jwt.WithAudience(options[0].Audience))
+		}
+	}
 	parsed, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		if t.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("%w: unexpected signing method %v", ErrInvalidToken, t.Header["alg"])
 		}
 		return []byte(secret), nil
-	})
+	}, parserOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidToken, err)
 	}

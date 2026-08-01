@@ -23,10 +23,15 @@ type Handler struct {
 	commands      CommandService
 	jwtSecret     string
 	applicationID string
+	tokenOptions  auth.TokenOptions
 }
 
-func NewHandler(commands CommandService, jwtSecret, applicationID string) *Handler {
-	return &Handler{commands: commands, jwtSecret: jwtSecret, applicationID: applicationID}
+func NewHandler(commands CommandService, jwtSecret, applicationID string, options ...auth.TokenOptions) *Handler {
+	var tokenOptions auth.TokenOptions
+	if len(options) > 0 {
+		tokenOptions = options[0]
+	}
+	return &Handler{commands: commands, jwtSecret: jwtSecret, applicationID: applicationID, tokenOptions: tokenOptions}
 }
 
 type request struct {
@@ -81,7 +86,11 @@ func (h *Handler) Handle(c echo.Context) error {
 		return c.JSON(http.StatusOK, speak("Esse comando ainda não está disponível."))
 	}
 
-	claims, err := auth.ParseAccessToken(strings.TrimSpace(req.Context.System.User.AccessToken), h.jwtSecret)
+	claims, err := auth.ParseAccessToken(
+		strings.TrimSpace(req.Context.System.User.AccessToken),
+		h.jwtSecret,
+		h.tokenOptions,
+	)
 	if err != nil {
 		return c.JSON(http.StatusOK, speak("Você precisa vincular sua conta do SupaNotes à Alexa."))
 	}

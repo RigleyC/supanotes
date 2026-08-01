@@ -5,7 +5,7 @@ import (
 )
 
 func TestLoad_Defaults(t *testing.T) {
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET"} {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "JWT_ISSUER", "JWT_AUDIENCE"} {
 		t.Setenv(k, "")
 	}
 
@@ -26,6 +26,9 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.JWTSecret == "" {
 		t.Errorf("JWTSecret: want dev fallback in dev mode, got empty")
 	}
+	if cfg.JWTIssuer != "supanotes-api" || cfg.JWTAudience != "supanotes-client" {
+		t.Errorf("JWT claims defaults: issuer=%q audience=%q", cfg.JWTIssuer, cfg.JWTAudience)
+	}
 }
 
 func TestLoad_FromEnv(t *testing.T) {
@@ -33,6 +36,8 @@ func TestLoad_FromEnv(t *testing.T) {
 	t.Setenv("ENVIRONMENT", "prod")
 	t.Setenv("DATABASE_URL", "postgres://user:pass@db:5432/app?sslmode=disable")
 	t.Setenv("JWT_SECRET", "prod-secret-at-least-32-characters-long")
+	t.Setenv("JWT_ISSUER", "custom-api")
+	t.Setenv("JWT_AUDIENCE", "custom-client")
 
 	cfg, err := Load()
 	if err != nil {
@@ -51,10 +56,13 @@ func TestLoad_FromEnv(t *testing.T) {
 	if cfg.JWTSecret != "prod-secret-at-least-32-characters-long" {
 		t.Errorf("JWTSecret mismatch: %q", cfg.JWTSecret)
 	}
+	if cfg.JWTIssuer != "custom-api" || cfg.JWTAudience != "custom-client" {
+		t.Errorf("JWT claims mismatch: issuer=%q audience=%q", cfg.JWTIssuer, cfg.JWTAudience)
+	}
 }
 
 func TestLoad_ProdRequiresJWTSecret(t *testing.T) {
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET"} {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "JWT_ISSUER", "JWT_AUDIENCE"} {
 		t.Setenv(k, "")
 	}
 	t.Setenv("ENVIRONMENT", "prod")

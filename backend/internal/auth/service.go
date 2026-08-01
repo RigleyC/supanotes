@@ -201,7 +201,12 @@ func (s *Service) generateRotatedAuthResponse(
 	familyID pgtype.UUID,
 	parentID pgtype.UUID,
 ) (string, string, error) {
-	access, err := authpkg.GenerateAccessToken(uid.UUIDToString(userID), s.cfg.JWTSecret, authpkg.AccessTokenTTL)
+	access, err := authpkg.GenerateAccessToken(
+		uid.UUIDToString(userID),
+		s.cfg.JWTSecret,
+		authpkg.AccessTokenTTL,
+		authpkg.TokenOptions{Issuer: s.cfg.JWTIssuer, Audience: s.cfg.JWTAudience},
+	)
 	if err != nil {
 		return "", "", fmt.Errorf("auth: sign access token: %w", err)
 	}
@@ -232,7 +237,12 @@ func (s *Service) generateAuthResponse(
 ) (string, string, error) {
 	idStr := uid.UUIDToString(userID)
 
-	access, err := authpkg.GenerateAccessToken(idStr, s.cfg.JWTSecret, authpkg.AccessTokenTTL)
+	access, err := authpkg.GenerateAccessToken(
+		idStr,
+		s.cfg.JWTSecret,
+		authpkg.AccessTokenTTL,
+		authpkg.TokenOptions{Issuer: s.cfg.JWTIssuer, Audience: s.cfg.JWTAudience},
+	)
 	if err != nil {
 		return "", "", fmt.Errorf("auth: sign access token: %w", err)
 	}

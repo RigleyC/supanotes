@@ -98,7 +98,12 @@ func (h *OAuthHandler) Token(c echo.Context) error {
 	if _, err = h.pool.Exec(c.Request().Context(), `UPDATE alexa_authorization_codes SET used_at=NOW(),refresh_token_hash=$2,refresh_expires_at=$3 WHERE code_hash=$1 AND used_at IS NULL`, codeHash, hashCode(refreshToken), refreshExpiry); err != nil {
 		return err
 	}
-	access, err := authpkg.GenerateAccessToken(uid.UUIDToString(userID), h.cfg.JWTSecret, authpkg.AccessTokenTTL)
+	access, err := authpkg.GenerateAccessToken(
+		uid.UUIDToString(userID),
+		h.cfg.JWTSecret,
+		authpkg.AccessTokenTTL,
+		authpkg.TokenOptions{Issuer: h.cfg.JWTIssuer, Audience: h.cfg.JWTAudience},
+	)
 	if err != nil {
 		return err
 	}
@@ -121,7 +126,12 @@ func (h *OAuthHandler) refresh(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	access, err := authpkg.GenerateAccessToken(uid.UUIDToString(userID), h.cfg.JWTSecret, authpkg.AccessTokenTTL)
+	access, err := authpkg.GenerateAccessToken(
+		uid.UUIDToString(userID),
+		h.cfg.JWTSecret,
+		authpkg.AccessTokenTTL,
+		authpkg.TokenOptions{Issuer: h.cfg.JWTIssuer, Audience: h.cfg.JWTAudience},
+	)
 	if err != nil {
 		return err
 	}

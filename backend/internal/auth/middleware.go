@@ -31,7 +31,11 @@ func JWT(cfg *config.Config) echo.MiddlewareFunc {
 				return web.JSONError(c, http.StatusUnauthorized, "empty bearer token")
 			}
 
-			claims, err := authpkg.ParseAccessToken(token, cfg.JWTSecret)
+			claims, err := authpkg.ParseAccessToken(
+				token,
+				cfg.JWTSecret,
+				authpkg.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
+			)
 			if err != nil {
 				return web.JSONError(c, http.StatusUnauthorized, "invalid or expired token")
 			}

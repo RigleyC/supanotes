@@ -14,6 +14,8 @@ type Config struct {
 	Port               string
 	DatabaseURL        string
 	JWTSecret          string
+	JWTIssuer          string
+	JWTAudience        string
 	CORSOrigins        []string
 	Environment        string
 	AlexaApplicationID string
@@ -49,6 +51,8 @@ func Load() (*Config, error) {
 		}
 		jwtSecret = devJWTSecret
 	}
+	jwtIssuer := firstNonEmpty(strings.TrimSpace(os.Getenv("JWT_ISSUER")), "supanotes-api")
+	jwtAudience := firstNonEmpty(strings.TrimSpace(os.Getenv("JWT_AUDIENCE")), "supanotes-client")
 
 	corsOrigins := parseCORSOrigins(os.Getenv("CORS_ORIGINS"), env)
 
@@ -60,6 +64,8 @@ func Load() (*Config, error) {
 		AlexaClientSecret:  strings.TrimSpace(os.Getenv("ALEXA_CLIENT_SECRET")),
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
 		JWTSecret:          jwtSecret,
+		JWTIssuer:          jwtIssuer,
+		JWTAudience:        jwtAudience,
 		CORSOrigins:        corsOrigins,
 		S3Endpoint:         firstNonEmpty(os.Getenv("S3_ENDPOINT"), os.Getenv("AWS_ENDPOINT_URL_S3")),
 		S3Region:           firstNonEmpty(os.Getenv("S3_REGION"), os.Getenv("AWS_REGION")),

@@ -32,6 +32,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/shares"
 	"github.com/RigleyC/supanotes/internal/shoppinglist"
 	"github.com/RigleyC/supanotes/internal/tasks"
+	authpkg "github.com/RigleyC/supanotes/pkg/auth"
 	"github.com/RigleyC/supanotes/pkg/config"
 	"github.com/RigleyC/supanotes/pkg/db"
 	"github.com/RigleyC/supanotes/pkg/migrate"
@@ -230,7 +231,12 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	shoppingListSvc := shoppinglist.NewService(notesSvc, noteOpsSvc)
 	shoppingListH := shoppinglist.NewHandler(shoppingListSvc)
 	protected.POST("/integrations/shopping-list/items", shoppingListH.AddItem)
-	alexaH := alexa.NewHandler(shoppingListSvc, cfg.JWTSecret, cfg.AlexaApplicationID)
+	alexaH := alexa.NewHandler(
+		shoppingListSvc,
+		cfg.JWTSecret,
+		cfg.AlexaApplicationID,
+		authpkg.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
+	)
 	api.POST("/integrations/alexa", alexaH.Handle)
 	oauthH := alexa.NewOAuthHandler(authSvc, pool, cfg)
 	api.GET("/integrations/alexa/oauth/authorize", oauthH.Authorize)
