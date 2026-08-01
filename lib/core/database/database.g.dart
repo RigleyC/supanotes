@@ -4703,6 +4703,17 @@ class $NoteSyncErrorsTable extends NoteSyncErrors
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _errorCodeMeta = const VerificationMeta(
     'errorCode',
   );
@@ -4751,6 +4762,7 @@ class $NoteSyncErrorsTable extends NoteSyncErrors
   List<GeneratedColumn> get $columns => [
     operationId,
     noteId,
+    ownerUserId,
     errorCode,
     message,
     payloadJson,
@@ -4786,6 +4798,15 @@ class $NoteSyncErrorsTable extends NoteSyncErrors
       );
     } else if (isInserting) {
       context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
     }
     if (data.containsKey('error_code')) {
       context.handle(
@@ -4839,6 +4860,10 @@ class $NoteSyncErrorsTable extends NoteSyncErrors
         DriftSqlType.string,
         data['${effectivePrefix}note_id'],
       )!,
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      ),
       errorCode: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}error_code'],
@@ -4868,6 +4893,11 @@ class NoteSyncErrorData extends DataClass
     implements Insertable<NoteSyncErrorData> {
   final String operationId;
   final String noteId;
+
+  /// Account that owns the failed operation.
+  ///
+  /// Nullable for rows written before sync errors became account-scoped.
+  final String? ownerUserId;
   final String errorCode;
   final String message;
   final String payloadJson;
@@ -4875,6 +4905,7 @@ class NoteSyncErrorData extends DataClass
   const NoteSyncErrorData({
     required this.operationId,
     required this.noteId,
+    this.ownerUserId,
     required this.errorCode,
     required this.message,
     required this.payloadJson,
@@ -4885,6 +4916,9 @@ class NoteSyncErrorData extends DataClass
     final map = <String, Expression>{};
     map['operation_id'] = Variable<String>(operationId);
     map['note_id'] = Variable<String>(noteId);
+    if (!nullToAbsent || ownerUserId != null) {
+      map['owner_user_id'] = Variable<String>(ownerUserId);
+    }
     map['error_code'] = Variable<String>(errorCode);
     map['message'] = Variable<String>(message);
     map['payload_json'] = Variable<String>(payloadJson);
@@ -4896,6 +4930,9 @@ class NoteSyncErrorData extends DataClass
     return NoteSyncErrorsCompanion(
       operationId: Value(operationId),
       noteId: Value(noteId),
+      ownerUserId: ownerUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerUserId),
       errorCode: Value(errorCode),
       message: Value(message),
       payloadJson: Value(payloadJson),
@@ -4911,6 +4948,7 @@ class NoteSyncErrorData extends DataClass
     return NoteSyncErrorData(
       operationId: serializer.fromJson<String>(json['operationId']),
       noteId: serializer.fromJson<String>(json['noteId']),
+      ownerUserId: serializer.fromJson<String?>(json['ownerUserId']),
       errorCode: serializer.fromJson<String>(json['errorCode']),
       message: serializer.fromJson<String>(json['message']),
       payloadJson: serializer.fromJson<String>(json['payloadJson']),
@@ -4923,6 +4961,7 @@ class NoteSyncErrorData extends DataClass
     return <String, dynamic>{
       'operationId': serializer.toJson<String>(operationId),
       'noteId': serializer.toJson<String>(noteId),
+      'ownerUserId': serializer.toJson<String?>(ownerUserId),
       'errorCode': serializer.toJson<String>(errorCode),
       'message': serializer.toJson<String>(message),
       'payloadJson': serializer.toJson<String>(payloadJson),
@@ -4933,6 +4972,7 @@ class NoteSyncErrorData extends DataClass
   NoteSyncErrorData copyWith({
     String? operationId,
     String? noteId,
+    Value<String?> ownerUserId = const Value.absent(),
     String? errorCode,
     String? message,
     String? payloadJson,
@@ -4940,6 +4980,7 @@ class NoteSyncErrorData extends DataClass
   }) => NoteSyncErrorData(
     operationId: operationId ?? this.operationId,
     noteId: noteId ?? this.noteId,
+    ownerUserId: ownerUserId.present ? ownerUserId.value : this.ownerUserId,
     errorCode: errorCode ?? this.errorCode,
     message: message ?? this.message,
     payloadJson: payloadJson ?? this.payloadJson,
@@ -4951,6 +4992,9 @@ class NoteSyncErrorData extends DataClass
           ? data.operationId.value
           : this.operationId,
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
       errorCode: data.errorCode.present ? data.errorCode.value : this.errorCode,
       message: data.message.present ? data.message.value : this.message,
       payloadJson: data.payloadJson.present
@@ -4965,6 +5009,7 @@ class NoteSyncErrorData extends DataClass
     return (StringBuffer('NoteSyncErrorData(')
           ..write('operationId: $operationId, ')
           ..write('noteId: $noteId, ')
+          ..write('ownerUserId: $ownerUserId, ')
           ..write('errorCode: $errorCode, ')
           ..write('message: $message, ')
           ..write('payloadJson: $payloadJson, ')
@@ -4977,6 +5022,7 @@ class NoteSyncErrorData extends DataClass
   int get hashCode => Object.hash(
     operationId,
     noteId,
+    ownerUserId,
     errorCode,
     message,
     payloadJson,
@@ -4988,6 +5034,7 @@ class NoteSyncErrorData extends DataClass
       (other is NoteSyncErrorData &&
           other.operationId == this.operationId &&
           other.noteId == this.noteId &&
+          other.ownerUserId == this.ownerUserId &&
           other.errorCode == this.errorCode &&
           other.message == this.message &&
           other.payloadJson == this.payloadJson &&
@@ -4997,6 +5044,7 @@ class NoteSyncErrorData extends DataClass
 class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
   final Value<String> operationId;
   final Value<String> noteId;
+  final Value<String?> ownerUserId;
   final Value<String> errorCode;
   final Value<String> message;
   final Value<String> payloadJson;
@@ -5005,6 +5053,7 @@ class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
   const NoteSyncErrorsCompanion({
     this.operationId = const Value.absent(),
     this.noteId = const Value.absent(),
+    this.ownerUserId = const Value.absent(),
     this.errorCode = const Value.absent(),
     this.message = const Value.absent(),
     this.payloadJson = const Value.absent(),
@@ -5014,6 +5063,7 @@ class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
   NoteSyncErrorsCompanion.insert({
     required String operationId,
     required String noteId,
+    this.ownerUserId = const Value.absent(),
     required String errorCode,
     required String message,
     required String payloadJson,
@@ -5028,6 +5078,7 @@ class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
   static Insertable<NoteSyncErrorData> custom({
     Expression<String>? operationId,
     Expression<String>? noteId,
+    Expression<String>? ownerUserId,
     Expression<String>? errorCode,
     Expression<String>? message,
     Expression<String>? payloadJson,
@@ -5037,6 +5088,7 @@ class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
     return RawValuesInsertable({
       if (operationId != null) 'operation_id': operationId,
       if (noteId != null) 'note_id': noteId,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
       if (errorCode != null) 'error_code': errorCode,
       if (message != null) 'message': message,
       if (payloadJson != null) 'payload_json': payloadJson,
@@ -5048,6 +5100,7 @@ class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
   NoteSyncErrorsCompanion copyWith({
     Value<String>? operationId,
     Value<String>? noteId,
+    Value<String?>? ownerUserId,
     Value<String>? errorCode,
     Value<String>? message,
     Value<String>? payloadJson,
@@ -5057,6 +5110,7 @@ class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
     return NoteSyncErrorsCompanion(
       operationId: operationId ?? this.operationId,
       noteId: noteId ?? this.noteId,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
       errorCode: errorCode ?? this.errorCode,
       message: message ?? this.message,
       payloadJson: payloadJson ?? this.payloadJson,
@@ -5073,6 +5127,9 @@ class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
     }
     if (noteId.present) {
       map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
     }
     if (errorCode.present) {
       map['error_code'] = Variable<String>(errorCode.value);
@@ -5097,6 +5154,7 @@ class NoteSyncErrorsCompanion extends UpdateCompanion<NoteSyncErrorData> {
     return (StringBuffer('NoteSyncErrorsCompanion(')
           ..write('operationId: $operationId, ')
           ..write('noteId: $noteId, ')
+          ..write('ownerUserId: $ownerUserId, ')
           ..write('errorCode: $errorCode, ')
           ..write('message: $message, ')
           ..write('payloadJson: $payloadJson, ')
@@ -8079,6 +8137,7 @@ typedef $$NoteSyncErrorsTableCreateCompanionBuilder =
     NoteSyncErrorsCompanion Function({
       required String operationId,
       required String noteId,
+      Value<String?> ownerUserId,
       required String errorCode,
       required String message,
       required String payloadJson,
@@ -8089,6 +8148,7 @@ typedef $$NoteSyncErrorsTableUpdateCompanionBuilder =
     NoteSyncErrorsCompanion Function({
       Value<String> operationId,
       Value<String> noteId,
+      Value<String?> ownerUserId,
       Value<String> errorCode,
       Value<String> message,
       Value<String> payloadJson,
@@ -8112,6 +8172,11 @@ class $$NoteSyncErrorsTableFilterComposer
 
   ColumnFilters<String> get noteId => $composableBuilder(
     column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8155,6 +8220,11 @@ class $$NoteSyncErrorsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get errorCode => $composableBuilder(
     column: $table.errorCode,
     builder: (column) => ColumnOrderings(column),
@@ -8192,6 +8262,11 @@ class $$NoteSyncErrorsTableAnnotationComposer
 
   GeneratedColumn<String> get noteId =>
       $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get errorCode =>
       $composableBuilder(column: $table.errorCode, builder: (column) => column);
@@ -8247,6 +8322,7 @@ class $$NoteSyncErrorsTableTableManager
               ({
                 Value<String> operationId = const Value.absent(),
                 Value<String> noteId = const Value.absent(),
+                Value<String?> ownerUserId = const Value.absent(),
                 Value<String> errorCode = const Value.absent(),
                 Value<String> message = const Value.absent(),
                 Value<String> payloadJson = const Value.absent(),
@@ -8255,6 +8331,7 @@ class $$NoteSyncErrorsTableTableManager
               }) => NoteSyncErrorsCompanion(
                 operationId: operationId,
                 noteId: noteId,
+                ownerUserId: ownerUserId,
                 errorCode: errorCode,
                 message: message,
                 payloadJson: payloadJson,
@@ -8265,6 +8342,7 @@ class $$NoteSyncErrorsTableTableManager
               ({
                 required String operationId,
                 required String noteId,
+                Value<String?> ownerUserId = const Value.absent(),
                 required String errorCode,
                 required String message,
                 required String payloadJson,
@@ -8273,6 +8351,7 @@ class $$NoteSyncErrorsTableTableManager
               }) => NoteSyncErrorsCompanion.insert(
                 operationId: operationId,
                 noteId: noteId,
+                ownerUserId: ownerUserId,
                 errorCode: errorCode,
                 message: message,
                 payloadJson: payloadJson,

@@ -46,7 +46,13 @@ class AuthTokenManager {
     return _accessToken;
   }
 
-  Future<String?> getRefreshToken() => _storage.getRefreshToken();
+  /// Reads the refresh token after any in-flight install, refresh or cleanup.
+  ///
+  /// Logout uses this boundary before calling the server. Without the
+  /// serialization, logout could send the parent token while a refresh was
+  /// already rotating it, leaving the server and local session out of order.
+  Future<String?> getRefreshToken() =>
+      _exclusive(() => _storage.getRefreshToken());
 
   /// Serializes a refresh request with credential replacement and cleanup.
   Future<AuthTokenPair?> refresh(RefreshHandler perform) =>

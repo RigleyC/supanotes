@@ -15,6 +15,11 @@ construtor de producao do cliente. O interceptor ainda os aceita para manter
 compatibilidade com testes antigos, mas o caminho de producao exige
 `RefreshSessionHandler`.
 
+O token manager agora serializa tambem a leitura do refresh token. Erros
+persistidos de sync passaram a carregar `ownerUserId`, e a telemetria e os
+queries de erro respeitam esse escopo. Linhas antigas so sao adotadas quando a
+propriedade local da nota confirma a conta.
+
 ## Evidencia
 
 - `go test ./pkg/auth ./internal/auth ./internal/alexa` passou.
@@ -27,3 +32,4 @@ compatibilidade com testes antigos, mas o caminho de producao exige
   `SUPANOTES_AUTH_TEST_DATABASE_URL` nao esta configurado.
 - `go test ./...` passou.
 - `flutter test` passou com 512 testes e 1 skip existente.
+- A migracao Drift para o escopo dos erros de sync foi gerada como schema 25.

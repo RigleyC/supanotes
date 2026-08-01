@@ -238,7 +238,10 @@ class NoteOperationsSyncService {
       noteId,
       ownerUserId: _actorId,
     );
-    final errorCount = await _dao.getSyncErrorCount(noteId);
+    final errorCount = await _dao.getSyncErrorCount(
+      noteId,
+      ownerUserId: _actorId,
+    );
     final session = await _dao.getSyncSession(noteId, ownerUserId: _actorId);
     return NoteSyncTelemetrySnapshot(
       noteId: noteId,

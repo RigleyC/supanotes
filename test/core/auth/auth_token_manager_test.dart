@@ -107,6 +107,40 @@ void main() {
   });
 
   test(
+    'refresh-token reads wait for an in-flight refresh replacement',
+    () async {
+      final storage = _MockAuthLocalStorage();
+      final refreshStarted = Completer<void>();
+      final releaseRefresh = Completer<void>();
+      var refreshTokenReads = 0;
+      when(() => storage.getRefreshToken()).thenAnswer((_) async {
+        refreshTokenReads++;
+        return refreshTokenReads == 1 ? 'refresh-1' : 'refresh-2';
+      });
+      when(
+        () => storage.saveTokens(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      ).thenAnswer((_) async {});
+      final manager = AuthTokenManager(storage: storage);
+
+      final refresh = manager.refresh((_) async {
+        refreshStarted.complete();
+        await releaseRefresh.future;
+        return (accessToken: 'access-2', refreshToken: 'refresh-2');
+      });
+      await refreshStarted.future;
+
+      final logoutToken = manager.getRefreshToken();
+      releaseRefresh.complete();
+
+      await refresh;
+      expect(await logoutToken, 'refresh-2');
+    },
+  );
+
+  test(
     'a late initial storage read cannot overwrite an installed session',
     () async {
       final storage = _MockAuthLocalStorage();

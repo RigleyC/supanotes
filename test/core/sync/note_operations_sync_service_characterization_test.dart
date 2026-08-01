@@ -353,6 +353,7 @@ void main() {
           NoteSyncErrorsCompanion.insert(
             noteId: 'note-observe',
             operationId: 'op-observe',
+            ownerUserId: const Value('user-1'),
             errorCode: 'NETWORK',
             message: 'network unavailable',
             payloadJson: '{}',

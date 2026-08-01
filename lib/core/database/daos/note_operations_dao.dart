@@ -97,6 +97,9 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
       await (update(syncSessions)
             ..where((t) => t.noteId.equals(noteId) & t.ownerUserId.isNull()))
           .write(SyncSessionsCompanion(ownerUserId: Value(ownerUserId)));
+      await (update(noteSyncErrors)
+            ..where((t) => t.noteId.equals(noteId) & t.ownerUserId.isNull()))
+          .write(NoteSyncErrorsCompanion(ownerUserId: Value(ownerUserId)));
     });
   }
 
@@ -210,11 +213,12 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     return count.length;
   }
 
-  Future<int> getSyncErrorCount(String noteId) async {
-    final count =
-        await (select(noteSyncErrors)..where((t) => t.noteId.equals(noteId)))
-            .map((row) => row.operationId)
-            .get();
+  Future<int> getSyncErrorCount(String noteId, {String? ownerUserId}) async {
+    final query = select(noteSyncErrors)..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    final count = await query.map((row) => row.operationId).get();
     return count.length;
   }
 
@@ -280,11 +284,16 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     return into(noteSyncErrors).insert(error, mode: InsertMode.insertOrReplace);
   }
 
-  Stream<List<NoteSyncErrorData>> watchSyncErrors(String noteId) {
-    return (select(noteSyncErrors)
-          ..where((t) => t.noteId.equals(noteId))
-          ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]))
-        .watch();
+  Stream<List<NoteSyncErrorData>> watchSyncErrors(
+    String noteId, {
+    String? ownerUserId,
+  }) {
+    final query = select(noteSyncErrors)..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    query.orderBy([(t) => OrderingTerm(expression: t.createdAt)]);
+    return query.watch();
   }
 
   Future<void> deleteSyncError(String operationId) async {

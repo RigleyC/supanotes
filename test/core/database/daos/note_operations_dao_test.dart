@@ -357,5 +357,40 @@ void main() {
 
       await db.close();
     });
+
+    test('sync errors can be queried by account owner', () async {
+      final db = AppDatabase.test();
+      final now = DateTime.utc(2026, 7, 20);
+
+      for (final owner in ['user-a', 'user-b']) {
+        await db.noteOperationsDao.insertSyncError(
+          NoteSyncErrorsCompanion.insert(
+            operationId: 'err-$owner',
+            noteId: 'note-1',
+            ownerUserId: Value(owner),
+            errorCode: 'NETWORK',
+            message: 'offline',
+            payloadJson: '{}',
+            createdAt: now,
+          ),
+        );
+      }
+
+      expect(
+        await db.noteOperationsDao.getSyncErrorCount(
+          'note-1',
+          ownerUserId: 'user-a',
+        ),
+        1,
+      );
+      expect(
+        await db.noteOperationsDao
+            .watchSyncErrors('note-1', ownerUserId: 'user-b')
+            .first,
+        hasLength(1),
+      );
+
+      await db.close();
+    });
   });
 }

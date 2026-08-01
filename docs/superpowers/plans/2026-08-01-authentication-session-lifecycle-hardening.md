@@ -28,7 +28,5 @@ sync como uma fila vazia.
 
 ## Pendencias conhecidas
 
-- Persistir `ownerUserId` nos erros de sync exige nova migracao Drift e fica
-  como proxima fatia, sem alterar o contrato REST/OT canonico.
 - A rotacao de refresh tokens da Alexa ainda precisa de deteccao de reuse por
   familia, separada da rotacao atomica do authorization code.

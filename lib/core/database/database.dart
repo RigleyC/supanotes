@@ -139,7 +139,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 24;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -301,6 +301,11 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from >= 22) {
           await m.addColumn(syncSessions, syncSessions.ownerUserId);
+        }
+      }
+      if (from < 25) {
+        if (from >= 21) {
+          await m.addColumn(noteSyncErrors, noteSyncErrors.ownerUserId);
         }
       }
     },
