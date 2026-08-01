@@ -51,6 +51,9 @@ dispose termina antes da transição para sessão anônima.
 - O teste PostgreSQL opt-in cobre duas chamadas concorrentes com o mesmo
   refresh token e pula de forma explicita quando
   `SUPANOTES_AUTH_TEST_DATABASE_URL` nao esta configurado.
+- A execucao `flutter run -d windows --debug --no-pub` atingiu o timeout de
+  124 segundos sem devolver logs de inicializacao ou de stream de notas; o
+  comportamento em runtime continua sem evidencia neste ambiente.
 - `go test ./...` passou.
 - `flutter test` passou com 515 testes e 1 skip existente.
 - A migracao Drift para o escopo dos erros de sync foi gerada como schema 25.
