@@ -105,4 +105,37 @@ void main() {
     expect(await manager.getAccessToken(), isNull);
     verify(() => storage.clear()).called(1);
   });
+
+  test(
+    'a late initial storage read cannot overwrite an installed session',
+    () async {
+      final storage = _MockAuthLocalStorage();
+      final loadStarted = Completer<void>();
+      final releaseLoad = Completer<void>();
+      when(() => storage.getAccessToken()).thenAnswer((_) async {
+        loadStarted.complete();
+        await releaseLoad.future;
+        return 'stale-access';
+      });
+      when(
+        () => storage.saveTokens(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      ).thenAnswer((_) async {});
+      final manager = AuthTokenManager(storage: storage);
+
+      final initialLoad = manager.getAccessToken();
+      await loadStarted.future;
+      await manager.installSession(
+        accessToken: 'fresh-access',
+        refreshToken: 'fresh-refresh',
+      );
+
+      releaseLoad.complete();
+      await initialLoad;
+
+      expect(await manager.getAccessToken(), 'fresh-access');
+    },
+  );
 }

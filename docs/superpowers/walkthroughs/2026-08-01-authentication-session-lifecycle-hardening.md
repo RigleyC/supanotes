@@ -9,7 +9,10 @@ da Alexa. O rate limiter remove buckets fora da janela.
 No Flutter, operacoes de sessao sao serializadas. O token manager protege a
 leitura inicial contra leituras atrasadas, e o sync informa explicitamente uma
 sessao bloqueada por outra conta. O catalogo local grava o proprietario remoto
-da nota compartilhada.
+da nota compartilhada. O `ApiClient` de producao usa somente o caminho de
+refresh do `AuthTokenManager`; os callbacks legados nao sao expostos pelo
+construtor de producao do cliente. O interceptor ainda os aceita para manter
+compatibilidade com testes antigos.
 
 ## Evidencia
 
@@ -18,3 +21,5 @@ da nota compartilhada.
 - `flutter test test/features/auth/domain/auth_state_test.dart` passou.
 - `flutter test test/core/sync/note_operations_sync_service_characterization_test.dart` passou.
 - `flutter analyze` nos modulos alterados passou sem issues.
+- O teste PostgreSQL opt-in foi adicionado e pula de forma explicita quando
+  `SUPANOTES_AUTH_TEST_DATABASE_URL` nao esta configurado.

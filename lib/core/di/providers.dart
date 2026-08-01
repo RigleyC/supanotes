@@ -44,12 +44,6 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   final tokens = ref.watch(authTokenManagerProvider);
   return ApiClient(
     getAccessToken: tokens.getAccessToken,
-    getRefreshToken: tokens.getRefreshToken,
-    saveTokens: ({required String accessToken, required String refreshToken}) =>
-        tokens.replaceTokens(
-          accessToken: accessToken,
-          refreshToken: refreshToken,
-        ),
     refreshSession: tokens.refresh,
     onAuthFailure: () async {
       await ref.read(authControllerProvider.notifier).onSessionExpired();

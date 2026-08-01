@@ -10,11 +10,14 @@ sync como uma fila vazia.
 
 - Commitar a revogacao de toda a familia quando houver reuse de refresh token.
 - Tornar issuer e audience obrigatorios na API JWT.
+- Manter o construtor de producao do `ApiClient` em um unico caminho de
+  refresh baseado no `AuthTokenManager`.
 - Limpar buckets expirados do rate limiter e aplicar a politica ao OAuth Alexa.
 - Serializar login, registro, logout e expiracao no `AuthController`.
 - Impedir que uma leitura inicial tardia sobrescreva o token em memoria.
 - Preservar o proprietario real de notas compartilhadas no catalogo local.
 - Expor estado explicito para uma sessao de sync pertencente a outra conta.
+- Cobrir revogacao de reuse por uma transacao PostgreSQL real em teste opt-in.
 
 ## Verificacao
 

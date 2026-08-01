@@ -29,19 +29,11 @@ class ApiClient {
   /// recursion).
   ApiClient({
     required Future<String?> Function() getAccessToken,
-    required Future<String?> Function() getRefreshToken,
-    required Future<void> Function({
-      required String accessToken,
-      required String refreshToken,
-    })
-    saveTokens,
     required AuthFailureHandler onAuthFailure,
-    RefreshSessionHandler? refreshSession,
+    required RefreshSessionHandler refreshSession,
   }) : _dio = _buildDio() {
     final interceptor = AuthInterceptor(
       getAccessToken: getAccessToken,
-      getRefreshToken: getRefreshToken,
-      saveTokens: saveTokens,
       onAuthFailure: onAuthFailure,
       refreshSession: refreshSession,
       onRefresh: (refreshToken) async {

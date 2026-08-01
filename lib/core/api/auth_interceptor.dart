@@ -45,11 +45,11 @@ typedef ReplayHandler =
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required Future<String?> Function() getAccessToken,
-    required Future<String?> Function() getRefreshToken,
-    required Future<void> Function({
+    Future<String?> Function()? getRefreshToken,
+    Future<void> Function({
       required String accessToken,
       required String refreshToken,
-    })
+    })?
     saveTokens,
     required this.onAuthFailure,
     required RefreshHandler onRefresh,
@@ -63,11 +63,11 @@ class AuthInterceptor extends Interceptor {
        _replay = replay;
 
   final Future<String?> Function() _getAccessToken;
-  final Future<String?> Function() _getRefreshToken;
+  final Future<String?> Function()? _getRefreshToken;
   final Future<void> Function({
     required String accessToken,
     required String refreshToken,
-  })
+  })?
   _saveTokens;
   final AuthFailureHandler onAuthFailure;
   final RefreshHandler _onRefresh;
@@ -168,13 +168,18 @@ class AuthInterceptor extends Interceptor {
       return refreshSession(_onRefresh);
     }
 
-    final refreshToken = await _getRefreshToken();
+    final getRefreshToken = _getRefreshToken;
+    final saveTokens = _saveTokens;
+    if (getRefreshToken == null || saveTokens == null) {
+      throw StateError('AuthInterceptor requires refreshSession');
+    }
+    final refreshToken = await getRefreshToken();
     if (refreshToken == null) return null;
 
     final tokens = await _onRefresh(refreshToken);
     if (tokens == null) return null;
 
-    await _saveTokens(
+    await saveTokens(
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     );
