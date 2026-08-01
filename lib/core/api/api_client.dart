@@ -36,12 +36,14 @@ class ApiClient {
     })
     saveTokens,
     required AuthFailureHandler onAuthFailure,
+    RefreshSessionHandler? refreshSession,
   }) : _dio = _buildDio() {
     final interceptor = AuthInterceptor(
       getAccessToken: getAccessToken,
       getRefreshToken: getRefreshToken,
       saveTokens: saveTokens,
       onAuthFailure: onAuthFailure,
+      refreshSession: refreshSession,
       onRefresh: (refreshToken) async {
         try {
           final response = await _dio.post<Map<String, dynamic>>(

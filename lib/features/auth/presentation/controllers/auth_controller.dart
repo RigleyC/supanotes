@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
+import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
@@ -14,21 +15,23 @@ import 'package:supanotes/features/auth/domain/user.dart';
 class AuthController extends AsyncNotifier<User?> {
   late final IAuthRepository _repository;
   late final AuthLocalStorage _storage;
+  late final AuthTokenManager _tokenManager;
   late final SessionCacheNotifier _sessionCache;
 
   @override
   Future<User?> build() async {
     _repository = ref.read(authRepositoryProvider);
     _storage = ref.read(authLocalStorageProvider);
+    _tokenManager = ref.read(authTokenManagerProvider);
     _sessionCache = ref.read(sessionCacheProvider.notifier);
 
     await _sessionCache.restore();
-    final accessToken = await _storage.getAccessToken();
+    final accessToken = await _tokenManager.getAccessToken();
     if (accessToken == null || accessToken.isEmpty) return null;
 
     final user = await _storage.getUser();
     if (user == null) {
-      await _storage.clear();
+      await _tokenManager.clearSession();
       _sessionCache.clear();
       return null;
     }
@@ -71,7 +74,7 @@ class AuthController extends AsyncNotifier<User?> {
       cleanupError = error;
       cleanupStack = stack;
     }
-    await _storage.clear();
+    await _tokenManager.clearSession();
     _sessionCache.clear();
 
     if (clearLocalData) {

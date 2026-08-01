@@ -28,12 +28,15 @@ typedef AuthFailureHandler = Future<void> Function();
 
 /// Signature for the refresh HTTP call. Receives the plain refresh token
 /// and returns a new token pair, or null on failure.
-typedef RefreshHandler =
-    Future<({String accessToken, String refreshToken})?> Function(
-      String refreshToken,
-    );
+typedef RefreshHandler = Future<AuthTokenPair?> Function(String refreshToken);
 
-typedef _TokenPair = ({String accessToken, String refreshToken});
+typedef AuthTokenPair = ({String accessToken, String refreshToken});
+
+/// Runs a refresh as one session-owned operation, including persistence of
+/// the resulting pair. This prevents logout or expiry cleanup from being
+/// overtaken by a late refresh response.
+typedef RefreshSessionHandler =
+    Future<AuthTokenPair?> Function(RefreshHandler refresh);
 
 /// Signature for replaying a failed request after a successful refresh.
 typedef ReplayHandler =
@@ -50,11 +53,13 @@ class AuthInterceptor extends Interceptor {
     saveTokens,
     required this.onAuthFailure,
     required RefreshHandler onRefresh,
+    RefreshSessionHandler? refreshSession,
     required ReplayHandler replay,
   }) : _getAccessToken = getAccessToken,
        _getRefreshToken = getRefreshToken,
        _saveTokens = saveTokens,
        _onRefresh = onRefresh,
+       _refreshSession = refreshSession,
        _replay = replay;
 
   final Future<String?> Function() _getAccessToken;
@@ -66,9 +71,10 @@ class AuthInterceptor extends Interceptor {
   _saveTokens;
   final AuthFailureHandler onAuthFailure;
   final RefreshHandler _onRefresh;
+  final RefreshSessionHandler? _refreshSession;
   final ReplayHandler _replay;
 
-  Future<_TokenPair?>? _refreshing;
+  Future<AuthTokenPair?>? _refreshing;
   Future<void>? _notifyingFailure;
   String? _latestAccessToken;
 
@@ -104,7 +110,7 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    late final _TokenPair? refreshedTokens;
+    late final AuthTokenPair? refreshedTokens;
     try {
       refreshedTokens = await _refreshOnce();
     } on DioException {
@@ -130,10 +136,10 @@ class AuthInterceptor extends Interceptor {
     }
   }
 
-  Future<_TokenPair?> _refreshOnce() {
+  Future<AuthTokenPair?> _refreshOnce() {
     final cached = _refreshing;
     if (cached != null) return cached;
-    late Future<_TokenPair?> future;
+    late Future<AuthTokenPair?> future;
     future = _doRefresh().whenComplete(() {
       if (identical(_refreshing, future)) {
         _refreshing = null;
@@ -156,7 +162,12 @@ class AuthInterceptor extends Interceptor {
     return future;
   }
 
-  Future<_TokenPair?> _doRefresh() async {
+  Future<AuthTokenPair?> _doRefresh() async {
+    final refreshSession = _refreshSession;
+    if (refreshSession != null) {
+      return refreshSession(_onRefresh);
+    }
+
     final refreshToken = await _getRefreshToken();
     if (refreshToken == null) return null;
 

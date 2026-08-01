@@ -24,6 +24,10 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
   when(() => storage.getUser()).thenAnswer((_) async => null);
   when(() => storage.getSessionData()).thenAnswer((_) async => const {});
+  when(() => storage.saveTokens(
+        accessToken: any(named: 'accessToken'),
+        refreshToken: any(named: 'refreshToken'),
+      )).thenAnswer((_) async {});
   when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
   when(() => storage.clear()).thenAnswer((_) async {});
 }

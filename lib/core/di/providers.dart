@@ -16,6 +16,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
+import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
@@ -40,15 +41,16 @@ import 'package:supanotes/features/notes/presentation/controllers/note_editor_se
 /// own [Dio] instance for refresh + replay calls. The interceptor's path
 /// and retry guards prevent recursion — no separate raw Dio needed.
 final apiClientProvider = Provider<ApiClient>((ref) {
-  final storage = ref.watch(authLocalStorageProvider);
+  final tokens = ref.watch(authTokenManagerProvider);
   return ApiClient(
-    getAccessToken: () => storage.getAccessToken(),
-    getRefreshToken: () => storage.getRefreshToken(),
+    getAccessToken: tokens.getAccessToken,
+    getRefreshToken: tokens.getRefreshToken,
     saveTokens: ({required String accessToken, required String refreshToken}) =>
-        storage.saveTokens(
+        tokens.replaceTokens(
           accessToken: accessToken,
           refreshToken: refreshToken,
         ),
+    refreshSession: tokens.refresh,
     onAuthFailure: () async {
       await ref.read(authControllerProvider.notifier).onSessionExpired();
     },
@@ -64,6 +66,7 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
   return AuthRepository(
     apiClient: ref.watch(apiClientProvider),
     storage: ref.watch(authLocalStorageProvider),
+    tokenManager: ref.watch(authTokenManagerProvider),
   );
 });
 

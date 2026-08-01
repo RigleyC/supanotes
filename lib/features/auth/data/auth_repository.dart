@@ -1,10 +1,12 @@
 library;
+
 import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
@@ -24,11 +26,14 @@ class AuthRepository implements IAuthRepository {
   AuthRepository({
     required ApiClient apiClient,
     required AuthLocalStorage storage,
+    AuthTokenManager? tokenManager,
   }) : _api = apiClient,
-       _storage = storage;
+       _storage = storage,
+       _tokenManager = tokenManager;
 
   final ApiClient _api;
   final AuthLocalStorage _storage;
+  final AuthTokenManager? _tokenManager;
 
   @override
   Future<AuthResult> register({
@@ -50,13 +55,15 @@ class AuthRepository implements IAuthRepository {
       }
       final result = AuthResult.fromJson(body);
       await _storage.saveUser(user: result.user);
-      await _storage.saveTokens(
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      );
-      await _storage.saveSessionData({
-        'settings': result.session.settings,
-      });
+      await (_tokenManager?.installSession(
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          ) ??
+          _storage.saveTokens(
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          ));
+      await _storage.saveSessionData({'settings': result.session.settings});
       return result;
     } on DioException catch (e) {
       throw fromDioError(e);
@@ -82,13 +89,15 @@ class AuthRepository implements IAuthRepository {
       }
       final result = AuthResult.fromJson(body);
       await _storage.saveUser(user: result.user);
-      await _storage.saveTokens(
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      );
-      await _storage.saveSessionData({
-        'settings': result.session.settings,
-      });
+      await (_tokenManager?.installSession(
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          ) ??
+          _storage.saveTokens(
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          ));
+      await _storage.saveSessionData({'settings': result.session.settings});
       return result;
     } on DioException catch (e) {
       throw fromDioError(e);
@@ -97,7 +106,8 @@ class AuthRepository implements IAuthRepository {
 
   @override
   Future<void> logout() async {
-    final refreshToken = await _storage.getRefreshToken();
+    final refreshToken =
+        await (_tokenManager?.getRefreshToken() ?? _storage.getRefreshToken());
     try {
       if (refreshToken != null) {
         await _api.post<dynamic>(
@@ -108,13 +118,14 @@ class AuthRepository implements IAuthRepository {
     } on DioException {
       // Ignored: best-effort logout clean up
     } finally {
-      await _storage.clear();
+      await (_tokenManager?.clearSession() ?? _storage.clear());
     }
   }
 
   @override
   Future<bool> isAuthenticated() async {
-    final token = await _storage.getAccessToken();
+    final token =
+        await (_tokenManager?.getAccessToken() ?? _storage.getAccessToken());
     return token != null && token.isNotEmpty;
   }
 
