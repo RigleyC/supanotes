@@ -12,6 +12,7 @@ class AppSelectionTile extends StatelessWidget {
     this.isSelected = false,
     this.onTap,
     this.trailing,
+    this.selectedTrailing,
   });
 
   final String label;
@@ -19,6 +20,7 @@ class AppSelectionTile extends StatelessWidget {
   final bool isSelected;
   final VoidCallback? onTap;
   final Widget? trailing;
+  final Widget? selectedTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +45,8 @@ class AppSelectionTile extends StatelessWidget {
         ),
       ),
       trailing: isSelected
-          ? Icon(Icons.check_rounded, size: 20, color: scheme.primary)
+          ? (selectedTrailing ??
+                Icon(Icons.check_rounded, size: 20, color: scheme.primary))
           : trailing,
     );
   }

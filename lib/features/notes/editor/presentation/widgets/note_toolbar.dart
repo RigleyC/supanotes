@@ -138,45 +138,40 @@ class _NoteToolbarState extends State<NoteToolbar> {
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOutCubic,
                       alignment: Alignment.centerLeft,
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 180),
-                        opacity: hasSelection ? 1.0 : 0.0,
-                        curve: Curves.easeInOut,
-                        child: hasSelection
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _ToolbarButton(
-                                    icon: Icons.format_bold,
-                                    isActive: _selectionHasAttribution(
-                                      selection,
-                                      boldAttribution,
-                                    ),
-                                    onPressed: () =>
-                                        _toggleInline(boldAttribution),
-                                  ),
-                                  _ToolbarButton(
-                                    icon: Icons.format_italic,
-                                    isActive: _selectionHasAttribution(
-                                      selection,
-                                      italicsAttribution,
-                                    ),
-                                    onPressed: () =>
-                                        _toggleInline(italicsAttribution),
-                                  ),
-                                  _ToolbarButton(
-                                    icon: Icons.format_strikethrough,
-                                    isActive: _selectionHasAttribution(
-                                      selection,
-                                      strikethroughAttribution,
-                                    ),
-                                    onPressed: () =>
-                                        _toggleInline(strikethroughAttribution),
-                                  ),
-                                  const _ToolbarDivider(),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
+                      child: _ToolbarMotionGroup(
+                        visible: hasSelection,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _ToolbarButton(
+                              icon: Icons.format_bold,
+                              isActive: _selectionHasAttribution(
+                                selection,
+                                boldAttribution,
+                              ),
+                              onPressed: () => _toggleInline(boldAttribution),
+                            ),
+                            _ToolbarButton(
+                              icon: Icons.format_italic,
+                              isActive: _selectionHasAttribution(
+                                selection,
+                                italicsAttribution,
+                              ),
+                              onPressed: () =>
+                                  _toggleInline(italicsAttribution),
+                            ),
+                            _ToolbarButton(
+                              icon: Icons.format_strikethrough,
+                              isActive: _selectionHasAttribution(
+                                selection,
+                                strikethroughAttribution,
+                              ),
+                              onPressed: () =>
+                                  _toggleInline(strikethroughAttribution),
+                            ),
+                            const _ToolbarDivider(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -684,19 +679,19 @@ class _ListFormatMenu extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppSelectionTile(
+              _ToolbarListOptionTile(
                 label: 'Bullet List',
                 icon: Icons.format_list_bulleted,
                 isSelected: activeOption == _ListFormatOption.bulleted,
                 onTap: () => onSelected(_ListFormatOption.bulleted),
               ),
-              AppSelectionTile(
+              _ToolbarListOptionTile(
                 label: 'Numbered List',
                 icon: Icons.format_list_numbered,
                 isSelected: activeOption == _ListFormatOption.numbered,
                 onTap: () => onSelected(_ListFormatOption.numbered),
               ),
-              AppSelectionTile(
+              _ToolbarListOptionTile(
                 label: 'Checklist',
                 icon: Icons.check_box_outlined,
                 isSelected: activeOption == _ListFormatOption.checklist,
@@ -726,7 +721,184 @@ class _ListFormatMenu extends StatelessWidget {
   }
 }
 
-class _ToolbarButton extends StatelessWidget {
+class _ToolbarListOptionTile extends StatefulWidget {
+  const _ToolbarListOptionTile({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  State<_ToolbarListOptionTile> createState() => _ToolbarListOptionTileState();
+}
+
+class _ToolbarListOptionTileState extends State<_ToolbarListOptionTile>
+    with TickerProviderStateMixin {
+  late final SingleMotionController _selectionMotion;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectionMotion = SingleMotionController(
+      motion: const MaterialSpringMotion.standardEffectsFast(),
+      vsync: this,
+      initialValue: widget.isSelected ? 1 : 0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_ToolbarListOptionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isSelected != widget.isSelected) {
+      _animateSelection(widget.isSelected ? 1 : 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _selectionMotion.dispose();
+    super.dispose();
+  }
+
+  Future<void> _animateSelection(double target) async {
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      _selectionMotion.value = target;
+      return;
+    }
+    try {
+      await _selectionMotion.animateTo(target).orCancel;
+    } on TickerCanceled {
+      // The controller is disposed with the menu.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AppSelectionTile(
+      label: widget.label,
+      icon: widget.icon,
+      isSelected: widget.isSelected,
+      onTap: widget.onTap,
+      selectedTrailing: AnimatedBuilder(
+        animation: _selectionMotion,
+        builder: (context, child) {
+          final progress = _selectionMotion.value.clamp(0.0, 1.0);
+          return Opacity(
+            opacity: progress,
+            child: Transform.scale(
+              scale: 0.72 + (0.28 * progress),
+              child: child,
+            ),
+          );
+        },
+        child: Icon(Icons.check_rounded, size: 20, color: scheme.primary),
+      ),
+    );
+  }
+}
+
+class _ToolbarMotionGroup extends StatefulWidget {
+  const _ToolbarMotionGroup({required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  State<_ToolbarMotionGroup> createState() => _ToolbarMotionGroupState();
+}
+
+class _ToolbarMotionGroupState extends State<_ToolbarMotionGroup>
+    with TickerProviderStateMixin {
+  late final SingleMotionController _motion;
+  bool _hasVisualChild = false;
+  int _transitionId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _motion = SingleMotionController(
+      motion: const MaterialSpringMotion.standardEffectsFast(),
+      vsync: this,
+      initialValue: widget.visible ? 1 : 0,
+    );
+    _hasVisualChild = widget.visible;
+  }
+
+  @override
+  void didUpdateWidget(_ToolbarMotionGroup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.visible != widget.visible) {
+      final transitionId = ++_transitionId;
+      if (widget.visible && !_hasVisualChild) {
+        setState(() => _hasVisualChild = true);
+      }
+      _animateTo(widget.visible ? 1 : 0).then((_) {
+        if (!mounted || transitionId != _transitionId || widget.visible) {
+          return;
+        }
+        setState(() => _hasVisualChild = false);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _motion.dispose();
+    super.dispose();
+  }
+
+  Future<void> _animateTo(double target) async {
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      _motion.value = target;
+      return Future<void>.value();
+    }
+    try {
+      await _motion.animateTo(target).orCancel;
+    } on TickerCanceled {
+      // The controller is disposed with the toolbar.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _motion,
+      builder: (context, child) {
+        final progress = _motion.value.clamp(0.0, 1.0);
+        return IgnorePointer(
+          ignoring: progress < 0.5,
+          child: ClipRect(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress,
+              child: Opacity(
+                opacity: progress,
+                child: Transform.translate(
+                  offset: Offset(-10 * (1 - progress), 0),
+                  child: Transform.scale(
+                    alignment: Alignment.centerLeft,
+                    scale: 0.94 + (0.06 * progress),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      child: _hasVisualChild ? widget.child : null,
+    );
+  }
+}
+
+class _ToolbarButton extends StatefulWidget {
   const _ToolbarButton({
     this.icon,
     this.svgAsset,
@@ -743,35 +915,107 @@ class _ToolbarButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
   @override
+  State<_ToolbarButton> createState() => _ToolbarButtonState();
+}
+
+class _ToolbarButtonState extends State<_ToolbarButton>
+    with TickerProviderStateMixin {
+  late final SingleMotionController _activeMotion;
+  late final SingleMotionController _iconMotion;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeMotion = SingleMotionController(
+      motion: const MaterialSpringMotion.standardEffectsFast(),
+      vsync: this,
+      initialValue: widget.isActive ? 1 : 0,
+    );
+    _iconMotion = SingleMotionController(
+      motion: const MaterialSpringMotion.standardEffectsFast(),
+      vsync: this,
+      initialValue: 1,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_ToolbarButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _animateTo(_activeMotion, widget.isActive ? 1 : 0);
+    }
+    if (oldWidget.icon != widget.icon ||
+        oldWidget.svgAsset != widget.svgAsset) {
+      _iconMotion.value = 0;
+      _animateTo(_iconMotion, 1);
+    }
+  }
+
+  @override
+  void dispose() {
+    _activeMotion.dispose();
+    _iconMotion.dispose();
+    super.dispose();
+  }
+
+  Future<void> _animateTo(
+    SingleMotionController controller,
+    double target,
+  ) async {
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      controller.value = target;
+      return;
+    }
+    try {
+      await controller.animateTo(target).orCancel;
+    } on TickerCanceled {
+      // The controller is disposed with the toolbar.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final fg = isActive
-        ? colorScheme.primary
-        : (onPressed == null
-              ? colorScheme.onSurface.withValues(alpha: 0.38)
-              : colorScheme.onSurface);
+    final activeProgress = _activeMotion.value.clamp(0.0, 1.0);
+    final iconProgress = _iconMotion.value.clamp(0.0, 1.0);
+    final inactiveColor = widget.onPressed == null
+        ? colorScheme.onSurface.withValues(alpha: 0.38)
+        : colorScheme.onSurface;
+    final fg = Color.lerp(inactiveColor, colorScheme.primary, activeProgress)!;
+    final background = colorScheme.primary.withValues(
+      alpha: 0.12 * activeProgress,
+    );
+
+    final icon = widget.icon != null
+        ? Icon(widget.icon, size: 26, color: fg)
+        : SvgPicture.asset(
+            widget.svgAsset!,
+            width: 24,
+            height: 24,
+            colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+          );
 
     return InkWell(
       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-      onTap: onPressed,
+      onTap: widget.onPressed,
       child: Container(
         constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         alignment: Alignment.center,
         padding: const EdgeInsets.all(AppSpacing.xs),
         decoration: BoxDecoration(
-          color: isActive
-              ? colorScheme.primary.withValues(alpha: 0.12)
-              : Colors.transparent,
+          color: background,
           borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
         ),
-        child: icon != null
-            ? Icon(icon, size: 26, color: fg)
-            : SvgPicture.asset(
-                svgAsset!,
-                width: 24,
-                height: 24,
-                colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-              ),
+        child: Transform.scale(
+          scale: 0.96 + (0.04 * activeProgress),
+          child: Opacity(
+            opacity: 0.7 + (0.3 * iconProgress),
+            child: Transform.scale(
+              scale: 0.9 + (0.1 * iconProgress),
+              child: icon,
+            ),
+          ),
+        ),
       ),
     );
   }
