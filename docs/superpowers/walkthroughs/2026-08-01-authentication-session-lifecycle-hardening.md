@@ -56,9 +56,11 @@ dispose termina antes da transição para sessão anônima.
   foi perdida sem logs de autenticacao ou da stream de notas; o carregamento
   das notas continua sem evidencia neste ambiente.
 - `go test ./...` passou.
-- `flutter test` passou com 516 testes e 1 skip existente.
+- `flutter test` passou com 517 testes e 1 skip existente.
 - O teste `notes_providers_test.dart` confirma que `activeNotesProvider` emite
   notas locais com um usuário autenticado e um banco Drift real.
+- O teste `note_catalog_sync_provider_test.dart` confirma a composição
+  autenticada do catálogo remoto até a persistência no Drift.
 - A migracao Drift para o escopo dos erros de sync foi gerada como schema 25.
 - A migracao `000046_alexa_refresh_family` e o teste PostgreSQL opt-in cobrem
   a revogacao apos duas trocas concorrentes.
