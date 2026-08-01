@@ -173,6 +173,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	protected := api.Group("")
 	protected.Use(auth.JWT(cfg))
+	protected.POST("/auth/revoke-sessions", authH.RevokeAllSessions)
 
 	// Notes
 	notesRepo := notes.NewRepository(queries)

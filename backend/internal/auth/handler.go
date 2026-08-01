@@ -193,3 +193,16 @@ func (h *Handler) Logout(c echo.Context) error {
 	}
 	return c.NoContent(http.StatusNoContent)
 }
+
+// RevokeAllSessions invalidates all sessions for the authenticated account.
+// The account comes from JWT middleware, never from request input.
+func (h *Handler) RevokeAllSessions(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return web.JSONError(c, http.StatusUnauthorized, "missing authenticated user")
+	}
+	if err := h.svc.RevokeAllSessions(c.Request().Context(), userID); err != nil {
+		return respondError(c, err, nil, "could not revoke sessions")
+	}
+	return c.NoContent(http.StatusNoContent)
+}

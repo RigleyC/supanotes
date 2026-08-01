@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/auth"
 )
 
@@ -277,6 +279,27 @@ func TestHandler_Logout_UnknownTokenIsNoop(t *testing.T) {
 		`{"refresh_token":"definitely-not-real"}`)
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("status: want 204, got %d", rec.Code)
+	}
+}
+
+func TestHandler_RevokeAllSessionsUsesAuthenticatedUser(t *testing.T) {
+	q := newMockQuerier()
+	h := NewHandler(NewService(q, testConfig(), nil))
+	e := echo.New()
+	userID := uuid.New()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/revoke-sessions", nil)
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+	web.SetUserID(ctx, userID.String())
+
+	if err := h.RevokeAllSessions(ctx); err != nil {
+		t.Fatalf("RevokeAllSessions: %v", err)
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status: want 204, got %d", rec.Code)
+	}
+	if q.revokeAllUserID != pgUUID(userID) {
+		t.Fatalf("revoked user: want %s, got %s", userID, q.revokeAllUserID)
 	}
 }
 

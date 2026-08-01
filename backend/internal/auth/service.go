@@ -199,6 +199,14 @@ func (s *Service) Logout(ctx context.Context, refreshPlain string) error {
 	})
 }
 
+// RevokeAllSessions invalidates every refresh credential owned by the user.
+// It is intended for security-sensitive account recovery and incident response.
+func (s *Service) RevokeAllSessions(ctx context.Context, userID pgtype.UUID) error {
+	return s.inTx(ctx, func(q sqlcgen.Querier) error {
+		return q.RevokeAllUserRefreshTokens(ctx, userID)
+	})
+}
+
 func (s *Service) generateRotatedAuthResponse(
 	ctx context.Context,
 	q sqlcgen.Querier,

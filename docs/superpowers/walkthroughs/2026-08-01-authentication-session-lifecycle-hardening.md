@@ -25,6 +25,10 @@ vinculo como revogado quando esse hash e reutilizado. Isso cobre a corrida em
 que a resposta da primeira troca se perde: a segunda tentativa nao cria outra
 credencial utilizavel.
 
+Tambem existe agora `POST /api/v1/auth/revoke-sessions`, protegido por JWT,
+que revoga todas as sessoes do usuario identificado pelo token. O endpoint nao
+aceita um user ID no corpo ou na URL.
+
 ## Evidencia
 
 - `go test ./pkg/auth ./internal/auth ./internal/alexa` passou.
@@ -40,3 +44,5 @@ credencial utilizavel.
 - A migracao Drift para o escopo dos erros de sync foi gerada como schema 25.
 - A migracao `000046_alexa_refresh_family` e o teste PostgreSQL opt-in cobrem
   a revogacao apos duas trocas concorrentes.
+- Os testes de auth cobrem a revogacao de sessoes e o isolamento do usuario
+  obtido do contexto autenticado.

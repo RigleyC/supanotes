@@ -34,6 +34,8 @@ type mockQuerier struct {
 	createSettingsErr error
 	createRefreshErr  error
 	revokeRefreshErr  error
+	revokeAllErr      error
+	revokeAllUserID   pgtype.UUID
 }
 
 func newMockQuerier() *mockQuerier {
@@ -218,7 +220,21 @@ func (m *mockQuerier) GetUserSettings(ctx context.Context, userID pgtype.UUID) (
 	return sqlcgen.UserSetting{UserID: userID, Timezone: "UTC", CreatedAt: pgtype.Timestamptz{Valid: true}, UpdatedAt: pgtype.Timestamptz{Valid: true}}, nil
 }
 func (m *mockQuerier) RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error {
-	return errors.New("RevokeAllUserRefreshTokens: not implemented in mock")
+	if m.revokeAllErr != nil {
+		return m.revokeAllErr
+	}
+	now := time.Now()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.revokeAllUserID = userID
+	for id, rt := range m.refreshByID {
+		if rt.UserID != userID {
+			continue
+		}
+		rt.RevokedAt = pgtype.Timestamptz{Time: now, Valid: true}
+		m.refreshByID[id] = rt
+	}
+	return nil
 }
 func (m *mockQuerier) CreateNote(ctx context.Context, arg sqlcgen.CreateNoteParams) (sqlcgen.Note, error) {
 	return sqlcgen.Note{}, nil
@@ -490,6 +506,45 @@ func TestService_Refresh_UnknownToken(t *testing.T) {
 	_, _, err := svc.Refresh(context.Background(), "deadbeef")
 	if !errors.Is(err, ErrInvalidRefreshToken) {
 		t.Fatalf("Refresh unknown: want ErrInvalidRefreshToken, got %v", err)
+	}
+}
+
+func TestService_RevokeAllSessions(t *testing.T) {
+	q := newMockQuerier()
+	svc := NewService(q, testConfig(), nil)
+	userID := pgUUID(uuid.New())
+	otherUserID := pgUUID(uuid.New())
+
+	_, err := q.CreateRefreshToken(context.Background(), sqlcgen.CreateRefreshTokenParams{
+		UserID:    userID,
+		TokenHash: "user-token",
+		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("create user token: %v", err)
+	}
+	_, err = q.CreateRefreshToken(context.Background(), sqlcgen.CreateRefreshTokenParams{
+		UserID:    otherUserID,
+		TokenHash: "other-token",
+		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("create other token: %v", err)
+	}
+
+	if err := svc.RevokeAllSessions(context.Background(), userID); err != nil {
+		t.Fatalf("RevokeAllSessions: %v", err)
+	}
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, token := range q.refreshByID {
+		if token.UserID == userID && !token.RevokedAt.Valid {
+			t.Error("user refresh token was not revoked")
+		}
+		if token.UserID == otherUserID && token.RevokedAt.Valid {
+			t.Error("other user's refresh token was revoked")
+		}
 	}
 }
 

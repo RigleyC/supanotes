@@ -13,6 +13,7 @@ sync como uma fila vazia.
 - Manter o construtor de producao do `ApiClient` em um unico caminho de
   refresh baseado no `AuthTokenManager`.
 - Limpar buckets expirados do rate limiter e aplicar a politica ao OAuth Alexa.
+- Expor revogacao autenticada de todas as sessoes do proprio usuario.
 - Serializar login, registro, logout e expiracao no `AuthController`.
 - Impedir que uma leitura inicial tardia sobrescreva o token em memoria.
 - Preservar o proprietario real de notas compartilhadas no catalogo local.
