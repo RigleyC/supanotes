@@ -17,6 +17,7 @@ import 'package:supanotes/features/notes/editor/application/note_editor_delegate
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/slash_command_overlay.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
@@ -335,6 +336,43 @@ void main() {
       tester.widget<SuperEditor>(find.byType(SuperEditor)).autofocus,
       isFalse,
     );
+  });
+
+  testWidgets('shows the editor toolbar on desktop layout', (tester) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final controller = _createTestController([
+      ParagraphNode(id: '1', text: AttributedText('Desktop note')),
+    ]);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _sessionFor(controller),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: NoteEditor(
+              noteId: 'note-1',
+              taskMetadata: const {},
+              delegate: const NoteEditorDelegate(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NoteToolbar), findsOneWidget);
+    expect(find.byType(NoteSuggestionOverlay), findsNothing);
   });
 
   testWidgets('hideCompleted removes completed task components', (

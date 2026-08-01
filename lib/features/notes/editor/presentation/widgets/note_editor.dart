@@ -247,31 +247,31 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                       controller.pickAndAttachFile(imageOnly: true),
                 ),
               ),
-              if (!isDesktop)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: bottomInset,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: bottomInset,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isDesktop)
                       NoteSuggestionOverlay(
                         editor: controller.editor,
                         composer: controller.composer,
                         currentNoteId: widget.noteId,
                         onPersist: () async {},
                       ),
-                      NoteToolbar(
-                        editor: controller.editor,
-                        composer: controller.composer,
-                        onAttachFile: () =>
-                            controller.pickAndAttachFile(imageOnly: false),
-                        onAttachImage: () =>
-                            controller.pickAndAttachFile(imageOnly: true),
-                      ),
-                    ],
-                  ),
+                    NoteToolbar(
+                      editor: controller.editor,
+                      composer: controller.composer,
+                      onAttachFile: () =>
+                          controller.pickAndAttachFile(imageOnly: false),
+                      onAttachImage: () =>
+                          controller.pickAndAttachFile(imageOnly: true),
+                    ),
+                  ],
                 ),
+              ),
             ],
           ],
         );
