@@ -80,6 +80,7 @@ final noteProvider = FutureProvider.autoDispose<Note>((ref) async {
 - `syncStateProvider`
 - `connectivityMonitorProvider`
 - `sessionCacheProvider`
+- `authSessionResourceRegistryProvider`
 
 ## Erros comuns (antes/depois)
 
