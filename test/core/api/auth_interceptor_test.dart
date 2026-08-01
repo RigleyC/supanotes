@@ -264,6 +264,63 @@ void main() {
       ).called(1);
     });
 
+    test('refreshes and replays an expired MCP token request', () async {
+      final storage = _MockAuthLocalStorage();
+      when(
+        () => storage.getAccessToken(),
+      ).thenAnswer((_) async => 'old-access');
+      when(
+        () => storage.getRefreshToken(),
+      ).thenAnswer((_) async => 'old-refresh');
+      when(
+        () => storage.saveTokens(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      ).thenAnswer((_) async {});
+
+      var refreshCount = 0;
+      final refreshAdapter = _TestAdapter((options) async {
+        if (options.path == '/auth/refresh') {
+          refreshCount++;
+          return _jsonResponse(200, {
+            'access_token': 'new-access',
+            'refresh_token': 'new-refresh',
+          });
+        }
+        return _jsonResponse(200, {'token': 'mcp-token'});
+      });
+      final refreshDio = Dio()..httpClientAdapter = refreshAdapter;
+      final callbacks = _refreshCallbacks(refreshDio);
+
+      final interceptor = AuthInterceptor(
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: ({required accessToken, required refreshToken}) => storage
+            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        onAuthFailure: () async {},
+        onRefresh: callbacks.onRefresh,
+        replay: callbacks.replay,
+      );
+      final dio = Dio()
+        ..httpClientAdapter = _TestAdapter(
+          (_) async => _jsonResponse(401, {'error': 'expired'}),
+        )
+        ..interceptors.add(interceptor);
+
+      final response = await dio.post<dynamic>('/auth/mcp-token');
+
+      expect(response.statusCode, 200);
+      expect(response.data, {'token': 'mcp-token'});
+      expect(refreshCount, 1);
+      verify(
+        () => storage.saveTokens(
+          accessToken: 'new-access',
+          refreshToken: 'new-refresh',
+        ),
+      ).called(1);
+    });
+
     test(
       'replay uses the refreshed access token without reading stale storage',
       () async {

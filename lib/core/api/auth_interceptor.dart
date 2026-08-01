@@ -96,9 +96,10 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    // Skip auth endpoints (login/register) so failed credentials
-    // don't trigger an unnecessary session-clear cycle.
-    if (err.requestOptions.path.startsWith('/auth/')) {
+    // Skip endpoints that do not require an authenticated session. Other
+    // auth endpoints, such as MCP token generation, still need refresh and
+    // replay when the access token expires.
+    if (_isUnauthenticatedAuthRoute(err.requestOptions.path)) {
       handler.next(err);
       return;
     }
@@ -169,4 +170,14 @@ class AuthInterceptor extends Interceptor {
     _latestAccessToken = tokens.accessToken;
     return tokens;
   }
+}
+
+bool _isUnauthenticatedAuthRoute(String path) {
+  return switch (path) {
+    '/auth/login' ||
+    '/auth/register' ||
+    '/auth/refresh' ||
+    '/auth/logout' => true,
+    _ => false,
+  };
 }
