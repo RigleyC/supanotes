@@ -36,6 +36,10 @@ removidas.
 Reuse de refresh tokens gera um evento estruturado com identificadores de
 usuario e familia, sem registrar o token em claro.
 
+O teste de expiração agora abre um `NoteEditorSession` real dentro de um
+`NoteSessionCoordinator` registrado no lifecycle registry e verifica que o
+dispose termina antes da transição para sessão anônima.
+
 ## Evidencia
 
 - `go test ./pkg/auth ./internal/auth ./internal/alexa` passou.

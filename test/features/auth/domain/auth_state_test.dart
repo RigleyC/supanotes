@@ -11,10 +11,41 @@ import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
+
+class _LifecycleSyncHandle implements NoteEditorSyncHandle {
+  bool disposed = false;
+
+  @override
+  NoteSessionStatus get status => NoteSessionStatus.ready;
+
+  @override
+  Stream<NoteSessionStatus> get statusChanges =>
+      Stream<NoteSessionStatus>.value(NoteSessionStatus.ready);
+
+  @override
+  bool get captureLocalOperations => true;
+
+  @override
+  void setCaptureLocalOperations(bool captureLocalOperations) {}
+
+  @override
+  Future<void> start() async {}
+
+  @override
+  Future<void> flushNow() async {}
+
+  @override
+  Future<void> dispose() async {
+    disposed = true;
+  }
+}
 
 const _storageKey = 'test.storage';
 const _repositoryKey = 'test.repository';
@@ -24,10 +55,12 @@ void _stubEmptySession(_MockAuthLocalStorage storage) {
   when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
   when(() => storage.getUser()).thenAnswer((_) async => null);
   when(() => storage.getSessionData()).thenAnswer((_) async => const {});
-  when(() => storage.saveTokens(
-        accessToken: any(named: 'accessToken'),
-        refreshToken: any(named: 'refreshToken'),
-      )).thenAnswer((_) async {});
+  when(
+    () => storage.saveTokens(
+      accessToken: any(named: 'accessToken'),
+      refreshToken: any(named: 'refreshToken'),
+    ),
+  ).thenAnswer((_) async {});
   when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
   when(() => storage.clear()).thenAnswer((_) async {});
 }
@@ -36,9 +69,11 @@ Future<ProviderContainer> makeContainer({
   required AuthLocalStorage storage,
   required AuthRepository repository,
   AuthSessionResourceRegistry? sessionResources,
+  AppDatabase? database,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
+  final testDatabase = database ?? AppDatabase.test();
   final container = ProviderContainer(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
@@ -46,9 +81,10 @@ Future<ProviderContainer> makeContainer({
       authRepositoryProvider.overrideWithValue(repository),
       if (sessionResources != null)
         authSessionResourceRegistryProvider.overrideWithValue(sessionResources),
-      appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+      appDatabaseProvider.overrideWithValue(testDatabase),
     ],
   );
+  addTearDown(testDatabase.close);
   addTearDown(container.dispose);
   return container;
 }
@@ -138,17 +174,19 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
-      when(() => repository.login(
-            email: any(named: 'email'),
-            password: any(named: 'password'),
-          )).thenAnswer((_) async => const AuthResult(
-            user: User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
-            accessToken: 'a',
-            refreshToken: 'r',
-            session: SessionData(
-              settings: {},
-            ),
-          ));
+      when(
+        () => repository.login(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer(
+        (_) async => const AuthResult(
+          user: User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+          accessToken: 'a',
+          refreshToken: 'r',
+          session: SessionData(settings: {}),
+        ),
+      );
 
       final container = await makeContainer(
         storage: storage,
@@ -172,12 +210,12 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
-      when(() => repository.login(
-            email: any(named: 'email'),
-            password: any(named: 'password'),
-          )).thenThrow(
-        const UnauthorizedException(message: 'wrong password'),
-      );
+      when(
+        () => repository.login(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenThrow(const UnauthorizedException(message: 'wrong password'));
 
       final container = await makeContainer(
         storage: storage,
@@ -191,10 +229,7 @@ void main() {
             .login(email: 'a@b.com', password: 'wrong'),
         throwsA(isA<UnauthorizedException>()),
       );
-      expect(
-        container.read(authControllerProvider).hasError,
-        isTrue,
-      );
+      expect(container.read(authControllerProvider).hasError, isTrue);
     });
   });
 
@@ -203,18 +238,20 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
-      when(() => repository.register(
-            email: any(named: 'email'),
-            password: any(named: 'password'),
-            name: any(named: 'name'),
-          )).thenAnswer((_) async => const AuthResult(
-            user: User(id: 'u-2', email: 'b@c.com', name: 'Bob'),
-            accessToken: 'a',
-            refreshToken: 'r',
-            session: SessionData(
-              settings: {},
-            ),
-          ));
+      when(
+        () => repository.register(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          name: any(named: 'name'),
+        ),
+      ).thenAnswer(
+        (_) async => const AuthResult(
+          user: User(id: 'u-2', email: 'b@c.com', name: 'Bob'),
+          accessToken: 'a',
+          refreshToken: 'r',
+          session: SessionData(settings: {}),
+        ),
+      );
 
       final container = await makeContainer(
         storage: storage,
@@ -224,11 +261,7 @@ void main() {
 
       await container
           .read(authControllerProvider.notifier)
-          .register(
-            email: 'b@c.com',
-            password: 'hunter2hunter2',
-            name: 'Bob',
-          );
+          .register(email: 'b@c.com', password: 'hunter2hunter2', name: 'Bob');
 
       final user = container.read(authControllerProvider).requireValue;
       expect(user, isA<User>());
@@ -259,9 +292,9 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
-      when(() => repository.logout()).thenThrow(
-        const NetworkException(message: 'offline'),
-      );
+      when(
+        () => repository.logout(),
+      ).thenThrow(const NetworkException(message: 'offline'));
 
       final container = await makeContainer(
         storage: storage,
@@ -350,6 +383,40 @@ void main() {
 
       expect(container.read(authControllerProvider).requireValue, isNull);
       verify(() => storage.clear()).called(1);
+    });
+
+    test('awaits an opened editor session owned by the registry', () async {
+      final storage = _MockAuthLocalStorage();
+      final repository = _MockAuthRepository();
+      final resources = AuthSessionResourceRegistry();
+      _stubEmptySession(storage);
+      final container = await makeContainer(
+        storage: storage,
+        repository: repository,
+        sessionResources: resources,
+      );
+      await waitForBuild(container);
+
+      final coordinator = NoteSessionCoordinator<NoteEditorSession>();
+      final syncHandle = _LifecycleSyncHandle();
+      final controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+      );
+      await coordinator.open(
+        'note-1',
+        () => NoteEditorSession(
+          noteId: 'note-1',
+          controller: controller,
+          syncSession: syncHandle,
+        ),
+      );
+      resources.register(coordinator.closeAll);
+
+      await container.read(authControllerProvider.notifier).onSessionExpired();
+
+      expect(syncHandle.disposed, isTrue);
+      expect(container.read(authControllerProvider).requireValue, isNull);
     });
   });
 }
