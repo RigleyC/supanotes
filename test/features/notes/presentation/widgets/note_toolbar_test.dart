@@ -8,6 +8,7 @@ import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart'
 Widget buildEditorHarness({
   required List<DocumentNode> nodes,
   DocumentSelection? selection,
+  bool disableAnimations = false,
 }) {
   final document = MutableDocument(nodes: nodes);
   final composer = MutableDocumentComposer(initialSelection: selection);
@@ -16,9 +17,12 @@ Widget buildEditorHarness({
     composer: composer,
   );
 
-  return MaterialApp(
-    home: Scaffold(
-      body: NoteToolbar(editor: editor, composer: composer),
+  return MediaQuery(
+    data: MediaQueryData(disableAnimations: disableAnimations),
+    child: MaterialApp(
+      home: Scaffold(
+        body: NoteToolbar(editor: editor, composer: composer),
+      ),
     ),
   );
 }
@@ -620,7 +624,11 @@ void main() {
   });
 
   group('_setBlockType', () {
-    Future<void> openFormatPopup(WidgetTester tester) async {}
+    Future<void> openFormatPopup(WidgetTester tester) async {
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.close), findsOneWidget);
+    }
 
     // The format popup opens above the toolbar and is tall (heading previews
     // use headline-sized fonts). The default 800×600 test surface is shorter
@@ -1044,7 +1052,7 @@ void main() {
       },
     );
 
-    testWidgets('hides bold/italic/strikethrough when selection is collapsed', (
+    testWidgets('keeps formatting actions in compact mode until Aa is tapped', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -1063,6 +1071,18 @@ void main() {
       expect(find.byIcon(Icons.format_bold), findsNothing);
       expect(find.byIcon(Icons.format_italic), findsNothing);
       expect(find.byIcon(Icons.format_strikethrough), findsNothing);
+      expect(find.byIcon(Icons.text_format), findsOneWidget);
+
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.byIcon(Icons.format_bold), findsOneWidget);
+      expect(
+        (tester.widget(iconButtonWithIcon(Icons.format_bold)) as dynamic)
+            .onPressed,
+        isNull,
+      );
     });
 
     testWidgets('shows bold/italic/strikethrough when text is selected', (
@@ -1083,6 +1103,9 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
+
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.format_bold), findsOneWidget);
@@ -1117,9 +1140,315 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        await tester.tap(iconButtonWithIcon(Icons.text_format));
+        await tester.pumpAndSettle();
+
         final boldButton = iconButtonWithIcon(Icons.format_bold);
         expect((tester.widget(boldButton) as dynamic).isActive, isFalse);
       },
     );
+  });
+
+  group('Formatting toolbar mode', () {
+    testWidgets('replaces the compact toolbar and returns with X', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.text_format), findsOneWidget);
+      expect(find.bySemanticsLabel('Abrir formatação'), findsOneWidget);
+      expect(find.byIcon(Icons.format_quote), findsNothing);
+
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.text_format), findsNothing);
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.bySemanticsLabel('Fechar formatação'), findsOneWidget);
+      expect(find.byIcon(Icons.format_quote), findsOneWidget);
+
+      await tester.tap(iconButtonWithIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.text_format), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsNothing);
+    });
+
+    testWidgets('applies H3 from the formatting toolbar', (tester) async {
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Heading'))],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NoteToolbar(editor: editor, composer: composer),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget.runtimeType.toString() == '_ToolbarButton' &&
+              (widget as dynamic).svgAsset == 'assets/icons/h3_icon.svg',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        (document.first as ParagraphNode).getMetadataValue('blockType'),
+        header3Attribution,
+      );
+    });
+
+    testWidgets('stays open after applying inline formatting', (tester) async {
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 5),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NoteToolbar(editor: editor, composer: composer),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      await tester.tap(iconButtonWithIcon(Icons.format_bold));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(
+        (tester.widget(iconButtonWithIcon(Icons.format_bold)) as dynamic)
+            .isActive,
+        isTrue,
+      );
+      final textNode = document.first as ParagraphNode;
+      expect(
+        textNode.text.hasAttributionAt(0, attribution: boldAttribution),
+        isTrue,
+      );
+
+      await tester.tap(iconButtonWithIcon(Icons.format_italic));
+      await tester.pumpAndSettle();
+      await tester.tap(iconButtonWithIcon(Icons.format_strikethrough));
+      await tester.pumpAndSettle();
+      expect(
+        (document.first as ParagraphNode).text.hasAttributionAt(
+          0,
+          attribution: italicsAttribution,
+        ),
+        isTrue,
+      );
+      expect(
+        (document.first as ParagraphNode).text.hasAttributionAt(
+          0,
+          attribution: strikethroughAttribution,
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('keeps the mode open while the selection changes', (
+      tester,
+    ) async {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'node-1', text: AttributedText('First')),
+          ParagraphNode(id: 'node-2', text: AttributedText('Second')),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 5),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NoteToolbar(editor: editor, composer: composer),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      const finalSelection = DocumentSelection(
+        base: DocumentPosition(
+          nodeId: 'node-2',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+        extent: DocumentPosition(
+          nodeId: 'node-2',
+          nodePosition: TextNodePosition(offset: 6),
+        ),
+      );
+      composer.setSelectionWithReason(
+        const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 2),
+          ),
+        ),
+      );
+      composer.setSelectionWithReason(finalSelection);
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(
+        (tester.widget(iconButtonWithIcon(Icons.format_bold)) as dynamic)
+            .onPressed,
+        isNotNull,
+      );
+      await tester.tap(iconButtonWithIcon(Icons.format_bold));
+      await tester.pumpAndSettle();
+      expect(composer.selection, finalSelection);
+      expect(
+        (document.getNodeById('node-2') as ParagraphNode).text.hasAttributionAt(
+          0,
+          attribution: boldAttribution,
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('closes with Escape and outside tap', (tester) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.text_format), findsOneWidget);
+
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.text_format), findsOneWidget);
+    });
+
+    testWidgets('opens immediately when reduced motion is enabled', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          disableAnimations: true,
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.byIcon(Icons.format_quote), findsOneWidget);
+      await tester.tap(iconButtonWithIcon(Icons.close));
+      await tester.pump();
+      expect(find.byIcon(Icons.text_format), findsOneWidget);
+    });
+
+    testWidgets('renders the formatting mode on a desktop-width surface', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(420, 300);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.byIcon(Icons.format_quote), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

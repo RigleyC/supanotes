@@ -43,6 +43,10 @@ class NoteToolbar extends StatefulWidget {
 }
 
 class _NoteToolbarState extends State<NoteToolbar> {
+  bool _isFormattingMode = false;
+  FocusNode? _focusBeforeFormatting;
+  DocumentSelection? _lastKnownSelection;
+
   Editor get editor => widget.editor;
   MutableDocumentComposer get composer => widget.composer;
   VoidCallback? get onAttachFile => widget.onAttachFile;
@@ -51,7 +55,9 @@ class _NoteToolbarState extends State<NoteToolbar> {
   @override
   void initState() {
     super.initState();
+    _lastKnownSelection = widget.composer.selection;
     _attachListeners(widget);
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
   }
 
   @override
@@ -66,6 +72,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _detachListeners(widget);
     super.dispose();
   }
@@ -81,11 +88,50 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   void _onEditorStateChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final selection = composer.selection;
+    if (selection != null) {
+      _lastKnownSelection = selection;
+    }
+    setState(() {});
   }
 
   void _onDocumentChanged(DocumentChangeLog changeLog) =>
       _onEditorStateChanged();
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (_isFormattingMode &&
+        event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      _closeFormattingMode();
+      return true;
+    }
+    return false;
+  }
+
+  void _openFormattingMode() {
+    _focusBeforeFormatting = FocusManager.instance.primaryFocus;
+    _lastKnownSelection = composer.selection ?? _lastKnownSelection;
+    setState(() => _isFormattingMode = true);
+  }
+
+  void _closeFormattingMode() {
+    if (!_isFormattingMode) return;
+    final focusNode = _focusBeforeFormatting;
+    setState(() {
+      _isFormattingMode = false;
+      _focusBeforeFormatting = null;
+    });
+    focusNode?.requestFocus();
+  }
+
+  void _runFormattingAction(VoidCallback action) {
+    final selection = composer.selection ?? _lastKnownSelection;
+    if (selection != null && composer.selection != selection) {
+      composer.setSelectionWithReason(selection);
+    }
+    action();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,158 +144,74 @@ class _NoteToolbarState extends State<NoteToolbar> {
     final isTask =
         selectedNodes.isNotEmpty &&
         selectedNodes.every((node) => node is TaskNode);
-    final hasSelection = selection != null && !selection.isCollapsed;
-
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bottomPadding = bottomInset > 0 ? 6.0 : 16.0;
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final modeContent = _isFormattingMode
+        ? _FormattingToolbarContent(
+            key: const ValueKey('formatting-toolbar'),
+            blockType: blockType,
+            hasSelection: selection != null && !selection.isCollapsed,
+            isBold: _selectionHasAttribution(selection, boldAttribution),
+            isItalic: _selectionHasAttribution(selection, italicsAttribution),
+            isStrikethrough: _selectionHasAttribution(
+              selection,
+              strikethroughAttribution,
+            ),
+            onClose: _closeFormattingMode,
+            onBlockType: (attribution) =>
+                _runFormattingAction(() => _setBlockType(attribution)),
+            onToggleInline: (attribution) =>
+                _runFormattingAction(() => _toggleInline(attribution)),
+          )
+        : _CompactToolbarContent(
+            key: const ValueKey('compact-toolbar'),
+            selectedListType: selectedListType,
+            isTask: isTask,
+            selection: selection,
+            isListItem: isListItem,
+            onFormat: _openFormattingMode,
+            onListSelected: _onListFormatSelected,
+            onIndent: _indentListItem,
+            onUnindent: _unindentListItem,
+            onInsertDivider: _insertDivider,
+            onAttachImage: onAttachImage,
+            onAttachFile: onAttachFile,
+          );
+    final modeTransition = _ToolbarModeTransition(
+      mode: _isFormattingMode,
+      disableAnimations: disableAnimations,
+      child: modeContent,
+    );
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.78),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(alpha: 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: 8,
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ClipRect(
-                    child: AnimatedSize(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      alignment: Alignment.centerLeft,
-                      child: _ToolbarMotionGroup(
-                        visible: hasSelection,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _ToolbarButton(
-                              icon: Icons.format_bold,
-                              isActive: _selectionHasAttribution(
-                                selection,
-                                boldAttribution,
-                              ),
-                              onPressed: () => _toggleInline(boldAttribution),
-                            ),
-                            _ToolbarButton(
-                              icon: Icons.format_italic,
-                              isActive: _selectionHasAttribution(
-                                selection,
-                                italicsAttribution,
-                              ),
-                              onPressed: () =>
-                                  _toggleInline(italicsAttribution),
-                            ),
-                            _ToolbarButton(
-                              icon: Icons.format_strikethrough,
-                              isActive: _selectionHasAttribution(
-                                selection,
-                                strikethroughAttribution,
-                              ),
-                              onPressed: () =>
-                                  _toggleInline(strikethroughAttribution),
-                            ),
-                            const _ToolbarDivider(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  _ToolbarButton(
-                    svgAsset: 'assets/icons/h1_icon.svg',
-                    isActive: blockType == header1Attribution,
-                    onPressed: () => _setBlockType(header1Attribution),
-                  ),
-                  _ToolbarButton(
-                    svgAsset: 'assets/icons/h2_icon.svg',
-                    isActive: blockType == header2Attribution,
-                    onPressed: () => _setBlockType(header2Attribution),
-                  ),
-                  _ToolbarButton(
-                    svgAsset: 'assets/icons/h3_icon.svg',
-                    isActive: blockType == header3Attribution,
-                    onPressed: () => _setBlockType(header3Attribution),
-                  ),
-                  _ToolbarButton(
-                    icon: Icons.format_quote,
-                    isActive: blockType == blockquoteAttribution,
-                    onPressed: () => _setBlockType(blockquoteAttribution),
-                  ),
-                  const _ToolbarDivider(),
-                  _ToolbarListPopover(
-                    selectedListType: selectedListType,
-                    isTask: isTask,
-                    selection: selection,
-                    onSelected: _onListFormatSelected,
-                  ),
-                  ClipRect(
-                    child: AnimatedSize(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      alignment: Alignment.centerLeft,
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 180),
-                        opacity: isListItem ? 1.0 : 0.0,
-                        curve: Curves.easeInOut,
-                        child: isListItem
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _ToolbarButton(
-                                    icon: Icons.format_indent_increase,
-                                    isActive: false,
-                                    onPressed: _indentListItem,
-                                  ),
-                                  _ToolbarButton(
-                                    icon: Icons.format_indent_decrease,
-                                    isActive: false,
-                                    onPressed: _unindentListItem,
-                                  ),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                  const _ToolbarDivider(),
-                  _ToolbarButton(
-                    icon: Icons.horizontal_rule,
-                    isActive: false,
-                    onPressed: _insertDivider,
-                  ),
-                  const _ToolbarDivider(),
-                  _ToolbarButton(
-                    icon: Icons.image,
-                    isActive: false,
-                    onPressed: onAttachImage,
-                  ),
-                  _ToolbarButton(
-                    icon: Icons.attach_file,
-                    isActive: false,
-                    onPressed: onAttachFile,
+    return TapRegion(
+      onTapOutside: _isFormattingMode ? (_) => _closeFormattingMode() : null,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface.withValues(alpha: 0.78),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.shadow.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
                   ),
                 ],
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                ),
               ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: 8,
+              ),
+              child: modeTransition,
             ),
           ),
         ),
@@ -373,6 +335,322 @@ class _NoteToolbarState extends State<NoteToolbar> {
   void _insertDivider() {
     HapticFeedback.selectionClick();
     NoteEditorCommands.insertDivider(editor, dividerCount: 35);
+  }
+}
+
+class _ToolbarModeTransition extends StatefulWidget {
+  const _ToolbarModeTransition({
+    required this.mode,
+    required this.disableAnimations,
+    required this.child,
+  });
+
+  final bool mode;
+  final bool disableAnimations;
+  final Widget child;
+
+  @override
+  State<_ToolbarModeTransition> createState() => _ToolbarModeTransitionState();
+}
+
+class _ToolbarModeTransitionState extends State<_ToolbarModeTransition>
+    with TickerProviderStateMixin {
+  late final SingleMotionController _motion;
+  late Widget _currentChild;
+  Widget? _previousChild;
+  int _transitionId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentChild = widget.child;
+    _motion = SingleMotionController(
+      motion: const MaterialSpringMotion.standardEffectsFast(),
+      vsync: this,
+      initialValue: 1,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_ToolbarModeTransition oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mode == widget.mode) {
+      _currentChild = widget.child;
+      return;
+    }
+
+    final transitionId = ++_transitionId;
+    _previousChild = _currentChild;
+    _currentChild = widget.child;
+    if (widget.disableAnimations) {
+      _motion.value = 1;
+      _previousChild = null;
+      return;
+    }
+
+    _motion.value = 0;
+    _motion
+        .animateTo(1)
+        .orCancel
+        .then((_) {
+          if (!mounted || transitionId != _transitionId) return;
+          setState(() => _previousChild = null);
+        })
+        .catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    _motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.disableAnimations) return _currentChild;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.bottomCenter,
+      child: ClipRect(
+        child: AnimatedBuilder(
+          animation: _motion,
+          builder: (context, child) {
+            final progress = _motion.value.clamp(0.0, 1.0);
+            return Stack(
+              alignment: Alignment.bottomCenter,
+              children: [
+                Opacity(
+                  opacity: progress,
+                  child: Transform.scale(
+                    alignment: Alignment.bottomCenter,
+                    scale: 0.96 + (0.04 * progress),
+                    child: _currentChild,
+                  ),
+                ),
+                if (_previousChild != null)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 1 - progress,
+                        child: Transform.scale(
+                          alignment: Alignment.bottomCenter,
+                          scale: 0.96 + (0.04 * progress),
+                          child: _previousChild,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactToolbarContent extends StatelessWidget {
+  const _CompactToolbarContent({
+    super.key,
+    required this.selectedListType,
+    required this.isTask,
+    required this.selection,
+    required this.isListItem,
+    required this.onFormat,
+    required this.onListSelected,
+    required this.onIndent,
+    required this.onUnindent,
+    required this.onInsertDivider,
+    required this.onAttachImage,
+    required this.onAttachFile,
+  });
+
+  final ListItemType? selectedListType;
+  final bool isTask;
+  final DocumentSelection? selection;
+  final bool isListItem;
+  final VoidCallback onFormat;
+  final void Function(_ListFormatOption option, DocumentSelection? selection)
+  onListSelected;
+  final VoidCallback onIndent;
+  final VoidCallback onUnindent;
+  final VoidCallback onInsertDivider;
+  final VoidCallback? onAttachImage;
+  final VoidCallback? onAttachFile;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ToolbarButton(
+            icon: Icons.text_format,
+            isActive: false,
+            onPressed: onFormat,
+            semanticLabel: 'Abrir formatação',
+          ),
+          const _ToolbarDivider(),
+          _ToolbarListPopover(
+            selectedListType: selectedListType,
+            isTask: isTask,
+            selection: selection,
+            onSelected: onListSelected,
+          ),
+          ClipRect(
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.centerLeft,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: isListItem ? 1.0 : 0.0,
+                curve: Curves.easeInOut,
+                child: isListItem
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _ToolbarButton(
+                            icon: Icons.format_indent_increase,
+                            isActive: false,
+                            onPressed: onIndent,
+                          ),
+                          _ToolbarButton(
+                            icon: Icons.format_indent_decrease,
+                            isActive: false,
+                            onPressed: onUnindent,
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          const _ToolbarDivider(),
+          _ToolbarButton(
+            icon: Icons.horizontal_rule,
+            isActive: false,
+            onPressed: onInsertDivider,
+          ),
+          const _ToolbarDivider(),
+          _ToolbarButton(
+            icon: Icons.image,
+            isActive: false,
+            onPressed: onAttachImage,
+          ),
+          _ToolbarButton(
+            icon: Icons.attach_file,
+            isActive: false,
+            onPressed: onAttachFile,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormattingToolbarContent extends StatelessWidget {
+  const _FormattingToolbarContent({
+    super.key,
+    required this.blockType,
+    required this.hasSelection,
+    required this.isBold,
+    required this.isItalic,
+    required this.isStrikethrough,
+    required this.onClose,
+    required this.onBlockType,
+    required this.onToggleInline,
+  });
+
+  final Attribution? blockType;
+  final bool hasSelection;
+  final bool isBold;
+  final bool isItalic;
+  final bool isStrikethrough;
+  final VoidCallback onClose;
+  final ValueChanged<Attribution?> onBlockType;
+  final ValueChanged<Attribution> onToggleInline;
+
+  @override
+  Widget build(BuildContext context) {
+    final inlineEnabled = hasSelection;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ToolbarButton(
+                icon: Icons.close,
+                isActive: false,
+                onPressed: onClose,
+                semanticLabel: 'Fechar formatação',
+              ),
+              const _ToolbarDivider(),
+              _ToolbarButton(
+                svgAsset: 'assets/icons/h1_icon.svg',
+                isActive: blockType == header1Attribution,
+                onPressed: () => onBlockType(header1Attribution),
+                semanticLabel: 'Título 1',
+              ),
+              _ToolbarButton(
+                svgAsset: 'assets/icons/h2_icon.svg',
+                isActive: blockType == header2Attribution,
+                onPressed: () => onBlockType(header2Attribution),
+                semanticLabel: 'Título 2',
+              ),
+              _ToolbarButton(
+                svgAsset: 'assets/icons/h3_icon.svg',
+                isActive: blockType == header3Attribution,
+                onPressed: () => onBlockType(header3Attribution),
+                semanticLabel: 'Título 3',
+              ),
+              _ToolbarButton(
+                icon: Icons.format_quote,
+                isActive: blockType == blockquoteAttribution,
+                onPressed: () => onBlockType(blockquoteAttribution),
+                semanticLabel: 'Citação',
+              ),
+            ],
+          ),
+          const _ToolbarDivider(horizontal: false),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ToolbarButton(
+                icon: Icons.format_bold,
+                isActive: isBold,
+                onPressed: inlineEnabled
+                    ? () => onToggleInline(boldAttribution)
+                    : null,
+                semanticLabel: 'Negrito',
+              ),
+              _ToolbarButton(
+                icon: Icons.format_italic,
+                isActive: isItalic,
+                onPressed: inlineEnabled
+                    ? () => onToggleInline(italicsAttribution)
+                    : null,
+                semanticLabel: 'Itálico',
+              ),
+              _ToolbarButton(
+                icon: Icons.format_strikethrough,
+                isActive: isStrikethrough,
+                onPressed: inlineEnabled
+                    ? () => onToggleInline(strikethroughAttribution)
+                    : null,
+                semanticLabel: 'Tachado',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -804,104 +1082,11 @@ class _ToolbarListOptionTileState extends State<_ToolbarListOptionTile>
   }
 }
 
-class _ToolbarMotionGroup extends StatefulWidget {
-  const _ToolbarMotionGroup({required this.visible, required this.child});
-
-  final bool visible;
-  final Widget child;
-
-  @override
-  State<_ToolbarMotionGroup> createState() => _ToolbarMotionGroupState();
-}
-
-class _ToolbarMotionGroupState extends State<_ToolbarMotionGroup>
-    with TickerProviderStateMixin {
-  late final SingleMotionController _motion;
-  bool _hasVisualChild = false;
-  int _transitionId = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _motion = SingleMotionController(
-      motion: const MaterialSpringMotion.standardEffectsFast(),
-      vsync: this,
-      initialValue: widget.visible ? 1 : 0,
-    );
-    _hasVisualChild = widget.visible;
-  }
-
-  @override
-  void didUpdateWidget(_ToolbarMotionGroup oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.visible != widget.visible) {
-      final transitionId = ++_transitionId;
-      if (widget.visible && !_hasVisualChild) {
-        setState(() => _hasVisualChild = true);
-      }
-      _animateTo(widget.visible ? 1 : 0).then((_) {
-        if (!mounted || transitionId != _transitionId || widget.visible) {
-          return;
-        }
-        setState(() => _hasVisualChild = false);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _motion.dispose();
-    super.dispose();
-  }
-
-  Future<void> _animateTo(double target) async {
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
-      _motion.value = target;
-      return Future<void>.value();
-    }
-    try {
-      await _motion.animateTo(target).orCancel;
-    } on TickerCanceled {
-      // The controller is disposed with the toolbar.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _motion,
-      builder: (context, child) {
-        final progress = _motion.value.clamp(0.0, 1.0);
-        return IgnorePointer(
-          ignoring: progress < 0.5,
-          child: ClipRect(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              widthFactor: progress,
-              child: Opacity(
-                opacity: progress,
-                child: Transform.translate(
-                  offset: Offset(-10 * (1 - progress), 0),
-                  child: Transform.scale(
-                    alignment: Alignment.centerLeft,
-                    scale: 0.94 + (0.06 * progress),
-                    child: child,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-      child: _hasVisualChild ? widget.child : null,
-    );
-  }
-}
-
 class _ToolbarButton extends StatefulWidget {
   const _ToolbarButton({
     this.icon,
     this.svgAsset,
+    this.semanticLabel,
     required this.isActive,
     this.onPressed,
   }) : assert(
@@ -911,6 +1096,7 @@ class _ToolbarButton extends StatefulWidget {
 
   final IconData? icon;
   final String? svgAsset;
+  final String? semanticLabel;
   final bool isActive;
   final VoidCallback? onPressed;
 
@@ -995,24 +1181,29 @@ class _ToolbarButtonState extends State<_ToolbarButton>
             colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
           );
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-      onTap: widget.onPressed,
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.all(AppSpacing.xs),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        ),
-        child: Transform.scale(
-          scale: 0.96 + (0.04 * activeProgress),
-          child: Opacity(
-            opacity: 0.7 + (0.3 * iconProgress),
-            child: Transform.scale(
-              scale: 0.9 + (0.1 * iconProgress),
-              child: icon,
+    return Semantics(
+      button: true,
+      enabled: widget.onPressed != null,
+      label: widget.semanticLabel,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        onTap: widget.onPressed,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          ),
+          child: Transform.scale(
+            scale: 0.96 + (0.04 * activeProgress),
+            child: Opacity(
+              opacity: 0.7 + (0.3 * iconProgress),
+              child: Transform.scale(
+                scale: 0.9 + (0.1 * iconProgress),
+                child: icon,
+              ),
             ),
           ),
         ),
@@ -1022,14 +1213,18 @@ class _ToolbarButtonState extends State<_ToolbarButton>
 }
 
 class _ToolbarDivider extends StatelessWidget {
-  const _ToolbarDivider();
+  const _ToolbarDivider({this.horizontal = true});
+
+  final bool horizontal;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 1,
-      height: 24,
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      width: horizontal ? 1 : 220,
+      height: horizontal ? 24 : 1,
+      margin: horizontal
+          ? const EdgeInsets.symmetric(horizontal: AppSpacing.xs)
+          : const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       color: Theme.of(context).colorScheme.outlineVariant,
     );
   }
