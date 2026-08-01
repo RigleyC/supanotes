@@ -91,15 +91,19 @@ class AuthController extends AsyncNotifier<User?> {
       try {
         final prefs = ref.read(sharedPreferencesProvider);
         await prefs.remove('last_synced_at');
-      } catch (e) {
-        debugPrint('Error clearing last_synced_at: $e');
+      } catch (error, stack) {
+        debugPrint('Error clearing last_synced_at: $error');
+        cleanupError ??= error;
+        cleanupStack ??= stack;
       }
 
       // Explicit logout is the user-confirmed data-clearing operation.
       try {
         await ref.read(appDatabaseProvider).clearAllData();
-      } catch (e) {
-        debugPrint('Error clearing local database: $e');
+      } catch (error, stack) {
+        debugPrint('Error clearing local database: $error');
+        cleanupError ??= error;
+        cleanupStack ??= stack;
       }
     }
 

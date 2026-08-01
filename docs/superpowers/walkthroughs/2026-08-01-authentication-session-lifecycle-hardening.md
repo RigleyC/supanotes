@@ -29,6 +29,10 @@ Tambem existe agora `POST /api/v1/auth/revoke-sessions`, protegido por JWT,
 que revoga todas as sessoes do usuario identificado pelo token. O endpoint nao
 aceita um user ID no corpo ou na URL.
 
+Falhas ao limpar preferencias ou o banco local durante logout explicito agora
+tambem entram no estado de erro da sessao, depois que as credenciais ja foram
+removidas.
+
 ## Evidencia
 
 - `go test ./pkg/auth ./internal/auth ./internal/alexa` passou.
