@@ -11,15 +11,18 @@ library;
 /// The toolbar rebuilds itself independently by listening to
 /// [MutableDocumentComposer.selectionNotifier], so the parent widget
 /// does not need to call `setState` whenever the selection changes.
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:motor/motor.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_selection_tile.dart';
 
 class NoteToolbar extends StatefulWidget {
   const NoteToolbar({
@@ -198,20 +201,11 @@ class _NoteToolbarState extends State<NoteToolbar> {
                     onPressed: () => _setBlockType(blockquoteAttribution),
                   ),
                   const _ToolbarDivider(),
-                  _ToolbarButton(
-                    icon: Icons.check_box_outlined,
-                    isActive: isTask,
-                    onPressed: _convertToTask,
-                  ),
-                  _ToolbarButton(
-                    icon: Icons.format_list_bulleted,
-                    isActive: selectedListType == ListItemType.unordered,
-                    onPressed: () => _convertToListItem(ListItemType.unordered),
-                  ),
-                  _ToolbarButton(
-                    icon: Icons.format_list_numbered,
-                    isActive: selectedListType == ListItemType.ordered,
-                    onPressed: () => _convertToListItem(ListItemType.ordered),
+                  _ToolbarListPopover(
+                    selectedListType: selectedListType,
+                    isTask: isTask,
+                    selection: selection,
+                    onSelected: _onListFormatSelected,
                   ),
                   ClipRect(
                     child: AnimatedSize(
@@ -354,6 +348,23 @@ class _NoteToolbarState extends State<NoteToolbar> {
     NoteEditorCommands.convertToTask(editor, composer);
   }
 
+  void _onListFormatSelected(
+    _ListFormatOption option,
+    DocumentSelection? selection,
+  ) {
+    if (selection != null) {
+      composer.setSelectionWithReason(selection);
+    }
+    switch (option) {
+      case _ListFormatOption.bulleted:
+        _convertToListItem(ListItemType.unordered);
+      case _ListFormatOption.numbered:
+        _convertToListItem(ListItemType.ordered);
+      case _ListFormatOption.checklist:
+        _convertToTask();
+    }
+  }
+
   void _indentListItem() {
     HapticFeedback.selectionClick();
     NoteEditorCommands.indentListItems(editor, composer);
@@ -367,6 +378,351 @@ class _NoteToolbarState extends State<NoteToolbar> {
   void _insertDivider() {
     HapticFeedback.selectionClick();
     NoteEditorCommands.insertDivider(editor, dividerCount: 35);
+  }
+}
+
+enum _ListFormatOption { bulleted, numbered, checklist }
+
+class _ToolbarListPopover extends StatefulWidget {
+  const _ToolbarListPopover({
+    required this.selectedListType,
+    required this.isTask,
+    required this.selection,
+    required this.onSelected,
+  });
+
+  final ListItemType? selectedListType;
+  final bool isTask;
+  final DocumentSelection? selection;
+  final void Function(_ListFormatOption option, DocumentSelection? selection)
+  onSelected;
+
+  @override
+  State<_ToolbarListPopover> createState() => _ToolbarListPopoverState();
+}
+
+class _ToolbarListPopoverState extends State<_ToolbarListPopover>
+    with TickerProviderStateMixin {
+  static const _menuWidth = 224.0;
+  static const _menuHeight = 176.0;
+  static const _viewportMargin = 12.0;
+
+  final _overlayController = OverlayPortalController();
+  final _layerLink = LayerLink();
+  final _triggerKey = GlobalKey();
+  late final SingleMotionController _motion;
+
+  FocusNode? _focusBeforeOpen;
+  DocumentSelection? _selectionBeforeOpen;
+  bool _isShowing = false;
+  bool _showAbove = true;
+  double _horizontalOffset = 0;
+  double _currentMenuWidth = _menuWidth;
+  double _currentMenuHeight = _menuHeight;
+  int _transitionId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _motion = SingleMotionController(
+      motion: const MaterialSpringMotion.standardSpatialFast(),
+      vsync: this,
+    );
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    _motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isShowing) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_isShowing) return;
+      _calculatePlacement();
+      setState(() {});
+    });
+  }
+
+  bool get _animationsDisabled =>
+      MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+  _ListFormatOption? get _activeOption {
+    if (widget.isTask) return _ListFormatOption.checklist;
+    return switch (widget.selectedListType) {
+      ListItemType.unordered => _ListFormatOption.bulleted,
+      ListItemType.ordered => _ListFormatOption.numbered,
+      null => null,
+    };
+  }
+
+  IconData get _triggerIcon {
+    return switch (_activeOption) {
+      _ListFormatOption.checklist => Icons.check_box_outlined,
+      _ListFormatOption.numbered => Icons.format_list_numbered,
+      _ListFormatOption.bulleted || null => Icons.format_list_bulleted,
+    };
+  }
+
+  void _toggle() {
+    if (_isShowing && _motion.value > 0.5) {
+      _close();
+    } else {
+      _open();
+    }
+  }
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (_isShowing &&
+        event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      _close();
+      return true;
+    }
+    return false;
+  }
+
+  void _open() {
+    _transitionId++;
+    _focusBeforeOpen = FocusManager.instance.primaryFocus;
+    _selectionBeforeOpen = widget.selection;
+    _calculatePlacement();
+    setState(() => _isShowing = true);
+    _overlayController.show();
+    _animateTo(1);
+  }
+
+  void _close({VoidCallback? afterClose}) {
+    if (!_isShowing) {
+      afterClose?.call();
+      return;
+    }
+
+    final transitionId = ++_transitionId;
+    final focusNode = _focusBeforeOpen;
+    _animateTo(0).then((_) {
+      if (!mounted || transitionId != _transitionId) return;
+      _overlayController.hide();
+      setState(() => _isShowing = false);
+      _focusBeforeOpen = null;
+      _selectionBeforeOpen = null;
+      if (afterClose != null) {
+        afterClose();
+      } else {
+        focusNode?.requestFocus();
+      }
+    });
+  }
+
+  void _select(_ListFormatOption option) {
+    final focusNode = _focusBeforeOpen;
+    final selection = _selectionBeforeOpen;
+    _close(
+      afterClose: () {
+        widget.onSelected(option, selection);
+        focusNode?.requestFocus();
+      },
+    );
+  }
+
+  Future<void> _animateTo(double target) async {
+    if (_animationsDisabled) {
+      _motion.value = target;
+      return;
+    }
+
+    try {
+      await _motion.animateTo(target).orCancel;
+    } on TickerCanceled {
+      // The controller is disposed with the toolbar.
+    }
+  }
+
+  void _calculatePlacement() {
+    final renderObject =
+        _triggerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderObject == null || !renderObject.hasSize) return;
+
+    final topLeft = renderObject.localToGlobal(Offset.zero);
+    final size = renderObject.size;
+    final viewport = MediaQuery.sizeOf(context);
+    final topPadding = MediaQuery.paddingOf(context).top + _viewportMargin;
+    final bottomPadding =
+        viewport.height - MediaQuery.viewInsetsOf(context).bottom;
+    final spaceAbove = topLeft.dy - topPadding;
+    final spaceBelow = bottomPadding - (topLeft.dy + size.height);
+
+    _showAbove = spaceAbove >= _menuHeight || spaceAbove >= spaceBelow;
+    final availableHeight = (_showAbove ? spaceAbove : spaceBelow) - 8;
+    _currentMenuHeight = availableHeight.clamp(1.0, _menuHeight);
+
+    _currentMenuWidth = (viewport.width - 2 * _viewportMargin).clamp(
+      1.0,
+      _menuWidth,
+    );
+    final desiredLeft = topLeft.dx + size.width / 2 - _currentMenuWidth / 2;
+    final minLeft = _viewportMargin;
+    final maxLeft = viewport.width - _viewportMargin - _currentMenuWidth;
+    final clampedLeft = desiredLeft.clamp(
+      math.min(minLeft, maxLeft),
+      math.max(minLeft, maxLeft),
+    );
+    _horizontalOffset = clampedLeft - desiredLeft;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_isShowing,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isShowing) _close();
+      },
+      child: CompositedTransformTarget(
+        link: _layerLink,
+        child: OverlayPortal(
+          controller: _overlayController,
+          overlayChildBuilder: (context) => Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: _close,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+              CompositedTransformFollower(
+                link: _layerLink,
+                showWhenUnlinked: false,
+                targetAnchor: _showAbove
+                    ? Alignment.topCenter
+                    : Alignment.bottomCenter,
+                followerAnchor: _showAbove
+                    ? Alignment.bottomCenter
+                    : Alignment.topCenter,
+                offset: Offset(_horizontalOffset, _showAbove ? -8 : 8),
+                child: AnimatedBuilder(
+                  animation: _motion,
+                  builder: (context, child) {
+                    final progress = _motion.value.clamp(0.0, 1.0);
+                    return Transform.scale(
+                      alignment: _showAbove
+                          ? Alignment.bottomCenter
+                          : Alignment.topCenter,
+                      scale: 0.88 + (0.12 * progress),
+                      child: Opacity(opacity: progress, child: child),
+                    );
+                  },
+                  child: _ListFormatMenu(
+                    activeOption: _activeOption,
+                    width: _currentMenuWidth,
+                    height: _currentMenuHeight,
+                    onSelected: _select,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          child: KeyedSubtree(
+            key: _triggerKey,
+            child: _ToolbarButton(
+              icon: _triggerIcon,
+              isActive: _activeOption != null,
+              onPressed: _toggle,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ListFormatMenu extends StatelessWidget {
+  const _ListFormatMenu({
+    required this.activeOption,
+    required this.width,
+    required this.height,
+    required this.onSelected,
+  });
+
+  final _ListFormatOption? activeOption;
+  final double width;
+  final double height;
+  final ValueChanged<_ListFormatOption> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final borderRadius = BorderRadius.circular(24);
+    final highContrast = MediaQuery.highContrastOf(context);
+
+    final surface = Container(
+      width: width,
+      constraints: BoxConstraints(maxHeight: height),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: highContrast ? 1 : 0.82),
+        borderRadius: borderRadius,
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.16),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppSelectionTile(
+                label: 'Bullet List',
+                icon: Icons.format_list_bulleted,
+                isSelected: activeOption == _ListFormatOption.bulleted,
+                onTap: () => onSelected(_ListFormatOption.bulleted),
+              ),
+              AppSelectionTile(
+                label: 'Numbered List',
+                icon: Icons.format_list_numbered,
+                isSelected: activeOption == _ListFormatOption.numbered,
+                onTap: () => onSelected(_ListFormatOption.numbered),
+              ),
+              AppSelectionTile(
+                label: 'Checklist',
+                icon: Icons.check_box_outlined,
+                isSelected: activeOption == _ListFormatOption.checklist,
+                onTap: () => onSelected(_ListFormatOption.checklist),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final glassSurface = highContrast
+        ? surface
+        : ClipRRect(
+            borderRadius: borderRadius,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: surface,
+            ),
+          );
+
+    return Semantics(
+      container: true,
+      label: 'Opções de lista',
+      child: glassSurface,
+    );
   }
 }
 

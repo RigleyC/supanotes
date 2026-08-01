@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
@@ -41,6 +42,26 @@ Finder iconButtonWithIcon(IconData icon) {
   );
 }
 
+Finder listPopoverFinder() {
+  return find.byWidgetPredicate(
+    (widget) => widget.runtimeType.toString() == '_ToolbarListPopover',
+  );
+}
+
+Future<void> openListMenu(WidgetTester tester) async {
+  await tester.tap(listPopoverFinder());
+  await tester.pumpAndSettle();
+  expect(find.text('Bullet List'), findsOneWidget);
+  expect(find.text('Numbered List'), findsOneWidget);
+  expect(find.text('Checklist'), findsOneWidget);
+}
+
+Future<void> selectListOption(WidgetTester tester, String label) async {
+  await openListMenu(tester);
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
+}
+
 Widget buildConversionHarness({
   required List<DocumentNode> nodes,
   DocumentSelection? selection,
@@ -73,7 +94,7 @@ Widget buildConversionHarness({
 }
 
 void main() {
-  group('Task button isActive', () {
+  group('List menu trigger state', () {
     testWidgets('is inactive when cursor is on a ParagraphNode', (
       tester,
     ) async {
@@ -90,11 +111,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final checkbox = iconButtonWithIcon(Icons.check_box_outlined);
-      expect(checkbox, findsOneWidget);
+      final listPopover = listPopoverFinder();
+      expect(listPopover, findsOneWidget);
 
-      final button = tester.widget(checkbox);
-      expect((button as dynamic).isActive, isFalse);
+      final button = tester.widget(listPopover);
+      expect((button as dynamic).isTask, isFalse);
+      expect(
+        (tester.widget(iconButtonWithIcon(Icons.format_list_bulleted))
+                as dynamic)
+            .isActive,
+        isFalse,
+      );
     });
 
     testWidgets('is active when cursor is on a TaskNode', (tester) async {
@@ -117,11 +144,150 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final checkbox = iconButtonWithIcon(Icons.check_box_outlined);
-      expect(checkbox, findsOneWidget);
+      final listPopover = listPopoverFinder();
+      expect(listPopover, findsOneWidget);
 
-      final button = tester.widget(checkbox);
-      expect((button as dynamic).isActive, isTrue);
+      final button = tester.widget(listPopover);
+      expect((button as dynamic).isTask, isTrue);
+      expect(
+        (tester.widget(iconButtonWithIcon(Icons.check_box_outlined)) as dynamic)
+            .isActive,
+        isTrue,
+      );
+    });
+
+    testWidgets('opens with the three list options and dismisses outside', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openListMenu(tester);
+
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bullet List'), findsNothing);
+      expect(find.text('Numbered List'), findsNothing);
+      expect(find.text('Checklist'), findsNothing);
+    });
+
+    testWidgets('dismisses with Escape', (tester) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openListMenu(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bullet List'), findsNothing);
+    });
+
+    testWidgets('constrains the menu on a short viewport', (tester) async {
+      tester.view.physicalSize = const Size(240, 180);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openListMenu(tester);
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('applies the option to the selection captured on open', (
+      tester,
+    ) async {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'node-1', text: AttributedText('First')),
+          ParagraphNode(id: 'node-2', text: AttributedText('Second')),
+        ],
+      );
+      final firstSelection = const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'node-1',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+      );
+      final secondSelection = const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'node-2',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: firstSelection,
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: SuperEditor(
+                    editor: editor,
+                    componentBuilders: [
+                      ...defaultComponentBuilders,
+                      CustomTaskComponentBuilder(),
+                    ],
+                  ),
+                ),
+                NoteToolbar(editor: editor, composer: composer),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openListMenu(tester);
+      composer.setSelectionWithReason(secondSelection);
+      await tester.pump();
+      await tester.tap(find.text('Bullet List'));
+      await tester.pumpAndSettle();
+
+      expect(document.getNodeById('node-1'), isA<ListItemNode>());
+      expect(document.getNodeById('node-2'), isA<ParagraphNode>());
     });
   });
 
@@ -165,8 +331,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.check_box_outlined));
-      await tester.pumpAndSettle();
+      await selectListOption(tester, 'Checklist');
 
       expect(document.first, isA<TaskNode>());
       expect((document.first as TaskNode).text.toPlainText(), 'Buy milk');
@@ -216,8 +381,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.check_box_outlined));
-      await tester.pumpAndSettle();
+      await selectListOption(tester, 'Checklist');
 
       expect(document.first, isA<TaskNode>());
       expect((document.first as TaskNode).text.toPlainText(), 'Buy milk');
@@ -279,8 +443,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.check_box_outlined));
-      await tester.pumpAndSettle();
+      await selectListOption(tester, 'Checklist');
 
       final nodes = [
         document.getNodeById('node-1'),
@@ -341,8 +504,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.check_box_outlined));
-      await tester.pumpAndSettle();
+      await selectListOption(tester, 'Checklist');
 
       expect(document.first, isA<ParagraphNode>());
       expect((document.first as ParagraphNode).text.toPlainText(), 'Buy milk');
@@ -395,8 +557,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.format_list_bulleted));
-      await tester.pumpAndSettle();
+      await selectListOption(tester, 'Bullet List');
 
       expect(document.first, isA<ListItemNode>());
       final item = document.first as ListItemNode;
@@ -449,8 +610,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.format_list_numbered));
-      await tester.pumpAndSettle();
+      await selectListOption(tester, 'Numbered List');
 
       expect(document.first, isA<ListItemNode>());
       final item = document.first as ListItemNode;
@@ -653,7 +813,7 @@ void main() {
     });
   });
 
-  group('Numbered list button isActive', () {
+  group('List menu trigger active state', () {
     testWidgets('is active on ordered list item', (tester) async {
       await tester.pumpWidget(
         buildEditorHarness(
@@ -676,7 +836,7 @@ void main() {
       expect((btnWidget as dynamic).isActive, isTrue);
     });
 
-    testWidgets('is inactive on unordered list item', (tester) async {
+    testWidgets('is active on unordered list item', (tester) async {
       await tester.pumpWidget(
         buildEditorHarness(
           nodes: [
@@ -695,10 +855,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final numberedBtn = iconButtonWithIcon(Icons.format_list_numbered);
-      expect(numberedBtn, findsOneWidget);
-      final btnWidget = tester.widget(numberedBtn);
-      expect((btnWidget as dynamic).isActive, isFalse);
+      final bulletedBtn = iconButtonWithIcon(Icons.format_list_bulleted);
+      expect(bulletedBtn, findsOneWidget);
+      final btnWidget = tester.widget(bulletedBtn);
+      expect((btnWidget as dynamic).isActive, isTrue);
     });
   });
 
@@ -873,12 +1033,13 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final taskButton = iconButtonWithIcon(Icons.check_box_outlined);
-        expect((tester.widget(taskButton) as dynamic).isActive, isFalse);
+        final listButton = iconButtonWithIcon(Icons.format_list_bulleted);
+        expect((tester.widget(listButton) as dynamic).isActive, isFalse);
 
         editor.execute([ConvertParagraphToTaskRequest(nodeId: 'node-1')]);
         await tester.pumpAndSettle();
 
+        final taskButton = iconButtonWithIcon(Icons.check_box_outlined);
         expect((tester.widget(taskButton) as dynamic).isActive, isTrue);
       },
     );
