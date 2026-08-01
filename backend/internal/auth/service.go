@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/dto"
@@ -137,6 +138,7 @@ func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, str
 
 	var access, refresh string
 	var reuseDetected bool
+	var reuseUserID, reuseFamilyID pgtype.UUID
 
 	err := s.inTx(ctx, func(q sqlcgen.Querier) error {
 		row, err := q.ConsumeRefreshToken(ctx, hashed)
@@ -157,6 +159,8 @@ func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, str
 					return err
 				}
 				reuseDetected = true
+				reuseUserID = record.UserID
+				reuseFamilyID = record.FamilyID
 				return nil
 			}
 			return ErrInvalidRefreshToken
@@ -178,6 +182,11 @@ func (s *Service) Refresh(ctx context.Context, refreshPlain string) (string, str
 		return "", "", fmt.Errorf("auth: refresh: %w", err)
 	}
 	if reuseDetected {
+		log.Warn().
+			Str("event", "auth.refresh_token_reuse").
+			Str("user_id", uid.UUIDToString(reuseUserID)).
+			Str("family_id", uid.UUIDToString(reuseFamilyID)).
+			Msg("refresh token reuse detected; family revoked")
 		return "", "", ErrRefreshTokenReuse
 	}
 

@@ -33,6 +33,9 @@ Falhas ao limpar preferencias ou o banco local durante logout explicito agora
 tambem entram no estado de erro da sessao, depois que as credenciais ja foram
 removidas.
 
+Reuse de refresh tokens gera um evento estruturado com identificadores de
+usuario e familia, sem registrar o token em claro.
+
 ## Evidencia
 
 - `go test ./pkg/auth ./internal/auth ./internal/alexa` passou.
