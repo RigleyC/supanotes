@@ -26,11 +26,17 @@ class RealHttpTestBackend {
     await _server.close(force: true);
   }
 
-  void seedNote(String noteId, Map<String, dynamic> docJson, {Map<String, String>? permissions}) {
+  void seedNote(
+    String noteId,
+    Map<String, dynamic> docJson, {
+    Map<String, String>? permissions,
+  }) {
     _notes[noteId] = _ServerNoteState(
       revision: 0,
       document: docJson,
-      permissions: permissions ?? {'user-a': 'edit', 'user-b': 'edit', 'user-viewer': 'view'},
+      permissions:
+          permissions ??
+          {'user-a': 'edit', 'user-b': 'edit', 'user-viewer': 'view'},
     );
   }
 
@@ -69,18 +75,22 @@ class RealHttpTestBackend {
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({
-          'noteId': noteId,
-          'revision': note.revision,
-          'document': note.document,
-          'serverTime': DateTime.now().toUtc().toIso8601String(),
-        }))
+        ..write(
+          jsonEncode({
+            'noteId': noteId,
+            'revision': note.revision,
+            'document': note.document,
+            'serverTime': DateTime.now().toUtc().toIso8601String(),
+          }),
+        )
         ..close();
       return;
     }
 
     // Match GET /api/v1/notes/:noteId/operations
-    if (request.method == 'GET' && path.contains('/operations') && !path.contains(':sync')) {
+    if (request.method == 'GET' &&
+        path.contains('/operations') &&
+        !path.contains(':sync')) {
       final segments = path.split('/');
       final noteIdIndex = segments.indexOf('notes') + 1;
       final noteId = segments[noteIdIndex];
@@ -97,17 +107,21 @@ class RealHttpTestBackend {
 
       final afterStr = request.uri.queryParameters['afterRevision'] ?? '0';
       final afterRev = int.tryParse(afterStr) ?? 0;
-      final ops = note.ops.where((o) => (o['revision'] as int) > afterRev).toList();
+      final ops = note.ops
+          .where((o) => (o['revision'] as int) > afterRev)
+          .toList();
 
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({
-          'operations': ops,
-          'revision': note.revision,
-          'document': note.document,
-          'serverTime': DateTime.now().toUtc().toIso8601String(),
-        }))
+        ..write(
+          jsonEncode({
+            'operations': ops,
+            'revision': note.revision,
+            'document': note.document,
+            'serverTime': DateTime.now().toUtc().toIso8601String(),
+          }),
+        )
         ..close();
       return;
     }
@@ -140,7 +154,8 @@ class RealHttpTestBackend {
 
       final bodyStr = await utf8.decoder.bind(request).join();
       final body = jsonDecode(bodyStr) as Map<String, dynamic>;
-      final operations = (body['operations'] as List? ?? []).cast<Map<String, dynamic>>();
+      final operations = (body['operations'] as List? ?? [])
+          .cast<Map<String, dynamic>>();
 
       final accepted = <Map<String, dynamic>>[];
       for (final op in operations) {
@@ -168,12 +183,14 @@ class RealHttpTestBackend {
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({
-          'accepted': accepted,
-          'finalRevision': note.revision,
-          'canonicalDocument': note.document,
-          'serverTime': DateTime.now().toUtc().toIso8601String(),
-        }))
+        ..write(
+          jsonEncode({
+            'accepted': accepted,
+            'finalRevision': note.revision,
+            'canonicalDocument': note.document,
+            'serverTime': DateTime.now().toUtc().toIso8601String(),
+          }),
+        )
         ..close();
       return;
     }
@@ -198,13 +215,15 @@ class _ServerNoteState {
 }
 
 ApiClient _createTestApiClient(String baseUrl, String userToken) {
-  final dio = Dio(BaseOptions(
-    baseUrl: baseUrl,
-    connectTimeout: const Duration(seconds: 5),
-    receiveTimeout: const Duration(seconds: 5),
-  ));
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 5),
+    ),
+  );
 
-  final authInterceptor = AuthInterceptor(
+  final authInterceptor = AuthInterceptor.legacy(
     getAccessToken: () async => userToken,
     getRefreshToken: () async => 'refresh-token',
     saveTokens: ({required accessToken, required refreshToken}) async {},
@@ -213,10 +232,7 @@ ApiClient _createTestApiClient(String baseUrl, String userToken) {
     replay: (options) => dio.fetch<dynamic>(options),
   );
 
-  return ApiClient.test(
-    authInterceptor: authInterceptor,
-    dio: dio,
-  );
+  return ApiClient.test(authInterceptor: authInterceptor, dio: dio);
 }
 
 void main() {
@@ -240,8 +256,8 @@ void main() {
       final docJson = {
         'schemaVersion': 1,
         'blocks': [
-          {'id': 'b1', 'type': 'paragraph', 'delta': [], 'metadata': {}}
-        ]
+          {'id': 'b1', 'type': 'paragraph', 'delta': [], 'metadata': {}},
+        ],
       };
       backend.seedNote(noteId, docJson);
 
@@ -252,8 +268,12 @@ void main() {
       addTearDown(dbA.close);
       addTearDown(dbB.close);
 
-      final clientA = NoteSyncClient(client: _createTestApiClient(baseUrl, 'user-a'));
-      final clientB = NoteSyncClient(client: _createTestApiClient(baseUrl, 'user-b'));
+      final clientA = NoteSyncClient(
+        client: _createTestApiClient(baseUrl, 'user-a'),
+      );
+      final clientB = NoteSyncClient(
+        client: _createTestApiClient(baseUrl, 'user-b'),
+      );
 
       final serviceA = NoteOperationsSyncService(
         syncClient: clientA,
@@ -323,7 +343,9 @@ void main() {
       final db = AppDatabase.test();
       addTearDown(db.close);
 
-      final invalidClient = NoteSyncClient(client: _createTestApiClient(baseUrl, 'invalid-token'));
+      final invalidClient = NoteSyncClient(
+        client: _createTestApiClient(baseUrl, 'invalid-token'),
+      );
       final service = NoteOperationsSyncService(
         syncClient: invalidClient,
         dao: db.noteOperationsDao,
@@ -364,7 +386,9 @@ void main() {
       final db = AppDatabase.test();
       addTearDown(db.close);
 
-      final viewerClient = NoteSyncClient(client: _createTestApiClient(baseUrl, 'user-viewer'));
+      final viewerClient = NoteSyncClient(
+        client: _createTestApiClient(baseUrl, 'user-viewer'),
+      );
       final service = NoteOperationsSyncService(
         syncClient: viewerClient,
         dao: db.noteOperationsDao,

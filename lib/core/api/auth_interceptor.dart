@@ -45,45 +45,60 @@ typedef ReplayHandler =
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required Future<String?> Function() getAccessToken,
-    Future<String?> Function()? getRefreshToken,
-    Future<void> Function({
-      required String accessToken,
-      required String refreshToken,
-    })?
-    saveTokens,
     required this.onAuthFailure,
     required RefreshHandler onRefresh,
-    RefreshSessionHandler? refreshSession,
+    required RefreshSessionHandler refreshSession,
     required ReplayHandler replay,
   }) : _getAccessToken = getAccessToken,
-       _getRefreshToken = getRefreshToken,
-       _saveTokens = saveTokens,
        _onRefresh = onRefresh,
        _refreshSession = refreshSession,
        _replay = replay;
 
+  @Deprecated('Use AuthInterceptor with a RefreshSessionHandler.')
+  AuthInterceptor.legacy({
+    required Future<String?> Function() getAccessToken,
+    required Future<String?> Function() getRefreshToken,
+    required Future<void> Function({
+      required String accessToken,
+      required String refreshToken,
+    })
+    saveTokens,
+    required AuthFailureHandler onAuthFailure,
+    required RefreshHandler onRefresh,
+    required ReplayHandler replay,
+  }) : this(
+         getAccessToken: getAccessToken,
+         onAuthFailure: onAuthFailure,
+         onRefresh: onRefresh,
+         refreshSession: (refresh) async {
+           final refreshToken = await getRefreshToken();
+           if (refreshToken == null) return null;
+           final tokens = await refresh(refreshToken);
+           if (tokens == null) return null;
+           await saveTokens(
+             accessToken: tokens.accessToken,
+             refreshToken: tokens.refreshToken,
+           );
+           return tokens;
+         },
+         replay: replay,
+       );
+
   final Future<String?> Function() _getAccessToken;
-  final Future<String?> Function()? _getRefreshToken;
-  final Future<void> Function({
-    required String accessToken,
-    required String refreshToken,
-  })?
-  _saveTokens;
   final AuthFailureHandler onAuthFailure;
   final RefreshHandler _onRefresh;
-  final RefreshSessionHandler? _refreshSession;
+  final RefreshSessionHandler _refreshSession;
   final ReplayHandler _replay;
 
   Future<AuthTokenPair?>? _refreshing;
   Future<void>? _notifyingFailure;
-  String? _latestAccessToken;
 
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = _latestAccessToken ?? await _getAccessToken();
+    final token = await _getAccessToken();
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -163,28 +178,7 @@ class AuthInterceptor extends Interceptor {
   }
 
   Future<AuthTokenPair?> _doRefresh() async {
-    final refreshSession = _refreshSession;
-    if (refreshSession != null) {
-      return refreshSession(_onRefresh);
-    }
-
-    final getRefreshToken = _getRefreshToken;
-    final saveTokens = _saveTokens;
-    if (getRefreshToken == null || saveTokens == null) {
-      throw StateError('AuthInterceptor requires refreshSession');
-    }
-    final refreshToken = await getRefreshToken();
-    if (refreshToken == null) return null;
-
-    final tokens = await _onRefresh(refreshToken);
-    if (tokens == null) return null;
-
-    await saveTokens(
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    );
-    _latestAccessToken = tokens.accessToken;
-    return tokens;
+    return _refreshSession(_onRefresh);
   }
 }
 

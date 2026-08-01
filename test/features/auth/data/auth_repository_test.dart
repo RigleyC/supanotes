@@ -66,14 +66,14 @@ ApiClient _apiClient(_StubAdapter adapter) {
   // We pass a no-op interceptor — this test exercises the repository, not
   // the auth flow. The interceptor must still be present because the
   // ApiClient constructor requires it.
-  final interceptor = AuthInterceptor(
+  final interceptor = AuthInterceptor.legacy(
     getAccessToken: () => _NoopStorage().getAccessToken(),
     getRefreshToken: () => _NoopStorage().getRefreshToken(),
     saveTokens: ({required accessToken, required refreshToken}) =>
         _NoopStorage().saveTokens(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-    ),
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        ),
     onAuthFailure: () async {},
     onRefresh: (_) async => null,
     replay: (_) => throw UnimplementedError('not used in repository test'),
@@ -108,24 +108,22 @@ class _NoopStorage implements AuthLocalStorage {
 
 void main() {
   setUpAll(() {
-    registerFallbackValue(
-      RequestOptions(path: '/', method: 'GET'),
-    );
-    registerFallbackValue(
-      const User(id: '', email: '', name: ''),
-    );
+    registerFallbackValue(RequestOptions(path: '/', method: 'GET'));
+    registerFallbackValue(const User(id: '', email: '', name: ''));
   });
 
   group('AuthRepository.register', () {
     test('sends a POST to /auth/register and persists tokens', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.saveUser(
-            user: any(named: 'user'),
-          )).thenAnswer((_) async {});
-      when(() => storage.saveTokens(
-            accessToken: any(named: 'accessToken'),
-            refreshToken: any(named: 'refreshToken'),
-          )).thenAnswer((_) async {});
+      when(
+        () => storage.saveUser(user: any(named: 'user')),
+      ).thenAnswer((_) async {});
+      when(
+        () => storage.saveTokens(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      ).thenAnswer((_) async {});
       when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
 
       late _StubAdapter adapter;
@@ -159,13 +157,17 @@ void main() {
       expect(result.user.id, 'u-1');
       expect(result.accessToken, 'access-1');
       expect(result.refreshToken, 'refresh-1');
-      verify(() => storage.saveUser(
-            user: const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
-          )).called(1);
-      verify(() => storage.saveTokens(
-            accessToken: 'access-1',
-            refreshToken: 'refresh-1',
-          )).called(1);
+      verify(
+        () => storage.saveUser(
+          user: const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+        ),
+      ).called(1);
+      verify(
+        () => storage.saveTokens(
+          accessToken: 'access-1',
+          refreshToken: 'refresh-1',
+        ),
+      ).called(1);
     });
 
     test('translates a 409 into ConflictException', () async {
@@ -187,23 +189,27 @@ void main() {
         throwsA(isA<ConflictException>()),
       );
       verifyNever(() => storage.saveUser(user: any(named: 'user')));
-      verifyNever(() => storage.saveTokens(
-            accessToken: any(named: 'accessToken'),
-            refreshToken: any(named: 'refreshToken'),
-          ));
+      verifyNever(
+        () => storage.saveTokens(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      );
     });
   });
 
   group('AuthRepository.login', () {
     test('sends a POST to /auth/login and persists tokens', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.saveUser(
-            user: any(named: 'user'),
-          )).thenAnswer((_) async {});
-      when(() => storage.saveTokens(
-            accessToken: any(named: 'accessToken'),
-            refreshToken: any(named: 'refreshToken'),
-          )).thenAnswer((_) async {});
+      when(
+        () => storage.saveUser(user: any(named: 'user')),
+      ).thenAnswer((_) async {});
+      when(
+        () => storage.saveTokens(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      ).thenAnswer((_) async {});
       when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
 
       final adapter = _StubAdapter((options) async {
@@ -226,13 +232,17 @@ void main() {
       );
 
       expect(result.user.email, 'b@c.com');
-      verify(() => storage.saveUser(
-            user: const User(id: 'u-2', email: 'b@c.com', name: 'Bob'),
-          )).called(1);
-      verify(() => storage.saveTokens(
-            accessToken: 'access-2',
-            refreshToken: 'refresh-2',
-          )).called(1);
+      verify(
+        () => storage.saveUser(
+          user: const User(id: 'u-2', email: 'b@c.com', name: 'Bob'),
+        ),
+      ).called(1);
+      verify(
+        () => storage.saveTokens(
+          accessToken: 'access-2',
+          refreshToken: 'refresh-2',
+        ),
+      ).called(1);
     });
 
     test('translates a 401 into UnauthorizedException', () async {
@@ -253,26 +263,28 @@ void main() {
   });
 
   group('AuthRepository.logout', () {
-    test('calls /auth/logout with the refresh token and clears storage',
-        () async {
-      final storage = _MockAuthLocalStorage();
-      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'r-1');
-      when(() => storage.clear()).thenAnswer((_) async {});
+    test(
+      'calls /auth/logout with the refresh token and clears storage',
+      () async {
+        final storage = _MockAuthLocalStorage();
+        when(() => storage.getRefreshToken()).thenAnswer((_) async => 'r-1');
+        when(() => storage.clear()).thenAnswer((_) async {});
 
-      final adapter = _StubAdapter((options) async {
-        expect(options.path, '/auth/logout');
-        return _jsonResponse(204, <String, dynamic>{});
-      });
+        final adapter = _StubAdapter((options) async {
+          expect(options.path, '/auth/logout');
+          return _jsonResponse(204, <String, dynamic>{});
+        });
 
-      final repo = AuthRepository(
-        apiClient: _apiClient(adapter),
-        storage: storage,
-      );
+        final repo = AuthRepository(
+          apiClient: _apiClient(adapter),
+          storage: storage,
+        );
 
-      await repo.logout();
-      expect(adapter.hits.length, 1);
-      verify(() => storage.clear()).called(1);
-    });
+        await repo.logout();
+        expect(adapter.hits.length, 1);
+        verify(() => storage.clear()).called(1);
+      },
+    );
 
     test('still clears storage when /auth/logout fails', () async {
       final storage = _MockAuthLocalStorage();
@@ -317,7 +329,9 @@ void main() {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
       final repo = AuthRepository(
-        apiClient: _apiClient(_StubAdapter((_) async => _jsonResponse(200, {}))),
+        apiClient: _apiClient(
+          _StubAdapter((_) async => _jsonResponse(200, {})),
+        ),
         storage: storage,
       );
       expect(await repo.isAuthenticated(), isTrue);
@@ -327,7 +341,9 @@ void main() {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => null);
       final repo = AuthRepository(
-        apiClient: _apiClient(_StubAdapter((_) async => _jsonResponse(200, {}))),
+        apiClient: _apiClient(
+          _StubAdapter((_) async => _jsonResponse(200, {})),
+        ),
         storage: storage,
       );
       expect(await repo.isAuthenticated(), isFalse);
@@ -337,7 +353,9 @@ void main() {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => '');
       final repo = AuthRepository(
-        apiClient: _apiClient(_StubAdapter((_) async => _jsonResponse(200, {}))),
+        apiClient: _apiClient(
+          _StubAdapter((_) async => _jsonResponse(200, {})),
+        ),
         storage: storage,
       );
       expect(await repo.isAuthenticated(), isFalse);

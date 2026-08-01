@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -52,10 +53,39 @@ func TestRefreshReuseCommitsFamilyRevocation(t *testing.T) {
 		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", session.User.ID)
 	}()
 
-	_, childRefresh, err := service.Refresh(ctx, originalRefresh)
-	require.NoError(t, err)
-	_, _, err = service.Refresh(ctx, originalRefresh)
-	require.True(t, errors.Is(err, ErrRefreshTokenReuse))
+	type refreshResult struct {
+		refreshToken string
+		err          error
+	}
+	results := make(chan refreshResult, 2)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(2)
+	for range 2 {
+		go func() {
+			defer waitGroup.Done()
+			_, refreshToken, refreshErr := service.Refresh(ctx, originalRefresh)
+			results <- refreshResult{refreshToken: refreshToken, err: refreshErr}
+		}()
+	}
+	waitGroup.Wait()
+	close(results)
+
+	var childRefresh string
+	var successCount, reuseCount int
+	for result := range results {
+		if result.err == nil {
+			successCount++
+			childRefresh = result.refreshToken
+			continue
+		}
+		if errors.Is(result.err, ErrRefreshTokenReuse) {
+			reuseCount++
+			continue
+		}
+		t.Fatalf("unexpected concurrent refresh error: %v", result.err)
+	}
+	require.Equal(t, 1, successCount)
+	require.Equal(t, 1, reuseCount)
 
 	_, _, err = service.Refresh(ctx, childRefresh)
 	require.ErrorIs(t, err, ErrInvalidRefreshToken)

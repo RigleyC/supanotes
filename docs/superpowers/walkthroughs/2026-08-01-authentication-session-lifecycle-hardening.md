@@ -12,7 +12,8 @@ sessao bloqueada por outra conta. O catalogo local grava o proprietario remoto
 da nota compartilhada. O `ApiClient` de producao usa somente o caminho de
 refresh do `AuthTokenManager`; os callbacks legados nao sao expostos pelo
 construtor de producao do cliente. O interceptor ainda os aceita para manter
-compatibilidade com testes antigos.
+compatibilidade com testes antigos, mas o caminho de producao exige
+`RefreshSessionHandler`.
 
 ## Evidencia
 
@@ -21,5 +22,8 @@ compatibilidade com testes antigos.
 - `flutter test test/features/auth/domain/auth_state_test.dart` passou.
 - `flutter test test/core/sync/note_operations_sync_service_characterization_test.dart` passou.
 - `flutter analyze` nos modulos alterados passou sem issues.
-- O teste PostgreSQL opt-in foi adicionado e pula de forma explicita quando
+- O teste PostgreSQL opt-in cobre duas chamadas concorrentes com o mesmo
+  refresh token e pula de forma explicita quando
   `SUPANOTES_AUTH_TEST_DATABASE_URL` nao esta configurado.
+- `go test ./...` passou.
+- `flutter test` passou com 512 testes e 1 skip existente.

@@ -40,7 +40,7 @@ ResponseBody _jsonResponse(int status, Object body) {
 
 ApiClient _apiClient(_StubAdapter adapter) {
   final dio = Dio()..httpClientAdapter = adapter;
-  final interceptor = AuthInterceptor(
+  final interceptor = AuthInterceptor.legacy(
     getAccessToken: () async => null,
     getRefreshToken: () async => null,
     saveTokens: ({required accessToken, required refreshToken}) async {},

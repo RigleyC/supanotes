@@ -117,7 +117,7 @@ void main() {
     test('attaches Authorization header when a token is stored', () async {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok-1');
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -145,7 +145,7 @@ void main() {
     test('attaches Authorization header even for /auth/* paths', () async {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok-1');
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -173,7 +173,7 @@ void main() {
     test('does not attach Authorization when storage is empty', () async {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => null);
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -236,7 +236,7 @@ void main() {
       final refreshDio = Dio()..httpClientAdapter = refreshAdapter;
       final cb = _refreshCallbacks(refreshDio);
 
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -293,7 +293,7 @@ void main() {
       final refreshDio = Dio()..httpClientAdapter = refreshAdapter;
       final callbacks = _refreshCallbacks(refreshDio);
 
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: storage.getAccessToken,
         getRefreshToken: storage.getRefreshToken,
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -340,7 +340,7 @@ void main() {
 
         String? replayedAuthorization;
         var refreshCalls = 0;
-        final interceptor = AuthInterceptor(
+        final interceptor = AuthInterceptor.legacy(
           getAccessToken: storage.getAccessToken,
           getRefreshToken: storage.getRefreshToken,
           saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -364,7 +364,6 @@ void main() {
           )
           ..interceptors.add(interceptor);
 
-        await dio.get<dynamic>('/notes');
         await dio.get<dynamic>('/notes');
 
         expect(replayedAuthorization, 'Bearer new-access');
@@ -390,7 +389,7 @@ void main() {
       final refreshDio = Dio()..httpClientAdapter = refreshAdapter;
       final cb = _refreshCallbacks(refreshDio);
 
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -421,7 +420,7 @@ void main() {
       when(() => storage.getRefreshToken()).thenAnswer((_) async => 'refresh');
 
       var failureCalls = 0;
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: storage.getAccessToken,
         getRefreshToken: storage.getRefreshToken,
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -451,7 +450,7 @@ void main() {
         'through unchanged', () async {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -501,7 +500,7 @@ void main() {
       final refreshDio = Dio()..httpClientAdapter = refreshAdapter;
       final cb = _refreshCallbacks(refreshDio);
 
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -538,7 +537,7 @@ void main() {
     test('non-401 errors are passed through with no refresh attempt', () async {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
@@ -569,7 +568,7 @@ void main() {
     test('auth route 401s skip refresh and are passed through', () async {
       final storage = _MockAuthLocalStorage();
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
-      final interceptor = AuthInterceptor(
+      final interceptor = AuthInterceptor.legacy(
         getAccessToken: () => storage.getAccessToken(),
         getRefreshToken: () => storage.getRefreshToken(),
         saveTokens: ({required accessToken, required refreshToken}) => storage
