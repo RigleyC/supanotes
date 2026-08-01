@@ -20,6 +20,11 @@ persistidos de sync passaram a carregar `ownerUserId`, e a telemetria e os
 queries de erro respeitam esse escopo. Linhas antigas so sao adotadas quando a
 propriedade local da nota confirma a conta.
 
+Na integracao OAuth da Alexa, o refresh agora guarda o hash anterior e marca o
+vinculo como revogado quando esse hash e reutilizado. Isso cobre a corrida em
+que a resposta da primeira troca se perde: a segunda tentativa nao cria outra
+credencial utilizavel.
+
 ## Evidencia
 
 - `go test ./pkg/auth ./internal/auth ./internal/alexa` passou.
@@ -31,5 +36,7 @@ propriedade local da nota confirma a conta.
   refresh token e pula de forma explicita quando
   `SUPANOTES_AUTH_TEST_DATABASE_URL` nao esta configurado.
 - `go test ./...` passou.
-- `flutter test` passou com 512 testes e 1 skip existente.
+- `flutter test` passou com 514 testes e 1 skip existente.
 - A migracao Drift para o escopo dos erros de sync foi gerada como schema 25.
+- A migracao `000046_alexa_refresh_family` e o teste PostgreSQL opt-in cobrem
+  a revogacao apos duas trocas concorrentes.

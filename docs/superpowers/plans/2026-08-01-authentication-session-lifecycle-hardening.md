@@ -28,5 +28,5 @@ sync como uma fila vazia.
 
 ## Pendencias conhecidas
 
-- A rotacao de refresh tokens da Alexa ainda precisa de deteccao de reuse por
-  familia, separada da rotacao atomica do authorization code.
+- O teste de concorrencia Alexa e opt-in porque exige um PostgreSQL descartavel
+  configurado em `SUPANOTES_AUTH_TEST_DATABASE_URL`.

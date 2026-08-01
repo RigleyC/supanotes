@@ -127,8 +127,25 @@ func (h *OAuthHandler) refresh(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	err = h.pool.QueryRow(c.Request().Context(), `UPDATE alexa_authorization_codes SET refresh_token_hash=$2,refresh_expires_at=$3 WHERE refresh_token_hash=$1 AND refresh_expires_at > NOW() RETURNING user_id`, hashCode(c.FormValue("refresh_token")), hashCode(newRefresh), time.Now().Add(90*24*time.Hour)).Scan(&userID)
+	oldHash := hashCode(c.FormValue("refresh_token"))
+	err = h.pool.QueryRow(c.Request().Context(), `
+		UPDATE alexa_authorization_codes
+		SET previous_refresh_token_hash=refresh_token_hash,
+		    refresh_token_hash=$2,
+		    refresh_expires_at=$3
+		WHERE refresh_token_hash=$1
+		  AND refresh_expires_at > NOW()
+		  AND refresh_revoked_at IS NULL
+		RETURNING user_id`, oldHash, hashCode(newRefresh), time.Now().Add(90*24*time.Hour)).Scan(&userID)
 	if errors.Is(err, pgx.ErrNoRows) {
+		_, revokeErr := h.pool.Exec(c.Request().Context(), `
+			UPDATE alexa_authorization_codes
+			SET refresh_revoked_at=NOW()
+			WHERE previous_refresh_token_hash=$1
+			  AND refresh_revoked_at IS NULL`, oldHash)
+		if revokeErr != nil {
+			return revokeErr
+		}
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_grant"})
 	}
 	if err != nil {
