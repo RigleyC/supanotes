@@ -1473,5 +1473,100 @@ void main() {
         header1Attribution,
       );
     });
+
+    testWidgets('replaces compact actions with the formatting panel', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Abrir formatação'), findsOneWidget);
+      expect(find.bySemanticsLabel('Fechar formatação'), findsNothing);
+
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
+      expect(find.bySemanticsLabel('Fechar formatação'), findsOneWidget);
+      expect(find.bySemanticsLabel('Abrir formatação'), findsNothing);
+    });
+
+    testWidgets(
+      'closes the formatting panel from its close button or outside',
+      (tester) async {
+        await tester.pumpWidget(
+          buildEditorHarness(
+            nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+            selection: const DocumentSelection.collapsed(
+              position: DocumentPosition(
+                nodeId: 'node-1',
+                nodePosition: TextNodePosition(offset: 0),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsLabel('Fechar formatação'));
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
+
+        await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+        await tester.pumpAndSettle();
+        await tester.tapAt(const Offset(8, 8));
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
+      },
+    );
+
+    testWidgets('closes formatting mode with Escape and restores focus', (
+      tester,
+    ) async {
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Focus(
+              focusNode: focusNode,
+              child: buildEditorHarness(
+                nodes: [
+                  ParagraphNode(id: 'node-1', text: AttributedText('Hello')),
+                ],
+                selection: const DocumentSelection.collapsed(
+                  position: DocumentPosition(
+                    nodeId: 'node-1',
+                    nodePosition: TextNodePosition(offset: 0),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      focusNode.requestFocus();
+
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
+      expect(focusNode.hasFocus, isTrue);
+    });
   });
 }

@@ -2,6 +2,77 @@ part of 'note_toolbar.dart';
 
 enum _ListFormatOption { bulleted, numbered, checklist }
 
+class _FormattingToolbarPanel extends StatelessWidget {
+  const _FormattingToolbarPanel({
+    required this.blockType,
+    required this.selection,
+    required this.isBold,
+    required this.isItalic,
+    required this.isStrikethrough,
+    required this.onClose,
+    required this.onBlockType,
+    required this.onToggleInline,
+  });
+
+  final Attribution? blockType;
+  final DocumentSelection? selection;
+  final bool isBold;
+  final bool isItalic;
+  final bool isStrikethrough;
+  final VoidCallback onClose;
+  final ValueChanged<Attribution> onBlockType;
+  final ValueChanged<Attribution> onToggleInline;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: 'Painel de formatação',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Formatar',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              Semantics(
+                button: true,
+                label: 'Fechar formatação',
+                child: _ToolbarButton(
+                  icon: Icons.close,
+                  isActive: false,
+                  onPressed: onClose,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: _FormattingMenu(
+              blockType: blockType,
+              hasSelection: !(selection?.isCollapsed ?? true),
+              isBold: isBold,
+              isItalic: isItalic,
+              isStrikethrough: isStrikethrough,
+              onBlockType: onBlockType,
+              onToggleInline: onToggleInline,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FormattingMenu extends StatelessWidget {
   const _FormattingMenu({
     super.key,

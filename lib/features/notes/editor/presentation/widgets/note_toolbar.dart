@@ -41,6 +41,8 @@ class NoteToolbar extends StatefulWidget {
   State<NoteToolbar> createState() => _NoteToolbarState();
 }
 
+enum _ToolbarMode { compact, formatting }
+
 class _NoteToolbarState extends State<NoteToolbar> {
   Editor get editor => widget.editor;
   MutableDocumentComposer get composer => widget.composer;
@@ -48,10 +50,15 @@ class _NoteToolbarState extends State<NoteToolbar> {
   VoidCallback? get onAttachImage => widget.onAttachImage;
   FocusNode? get focusNode => widget.focusNode;
 
+  _ToolbarMode _mode = _ToolbarMode.compact;
+  DocumentSelection? _selectionForFormatting;
+  FocusNode? _focusBeforeFormatting;
+
   @override
   void initState() {
     super.initState();
     _attachListeners(widget);
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
   }
 
   @override
@@ -66,8 +73,36 @@ class _NoteToolbarState extends State<NoteToolbar> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _detachListeners(widget);
     super.dispose();
+  }
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (_mode == _ToolbarMode.formatting &&
+        event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      _closeFormatting();
+      return true;
+    }
+    return false;
+  }
+
+  void _openFormatting() {
+    if (_mode == _ToolbarMode.formatting) return;
+    _focusBeforeFormatting = FocusManager.instance.primaryFocus;
+    _selectionForFormatting = composer.selection;
+    setState(() => _mode = _ToolbarMode.formatting);
+  }
+
+  void _closeFormatting() {
+    if (_mode == _ToolbarMode.compact) return;
+    setState(() {
+      _mode = _ToolbarMode.compact;
+      _selectionForFormatting = null;
+    });
+    (_focusBeforeFormatting ?? focusNode)?.requestFocus();
+    _focusBeforeFormatting = null;
   }
 
   void _attachListeners(NoteToolbar toolbar) {
@@ -92,7 +127,6 @@ class _NoteToolbarState extends State<NoteToolbar> {
     final colorScheme = Theme.of(context).colorScheme;
     final selection = composer.selection;
     final selectedNodes = _selectedNodes(selection);
-    final blockType = _selectedBlockType(selectedNodes);
     final selectedListType = _selectedListType(selectedNodes);
     final isListItem = selectedNodes.any((node) => node is ListItemNode);
     final isTask =
@@ -100,109 +134,151 @@ class _NoteToolbarState extends State<NoteToolbar> {
         selectedNodes.every((node) => node is TaskNode);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bottomPadding = bottomInset > 0 ? 6.0 : 16.0;
+    final formattingSelection = selection ?? _selectionForFormatting;
+    final formattingBlockType = _selectedBlockType(
+      _selectedNodes(formattingSelection),
+    );
+    final modeAnimationDuration = MediaQuery.of(context).disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 240);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.78),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(alpha: 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
+    return PopScope(
+      canPop: _mode == _ToolbarMode.compact,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _closeFormatting();
+      },
+      child: TapRegion(
+        onTapOutside: (_) => _closeFormatting(),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(
+              _mode == _ToolbarMode.formatting ? 28 : 30,
+            ),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(
+                    _mode == _ToolbarMode.formatting ? 28 : 30,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.shadow.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  ),
                 ),
-              ],
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: 8,
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ToolbarFormatPopover(
-                    blockType: blockType,
-                    selection: selection,
-                    isBold: _selectionHasAttribution(
-                      selection,
-                      boldAttribution,
-                    ),
-                    isItalic: _selectionHasAttribution(
-                      selection,
-                      italicsAttribution,
-                    ),
-                    isStrikethrough: _selectionHasAttribution(
-                      selection,
-                      strikethroughAttribution,
-                    ),
-                    onBlockType: _onFormattingBlockType,
-                    onToggleInline: _onFormattingInline,
-                  ),
-                  const _ToolbarDivider(),
-                  _ToolbarListPopover(
-                    selectedListType: selectedListType,
-                    isTask: isTask,
-                    selection: selection,
-                    onSelected: _onListFormatSelected,
-                  ),
-                  ClipRect(
-                    child: AnimatedSize(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      alignment: Alignment.centerLeft,
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 180),
-                        opacity: isListItem ? 1.0 : 0.0,
-                        curve: Curves.easeInOut,
-                        child: isListItem
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _ToolbarButton(
-                                    icon: Icons.format_indent_increase,
-                                    isActive: false,
-                                    onPressed: _indentListItem,
-                                  ),
-                                  _ToolbarButton(
-                                    icon: Icons.format_indent_decrease,
-                                    isActive: false,
-                                    onPressed: _unindentListItem,
-                                  ),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
+                padding: _mode == _ToolbarMode.formatting
+                    ? const EdgeInsets.fromLTRB(12, 12, 12, 10)
+                    : const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: 8,
                       ),
-                    ),
-                  ),
-                  const _ToolbarDivider(),
-                  _ToolbarButton(
-                    icon: Icons.horizontal_rule,
-                    isActive: false,
-                    onPressed: _insertDivider,
-                  ),
-                  const _ToolbarDivider(),
-                  _ToolbarButton(
-                    icon: Icons.image,
-                    isActive: false,
-                    onPressed: onAttachImage,
-                  ),
-                  _ToolbarButton(
-                    icon: Icons.attach_file,
-                    isActive: false,
-                    onPressed: onAttachFile,
-                  ),
-                ],
+                child: AnimatedSize(
+                  duration: modeAnimationDuration,
+                  curve: Curves.easeOutCubic,
+                  child: _mode == _ToolbarMode.formatting
+                      ? _FormattingToolbarPanel(
+                          blockType: formattingBlockType,
+                          selection: formattingSelection,
+                          isBold: _selectionHasAttribution(
+                            formattingSelection,
+                            boldAttribution,
+                          ),
+                          isItalic: _selectionHasAttribution(
+                            formattingSelection,
+                            italicsAttribution,
+                          ),
+                          isStrikethrough: _selectionHasAttribution(
+                            formattingSelection,
+                            strikethroughAttribution,
+                          ),
+                          onClose: _closeFormatting,
+                          onBlockType: (attribution) => _onFormattingBlockType(
+                            attribution,
+                            formattingSelection,
+                          ),
+                          onToggleInline: (attribution) => _onFormattingInline(
+                            attribution,
+                            formattingSelection,
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _ToolbarButton(
+                                icon: Icons.text_format,
+                                isActive: false,
+                                onPressed: _openFormatting,
+                                semanticLabel: 'Abrir formatação',
+                              ),
+                              const _ToolbarDivider(),
+                              _ToolbarListPopover(
+                                selectedListType: selectedListType,
+                                isTask: isTask,
+                                selection: selection,
+                                onSelected: _onListFormatSelected,
+                              ),
+                              ClipRect(
+                                child: AnimatedSize(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  alignment: Alignment.centerLeft,
+                                  child: AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 180),
+                                    opacity: isListItem ? 1.0 : 0.0,
+                                    curve: Curves.easeInOut,
+                                    child: isListItem
+                                        ? Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              _ToolbarButton(
+                                                icon: Icons
+                                                    .format_indent_increase,
+                                                isActive: false,
+                                                onPressed: _indentListItem,
+                                              ),
+                                              _ToolbarButton(
+                                                icon: Icons
+                                                    .format_indent_decrease,
+                                                isActive: false,
+                                                onPressed: _unindentListItem,
+                                              ),
+                                            ],
+                                          )
+                                        : const SizedBox.shrink(),
+                                  ),
+                                ),
+                              ),
+                              const _ToolbarDivider(),
+                              _ToolbarButton(
+                                icon: Icons.horizontal_rule,
+                                isActive: false,
+                                onPressed: _insertDivider,
+                              ),
+                              const _ToolbarDivider(),
+                              _ToolbarButton(
+                                icon: Icons.image,
+                                isActive: false,
+                                onPressed: onAttachImage,
+                              ),
+                              _ToolbarButton(
+                                icon: Icons.attach_file,
+                                isActive: false,
+                                onPressed: onAttachFile,
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
               ),
             ),
           ),
