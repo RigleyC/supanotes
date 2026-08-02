@@ -1188,6 +1188,45 @@ void main() {
       expect(find.bySemanticsLabel('Opções de formatação'), findsNothing);
     });
 
+    testWidgets('format and list overlays keep compact vertical bounds', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSize(
+              find.byWidgetPredicate(
+                (widget) => widget.runtimeType.toString() == '_FormattingMenu',
+              ),
+            )
+            .height,
+        lessThanOrEqualTo(44),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await tester.tap(listPopoverFinder());
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSize(
+              find.byWidgetPredicate(
+                (widget) => widget.runtimeType.toString() == '_ListFormatMenu',
+              ),
+            )
+            .height,
+        lessThanOrEqualTo(44),
+      );
+    });
+
     testWidgets('focuses the editor and creates a new block at the end', (
       tester,
     ) async {

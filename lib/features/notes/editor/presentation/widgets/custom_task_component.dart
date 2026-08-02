@@ -277,6 +277,12 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   }
 
   @override
+  NodePosition? getPositionAtOffset(Offset localOffset) {
+    if (_isHidden) return null;
+    return super.getPositionAtOffset(localOffset);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final semantics = Theme.of(context).extension<AppSemanticColors>();

@@ -749,8 +749,9 @@ class _FormattingMenu extends StatelessWidget {
     final borderRadius = BorderRadius.circular(24);
     final highContrast = MediaQuery.highContrastOf(context);
     final surface = Container(
+      height: 40,
       constraints: const BoxConstraints(maxWidth: 240),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: highContrast ? 1 : 0.86),
         borderRadius: borderRadius,
@@ -773,24 +774,28 @@ class _FormattingMenu extends StatelessWidget {
             children: [
               _ToolbarButton(
                 svgAsset: 'assets/icons/h1_icon.svg',
+                compact: true,
                 isActive: blockType == header1Attribution,
                 onPressed: () => onBlockType(header1Attribution),
                 semanticLabel: 'Título 1',
               ),
               _ToolbarButton(
                 svgAsset: 'assets/icons/h2_icon.svg',
+                compact: true,
                 isActive: blockType == header2Attribution,
                 onPressed: () => onBlockType(header2Attribution),
                 semanticLabel: 'Título 2',
               ),
               _ToolbarButton(
                 svgAsset: 'assets/icons/h3_icon.svg',
+                compact: true,
                 isActive: blockType == header3Attribution,
                 onPressed: () => onBlockType(header3Attribution),
                 semanticLabel: 'Título 3',
               ),
               _ToolbarButton(
                 icon: Icons.format_quote,
+                compact: true,
                 isActive: blockType == blockquoteAttribution,
                 onPressed: () => onBlockType(blockquoteAttribution),
                 semanticLabel: 'Citação',
@@ -803,6 +808,7 @@ class _FormattingMenu extends StatelessWidget {
               ),
               _ToolbarButton(
                 icon: Icons.format_bold,
+                compact: true,
                 isActive: isBold,
                 onPressed: hasSelection
                     ? () => onToggleInline(boldAttribution)
@@ -811,6 +817,7 @@ class _FormattingMenu extends StatelessWidget {
               ),
               _ToolbarButton(
                 icon: Icons.format_italic,
+                compact: true,
                 isActive: isItalic,
                 onPressed: hasSelection
                     ? () => onToggleInline(italicsAttribution)
@@ -819,6 +826,7 @@ class _FormattingMenu extends StatelessWidget {
               ),
               _ToolbarButton(
                 icon: Icons.format_strikethrough,
+                compact: true,
                 isActive: isStrikethrough,
                 onPressed: hasSelection
                     ? () => onToggleInline(strikethroughAttribution)
@@ -1145,8 +1153,9 @@ class _ListFormatMenu extends StatelessWidget {
 
     final surface = Container(
       width: width,
+      height: math.min(height, 40),
       constraints: BoxConstraints(maxHeight: height),
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: highContrast ? 1 : 0.82),
         borderRadius: borderRadius,
@@ -1168,18 +1177,21 @@ class _ListFormatMenu extends StatelessWidget {
           children: [
             _ToolbarButton(
               icon: Icons.format_list_bulleted,
+              compact: true,
               isActive: activeOption == _ListFormatOption.bulleted,
               onPressed: () => onSelected(_ListFormatOption.bulleted),
               semanticLabel: 'Lista com marcadores',
             ),
             _ToolbarButton(
               icon: Icons.format_list_numbered,
+              compact: true,
               isActive: activeOption == _ListFormatOption.numbered,
               onPressed: () => onSelected(_ListFormatOption.numbered),
               semanticLabel: 'Lista numerada',
             ),
             _ToolbarButton(
               icon: Icons.check_box_outlined,
+              compact: true,
               isActive: activeOption == _ListFormatOption.checklist,
               onPressed: () => onSelected(_ListFormatOption.checklist),
               semanticLabel: 'Checklist',
@@ -1212,6 +1224,7 @@ class _ToolbarButton extends StatefulWidget {
     this.icon,
     this.svgAsset,
     this.semanticLabel,
+    this.compact = false,
     required this.isActive,
     this.onPressed,
   }) : assert(
@@ -1222,6 +1235,7 @@ class _ToolbarButton extends StatefulWidget {
   final IconData? icon;
   final String? svgAsset;
   final String? semanticLabel;
+  final bool compact;
   final bool isActive;
   final VoidCallback? onPressed;
 
@@ -1298,11 +1312,11 @@ class _ToolbarButtonState extends State<_ToolbarButton>
     );
 
     final icon = widget.icon != null
-        ? Icon(widget.icon, size: 26, color: fg)
+        ? Icon(widget.icon, size: widget.compact ? 22 : 26, color: fg)
         : SvgPicture.asset(
             widget.svgAsset!,
-            width: 24,
-            height: 24,
+            width: widget.compact ? 20 : 24,
+            height: widget.compact ? 20 : 24,
             colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
           );
 
@@ -1314,9 +1328,12 @@ class _ToolbarButtonState extends State<_ToolbarButton>
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
         onTap: widget.onPressed,
         child: Container(
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          constraints: BoxConstraints(
+            minWidth: widget.compact ? 32 : 36,
+            minHeight: widget.compact ? 32 : 36,
+          ),
           alignment: Alignment.center,
-          padding: const EdgeInsets.all(AppSpacing.xs),
+          padding: EdgeInsets.all(widget.compact ? 2 : AppSpacing.xs),
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),

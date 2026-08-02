@@ -420,6 +420,114 @@ void main() {
     );
   });
 
+  testWidgets('hideCompleted does not place the caret in hidden tasks', (
+    tester,
+  ) async {
+    final controller = _createTestController([
+      TaskNode(
+        id: '1',
+        text: AttributedText('tarefa concluida'),
+        isComplete: true,
+      ),
+      ParagraphNode(id: '2', text: AttributedText('texto visivel')),
+    ]);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _sessionFor(controller),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: NoteEditor(
+              noteId: 'note-1',
+              taskMetadata: const {},
+              hideCompleted: true,
+              delegate: const NoteEditorDelegate(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final visibleText = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextComponent &&
+          widget.text.toPlainText() == 'texto visivel',
+    );
+    final visibleRect = tester.getRect(visibleText);
+    await tester.tapAt(Offset(visibleRect.center.dx, visibleRect.top - 4));
+    await tester.pumpAndSettle();
+
+    expect(controller.composer.selection?.extent.nodeId, isNot('1'));
+  });
+
+  testWidgets('hideCompleted does not select a task during its exit', (
+    tester,
+  ) async {
+    var hideCompleted = false;
+    final controller = _createTestController([
+      TaskNode(
+        id: '1',
+        text: AttributedText('tarefa concluida'),
+        isComplete: true,
+      ),
+      ParagraphNode(id: '2', text: AttributedText('texto visivel')),
+    ]);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _sessionFor(controller),
+          ),
+        ],
+        child: MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                body: Column(
+                  children: [
+                    TextButton(
+                      onPressed: () => setState(() => hideCompleted = true),
+                      child: const Text('toggle hide'),
+                    ),
+                    Expanded(
+                      child: NoteEditor(
+                        noteId: 'note-1',
+                        taskMetadata: const {},
+                        hideCompleted: hideCompleted,
+                        delegate: const NoteEditorDelegate(),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final taskRect = tester.getRect(find.byType(TaskExitAnimator).first);
+    await tester.tap(find.text('toggle hide'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(taskRect.center);
+    await tester.pumpAndSettle();
+
+    expect(controller.composer.selection?.extent.nodeId, isNot('1'));
+  });
+
   testWidgets('hideCompleted updates existing task components', (tester) async {
     var hideCompleted = false;
 
