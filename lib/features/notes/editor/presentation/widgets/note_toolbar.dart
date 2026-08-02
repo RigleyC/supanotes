@@ -380,7 +380,7 @@ class _ToolbarFormatPopover extends StatefulWidget {
 
 class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
     with TickerProviderStateMixin {
-  static const _menuWidth = 200.0;
+  static const _menuWidth = 176.0;
   static const _menuHeight = 232.0;
   static const _viewportMargin = 12.0;
 
@@ -410,7 +410,7 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
   @override
   void didUpdateWidget(_ToolbarFormatPopover oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_isShowing && widget.selection != null) {
+    if (_isShowing) {
       _selectionForAction = widget.selection;
     }
   }
@@ -546,18 +546,21 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
                         ? Alignment.bottomCenter
                         : Alignment.topCenter,
                     scale: 0.88 + (0.12 * progress),
-                    child: Opacity(opacity: progress, child: child),
+                    child: Opacity(
+                      opacity: progress,
+                      child: _FormattingMenu(
+                        blockType: widget.blockType,
+                        hasSelection:
+                            !(_selectionForAction?.isCollapsed ?? true),
+                        isBold: widget.isBold,
+                        isItalic: widget.isItalic,
+                        isStrikethrough: widget.isStrikethrough,
+                        onBlockType: _applyBlockType,
+                        onToggleInline: _applyInline,
+                      ),
+                    ),
                   );
                 },
-                child: _FormattingMenu(
-                  blockType: widget.blockType,
-                  hasSelection: !(_selectionForAction?.isCollapsed ?? true),
-                  isBold: widget.isBold,
-                  isItalic: widget.isItalic,
-                  isStrikethrough: widget.isStrikethrough,
-                  onBlockType: _applyBlockType,
-                  onToggleInline: _applyInline,
-                ),
               ),
             ),
           ],
@@ -1011,15 +1014,17 @@ class _ToolbarListPopoverState extends State<_ToolbarListPopover>
                           ? Alignment.bottomCenter
                           : Alignment.topCenter,
                       scale: 0.88 + (0.12 * progress),
-                      child: Opacity(opacity: progress, child: child),
+                      child: Opacity(
+                        opacity: progress,
+                        child: _ListFormatMenu(
+                          activeOption: _activeOption,
+                          width: _currentMenuWidth,
+                          height: _currentMenuHeight,
+                          onSelected: _select,
+                        ),
+                      ),
                     );
                   },
-                  child: _ListFormatMenu(
-                    activeOption: _activeOption,
-                    width: _currentMenuWidth,
-                    height: _currentMenuHeight,
-                    onSelected: _select,
-                  ),
                 ),
               ),
             ],
