@@ -256,10 +256,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 24) {
         if (from >= 21) {
-          await m.addColumn(
-            pendingNoteOperations,
-            pendingNoteOperations.ownerUserId,
-          );
+          // The table is rebuilt below with owner_user_id already included.
+          // Adding the column first makes upgrades from schema 21-23 fail
+          // with "duplicate column name: owner_user_id".
           await customStatement('''
             CREATE TABLE pending_note_operations_v24 (
               operation_id TEXT NOT NULL,
