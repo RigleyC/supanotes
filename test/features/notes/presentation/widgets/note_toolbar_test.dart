@@ -54,6 +54,14 @@ Finder iconButtonWithIcon(IconData icon) {
   );
 }
 
+Finder toolbarButtonWithSvgAsset(String asset) {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget.runtimeType.toString() == '_ToolbarButton' &&
+        (widget as dynamic).svgAsset == asset,
+  );
+}
+
 Finder listPopoverFinder() {
   return find.byWidgetPredicate(
     (widget) => widget.runtimeType.toString() == '_ToolbarListPopover',
@@ -168,7 +176,8 @@ void main() {
       final button = tester.widget(listPopover);
       expect((button as dynamic).isTask, isTrue);
       expect(
-        (tester.widget(iconButtonWithIcon(Icons.check_box_outlined)) as dynamic)
+        (tester.widget(toolbarButtonWithSvgAsset('assets/icons/checkbox.svg'))
+                as dynamic)
             .isActive,
         isTrue,
       );
@@ -1047,7 +1056,9 @@ void main() {
         editor.execute([ConvertParagraphToTaskRequest(nodeId: 'node-1')]);
         await tester.pumpAndSettle();
 
-        final taskButton = iconButtonWithIcon(Icons.check_box_outlined);
+        final taskButton = toolbarButtonWithSvgAsset(
+          'assets/icons/checkbox.svg',
+        );
         expect((tester.widget(taskButton) as dynamic).isActive, isTrue);
       },
     );
@@ -1107,6 +1118,52 @@ void main() {
       expect(find.byIcon(Icons.format_italic), findsOneWidget);
       expect(find.byIcon(Icons.format_strikethrough), findsOneWidget);
     });
+
+    testWidgets(
+      'repaints the active inline icon color after the selection changes',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(
+          buildEditorHarness(
+            positionAtBottom: true,
+            nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+            selection: const DocumentSelection(
+              base: DocumentPosition(
+                nodeId: 'node-1',
+                nodePosition: TextNodePosition(offset: 0),
+              ),
+              extent: DocumentPosition(
+                nodeId: 'node-1',
+                nodePosition: TextNodePosition(offset: 5),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(iconButtonWithIcon(Icons.text_format));
+        await tester.pumpAndSettle();
+
+        final before = tester.widget<Icon>(find.byIcon(Icons.format_bold));
+        final colorScheme = Theme.of(
+          tester.element(find.byType(NoteToolbar)),
+        ).colorScheme;
+        expect(before.color, colorScheme.onSurface);
+
+        await tester.tap(iconButtonWithIcon(Icons.format_bold));
+        await tester.pumpAndSettle();
+
+        final after = tester.widget<Icon>(find.byIcon(Icons.format_bold));
+        expect(after.color, isNot(before.color));
+        expect(after.color!.toARGB32(), colorScheme.primary.toARGB32());
+      },
+    );
 
     testWidgets(
       'does not mark bold active when it starts after the selection',
@@ -1187,6 +1244,69 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Opções de formatação'), findsNothing);
     });
+
+    testWidgets(
+      'keeps the formatting selection when the editor clears it while open',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final document = MutableDocument(
+          nodes: [
+            ParagraphNode(id: 'node-1', text: AttributedText('Heading text')),
+          ],
+        );
+        final composer = MutableDocumentComposer(
+          initialSelection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        );
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: NoteToolbar(editor: editor, composer: composer),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(iconButtonWithIcon(Icons.text_format));
+        await tester.pumpAndSettle();
+
+        composer.clearSelection();
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.bySemanticsLabel('Título 1'));
+        await tester.pumpAndSettle();
+
+        expect(
+          (document.first as ParagraphNode).getMetadataValue('blockType'),
+          header1Attribution,
+        );
+        expect(document.length, 1);
+      },
+    );
 
     testWidgets('format and list overlays fit their content', (tester) async {
       await tester.pumpWidget(

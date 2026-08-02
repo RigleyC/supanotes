@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_icon.dart';
 
 void main() {
   setUpAll(() async {
@@ -28,7 +29,7 @@ void main() {
 
     await tester.pumpWidget(wrap(TaskMetadataBadges(dueDate: today)));
 
-    expect(find.byIcon(Icons.event_outlined), findsOneWidget);
+    expect(find.byType(TaskMetadataCalendarIcon), findsOneWidget);
     expect(find.text('Hoje'), findsOneWidget);
   });
 
@@ -50,7 +51,7 @@ void main() {
       wrap(TaskMetadataBadges(dueDate: yesterday, isCompleted: true)),
     );
 
-    expect(find.byIcon(Icons.event_outlined), findsOneWidget);
+    expect(find.byType(TaskMetadataCalendarIcon), findsOneWidget);
     expect(find.textContaining('Atrasada'), findsNothing);
   });
 
@@ -62,14 +63,18 @@ void main() {
     expect(find.byIcon(Icons.notifications_active_outlined), findsNothing);
   });
 
-  testWidgets('shows short recurrence label when dueDate is set', (tester) async {
+  testWidgets('shows short recurrence label when dueDate is set', (
+    tester,
+  ) async {
     final thursday = DateTime.utc(2026, 6, 11);
 
     await tester.pumpWidget(
-      wrap(TaskMetadataBadges(
-        dueDate: thursday,
-        recurrence: TaskRecurrence.weekly,
-      )),
+      wrap(
+        TaskMetadataBadges(
+          dueDate: thursday,
+          recurrence: TaskRecurrence.weekly,
+        ),
+      ),
     );
 
     expect(find.byIcon(Icons.refresh), findsOneWidget);
@@ -80,10 +85,12 @@ void main() {
     final fifteenth = DateTime.utc(2026, 7, 15);
 
     await tester.pumpWidget(
-      wrap(TaskMetadataBadges(
-        dueDate: fifteenth,
-        recurrence: TaskRecurrence.monthly,
-      )),
+      wrap(
+        TaskMetadataBadges(
+          dueDate: fifteenth,
+          recurrence: TaskRecurrence.monthly,
+        ),
+      ),
     );
 
     expect(find.byIcon(Icons.refresh), findsOneWidget);

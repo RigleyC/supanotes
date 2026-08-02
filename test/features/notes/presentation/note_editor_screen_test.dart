@@ -495,6 +495,106 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('hideCompleted cannot place the caret in a hidden task', (
+    tester,
+  ) async {
+    final controller = _createTestController([
+      ParagraphNode(id: '1', text: AttributedText('texto visivel')),
+      TaskNode(
+        id: '2',
+        text: AttributedText('tarefa concluida'),
+        isComplete: true,
+      ),
+    ]);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _sessionFor(controller),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: NoteEditor(
+              noteId: 'note-1',
+              taskMetadata: const {},
+              hideCompleted: true,
+              delegate: const NoteEditorDelegate(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final hiddenTaskRect = tester.getRect(find.byType(TaskExitAnimator).last);
+    await tester.tapAt(hiddenTaskRect.center);
+    await tester.pumpAndSettle();
+
+    expect(controller.composer.selection?.extent.nodeId, isNot('2'));
+    expect(
+      (controller.document.getNodeById('2')! as TaskNode).text.toPlainText(),
+      'tarefa concluida',
+    );
+  });
+
+  testWidgets(
+    'hideCompleted does not allow keyboard deletion in a hidden task',
+    (tester) async {
+      final controller = _createTestController([
+        ParagraphNode(id: '1', text: AttributedText('texto visivel')),
+        TaskNode(
+          id: '2',
+          text: AttributedText('tarefa concluida'),
+          isComplete: true,
+        ),
+      ]);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserIdProvider.overrideWithValue('test-user'),
+            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+            noteEditorSessionProvider.overrideWith(
+              (ref, noteId) async => _sessionFor(controller),
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: NoteEditor(
+                noteId: 'note-1',
+                taskMetadata: const {},
+                hideCompleted: true,
+                delegate: const NoteEditorDelegate(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      controller.composer.setSelectionWithReason(
+        DocumentSelection.collapsed(
+          position: const DocumentPosition(
+            nodeId: '2',
+            nodePosition: TextNodePosition(offset: 15),
+          ),
+        ),
+      );
+      controller.editor.execute([const DeleteUpstreamRequest()]);
+
+      expect(
+        (controller.document.getNodeById('2')! as TaskNode).text.toPlainText(),
+        'tarefa concluida',
+      );
+    },
+  );
+
   testWidgets('hideCompleted does not place the caret in hidden tasks', (
     tester,
   ) async {

@@ -7,6 +7,7 @@ class _ToolbarPopover extends StatefulWidget {
     required this.triggerBuilder,
     required this.menuBuilder,
     this.onOpen,
+    this.onClose,
   });
 
   final Widget Function(BuildContext context, bool isOpen, VoidCallback toggle)
@@ -14,6 +15,7 @@ class _ToolbarPopover extends StatefulWidget {
   final Widget Function(BuildContext context, _ToolbarPopoverClose close)
   menuBuilder;
   final VoidCallback? onOpen;
+  final VoidCallback? onClose;
 
   @override
   State<_ToolbarPopover> createState() => _ToolbarPopoverState();
@@ -103,6 +105,7 @@ class _ToolbarPopoverState extends State<_ToolbarPopover>
       return;
     }
 
+    widget.onClose?.call();
     final transitionId = ++_transitionId;
     final focusNode = _focusBeforeOpen;
     _animateTo(0).then((_) {
@@ -259,6 +262,7 @@ class _ToolbarFormatPopover extends StatefulWidget {
 
 class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover> {
   DocumentSelection? _selectionForAction;
+  bool _isOpen = false;
 
   @override
   void initState() {
@@ -269,12 +273,17 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover> {
   @override
   void didUpdateWidget(_ToolbarFormatPopover oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selection != widget.selection) {
+    if (!_isOpen && oldWidget.selection != widget.selection) {
       _selectionForAction = widget.selection;
     }
   }
 
-  void _onOpen() => _selectionForAction = widget.selection;
+  void _onOpen() {
+    _isOpen = true;
+    _selectionForAction = widget.selection;
+  }
+
+  void _onClose() => _isOpen = false;
 
   void _applyBlockType(Attribution attribution) {
     widget.onBlockType(attribution, _selectionForAction);
@@ -289,6 +298,7 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover> {
   Widget build(BuildContext context) {
     return _ToolbarPopover(
       onOpen: _onOpen,
+      onClose: _onClose,
       triggerBuilder: (context, isOpen, toggle) => _ToolbarButton(
         icon: Icons.text_format,
         isActive: isOpen,
@@ -357,10 +367,12 @@ class _ToolbarListPopoverState extends State<_ToolbarListPopover> {
   @override
   Widget build(BuildContext context) {
     final activeOption = _activeOption;
+    final isChecklist = activeOption == _ListFormatOption.checklist;
     return _ToolbarPopover(
       onOpen: _onOpen,
       triggerBuilder: (context, isOpen, toggle) => _ToolbarButton(
-        icon: _triggerIcon,
+        icon: isChecklist ? null : _triggerIcon,
+        svgAsset: isChecklist ? 'assets/icons/checkbox.svg' : null,
         isActive: isOpen || activeOption != null,
         onPressed: toggle,
       ),

@@ -9,6 +9,7 @@ class AppSelectionTile extends StatelessWidget {
     super.key,
     required this.label,
     this.icon,
+    this.leading,
     this.isSelected = false,
     this.onTap,
     this.trailing,
@@ -17,6 +18,7 @@ class AppSelectionTile extends StatelessWidget {
 
   final String label;
   final IconData? icon;
+  final Widget? leading;
   final bool isSelected;
   final VoidCallback? onTap;
   final Widget? trailing;
@@ -30,13 +32,15 @@ class AppSelectionTile extends StatelessWidget {
       dense: true,
       selected: isSelected,
       onTap: onTap,
-      leading: icon != null
-          ? Icon(
-              icon,
-              size: 20,
-              color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
-            )
-          : null,
+      leading:
+          leading ??
+          (icon != null
+              ? Icon(
+                  icon,
+                  size: 20,
+                  color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
+                )
+              : null),
       title: Text(
         label,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(

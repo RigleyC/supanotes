@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_tile.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_icon.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
 void main() {
@@ -39,7 +40,9 @@ void main() {
   testWidgets('renders title from TaskModel', (tester) async {
     final task = buildTask(title: 'Buy coffee');
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: TaskTile(task: task))),
+      MaterialApp(
+        home: Scaffold(body: TaskTile(task: task)),
+      ),
     );
     expect(find.text('Buy coffee'), findsOneWidget);
   });
@@ -47,15 +50,19 @@ void main() {
   testWidgets('renders due date badge when dueDate set', (tester) async {
     final task = buildTask(dueDate: DateTime(2026, 6, 15));
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: TaskTile(task: task))),
+      MaterialApp(
+        home: Scaffold(body: TaskTile(task: task)),
+      ),
     );
-    expect(find.byIcon(Icons.event_outlined), findsOneWidget);
+    expect(find.byType(TaskMetadataCalendarIcon), findsOneWidget);
   });
 
   testWidgets('renders recurrence badge when recurrence set', (tester) async {
     final task = buildTask(recurrence: TaskRecurrence.weekly);
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: TaskTile(task: task))),
+      MaterialApp(
+        home: Scaffold(body: TaskTile(task: task)),
+      ),
     );
     expect(find.byIcon(Icons.refresh), findsOneWidget);
     expect(find.text('Semanalmente'), findsOneWidget);
@@ -64,23 +71,23 @@ void main() {
   testWidgets('hides meta row when no due date or recurrence', (tester) async {
     final task = buildTask();
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: TaskTile(task: task))),
+      MaterialApp(
+        home: Scaffold(body: TaskTile(task: task)),
+      ),
     );
-    expect(find.byIcon(Icons.event_outlined), findsNothing);
+    expect(find.byType(TaskMetadataCalendarIcon), findsNothing);
     expect(find.byIcon(Icons.refresh), findsNothing);
   });
 
-  testWidgets('tap on row toggles completion to true when open',
-      (tester) async {
+  testWidgets('tap on row toggles completion to true when open', (
+    tester,
+  ) async {
     bool? toggled;
     final task = buildTask(status: 'open');
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TaskTile(
-            task: task,
-            onToggleComplete: (v) => toggled = v,
-          ),
+          body: TaskTile(task: task, onToggleComplete: (v) => toggled = v),
         ),
       ),
     );
@@ -91,17 +98,15 @@ void main() {
     expect(toggled, isTrue);
   });
 
-  testWidgets('tap on row toggles completion to false when completed',
-      (tester) async {
+  testWidgets('tap on row toggles completion to false when completed', (
+    tester,
+  ) async {
     bool? toggled;
     final task = buildTask(status: 'done');
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TaskTile(
-            task: task,
-            onToggleComplete: (v) => toggled = v,
-          ),
+          body: TaskTile(task: task, onToggleComplete: (v) => toggled = v),
         ),
       ),
     );
@@ -118,10 +123,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TaskTile(
-            task: task,
-            onOpenMetadata: () => opened = true,
-          ),
+          body: TaskTile(task: task, onOpenMetadata: () => opened = true),
         ),
       ),
     );
@@ -134,7 +136,9 @@ void main() {
 
   testWidgets('checkbox is purely visual (no own gesture)', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: TaskTile(task: buildTask()))),
+      MaterialApp(
+        home: Scaffold(body: TaskTile(task: buildTask())),
+      ),
     );
 
     expect(

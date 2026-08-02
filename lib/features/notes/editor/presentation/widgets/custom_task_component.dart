@@ -45,13 +45,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     if (node is! TaskNode) return null;
 
     final metadata = taskMetadataById[node.id];
-    final isRecurring =
-        TaskRecurrence.parse(
-              node.metadata['recurrenceRule'] as String? ??
-                  node.metadata['recurrence'] as String?,
-            ) !=
-            null ||
-        metadata?.recurrence != null;
+    final isRecurring = isRecurringTaskNode(node, metadata);
     if (isRecurring) {
       _recurringTaskIds.add(node.id);
     } else {
@@ -115,6 +109,15 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
             },
     );
   }
+}
+
+bool isRecurringTaskNode(TaskNode node, TaskModel? metadata) {
+  return TaskRecurrence.parse(
+            node.metadata['recurrenceRule'] as String? ??
+                node.metadata['recurrence'] as String?,
+          ) !=
+          null ||
+      metadata?.recurrence != null;
 }
 
 class CustomTaskComponentViewModel extends TaskComponentViewModel {

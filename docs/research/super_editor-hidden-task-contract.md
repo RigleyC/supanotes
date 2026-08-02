@@ -1,7 +1,7 @@
 # Contrato do Super Editor para ocultar tasks concluídas
 
 Data: 2026-08-02
-Escopo: investigação somente de leitura. Não alterei código de produção nesta pesquisa. O working tree já continha alterações não commitadas em `task_exit_animator.dart` e `note_editor_screen_test.dart`; elas foram preservadas.
+Escopo original: investigação somente de leitura. A implementação posterior adicionou o guard descrito na atualização abaixo. O working tree já continha alterações não commitadas em `task_exit_animator.dart` e `note_editor_screen_test.dart`; elas foram preservadas.
 
 ## Resumo executivo
 
@@ -167,6 +167,23 @@ Depois disso, os guards de interação e seleção devem ser tratados como parte
 
 Se no futuro o produto precisar apagar a task, a ação deve passar pelo editor com `DeleteNodeRequest` e seguir o fluxo de operações do documento. Se precisar converter a task em outro bloco, deve usar `ReplaceNodeRequest`. Nenhuma dessas operações deve ser usada para implementar apenas o filtro “ocultar concluídas”.
 
+## Atualização: seleção lógica e teclado
+
+A validação posterior encontrou uma limitação importante nos guards visuais acima: eles não tornam o node somente leitura para o pipeline de edição.
+
+`TaskNode` estende `TextNode`. Quando o composer já contém uma posição dentro da task, as operações comuns de texto tratam essa posição diretamente como texto. Portanto, `isVisualSelectionSupported() == false`, `IgnorePointer` e `ExcludeSemantics` não impedem `DeleteUpstreamRequest`, inserção de texto ou uma exclusão que tente atravessar a task na borda de um bloco vizinho.
+
+Esse comportamento foi reproduzido com um teste de regressão: uma task oculta com o texto `tarefa concluida` era alterada para `tarefa concluia` após um `DeleteUpstreamRequest`.
+
+A correção aplicada usa a cadeia pública `Editor.requestHandlers` para interceptar as requisições dependentes da seleção antes dos handlers padrão. O guard em [hidden_task_editing_guard.dart](../../lib/features/notes/editor/document/hidden_task_editing_guard.dart) agora:
+
+- rejeita uma seleção visual que aponta para uma task oculta;
+- bloqueia inserção, formatação e exclusão quando a seleção toca uma task oculta;
+- impede que `DeleteUpstreamRequest` e `DeleteDownstreamRequest` atravessem uma task oculta;
+- consulta o estado atual da `TaskNode`, em vez de manter uma cópia estática dos IDs ocultos.
+
+Isso preserva a separação entre apresentação e conteúdo: a task continua no `MutableDocument`, no `NoteSyncSession` e na projeção canônica; somente a participação dela nas interações de edição é bloqueada enquanto estiver visualmente oculta.
+
 ## Testes exigidos antes da alteração ser considerada correta
 
 1. Task concluída oculta como primeiro node: clicar acima dela não lança exceção e não seleciona a task.
@@ -178,6 +195,6 @@ Se no futuro o produto precisar apagar a task, a ação deve passar pelo editor 
 
 ## Conclusão
 
-A forma recomendada para este caso não é apagar ou substituir o node. Também não é remover o filho de um `ProxyDocumentComponent` e tentar neutralizar chamadas com vários `null-checks`.
+A forma recomendada para este caso não é apagar ou substituir o node. Também não é remover o filho de um `ProxyDocumentComponent` e tentar neutralizar chamadas com vários `null-checks`. Manter o filho montado é necessário para o contrato do proxy, mas isso precisa ser acompanhado por uma política de edição no pipeline do `Editor`; a proteção visual, sozinha, não é suficiente.
 
-A correção alinhada ao contrato é manter o componente document-aware montado e controlar visibilidade, interação e participação na seleção explicitamente. `SizeTransition` pode permanecer como mecanismo de animação; o branch que desmonta o filho após a animação deve ser removido ou substituído por uma estratégia que preserve o `DocumentComponent` enquanto o node existir no documento.
+A correção alinhada ao contrato é manter o componente document-aware montado, controlar visibilidade, interação e participação na seleção explicitamente e bloquear requisições de edição que alcancem um node oculto. `SizeTransition` pode permanecer como mecanismo de animação; o branch que desmonta o filho após a animação deve ser removido ou substituído por uma estratégia que preserve o `DocumentComponent` enquanto o node existir no documento.

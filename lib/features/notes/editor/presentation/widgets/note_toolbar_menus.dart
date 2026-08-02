@@ -148,7 +148,7 @@ class _ListFormatMenu extends StatelessWidget {
               semanticLabel: 'Lista numerada',
             ),
             _ToolbarButton(
-              icon: Icons.check_box_outlined,
+              svgAsset: 'assets/icons/checkbox.svg',
               compact: true,
               isActive: activeOption == _ListFormatOption.checklist,
               onPressed: () => onSelected(_ListFormatOption.checklist),

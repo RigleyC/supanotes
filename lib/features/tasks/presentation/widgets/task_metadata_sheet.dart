@@ -14,6 +14,7 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 
 import '../controllers/task_metadata_controller.dart';
 import 'task_metadata_date_page.dart';
+import 'task_metadata_icon.dart';
 import 'task_metadata_selection_page.dart';
 import 'task_metadata_time_page.dart';
 
@@ -191,8 +192,7 @@ class _DateTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      leading: Icon(
-        Icons.calendar_today_rounded,
+      leading: TaskMetadataCalendarIcon(
         size: 20,
         color: hasDueDate ? scheme.primary : scheme.onSurface,
       ),

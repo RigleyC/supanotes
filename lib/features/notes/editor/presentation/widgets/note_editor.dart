@@ -116,9 +116,26 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     ];
   }
 
+  void _configureHiddenTaskEditing() {
+    final controller = _controller;
+    if (controller == null) return;
+
+    controller.setHiddenTaskPredicate(
+      (node) =>
+          widget.hideCompleted &&
+          node.isComplete &&
+          !isRecurringTaskNode(node, widget.taskMetadata[node.id]),
+    );
+  }
+
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (widget.hideCompleted != oldWidget.hideCompleted ||
+        widget.taskMetadata != oldWidget.taskMetadata) {
+      _configureHiddenTaskEditing();
+    }
 
     if (widget.hideCompleted != oldWidget.hideCompleted ||
         widget.collapseImages != oldWidget.collapseImages ||
@@ -172,6 +189,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           _controller!.onHasContentChanged = (hasContent) {
             widget.delegate.onHasContentChanged?.call(hasContent);
           };
+          _configureHiddenTaskEditing();
         }
 
         _initControls();

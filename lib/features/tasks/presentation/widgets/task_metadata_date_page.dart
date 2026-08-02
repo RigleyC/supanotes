@@ -4,6 +4,7 @@ import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/shared/widgets/app_selection_tile.dart';
 
 import 'task_metadata_page_header.dart';
+import 'task_metadata_icon.dart';
 
 enum QuickDueDate {
   today,
@@ -17,8 +18,6 @@ enum QuickDueDate {
       QuickDueDate.nextWeek => 'Próxima semana',
     };
   }
-
-  IconData get icon => Icons.calendar_month_rounded;
 
   DateTime compute(DateTime now) {
     final today = now.startOfDay;
@@ -58,7 +57,12 @@ class TaskMetadataDatePage extends StatelessWidget {
               final date = option.compute(now);
               return AppSelectionTile(
                 label: option.label,
-                icon: option.icon,
+                leading: TaskMetadataCalendarIcon(
+                  size: 20,
+                  color: selected != null && selected!.isSameDayAs(date)
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 isSelected: selected != null && selected!.isSameDayAs(date),
                 onTap: () {
                   onSelected(date);

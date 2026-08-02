@@ -19,7 +19,7 @@ class AppColors {
   // Seed
   // ---------------------------------------------------------------------------
 
-  static const Color primarySeed = Color(0xFF4F46E5);
+  static const Color primarySeed = Color(0xFFAF52DE);
 
   // ---------------------------------------------------------------------------
   // Light scheme

@@ -5,6 +5,7 @@ import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 import '../../domain/task_recurrence.dart';
+import 'task_metadata_icon.dart';
 
 class TaskMetadataBadges extends StatelessWidget {
   const TaskMetadataBadges({
@@ -44,7 +45,10 @@ class TaskMetadataBadges extends StatelessWidget {
       children: [
         if (_hasDueDate)
           _MetadataPill(
-            icon: Icons.event_outlined,
+            leading: TaskMetadataCalendarIcon(
+              size: 14,
+              color: _dueDateColor(context, dueDate!),
+            ),
             label: formatDueDate(
               dueDate!,
               hasTime: hasTime,
@@ -55,7 +59,11 @@ class TaskMetadataBadges extends StatelessWidget {
           ),
         if (_hasRecurrence)
           _MetadataPill(
-            icon: Icons.refresh,
+            leading: Icon(
+              Icons.refresh,
+              size: 14,
+              color: scheme.onSurfaceVariant,
+            ),
             label: recurrence!.shortLabel,
             color: scheme.onSurfaceVariant,
           ),
@@ -94,12 +102,12 @@ class TaskMetadataBadges extends StatelessWidget {
 
 class _MetadataPill extends StatelessWidget {
   const _MetadataPill({
-    required this.icon,
+    required this.leading,
     required this.label,
     required this.color,
   });
 
-  final IconData icon;
+  final Widget leading;
   final String label;
   final Color color;
 
@@ -108,7 +116,7 @@ class _MetadataPill extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
+        leading,
         const SizedBox(width: 4),
         Flexible(
           child: Text(

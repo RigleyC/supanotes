@@ -28,6 +28,7 @@ class _ToolbarButtonState extends State<_ToolbarButton>
     with TickerProviderStateMixin {
   late final SingleMotionController _activeMotion;
   late final SingleMotionController _iconMotion;
+  late final Listenable _motion;
 
   @override
   void initState() {
@@ -42,6 +43,7 @@ class _ToolbarButtonState extends State<_ToolbarButton>
       vsync: this,
       initialValue: 1,
     );
+    _motion = Listenable.merge([_activeMotion, _iconMotion]);
   }
 
   @override
@@ -81,60 +83,69 @@ class _ToolbarButtonState extends State<_ToolbarButton>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final activeProgress = _activeMotion.value.clamp(0.0, 1.0);
-    final iconProgress = _iconMotion.value.clamp(0.0, 1.0);
-    final inactiveColor = widget.onPressed == null
-        ? colorScheme.onSurface.withValues(alpha: 0.38)
-        : colorScheme.onSurface;
-    final foreground = Color.lerp(
-      inactiveColor,
-      colorScheme.primary,
-      activeProgress,
-    )!;
-    final background = colorScheme.primary.withValues(
-      alpha: 0.12 * activeProgress,
-    );
+    return AnimatedBuilder(
+      animation: _motion,
+      builder: (context, child) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final activeProgress = _activeMotion.value.clamp(0.0, 1.0);
+        final iconProgress = _iconMotion.value.clamp(0.0, 1.0);
+        final inactiveColor = widget.onPressed == null
+            ? colorScheme.onSurface.withValues(alpha: 0.38)
+            : colorScheme.onSurface;
+        final foreground = Color.lerp(
+          inactiveColor,
+          colorScheme.primary,
+          activeProgress,
+        )!;
+        final background = colorScheme.primary.withValues(
+          alpha: 0.12 * activeProgress,
+        );
 
-    final icon = widget.icon != null
-        ? Icon(widget.icon, size: widget.compact ? 22 : 26, color: foreground)
-        : SvgPicture.asset(
-            widget.svgAsset!,
-            width: widget.compact ? 20 : 24,
-            height: widget.compact ? 20 : 24,
-            colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
-          );
+        final icon = widget.icon != null
+            ? Icon(
+                widget.icon,
+                size: widget.compact ? 22 : 26,
+                color: foreground,
+              )
+            : SvgPicture.asset(
+                widget.svgAsset!,
+                width: widget.compact ? 20 : 24,
+                height: widget.compact ? 20 : 24,
+                colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
+              );
 
-    return Semantics(
-      button: true,
-      enabled: widget.onPressed != null,
-      label: widget.semanticLabel,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        onTap: widget.onPressed,
-        child: Container(
-          constraints: BoxConstraints(
-            minWidth: widget.compact ? 32 : 36,
-            minHeight: widget.compact ? 32 : 36,
-          ),
-          alignment: Alignment.center,
-          padding: EdgeInsets.all(widget.compact ? 2 : AppSpacing.xs),
-          decoration: BoxDecoration(
-            color: background,
+        return Semantics(
+          button: true,
+          enabled: widget.onPressed != null,
+          label: widget.semanticLabel,
+          child: InkWell(
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          ),
-          child: Transform.scale(
-            scale: 0.96 + (0.04 * activeProgress),
-            child: Opacity(
-              opacity: 0.7 + (0.3 * iconProgress),
+            onTap: widget.onPressed,
+            child: Container(
+              constraints: BoxConstraints(
+                minWidth: widget.compact ? 32 : 36,
+                minHeight: widget.compact ? 32 : 36,
+              ),
+              alignment: Alignment.center,
+              padding: EdgeInsets.all(widget.compact ? 2 : AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              ),
               child: Transform.scale(
-                scale: 0.9 + (0.1 * iconProgress),
-                child: icon,
+                scale: 0.96 + (0.04 * activeProgress),
+                child: Opacity(
+                  opacity: 0.7 + (0.3 * iconProgress),
+                  child: Transform.scale(
+                    scale: 0.9 + (0.1 * iconProgress),
+                    child: icon,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
+import 'package:supanotes/features/notes/editor/document/hidden_task_editing_guard.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
@@ -43,11 +44,25 @@ class NoteEditorController extends ChangeNotifier {
   final FocusNode focusNode = FocusNode();
   void Function(bool)? onHasContentChanged;
   void Function()? _assertCanMutate;
+  late final HiddenTaskEditingGuard _hiddenTaskEditingGuard;
 
   final String _noteId;
 
   void attachMutationGuard(void Function() assertCanMutate) {
     _assertCanMutate = assertCanMutate;
+  }
+
+  void setHiddenTaskPredicate(bool Function(TaskNode node) predicate) {
+    _hiddenTaskEditingGuard.updateHiddenTaskPredicate(predicate);
+    final selection = composer.selection;
+    if (selection == null) return;
+
+    if (_hiddenTaskEditingGuard.selectionTouchesHiddenTask(
+      document,
+      selection,
+    )) {
+      composer.clearSelection();
+    }
   }
 
   TaskCompletionResult? completeTaskInEditor(
@@ -183,10 +198,12 @@ class NoteEditorController extends ChangeNotifier {
 
   void _setupEditor() {
     composer = MutableDocumentComposer();
+    _hiddenTaskEditingGuard = HiddenTaskEditingGuard();
     editor = createDefaultDocumentEditor(
       document: document,
       composer: composer,
     );
+    editor.requestHandlers.insert(0, _hiddenTaskEditingGuard.handle);
     editor.reactionPipeline.removeWhere(
       (r) => r is HorizontalRuleConversionReaction,
     );
