@@ -41,8 +41,9 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
       final q = _searchQuery.toLowerCase();
       result = result.where((n) {
         final titleMatch = n.title.toLowerCase().contains(q);
-        final bodyMatch =
-            (n.excerpt ?? n.content ?? '').toLowerCase().contains(q);
+        final bodyMatch = (n.excerpt ?? n.content ?? '').toLowerCase().contains(
+          q,
+        );
         return titleMatch || bodyMatch;
       }).toList();
     }
@@ -72,8 +73,8 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
                   child: Text(
                     'SupaNotes',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -100,7 +101,10 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Buscar notas...',
-                hintStyle: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: scheme.onSurfaceVariant,
+                ),
                 prefixIcon: const Icon(Icons.search, size: 18),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(
@@ -108,7 +112,9 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
                   vertical: 8,
                 ),
                 filled: true,
-                fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                fillColor: scheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide.none,
@@ -135,7 +141,8 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
                 _buildFilterChip(
                   label: 'Favoritas',
                   isSelected: _activeTab == NoteFilterTab.favorites,
-                  onTap: () => setState(() => _activeTab = NoteFilterTab.favorites),
+                  onTap: () =>
+                      setState(() => _activeTab = NoteFilterTab.favorites),
                 ),
               ],
             ),
@@ -161,8 +168,8 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
                           ? 'Nenhuma nota encontrada'
                           : 'Nenhuma nota',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   );
                 }
@@ -174,6 +181,7 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
                     final note = filtered[index];
                     final isSelected = note.id == widget.selectedNoteId;
                     return _SidebarNoteTile(
+                      key: ValueKey(note.id),
                       note: note,
                       isSelected: isSelected,
                       onTap: () => widget.onNoteTap(note),
@@ -183,9 +191,7 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
                             .toggleFavorite(note.id);
                       },
                       onDelete: () {
-                        ref
-                            .read(notesRepositoryProvider)
-                            .softDelete(note.id);
+                        ref.read(notesRepositoryProvider).softDelete(note.id);
                         AppMessenger.showSuccess('Nota movida para a lixeira');
                       },
                     );
@@ -236,6 +242,7 @@ class _SidebarNoteTile extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _SidebarNoteTile({
+    super.key,
     required this.note,
     required this.isSelected,
     required this.onTap,
@@ -273,8 +280,9 @@ class _SidebarNoteTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight:
-                                isSelected ? FontWeight.bold : FontWeight.w500,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
                             color: isSelected
                                 ? scheme.onSecondaryContainer
                                 : scheme.onSurface,
@@ -290,8 +298,9 @@ class _SidebarNoteTile extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isSelected
-                                    ? scheme.onSecondaryContainer
-                                        .withValues(alpha: 0.7)
+                                    ? scheme.onSecondaryContainer.withValues(
+                                        alpha: 0.7,
+                                      )
                                     : scheme.onSurfaceVariant,
                               ),
                             ),

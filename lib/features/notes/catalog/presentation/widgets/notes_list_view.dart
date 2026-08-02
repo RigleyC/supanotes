@@ -36,11 +36,12 @@ class NotesListView extends StatelessWidget {
         itemBuilder: (context, index) {
           final note = notes[index];
           return NoteListRow(
-              note: note,
-               onTap: () => onTap(note),
-               onDelete: () => onDelete(note),
-               onToggleFavorite: () => onToggleFavorite(note),
-             );
+            key: ValueKey(note.id),
+            note: note,
+            onTap: () => onTap(note),
+            onDelete: () => onDelete(note),
+            onToggleFavorite: () => onToggleFavorite(note),
+          );
         },
       ),
     );

@@ -137,24 +137,6 @@ class NoteCatalogSync {
       return;
     }
 
-    if (existing == null) {
-      final ownerUserId = json['user_id'] as String? ?? userId;
-      await _database
-          .into(_database.notes)
-          .insert(
-            NotesCompanion.insert(
-              id: id,
-              userId: ownerUserId,
-              content: '',
-              createdAt: createdAt,
-              updatedAt: updatedAt,
-              isDirty: const Value(false),
-              hasRemoteCopy: const Value(false),
-              collapseImages: Value(json['collapse_images'] as bool? ?? false),
-            ),
-          );
-    }
-
     final remote = await _syncClient.getDocument(id);
     await _database.noteOperationsDao.upsertNoteDocument(
       LocalNoteDocumentsCompanion.insert(
@@ -169,17 +151,35 @@ class NoteCatalogSync {
       snapshot: remote.document,
       userId: userId,
     );
-    await (_database.update(
-      _database.notes,
-    )..where((note) => note.id.equals(id))).write(
-      NotesCompanion(
-        createdAt: Value(createdAt),
-        updatedAt: Value(updatedAt),
-        isDirty: const Value(false),
-        hasRemoteCopy: const Value(true),
-        collapseImages: Value(json['collapse_images'] as bool? ?? false),
-      ),
-    );
+    if (existing == null) {
+      final ownerUserId = json['user_id'] as String? ?? userId;
+      await _database
+          .into(_database.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: id,
+              userId: ownerUserId,
+              content: '',
+              createdAt: createdAt,
+              updatedAt: updatedAt,
+              isDirty: const Value(false),
+              hasRemoteCopy: const Value(true),
+              collapseImages: Value(json['collapse_images'] as bool? ?? false),
+            ),
+          );
+    } else {
+      await (_database.update(
+        _database.notes,
+      )..where((note) => note.id.equals(id))).write(
+        NotesCompanion(
+          createdAt: Value(createdAt),
+          updatedAt: Value(updatedAt),
+          isDirty: const Value(false),
+          hasRemoteCopy: const Value(true),
+          collapseImages: Value(json['collapse_images'] as bool? ?? false),
+        ),
+      );
+    }
     dev.log('[NoteCatalogSync] Hydrated $id from remote snapshot');
   }
 }

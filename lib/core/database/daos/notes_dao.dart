@@ -62,7 +62,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
-      'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC',
+      'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC, n.id DESC',
       userId,
     );
   }
@@ -145,7 +145,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
-      'ORDER BY n.updated_at DESC',
+      'ORDER BY n.updated_at DESC, n.id DESC',
       userId,
     );
   }

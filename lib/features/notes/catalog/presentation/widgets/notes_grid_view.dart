@@ -41,11 +41,12 @@ class NotesGridView extends StatelessWidget {
         itemBuilder: (context, index) {
           final note = notes[index];
           return NoteCard(
-              note: note,
-               onTap: () => onTap(note),
-               onDelete: () => onDelete(note),
-               onToggleFavorite: () => onToggleFavorite(note),
-             );
+            key: ValueKey(note.id),
+            note: note,
+            onTap: () => onTap(note),
+            onDelete: () => onDelete(note),
+            onToggleFavorite: () => onToggleFavorite(note),
+          );
         },
       ),
     );

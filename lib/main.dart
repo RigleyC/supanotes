@@ -69,8 +69,6 @@ class SupaNotesApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // We must listen to it (not just read) so Riverpod keeps it active and
-    // forces it to rebuild when its internal dependencies (like auth) change.
     ref.listen(taskNotificationSchedulerProvider, (_, _) {});
     ref.listen(noteCatalogSyncProvider, (_, next) {
       next.whenOrNull(
