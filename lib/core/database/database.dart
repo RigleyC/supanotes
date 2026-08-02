@@ -145,6 +145,23 @@ class AppDatabase extends _$AppDatabase {
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
+      Future<bool> hasColumn(String tableName, String columnName) async {
+        final columns = await customSelect(
+          'PRAGMA table_info($tableName)',
+        ).get();
+        return columns.any((column) => column.data['name'] == columnName);
+      }
+
+      Future<void> addColumnIfMissing(
+        TableInfo table,
+        String tableName,
+        GeneratedColumn column,
+      ) async {
+        if (!await hasColumn(tableName, column.$name)) {
+          await m.addColumn(table, column);
+        }
+      }
+
       if (from < 2) {
         await m.createTable(localTaskCompletions);
         await m.addColumn(tasks, tasks.completedAt);
@@ -256,9 +273,11 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 24) {
         if (from >= 21) {
-          // The table is rebuilt below with owner_user_id already included.
-          // Adding the column first makes upgrades from schema 21-23 fail
-          // with "duplicate column name: owner_user_id".
+          await addColumnIfMissing(
+            pendingNoteOperations,
+            'pending_note_operations',
+            pendingNoteOperations.ownerUserId,
+          );
           await customStatement('''
             CREATE TABLE pending_note_operations_v24 (
               operation_id TEXT NOT NULL,
@@ -299,13 +318,19 @@ class AppDatabase extends _$AppDatabase {
           );
         }
         if (from >= 22) {
-          await m.addColumn(syncSessions, syncSessions.ownerUserId);
+          await addColumnIfMissing(
+            syncSessions,
+            'sync_sessions',
+            syncSessions.ownerUserId,
+          );
         }
       }
-      if (from < 25) {
-        if (from >= 21) {
-          await m.addColumn(noteSyncErrors, noteSyncErrors.ownerUserId);
-        }
+      if (from < 25 && from >= 21) {
+        await addColumnIfMissing(
+          noteSyncErrors,
+          'note_sync_errors',
+          noteSyncErrors.ownerUserId,
+        );
       }
     },
     beforeOpen: (details) async {
