@@ -181,6 +181,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
   bool get _isRecurring => widget.isRecurring;
 
+  bool get _isHidden => widget.hideCompleted && _isComplete && !_isRecurring;
+
   @override
   void initState() {
     super.initState();
@@ -250,6 +252,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
   @override
   Rect getRectForPosition(dynamic nodePosition) {
+    if (_isHidden) return Rect.zero;
     try {
       if (!mounted) return Rect.zero;
       final renderObj = _textKey.currentContext?.findRenderObject();
@@ -262,6 +265,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
   @override
   Offset getOffsetForPosition(dynamic nodePosition) {
+    if (_isHidden) return Offset.zero;
     try {
       if (!mounted) return Offset.zero;
       final renderObj = _textKey.currentContext?.findRenderObject();
@@ -373,7 +377,10 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       onAnimationComplete: _isAnimating
           ? () => setState(() => _isAnimating = false)
           : null,
-      child: Padding(padding: const EdgeInsets.only(top: 14), child: content),
+      child: IgnorePointer(
+        ignoring: _isHidden,
+        child: Padding(padding: const EdgeInsets.only(top: 14), child: content),
+      ),
     );
   }
 }

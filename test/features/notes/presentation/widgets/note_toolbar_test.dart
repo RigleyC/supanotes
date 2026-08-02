@@ -63,14 +63,20 @@ Finder listPopoverFinder() {
 Future<void> openListMenu(WidgetTester tester) async {
   await tester.tap(listPopoverFinder());
   await tester.pumpAndSettle();
-  expect(find.text('Bullet List'), findsOneWidget);
-  expect(find.text('Numbered List'), findsOneWidget);
-  expect(find.text('Checklist'), findsOneWidget);
+  expect(find.bySemanticsLabel('Lista com marcadores'), findsOneWidget);
+  expect(find.bySemanticsLabel('Lista numerada'), findsOneWidget);
+  expect(find.bySemanticsLabel('Checklist'), findsOneWidget);
 }
 
 Future<void> selectListOption(WidgetTester tester, String label) async {
   await openListMenu(tester);
-  await tester.tap(find.text(label));
+  final semanticLabel = switch (label) {
+    'Bullet List' => 'Lista com marcadores',
+    'Numbered List' => 'Lista numerada',
+    'Checklist' => 'Checklist',
+    _ => throw ArgumentError.value(label, 'label'),
+  };
+  await tester.tap(find.bySemanticsLabel(semanticLabel));
   await tester.pumpAndSettle();
 }
 
@@ -189,9 +195,7 @@ void main() {
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
-      expect(find.text('Bullet List'), findsNothing);
-      expect(find.text('Numbered List'), findsNothing);
-      expect(find.text('Checklist'), findsNothing);
+      expect(find.bySemanticsLabel('Opções de lista'), findsNothing);
     });
 
     testWidgets('dismisses with Escape', (tester) async {
@@ -212,7 +216,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
 
-      expect(find.text('Bullet List'), findsNothing);
+      expect(find.bySemanticsLabel('Opções de lista'), findsNothing);
     });
 
     testWidgets('constrains the menu on a short viewport', (tester) async {
@@ -295,7 +299,7 @@ void main() {
       await openListMenu(tester);
       composer.setSelectionWithReason(secondSelection);
       await tester.pump();
-      await tester.tap(find.text('Bullet List'));
+      await tester.tap(find.bySemanticsLabel('Lista com marcadores'));
       await tester.pumpAndSettle();
 
       expect(document.getNodeById('node-1'), isA<ListItemNode>());
@@ -697,7 +701,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(find.text('Título 1'));
+      await tester.tap(find.bySemanticsLabel('Título 1'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
@@ -752,7 +756,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(find.text('Título 2'));
+      await tester.tap(find.bySemanticsLabel('Título 2'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
@@ -807,7 +811,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(find.text('Citação'));
+      await tester.tap(find.bySemanticsLabel('Citação'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());

@@ -123,6 +123,16 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (widget.hideCompleted != oldWidget.hideCompleted ||
         widget.collapseImages != oldWidget.collapseImages ||
         widget.isReadOnly != oldWidget.isReadOnly) {
+      if (widget.hideCompleted && !oldWidget.hideCompleted) {
+        final selection = _controller?.composer.selection;
+        final selectedNode = selection == null
+            ? null
+            : _controller?.editor.document.getNodeById(selection.extent.nodeId);
+        if (selectedNode is TaskNode && selectedNode.isComplete) {
+          _controller?.composer.clearSelection();
+          _controller?.focusNode.unfocus();
+        }
+      }
       _componentBuilders = null;
       _contentTapDelegateFactories = null;
       _taskComponentBuilder = null;

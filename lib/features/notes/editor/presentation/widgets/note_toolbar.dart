@@ -22,7 +22,6 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/app_selection_tile.dart';
 
 class NoteToolbar extends StatefulWidget {
   const NoteToolbar({
@@ -636,67 +635,66 @@ class _FormattingMenu extends StatelessWidget {
       ),
       child: Material(
         type: MaterialType.transparency,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _FormattingMenuOption(
-              label: 'Título 1',
-              leading: SvgPicture.asset('assets/icons/h1_icon.svg'),
-              isSelected: blockType == header1Attribution,
-              onTap: () => onBlockType(header1Attribution),
-            ),
-            _FormattingMenuOption(
-              label: 'Título 2',
-              leading: SvgPicture.asset('assets/icons/h2_icon.svg'),
-              isSelected: blockType == header2Attribution,
-              onTap: () => onBlockType(header2Attribution),
-            ),
-            _FormattingMenuOption(
-              label: 'Título 3',
-              leading: SvgPicture.asset('assets/icons/h3_icon.svg'),
-              isSelected: blockType == header3Attribution,
-              onTap: () => onBlockType(header3Attribution),
-            ),
-            _FormattingMenuOption(
-              label: 'Citação',
-              leading: const Icon(Icons.format_quote, size: 20),
-              isSelected: blockType == blockquoteAttribution,
-              onTap: () => onBlockType(blockquoteAttribution),
-            ),
-            Container(
-              height: 1,
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-            _FormattingMenuRow(
-              children: [
-                _ToolbarButton(
-                  icon: Icons.format_bold,
-                  isActive: isBold,
-                  onPressed: hasSelection
-                      ? () => onToggleInline(boldAttribution)
-                      : null,
-                  semanticLabel: 'Negrito',
-                ),
-                _ToolbarButton(
-                  icon: Icons.format_italic,
-                  isActive: isItalic,
-                  onPressed: hasSelection
-                      ? () => onToggleInline(italicsAttribution)
-                      : null,
-                  semanticLabel: 'Itálico',
-                ),
-                _ToolbarButton(
-                  icon: Icons.format_strikethrough,
-                  isActive: isStrikethrough,
-                  onPressed: hasSelection
-                      ? () => onToggleInline(strikethroughAttribution)
-                      : null,
-                  semanticLabel: 'Tachado',
-                ),
-              ],
-            ),
-          ],
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: _FormattingMenuRow(
+            children: [
+              _ToolbarButton(
+                svgAsset: 'assets/icons/h1_icon.svg',
+                isActive: blockType == header1Attribution,
+                onPressed: () => onBlockType(header1Attribution),
+                semanticLabel: 'Título 1',
+              ),
+              _ToolbarButton(
+                svgAsset: 'assets/icons/h2_icon.svg',
+                isActive: blockType == header2Attribution,
+                onPressed: () => onBlockType(header2Attribution),
+                semanticLabel: 'Título 2',
+              ),
+              _ToolbarButton(
+                svgAsset: 'assets/icons/h3_icon.svg',
+                isActive: blockType == header3Attribution,
+                onPressed: () => onBlockType(header3Attribution),
+                semanticLabel: 'Título 3',
+              ),
+              _ToolbarButton(
+                icon: Icons.format_quote,
+                isActive: blockType == blockquoteAttribution,
+                onPressed: () => onBlockType(blockquoteAttribution),
+                semanticLabel: 'Citação',
+              ),
+              Container(
+                width: 1,
+                height: 24,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                color: colorScheme.outlineVariant,
+              ),
+              _ToolbarButton(
+                icon: Icons.format_bold,
+                isActive: isBold,
+                onPressed: hasSelection
+                    ? () => onToggleInline(boldAttribution)
+                    : null,
+                semanticLabel: 'Negrito',
+              ),
+              _ToolbarButton(
+                icon: Icons.format_italic,
+                isActive: isItalic,
+                onPressed: hasSelection
+                    ? () => onToggleInline(italicsAttribution)
+                    : null,
+                semanticLabel: 'Itálico',
+              ),
+              _ToolbarButton(
+                icon: Icons.format_strikethrough,
+                isActive: isStrikethrough,
+                onPressed: hasSelection
+                    ? () => onToggleInline(strikethroughAttribution)
+                    : null,
+                semanticLabel: 'Tachado',
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -732,71 +730,6 @@ class _FormattingMenuRow extends StatelessWidget {
   }
 }
 
-class _FormattingMenuOption extends StatelessWidget {
-  const _FormattingMenuOption({
-    required this.label,
-    required this.leading,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final Widget leading;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final foreground = isSelected ? scheme.primary : scheme.onSurface;
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      label: label,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        onTap: onTap,
-        child: SizedBox(
-          height: 40,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Center(
-                    child: ColorFiltered(
-                      colorFilter: ColorFilter.mode(
-                        isSelected ? scheme.primary : scheme.onSurfaceVariant,
-                        BlendMode.srcIn,
-                      ),
-                      child: leading,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: foreground,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-                if (isSelected)
-                  Icon(Icons.check_rounded, size: 20, color: scheme.primary)
-                else
-                  const SizedBox(width: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 enum _ListFormatOption { bulleted, numbered, checklist }
 
 class _ToolbarListPopover extends StatefulWidget {
@@ -819,7 +752,7 @@ class _ToolbarListPopover extends StatefulWidget {
 
 class _ToolbarListPopoverState extends State<_ToolbarListPopover>
     with TickerProviderStateMixin {
-  static const _menuWidth = 224.0;
+  static const _menuWidth = 160.0;
   static const _menuHeight = 176.0;
   static const _viewportMargin = 12.0;
 
@@ -1098,30 +1031,28 @@ class _ListFormatMenu extends StatelessWidget {
       ),
       child: Material(
         type: MaterialType.transparency,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ToolbarListOptionTile(
-                label: 'Bullet List',
-                icon: Icons.format_list_bulleted,
-                isSelected: activeOption == _ListFormatOption.bulleted,
-                onTap: () => onSelected(_ListFormatOption.bulleted),
-              ),
-              _ToolbarListOptionTile(
-                label: 'Numbered List',
-                icon: Icons.format_list_numbered,
-                isSelected: activeOption == _ListFormatOption.numbered,
-                onTap: () => onSelected(_ListFormatOption.numbered),
-              ),
-              _ToolbarListOptionTile(
-                label: 'Checklist',
-                icon: Icons.check_box_outlined,
-                isSelected: activeOption == _ListFormatOption.checklist,
-                onTap: () => onSelected(_ListFormatOption.checklist),
-              ),
-            ],
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ToolbarButton(
+              icon: Icons.format_list_bulleted,
+              isActive: activeOption == _ListFormatOption.bulleted,
+              onPressed: () => onSelected(_ListFormatOption.bulleted),
+              semanticLabel: 'Lista com marcadores',
+            ),
+            _ToolbarButton(
+              icon: Icons.format_list_numbered,
+              isActive: activeOption == _ListFormatOption.numbered,
+              onPressed: () => onSelected(_ListFormatOption.numbered),
+              semanticLabel: 'Lista numerada',
+            ),
+            _ToolbarButton(
+              icon: Icons.check_box_outlined,
+              isActive: activeOption == _ListFormatOption.checklist,
+              onPressed: () => onSelected(_ListFormatOption.checklist),
+              semanticLabel: 'Checklist',
+            ),
+          ],
         ),
       ),
     );
@@ -1140,89 +1071,6 @@ class _ListFormatMenu extends StatelessWidget {
       container: true,
       label: 'Opções de lista',
       child: glassSurface,
-    );
-  }
-}
-
-class _ToolbarListOptionTile extends StatefulWidget {
-  const _ToolbarListOptionTile({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  State<_ToolbarListOptionTile> createState() => _ToolbarListOptionTileState();
-}
-
-class _ToolbarListOptionTileState extends State<_ToolbarListOptionTile>
-    with TickerProviderStateMixin {
-  late final SingleMotionController _selectionMotion;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectionMotion = SingleMotionController(
-      motion: const MaterialSpringMotion.standardEffectsFast(),
-      vsync: this,
-      initialValue: widget.isSelected ? 1 : 0,
-    );
-  }
-
-  @override
-  void didUpdateWidget(_ToolbarListOptionTile oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isSelected != widget.isSelected) {
-      _animateSelection(widget.isSelected ? 1 : 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _selectionMotion.dispose();
-    super.dispose();
-  }
-
-  Future<void> _animateSelection(double target) async {
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
-      _selectionMotion.value = target;
-      return;
-    }
-    try {
-      await _selectionMotion.animateTo(target).orCancel;
-    } on TickerCanceled {
-      // The controller is disposed with the menu.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return AppSelectionTile(
-      label: widget.label,
-      icon: widget.icon,
-      isSelected: widget.isSelected,
-      onTap: widget.onTap,
-      selectedTrailing: AnimatedBuilder(
-        animation: _selectionMotion,
-        builder: (context, child) {
-          final progress = _selectionMotion.value.clamp(0.0, 1.0);
-          return Opacity(
-            opacity: progress,
-            child: Transform.scale(
-              scale: 0.72 + (0.28 * progress),
-              child: child,
-            ),
-          );
-        },
-        child: Icon(Icons.check_rounded, size: 20, color: scheme.primary),
-      ),
     );
   }
 }
