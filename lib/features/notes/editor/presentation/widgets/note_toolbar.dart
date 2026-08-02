@@ -380,13 +380,14 @@ class _ToolbarFormatPopover extends StatefulWidget {
 
 class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
     with TickerProviderStateMixin {
-  static const _menuWidth = 176.0;
+  static const _initialMenuWidth = 176.0;
   static const _menuHeight = 232.0;
   static const _viewportMargin = 12.0;
 
   final _overlayController = OverlayPortalController();
   final _layerLink = LayerLink();
   final _triggerKey = GlobalKey();
+  final _menuKey = GlobalKey();
   late final SingleMotionController _motion;
 
   FocusNode? _focusBeforeOpen;
@@ -394,6 +395,7 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
   bool _isShowing = false;
   bool _showAbove = true;
   double _horizontalOffset = 0;
+  double _currentMenuWidth = _initialMenuWidth;
   int _transitionId = 0;
 
   @override
@@ -450,6 +452,16 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
     _calculatePlacement();
     setState(() => _isShowing = true);
     _overlayController.show();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_isShowing) return;
+      final renderObject =
+          _menuKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderObject == null || !renderObject.hasSize) return;
+      if (_currentMenuWidth == renderObject.size.width) return;
+      _currentMenuWidth = renderObject.size.width;
+      _calculatePlacement();
+      setState(() {});
+    });
     _animateTo(1);
   }
 
@@ -493,9 +505,9 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
     final spaceBelow = bottomPadding - (topLeft.dy + size.height);
 
     _showAbove = spaceAbove >= _menuHeight || spaceAbove >= spaceBelow;
-    final desiredLeft = topLeft.dx + size.width / 2 - _menuWidth / 2;
+    final desiredLeft = topLeft.dx + size.width / 2 - _currentMenuWidth / 2;
     final minLeft = _viewportMargin;
-    final maxLeft = viewport.width - _viewportMargin - _menuWidth;
+    final maxLeft = viewport.width - _viewportMargin - _currentMenuWidth;
     final clampedLeft = desiredLeft.clamp(
       math.min(minLeft, maxLeft),
       math.max(minLeft, maxLeft),
@@ -549,6 +561,7 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
                     child: Opacity(
                       opacity: progress,
                       child: _FormattingMenu(
+                        key: _menuKey,
                         blockType: widget.blockType,
                         hasSelection:
                             !(_selectionForAction?.isCollapsed ?? true),
@@ -581,6 +594,7 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
 
 class _FormattingMenu extends StatelessWidget {
   const _FormattingMenu({
+    super.key,
     required this.blockType,
     required this.hasSelection,
     required this.isBold,
@@ -604,7 +618,7 @@ class _FormattingMenu extends StatelessWidget {
     final borderRadius = BorderRadius.circular(24);
     final highContrast = MediaQuery.highContrastOf(context);
     final surface = Container(
-      width: _ToolbarFormatPopoverState._menuWidth,
+      constraints: const BoxConstraints(maxWidth: 240),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: highContrast ? 1 : 0.86),
@@ -710,7 +724,11 @@ class _FormattingMenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(mainAxisAlignment: MainAxisAlignment.start, children: children);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: children,
+    );
   }
 }
 
@@ -740,10 +758,10 @@ class _FormattingMenuOption extends StatelessWidget {
         onTap: onTap,
         child: SizedBox(
           height: 40,
-          width: double.infinity,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
                   width: 24,
@@ -759,19 +777,17 @@ class _FormattingMenuOption extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: foreground,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                    ),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: foreground,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
                 if (isSelected)
-                  Icon(Icons.check_rounded, size: 20, color: scheme.primary),
+                  Icon(Icons.check_rounded, size: 20, color: scheme.primary)
+                else
+                  const SizedBox(width: 20),
               ],
             ),
           ),
