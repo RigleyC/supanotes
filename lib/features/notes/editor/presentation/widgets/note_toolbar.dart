@@ -28,12 +28,14 @@ class NoteToolbar extends StatefulWidget {
     super.key,
     required this.editor,
     required this.composer,
+    this.focusNode,
     this.onAttachFile,
     this.onAttachImage,
   });
 
   final Editor editor;
   final MutableDocumentComposer composer;
+  final FocusNode? focusNode;
   final VoidCallback? onAttachFile;
   final VoidCallback? onAttachImage;
 
@@ -46,10 +48,14 @@ class _NoteToolbarState extends State<NoteToolbar> {
   MutableDocumentComposer get composer => widget.composer;
   VoidCallback? get onAttachFile => widget.onAttachFile;
   VoidCallback? get onAttachImage => widget.onAttachImage;
+  FocusNode? get focusNode => widget.focusNode;
+
+  DocumentSelection? _lastSelection;
 
   @override
   void initState() {
     super.initState();
+    _lastSelection = widget.composer.selection;
     _attachListeners(widget);
   }
 
@@ -80,6 +86,10 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   void _onEditorStateChanged() {
+    final selection = composer.selection;
+    if (selection != null && _selectionIsValid(selection)) {
+      _lastSelection = selection;
+    }
     if (mounted) setState(() {});
   }
 
@@ -288,33 +298,68 @@ class _NoteToolbarState extends State<NoteToolbar> {
     Attribution attribution,
     DocumentSelection? selection,
   ) {
-    if (selection == null || selection.isCollapsed) return;
-    _restoreFormattingSelection(selection);
+    final actionSelection = selection ?? _lastSelection;
+    if (actionSelection == null || actionSelection.isCollapsed) return;
+    _restoreFormattingSelection(actionSelection);
     _toggleInline(attribution);
   }
 
   void _restoreFormattingSelection(DocumentSelection? selection) {
-    if (selection != null && composer.selection != selection) {
-      composer.setSelectionWithReason(selection);
+    _prepareEditorAction(selection);
+  }
+
+  DocumentSelection? _prepareEditorAction(DocumentSelection? selection) {
+    final actionSelection =
+        selection ?? _lastSelection ?? _selectionAtDocumentEnd();
+    if (actionSelection == null || !_selectionIsValid(actionSelection)) {
+      return null;
     }
+    focusNode?.requestFocus();
+    if (composer.selection != actionSelection) {
+      composer.setSelectionWithReason(actionSelection);
+    }
+    return actionSelection;
+  }
+
+  DocumentSelection? _selectionAtDocumentEnd() {
+    final document = editor.context.document;
+    if (document.nodeCount == 0) return null;
+    final lastNode = document.last;
+    if (lastNode is! TextNode) return null;
+    return DocumentSelection.collapsed(
+      position: DocumentPosition(
+        nodeId: lastNode.id,
+        nodePosition: TextNodePosition(offset: lastNode.text.length),
+      ),
+    );
+  }
+
+  bool _selectionIsValid(DocumentSelection selection) {
+    final document = editor.context.document;
+    return document.getNodeById(selection.start.nodeId) != null &&
+        document.getNodeById(selection.end.nodeId) != null;
   }
 
   void _toggleInline(Attribution attribution) {
+    if (_prepareEditorAction(null) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
   }
 
   void _setBlockType(Attribution? attribution) {
+    if (_prepareEditorAction(null) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.setBlockType(editor, composer, attribution);
   }
 
   void _convertToListItem(ListItemType type) {
+    if (_prepareEditorAction(null) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.convertToListItem(editor, composer, type);
   }
 
   void _convertToTask() {
+    if (_prepareEditorAction(null) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.convertToTask(editor, composer);
   }
@@ -323,9 +368,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
     _ListFormatOption option,
     DocumentSelection? selection,
   ) {
-    if (selection != null) {
-      composer.setSelectionWithReason(selection);
-    }
+    if (_prepareEditorAction(selection) == null) return;
     switch (option) {
       case _ListFormatOption.bulleted:
         _convertToListItem(ListItemType.unordered);
@@ -337,16 +380,19 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   void _indentListItem() {
+    if (_prepareEditorAction(null) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.indentListItems(editor, composer);
   }
 
   void _unindentListItem() {
+    if (_prepareEditorAction(null) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.unindentListItems(editor, composer);
   }
 
   void _insertDivider() {
+    if (_prepareEditorAction(null) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.insertDivider(editor, dividerCount: 35);
   }

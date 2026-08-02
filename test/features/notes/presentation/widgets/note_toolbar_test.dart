@@ -1187,5 +1187,72 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Opções de formatação'), findsNothing);
     });
+
+    testWidgets('focuses the editor and applies a block action at the end', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'node-1', text: AttributedText('Existing text')),
+          ParagraphNode(id: 'node-2', text: AttributedText('Final text')),
+        ],
+      );
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Focus(
+                    focusNode: focusNode,
+                    child: NoteToolbar(
+                      editor: editor,
+                      composer: composer,
+                      focusNode: focusNode,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Título 1'));
+      await tester.pumpAndSettle();
+
+      expect(focusNode.hasFocus, isTrue);
+      expect(composer.selection?.extent.nodeId, 'node-2');
+      expect(
+        (composer.selection?.extent.nodePosition as TextNodePosition).offset,
+        'Final text'.length,
+      );
+      expect(
+        (document.getNodeById('node-2') as ParagraphNode).getMetadataValue(
+          'blockType',
+        ),
+        header1Attribution,
+      );
+    });
   });
 }

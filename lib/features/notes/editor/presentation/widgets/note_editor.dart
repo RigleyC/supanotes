@@ -274,6 +274,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                     NoteToolbar(
                       editor: controller.editor,
                       composer: controller.composer,
+                      focusNode: controller.focusNode,
                       onAttachFile: () =>
                           controller.pickAndAttachFile(imageOnly: false),
                       onAttachImage: () =>
