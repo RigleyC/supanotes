@@ -697,13 +697,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(
-        find.byWidgetPredicate(
-          (w) =>
-              w.runtimeType.toString() == '_ToolbarButton' &&
-              (w as dynamic).svgAsset == 'assets/icons/h1_icon.svg',
-        ),
-      );
+      await tester.tap(find.bySemanticsLabel('Título 1'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
@@ -758,13 +752,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(
-        find.byWidgetPredicate(
-          (w) =>
-              w.runtimeType.toString() == '_ToolbarButton' &&
-              (w as dynamic).svgAsset == 'assets/icons/h2_icon.svg',
-        ),
-      );
+      await tester.tap(find.bySemanticsLabel('Título 2'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
@@ -819,7 +807,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(find.byIcon(Icons.format_quote));
+      await tester.tap(find.bySemanticsLabel('Citação'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());

@@ -380,7 +380,7 @@ class _ToolbarFormatPopover extends StatefulWidget {
 
 class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
     with TickerProviderStateMixin {
-  static const _menuWidth = 176.0;
+  static const _menuWidth = 224.0;
   static const _menuHeight = 260.0;
   static const _viewportMargin = 12.0;
 
@@ -622,41 +622,29 @@ class _FormattingMenu extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _FormattingMenuColumn(
-              children: [
-                _FormattingMenuItem(
-                  child: _ToolbarButton(
-                    svgAsset: 'assets/icons/h1_icon.svg',
-                    isActive: blockType == header1Attribution,
-                    onPressed: () => onBlockType(header1Attribution),
-                    semanticLabel: 'Título 1',
-                  ),
-                ),
-                _FormattingMenuItem(
-                  child: _ToolbarButton(
-                    svgAsset: 'assets/icons/h2_icon.svg',
-                    isActive: blockType == header2Attribution,
-                    onPressed: () => onBlockType(header2Attribution),
-                    semanticLabel: 'Título 2',
-                  ),
-                ),
-                _FormattingMenuItem(
-                  child: _ToolbarButton(
-                    svgAsset: 'assets/icons/h3_icon.svg',
-                    isActive: blockType == header3Attribution,
-                    onPressed: () => onBlockType(header3Attribution),
-                    semanticLabel: 'Título 3',
-                  ),
-                ),
-                _FormattingMenuItem(
-                  child: _ToolbarButton(
-                    icon: Icons.format_quote,
-                    isActive: blockType == blockquoteAttribution,
-                    onPressed: () => onBlockType(blockquoteAttribution),
-                    semanticLabel: 'Citação',
-                  ),
-                ),
-              ],
+            _FormattingMenuOption(
+              label: 'Título 1',
+              leading: SvgPicture.asset('assets/icons/h1_icon.svg'),
+              isSelected: blockType == header1Attribution,
+              onTap: () => onBlockType(header1Attribution),
+            ),
+            _FormattingMenuOption(
+              label: 'Título 2',
+              leading: SvgPicture.asset('assets/icons/h2_icon.svg'),
+              isSelected: blockType == header2Attribution,
+              onTap: () => onBlockType(header2Attribution),
+            ),
+            _FormattingMenuOption(
+              label: 'Título 3',
+              leading: SvgPicture.asset('assets/icons/h3_icon.svg'),
+              isSelected: blockType == header3Attribution,
+              onTap: () => onBlockType(header3Attribution),
+            ),
+            _FormattingMenuOption(
+              label: 'Citação',
+              leading: const Icon(Icons.format_quote, size: 20),
+              isSelected: blockType == blockquoteAttribution,
+              onTap: () => onBlockType(blockquoteAttribution),
             ),
             Container(
               height: 1,
@@ -723,32 +711,49 @@ class _FormattingMenuRow extends StatelessWidget {
   }
 }
 
-class _FormattingMenuColumn extends StatelessWidget {
-  const _FormattingMenuColumn({required this.children});
+class _FormattingMenuOption extends StatelessWidget {
+  const _FormattingMenuOption({
+    required this.label,
+    required this.leading,
+    required this.isSelected,
+    required this.onTap,
+  });
 
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: children,
-    );
-  }
-}
-
-class _FormattingMenuItem extends StatelessWidget {
-  const _FormattingMenuItem({required this.child});
-
-  final Widget child;
+  final String label;
+  final Widget leading;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: Align(alignment: Alignment.centerLeft, child: child),
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      dense: true,
+      selected: isSelected,
+      onTap: onTap,
+      leading: SizedBox(
+        width: 24,
+        height: 24,
+        child: Center(
+          child: ColorFiltered(
+            colorFilter: ColorFilter.mode(
+              isSelected ? scheme.primary : scheme.onSurfaceVariant,
+              BlendMode.srcIn,
+            ),
+            child: leading,
+          ),
+        ),
+      ),
+      title: Text(
+        label,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: isSelected ? scheme.primary : scheme.onSurface,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_rounded, size: 20, color: scheme.primary)
+          : null,
     );
   }
 }
