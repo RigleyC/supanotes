@@ -290,8 +290,14 @@ class _NoteToolbarState extends State<NoteToolbar> {
     Attribution attribution,
     DocumentSelection? selection,
   ) {
-    _restoreFormattingSelection(selection);
-    _setBlockType(attribution);
+    final actionSelection = _existingActionSelection(selection);
+    if (actionSelection != null) {
+      _restoreFormattingSelection(actionSelection);
+      _setBlockType(attribution);
+      return;
+    }
+
+    _insertParagraphAtEnd(attribution);
   }
 
   void _onFormattingInline(
@@ -309,8 +315,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   DocumentSelection? _prepareEditorAction(DocumentSelection? selection) {
-    final actionSelection =
-        selection ?? _lastSelection ?? _selectionAtDocumentEnd();
+    final actionSelection = _existingActionSelection(selection);
     if (actionSelection == null || !_selectionIsValid(actionSelection)) {
       return null;
     }
@@ -321,17 +326,12 @@ class _NoteToolbarState extends State<NoteToolbar> {
     return actionSelection;
   }
 
-  DocumentSelection? _selectionAtDocumentEnd() {
-    final document = editor.context.document;
-    if (document.nodeCount == 0) return null;
-    final lastNode = document.last;
-    if (lastNode is! TextNode) return null;
-    return DocumentSelection.collapsed(
-      position: DocumentPosition(
-        nodeId: lastNode.id,
-        nodePosition: TextNodePosition(offset: lastNode.text.length),
-      ),
-    );
+  DocumentSelection? _existingActionSelection(DocumentSelection? selection) {
+    final actionSelection = selection ?? _lastSelection;
+    if (actionSelection == null || !_selectionIsValid(actionSelection)) {
+      return null;
+    }
+    return actionSelection;
   }
 
   bool _selectionIsValid(DocumentSelection selection) {
@@ -368,7 +368,12 @@ class _NoteToolbarState extends State<NoteToolbar> {
     _ListFormatOption option,
     DocumentSelection? selection,
   ) {
-    if (_prepareEditorAction(selection) == null) return;
+    final actionSelection = _existingActionSelection(selection);
+    if (actionSelection == null) {
+      _insertListBlockAtEnd(option);
+      return;
+    }
+    _restoreFormattingSelection(actionSelection);
     switch (option) {
       case _ListFormatOption.bulleted:
         _convertToListItem(ListItemType.unordered);
@@ -392,9 +397,90 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   void _insertDivider() {
+    if (_existingActionSelection(null) == null) {
+      _insertDividerAtEnd();
+      return;
+    }
     if (_prepareEditorAction(null) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.insertDivider(editor, dividerCount: 35);
+  }
+
+  void _insertParagraphAtEnd(Attribution blockType) {
+    final node = ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(),
+      metadata: {'blockType': blockType},
+    );
+    _insertNodeAtEnd(node);
+  }
+
+  void _insertListBlockAtEnd(_ListFormatOption option) {
+    final node = switch (option) {
+      _ListFormatOption.bulleted => ListItemNode.unordered(
+        id: Editor.createNodeId(),
+        text: AttributedText(),
+      ),
+      _ListFormatOption.numbered => ListItemNode.ordered(
+        id: Editor.createNodeId(),
+        text: AttributedText(),
+      ),
+      _ListFormatOption.checklist => TaskNode(
+        id: Editor.createNodeId(),
+        text: AttributedText(),
+        isComplete: false,
+      ),
+    };
+    _insertNodeAtEnd(node);
+  }
+
+  void _insertDividerAtEnd() {
+    final paragraph = ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(),
+    );
+    final dividerIndex = math.Random().nextInt(35) + 1;
+    focusNode?.requestFocus();
+    editor.execute([
+      InsertNodeAtEndOfDocumentRequest(
+        HorizontalRuleNode(
+          id: Editor.createNodeId(),
+          metadata: {'dividerIndex': dividerIndex},
+        ),
+      ),
+      InsertNodeAtEndOfDocumentRequest(paragraph),
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: paragraph.id,
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+        ),
+        SelectionChangeType.placeCaret,
+        SelectionReason.contentChange,
+      ),
+    ]);
+    HapticFeedback.selectionClick();
+  }
+
+  void _insertNodeAtEnd(DocumentNode node) {
+    final selection = DocumentSelection.collapsed(
+      position: DocumentPosition(
+        nodeId: node.id,
+        nodePosition: const TextNodePosition(offset: 0),
+      ),
+    );
+    focusNode?.requestFocus();
+    editor.execute([
+      InsertNodeAtEndOfDocumentRequest(node),
+      ChangeSelectionRequest(
+        selection,
+        SelectionChangeType.placeCaret,
+        SelectionReason.contentChange,
+      ),
+    ]);
+    _lastSelection = selection;
+    HapticFeedback.selectionClick();
   }
 }
 

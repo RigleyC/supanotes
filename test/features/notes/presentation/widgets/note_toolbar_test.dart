@@ -1188,7 +1188,7 @@ void main() {
       expect(find.bySemanticsLabel('Opções de formatação'), findsNothing);
     });
 
-    testWidgets('focuses the editor and applies a block action at the end', (
+    testWidgets('focuses the editor and creates a new block at the end', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(800, 1000);
@@ -1200,7 +1200,11 @@ void main() {
       final document = MutableDocument(
         nodes: [
           ParagraphNode(id: 'node-1', text: AttributedText('Existing text')),
-          ParagraphNode(id: 'node-2', text: AttributedText('Final text')),
+          TaskNode(
+            id: 'node-2',
+            text: AttributedText('Final task'),
+            isComplete: false,
+          ),
         ],
       );
       final composer = MutableDocumentComposer();
@@ -1242,15 +1246,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(focusNode.hasFocus, isTrue);
-      expect(composer.selection?.extent.nodeId, 'node-2');
+      expect(composer.selection?.extent.nodeId, isNot('node-2'));
+      final newNode = document.last;
+      expect(newNode, isA<ParagraphNode>());
+      expect(newNode.id, isNot('node-2'));
+      expect(composer.selection?.extent.nodeId, newNode.id);
+      expect(document.getNodeById('node-2'), isA<TaskNode>());
       expect(
-        (composer.selection?.extent.nodePosition as TextNodePosition).offset,
-        'Final text'.length,
-      );
-      expect(
-        (document.getNodeById('node-2') as ParagraphNode).getMetadataValue(
-          'blockType',
-        ),
+        (newNode as ParagraphNode).getMetadataValue('blockType'),
         header1Attribution,
       );
     });
