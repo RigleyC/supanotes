@@ -697,7 +697,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(find.bySemanticsLabel('Título 1'));
+      await tester.tap(find.text('Título 1'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
@@ -752,7 +752,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(find.bySemanticsLabel('Título 2'));
+      await tester.tap(find.text('Título 2'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());
@@ -807,7 +807,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openFormatPopup(tester);
-      await tester.tap(find.bySemanticsLabel('Citação'));
+      await tester.tap(find.text('Citação'));
       await tester.pumpAndSettle();
 
       expect(document.first, isA<ParagraphNode>());

@@ -380,8 +380,8 @@ class _ToolbarFormatPopover extends StatefulWidget {
 
 class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover>
     with TickerProviderStateMixin {
-  static const _menuWidth = 224.0;
-  static const _menuHeight = 260.0;
+  static const _menuWidth = 200.0;
+  static const _menuHeight = 232.0;
   static const _viewportMargin = 12.0;
 
   final _overlayController = OverlayPortalController();
@@ -727,33 +727,53 @@ class _FormattingMenuOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return ListTile(
-      dense: true,
+    final foreground = isSelected ? scheme.primary : scheme.onSurface;
+    return Semantics(
+      button: true,
       selected: isSelected,
-      onTap: onTap,
-      leading: SizedBox(
-        width: 24,
-        height: 24,
-        child: Center(
-          child: ColorFiltered(
-            colorFilter: ColorFilter.mode(
-              isSelected ? scheme.primary : scheme.onSurfaceVariant,
-              BlendMode.srcIn,
+      label: label,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        onTap: onTap,
+        child: SizedBox(
+          height: 40,
+          width: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Center(
+                    child: ColorFiltered(
+                      colorFilter: ColorFilter.mode(
+                        isSelected ? scheme.primary : scheme.onSurfaceVariant,
+                        BlendMode.srcIn,
+                      ),
+                      child: leading,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: foreground,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  Icon(Icons.check_rounded, size: 20, color: scheme.primary),
+              ],
             ),
-            child: leading,
           ),
         ),
       ),
-      title: Text(
-        label,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-          color: isSelected ? scheme.primary : scheme.onSurface,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-        ),
-      ),
-      trailing: isSelected
-          ? Icon(Icons.check_rounded, size: 20, color: scheme.primary)
-          : null,
     );
   }
 }
