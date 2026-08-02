@@ -597,6 +597,15 @@ void main() {
     final taskRect = tester.getRect(find.byType(TaskExitAnimator).first);
     await tester.tap(find.text('toggle hide'));
     await tester.pump(const Duration(milliseconds: 100));
+
+    final documentLayout =
+        tester.state(find.byType(SingleColumnDocumentLayout)) as DocumentLayout;
+    final exitingTask = documentLayout.getComponentByNodeId('1');
+    expect(exitingTask, isNotNull);
+    expect(exitingTask!.isVisualSelectionSupported(), isFalse);
+    expect(exitingTask.getPositionAtOffset(Offset.zero), isNull);
+    expect(exitingTask.getDesiredCursorAtOffset(Offset.zero), isNull);
+
     await tester.tapAt(taskRect.center);
     await tester.pumpAndSettle();
 
@@ -660,6 +669,14 @@ void main() {
       tester.getSize(find.byType(TaskExitAnimator).first).height,
       equals(0.0),
     );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextComponent &&
+            widget.text.toPlainText() == 'tarefa concluida',
+      ),
+      findsOneWidget,
+    );
     expect(find.byType(Placeholder), findsNothing);
     expect(
       find.byWidgetPredicate(
@@ -670,6 +687,105 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'hideCompleted restores a hidden task without replacing its node',
+    (tester) async {
+      var hideCompleted = false;
+      final controller = _createTestController([
+        TaskNode(
+          id: '1',
+          text: AttributedText('tarefa concluida'),
+          isComplete: true,
+        ),
+        ParagraphNode(id: '2', text: AttributedText('texto visivel')),
+      ]);
+      addTearDown(controller.dispose);
+      final delegate = NoteEditorDelegate(
+        onTaskReopen: (taskId) async {
+          controller.reopenTaskInEditor(taskId);
+        },
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserIdProvider.overrideWithValue('test-user'),
+            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+            noteEditorSessionProvider.overrideWith(
+              (ref, noteId) async => _sessionFor(controller),
+            ),
+          ],
+          child: MaterialApp(
+            home: StatefulBuilder(
+              builder: (context, setState) {
+                return Scaffold(
+                  body: Column(
+                    children: [
+                      TextButton(
+                        onPressed: () =>
+                            setState(() => hideCompleted = !hideCompleted),
+                        child: const Text('toggle hide'),
+                      ),
+                      Expanded(
+                        child: NoteEditor(
+                          noteId: 'note-1',
+                          taskMetadata: const {},
+                          hideCompleted: hideCompleted,
+                          delegate: delegate,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final taskText = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextComponent &&
+            widget.text.toPlainText() == 'tarefa concluida',
+      );
+      expect(taskText, findsOneWidget);
+
+      await tester.tap(find.text('toggle hide'));
+      await tester.pumpAndSettle();
+
+      final hiddenLayout =
+          tester.state(find.byType(SingleColumnDocumentLayout))
+              as DocumentLayout;
+      final hiddenTask = hiddenLayout.getComponentByNodeId('1');
+      expect(hiddenTask, isNotNull);
+      expect(hiddenTask!.isVisualSelectionSupported(), isFalse);
+      expect(taskText, findsOneWidget);
+      expect(tester.getSize(find.byType(TaskExitAnimator).first).height, 0.0);
+
+      await tester.tap(find.text('toggle hide'));
+      await tester.pumpAndSettle();
+
+      final restoredLayout =
+          tester.state(find.byType(SingleColumnDocumentLayout))
+              as DocumentLayout;
+      final restoredTask = restoredLayout.getComponentByNodeId('1');
+      expect(restoredTask, isNotNull);
+      expect(restoredTask!.isVisualSelectionSupported(), isTrue);
+      expect(
+        tester.getSize(find.byType(TaskExitAnimator).first).height,
+        greaterThan(0),
+      );
+
+      await tester.tap(find.byType(AppTaskCheckbox));
+      await tester.pumpAndSettle();
+      expect(
+        (controller.document.getNodeById('1')! as TaskNode).isComplete,
+        isFalse,
+      );
+    },
+  );
 
   testWidgets('owner actions put share inside the more menu', (tester) async {
     final streamController = StreamController<NoteModel?>();

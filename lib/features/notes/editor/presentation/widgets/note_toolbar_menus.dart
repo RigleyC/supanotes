@@ -25,26 +25,12 @@ class _FormattingMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final borderRadius = BorderRadius.circular(24);
-    final highContrast = MediaQuery.highContrastOf(context);
-    final surface = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: highContrast ? 1 : 0.86),
-        borderRadius: borderRadius,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.16),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Material(
-        type: MaterialType.transparency,
+    return Semantics(
+      container: true,
+      label: 'Opções de formatação',
+      child: _ToolbarGlassMenuSurface(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        surfaceAlpha: 0.86,
         child: _FormattingMenuRow(
           children: [
             _ToolbarButton(
@@ -112,20 +98,6 @@ class _FormattingMenu extends StatelessWidget {
         ),
       ),
     );
-
-    return Semantics(
-      container: true,
-      label: 'Opções de formatação',
-      child: highContrast
-          ? surface
-          : ClipRRect(
-              borderRadius: borderRadius,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: surface,
-              ),
-            ),
-    );
   }
 }
 
@@ -152,28 +124,12 @@ class _ListFormatMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final borderRadius = BorderRadius.circular(24);
-    final highContrast = MediaQuery.highContrastOf(context);
-
-    final surface = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: highContrast ? 1 : 0.82),
-        borderRadius: borderRadius,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.16),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Material(
-        type: MaterialType.transparency,
+    return Semantics(
+      container: true,
+      label: 'Opções de lista',
+      child: _ToolbarGlassMenuSurface(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        surfaceAlpha: 0.82,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -202,8 +158,47 @@ class _ListFormatMenu extends StatelessWidget {
         ),
       ),
     );
+  }
+}
 
-    final glassSurface = highContrast
+class _ToolbarGlassMenuSurface extends StatelessWidget {
+  const _ToolbarGlassMenuSurface({
+    required this.child,
+    required this.padding,
+    required this.surfaceAlpha,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double surfaceAlpha;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final borderRadius = BorderRadius.circular(24);
+    final highContrast = MediaQuery.highContrastOf(context);
+    final surface = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(
+          alpha: highContrast ? 1 : surfaceAlpha,
+        ),
+        borderRadius: borderRadius,
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.16),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(type: MaterialType.transparency, child: child),
+    );
+
+    return highContrast
         ? surface
         : ClipRRect(
             borderRadius: borderRadius,
@@ -212,11 +207,5 @@ class _ListFormatMenu extends StatelessWidget {
               child: surface,
             ),
           );
-
-    return Semantics(
-      container: true,
-      label: 'Opções de lista',
-      child: glassSurface,
-    );
   }
 }

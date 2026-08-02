@@ -2,12 +2,6 @@ part of 'note_toolbar.dart';
 
 typedef _ToolbarPopoverClose = void Function({VoidCallback? afterClose});
 
-class _ToolbarPopoverActions {
-  const _ToolbarPopoverActions({required this.close});
-
-  final _ToolbarPopoverClose close;
-}
-
 class _ToolbarPopover extends StatefulWidget {
   const _ToolbarPopover({
     required this.triggerBuilder,
@@ -17,7 +11,7 @@ class _ToolbarPopover extends StatefulWidget {
 
   final Widget Function(BuildContext context, bool isOpen, VoidCallback toggle)
   triggerBuilder;
-  final Widget Function(BuildContext context, _ToolbarPopoverActions actions)
+  final Widget Function(BuildContext context, _ToolbarPopoverClose close)
   menuBuilder;
   final VoidCallback? onOpen;
 
@@ -177,7 +171,6 @@ class _ToolbarPopoverState extends State<_ToolbarPopover>
 
   @override
   Widget build(BuildContext context) {
-    final actions = _ToolbarPopoverActions(close: _close);
     return PopScope(
       canPop: !_isShowing,
       onPopInvokedWithResult: (didPop, result) {
@@ -212,7 +205,7 @@ class _ToolbarPopoverState extends State<_ToolbarPopover>
                     alignment: Alignment.topLeft,
                     child: KeyedSubtree(
                       key: _menuKey,
-                      child: widget.menuBuilder(context, actions),
+                      child: widget.menuBuilder(context, _close),
                     ),
                   ),
                   builder: (context, child) {
@@ -302,7 +295,7 @@ class _ToolbarFormatPopoverState extends State<_ToolbarFormatPopover> {
         onPressed: toggle,
         semanticLabel: 'Abrir formatação',
       ),
-      menuBuilder: (context, actions) => _FormattingMenu(
+      menuBuilder: (context, _) => _FormattingMenu(
         key: const ValueKey('formatting-menu'),
         blockType: widget.blockType,
         hasSelection: !(_selectionForAction?.isCollapsed ?? true),
@@ -371,9 +364,9 @@ class _ToolbarListPopoverState extends State<_ToolbarListPopover> {
         isActive: isOpen || activeOption != null,
         onPressed: toggle,
       ),
-      menuBuilder: (context, actions) => _ListFormatMenu(
+      menuBuilder: (context, close) => _ListFormatMenu(
         activeOption: activeOption,
-        onSelected: (option) => _select(option, actions.close),
+        onSelected: (option) => _select(option, close),
       ),
     );
   }

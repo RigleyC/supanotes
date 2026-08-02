@@ -1,6 +1,6 @@
 # Contrato do Super Editor para ocultar tasks concluídas
 
-Data: 2026-08-02  
+Data: 2026-08-02
 Escopo: investigação somente de leitura. Não alterei código de produção nesta pesquisa. O working tree já continha alterações não commitadas em `task_exit_animator.dart` e `note_editor_screen_test.dart`; elas foram preservadas.
 
 ## Resumo executivo
