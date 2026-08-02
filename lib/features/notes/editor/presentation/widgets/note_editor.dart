@@ -228,32 +228,38 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                 controller: _controls!.androidController,
                 child: SuperEditorIosControlsScope(
                   controller: _controls!.iosController,
-                  child: SuperEditor(
-                    editor: controller.editor,
-                    focusNode: widget.isReadOnly ? null : controller.focusNode,
-                    autofocus: widget.requestInitialFocus && !widget.isReadOnly,
-                    inputSource: TextInputSource.ime,
-                    documentLayoutKey: _docLayoutKey,
-                    stylesheet: _cachedStylesheet!,
-                    selectionStyle: editorSelectionStyle(theme.colorScheme),
-                    documentOverlayBuilders: [
-                      ...defaultSuperEditorDocumentOverlayBuilders.where(
-                        (builder) => builder is! DefaultCaretOverlayBuilder,
-                      ),
-                      DefaultCaretOverlayBuilder(
-                        caretStyle: CaretStyle(
-                          color: theme.colorScheme.primary,
-                          width: 2.5,
-                        ),
-                      ),
-                    ],
-                    contentTapDelegateFactories: _contentTapDelegateFactories,
-                    keyboardActions: editorKeyboardActions(
-                      slashCommandController: widget.isReadOnly
+                  child: TapRegion(
+                    groupId: noteEditorToolbarTapRegionGroup,
+                    child: SuperEditor(
+                      editor: controller.editor,
+                      focusNode: widget.isReadOnly
                           ? null
-                          : _slashCommandController,
+                          : controller.focusNode,
+                      autofocus:
+                          widget.requestInitialFocus && !widget.isReadOnly,
+                      inputSource: TextInputSource.ime,
+                      documentLayoutKey: _docLayoutKey,
+                      stylesheet: _cachedStylesheet!,
+                      selectionStyle: editorSelectionStyle(theme.colorScheme),
+                      documentOverlayBuilders: [
+                        ...defaultSuperEditorDocumentOverlayBuilders.where(
+                          (builder) => builder is! DefaultCaretOverlayBuilder,
+                        ),
+                        DefaultCaretOverlayBuilder(
+                          caretStyle: CaretStyle(
+                            color: theme.colorScheme.primary,
+                            width: 2.5,
+                          ),
+                        ),
+                      ],
+                      contentTapDelegateFactories: _contentTapDelegateFactories,
+                      keyboardActions: editorKeyboardActions(
+                        slashCommandController: widget.isReadOnly
+                            ? null
+                            : _slashCommandController,
+                      ),
+                      componentBuilders: _componentBuilders!,
                     ),
-                    componentBuilders: _componentBuilders!,
                   ),
                 ),
               ),

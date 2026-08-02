@@ -21,6 +21,8 @@ part 'note_toolbar_button.dart';
 part 'note_toolbar_menus.dart';
 part 'note_toolbar_popover.dart';
 
+const noteEditorToolbarTapRegionGroup = Object();
+
 class NoteToolbar extends StatefulWidget {
   const NoteToolbar({
     super.key,
@@ -148,6 +150,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         if (!didPop) _closeFormatting();
       },
       child: TapRegion(
+        groupId: noteEditorToolbarTapRegionGroup,
         onTapOutside: (_) => _closeFormatting(),
         child: Padding(
           padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),

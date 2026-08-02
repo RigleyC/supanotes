@@ -1568,5 +1568,67 @@ void main() {
       expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
       expect(focusNode.hasFocus, isTrue);
     });
+
+    testWidgets('keeps formatting mode open while navigating the editor', (
+      tester,
+    ) async {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'node-1', text: AttributedText('First line')),
+          ParagraphNode(id: 'node-2', text: AttributedText('Second line')),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: TapRegion(
+                    groupId: noteEditorToolbarTapRegionGroup,
+                    child: SuperEditor(editor: editor),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: NoteToolbar(editor: editor, composer: composer),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(100, 100));
+      composer.setSelectionWithReason(
+        const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-2',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
+    });
   });
 }
