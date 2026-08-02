@@ -184,6 +184,95 @@ class NoteEditorCommands {
     if (requestList.isNotEmpty) editor.execute(requestList);
   }
 
+  /// Inserts an empty paragraph with [blockType] after the existing document.
+  static void insertParagraphAtEnd(
+    Editor editor, {
+    required Attribution blockType,
+  }) {
+    insertNodeAtEnd(
+      editor,
+      ParagraphNode(
+        id: Editor.createNodeId(),
+        text: AttributedText(),
+        metadata: {'blockType': blockType},
+      ),
+    );
+  }
+
+  /// Inserts an empty list item after the existing document.
+  static void insertListItemAtEnd(Editor editor, {required ListItemType type}) {
+    insertNodeAtEnd(
+      editor,
+      type == ListItemType.unordered
+          ? ListItemNode.unordered(
+              id: Editor.createNodeId(),
+              text: AttributedText(),
+            )
+          : ListItemNode.ordered(
+              id: Editor.createNodeId(),
+              text: AttributedText(),
+            ),
+    );
+  }
+
+  /// Inserts an empty task after the existing document.
+  static void insertTaskAtEnd(Editor editor) {
+    insertNodeAtEnd(
+      editor,
+      TaskNode(
+        id: Editor.createNodeId(),
+        text: AttributedText(),
+        isComplete: false,
+      ),
+    );
+  }
+
+  /// Inserts a node at the end and places the caret in it.
+  static void insertNodeAtEnd(Editor editor, DocumentNode node) {
+    final selection = DocumentSelection.collapsed(
+      position: DocumentPosition(
+        nodeId: node.id,
+        nodePosition: const TextNodePosition(offset: 0),
+      ),
+    );
+    editor.execute([
+      InsertNodeAtEndOfDocumentRequest(node),
+      ChangeSelectionRequest(
+        selection,
+        SelectionChangeType.placeCaret,
+        SelectionReason.contentChange,
+      ),
+    ]);
+  }
+
+  /// Inserts a divider followed by an empty paragraph at the document end.
+  static void insertDividerAtEnd(Editor editor, {required int dividerCount}) {
+    final paragraph = ParagraphNode(
+      id: Editor.createNodeId(),
+      text: AttributedText(),
+    );
+    final dividerIndex = math.Random().nextInt(dividerCount) + 1;
+    editor.execute([
+      InsertNodeAtEndOfDocumentRequest(
+        HorizontalRuleNode(
+          id: Editor.createNodeId(),
+          metadata: {'dividerIndex': dividerIndex},
+        ),
+      ),
+      InsertNodeAtEndOfDocumentRequest(paragraph),
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: paragraph.id,
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+        ),
+        SelectionChangeType.placeCaret,
+        SelectionReason.contentChange,
+      ),
+    ]);
+  }
+
   static List<DocumentNode> _selectedEditableNodes(
     Document document,
     DocumentSelection? selection,

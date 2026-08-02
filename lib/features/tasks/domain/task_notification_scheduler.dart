@@ -5,6 +5,7 @@ import 'dart:developer' as dev;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
@@ -15,14 +16,14 @@ import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
 final openTasksStreamProvider = StreamProvider.autoDispose<List<TaskData>>((
   ref,
 ) {
-  try {
-    final repo = ref.watch(tasksLocalRepositoryProvider);
-    dev.log('[Scheduler] watchOpenTasks stream started');
-    return repo.watchOpenTasks();
-  } catch (e) {
-    dev.log('[Scheduler] watchOpenTasks error: $e');
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null || userId.isEmpty) {
     return const Stream.empty();
   }
+
+  final repo = ref.watch(tasksLocalRepositoryProvider);
+  dev.log('[Scheduler] watchOpenTasks stream started for $userId');
+  return repo.watchOpenTasks();
 });
 
 final taskNotificationSchedulerProvider =

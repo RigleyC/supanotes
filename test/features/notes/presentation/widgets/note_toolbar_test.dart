@@ -1188,9 +1188,7 @@ void main() {
       expect(find.bySemanticsLabel('Opções de formatação'), findsNothing);
     });
 
-    testWidgets('format and list overlays keep compact vertical bounds', (
-      tester,
-    ) async {
+    testWidgets('format and list overlays fit their content', (tester) async {
       await tester.pumpWidget(
         buildEditorHarness(
           nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
@@ -1200,31 +1198,25 @@ void main() {
 
       await tester.tap(iconButtonWithIcon(Icons.text_format));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .getSize(
-              find.byWidgetPredicate(
-                (widget) => widget.runtimeType.toString() == '_FormattingMenu',
-              ),
-            )
-            .height,
-        lessThanOrEqualTo(44),
+      final formatSize = tester.getSize(
+        find.byWidgetPredicate(
+          (widget) => widget.runtimeType.toString() == '_FormattingMenu',
+        ),
       );
+      expect(formatSize.height, lessThanOrEqualTo(44));
+      expect(formatSize.width, lessThan(300));
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       await tester.tap(listPopoverFinder());
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .getSize(
-              find.byWidgetPredicate(
-                (widget) => widget.runtimeType.toString() == '_ListFormatMenu',
-              ),
-            )
-            .height,
-        lessThanOrEqualTo(44),
+      final listSize = tester.getSize(
+        find.byWidgetPredicate(
+          (widget) => widget.runtimeType.toString() == '_ListFormatMenu',
+        ),
       );
+      expect(listSize.height, lessThanOrEqualTo(44));
+      expect(listSize.width, lessThan(140));
     });
 
     testWidgets('focuses the editor and creates a new block at the end', (
@@ -1293,6 +1285,71 @@ void main() {
       expect(document.getNodeById('node-2'), isA<TaskNode>());
       expect(
         (newNode as ParagraphNode).getMetadataValue('blockType'),
+        header1Attribution,
+      );
+    });
+
+    testWidgets('does not reuse a cleared selection for a new block', (
+      tester,
+    ) async {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'node-1', text: AttributedText('Existing text')),
+          TaskNode(
+            id: 'node-2',
+            text: AttributedText('Final task'),
+            isComplete: false,
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: NoteToolbar(editor: editor, composer: composer),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      composer.clearSelection();
+      await tester.pump();
+      await tester.tap(iconButtonWithIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Título 1'));
+      await tester.pumpAndSettle();
+
+      expect(
+        (document.getNodeById('node-1') as ParagraphNode).getMetadataValue(
+          'blockType',
+        ),
+        isNot(header1Attribution),
+      );
+      expect(document.last.id, isNot('node-2'));
+      expect(document.last, isA<ParagraphNode>());
+      expect(
+        (document.last as ParagraphNode).getMetadataValue('blockType'),
         header1Attribution,
       );
     });

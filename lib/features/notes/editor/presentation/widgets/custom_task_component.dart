@@ -251,35 +251,30 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       childDocumentComponentKey.currentState as TextComposable;
 
   @override
-  Rect getRectForPosition(dynamic nodePosition) {
+  Rect getRectForPosition(NodePosition nodePosition) {
     if (_isHidden) return Rect.zero;
-    try {
-      if (!mounted) return Rect.zero;
-      final renderObj = _textKey.currentContext?.findRenderObject();
-      if (renderObj == null || !renderObj.attached) return Rect.zero;
-      return super.getRectForPosition(nodePosition);
-    } catch (_) {
-      return Rect.zero;
-    }
+    return super.getRectForPosition(nodePosition);
   }
 
   @override
-  Offset getOffsetForPosition(dynamic nodePosition) {
+  Offset getOffsetForPosition(NodePosition nodePosition) {
     if (_isHidden) return Offset.zero;
-    try {
-      if (!mounted) return Offset.zero;
-      final renderObj = _textKey.currentContext?.findRenderObject();
-      if (renderObj == null || !renderObj.attached) return Offset.zero;
-      return super.getOffsetForPosition(nodePosition);
-    } catch (_) {
-      return Offset.zero;
-    }
+    return super.getOffsetForPosition(nodePosition);
   }
 
   @override
   NodePosition? getPositionAtOffset(Offset localOffset) {
     if (_isHidden) return null;
     return super.getPositionAtOffset(localOffset);
+  }
+
+  @override
+  bool isVisualSelectionSupported() => !_isHidden;
+
+  @override
+  MouseCursor? getDesiredCursorAtOffset(Offset localOffset) {
+    if (_isHidden) return null;
+    return super.getDesiredCursorAtOffset(localOffset);
   }
 
   @override
@@ -383,9 +378,15 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       onAnimationComplete: _isAnimating
           ? () => setState(() => _isAnimating = false)
           : null,
-      child: IgnorePointer(
-        ignoring: _isHidden,
-        child: Padding(padding: const EdgeInsets.only(top: 14), child: content),
+      child: ExcludeSemantics(
+        excluding: _isHidden,
+        child: IgnorePointer(
+          ignoring: _isHidden,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: content,
+          ),
+        ),
       ),
     );
   }

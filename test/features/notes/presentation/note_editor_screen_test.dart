@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -420,6 +421,80 @@ void main() {
     );
   });
 
+  testWidgets('hideCompleted keeps the last task valid for desktop hover', (
+    tester,
+  ) async {
+    var hideCompleted = false;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserIdProvider.overrideWithValue('test-user'),
+          appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _createTestSession([
+              ParagraphNode(id: '1', text: AttributedText('texto visivel')),
+              TaskNode(
+                id: '2',
+                text: AttributedText('tarefa concluida'),
+                isComplete: true,
+              ),
+            ]),
+          ),
+        ],
+        child: MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                body: Column(
+                  children: [
+                    TextButton(
+                      onPressed: () => setState(() => hideCompleted = true),
+                      child: const Text('hide'),
+                    ),
+                    Expanded(
+                      child: NoteEditor(
+                        noteId: 'note-1',
+                        taskMetadata: const {},
+                        hideCompleted: hideCompleted,
+                        delegate: const NoteEditorDelegate(),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('hide'));
+    await tester.pumpAndSettle();
+
+    final documentLayout =
+        tester.state(find.byType(SingleColumnDocumentLayout)) as DocumentLayout;
+    final hiddenTask = documentLayout.getComponentByNodeId('2');
+    expect(hiddenTask, isNotNull);
+    expect(hiddenTask!.isVisualSelectionSupported(), isFalse);
+    expect(documentLayout.findLastSelectablePosition()?.nodeId, '1');
+    expect(
+      () => documentLayout.getDocumentPositionNearestToOffset(
+        const Offset(8, 5000),
+      ),
+      returnsNormally,
+    );
+
+    final editorRect = tester.getRect(find.byType(SuperEditor));
+    await tester.sendEventToBinding(
+      PointerHoverEvent(position: editorRect.bottomCenter),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('hideCompleted does not place the caret in hidden tasks', (
     tester,
   ) async {
@@ -580,7 +655,11 @@ void main() {
     await tester.tap(find.text('toggle hide'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AppTaskCheckbox), findsNothing);
+    expect(find.byType(AppTaskCheckbox), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(TaskExitAnimator).first).height,
+      equals(0.0),
+    );
     expect(find.byType(Placeholder), findsNothing);
     expect(
       find.byWidgetPredicate(

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
@@ -88,10 +89,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         localNotificationServiceProvider.overrideWithValue(
-          LocalNotificationService(
-            plugin: fakePlugin,
-            supportedPlatform: true,
-          ),
+          LocalNotificationService(plugin: fakePlugin, supportedPlatform: true),
         ),
         tasksLocalRepositoryProvider.overrideWithValue(mockTasksRepo),
         authControllerProvider.overrideWith(() => _MockAuthController()),
@@ -101,6 +99,27 @@ void main() {
 
   tearDown(() {
     container.dispose();
+  });
+
+  test('does not read the task repository while signed out', () async {
+    final signedOutContainer = ProviderContainer(
+      overrides: [
+        currentUserIdProvider.overrideWithValue(null),
+        tasksLocalRepositoryProvider.overrideWith((ref) {
+          throw StateError('repository must not be created while signed out');
+        }),
+      ],
+    );
+    addTearDown(signedOutContainer.dispose);
+
+    final subscription = signedOutContainer.listen(
+      openTasksStreamProvider,
+      (_, _) {},
+    );
+    addTearDown(subscription.close);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(signedOutContainer.read(openTasksStreamProvider).hasError, isFalse);
   });
 
   test('schedules notifications for tasks with due date', () async {
