@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
-import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
 import '../../../helpers/auth_interceptor_test_helper.dart';
 
