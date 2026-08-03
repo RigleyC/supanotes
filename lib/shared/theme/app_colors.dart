@@ -14,6 +14,17 @@ class AppColors {
   // ---------------------------------------------------------------------------
 
   static const Color joiBlue = Color(0xFF007AFF);
+  static const Color joiBlueDark = Color(0xFF0A84FF);
+  static const Color joiGreen = Color(0xFF34C759);
+  static const Color joiGreenDark = Color(0xFF30D158);
+  static const Color joiOrange = Color(0xFFFF9500);
+  static const Color joiOrangeDark = Color(0xFFFF9F0A);
+  static const Color joiRed = Color(0xFFFF3B30);
+  static const Color joiRedDark = Color(0xFFFF453A);
+  static const Color joiYellow = Color(0xFFFFCC00);
+  static const Color joiYellowDark = Color(0xFFFFD60A);
+  static const Color joiIndigo = Color(0xFF5856D6);
+  static const Color joiIndigoDark = Color(0xFF5E5CE6);
   static const Color primarySeed = joiBlue;
 
   // ---------------------------------------------------------------------------
@@ -27,6 +38,18 @@ class AppColors {
       ).copyWith(
         surface: const Color(0xFFFFFFFF),
         onSurface: const Color(0xFF0D0D0D),
+        primary: joiBlue,
+        onPrimary: const Color(0xFFFFFFFF),
+        primaryContainer: const Color(0xFFD9ECFF),
+        onPrimaryContainer: const Color(0xFF001A33),
+        secondary: joiIndigo,
+        onSecondary: const Color(0xFFFFFFFF),
+        tertiary: joiOrange,
+        onTertiary: const Color(0xFFFFFFFF),
+        error: joiRed,
+        onError: const Color(0xFFFFFFFF),
+        errorContainer: const Color(0xFFFFDAD6),
+        onErrorContainer: const Color(0xFF410002),
         surfaceContainerLowest: const Color(0xFFFFFFFF),
         surfaceContainerLow: const Color(0xFFF5F5F7),
         surfaceContainer: const Color(0xFFF2F2F7),
@@ -47,6 +70,18 @@ class AppColors {
       ).copyWith(
         surface: const Color(0xFF000000),
         onSurface: const Color(0xFFF5F5F7),
+        primary: joiBlueDark,
+        onPrimary: const Color(0xFFFFFFFF),
+        primaryContainer: const Color(0xFF004B76),
+        onPrimaryContainer: const Color(0xFFCCE5FF),
+        secondary: joiIndigoDark,
+        onSecondary: const Color(0xFFFFFFFF),
+        tertiary: joiOrangeDark,
+        onTertiary: const Color(0xFF321300),
+        error: joiRedDark,
+        onError: const Color(0xFFFFFFFF),
+        errorContainer: const Color(0xFF93000A),
+        onErrorContainer: const Color(0xFFFFDAD6),
         surfaceContainerLowest: const Color(0xFF000000),
         surfaceContainerLow: const Color(0xFF1C1C1E),
         surfaceContainer: const Color(0xFF2C2C2E),
@@ -61,19 +96,16 @@ class AppColors {
   // // communicate state, not surface ownership).
   // ---------------------------------------------------------------------------
 
-  static const Color success = Color(0xFF10B981);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color info = Color(0xFF3B82F6);
-  static const Color muted = Color(0xFF6B7280);
+  static const Color success = joiGreen;
+  static const Color warning = joiOrange;
+  static const Color info = joiBlue;
+  static const Color muted = Color(0xFF6E6E73);
 
   // ---------------------------------------------------------------------------
-  // Task accent — #7047EB (violet-purple used for all task-related UI).
+  // Task accent — Joi indigo used for task-related UI.
   // ---------------------------------------------------------------------------
 
-  /// The primary brand colour for tasks.
-  /// On dark surfaces this value is used directly; on light surfaces the
-  /// [AppSemanticColors.task] token provides a slightly adjusted variant.
-  static const Color taskAccent = Color(0xFF7047EB);
+  static const Color taskAccent = joiIndigo;
 }
 
 /// Semantic color tokens exposed as a [ThemeExtension] so they participate
@@ -141,24 +173,22 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   }
 
   static const light = AppSemanticColors(
-    success: Color(0xFF2E7D32),
-    warning: Color(0xFFF57F17),
-    info: Color(0xFF1976D2),
-    highlightBackground: Color(0xFFFFF59D),
-    highlightForeground: Color(0xFF1F1B16),
+    success: AppColors.joiGreen,
+    warning: AppColors.joiOrange,
+    info: AppColors.joiBlue,
+    highlightBackground: AppColors.joiYellow,
+    highlightForeground: Color(0xFF0D0D0D),
     overlay: Color(0x1A000000),
-    // Slightly darker purple to maintain contrast on light surfaces.
-    task: Color(0xFF5B2FD4),
+    task: AppColors.joiIndigo,
   );
 
   static const dark = AppSemanticColors(
-    success: Color(0xFF4CAF50),
-    warning: Color(0xFFFFB300),
-    info: Color(0xFF90CAF9),
-    highlightBackground: Color(0xFF3E2723),
-    highlightForeground: Color(0xFFFFF59D),
+    success: AppColors.joiGreenDark,
+    warning: AppColors.joiOrangeDark,
+    info: AppColors.joiBlueDark,
+    highlightBackground: Color(0xFF5C4300),
+    highlightForeground: AppColors.joiYellowDark,
     overlay: Color(0x33FFFFFF),
-    // Full brand purple on dark backgrounds — pops without feeling harsh.
-    task: Color(0xFF7047EB),
+    task: AppColors.joiIndigoDark,
   );
 }

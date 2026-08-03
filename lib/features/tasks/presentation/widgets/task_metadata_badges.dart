@@ -93,7 +93,8 @@ class TaskMetadataBadges extends StatelessWidget {
       if (hasTime && dueDate.isBefore(effectiveNow)) {
         return Theme.of(context).colorScheme.error;
       }
-      return AppColors.success;
+      return Theme.of(context).extension<AppSemanticColors>()?.success ??
+          AppColors.success;
     }
 
     return Theme.of(context).colorScheme.onSurfaceVariant;
