@@ -4,8 +4,7 @@ library;
 ///
 /// The toolbar delegates document mutations to [NoteEditorCommands]. It only
 /// projects the current composer selection into button state and owns the
-/// presentation of the two compact popovers.
-import 'dart:math' as math;
+/// compact and formatting presentations.
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -19,7 +18,6 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 
 part 'note_toolbar_button.dart';
 part 'note_toolbar_menus.dart';
-part 'note_toolbar_popover.dart';
 
 const noteEditorToolbarTapRegionGroup = Object();
 
@@ -128,18 +126,11 @@ class _NoteToolbarState extends State<NoteToolbar> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final selection = composer.selection;
-    final selectedNodes = _selectedNodes(selection);
-    final selectedListType = _selectedListType(selectedNodes);
-    final isListItem = selectedNodes.any((node) => node is ListItemNode);
-    final isTask =
-        selectedNodes.isNotEmpty &&
-        selectedNodes.every((node) => node is TaskNode);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bottomPadding = bottomInset > 0 ? 6.0 : 16.0;
     final formattingSelection = selection ?? _selectionForFormatting;
-    final formattingBlockType = _selectedBlockType(
-      _selectedNodes(formattingSelection),
-    );
+    final formattingNodes = _selectedNodes(formattingSelection);
+    final formattingBlockType = _selectedBlockType(formattingNodes);
     final modeAnimationDuration = MediaQuery.of(context).disableAnimations
         ? Duration.zero
         : const Duration(milliseconds: 240);
@@ -190,6 +181,10 @@ class _NoteToolbarState extends State<NoteToolbar> {
                       ? _FormattingToolbarPanel(
                           blockType: formattingBlockType,
                           selection: formattingSelection,
+                          activeListOption: _activeListOption(formattingNodes),
+                          isListItem: formattingNodes.any(
+                            (node) => node is ListItemNode,
+                          ),
                           isBold: _selectionHasAttribution(
                             formattingSelection,
                             boldAttribution,
@@ -211,6 +206,13 @@ class _NoteToolbarState extends State<NoteToolbar> {
                             attribution,
                             formattingSelection,
                           ),
+                          onListSelected: (option) => _onListFormatSelected(
+                            option,
+                            formattingSelection,
+                          ),
+                          onIndent: () => _indentListItem(formattingSelection),
+                          onUnindent: () =>
+                              _unindentListItem(formattingSelection),
                         )
                       : SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -222,44 +224,6 @@ class _NoteToolbarState extends State<NoteToolbar> {
                                 isActive: false,
                                 onPressed: _openFormatting,
                                 semanticLabel: 'Abrir formatação',
-                              ),
-                              const _ToolbarDivider(),
-                              _ToolbarListPopover(
-                                selectedListType: selectedListType,
-                                isTask: isTask,
-                                selection: selection,
-                                onSelected: _onListFormatSelected,
-                              ),
-                              ClipRect(
-                                child: AnimatedSize(
-                                  duration: const Duration(milliseconds: 220),
-                                  curve: Curves.easeOutCubic,
-                                  alignment: Alignment.centerLeft,
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 180),
-                                    opacity: isListItem ? 1.0 : 0.0,
-                                    curve: Curves.easeInOut,
-                                    child: isListItem
-                                        ? Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              _ToolbarButton(
-                                                icon: Icons
-                                                    .format_indent_increase,
-                                                isActive: false,
-                                                onPressed: _indentListItem,
-                                              ),
-                                              _ToolbarButton(
-                                                icon: Icons
-                                                    .format_indent_decrease,
-                                                isActive: false,
-                                                onPressed: _unindentListItem,
-                                              ),
-                                            ],
-                                          )
-                                        : const SizedBox.shrink(),
-                                  ),
-                                ),
                               ),
                               const _ToolbarDivider(),
                               _ToolbarButton(
@@ -323,6 +287,17 @@ class _NoteToolbarState extends State<NoteToolbar> {
         .map((node) => node.type)
         .toSet();
     return listTypes.length == 1 ? listTypes.single : null;
+  }
+
+  _ListFormatOption? _activeListOption(List<DocumentNode> nodes) {
+    if (nodes.isNotEmpty && nodes.every((node) => node is TaskNode)) {
+      return _ListFormatOption.checklist;
+    }
+    return switch (_selectedListType(nodes)) {
+      ListItemType.unordered => _ListFormatOption.bulleted,
+      ListItemType.ordered => _ListFormatOption.numbered,
+      null => null,
+    };
   }
 
   bool _selectionHasAttribution(
@@ -421,14 +396,14 @@ class _NoteToolbarState extends State<NoteToolbar> {
     }
   }
 
-  void _indentListItem() {
-    if (_prepareEditorAction(composer.selection) == null) return;
+  void _indentListItem(DocumentSelection? selection) {
+    if (_prepareEditorAction(selection) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.indentListItems(editor, composer);
   }
 
-  void _unindentListItem() {
-    if (_prepareEditorAction(composer.selection) == null) return;
+  void _unindentListItem(DocumentSelection? selection) {
+    if (_prepareEditorAction(selection) == null) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.unindentListItems(editor, composer);
   }

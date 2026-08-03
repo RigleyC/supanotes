@@ -62,15 +62,10 @@ Finder toolbarButtonWithSvgAsset(String asset) {
   );
 }
 
-Finder listPopoverFinder() {
-  return find.byWidgetPredicate(
-    (widget) => widget.runtimeType.toString() == '_ToolbarListPopover',
-  );
-}
-
 Future<void> openListMenu(WidgetTester tester) async {
-  await tester.tap(listPopoverFinder());
+  await tester.tap(find.bySemanticsLabel('Abrir formatação'));
   await tester.pumpAndSettle();
+  expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
   expect(find.bySemanticsLabel('Lista com marcadores'), findsOneWidget);
   expect(find.bySemanticsLabel('Lista numerada'), findsOneWidget);
   expect(find.bySemanticsLabel('Checklist'), findsOneWidget);
@@ -121,6 +116,33 @@ Widget buildConversionHarness({
 
 void main() {
   group('List menu trigger state', () {
+    testWidgets('shows list controls only inside formatting mode', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Lista com marcadores'), findsNothing);
+      expect(find.bySemanticsLabel('Lista numerada'), findsNothing);
+      expect(find.bySemanticsLabel('Checklist'), findsNothing);
+
+      await openListMenu(tester);
+
+      expect(find.bySemanticsLabel('Lista com marcadores'), findsOneWidget);
+      expect(find.bySemanticsLabel('Lista numerada'), findsOneWidget);
+      expect(find.bySemanticsLabel('Checklist'), findsOneWidget);
+    });
+
     testWidgets('is inactive when cursor is on a ParagraphNode', (
       tester,
     ) async {
@@ -137,11 +159,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final listPopover = listPopoverFinder();
-      expect(listPopover, findsOneWidget);
-
-      final button = tester.widget(listPopover);
-      expect((button as dynamic).isTask, isFalse);
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
       expect(
         (tester.widget(iconButtonWithIcon(Icons.format_list_bulleted))
                 as dynamic)
@@ -170,11 +189,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final listPopover = listPopoverFinder();
-      expect(listPopover, findsOneWidget);
-
-      final button = tester.widget(listPopover);
-      expect((button as dynamic).isTask, isTrue);
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
       expect(
         (tester.widget(toolbarButtonWithSvgAsset('assets/icons/checkbox.svg'))
                 as dynamic)
@@ -204,7 +220,7 @@ void main() {
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsLabel('Opções de lista'), findsNothing);
+      expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
     });
 
     testWidgets('dismisses with Escape', (tester) async {
@@ -225,7 +241,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsLabel('Opções de lista'), findsNothing);
+      expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
     });
 
     testWidgets('constrains the menu on a short viewport', (tester) async {
@@ -254,7 +270,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('applies the option to the selection captured on open', (
+    testWidgets('applies the option to the current selection while open', (
       tester,
     ) async {
       final document = MutableDocument(
@@ -311,8 +327,8 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Lista com marcadores'));
       await tester.pumpAndSettle();
 
-      expect(document.getNodeById('node-1'), isA<ListItemNode>());
-      expect(document.getNodeById('node-2'), isA<ParagraphNode>());
+      expect(document.getNodeById('node-1'), isA<ParagraphNode>());
+      expect(document.getNodeById('node-2'), isA<ListItemNode>());
     });
   });
 
@@ -847,6 +863,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openListMenu(tester);
       final numberedBtn = iconButtonWithIcon(Icons.format_list_numbered);
       expect(numberedBtn, findsOneWidget);
       final btnWidget = tester.widget(numberedBtn);
@@ -872,6 +889,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openListMenu(tester);
       final bulletedBtn = iconButtonWithIcon(Icons.format_list_bulleted);
       expect(bulletedBtn, findsOneWidget);
       final btnWidget = tester.widget(bulletedBtn);
@@ -896,6 +914,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openListMenu(tester);
       final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
       expect(indentBtn, findsOneWidget);
       expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
@@ -917,6 +936,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openListMenu(tester);
       final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
       expect(indentBtn, findsNothing);
     });
@@ -937,6 +957,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openListMenu(tester);
       final unindentBtn = iconButtonWithIcon(Icons.format_indent_decrease);
       expect(unindentBtn, findsOneWidget);
       expect((tester.widget(unindentBtn) as dynamic).onPressed, isNotNull);
@@ -958,6 +979,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openListMenu(tester);
       final unindentBtn = iconButtonWithIcon(Icons.format_indent_decrease);
       expect(unindentBtn, findsNothing);
     });
@@ -1007,6 +1029,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openListMenu(tester);
       final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
       expect(indentBtn, findsOneWidget);
       expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
@@ -1050,6 +1073,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        await openListMenu(tester);
         final listButton = iconButtonWithIcon(Icons.format_list_bulleted);
         expect((tester.widget(listButton) as dynamic).isActive, isFalse);
 
@@ -1326,10 +1350,6 @@ void main() {
       expect(formatSize.height, lessThanOrEqualTo(44));
       expect(formatSize.width, lessThan(300));
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      await tester.tap(listPopoverFinder());
-      await tester.pumpAndSettle();
       final listSize = tester.getSize(
         find.byWidgetPredicate(
           (widget) => widget.runtimeType.toString() == '_ListFormatMenu',
