@@ -5,7 +5,7 @@ class _ToolbarButton extends StatefulWidget {
     this.icon,
     this.svgAsset,
     this.semanticLabel,
-    this.compact = false,
+    this.spacious = false,
     required this.isActive,
     this.onPressed,
   }) : assert(
@@ -16,7 +16,7 @@ class _ToolbarButton extends StatefulWidget {
   final IconData? icon;
   final String? svgAsset;
   final String? semanticLabel;
-  final bool compact;
+  final bool spacious;
   final bool isActive;
   final VoidCallback? onPressed;
 
@@ -104,13 +104,13 @@ class _ToolbarButtonState extends State<_ToolbarButton>
         final icon = widget.icon != null
             ? Icon(
                 widget.icon,
-                size: widget.compact ? 22 : 26,
+                size: widget.spacious ? 28 : 26,
                 color: foreground,
               )
             : SvgPicture.asset(
                 widget.svgAsset!,
-                width: widget.compact ? 20 : 24,
-                height: widget.compact ? 20 : 24,
+                width: widget.spacious ? 26 : 24,
+                height: widget.spacious ? 26 : 24,
                 colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
               );
 
@@ -123,11 +123,11 @@ class _ToolbarButtonState extends State<_ToolbarButton>
             onTap: widget.onPressed,
             child: Container(
               constraints: BoxConstraints(
-                minWidth: widget.compact ? 32 : 36,
-                minHeight: widget.compact ? 32 : 36,
+                minWidth: widget.spacious ? 44 : 36,
+                minHeight: widget.spacious ? 44 : 36,
               ),
               alignment: Alignment.center,
-              padding: EdgeInsets.all(widget.compact ? 2 : AppSpacing.xs),
+              padding: EdgeInsets.all(AppSpacing.xs),
               decoration: BoxDecoration(
                 color: background,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusSm),

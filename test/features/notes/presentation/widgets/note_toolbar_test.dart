@@ -1347,15 +1347,15 @@ void main() {
           (widget) => widget.runtimeType.toString() == '_FormattingMenu',
         ),
       );
-      expect(formatSize.height, lessThanOrEqualTo(44));
-      expect(formatSize.width, lessThan(300));
+      expect(formatSize.height, lessThanOrEqualTo(48));
+      expect(formatSize.width, lessThan(360));
 
       final listSize = tester.getSize(
         find.byWidgetPredicate(
           (widget) => widget.runtimeType.toString() == '_ListFormatMenu',
         ),
       );
-      expect(listSize.height, lessThanOrEqualTo(44));
+      expect(listSize.height, lessThanOrEqualTo(48));
       expect(listSize.width, lessThan(140));
     });
 

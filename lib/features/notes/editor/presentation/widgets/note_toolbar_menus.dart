@@ -39,70 +39,78 @@ class _FormattingToolbarPanel extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       label: 'Painel de formatação',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Formatar',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Semantics(
-                button: true,
-                label: 'Fechar formatação',
-                child: _ToolbarButton(
-                  icon: Icons.close,
-                  isActive: false,
-                  onPressed: onClose,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: _FormattingMenu(
-              blockType: blockType,
-              hasSelection: !(selection?.isCollapsed ?? true),
-              isBold: isBold,
-              isItalic: isItalic,
-              isStrikethrough: isStrikethrough,
-              onBlockType: onBlockType,
-              onToggleInline: onToggleInline,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _ListFormatMenu(
-                activeOption: activeListOption,
-                onSelected: onListSelected,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Formatar',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: 'Fechar formatação',
+                    child: _ToolbarButton(
+                      icon: Icons.close,
+                      spacious: true,
+                      isActive: false,
+                      onPressed: onClose,
+                    ),
+                  ),
+                ],
               ),
-              if (isListItem) ...[
-                const _ToolbarDivider(),
-                _ToolbarButton(
-                  icon: Icons.format_indent_increase,
-                  isActive: false,
-                  onPressed: onIndent,
-                  semanticLabel: 'Aumentar recuo',
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: _FormattingMenu(
+                  blockType: blockType,
+                  hasSelection: !(selection?.isCollapsed ?? true),
+                  isBold: isBold,
+                  isItalic: isItalic,
+                  isStrikethrough: isStrikethrough,
+                  onBlockType: onBlockType,
+                  onToggleInline: onToggleInline,
                 ),
-                _ToolbarButton(
-                  icon: Icons.format_indent_decrease,
-                  isActive: false,
-                  onPressed: onUnindent,
-                  semanticLabel: 'Diminuir recuo',
-                ),
-              ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ListFormatMenu(
+                    activeOption: activeListOption,
+                    onSelected: onListSelected,
+                  ),
+                  if (isListItem) ...[
+                    const _ToolbarDivider(),
+                    _ToolbarButton(
+                      icon: Icons.format_indent_increase,
+                      isActive: false,
+                      onPressed: onIndent,
+                      semanticLabel: 'Aumentar recuo',
+                    ),
+                    _ToolbarButton(
+                      icon: Icons.format_indent_decrease,
+                      isActive: false,
+                      onPressed: onUnindent,
+                      semanticLabel: 'Diminuir recuo',
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -136,28 +144,28 @@ class _FormattingMenu extends StatelessWidget {
         children: [
           _ToolbarButton(
             svgAsset: 'assets/icons/h1_icon.svg',
-            compact: true,
+            spacious: true,
             isActive: blockType == header1Attribution,
             onPressed: () => onBlockType(header1Attribution),
             semanticLabel: 'Título 1',
           ),
           _ToolbarButton(
             svgAsset: 'assets/icons/h2_icon.svg',
-            compact: true,
+            spacious: true,
             isActive: blockType == header2Attribution,
             onPressed: () => onBlockType(header2Attribution),
             semanticLabel: 'Título 2',
           ),
           _ToolbarButton(
             svgAsset: 'assets/icons/h3_icon.svg',
-            compact: true,
+            spacious: true,
             isActive: blockType == header3Attribution,
             onPressed: () => onBlockType(header3Attribution),
             semanticLabel: 'Título 3',
           ),
           _ToolbarButton(
             icon: Icons.format_quote,
-            compact: true,
+            spacious: true,
             isActive: blockType == blockquoteAttribution,
             onPressed: () => onBlockType(blockquoteAttribution),
             semanticLabel: 'Citação',
@@ -165,7 +173,7 @@ class _FormattingMenu extends StatelessWidget {
           const _ToolbarDivider(),
           _ToolbarButton(
             icon: Icons.format_bold,
-            compact: true,
+            spacious: true,
             isActive: isBold,
             onPressed: hasSelection
                 ? () => onToggleInline(boldAttribution)
@@ -174,7 +182,7 @@ class _FormattingMenu extends StatelessWidget {
           ),
           _ToolbarButton(
             icon: Icons.format_italic,
-            compact: true,
+            spacious: true,
             isActive: isItalic,
             onPressed: hasSelection
                 ? () => onToggleInline(italicsAttribution)
@@ -183,7 +191,7 @@ class _FormattingMenu extends StatelessWidget {
           ),
           _ToolbarButton(
             icon: Icons.format_strikethrough,
-            compact: true,
+            spacious: true,
             isActive: isStrikethrough,
             onPressed: hasSelection
                 ? () => onToggleInline(strikethroughAttribution)
@@ -227,21 +235,21 @@ class _ListFormatMenu extends StatelessWidget {
         children: [
           _ToolbarButton(
             icon: Icons.format_list_bulleted,
-            compact: true,
+            spacious: true,
             isActive: activeOption == _ListFormatOption.bulleted,
             onPressed: () => onSelected(_ListFormatOption.bulleted),
             semanticLabel: 'Lista com marcadores',
           ),
           _ToolbarButton(
             icon: Icons.format_list_numbered,
-            compact: true,
+            spacious: true,
             isActive: activeOption == _ListFormatOption.numbered,
             onPressed: () => onSelected(_ListFormatOption.numbered),
             semanticLabel: 'Lista numerada',
           ),
           _ToolbarButton(
             svgAsset: 'assets/icons/checkbox.svg',
-            compact: true,
+            spacious: true,
             isActive: activeOption == _ListFormatOption.checklist,
             onPressed: () => onSelected(_ListFormatOption.checklist),
             semanticLabel: 'Checklist',
