@@ -24,10 +24,8 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    final fabBgColor = isDark ? Colors.white : Colors.black;
-    final fabFgColor = isDark ? Colors.black : Colors.white;
+    final fabBgColor = scheme.primary;
+    final fabFgColor = scheme.onPrimary;
 
     final Widget child;
     if (isLoading) {

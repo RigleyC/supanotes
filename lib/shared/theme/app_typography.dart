@@ -1,65 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Typographic scale for the SupaNotes design system.
+/// Global typography for SupaNotes.
 ///
-/// Built on top of [GoogleFonts.bricolageGrotesqueTextTheme] so every widget that
-/// picks up the theme renders in **Bricolage Grotesque**.
-///
-/// Sizes and weights follow the Material 3 type scale. Numeric values are
-/// exposed as `static const` so the [TextStyle] copies below stay free of
-/// magic numbers and can be tweaked in one place.
+/// Bricolage Grotesk is the app's intentional product font. Components may
+/// define local styles when their content needs a different treatment.
 class AppTypography {
   AppTypography._();
-
-  // ---------------------------------------------------------------------------
-  // Font family
-  // ---------------------------------------------------------------------------
 
   static String get fontFamily =>
       GoogleFonts.bricolageGrotesque().fontFamily ?? 'Bricolage Grotesque';
 
-  /// Monospace style for inline code and code blocks.
   static TextStyle get codeStyle => const TextStyle(
     fontFamily: 'monospace',
     fontFamilyFallback: ['Courier', 'monospace'],
   );
 
-  // ---------------------------------------------------------------------------
-  // Font sizes (Material 3 type scale, in logical pixels)
-  // ---------------------------------------------------------------------------
-
   static const double displayLargeSize = 57.0;
   static const double displayMediumSize = 45.0;
   static const double displaySmallSize = 36.0;
-
   static const double headlineLargeSize = 32.0;
   static const double headlineMediumSize = 28.0;
   static const double headlineSmallSize = 24.0;
-
   static const double titleLargeSize = 22.0;
   static const double titleMediumSize = 18.0;
   static const double titleSmallSize = 16.0;
-
   static const double bodyLargeSize = 16.0;
   static const double bodyMediumSize = 14.0;
   static const double bodySmallSize = 12.0;
-
   static const double labelLargeSize = 14.0;
   static const double labelMediumSize = 12.0;
   static const double labelSmallSize = 11.0;
 
-  // ---------------------------------------------------------------------------
-  // Font weights
-  // ---------------------------------------------------------------------------
-
   static const FontWeight regular = FontWeight.w400;
   static const FontWeight medium = FontWeight.w500;
   static const FontWeight semibold = FontWeight.w600;
-
-  // ---------------------------------------------------------------------------
-  // Letter spacing (Material 3 type scale)
-  // ---------------------------------------------------------------------------
 
   static const double displayLetterSpacing = -0.25;
   static const double headlineLetterSpacing = 0.0;
@@ -67,14 +42,6 @@ class AppTypography {
   static const double bodyLetterSpacing = 0.5;
   static const double labelLetterSpacing = 0.5;
 
-  // ---------------------------------------------------------------------------
-  // TextTheme
-  // ---------------------------------------------------------------------------
-
-  /// The base [TextTheme] used by both light and dark themes.
-  ///
-  /// Built from [GoogleFonts.interTextTheme] (so Inter is wired in) and then
-  /// tuned with the explicit sizes / weights above.
   static final TextTheme textTheme = _buildTextTheme();
 
   static TextTheme _buildTextTheme() {

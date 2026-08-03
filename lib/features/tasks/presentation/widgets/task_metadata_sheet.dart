@@ -39,9 +39,7 @@ Future<void> showTaskMetadataSheet({
       context: context,
       isDismissible: true,
       enableDrag: true,
-      contentBackgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF333333)
-          : Theme.of(context).colorScheme.surface,
+      contentBackgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       builder: (ctx) => TaskMetadataSheetBody(taskId: taskId),
     );
 

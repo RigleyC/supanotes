@@ -99,7 +99,7 @@ class _AppTaskCheckboxState extends State<AppTaskCheckbox>
               ),
               child: _CheckmarkPainter(
                 progress: _checkAnim.value,
-                color: Colors.white,
+                color: scheme.onPrimary,
               ),
             );
           },

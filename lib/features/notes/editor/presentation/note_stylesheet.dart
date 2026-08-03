@@ -10,6 +10,7 @@ Stylesheet noteStylesheet(
   bool isDesktop = false,
 }) {
   final colorScheme = Theme.of(context).colorScheme;
+  final linkColor = colorScheme.primary;
   final onSurface = colorScheme.onSurface;
   final onSurfaceVariant = colorScheme.onSurfaceVariant;
 
@@ -26,9 +27,9 @@ Stylesheet noteStylesheet(
         if (attribution is LinkAttribution &&
             attribution.launchableUri.scheme == 'note') {
           return existingStyle.copyWith(
-            color: Colors.white,
+            color: colorScheme.onPrimary,
             background: Paint()
-              ..color = const Color(0xFF7C3AED)
+              ..color = linkColor
               ..style = PaintingStyle.fill,
           );
         }
@@ -126,18 +127,15 @@ Stylesheet noteStylesheet(
       ),
       // Task block — padding is managed inside CustomTaskComponent so the
       // TaskExitAnimator can collapse it fully when hiding completed tasks.
-      StyleRule(
-        const BlockSelector('task'),
-        (doc, docNode) {
-          return {
-            Styles.textStyle: TextStyle(
-              color: onSurface,
-              fontSize: bodySize,
-              height: 1.4,
-            ),
-          };
-        },
-      ),
+      StyleRule(const BlockSelector('task'), (doc, docNode) {
+        return {
+          Styles.textStyle: TextStyle(
+            color: onSurface,
+            fontSize: bodySize,
+            height: 1.4,
+          ),
+        };
+      }),
       // Paragraph spacing.
       StyleRule(
         const BlockSelector('paragraph'),

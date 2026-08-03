@@ -2,16 +2,10 @@ import 'package:flutter/material.dart';
 
 /// Color palette for the SupaNotes design system.
 ///
-/// The Material 3 [ColorScheme] is derived from a single seed color via
-/// [ColorScheme.fromSeed] so the whole UI is tonally consistent. Semantic
-/// colors (success, warning, info, muted) are not part of the Material 3
-/// spec and are exposed as raw constants so feature code can reference them
-/// without rebuilding a custom [ColorScheme] extension.
+/// Small color palette based on the Joi colors identified in the research.
 ///
-/// **Seed choice**: `indigo-600` (#4F46E5, a deep violet-blue) — it reads as
-/// modern and professional in both light and dark mode, and it stays
-/// legible on white surfaces. It is the same family used by apps like
-/// Linear and Notion's accent.
+/// The neutral colors are explicit because they are surface tokens, not brand
+/// colors. This keeps the theme predictable in light and dark mode.
 class AppColors {
   AppColors._();
 
@@ -19,16 +13,28 @@ class AppColors {
   // Seed
   // ---------------------------------------------------------------------------
 
-  static const Color primarySeed = Color(0xFFAF52DE);
+  static const Color joiBlue = Color(0xFF007AFF);
+  static const Color primarySeed = joiBlue;
 
   // ---------------------------------------------------------------------------
   // Light scheme
   // ---------------------------------------------------------------------------
 
-  static final ColorScheme lightColorScheme = ColorScheme.fromSeed(
-    seedColor: primarySeed,
-    brightness: Brightness.light,
-  );
+  static final ColorScheme lightColorScheme =
+      ColorScheme.fromSeed(
+        seedColor: primarySeed,
+        brightness: Brightness.light,
+      ).copyWith(
+        surface: const Color(0xFFFFFFFF),
+        onSurface: const Color(0xFF0D0D0D),
+        surfaceContainerLowest: const Color(0xFFFFFFFF),
+        surfaceContainerLow: const Color(0xFFF5F5F7),
+        surfaceContainer: const Color(0xFFF2F2F7),
+        surfaceContainerHigh: const Color(0xFFFAFAFA),
+        surfaceContainerHighest: const Color(0xFFF2F2F7),
+        onSurfaceVariant: const Color(0xFF6E6E73),
+        outlineVariant: const Color(0xFFE5E5EA),
+      );
 
   // ---------------------------------------------------------------------------
   // Dark scheme
@@ -39,15 +45,15 @@ class AppColors {
         seedColor: primarySeed,
         brightness: Brightness.dark,
       ).copyWith(
-        // OLED-friendly true black surfaces so text is always visible.
         surface: const Color(0xFF000000),
-        onSurface: const Color(0xFFFFFFFF),
-        surfaceContainerLowest: const Color(0xFF0A0A0A),
-        surfaceContainerLow: const Color(0xFF111111),
-        surfaceContainer: const Color(0xFF1A1A1A),
-        surfaceContainerHigh: const Color(0xFF222222),
-        surfaceContainerHighest: const Color(0xFF2A2A2A),
-        onSurfaceVariant: const Color(0xFFCCCCCC),
+        onSurface: const Color(0xFFF5F5F7),
+        surfaceContainerLowest: const Color(0xFF000000),
+        surfaceContainerLow: const Color(0xFF1C1C1E),
+        surfaceContainer: const Color(0xFF2C2C2E),
+        surfaceContainerHigh: const Color(0xFF2C2C2E),
+        surfaceContainerHighest: const Color(0xFF2C2C2E),
+        onSurfaceVariant: const Color(0xFFAEAEB2),
+        outlineVariant: const Color(0xFF38383A),
       );
 
   // ---------------------------------------------------------------------------

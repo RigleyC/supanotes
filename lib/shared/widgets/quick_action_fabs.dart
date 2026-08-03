@@ -36,8 +36,9 @@ class QuickActionFabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? Colors.white : Colors.black;
+    final scheme = Theme.of(context).colorScheme;
+    final bgColor = scheme.primary;
+    final fgColor = scheme.onPrimary;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -53,10 +54,7 @@ class QuickActionFabs extends StatelessWidget {
             smallIcon,
             width: smallIconSize,
             height: smallIconSize,
-            colorFilter: ColorFilter.mode(
-              isDark ? Colors.black : Colors.white,
-              BlendMode.srcIn,
-            ),
+            colorFilter: ColorFilter.mode(fgColor, BlendMode.srcIn),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -71,10 +69,7 @@ class QuickActionFabs extends StatelessWidget {
             primaryIcon,
             width: primaryIconSize,
             height: primaryIconSize,
-            colorFilter: ColorFilter.mode(
-              isDark ? Colors.black : Colors.white,
-              BlendMode.srcIn,
-            ),
+            colorFilter: ColorFilter.mode(fgColor, BlendMode.srcIn),
           ),
         ),
       ],

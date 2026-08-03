@@ -36,10 +36,14 @@ class AppTheme {
   static final ThemeData darkTheme = buildTheme(Brightness.dark);
 
   /// Cached light Cupertino theme derived from the Material color scheme.
-  static final CupertinoThemeData cupertinoLightTheme = _buildCupertinoTheme(Brightness.light);
+  static final CupertinoThemeData cupertinoLightTheme = _buildCupertinoTheme(
+    Brightness.light,
+  );
 
   /// Cached dark Cupertino theme derived from the Material color scheme.
-  static final CupertinoThemeData cupertinoDarkTheme = _buildCupertinoTheme(Brightness.dark);
+  static final CupertinoThemeData cupertinoDarkTheme = _buildCupertinoTheme(
+    Brightness.dark,
+  );
 
   static CupertinoThemeData _buildCupertinoTheme(Brightness brightness) {
     final colorScheme = brightness == Brightness.light
@@ -51,9 +55,10 @@ class AppTheme {
       scaffoldBackgroundColor: colorScheme.surface,
       textTheme: CupertinoTextThemeData(
         primaryColor: colorScheme.onSurface,
-        textStyle: AppTypography.textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurface,
-        ) ??
+        textStyle:
+            AppTypography.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface,
+            ) ??
             const TextStyle(),
       ),
     );
@@ -118,12 +123,8 @@ class AppTheme {
         errorBorder: _buildInputBorder(
           InputBorderType.outline,
         ).copyWith(borderSide: BorderSide(color: colorScheme.error)),
-        labelStyle: AppTypography.textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-        ),
-        hintStyle: AppTypography.textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-        ),
+        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: colorScheme.surface,

@@ -531,7 +531,7 @@ class _SlashMenuCardState extends State<_SlashMenuCard> {
       elevation: 8,
       borderRadius: BorderRadius.circular(12),
       color: scheme.surfaceContainerHigh,
-      shadowColor: Colors.black26,
+      shadowColor: scheme.shadow.withValues(alpha: 0.26),
       child: Container(
         constraints: const BoxConstraints(maxHeight: 280, maxWidth: 260),
         width: 260,

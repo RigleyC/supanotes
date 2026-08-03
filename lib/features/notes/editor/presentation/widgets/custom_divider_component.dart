@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -89,7 +90,7 @@ class CustomDividerComponent extends StatelessWidget {
     super.key,
     required this.componentKey,
     this.dividerIndex,
-    this.selectionColor = Colors.blue,
+    this.selectionColor = AppColors.joiBlue,
     this.selection,
     required this.caretColor,
     this.showCaret = false,

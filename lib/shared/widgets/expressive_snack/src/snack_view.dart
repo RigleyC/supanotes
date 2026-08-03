@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:flutter/physics.dart';
 import 'package:motor/motor.dart';
 
@@ -207,18 +208,21 @@ class _Pill extends StatelessWidget {
   final Snack snack;
   final VoidCallback onTap;
 
-  Color _dotColor(ColorScheme cs) {
+  Color _dotColor(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantics = theme.extension<AppSemanticColors>();
     return switch (snack.icon) {
-      Icons.check_circle || Icons.task_alt => Colors.green,
-      Icons.error => Colors.red,
-      _ => cs.primary,
+      Icons.check_circle ||
+      Icons.task_alt => semantics?.success ?? AppColors.success,
+      Icons.error => theme.colorScheme.error,
+      _ => theme.colorScheme.primary,
     };
   }
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final Color dotColor = _dotColor(cs);
+    final Color dotColor = _dotColor(context);
 
     return Material(
       color: cs.surfaceContainerHighest,

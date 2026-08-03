@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
-import 'package:supanotes/shared/theme/app_typography.dart';
 
 void main() {
   setUpAll(() {
@@ -15,19 +14,18 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
-  // AppTheme's static caches evaluate `AppTypography.textTheme` which calls
-  // into `google_fonts`. In a unit-test environment the font download fails
-  // and the resulting unhandled async error is rethrown into the test
-  // runner. We run each test inside `runZonedGuarded` so the framework
-  // treats those background failures as swallowed and only reports the
-  // assertions that actually run inside the test body.
+  // The theme is cached statically, so each assertion runs in a guarded zone
+  // to keep framework-level errors isolated from the test under evaluation.
   Future<void> runGuarded(FutureOr<void> Function() body) async {
     final errors = <Object>[];
-    await runZonedGuarded(() async {
-      await body();
-    }, (error, stack) {
-      errors.add(error);
-    });
+    await runZonedGuarded(
+      () async {
+        await body();
+      },
+      (error, stack) {
+        errors.add(error);
+      },
+    );
   }
 
   group('AppTheme', () {
@@ -58,19 +56,6 @@ void main() {
         expect(
           AppTheme.darkTheme.colorScheme.primary,
           AppColors.darkColorScheme.primary,
-        );
-      });
-    });
-
-    test('both themes apply the design-system text theme', () async {
-      await runGuarded(() {
-        expect(
-          AppTheme.lightTheme.textTheme.bodyLarge?.fontSize,
-          AppTypography.bodyLargeSize,
-        );
-        expect(
-          AppTheme.darkTheme.textTheme.titleLarge?.fontSize,
-          AppTypography.titleLargeSize,
         );
       });
     });
@@ -117,24 +102,29 @@ void main() {
       });
     });
 
-    test('buildTheme returns a new instance on each call (factory semantics)', () async {
-      await runGuarded(() {
-        final fromCache = AppTheme.lightTheme;
-        final fromFactory = AppTheme.buildTheme(Brightness.light);
-        expect(identical(fromCache, fromFactory), isFalse);
-      });
-    });
+    test(
+      'buildTheme returns a new instance on each call (factory semantics)',
+      () async {
+        await runGuarded(() {
+          final fromCache = AppTheme.lightTheme;
+          final fromFactory = AppTheme.buildTheme(Brightness.light);
+          expect(identical(fromCache, fromFactory), isFalse);
+        });
+      },
+    );
 
-    test('text selection theme follows the primary color in both modes',
-        () async {
-      await runGuarded(() {
-        for (final theme in [AppTheme.lightTheme, AppTheme.darkTheme]) {
-          final sel = theme.textSelectionTheme;
-          expect(sel.cursorColor, theme.colorScheme.primary);
-          expect(sel.selectionHandleColor, theme.colorScheme.primary);
-          expect(sel.selectionColor, isNotNull);
-        }
-      });
-    });
+    test(
+      'text selection theme follows the primary color in both modes',
+      () async {
+        await runGuarded(() {
+          for (final theme in [AppTheme.lightTheme, AppTheme.darkTheme]) {
+            final sel = theme.textSelectionTheme;
+            expect(sel.cursorColor, theme.colorScheme.primary);
+            expect(sel.selectionHandleColor, theme.colorScheme.primary);
+            expect(sel.selectionColor, isNotNull);
+          }
+        });
+      },
+    );
   });
 }

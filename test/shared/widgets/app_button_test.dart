@@ -24,7 +24,7 @@ void main() {
       expect(find.byIcon(Icons.add), findsOneWidget);
     });
 
-    testWidgets('AppButtonVariant.fab uses black background in light theme', (
+    testWidgets('AppButtonVariant.fab uses the light theme action colors', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -43,11 +43,12 @@ void main() {
       final fab = tester.widget<FloatingActionButton>(
         find.byType(FloatingActionButton),
       );
-      expect(fab.backgroundColor, Colors.black);
-      expect(fab.foregroundColor, Colors.white);
+      final scheme = ThemeData.light().colorScheme;
+      expect(fab.backgroundColor, scheme.primary);
+      expect(fab.foregroundColor, scheme.onPrimary);
     });
 
-    testWidgets('AppButtonVariant.fab uses white background in dark theme', (
+    testWidgets('AppButtonVariant.fab uses the dark theme action colors', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -66,8 +67,9 @@ void main() {
       final fab = tester.widget<FloatingActionButton>(
         find.byType(FloatingActionButton),
       );
-      expect(fab.backgroundColor, Colors.white);
-      expect(fab.foregroundColor, Colors.black);
+      final scheme = ThemeData.dark().colorScheme;
+      expect(fab.backgroundColor, scheme.primary);
+      expect(fab.foregroundColor, scheme.onPrimary);
     });
   });
 }
