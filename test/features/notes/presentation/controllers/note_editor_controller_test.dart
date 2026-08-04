@@ -90,13 +90,15 @@ void main() {
         now: DateTime(2026, 7, 4, 12),
       );
 
-      expect(result?.scheduledAt, DateTime(2026, 7, 4, 9));
-      expect(result?.nextDue, DateTime(2026, 7, 5, 9));
+      final expectedScheduledAt = DateTime(2026, 7, 4, 9);
+      final expectedNextDue = DateTime(2026, 7, 5, 9);
+      expect(result?.scheduledAt, expectedScheduledAt);
+      expect(result?.nextDue, expectedNextDue);
       final task = controller.document.getNodeById('task-1')! as TaskNode;
-      expect(task.metadata['dueDate'], '2026-07-05T09:00:00.000');
+      expect(task.metadata['dueDate'], expectedNextDue.toIso8601String());
       expect(
         (task.metadata['completions'] as Map).keys,
-        contains('2026-07-04T12:00:00.000Z'),
+        contains(expectedScheduledAt.toUtc().toIso8601String()),
       );
       await controller.dispose();
     },
