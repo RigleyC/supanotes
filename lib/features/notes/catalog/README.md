@@ -11,7 +11,10 @@ busca e hidratação remota.
 - `data/local/notes_local_repository.dart`: chamadas de baixo nível ao DAO,
   sempre limitadas ao usuário autenticado.
 - `data/note_catalog_sync.dart`: baixa snapshots das notas que não estão com
-  uma sessão de editor ativa e chama a projeção de tarefas.
+  uma sessão de editor ativa, calcula `content`, `excerpt` e tarefas com
+  `NoteDocumentProjector` e usa `AppDatabase.saveRemoteNote` para persistir a
+  linha do catálogo, o snapshot e as projeções na mesma transação. Uma edição
+  local, exclusão ou versão concorrente faz a hidratação remota ser ignorada.
 - `model/`: `NoteModel`, `NoteWithTasks` e textos compartilhados do catálogo.
 - `application/notes_providers.dart`: streams reativos para lista e detalhe.
 - `presentation/`: shell desktop, lista e widgets de cartão/barra lateral.
@@ -26,5 +29,7 @@ um tombstone para uma nota que já existia no servidor.
 
 - Abrir uma nota navega para o [editor](../editor/README.md).
 - `NoteCatalogSync` respeita `NoteSessionActivityTracker`: nunca deve
-  sobrescrever uma nota enquanto uma sessão local está editando-a.
+  sobrescrever uma nota enquanto uma sessão local está editando-a. A gravação
+  remota também usa uma comparação de versão para proteger uma edição feita
+  enquanto a requisição estava em andamento.
 - Tarefas para a lista são leitura da projeção em [tasks](../../tasks/README.md).

@@ -5,9 +5,12 @@ relacional para consultas e UI, sem tomar posse da escrita canônica.
 
 ## Camadas
 
-- `domain/task_projection_engine.dart`: recebe o documento/snapshot e grava
-  `tasks` e `task_completions` na mesma transação. É o único caminho para
-  atualizar conteúdo/metadados de tarefas vindo do editor.
+- `domain/note_document_projector.dart`: calcula `content`, `excerpt` e tarefas
+  a partir do snapshot REST/OT sem conhecer banco ou ciclo de vida do editor.
+- `domain/task_projection_engine.dart`: recebe o documento/snapshot, delega o
+  cálculo ao `NoteDocumentProjector` e grava `tasks` e `task_completions` na
+  mesma transação. É a fronteira de persistência para alterações vindas do
+  editor; a hidratação remota do catálogo usa `AppDatabase.saveRemoteNote`.
 - `domain/task_occurrence.dart` e `task_recurrence.dart`: calculam ocorrências
   de recorrência. Conclusões são eventos por ocorrência, não deslocamentos do
   template.

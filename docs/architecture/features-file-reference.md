@@ -17,7 +17,8 @@
 | --- | --- | --- |
 | `tasks/domain/task_model.dart` | `TaskModel` | Modelo de leitura da projeção; não é o bloco canônico. |
 | `tasks/domain/projected_task.dart` | `ProjectedTask` | Resultado intermediário do parser de blocos antes da escrita transacional. |
-| `tasks/domain/task_projection_engine.dart` | `TaskProjectionEngine` | `projectTasksFromDocument`/`projectTasksFromSnapshot` calculam tarefas e completions; `saveProjectedDocument` mantém snapshot + projeção atômicos. |
+| `tasks/domain/note_document_projector.dart` | `NoteDocumentProjector` | Calcula `content`, `excerpt` e tarefas de blocos/snapshot REST/OT sem banco ou ciclo de vida do editor. |
+| `tasks/domain/task_projection_engine.dart` | `TaskProjectionEngine` | `projectTasksFromDocument`/`projectTasksFromSnapshot` delegam o cálculo ao projector e persistem tarefas/projeções; `saveProjectedDocument` mantém snapshot + projeção do editor atômicos. A hidratação remota usa `AppDatabase.saveRemoteNote`. |
 | `tasks/domain/task_occurrence.dart` | `TaskOccurrence` | `buildOccurrences` transforma regra de recorrência em estados pending/overdue/completed sem criar uma task por período. |
 | `tasks/domain/task_recurrence.dart` | `TaskRecurrence` | Faz parse e cálculo de próxima ocorrência; concentra bordas de calendário. |
 | `tasks/domain/task_completion_command.dart` | `TaskCompletionCommand` | Resultado e snapshot para completar/reabrir; mantém undo com a ocorrência correta. |

@@ -17,7 +17,8 @@ reativas da UI. Ele não substitui a fonte de verdade remota do documento.
 - `AppDatabase` é a única porta de migração e transação entre tabelas.
 - Cada DAO encapsula consultas de uma tabela ou de um agregado de leitura.
 - `TaskProjectionEngine` é o escritor de `tasks` para alterações que vêm do
-  editor. Não adicione uma escrita direta da UI para “resolver rápido”.
+  editor. A hidratação remota do catálogo usa `AppDatabase.saveRemoteNote`;
+  não adicione uma escrita direta da UI para “resolver rápido”.
 - A outbox usa operações ordenadas e revisão-base; não apague ou reordene
   operações fora de `NoteOperationsSyncService`.
 
@@ -29,10 +30,18 @@ reativas da UI. Ele não substitui a fonte de verdade remota do documento.
 ## Classes e métodos que definem a fronteira
 
 - `AppDatabase.clearAllData`: limpa dados no logout; `saveProjectedDocument`
-  coordena snapshot e projeções na mesma transação.
+  coordena snapshot e projeções do editor na mesma transação; `saveRemoteNote`
+  coordena linha do catálogo, snapshot, conteúdo e tarefas durante hidratação
+  remota.
+- `saveRemoteNote` aceita `InsertRemoteNote` ou `UpdateRemoteNote` com a
+  versão esperada. A atualização falha sem escrever o agregado quando a linha
+  foi alterada, ficou suja, foi excluída ou deixou de existir.
 - `NotesDao.watchAllActiveNotes`, `watchNoteById` e `watchNoteWithTasks` são
   consultas reativas usadas pelo catálogo; `createNote`, `updateNote` e
-  `softDeleteNote` implementam o ciclo de vida local.
+  `softDeleteNote` implementam o ciclo de vida local. `updateRemoteNoteIfUnchanged`
+  protege a hidratação remota por comparação de versão e
+  `updateRemoteShareMetadata` centraliza a atualização de metadados de
+  compartilhamento.
 - `NoteOperationsDao` mantém snapshot confirmado, operações pendentes,
   `in_flight`, sessão persistida, erros e transações. Seus métodos
   `markInFlight`, `replacePendingOps`, `deleteAccepted` e `runInTransaction`
