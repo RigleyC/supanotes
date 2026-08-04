@@ -253,7 +253,7 @@ void main() {
           'shared_by_name': 'Owner',
           'created_at': '2026-07-31T12:00:00.000Z',
           'updated_at': '2026-07-31T12:00:00.000Z',
-          'collapse_images': false,
+          'collapse_images': true,
         },
       ],
     );
@@ -295,10 +295,167 @@ void main() {
     expect(note.excerpt, 'Shared\nReview offline behavior');
     expect(note.sharedByEmail, 'owner@example.com');
     expect(note.sharedByName, 'Owner');
+    final query = await database.notesDao.getNoteWithPrefsById(
+      'shared-view-note',
+      'viewer-user',
+    );
+    expect(query!.title, 'Shared');
+    expect(query.note.collapseImages, isTrue);
     final tasks = await database.tasksDao.getNoteTasks('shared-view-note');
     expect(tasks, hasLength(1));
     expect(tasks.single.title, 'Review offline behavior');
+    final document =
+        await (database.select(database.localNoteDocuments)
+              ..where((document) => document.noteId.equals('shared-view-note')))
+            .getSingle();
+    expect(document.revision, 2);
   });
+
+  test(
+    'does not replace a local edit made while the remote document loads',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: NoteSessionActivityTracker(),
+      );
+      addTearDown(database.close);
+
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'race-note',
+          userId: 'user-a',
+          content: 'Old content',
+          createdAt: DateTime.utc(2026, 7, 31),
+          updatedAt: DateTime.utc(2026, 7, 31),
+          isDirty: const Value(false),
+          hasRemoteCopy: const Value(true),
+        ),
+      );
+      await database.noteOperationsDao.upsertNoteDocument(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: 'race-note',
+          revision: 1,
+          documentJson: '{"blocks":[]}',
+          updatedAt: DateTime.utc(2026, 7, 31),
+        ),
+      );
+
+      when(() => client.listNotes()).thenAnswer(
+        (_) async => [
+          {
+            'id': 'race-note',
+            'user_id': 'user-a',
+            'created_at': '2026-07-31T12:00:00.000Z',
+            'updated_at': '2026-08-03T13:00:00.000Z',
+            'collapse_images': false,
+          },
+        ],
+      );
+      when(() => client.getDocument('race-note')).thenAnswer((_) async {
+        await (database.update(
+          database.notes,
+        )..where((note) => note.id.equals('race-note'))).write(
+          NotesCompanion(
+            content: const Value('Offline edit'),
+            updatedAt: Value(DateTime.utc(2026, 8, 3, 12)),
+            isDirty: const Value(true),
+          ),
+        );
+        return NoteDocumentResponse(
+          noteId: 'race-note',
+          revision: 2,
+          document: const {
+            'blocks': [
+              {
+                'id': 'remote-block',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'Remote replacement'},
+                ],
+              },
+            ],
+          },
+          serverTime: DateTime.utc(2026, 8, 3, 13),
+        );
+      });
+
+      await sync.pullRemoteNotes('user-a');
+
+      final note = await database.notesDao.getNoteById('race-note');
+      expect(note!.content, 'Offline edit');
+      expect(note.isDirty, isTrue);
+      final document = await (database.select(
+        database.localNoteDocuments,
+      )..where((document) => document.noteId.equals('race-note'))).getSingle();
+      expect(document.revision, 1);
+    },
+  );
+
+  test(
+    'does not hydrate a note that becomes active while the document loads',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final activityTracker = NoteSessionActivityTracker();
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: activityTracker,
+      );
+      addTearDown(database.close);
+
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'active-during-load',
+          userId: 'user-a',
+          content: 'Keep this content',
+          createdAt: DateTime.utc(2026, 7, 31),
+          updatedAt: DateTime.utc(2026, 7, 31),
+          isDirty: const Value(false),
+          hasRemoteCopy: const Value(true),
+        ),
+      );
+      when(() => client.listNotes()).thenAnswer(
+        (_) async => [
+          {
+            'id': 'active-during-load',
+            'user_id': 'user-a',
+            'created_at': '2026-07-31T12:00:00.000Z',
+            'updated_at': '2026-08-03T13:00:00.000Z',
+          },
+        ],
+      );
+      when(() => client.getDocument('active-during-load')).thenAnswer((
+        _,
+      ) async {
+        activityTracker.markActive('active-during-load');
+        return NoteDocumentResponse(
+          noteId: 'active-during-load',
+          revision: 2,
+          document: const {
+            'blocks': [
+              {
+                'id': 'remote-block',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'Must not replace active content'},
+                ],
+              },
+            ],
+          },
+          serverTime: DateTime.utc(2026, 8, 3, 13),
+        );
+      });
+
+      await sync.pullRemoteNotes('user-a');
+
+      final note = await database.notesDao.getNoteById('active-during-load');
+      expect(note!.content, 'Keep this content');
+    },
+  );
 
   test(
     'reopens the hydrated note from local storage without network access',

@@ -31,6 +31,20 @@ import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNam
 
 part 'database.g.dart';
 
+sealed class RemoteNoteWriteMode {
+  const RemoteNoteWriteMode();
+}
+
+final class InsertRemoteNote extends RemoteNoteWriteMode {
+  const InsertRemoteNote();
+}
+
+final class UpdateRemoteNote extends RemoteNoteWriteMode {
+  const UpdateRemoteNote({required this.expectedUpdatedAt});
+
+  final DateTime expectedUpdatedAt;
+}
+
 @DriftDatabase(
   tables: [
     Notes,
@@ -139,25 +153,48 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Saves a remote note's canonical snapshot and every local projection atomically.
-  Future<void> saveRemoteNote({
-    required bool insertNote,
+  /// [mode] describes whether the catalog observed a new note or a clean
+  /// existing row. Returns `false` when a local edit or a concurrent deletion
+  /// changed the row after the catalog read. In that case no part of the
+  /// remote aggregate is written.
+  Future<bool> saveRemoteNote({
+    required String noteId,
+    required RemoteNoteWriteMode mode,
     required NotesCompanion note,
     required LocalNoteDocumentsCompanion document,
     required List<ProjectedTask> tasks,
     String userId = '',
   }) {
     return transaction(() async {
-      await noteOperationsDao.upsertNoteDocument(document);
-      if (insertNote) {
-        await notesDao.createNote(note);
-      } else {
-        await notesDao.updateNote(note);
+      if (!note.id.present || note.id.value != noteId) {
+        throw ArgumentError('Remote note companion id must match noteId');
       }
+      if (!document.noteId.present || document.noteId.value != noteId) {
+        throw ArgumentError('Remote document noteId must match noteId');
+      }
+
+      if (mode is InsertRemoteNote) {
+        if (await notesDao.getNoteById(noteId) != null) return false;
+        await notesDao.createNote(note);
+      } else if (mode is UpdateRemoteNote) {
+        if (!await notesDao.updateRemoteNoteIfUnchanged(
+          id: noteId,
+          expectedUpdatedAt: mode.expectedUpdatedAt,
+          note: note,
+        )) {
+          return false;
+        }
+      } else {
+        throw StateError('Unsupported remote note write mode');
+      }
+
+      await noteOperationsDao.upsertNoteDocument(document);
       await tasksDao.syncProjectedTasksForNoteTyped(
-        note.id.value,
+        noteId,
         tasks,
         userId: userId,
       );
+      return true;
     });
   }
 

@@ -7,7 +7,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/data/note_sync_client.dart';
 import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
-import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
+import 'package:supanotes/features/tasks/domain/note_document_projector.dart';
 
 class NoteCatalogSync {
   static const _pageSize = 100;
@@ -19,12 +19,12 @@ class NoteCatalogSync {
   }) : _syncClient = syncClient,
        _database = database,
        _activityTracker = activityTracker,
-       _taskProjectionEngine = TaskProjectionEngine(database: database);
+       _documentProjector = const NoteDocumentProjector();
 
   final NoteSyncClient _syncClient;
   final AppDatabase _database;
   final NoteSessionActivityTracker _activityTracker;
-  final TaskProjectionEngine _taskProjectionEngine;
+  final NoteDocumentProjector _documentProjector;
 
   Future<void> pushDeletedNotes() async {
     final localOnlyDeletedNotes = await _database.notesDao
@@ -129,14 +129,17 @@ class NoteCatalogSync {
 
     if (_activityTracker.isActive(id)) {
       if (existing != null && hasShareMetadata) {
-        await (_database.update(
-          _database.notes,
-        )..where((note) => note.id.equals(id))).write(
-          NotesCompanion(
-            permission: Value(permission),
-            sharedByEmail: Value(sharedByEmail),
-            sharedByName: Value(sharedByName),
-          ),
+        await _database.notesDao.updateRemoteShareMetadata(
+          id: id,
+          permission: json.containsKey('permission')
+              ? Value(permission)
+              : const Value.absent(),
+          sharedByEmail: json.containsKey('shared_by_email')
+              ? Value(sharedByEmail)
+              : const Value.absent(),
+          sharedByName: json.containsKey('shared_by_name')
+              ? Value(sharedByName)
+              : const Value.absent(),
         );
       }
       dev.log('[NoteCatalogSync] Skipping active note content $id');
@@ -158,7 +161,17 @@ class NoteCatalogSync {
     }
 
     final remote = await _syncClient.getDocument(id);
-    final projection = _taskProjectionEngine.projectBlocks(
+    if (remote.noteId != id) {
+      throw StateError(
+        'Remote document id ${remote.noteId} does not match catalog id $id',
+      );
+    }
+    if (_activityTracker.isActive(id)) {
+      dev.log('[NoteCatalogSync] Note became active during hydration $id');
+      return;
+    }
+
+    final projection = _documentProjector.projectBlocks(
       noteId: id,
       blocks: remote.document['blocks'] as List<dynamic>? ?? [],
     );
@@ -168,59 +181,42 @@ class NoteCatalogSync {
       documentJson: jsonEncode(remote.document),
       updatedAt: remote.serverTime,
     );
-    if (existing == null) {
-      final ownerUserId = json['user_id'] as String? ?? userId;
-      await _database.saveRemoteNote(
-        insertNote: true,
-        document: document,
-        tasks: projection.tasks,
-        userId: userId,
-        note: NotesCompanion.insert(
-          id: id,
-          userId: ownerUserId,
-          content: projection.content,
-          excerpt: Value(projection.excerpt),
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-          isDirty: const Value(false),
-          hasRemoteCopy: const Value(true),
-          collapseImages: json.containsKey('collapse_images')
-              ? Value(json['collapse_images'] as bool? ?? false)
-              : const Value.absent(),
-          permission: Value(permission),
-          sharedByEmail: Value(sharedByEmail),
-          sharedByName: Value(sharedByName),
-        ),
-      );
-    } else {
-      final metadata = hasShareMetadata
-          ? NotesCompanion(
-              permission: Value(permission),
-              sharedByEmail: Value(sharedByEmail),
-              sharedByName: Value(sharedByName),
-            )
-          : const NotesCompanion();
-      await _database.saveRemoteNote(
-        insertNote: false,
-        document: document,
-        tasks: projection.tasks,
-        userId: userId,
-        note: NotesCompanion(
-          id: Value(id),
-          content: Value(projection.content),
-          excerpt: Value(projection.excerpt),
-          createdAt: Value(createdAt),
-          updatedAt: Value(updatedAt),
-          isDirty: const Value(false),
-          hasRemoteCopy: const Value(true),
-          collapseImages: json.containsKey('collapse_images')
-              ? Value(json['collapse_images'] as bool? ?? false)
-              : const Value.absent(),
-          permission: metadata.permission,
-          sharedByEmail: metadata.sharedByEmail,
-          sharedByName: metadata.sharedByName,
-        ),
-      );
+    final ownerUserId =
+        existing?.userId ?? json['user_id'] as String? ?? userId;
+    final applied = await _database.saveRemoteNote(
+      noteId: id,
+      mode: existing == null
+          ? const InsertRemoteNote()
+          : UpdateRemoteNote(expectedUpdatedAt: existing.updatedAt),
+      document: document,
+      tasks: projection.tasks,
+      userId: userId,
+      note: NotesCompanion(
+        id: Value(id),
+        userId: Value(ownerUserId),
+        content: Value(projection.content),
+        excerpt: Value(projection.excerpt),
+        createdAt: Value(createdAt),
+        updatedAt: Value(updatedAt),
+        isDirty: const Value(false),
+        hasRemoteCopy: const Value(true),
+        collapseImages: json.containsKey('collapse_images')
+            ? Value(json['collapse_images'] as bool? ?? false)
+            : const Value.absent(),
+        permission: json.containsKey('permission')
+            ? Value(permission)
+            : const Value.absent(),
+        sharedByEmail: json.containsKey('shared_by_email')
+            ? Value(sharedByEmail)
+            : const Value.absent(),
+        sharedByName: json.containsKey('shared_by_name')
+            ? Value(sharedByName)
+            : const Value.absent(),
+      ),
+    );
+    if (!applied) {
+      dev.log('[NoteCatalogSync] Skipped stale remote hydration $id');
+      return;
     }
     dev.log('[NoteCatalogSync] Hydrated $id from remote snapshot');
   }

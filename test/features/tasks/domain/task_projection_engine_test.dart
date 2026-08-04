@@ -253,7 +253,8 @@ void main() {
 
       await expectLater(
         failingDb.saveRemoteNote(
-          insertNote: true,
+          noteId: noteId,
+          mode: const InsertRemoteNote(),
           document: document,
           tasks: const [],
           note: NotesCompanion.insert(
@@ -281,4 +282,42 @@ void main() {
       await failingDb.close();
     }
   });
+
+  test(
+    'does not publish a remote aggregate when the expected note is gone',
+    () async {
+      const noteId = 'missing-remote-note';
+      final document = LocalNoteDocumentsCompanion.insert(
+        noteId: noteId,
+        revision: 4,
+        documentJson: '{"blocks":[]}',
+        updatedAt: DateTime.utc(2026, 8, 3),
+      );
+
+      final applied = await db.saveRemoteNote(
+        noteId: noteId,
+        mode: UpdateRemoteNote(expectedUpdatedAt: DateTime.utc(2026, 8, 2)),
+        document: document,
+        tasks: const [],
+        note: NotesCompanion.insert(
+          id: noteId,
+          userId: 'user-1',
+          content: 'Must not be published',
+          createdAt: DateTime.utc(2026, 8, 2),
+          updatedAt: DateTime.utc(2026, 8, 3),
+          isDirty: const Value(false),
+          hasRemoteCopy: const Value(true),
+        ),
+      );
+
+      expect(applied, isFalse);
+      expect(await db.notesDao.getNoteById(noteId), isNull);
+      expect(
+        await (db.select(
+          db.localNoteDocuments,
+        )..where((document) => document.noteId.equals(noteId))).get(),
+        isEmpty,
+      );
+    },
+  );
 }

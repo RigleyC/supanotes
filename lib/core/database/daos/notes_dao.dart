@@ -254,6 +254,43 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     await (update(notes)..where((t) => t.id.equals(note.id.value))).write(note);
   }
 
+  /// Applies a remote snapshot only when the clean local row still has the
+  /// version observed before the network request started.
+  Future<bool> updateRemoteNoteIfUnchanged({
+    required String id,
+    required DateTime expectedUpdatedAt,
+    required NotesCompanion note,
+  }) async {
+    final updatedRows =
+        await (update(notes)..where(
+              (t) =>
+                  t.id.equals(id) &
+                  t.deletedAt.isNull() &
+                  t.isDirty.equals(false) &
+                  t.updatedAt.equals(expectedUpdatedAt),
+            ))
+            .write(note);
+    return updatedRows == 1;
+  }
+
+  /// Updates only the share metadata present in the remote catalog response.
+  Future<bool> updateRemoteShareMetadata({
+    required String id,
+    Value<String?> permission = const Value.absent(),
+    Value<String?> sharedByEmail = const Value.absent(),
+    Value<String?> sharedByName = const Value.absent(),
+  }) async {
+    final updatedRows = await (update(notes)..where((t) => t.id.equals(id)))
+        .write(
+          NotesCompanion(
+            permission: permission,
+            sharedByEmail: sharedByEmail,
+            sharedByName: sharedByName,
+          ),
+        );
+    return updatedRows == 1;
+  }
+
   /// Updates content, excerpt and updatedAt for a projected note in SQLite.
   Future<void> updateNoteProjection({
     required String id,

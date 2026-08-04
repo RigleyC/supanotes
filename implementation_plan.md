@@ -2,6 +2,8 @@
 
 Status: complete for ticket 01.
 
+Review-fix pass: complete.
+
 Scope: ticket 01, atomic local persistence during remote note hydration.
 
 - [x] Confirm the current write order and data-loss failure mode.
@@ -10,3 +12,11 @@ Scope: ticket 01, atomic local persistence during remote note hydration.
 - [x] Update catalog hydration to use the aggregate transaction.
 - [x] Add first-hydration and rollback tests.
 - [x] Run focused tests, full suite, code review, and commit the ticket.
+
+Review fixes:
+
+- [x] Reject stale or missing local rows before publishing remote hydration.
+- [x] Remove the insert/update mode flag and centralize metadata updates in the DAO.
+- [x] Separate pure document projection from database persistence.
+- [x] Test the real editor session opening from local storage.
+- [x] Run the final full suite, review, and commit the fixes.

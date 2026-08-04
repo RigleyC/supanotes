@@ -8,5 +8,13 @@ Verification:
 
 - Focused Flutter tests: passed.
 - Flutter analyze on changed files: passed.
-- Full Flutter test suite: 544 passed, 1 skipped.
+- Full Flutter test suite: 550 passed, 1 skipped.
 - `git diff --check`: passed.
+
+Review fixes complete:
+
+- Remote hydration now uses a version-checked compare-and-set update. Local edits, deleted rows, or notes opened during the request are not overwritten.
+- The catalog builds one typed companion and the DAO owns the remote metadata update.
+- Pure document projection is separated from database persistence.
+- Coverage now opens the real editor session from the persisted local document.
+- The final Flutter suite passed with 550 tests and 1 skipped test.

@@ -1,8 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' hide isNotNull;
+import 'package:drift/native.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
@@ -20,30 +25,37 @@ class _MockAttachmentsRepository extends Mock
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Future<ProviderContainer> buildContainer() async {
+  Future<ProviderContainer> buildContainer({
+    AppDatabase? database,
+    NoteSyncClient? syncClient,
+    bool registerTearDown = true,
+  }) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
-    final db = AppDatabase.test();
-    addTearDown(db.close);
+    final db = database ?? AppDatabase.test();
+    if (registerTearDown) addTearDown(db.close);
 
     final container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         appDatabaseProvider.overrideWithValue(db),
         currentUserIdProvider.overrideWithValue('user-1'),
-        noteSyncClientProvider.overrideWithValue(_MockNoteSyncClient()),
+        noteSyncClientProvider.overrideWithValue(
+          syncClient ?? _MockNoteSyncClient(),
+        ),
         attachmentsRepositoryProvider.overrideWithValue(
           _MockAttachmentsRepository(),
         ),
       ],
     );
-    addTearDown(container.dispose);
+    if (registerTearDown) addTearDown(container.dispose);
     return container;
   }
 
   Future<void> insertNote(
     AppDatabase db, {
     required String id,
+    String content = '',
     String? permission,
   }) async {
     final now = DateTime.utc(2026, 7, 26);
@@ -53,7 +65,7 @@ void main() {
           NotesCompanion.insert(
             id: id,
             userId: 'user-1',
-            content: '',
+            content: content,
             createdAt: now,
             updatedAt: now,
             isDirty: const Value(false),
@@ -89,6 +101,124 @@ void main() {
 
     expect(session.captureLocalOperations, isTrue);
   });
+
+  test(
+    'opens the hydrated local document through the real editor session',
+    () async {
+      final container = await buildContainer();
+      final db = container.read(appDatabaseProvider);
+      await insertNote(
+        db,
+        id: 'note-local-first',
+        content: 'Local first frame',
+      );
+      await db.noteOperationsDao.upsertNoteDocument(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: 'note-local-first',
+          revision: 4,
+          documentJson: jsonEncode(const {
+            'schemaVersion': 1,
+            'blocks': [
+              {
+                'id': 'local-block',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'Local first frame'},
+                ],
+                'metadata': {},
+              },
+            ],
+          }),
+          updatedAt: DateTime.utc(2026, 8, 3),
+        ),
+      );
+
+      final session = await container.read(
+        noteEditorSessionProvider('note-local-first').future,
+      );
+
+      expect(
+        (session.controller.document.first as TextNode).text.toPlainText(),
+        'Local first frame',
+      );
+    },
+  );
+
+  test(
+    'reopens the hydrated local document after restart without network access',
+    () async {
+      final file = File(
+        '${Directory.systemTemp.path}/supanotes-editor-${DateTime.now().microsecondsSinceEpoch}.sqlite',
+      );
+      final client = _MockNoteSyncClient();
+      final firstDatabase = AppDatabase.test(executor: NativeDatabase(file));
+      final firstContainer = await buildContainer(
+        database: firstDatabase,
+        syncClient: client,
+        registerTearDown: false,
+      );
+
+      await insertNote(
+        firstDatabase,
+        id: 'note-restart-local',
+        content: 'Restarted local content',
+      );
+      await firstDatabase.noteOperationsDao.upsertNoteDocument(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: 'note-restart-local',
+          revision: 7,
+          documentJson: jsonEncode(const {
+            'schemaVersion': 1,
+            'blocks': [
+              {
+                'id': 'restart-block',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'Restarted local content'},
+                ],
+                'metadata': {},
+              },
+            ],
+          }),
+          updatedAt: DateTime.utc(2026, 8, 3),
+        ),
+      );
+
+      final firstSession = await firstContainer.read(
+        noteEditorSessionProvider('note-restart-local').future,
+      );
+      expect(
+        (firstSession.controller.document.first as TextNode).text.toPlainText(),
+        'Restarted local content',
+      );
+      firstContainer.dispose();
+      await firstDatabase.close();
+
+      final secondDatabase = AppDatabase.test(executor: NativeDatabase(file));
+      final secondContainer = await buildContainer(
+        database: secondDatabase,
+        syncClient: client,
+        registerTearDown: false,
+      );
+      addTearDown(() async {
+        secondContainer.dispose();
+        await secondDatabase.close();
+        if (file.existsSync()) await file.delete();
+      });
+
+      final secondSession = await secondContainer.read(
+        noteEditorSessionProvider('note-restart-local').future,
+      );
+      await pumpEventQueue();
+
+      expect(
+        (secondSession.controller.document.first as TextNode).text
+            .toPlainText(),
+        'Restarted local content',
+      );
+      verifyNever(() => client.getDocument('note-restart-local'));
+    },
+  );
 
   test(
     'open session stops capturing when note permission becomes view',
