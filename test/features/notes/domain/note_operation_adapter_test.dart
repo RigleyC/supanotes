@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
@@ -520,6 +522,97 @@ void main() {
       expect(node?.text.toPlainText(), 'Hello');
       expect(adapter.confirmedRevision, 1);
     });
+
+    test(
+      'persists an edit before applying a remote update during debounce',
+      () async {
+        final persistedOperations = <PendingNoteOperationData>[];
+        when(
+          () => mockSyncService.loadPendingProjection('note-1'),
+        ).thenAnswer((_) async => persistedOperations);
+        when(
+          () => mockSyncService.enqueueOperation('note-1', any()),
+        ).thenAnswer((invocation) async {
+          final request = invocation.positionalArguments[1] as OperationRequest;
+          persistedOperations.add(
+            PendingNoteOperationData(
+              operationId: request.operationId,
+              noteId: 'note-1',
+              baseRevision: request.baseRevision,
+              ordinal: persistedOperations.length,
+              kind: request.kind,
+              blockId: request.blockId,
+              payloadJson: jsonEncode(request.payload),
+              createdAt: DateTime.utc(2026, 8, 3),
+              status: 'pending',
+              attemptCount: 0,
+            ),
+          );
+        });
+
+        final adapter = createAdapter();
+        addTearDown(adapter.dispose);
+        await adapter.start();
+
+        editor.execute([
+          InsertTextRequest(
+            documentPosition: const DocumentPosition(
+              nodeId: 'block-1',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+            textToInsert: ' local',
+            attributions: const {},
+          ),
+        ]);
+
+        await adapter.reconcile(
+          SyncResult(
+            acceptedCount: 0,
+            acceptedOperationIds: const [],
+            finalRevision: 2,
+            remoteOperations: [
+              Operation(
+                operationId: 'remote-1',
+                noteId: 'note-1',
+                revision: 2,
+                baseRevision: 1,
+                actorId: 'remote-user',
+                kind: 'text_delta',
+                blockId: 'block-1',
+                payload: const {
+                  'ops': [
+                    {'retain': 5, 'insert': ' remote'},
+                  ],
+                },
+                createdAt: DateTime.utc(2026, 8, 3),
+              ),
+            ],
+            canonicalDocument: NoteDocumentResponse(
+              noteId: 'note-1',
+              revision: 2,
+              document: {
+                'blocks': [
+                  {
+                    'id': 'block-1',
+                    'type': 'paragraph',
+                    'delta': [
+                      {'insert': 'Hello remote'},
+                    ],
+                  },
+                ],
+              },
+              serverTime: DateTime.utc(2026, 8, 3),
+            ),
+          ),
+        );
+
+        expect(
+          (document.first as TextNode).text.toPlainText(),
+          contains('local'),
+        );
+        expect(persistedOperations, hasLength(1));
+      },
+    );
 
     test('applies text_delta to document', () async {
       final adapter = createAdapter();

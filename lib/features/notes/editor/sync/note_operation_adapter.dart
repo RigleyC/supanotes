@@ -27,6 +27,7 @@ class NoteOperationAdapter {
     NoteDocumentCodec codec = const NoteDocumentCodec(),
   }) : _syncService = syncService,
        _noteId = noteId,
+       _document = document,
        _captureLocalOperations = captureLocalOperations,
        _codec = codec {
     _applier = DocumentProjectionApplier(
@@ -44,6 +45,7 @@ class NoteOperationAdapter {
 
   final NoteOperationsSyncService _syncService;
   final String _noteId;
+  final MutableDocument _document;
   bool _captureLocalOperations;
   final NoteDocumentCodec _codec;
 
@@ -51,6 +53,7 @@ class NoteOperationAdapter {
   late final EditorOperationCapture _capture;
 
   int _confirmedRevision = 0;
+  LocalNoteDocumentData? _confirmedDocument;
   final List<OperationRequest> _pendingOps = [];
   Timer? _debounceTimer;
 
@@ -87,7 +90,7 @@ class NoteOperationAdapter {
     if (_captureLocalOperations) {
       _capture.start();
     }
-    await _hydrateFromServer();
+    await _hydrateFromPersistedState();
     _capture.buildMirror();
     _capture.setSuppress(!_captureLocalOperations);
   }
@@ -106,29 +109,37 @@ class NoteOperationAdapter {
 
   Future<void> _loadConfirmedState() async {
     final doc = await _syncService.getConfirmedDocument(_noteId);
+    _confirmedDocument = doc;
     if (doc != null) {
       _confirmedRevision = doc.revision;
     }
   }
 
-  Future<void> _hydrateFromServer() async {
+  Future<void> _hydrateFromPersistedState() async {
     try {
-      final doc = await _syncService.getConfirmedDocument(_noteId);
+      final doc = _confirmedDocument;
+      final pending = await _syncService.loadPendingProjection(_noteId);
+      if (doc == null && pending.isEmpty) return;
+      if (doc == null && !_codec.isEmptyDocumentPlaceholder(_document)) {
+        return;
+      }
+
+      final snapshot = doc == null
+          ? const <String, dynamic>{'blocks': <dynamic>[]}
+          : jsonDecode(doc.documentJson) as Map<String, dynamic>;
+      await _applier.rebuildFromSnapshot(
+        snapshot: snapshot,
+        pendingOps: pending,
+        suppressCapture: () => _capture.setSuppress(true),
+        resumeCapture: () => _capture.setSuppress(!_captureLocalOperations),
+        rebuildMirror: _capture.buildMirror,
+      );
       if (doc != null) {
-        final snapshot = jsonDecode(doc.documentJson) as Map<String, dynamic>;
-        final pending = await _syncService.loadPendingProjection(_noteId);
-        await _applier.rebuildFromSnapshot(
-          snapshot: snapshot,
-          pendingOps: pending,
-          suppressCapture: () => _capture.setSuppress(true),
-          resumeCapture: () => _capture.setSuppress(!_captureLocalOperations),
-          rebuildMirror: _capture.buildMirror,
-        );
         _confirmedRevision = doc.revision;
       }
     } catch (e, stackTrace) {
       dev.log(
-        'Hydration from server failed for note $_noteId',
+        'Hydration from persisted state failed for note $_noteId',
         error: e,
         stackTrace: stackTrace,
       );
@@ -243,6 +254,7 @@ class NoteOperationAdapter {
     final canonical = result.canonicalDocument;
     if (canonical == null) return;
     _confirmedRevision = result.finalRevision;
+    await flushNow();
     final rebasedOps = await _syncService.loadPendingProjection(_noteId);
     NoteSyncDebug.log(
       'adapter.reconcile',

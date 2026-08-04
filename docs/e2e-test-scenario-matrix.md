@@ -22,8 +22,9 @@ timeout, falha HTTP e troca de conta não podem apagar uma operação nem expô-
 | Área | Cenário | Resultado esperado | Cobertura |
 | --- | --- | --- | --- |
 | Inicialização | Abrir nota com rede e snapshot remoto | snapshot local e projeções são hidratados | catálogo + contrato HTTP |
-| Inicialização | Abrir nota cacheada sem rede | editor abre do snapshot local sem bloquear em HTTP | `offline_persistence_e2e_test.dart` |
-| Inicialização | Nota nova sem snapshot, editar, matar e reabrir sem rede | outbox pendente é reaplicada sobre o documento vazio | `offline_persistence_e2e_test.dart` |
+| Inicialização | Abrir nota cacheada sem rede | editor abre do snapshot local sem bloquear em HTTP | `integration_test/full_suite_test.dart` |
+| Inicialização | Nota nova sem snapshot, editar, matar e reabrir sem rede | outbox pendente é reaplicada sobre o documento vazio | `integration_test/full_suite_test.dart` |
+| Inicialização | Projeção de tarefas lenta durante a abertura | editor fica pronto com o documento local; a projeção termina em segundo plano | `test/features/notes/domain/sync_characterization_test.dart` |
 | Inicialização | Edição local ocorre enquanto o snapshot remoto carrega | edição local permanece; hidratação remota obsoleta não é aplicada | `note_catalog_sync_test.dart` |
 | Inicialização | Nota nova vazia ao sair | nota local-only é apagada; não há push vazio | catálogo/repositório |
 | Persistência | Edição dentro do debounce seguida de dispose | edição é gravada antes do dispose | sessão/adapter |
@@ -50,6 +51,7 @@ timeout, falha HTTP e troca de conta não podem apagar uma operação nem expô-
 | Concorrência | catálogo sincroniza enquanto editor está aberto | catálogo não sobrescreve a sessão ativa | catálogo/activity tracker |
 | Concorrência | hidratação remota compete com uma edição local | comparação de versão recusa o remoto e preserva `isDirty` | `note_catalog_sync_test.dart` |
 | Catálogo | remote delete, local tombstone e retry | exclusão é segura e recuperável durante falha | catálogo |
+| Catálogo | sincronização inicial com muitas notas | todas as páginas são baixadas e o catálogo local é atualizado sem bloquear uma nota aberta | `test/features/notes/catalog/data/note_catalog_sync_provider_test.dart` |
 
 ## Limites que exigem validação em dispositivo
 

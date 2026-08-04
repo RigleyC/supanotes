@@ -221,11 +221,7 @@ class NoteOperationsSyncService {
   }
 
   Future<List<PendingNoteOperationData>> loadPendingProjection(String noteId) {
-    return _dao.getPendingOperations(
-      noteId,
-      status: 'pending',
-      ownerUserId: _actorId,
-    );
+    return _dao.getPendingOperations(noteId, ownerUserId: _actorId);
   }
 
   Future<int> getProjectedOutboxOperationCount(String noteId) {

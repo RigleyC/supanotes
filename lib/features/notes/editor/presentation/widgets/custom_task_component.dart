@@ -13,6 +13,7 @@ import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
 const double _taskCheckboxGap = 0.0;
 const double _taskCheckboxTouchTarget = 44.0;
+const double _taskCheckboxVisualTopInset = 2.0;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
@@ -316,7 +317,10 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 11),
+                      padding: const EdgeInsets.only(
+                        left: 11,
+                        top: _taskCheckboxVisualTopInset,
+                      ),
                       child: AppTaskCheckbox(
                         value: _isComplete,
                         accentColor: taskColor,

@@ -24,7 +24,12 @@ void main() {
       expect(AppColors.warning, isA<Color>());
       expect(AppColors.info, isA<Color>());
       expect(AppColors.muted, isA<Color>());
-      for (final c in [AppColors.success, AppColors.warning, AppColors.info, AppColors.muted]) {
+      for (final c in [
+        AppColors.success,
+        AppColors.warning,
+        AppColors.info,
+        AppColors.muted,
+      ]) {
         expect(
           (c.a * 255.0).round(),
           0xFF,
@@ -39,6 +44,20 @@ void main() {
         isNot(equals(AppColors.darkColorScheme.primary)),
         reason: 'light and dark schemes should have distinct primary colors',
       );
+    });
+
+    test('uses Joi indigo as the accent color', () {
+      expect(AppColors.primarySeed, AppColors.joiIndigo);
+      expect(AppColors.lightColorScheme.primary, AppColors.joiIndigo);
+      expect(AppColors.darkColorScheme.primary, AppColors.joiIndigoDark);
+    });
+
+    test('uses softened semantic success and error colors', () {
+      expect(AppColors.success, AppColors.joiGreen);
+      expect(AppColors.lightColorScheme.error, AppColors.joiRed);
+      expect(AppColors.darkColorScheme.error, AppColors.joiRedDark);
+      expect(AppColors.joiGreen, isNot(const Color(0xFF34C759)));
+      expect(AppColors.joiRed, isNot(const Color(0xFFFF3B30)));
     });
   });
 }

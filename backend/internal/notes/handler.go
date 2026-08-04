@@ -33,6 +33,9 @@ type NoteResponse struct {
 	CollapseImages bool    `json:"collapse_images"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
+	Permission     string  `json:"permission,omitempty"`
+	SharedByEmail  string  `json:"shared_by_email,omitempty"`
+	SharedByName   string  `json:"shared_by_name,omitempty"`
 }
 
 type Handler struct {
@@ -137,6 +140,8 @@ func (h *Handler) Get(c echo.Context) error {
 		Excerpt: note.Excerpt, Favorite: note.Favorite,
 		Archived: note.Archived, CollapseImages: note.CollapseImages,
 		CreatedAt: note.CreatedAt, UpdatedAt: note.UpdatedAt,
+		Permission: note.Permission, SharedByEmail: note.SharedByEmail,
+		SharedByName: note.SharedByName,
 	}))
 }
 
@@ -207,6 +212,9 @@ type NoteResponseFields struct {
 	CollapseImages bool
 	CreatedAt      pgtype.Timestamptz
 	UpdatedAt      pgtype.Timestamptz
+	Permission     string
+	SharedByEmail  string
+	SharedByName   string
 }
 
 func mapToNoteResponse(f NoteResponseFields) NoteResponse {
@@ -224,6 +232,9 @@ func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 		CollapseImages: f.CollapseImages,
 		CreatedAt:      f.CreatedAt.Time.Format(time.RFC3339Nano),
 		UpdatedAt:      f.UpdatedAt.Time.Format(time.RFC3339Nano),
+		Permission:     f.Permission,
+		SharedByEmail:  f.SharedByEmail,
+		SharedByName:   f.SharedByName,
 	}
 }
 
@@ -253,5 +264,8 @@ func mapToNoteResponseFields(n sqlcgen.GetNotesRow) NoteResponse {
 		CollapseImages: n.CollapseImages,
 		CreatedAt:      n.CreatedAt.Time.Format(time.RFC3339Nano),
 		UpdatedAt:      n.UpdatedAt.Time.Format(time.RFC3339Nano),
+		Permission:     n.Permission,
+		SharedByEmail:  n.SharedByEmail,
+		SharedByName:   n.SharedByName,
 	}
 }

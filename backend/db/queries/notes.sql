@@ -6,9 +6,14 @@ RETURNING *;
 -- name: GetNoteByID :one
 SELECT n.*,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
-  COALESCE(unp.archived, FALSE)::boolean AS archived
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
+  COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE owner_user.email END, '')::text AS shared_by_email,
+  COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE owner_user.name END, '')::text AS shared_by_name
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $2
+LEFT JOIN users owner_user ON owner_user.id = n.user_id
 WHERE n.id = $1 AND n.deleted_at IS NULL
   AND (n.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2));
 
@@ -41,9 +46,14 @@ SELECT
   n.collapse_images,
   COALESCE(NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
-  COALESCE(unp.archived, FALSE)::boolean AS archived
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
+  COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE owner_user.email END, '')::text AS shared_by_email,
+  COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE owner_user.name END, '')::text AS shared_by_name
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1
+LEFT JOIN users owner_user ON owner_user.id = n.user_id
 WHERE n.deleted_at IS NULL
   AND (n.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = n.id AND note_shares.user_id = $1))
   AND (sqlc.narg('favorite')::boolean IS NULL OR COALESCE(unp.favorite, FALSE) = sqlc.narg('favorite'))

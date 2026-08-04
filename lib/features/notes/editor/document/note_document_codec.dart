@@ -12,6 +12,14 @@ const corruptedAttribution = NamedAttribution('corrupted');
 class NoteDocumentCodec {
   const NoteDocumentCodec();
 
+  bool isEmptyDocumentPlaceholder(MutableDocument document) {
+    if (document.nodeCount != 1) return false;
+    final node = document.first;
+    return node is TextNode &&
+        node.id == initialNoteBlockId &&
+        node.text.toPlainText().isEmpty;
+  }
+
   // ---------------------------------------------------------------------------
   // Static Helper Methods (formerly NodeCodec static methods)
   // ---------------------------------------------------------------------------

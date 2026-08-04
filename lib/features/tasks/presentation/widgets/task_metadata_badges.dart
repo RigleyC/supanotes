@@ -5,7 +5,6 @@ import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 import '../../domain/task_recurrence.dart';
-import 'task_metadata_icon.dart';
 
 class TaskMetadataBadges extends StatelessWidget {
   const TaskMetadataBadges({
@@ -45,7 +44,8 @@ class TaskMetadataBadges extends StatelessWidget {
       children: [
         if (_hasDueDate)
           _MetadataPill(
-            leading: TaskMetadataCalendarIcon(
+            leading: Icon(
+              Icons.event_outlined,
               size: 14,
               color: _dueDateColor(context, dueDate!),
             ),

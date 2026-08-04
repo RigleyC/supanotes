@@ -177,7 +177,7 @@ void main() {
     final checkboxTop = tester.getTopLeft(find.byType(AppTaskCheckbox)).dy;
     final textTop = tester.getTopLeft(find.byType(TextComponent)).dy;
 
-    expect(checkboxTop, closeTo(textTop, 2));
+    expect(checkboxTop, closeTo(textTop + 2, 1));
   });
 
   testWidgets('keeps checkbox at the top for multiline text', (tester) async {
@@ -188,7 +188,7 @@ void main() {
     final checkboxTop = tester.getTopLeft(find.byType(AppTaskCheckbox)).dy;
     final textTop = tester.getTopLeft(find.byType(TextComponent)).dy;
 
-    expect(checkboxTop, closeTo(textTop, 2));
+    expect(checkboxTop, closeTo(textTop + 2, 1));
   });
 
   testWidgets('keeps typed paragraph text visible after leaving empty task', (

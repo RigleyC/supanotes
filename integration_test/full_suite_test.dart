@@ -1,94 +1,245 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:super_editor/super_editor.dart';
+
+import 'package:supanotes/main.dart';
+import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/sync/note_operations_sync_service.dart';
+import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
+
+class _OfflineClient extends Mock implements NoteSyncClient {}
+
+class _UnauthenticatedAuthController extends AuthController {
+  @override
+  Future<User?> build() async => null;
+}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  group('SupaNotes Full /goal E2E Test Suite', () {
-    testWidgets('B5. Troca rapida de notas (evitar conteudo residual)', (tester) async {
-      // Mock de abrir Nota A, depois B, depois A rapidamente
-      expect(true, isTrue);
+  setUpAll(() {
+    registerFallbackValue(
+      SyncRequest(knownRevision: 0, operations: const [], clientId: 'fallback'),
+    );
+  });
+
+  group('REST/OT persistence on a device', () {
+    testWidgets('the real app boots into the unauthenticated route', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          authControllerProvider.overrideWith(
+            _UnauthenticatedAuthController.new,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SupaNotesApp(),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byType(SupaNotesApp), findsOneWidget);
     });
 
-    testWidgets('B6 & C15. Deletar nota durante edicao em outro device', (tester) async {
-      // Deletar via API remota enquanto a nota está aberta localmente
-      expect(true, isTrue);
+    testWidgets('offline edit survives a cold restart before sync', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const SizedBox(width: 1, height: 1));
+      final database = AppDatabase.test();
+      addTearDown(database.close);
+      final service = NoteOperationsSyncService(
+        syncClient: _OfflineClient(),
+        dao: database.noteOperationsDao,
+        clientId: 'device-client',
+        actorId: 'user-device',
+      );
+
+      final firstDocument = _emptyDocument();
+      final firstEditor = createDefaultDocumentEditor(
+        document: firstDocument,
+        composer: MutableDocumentComposer(),
+      );
+      final firstAdapter = NoteOperationAdapter(
+        document: firstDocument,
+        syncService: service,
+        noteId: 'device-offline-note',
+        editor: firstEditor,
+      );
+      await firstAdapter.start();
+      firstEditor.execute([
+        InsertTextRequest(
+          documentPosition: const DocumentPosition(
+            nodeId: 'init',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          textToInsert: 'persistido no dispositivo',
+          attributions: const {},
+        ),
+      ]);
+      await firstAdapter.flushNow();
+      firstAdapter.dispose();
+
+      final restartedDocument = _emptyDocument();
+      final restartedEditor = createDefaultDocumentEditor(
+        document: restartedDocument,
+        composer: MutableDocumentComposer(),
+      );
+      final restartedAdapter = NoteOperationAdapter(
+        document: restartedDocument,
+        syncService: service,
+        noteId: 'device-offline-note',
+        editor: restartedEditor,
+      );
+      addTearDown(restartedAdapter.dispose);
+      await restartedAdapter.start();
+
+      expect(
+        (restartedDocument.first as TextNode).text.toPlainText(),
+        'persistido no dispositivo',
+      );
+      expect(
+        await database.noteOperationsDao.getPendingOperations(
+          'device-offline-note',
+          ownerUserId: 'user-device',
+        ),
+        hasLength(1),
+      );
     });
 
-    testWidgets('B7. Duplicar nota', (tester) async {
-      // Duplicar nota garante IDs independentes
-      expect(true, isTrue);
-    });
+    testWidgets(
+      'process death during a weak connection keeps in-flight edits',
+      (tester) async {
+        await tester.pumpWidget(const SizedBox(width: 1, height: 1));
+        final database = AppDatabase.test();
+        addTearDown(database.close);
+        final client = _OfflineClient();
+        when(
+          () => client.syncOperations(any(), any()),
+        ).thenThrow(StateError('connection interrupted'));
+        final service = NoteOperationsSyncService(
+          syncClient: client,
+          dao: database.noteOperationsDao,
+          clientId: 'device-client',
+          actorId: 'user-device',
+        );
 
-    testWidgets('B8. Mover node entre notas', (tester) async {
-      // Node cortado de YDoc A e colado no YDoc B
-      expect(true, isTrue);
-    });
+        final document = _emptyDocument();
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: MutableDocumentComposer(),
+        );
+        final adapter = NoteOperationAdapter(
+          document: document,
+          syncService: service,
+          noteId: 'device-in-flight-note',
+          editor: editor,
+        );
+        await adapter.start();
+        editor.execute([
+          InsertTextRequest(
+            documentPosition: const DocumentPosition(
+              nodeId: 'init',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            textToInsert: 'não perder esta edição',
+            attributions: const {},
+          ),
+        ]);
+        await adapter.flushNow();
+        await expectLater(
+          service.syncPending('device-in-flight-note'),
+          throwsA(isA<StateError>()),
+        );
+        adapter.dispose();
 
-    testWidgets('B9. Colisao fracionaria offline', (tester) async {
-      // Dois clients inserindo na mesma posicao
-      expect(true, isTrue);
-    });
+        final restartedDocument = _emptyDocument();
+        final restartedEditor = createDefaultDocumentEditor(
+          document: restartedDocument,
+          composer: MutableDocumentComposer(),
+        );
+        final restartedAdapter = NoteOperationAdapter(
+          document: restartedDocument,
+          syncService: service,
+          noteId: 'device-in-flight-note',
+          editor: restartedEditor,
+        );
+        addTearDown(restartedAdapter.dispose);
+        await restartedAdapter.start();
 
-    testWidgets('B10. Reuso de ID', (tester) async {
-      expect(true, isTrue);
-    });
+        expect(
+          (restartedDocument.first as TextNode).text.toPlainText(),
+          'não perder esta edição',
+        );
+      },
+    );
 
-    testWidgets('D19. Fechar no meio de onLocalFlush', (tester) async {
-      expect(true, isTrue);
-    });
+    testWidgets(
+      'a second account cannot project or take over another account session',
+      (tester) async {
+        await tester.pumpWidget(const SizedBox(width: 1, height: 1));
+        final database = AppDatabase.test();
+        addTearDown(database.close);
+        await database.noteOperationsDao.insertPendingOperation(
+          PendingNoteOperationsCompanion.insert(
+            operationId: 'account-a-operation',
+            noteId: 'shared-account-note',
+            ownerUserId: const Value('account-a'),
+            baseRevision: 0,
+            ordinal: 0,
+            kind: 'text_delta',
+            blockId: const Value('init'),
+            payloadJson: '{"ops":[{"insert":"account-a"}]}',
+            createdAt: DateTime.utc(2026, 8, 3),
+          ),
+        );
+        await database.noteOperationsDao.upsertSyncSession(
+          SyncSessionsCompanion.insert(
+            noteId: 'shared-account-note',
+            ownerUserId: const Value('account-a'),
+            knownRevision: 0,
+            operationIds: '["account-a-operation"]',
+            startedAt: DateTime.utc(2026, 8, 3).toIso8601String(),
+          ),
+        );
 
-    testWidgets('D21. Servidor reinicia', (tester) async {
-      expect(true, isTrue);
-    });
+        final clientB = _OfflineClient();
+        final serviceB = NoteOperationsSyncService(
+          syncClient: clientB,
+          dao: database.noteOperationsDao,
+          clientId: 'device-b',
+          actorId: 'account-b',
+        );
 
-    group('Phase 3: Multi-user (C)', () {
-      testWidgets('C11 & C12. Edicao simultanea no mesmo paragrafo e paragrafos distintos', (tester) async {
-        expect(true, isTrue);
-      });
-      testWidgets('C13. Remover acesso durante edicao', (tester) async {
-        expect(true, isTrue);
-      });
-      testWidgets('C14. Voltar de longo periodo offline', (tester) async {
-        expect(true, isTrue);
-      });
-      testWidgets('C16. Dois devices conectando pela 1a vez sem snapshot', (tester) async {
-        expect(true, isTrue);
-      });
-      testWidgets('C17. Presenca vazando pro doc', (tester) async {
-        expect(true, isTrue);
-      });
-    });
-
-    group('Phase 3: Tasks (F)', () {
-      testWidgets('F28. Marcar/desmarcar checkbox rapido', (tester) async {
-        expect(true, isTrue);
-      });
-      testWidgets('F29. LWW dueDate e completed concorrentes (Offline)', (tester) async {
-        expect(true, isTrue);
-      });
-      testWidgets('F30. Race na criacao do task node', (tester) async {
-        expect(true, isTrue);
-      });
-    });
-
-    group('Phase 3: UI Editor (G)', () {
-      testWidgets('G31. Crash na selecao apagada remotamente', (tester) async {
-        // Simular o No such position in document
-        expect(true, isTrue);
-      });
-      testWidgets('G32. Copiar/colar node gera IDs novos', (tester) async {
-        expect(true, isTrue);
-      });
-      testWidgets('G33. Undo/Redo CRDT', (tester) async {
-        expect(true, isTrue);
-      });
-    });
-
-    group('Phase 3: Websockets (H)', () {
-      testWidgets('H34-H38. Payloads anormais WS, fora de ordem, timeouts e auth', (tester) async {
-        expect(true, isTrue);
-      });
-    });
+        expect(
+          await serviceB.loadPendingProjection('shared-account-note'),
+          isEmpty,
+        );
+        final result = await serviceB.syncPending('shared-account-note');
+        expect(result.blockedReason, 'foreign_sync_session');
+        verifyNever(() => clientB.syncOperations(any(), any()));
+      },
+    );
   });
 }
+
+MutableDocument _emptyDocument() => MutableDocument(
+  nodes: [ParagraphNode(id: 'init', text: AttributedText())],
+);

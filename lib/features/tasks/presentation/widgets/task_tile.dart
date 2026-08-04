@@ -31,8 +31,7 @@ class TaskTile extends StatelessWidget {
     final isCompleted = task.isCompleted;
 
     final titleColor = isCompleted ? scheme.onSurfaceVariant : scheme.onSurface;
-    final titleDecoration =
-        isCompleted ? TextDecoration.lineThrough : null;
+    final titleDecoration = isCompleted ? TextDecoration.lineThrough : null;
 
     return Material(
       color: taskColor.withValues(alpha: 0.08),
@@ -58,11 +57,14 @@ class TaskTile extends StatelessWidget {
             vertical: dense ? AppSpacing.sm : AppSpacing.md,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppTaskCheckbox(
-                value: isCompleted,
-                accentColor: taskColor,
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: AppTaskCheckbox(
+                  value: isCompleted,
+                  accentColor: taskColor,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -80,7 +82,9 @@ class TaskTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (task.dueDate != null || task.recurrence != null || task.reminder != null) ...[
+                    if (task.dueDate != null ||
+                        task.recurrence != null ||
+                        task.reminder != null) ...[
                       const SizedBox(height: AppSpacing.xs),
                       TaskMetadataBadges(
                         dueDate: task.dueDate,

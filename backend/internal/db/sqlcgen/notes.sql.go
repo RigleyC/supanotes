@@ -164,9 +164,14 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 const getNoteByID = `-- name: GetNoteByID :one
 SELECT n.id, n.user_id, n.content, n.excerpt, n.created_at, n.updated_at, n.deleted_at, n.collapse_images, n.revision, n.document, n.snapshot_revision,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
-  COALESCE(unp.archived, FALSE)::boolean AS archived
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
+  COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE owner_user.email END, '')::text AS shared_by_email,
+  COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE owner_user.name END, '')::text AS shared_by_name
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $2
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $2
+LEFT JOIN users owner_user ON owner_user.id = n.user_id
 WHERE n.id = $1 AND n.deleted_at IS NULL
   AND (n.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2))
 `
@@ -190,6 +195,9 @@ type GetNoteByIDRow struct {
 	SnapshotRevision int64              `json:"snapshot_revision"`
 	Favorite         bool               `json:"favorite"`
 	Archived         bool               `json:"archived"`
+	Permission       string             `json:"permission"`
+	SharedByEmail    string             `json:"shared_by_email"`
+	SharedByName     string             `json:"shared_by_name"`
 }
 
 func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNoteByIDRow, error) {
@@ -209,6 +217,9 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 		&i.SnapshotRevision,
 		&i.Favorite,
 		&i.Archived,
+		&i.Permission,
+		&i.SharedByEmail,
+		&i.SharedByName,
 	)
 	return i, err
 }
@@ -221,9 +232,14 @@ SELECT
   n.collapse_images,
   COALESCE(NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
-  COALESCE(unp.archived, FALSE)::boolean AS archived
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
+  COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE owner_user.email END, '')::text AS shared_by_email,
+  COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE owner_user.name END, '')::text AS shared_by_name
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
+LEFT JOIN note_shares ns ON ns.note_id = n.id AND ns.user_id = $1
+LEFT JOIN users owner_user ON owner_user.id = n.user_id
 WHERE n.deleted_at IS NULL
   AND (n.user_id = $1 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = n.id AND note_shares.user_id = $1))
   AND ($2::boolean IS NULL OR COALESCE(unp.favorite, FALSE) = $2)
@@ -251,6 +267,9 @@ type GetNotesRow struct {
 	Title          string             `json:"title"`
 	Favorite       bool               `json:"favorite"`
 	Archived       bool               `json:"archived"`
+	Permission     string             `json:"permission"`
+	SharedByEmail  string             `json:"shared_by_email"`
+	SharedByName   string             `json:"shared_by_name"`
 }
 
 func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesRow, error) {
@@ -279,6 +298,9 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 			&i.Title,
 			&i.Favorite,
 			&i.Archived,
+			&i.Permission,
+			&i.SharedByEmail,
+			&i.SharedByName,
 		); err != nil {
 			return nil, err
 		}

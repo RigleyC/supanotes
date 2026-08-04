@@ -103,14 +103,17 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     };
     try {
       await adapter.start();
-      await _enqueueProjection();
-      if (_captureLocalOperations) {
-        // Drain operations persisted by an earlier offline session before polling.
-        await _onLocalOps();
-      }
       _startPolling();
       if (_status == NoteSessionStatus.opening) {
         _setStatus(NoteSessionStatus.ready);
+      }
+
+      // The local document is ready now. Keep projection and network work in
+      // the background so a large note or a slow connection cannot block the
+      // first frame of the editor.
+      unawaited(_enqueueProjection());
+      if (_captureLocalOperations) {
+        unawaited(_onLocalOps());
       }
     } catch (error, stackTrace) {
       _handleError(error, stackTrace, 'start');
@@ -239,12 +242,12 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     _setStatus(NoteSessionStatus.closing);
     _pollTimer?.cancel();
     try {
-      await _syncTail;
-      await _projectionTail;
+      // Persist the editor before waiting for a network request that may be
+      // slow or unavailable. Closing must not discard an in-memory edit.
       await adapter.flushNow();
-      if (_captureLocalOperations) {
-        await _syncPending();
-      }
+      await _projectionTail;
+      // The outbox is durable now. Do not wait for the network queue during
+      // teardown; the next session or catalog sync will retry it.
     } catch (error, stackTrace) {
       dev.log(
         'NoteSyncSession flush on dispose failed for $noteId',
@@ -267,6 +270,9 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     );
 
     if (isProtocolError(error)) {
+      if (error is NoteOperationsException && error.statusCode == 403) {
+        setCaptureLocalOperations(false);
+      }
       _protocolFailed = true;
       _pollTimer?.cancel();
       _setStatus(NoteSessionStatus.error);

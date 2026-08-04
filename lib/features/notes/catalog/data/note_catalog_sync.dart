@@ -222,6 +222,11 @@ class NoteCatalogSync {
   }
 }
 
+/// App-scoped catalog synchronization.
+///
+/// The root app listens to this provider so every catalog page is hydrated in
+/// the background while the UI continues reading Drift. It must stay alive
+/// across widget rebuilds; opening a note never waits for this provider.
 final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
   final user = ref.watch(authControllerProvider).asData?.value;
   if (user == null) return;

@@ -6,6 +6,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/domain/note_session_handle.dart';
 import 'package:supanotes/features/notes/domain/note_sync_session.dart';
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 
@@ -70,6 +71,153 @@ void main() {
     ).thenAnswer((_) async => SyncResult.empty());
   });
 
+  test('opens from local state before a slow network sync completes', () async {
+    const noteId = 'note-local-first-opening';
+    final syncCompleter = Completer<SyncResult>();
+    when(() => mockSyncService.getConfirmedDocument(noteId)).thenAnswer(
+      (_) async => LocalNoteDocumentData(
+        noteId: noteId,
+        revision: 4,
+        documentJson:
+            '{"blocks":[{"id":"local-block","type":"paragraph","delta":[{"insert":"Conteudo local"}],"metadata":{}}]}',
+        updatedAt: DateTime.utc(2026, 8, 3),
+      ),
+    );
+    var syncStarted = false;
+    when(
+      () => mockSyncService.syncPending(
+        noteId,
+        onReconcile: any(named: 'onReconcile'),
+      ),
+    ).thenAnswer((_) {
+      syncStarted = true;
+      return syncCompleter.future;
+    });
+
+    var startCompleted = false;
+    final session = NoteSyncSession(
+      noteId: noteId,
+      syncService: mockSyncService,
+      document: document,
+      editor: editor,
+    );
+    final startFuture = session.start().then((_) {
+      startCompleted = true;
+    });
+
+    try {
+      await pumpEventQueue();
+
+      expect(startCompleted, isTrue);
+      expect(syncStarted, isTrue);
+      expect((document.first as TextNode).text.toPlainText(), 'Conteudo local');
+    } finally {
+      if (!syncCompleter.isCompleted) {
+        syncCompleter.complete(SyncResult.empty());
+      }
+      await startFuture;
+      await session.dispose();
+    }
+  });
+
+  test('marks the session ready before task projection completes', () async {
+    const noteId = 'note-local-first-projection';
+    final projectionDb = AppDatabase.test();
+    final projection = GateTaskProjectionEngine(database: projectionDb);
+    final session = NoteSyncSession(
+      noteId: noteId,
+      syncService: mockSyncService,
+      document: document,
+      editor: editor,
+      taskProjectionEngine: projection,
+      userId: 'user-1',
+    );
+    var startCompleted = false;
+    final startFuture = session.start().then((_) {
+      startCompleted = true;
+    });
+
+    try {
+      await projection.started.future.timeout(const Duration(seconds: 1));
+      await pumpEventQueue();
+
+      expect(startCompleted, isTrue);
+      expect(session.status, NoteSessionStatus.ready);
+    } finally {
+      if (!projection.release.isCompleted) {
+        projection.release.complete();
+      }
+      await startFuture;
+      await session.dispose();
+      await projectionDb.close();
+    }
+  });
+
+  test(
+    'persists a new edit before waiting for a slow sync during close',
+    () async {
+      const noteId = 'note-local-first-close';
+      final syncCompleter = Completer<SyncResult>();
+      final syncStartedCompleter = Completer<void>();
+      var enqueued = false;
+      when(
+        () => mockSyncService.syncPending(
+          noteId,
+          onReconcile: any(named: 'onReconcile'),
+        ),
+      ).thenAnswer((_) {
+        if (!syncStartedCompleter.isCompleted) {
+          syncStartedCompleter.complete();
+        }
+        return syncCompleter.future;
+      });
+      when(() => mockSyncService.enqueueOperation(noteId, any())).thenAnswer((
+        _,
+      ) async {
+        enqueued = true;
+      });
+
+      final session = NoteSyncSession(
+        noteId: noteId,
+        syncService: mockSyncService,
+        document: document,
+        editor: editor,
+      );
+      final startFuture = session.start();
+      Future<void>? disposeFuture;
+      var disposeCompleted = false;
+      try {
+        await syncStartedCompleter.future;
+        editor.execute([
+          InsertTextRequest(
+            documentPosition: const DocumentPosition(
+              nodeId: 'block-1',
+              nodePosition: TextNodePosition(offset: 12),
+            ),
+            textToInsert: ' offline',
+            attributions: const {},
+          ),
+        ]);
+
+        disposeFuture = session.dispose();
+        await pumpEventQueue();
+        expect(enqueued, isTrue);
+        await disposeFuture.timeout(const Duration(seconds: 1));
+        disposeCompleted = true;
+        expect(syncCompleter.isCompleted, isFalse);
+      } finally {
+        if (!syncCompleter.isCompleted) {
+          syncCompleter.complete(SyncResult.empty());
+        }
+        await startFuture;
+        if (!disposeCompleted) {
+          disposeFuture ??= session.dispose();
+          await disposeFuture;
+        }
+      }
+    },
+  );
+
   test(
     'NoteSyncSession lifecycle starts sync resources and disposes them',
     () async {
@@ -83,17 +231,18 @@ void main() {
       );
 
       await session.start();
+      await pumpEventQueue();
       verify(
         () => mockSyncService.getConfirmedDocument(noteId),
       ).called(greaterThanOrEqualTo(1));
-
-      await session.dispose();
       verify(
         () => mockSyncService.syncPending(
           noteId,
           onReconcile: any(named: 'onReconcile'),
         ),
       ).called(greaterThanOrEqualTo(1));
+
+      await session.dispose();
     },
   );
 
@@ -130,7 +279,7 @@ void main() {
   });
 
   test(
-    'Editing inside 50ms debounce and calling dispose flushes outbox and syncs pending ops',
+    'Editing inside 50ms debounce and calling dispose flushes the outbox',
     () async {
       const noteId = 'note-characterization-dispose-flush';
       final session = NoteSyncSession(
@@ -158,14 +307,14 @@ void main() {
       // Call dispose() immediately without waiting for the 50ms debounce timer
       await session.dispose();
 
-      // Confirm that debounced edit was flushed to outbox AND syncPending was triggered (once via onLocalOperations and once via dispose sync)
+      // Confirm that the debounced edit was flushed to the durable outbox.
       verify(() => mockSyncService.enqueueOperation(noteId, any())).called(1);
-      verify(
+      verifyNever(
         () => mockSyncService.syncPending(
           noteId,
           onReconcile: any(named: 'onReconcile'),
         ),
-      ).called(1);
+      );
     },
   );
 
@@ -237,6 +386,7 @@ void main() {
       );
 
       await session.start();
+      await pumpEventQueue();
       expect(projection.userIds, contains('user-old'));
       projection.userIds.clear();
 
@@ -442,6 +592,37 @@ void main() {
   });
 
   test(
+    'forbidden sync disables local capture after access is revoked',
+    () async {
+      const noteId = 'note-revoked-access';
+      final session = NoteSyncSession(
+        noteId: noteId,
+        syncService: mockSyncService,
+        document: document,
+        editor: editor,
+      );
+      await session.start();
+      when(
+        () => mockSyncService.syncPending(
+          noteId,
+          onReconcile: any(named: 'onReconcile'),
+        ),
+      ).thenThrow(
+        NoteOperationsException(
+          errorCode: 'FORBIDDEN',
+          message: 'access revoked',
+          statusCode: 403,
+        ),
+      );
+
+      await session.pollNow();
+
+      expect(session.captureLocalOperations, isFalse);
+      await session.dispose();
+    },
+  );
+
+  test(
     'overlapping sync requests stay syncing until the queue drains',
     () async {
       const noteId = 'note-overlapping-status';
@@ -524,6 +705,23 @@ class RecordingTaskProjectionEngine extends TaskProjectionEngine {
     String userId = '',
   }) async {
     userIds.add(userId);
+  }
+}
+
+class GateTaskProjectionEngine extends TaskProjectionEngine {
+  GateTaskProjectionEngine({required super.database});
+
+  final started = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Future<void> projectTasksFromDocument({
+    required String noteId,
+    required MutableDocument document,
+    String userId = '',
+  }) async {
+    if (!started.isCompleted) started.complete();
+    await release.future;
   }
 }
 

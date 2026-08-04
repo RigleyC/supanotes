@@ -15,17 +15,17 @@ class AppColors {
 
   static const Color joiBlue = Color(0xFF007AFF);
   static const Color joiBlueDark = Color(0xFF0A84FF);
-  static const Color joiGreen = Color(0xFF34C759);
-  static const Color joiGreenDark = Color(0xFF30D158);
+  static const Color joiGreen = Color(0xFF4EA968);
+  static const Color joiGreenDark = Color(0xFF72BF7B);
   static const Color joiOrange = Color(0xFFFF9500);
   static const Color joiOrangeDark = Color(0xFFFF9F0A);
-  static const Color joiRed = Color(0xFFFF3B30);
-  static const Color joiRedDark = Color(0xFFFF453A);
+  static const Color joiRed = Color(0xFFD45A52);
+  static const Color joiRedDark = Color(0xFFE27B73);
   static const Color joiYellow = Color(0xFFFFCC00);
   static const Color joiYellowDark = Color(0xFFFFD60A);
   static const Color joiIndigo = Color(0xFF5856D6);
   static const Color joiIndigoDark = Color(0xFF5E5CE6);
-  static const Color primarySeed = joiBlue;
+  static const Color primarySeed = joiIndigo;
 
   // ---------------------------------------------------------------------------
   // Light scheme
@@ -38,18 +38,18 @@ class AppColors {
       ).copyWith(
         surface: const Color(0xFFFFFFFF),
         onSurface: const Color(0xFF0D0D0D),
-        primary: joiBlue,
+        primary: joiIndigo,
         onPrimary: const Color(0xFFFFFFFF),
-        primaryContainer: const Color(0xFFD9ECFF),
-        onPrimaryContainer: const Color(0xFF001A33),
-        secondary: joiIndigo,
+        primaryContainer: const Color(0xFFE5E3FF),
+        onPrimaryContainer: const Color(0xFF1B165F),
+        secondary: joiBlue,
         onSecondary: const Color(0xFFFFFFFF),
         tertiary: joiOrange,
         onTertiary: const Color(0xFFFFFFFF),
         error: joiRed,
         onError: const Color(0xFFFFFFFF),
-        errorContainer: const Color(0xFFFFDAD6),
-        onErrorContainer: const Color(0xFF410002),
+        errorContainer: const Color(0xFFF4D8D5),
+        onErrorContainer: const Color(0xFF4A1715),
         surfaceContainerLowest: const Color(0xFFFFFFFF),
         surfaceContainerLow: const Color(0xFFF5F5F7),
         surfaceContainer: const Color(0xFFF2F2F7),
@@ -70,18 +70,18 @@ class AppColors {
       ).copyWith(
         surface: const Color(0xFF000000),
         onSurface: const Color(0xFFF5F5F7),
-        primary: joiBlueDark,
+        primary: joiIndigoDark,
         onPrimary: const Color(0xFFFFFFFF),
-        primaryContainer: const Color(0xFF004B76),
-        onPrimaryContainer: const Color(0xFFCCE5FF),
-        secondary: joiIndigoDark,
+        primaryContainer: const Color(0xFF3E3A91),
+        onPrimaryContainer: const Color(0xFFE2E0FF),
+        secondary: joiBlueDark,
         onSecondary: const Color(0xFFFFFFFF),
         tertiary: joiOrangeDark,
         onTertiary: const Color(0xFF321300),
         error: joiRedDark,
         onError: const Color(0xFFFFFFFF),
-        errorContainer: const Color(0xFF93000A),
-        onErrorContainer: const Color(0xFFFFDAD6),
+        errorContainer: const Color(0xFF6E3633),
+        onErrorContainer: const Color(0xFFFFE0DD),
         surfaceContainerLowest: const Color(0xFF000000),
         surfaceContainerLow: const Color(0xFF1C1C1E),
         surfaceContainer: const Color(0xFF2C2C2E),

@@ -14,8 +14,13 @@ class _AllowLoopbackHttpOverrides extends HttpOverrides {}
 class RealHttpTestBackend {
   late HttpServer _server;
   final Map<String, _ServerNoteState> _notes = {};
+  bool failNextSyncAfterApplying = false;
 
   int get port => _server.port;
+
+  int revisionOf(String noteId) => _notes[noteId]!.revision;
+
+  int operationCount(String noteId) => _notes[noteId]!.ops.length;
 
   Future<void> start() async {
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -130,10 +135,10 @@ class RealHttpTestBackend {
     if (request.method == 'POST' && path.contains(':sync')) {
       final segments = path.split('/');
       final noteIdIndex = segments.indexOf('notes') + 1;
-      final noteId = segments[noteIdIndex].replaceFirst(':sync', '');
-      final note = _notes[noteId];
+      final requestNoteId = segments[noteIdIndex].replaceFirst(':sync', '');
+      final requestNote = _notes[requestNoteId];
 
-      if (note == null) {
+      if (requestNote == null) {
         request.response
           ..statusCode = HttpStatus.notFound
           ..headers.contentType = ContentType.json
@@ -142,7 +147,7 @@ class RealHttpTestBackend {
         return;
       }
 
-      final perm = note.permissions[userId] ?? 'none';
+      final perm = requestNote.permissions[userId] ?? 'none';
       if (perm != 'edit') {
         request.response
           ..statusCode = HttpStatus.forbidden
@@ -159,11 +164,18 @@ class RealHttpTestBackend {
 
       final accepted = <Map<String, dynamic>>[];
       for (final op in operations) {
-        note.revision += 1;
+        final operationId = op['operationId'] as String;
+        final previous = requestNote.acceptedByOperationId[operationId];
+        if (previous != null) {
+          accepted.add(previous);
+          continue;
+        }
+
+        requestNote.revision += 1;
         final acceptedOp = {
-          'operationId': op['operationId'],
-          'noteId': noteId,
-          'revision': note.revision,
+          'operationId': operationId,
+          'noteId': requestNoteId,
+          'revision': requestNote.revision,
           'baseRevision': op['baseRevision'],
           'actorId': userId,
           'kind': op['kind'],
@@ -171,13 +183,25 @@ class RealHttpTestBackend {
           'payload': op['payload'],
           'createdAt': DateTime.now().toUtc().toIso8601String(),
         };
-        note.ops.add(acceptedOp);
-        accepted.add({
-          'operationId': op['operationId'],
-          'revision': note.revision,
+        requestNote.ops.add(acceptedOp);
+        final acceptedResponse = {
+          'operationId': operationId,
+          'revision': requestNote.revision,
           'kind': op['kind'],
           'blockId': op['blockId'],
-        });
+        };
+        requestNote.acceptedByOperationId[operationId] = acceptedResponse;
+        accepted.add(acceptedResponse);
+      }
+
+      if (failNextSyncAfterApplying) {
+        failNextSyncAfterApplying = false;
+        request.response
+          ..statusCode = HttpStatus.serviceUnavailable
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'error': 'TEMPORARY'}))
+          ..close();
+        return;
       }
 
       request.response
@@ -186,8 +210,8 @@ class RealHttpTestBackend {
         ..write(
           jsonEncode({
             'accepted': accepted,
-            'finalRevision': note.revision,
-            'canonicalDocument': note.document,
+            'finalRevision': requestNote.revision,
+            'canonicalDocument': requestNote.document,
             'serverTime': DateTime.now().toUtc().toIso8601String(),
           }),
         )
@@ -206,6 +230,7 @@ class _ServerNoteState {
   Map<String, dynamic> document;
   final Map<String, String> permissions;
   final List<Map<String, dynamic>> ops = [];
+  final Map<String, Map<String, dynamic>> acceptedByOperationId = {};
 
   _ServerNoteState({
     required this.revision,
@@ -330,6 +355,72 @@ void main() {
       expect(resultB.finalRevision, equals(1));
       expect(resultB.remoteOperations, hasLength(1));
       expect(resultB.remoteOperations.first.operationId, equals('op-http-1'));
+    },
+  );
+
+  test(
+    'HTTP Client contract: retries a response lost after server apply without duplicating the operation',
+    () async {
+      const noteId = '550e8400-e29b-41d4-a716-446655440004';
+      backend.seedNote(noteId, {
+        'schemaVersion': 1,
+        'blocks': [
+          {'id': 'b1', 'type': 'paragraph', 'delta': []},
+        ],
+      });
+      backend.failNextSyncAfterApplying = true;
+
+      final baseUrl = 'http://127.0.0.1:${backend.port}/api/v1/';
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      final service = NoteOperationsSyncService(
+        syncClient: NoteSyncClient(
+          client: _createTestApiClient(baseUrl, 'user-a'),
+        ),
+        dao: db.noteOperationsDao,
+        clientId: 'client-retry',
+        actorId: 'user-a',
+      );
+      await db.noteOperationsDao.upsertNoteDocument(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: noteId,
+          revision: 0,
+          documentJson: jsonEncode(backend._notes[noteId]!.document),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      await service.enqueueOperation(
+        noteId,
+        OperationRequest(
+          operationId: 'op-retry-http',
+          baseRevision: 0,
+          kind: 'text_delta',
+          blockId: 'b1',
+          payload: const {'ops': []},
+        ),
+      );
+
+      await expectLater(
+        service.syncPending(noteId),
+        throwsA(
+          isA<NoteOperationsException>().having(
+            (error) => error.statusCode,
+            'statusCode',
+            HttpStatus.serviceUnavailable,
+          ),
+        ),
+      );
+      expect(
+        (await db.noteOperationsDao.getPendingOperations(noteId)).single.status,
+        'in_flight',
+      );
+
+      final result = await service.syncPending(noteId);
+
+      expect(result.finalRevision, 1);
+      expect(backend.revisionOf(noteId), 1);
+      expect(backend.operationCount(noteId), 1);
+      expect(await db.noteOperationsDao.getPendingOperations(noteId), isEmpty);
     },
   );
 

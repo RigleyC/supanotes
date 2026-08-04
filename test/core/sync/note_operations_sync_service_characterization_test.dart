@@ -161,6 +161,41 @@ void main() {
     );
 
     test(
+      'slow network keeps one persisted in-flight request until it completes',
+      () async {
+        await seedConfirmedDocument(db, 'note-slow', revision: 4);
+        await seedPendingOperation(db, 'note-slow', 'op-slow', baseRevision: 4);
+        final requestStarted = Completer<void>();
+        final response = Completer<SyncResponse>();
+        client.onSync = (noteId, request) async {
+          requestStarted.complete();
+          return response.future;
+        };
+
+        final syncFuture = service.syncPending('note-slow');
+        await requestStarted.future;
+
+        final inFlight = await db.noteOperationsDao.getPendingOperations(
+          'note-slow',
+          ownerUserId: 'user-1',
+        );
+        expect(inFlight.single.status, 'in_flight');
+        expect(client.syncOperationCalls, 1);
+
+        response.complete(syncResponseFor('op-slow', 5));
+        await syncFuture;
+
+        expect(
+          await db.noteOperationsDao.getPendingOperations(
+            'note-slow',
+            ownerUserId: 'user-1',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
       'different account cannot overwrite a foreign persisted sync session',
       () async {
         await seedConfirmedDocument(db, 'note-account-scope', revision: 4);

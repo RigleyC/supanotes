@@ -4,7 +4,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_tile.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_icon.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
 void main() {
@@ -54,7 +53,7 @@ void main() {
         home: Scaffold(body: TaskTile(task: task)),
       ),
     );
-    expect(find.byType(TaskMetadataCalendarIcon), findsOneWidget);
+    expect(find.byIcon(Icons.event_outlined), findsOneWidget);
   });
 
   testWidgets('renders recurrence badge when recurrence set', (tester) async {
@@ -75,7 +74,7 @@ void main() {
         home: Scaffold(body: TaskTile(task: task)),
       ),
     );
-    expect(find.byType(TaskMetadataCalendarIcon), findsNothing);
+    expect(find.byIcon(Icons.event_outlined), findsNothing);
     expect(find.byIcon(Icons.refresh), findsNothing);
   });
 

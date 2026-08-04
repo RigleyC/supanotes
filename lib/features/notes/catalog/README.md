@@ -10,11 +10,14 @@ busca e hidratação remota.
   `watchNoteWithTasks` e `deleteIfEmptyOrTombstone` são a porta para telas.
 - `data/local/notes_local_repository.dart`: chamadas de baixo nível ao DAO,
   sempre limitadas ao usuário autenticado.
-- `data/note_catalog_sync.dart`: baixa snapshots das notas que não estão com
-  uma sessão de editor ativa, calcula `content`, `excerpt` e tarefas com
-  `NoteDocumentProjector` e usa `AppDatabase.saveRemoteNote` para persistir a
-  linha do catálogo, o snapshot e as projeções na mesma transação. Uma edição
-  local, exclusão ou versão concorrente faz a hidratação remota ser ignorada.
+- `data/note_catalog_sync.dart`: sincroniza todas as páginas do catálogo e
+  baixa snapshots das notas que não estão com uma sessão de editor ativa,
+  calcula `content`, `excerpt` e tarefas com `NoteDocumentProjector` e usa
+  `AppDatabase.saveRemoteNote` para persistir a linha do catálogo, o snapshot
+  e as projeções na mesma transação. A sincronização é iniciada no escopo do
+  app e roda em segundo plano; abrir uma nota lê o estado local e não espera a
+  rede. Uma edição local, exclusão ou versão concorrente faz a hidratação
+  remota ser ignorada.
 - `model/`: `NoteModel`, `NoteWithTasks` e textos compartilhados do catálogo.
 - `application/notes_providers.dart`: streams reativos para lista e detalhe.
 - `presentation/`: shell desktop, lista e widgets de cartão/barra lateral.

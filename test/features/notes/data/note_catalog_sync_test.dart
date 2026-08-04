@@ -45,6 +45,68 @@ void main() {
     },
   );
 
+  test('hydrates every remote catalog page before completing', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+    );
+    addTearDown(database.close);
+
+    final firstPage = List.generate(100, (index) {
+      final id = 'remote-${index.toString().padLeft(3, '0')}';
+      return <String, dynamic>{
+        'id': id,
+        'user_id': 'user-a',
+        'created_at': '2026-07-31T12:00:00.000Z',
+        'updated_at': '2026-07-31T12:00:00.000Z',
+      };
+    });
+    final secondPage = [
+      <String, dynamic>{
+        'id': 'remote-100',
+        'user_id': 'user-a',
+        'created_at': '2026-07-31T12:00:00.000Z',
+        'updated_at': '2026-07-31T12:00:00.000Z',
+      },
+    ];
+
+    when(
+      () => client.listNotes(
+        limit: any(named: 'limit'),
+        cursorUpdatedAt: any(named: 'cursorUpdatedAt'),
+        cursorId: any(named: 'cursorId'),
+      ),
+    ).thenAnswer((invocation) async {
+      final cursorId = invocation.namedArguments[#cursorId] as String?;
+      return cursorId == null ? firstPage : secondPage;
+    });
+    when(() => client.getDocument(any())).thenAnswer((invocation) async {
+      final noteId = invocation.positionalArguments.single as String;
+      return NoteDocumentResponse(
+        noteId: noteId,
+        revision: 1,
+        document: const {'schemaVersion': 1, 'blocks': []},
+        serverTime: DateTime.utc(2026, 7, 31, 12),
+      );
+    });
+
+    await sync.pullRemoteNotes('user-a');
+
+    expect(await database.notesDao.getNoteById('remote-000'), isNotNull);
+    expect(await database.notesDao.getNoteById('remote-100'), isNotNull);
+    verify(
+      () => client.listNotes(
+        limit: any(named: 'limit'),
+        cursorUpdatedAt: any(named: 'cursorUpdatedAt'),
+        cursorId: any(named: 'cursorId'),
+      ),
+    ).called(2);
+    verify(() => client.getDocument(any())).called(101);
+  });
+
   test('pushes a local tombstone before removing the note locally', () async {
     final database = AppDatabase.test();
     final client = _MockNoteSyncClient();
