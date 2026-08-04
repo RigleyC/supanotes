@@ -138,6 +138,29 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// Saves a remote note's canonical snapshot and every local projection atomically.
+  Future<void> saveRemoteNote({
+    required bool insertNote,
+    required NotesCompanion note,
+    required LocalNoteDocumentsCompanion document,
+    required List<ProjectedTask> tasks,
+    String userId = '',
+  }) {
+    return transaction(() async {
+      await noteOperationsDao.upsertNoteDocument(document);
+      if (insertNote) {
+        await notesDao.createNote(note);
+      } else {
+        await notesDao.updateNote(note);
+      }
+      await tasksDao.syncProjectedTasksForNoteTyped(
+        note.id.value,
+        tasks,
+        userId: userId,
+      );
+    });
+  }
+
   @override
   int get schemaVersion => 25;
 

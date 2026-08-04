@@ -4,6 +4,7 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/domain/note_document_codec.dart';
+import 'projected_document.dart';
 import 'package:supanotes/features/tasks/domain/projected_task.dart';
 
 class TaskProjectionEngine {
@@ -13,8 +14,8 @@ class TaskProjectionEngine {
   TaskProjectionEngine({
     required AppDatabase database,
     NoteDocumentCodec codec = const NoteDocumentCodec(),
-  })  : _database = database,
-        _codec = codec;
+  }) : _database = database,
+       _codec = codec;
 
   /// Projects tasks and note content from canonical REST/OT blocks into SQLite inside a single atomic transaction.
   Future<void> projectTasksFromBlocks({
@@ -22,6 +23,22 @@ class TaskProjectionEngine {
     required List<dynamic> blocks,
     String userId = '',
   }) async {
+    final projection = projectBlocks(noteId: noteId, blocks: blocks);
+
+    await _database.saveProjectedDocument(
+      noteId: noteId,
+      content: projection.content,
+      excerpt: projection.excerpt,
+      tasks: projection.tasks,
+      userId: userId,
+    );
+  }
+
+  /// Calculates all local projections without writing to SQLite.
+  ProjectedDocument projectBlocks({
+    required String noteId,
+    required List<dynamic> blocks,
+  }) {
     final projectedTasks = <ProjectedTask>[];
     final textBuffer = StringBuffer();
 
@@ -33,22 +50,21 @@ class TaskProjectionEngine {
           (blockData['content'] ?? blockData['delta']) as List<dynamic>? ?? [];
       final attributedText = _codec.attributedFromDelta(content);
       final plain = attributedText.toPlainText();
-      if (plain.isNotEmpty) {
-        textBuffer.writeln(plain);
-      }
+      if (plain.isNotEmpty) textBuffer.writeln(plain);
 
       if (type == 'task') {
-        final blockId = blockData['id'] as String? ?? '';
-        final metadata = Map<String, dynamic>.from(blockData['metadata'] as Map? ?? {});
-
+        final metadata = Map<String, dynamic>.from(
+          blockData['metadata'] as Map? ?? {},
+        );
         projectedTasks.add(
           ProjectedTask(
-            id: blockId,
+            id: blockData['id'] as String? ?? '',
             noteId: noteId,
             title: plain,
             isCompleted: metadata['isCompleted'] as bool? ?? false,
             dueDate: metadata['dueDate'] as String?,
-            recurrenceRule: metadata['recurrenceRule'] as String? ??
+            recurrenceRule:
+                metadata['recurrenceRule'] as String? ??
                 metadata['recurrence'] as String?,
             hasTime: metadata['hasTime'] as bool? ?? false,
             reminder: metadata['reminder'] as String?,
@@ -58,16 +74,13 @@ class TaskProjectionEngine {
       }
     }
 
-    final fullText = textBuffer.toString().trimRight();
-    final excerpt =
-        fullText.isEmpty ? null : (fullText.length > 200 ? fullText.substring(0, 200) : fullText);
-
-    await _database.saveProjectedDocument(
-      noteId: noteId,
-      content: fullText,
-      excerpt: excerpt,
+    final content = textBuffer.toString().trimRight();
+    return ProjectedDocument(
+      content: content,
+      excerpt: content.isEmpty
+          ? null
+          : (content.length > 200 ? content.substring(0, 200) : content),
       tasks: projectedTasks,
-      userId: userId,
     );
   }
 

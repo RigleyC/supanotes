@@ -118,11 +118,31 @@ class NoteCatalogSync {
     required Map<String, dynamic> json,
   }) async {
     final id = json['id'] as String;
+    final existing = await _database.notesDao.getNoteById(id);
+    final hasShareMetadata =
+        json.containsKey('permission') ||
+        json.containsKey('shared_by_email') ||
+        json.containsKey('shared_by_name');
+    final permission = json['permission'] as String?;
+    final sharedByEmail = json['shared_by_email'] as String?;
+    final sharedByName = json['shared_by_name'] as String?;
+
     if (_activityTracker.isActive(id)) {
-      dev.log('[NoteCatalogSync] Skipping active note $id');
+      if (existing != null && hasShareMetadata) {
+        await (_database.update(
+          _database.notes,
+        )..where((note) => note.id.equals(id))).write(
+          NotesCompanion(
+            permission: Value(permission),
+            sharedByEmail: Value(sharedByEmail),
+            sharedByName: Value(sharedByName),
+          ),
+        );
+      }
+      dev.log('[NoteCatalogSync] Skipping active note content $id');
       return;
     }
-    final existing = await _database.notesDao.getNoteById(id);
+
     final localDocument = await (_database.select(
       _database.localNoteDocuments,
     )..where((document) => document.noteId.equals(id))).getSingleOrNull();
@@ -138,45 +158,67 @@ class NoteCatalogSync {
     }
 
     final remote = await _syncClient.getDocument(id);
-    await _database.noteOperationsDao.upsertNoteDocument(
-      LocalNoteDocumentsCompanion.insert(
-        noteId: remote.noteId,
-        revision: remote.revision,
-        documentJson: jsonEncode(remote.document),
-        updatedAt: remote.serverTime,
-      ),
-    );
-    await _taskProjectionEngine.projectTasksFromSnapshot(
+    final projection = _taskProjectionEngine.projectBlocks(
       noteId: id,
-      snapshot: remote.document,
-      userId: userId,
+      blocks: remote.document['blocks'] as List<dynamic>? ?? [],
+    );
+    final document = LocalNoteDocumentsCompanion.insert(
+      noteId: remote.noteId,
+      revision: remote.revision,
+      documentJson: jsonEncode(remote.document),
+      updatedAt: remote.serverTime,
     );
     if (existing == null) {
       final ownerUserId = json['user_id'] as String? ?? userId;
-      await _database
-          .into(_database.notes)
-          .insert(
-            NotesCompanion.insert(
-              id: id,
-              userId: ownerUserId,
-              content: '',
-              createdAt: createdAt,
-              updatedAt: updatedAt,
-              isDirty: const Value(false),
-              hasRemoteCopy: const Value(true),
-              collapseImages: Value(json['collapse_images'] as bool? ?? false),
-            ),
-          );
+      await _database.saveRemoteNote(
+        insertNote: true,
+        document: document,
+        tasks: projection.tasks,
+        userId: userId,
+        note: NotesCompanion.insert(
+          id: id,
+          userId: ownerUserId,
+          content: projection.content,
+          excerpt: Value(projection.excerpt),
+          createdAt: createdAt,
+          updatedAt: updatedAt,
+          isDirty: const Value(false),
+          hasRemoteCopy: const Value(true),
+          collapseImages: json.containsKey('collapse_images')
+              ? Value(json['collapse_images'] as bool? ?? false)
+              : const Value.absent(),
+          permission: Value(permission),
+          sharedByEmail: Value(sharedByEmail),
+          sharedByName: Value(sharedByName),
+        ),
+      );
     } else {
-      await (_database.update(
-        _database.notes,
-      )..where((note) => note.id.equals(id))).write(
-        NotesCompanion(
+      final metadata = hasShareMetadata
+          ? NotesCompanion(
+              permission: Value(permission),
+              sharedByEmail: Value(sharedByEmail),
+              sharedByName: Value(sharedByName),
+            )
+          : const NotesCompanion();
+      await _database.saveRemoteNote(
+        insertNote: false,
+        document: document,
+        tasks: projection.tasks,
+        userId: userId,
+        note: NotesCompanion(
+          id: Value(id),
+          content: Value(projection.content),
+          excerpt: Value(projection.excerpt),
           createdAt: Value(createdAt),
           updatedAt: Value(updatedAt),
           isDirty: const Value(false),
           hasRemoteCopy: const Value(true),
-          collapseImages: Value(json['collapse_images'] as bool? ?? false),
+          collapseImages: json.containsKey('collapse_images')
+              ? Value(json['collapse_images'] as bool? ?? false)
+              : const Value.absent(),
+          permission: metadata.permission,
+          sharedByEmail: metadata.sharedByEmail,
+          sharedByName: metadata.sharedByName,
         ),
       );
     }
