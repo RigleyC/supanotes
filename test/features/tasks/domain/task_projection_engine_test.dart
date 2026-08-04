@@ -32,7 +32,10 @@ void main() {
 
   setUp(() {
     db = AppDatabase.test();
-    engine = TaskProjectionEngine(database: db);
+    engine = TaskProjectionEngine(
+      database: db,
+      now: () => DateTime(2026, 8, 4, 12),
+    );
   });
 
   tearDown(() async {
@@ -93,6 +96,58 @@ void main() {
       )..where((t) => t.noteId.equals(noteId))).get();
       expect(tasks, hasLength(1));
       expect(tasks.first.title, 'Buy milk');
+    },
+  );
+
+  test(
+    'advances an overdue recurring task to the current occurrence',
+    () async {
+      const noteId = 'note-recurring-catch-up';
+      const userId = 'user-1';
+      final now = DateTime(2026, 8, 4, 12);
+      final today = DateTime(2026, 8, 4);
+      final overdueDate = today.subtract(const Duration(days: 3));
+
+      await db.notesDao.createNote(
+        NotesCompanion.insert(
+          id: noteId,
+          userId: userId,
+          content: 'Daily task',
+          excerpt: const Value('Daily task'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      await engine.projectTasksFromSnapshot(
+        noteId: noteId,
+        snapshot: {
+          'blocks': [
+            {
+              'id': 'task-recurring-catch-up',
+              'type': 'task',
+              'metadata': {
+                'isCompleted': false,
+                'dueDate': overdueDate.toIso8601String(),
+                'recurrenceRule': 'daily',
+              },
+              'content': [
+                {'insert': 'Daily task'},
+              ],
+            },
+          ],
+        },
+        userId: userId,
+      );
+
+      final task =
+          await (db.select(db.tasks)
+                ..where((task) => task.id.equals('task-recurring-catch-up')))
+              .getSingle();
+
+      expect(task.status, 'open');
+      expect(task.recurrence, isNotNull);
+      expect(task.dueDate, today);
     },
   );
 

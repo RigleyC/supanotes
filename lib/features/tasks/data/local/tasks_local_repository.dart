@@ -74,7 +74,8 @@ class TasksLocalRepository {
     await _dao.updateTask(companion);
   }
 
-  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id) async {
+  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
+  completeTask(String id) async {
     return await _dao.completeTask(id);
   }
 
@@ -92,10 +93,6 @@ class TasksLocalRepository {
 
   Future<void> deleteTask(String id) async {
     await _dao.deleteTaskById(id);
-  }
-
-  Future<void> catchUpRecurringTasks() async {
-    await _dao.catchUpRecurringTasks();
   }
 
   /// Runs [action] inside a Drift [Transaction] so that all batched

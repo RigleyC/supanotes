@@ -1,5 +1,6 @@
 import '../../../core/database/database.dart';
 import '../../../core/utils/date_time_extensions.dart';
+import '../../../core/utils/recurrence.dart';
 import 'task_recurrence.dart';
 
 /// Immutable view-model for a task shown in the presentation layer.
@@ -45,7 +46,17 @@ class TaskModel {
 
   /// Builds a presentation-layer [TaskModel] from a Drift row. Centralised
   /// here so the rest of the app never has to know about [TaskData].
-  factory TaskModel.fromData(TaskData d) {
+  factory TaskModel.fromData(TaskData d, {DateTime? now}) {
+    final dueDate =
+        d.status == 'open' && d.dueDate != null && d.recurrence != null
+        ? advanceRecurringDueDate(
+            from: d.dueDate!,
+            recurrence: d.recurrence!,
+            hasTime: d.hasTime,
+            now: now,
+          )
+        : d.dueDate;
+
     return TaskModel(
       id: d.id,
       userId: d.userId,
@@ -53,7 +64,7 @@ class TaskModel {
       title: d.title,
       status: d.status,
       position: d.position,
-      dueDate: d.dueDate,
+      dueDate: dueDate,
       hasTime: d.hasTime,
       completedAt: d.completedAt,
       recurrence: d.recurrence,

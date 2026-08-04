@@ -2,14 +2,18 @@ import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 /// Returns the next due date for a given [recurrence] rule starting from [from].
 /// Returns `null` when the rule is not recognised.
-DateTime? nextDueDate({required DateTime from, required TaskRecurrence recurrence}) {
+DateTime? nextDueDate({
+  required DateTime from,
+  required TaskRecurrence recurrence,
+}) {
   DateTime? raw;
   switch (recurrence) {
     case TaskRecurrence.daily:
       raw = _copyWith(from, day: from.day + 1);
     case TaskRecurrence.weekdays:
       var day = _copyWith(from, day: from.day + 1);
-      while (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
+      while (day.weekday == DateTime.saturday ||
+          day.weekday == DateTime.sunday) {
         day = _copyWith(day, day: day.day + 1);
       }
       raw = day;
@@ -27,12 +31,40 @@ DateTime? nextDueDate({required DateTime from, required TaskRecurrence recurrenc
   return raw;
 }
 
-DateTime _copyWith(
-  DateTime date, {
-  int? year,
-  int? month,
-  int? day,
+/// Returns the latest occurrence that has started at [now].
+///
+/// A missed occurrence is not kept as a permanent backlog. The task advances
+/// when the next scheduled date is reached, while the current occurrence can
+/// still be overdue until its following occurrence starts.
+DateTime advanceRecurringDueDate({
+  required DateTime from,
+  required TaskRecurrence recurrence,
+  required bool hasTime,
+  DateTime? now,
 }) {
+  final effectiveNow = now ?? DateTime.now();
+  final today = DateTime(
+    effectiveNow.year,
+    effectiveNow.month,
+    effectiveNow.day,
+  );
+  var current = from;
+
+  for (var i = 0; i < 10000; i++) {
+    final next = nextDueDate(from: current, recurrence: recurrence);
+    if (next == null || next.isAtSameMomentAs(current)) break;
+
+    final hasStarted = hasTime
+        ? !next.isAfter(effectiveNow)
+        : !DateTime(next.year, next.month, next.day).isAfter(today);
+    if (!hasStarted) break;
+    current = next;
+  }
+
+  return current;
+}
+
+DateTime _copyWith(DateTime date, {int? year, int? month, int? day}) {
   if (date.isUtc) {
     return DateTime.utc(
       year ?? date.year,
@@ -107,14 +139,10 @@ DateTime catchUpDueDate({
   required TaskRecurrence recurrence,
   required DateTime today,
 }) {
-  var currentDue = from;
-  var next = nextDueDate(from: currentDue, recurrence: recurrence);
-  while (next != null && next.isBefore(today)) {
-    currentDue = next;
-    next = nextDueDate(from: currentDue, recurrence: recurrence);
-  }
-  if (next != null && next.isAtSameMomentAs(today)) {
-    currentDue = next;
-  }
-  return currentDue;
+  return advanceRecurringDueDate(
+    from: from,
+    recurrence: recurrence,
+    hasTime: false,
+    now: today,
+  );
 }

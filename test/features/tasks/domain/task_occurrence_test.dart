@@ -64,7 +64,7 @@ void main() {
   });
 
   group('buildOccurrences - daily recurrence', () {
-    test('enumerates all occurrences from anchor to 30 days ahead', () {
+    test('advances missed occurrences to the current day', () {
       final result = buildOccurrences(
         taskId: 't1',
         anchor: DateTime(2026, 7, 1),
@@ -74,13 +74,12 @@ void main() {
         completedScheduledAts: {},
       );
 
-      expect(result.length, greaterThan(20));
-      expect(result[0].scheduledAt, DateTime(2026, 7, 1));
-      expect(result[0].status, OccurrenceStatus.overdue);
-      expect(result[20].status, OccurrenceStatus.pending);
+      expect(result, hasLength(1));
+      expect(result.single.scheduledAt, DateTime(2026, 7, 21));
+      expect(result.single.status, OccurrenceStatus.pending);
     });
 
-    test('marks completed occurrences', () {
+    test('does not keep missed completion history as overdue occurrences', () {
       final result = buildOccurrences(
         taskId: 't1',
         anchor: DateTime(2026, 7, 1),
@@ -90,9 +89,9 @@ void main() {
         completedScheduledAts: {DateTime(2026, 7, 1), DateTime(2026, 7, 2)},
       );
 
-      expect(result[0].status, OccurrenceStatus.completed);
-      expect(result[1].status, OccurrenceStatus.completed);
-      expect(result[2].status, OccurrenceStatus.overdue);
+      expect(result, hasLength(1));
+      expect(result.single.scheduledAt, DateTime(2026, 7, 21));
+      expect(result.single.status, OccurrenceStatus.pending);
     });
 
     test('respects hasTime in date comparison', () {
@@ -105,17 +104,19 @@ void main() {
         completedScheduledAts: {},
       );
 
-      final today = result.firstWhere((o) =>
-          o.scheduledAt.year == 2026 &&
-          o.scheduledAt.month == 7 &&
-          o.scheduledAt.day == 21);
+      final today = result.firstWhere(
+        (o) =>
+            o.scheduledAt.year == 2026 &&
+            o.scheduledAt.month == 7 &&
+            o.scheduledAt.day == 21,
+      );
       expect(today.status, OccurrenceStatus.pending);
       expect(today.scheduledAt.hour, 14);
     });
   });
 
   group('buildOccurrences - weekly recurrence', () {
-    test('marks missed weeks as overdue', () {
+    test('keeps only the latest reached occurrence', () {
       final result = buildOccurrences(
         taskId: 't1',
         anchor: DateTime(2026, 7, 1),
@@ -125,16 +126,28 @@ void main() {
         completedScheduledAts: {},
       );
 
-      expect(result[0].scheduledAt, DateTime(2026, 7, 1));
-      expect(result[0].status, OccurrenceStatus.overdue);
-      final nextIndex = result.indexWhere(
-        (o) => o.status == OccurrenceStatus.pending,
+      expect(result, hasLength(1));
+      expect(result.single.scheduledAt, DateTime(2026, 7, 15));
+      expect(result.single.status, OccurrenceStatus.overdue);
+    });
+
+    test('does not show earlier missed weeks when the current week starts', () {
+      final result = buildOccurrences(
+        taskId: 't1',
+        anchor: DateTime(2026, 7, 7),
+        recurrence: TaskRecurrence.weekly,
+        hasTime: false,
+        now: DateTime(2026, 7, 21),
+        completedScheduledAts: {DateTime(2026, 7, 7)},
       );
-      expect(nextIndex, greaterThan(0));
+
+      expect(result, hasLength(1));
+      expect(result.single.scheduledAt, DateTime(2026, 7, 21));
+      expect(result.single.status, OccurrenceStatus.pending);
     });
 
     test(
-      'conclude 07/jul, not 14/jul, opens in 21/jul — 14/jul overdue, 21/jul pending',
+      'a completion from a missed week does not reopen an old occurrence',
       () {
         final result = buildOccurrences(
           taskId: 't1',
@@ -142,37 +155,18 @@ void main() {
           recurrence: TaskRecurrence.weekly,
           hasTime: false,
           now: DateTime(2026, 7, 21),
-          completedScheduledAts: {DateTime(2026, 7, 7)},
+          completedScheduledAts: {DateTime(2026, 7, 14)},
         );
 
-        expect(result[0].scheduledAt, DateTime(2026, 7, 7));
-        expect(result[0].status, OccurrenceStatus.completed);
-        expect(result[1].scheduledAt, DateTime(2026, 7, 14));
-        expect(result[1].status, OccurrenceStatus.overdue);
-        expect(result[2].scheduledAt, DateTime(2026, 7, 21));
-        expect(result[2].status, OccurrenceStatus.pending);
+        expect(result, hasLength(1));
+        expect(result.single.scheduledAt, DateTime(2026, 7, 21));
+        expect(result.single.status, OccurrenceStatus.pending);
       },
     );
-
-    test('completing an overdue occurrence does not affect current', () {
-      final result = buildOccurrences(
-        taskId: 't1',
-        anchor: DateTime(2026, 7, 7),
-        recurrence: TaskRecurrence.weekly,
-        hasTime: false,
-        now: DateTime(2026, 7, 21),
-        completedScheduledAts: {DateTime(2026, 7, 14)},
-      );
-
-      expect(result[0].status, OccurrenceStatus.overdue);
-      expect(result[1].scheduledAt, DateTime(2026, 7, 14));
-      expect(result[1].status, OccurrenceStatus.completed);
-      expect(result[2].status, OccurrenceStatus.pending);
-    });
   });
 
   group('buildOccurrences - monthly recurrence', () {
-    test('enumerates monthly occurrences', () {
+    test('advances to the latest reached month', () {
       final result = buildOccurrences(
         taskId: 't1',
         anchor: DateTime(2026, 1, 15),
@@ -182,9 +176,9 @@ void main() {
         completedScheduledAts: {},
       );
 
-      expect(result.length, greaterThanOrEqualTo(3));
-      expect(result[0].scheduledAt, DateTime(2026, 1, 15));
-      expect(result[0].status, OccurrenceStatus.overdue);
+      expect(result, hasLength(1));
+      expect(result.single.scheduledAt, DateTime(2026, 3, 15));
+      expect(result.single.status, OccurrenceStatus.overdue);
     });
 
     test('clamps day for month with fewer days', () {
@@ -197,10 +191,8 @@ void main() {
         completedScheduledAts: {},
       );
 
-      expect(result[0],
-          predicate((TaskOccurrence o) => o.scheduledAt == DateTime(2026, 1, 31)));
-      expect(result[1],
-          predicate((TaskOccurrence o) => o.scheduledAt == DateTime(2026, 2, 28)));
+      expect(result, hasLength(1));
+      expect(result.single.scheduledAt, DateTime(2026, 2, 28));
     });
   });
 

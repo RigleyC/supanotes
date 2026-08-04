@@ -13,9 +13,10 @@ class TaskProjectionEngine {
   TaskProjectionEngine({
     required AppDatabase database,
     NoteDocumentCodec codec = const NoteDocumentCodec(),
+    DateTime Function()? now,
   }) : _database = database,
        _codec = codec,
-       _projector = NoteDocumentProjector(codec: codec);
+       _projector = NoteDocumentProjector(codec: codec, now: now);
 
   /// Projects tasks and note content from canonical REST/OT blocks into SQLite inside a single atomic transaction.
   Future<void> projectTasksFromBlocks({

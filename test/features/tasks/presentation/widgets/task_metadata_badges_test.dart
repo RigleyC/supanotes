@@ -32,6 +32,26 @@ void main() {
     expect(find.text('Hoje'), findsOneWidget);
   });
 
+  testWidgets('advances a missed recurring date before rendering the badge', (
+    tester,
+  ) async {
+    final today = DateTime(2026, 8, 4, 12);
+    final overdue = DateTime(2026, 8, 1);
+
+    await tester.pumpWidget(
+      wrap(
+        TaskMetadataBadges(
+          dueDate: overdue,
+          recurrence: TaskRecurrence.daily,
+          now: today,
+        ),
+      ),
+    );
+
+    expect(find.text('Hoje'), findsOneWidget);
+    expect(find.textContaining('Atrasada'), findsNothing);
+  });
+
   testWidgets('shows recurrence label', (tester) async {
     await tester.pumpWidget(
       wrap(const TaskMetadataBadges(recurrence: TaskRecurrence.weekly)),

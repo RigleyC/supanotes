@@ -67,10 +67,7 @@ void main() {
       final tasksLocal = FakeTasksLocalRepository();
       final repo = NotesRepository(local, tasksLocal, prefsDao);
 
-      await repo.saveNoteSnapshot(
-        id: 'note-1',
-        content: 'B',
-      );
+      await repo.saveNoteSnapshot(id: 'note-1', content: 'B');
 
       final saved = await local.getNoteById('note-1');
       expect(saved, isNotNull);
@@ -85,18 +82,22 @@ void main() {
       final linksDao = FakeNoteLinksDao();
       final repo = NotesRepository(local, tasksLocal, prefsDao, linksDao);
 
-      const content = 'Check out [Note A](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890) '
+      const content =
+          'Check out [Note A](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890) '
           'and [Note B](note://b2c3d4e5-f6a7-8901-bcde-f12345678901)';
 
-      await repo.saveNoteSnapshot(
-        id: 'source-1',
-        content: content,
-      );
+      await repo.saveNoteSnapshot(id: 'source-1', content: content);
 
       final links = await linksDao.getLinksForNote('source-1');
       expect(links.length, 2);
-      expect(links.any((l) => l.targetId == 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'), true);
-      expect(links.any((l) => l.targetId == 'b2c3d4e5-f6a7-8901-bcde-f12345678901'), true);
+      expect(
+        links.any((l) => l.targetId == 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
+        true,
+      );
+      expect(
+        links.any((l) => l.targetId == 'b2c3d4e5-f6a7-8901-bcde-f12345678901'),
+        true,
+      );
     });
 
     test('saveSnapshot removes stale links and adds new ones', () async {
@@ -113,12 +114,10 @@ void main() {
 
       final repo = NotesRepository(local, tasksLocal, prefsDao, linksDao);
 
-      const content = 'Only [New Note](note://bbbbbbbb-cccc-dddd-eeee-ffffffffffff)';
+      const content =
+          'Only [New Note](note://bbbbbbbb-cccc-dddd-eeee-ffffffffffff)';
 
-      await repo.saveNoteSnapshot(
-        id: 'source-1',
-        content: content,
-      );
+      await repo.saveNoteSnapshot(id: 'source-1', content: content);
 
       final links = await linksDao.getLinksForNote('source-1');
       expect(links.length, 1);
@@ -135,10 +134,7 @@ void main() {
       const content = '[Test](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890)';
 
       // Should not throw when dao is null
-      await repo.saveNoteSnapshot(
-        id: 'note-1',
-        content: content,
-      );
+      await repo.saveNoteSnapshot(id: 'note-1', content: content);
 
       final saved = await local.getNoteById('note-1');
       expect(saved, isNotNull);
@@ -165,13 +161,20 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   Stream<NoteQueryResult?> watchNoteById(String id) => const Stream.empty();
 
   @override
-  Stream<NoteWithTasksQueryResult?> watchNoteWithTasks(String id) => const Stream.empty();
+  Stream<NoteWithTasksQueryResult?> watchNoteWithTasks(String id) =>
+      const Stream.empty();
 
   @override
   Future<NoteQueryResult?> getNoteById(String id) async {
     final data = _store[id];
     if (data == null) return null;
-    return (note: data, title: 'Sem título', favorite: false, archived: false, hideCompleted: false);
+    return (
+      note: data,
+      title: 'Sem título',
+      favorite: false,
+      archived: false,
+      hideCompleted: false,
+    );
   }
 
   @override
@@ -179,8 +182,10 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       throw UnimplementedError('not used in these tests');
 
   @override
-  Future<NoteQueryResult> createNoteWithId(String id,
-      {String content = ''}) async {
+  Future<NoteQueryResult> createNoteWithId(
+    String id, {
+    String content = '',
+  }) async {
     final now = DateTime.now().toUtc();
     final data = NoteData(
       id: id,
@@ -193,7 +198,13 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       collapseImages: false,
     );
     _store[id] = data;
-    return (note: data, title: 'Sem título', favorite: false, archived: false, hideCompleted: false);
+    return (
+      note: data,
+      title: 'Sem título',
+      favorite: false,
+      archived: false,
+      hideCompleted: false,
+    );
   }
 
   @override
@@ -227,8 +238,9 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   Future<void> softDeleteNote(String id) async {
     softDeletedIds.add(id);
     if (_store.containsKey(id)) {
-      _store[id] =
-          _store[id]!.copyWith(deletedAt: Value(DateTime.now().toUtc()));
+      _store[id] = _store[id]!.copyWith(
+        deletedAt: Value(DateTime.now().toUtc()),
+      );
     }
   }
 
@@ -241,15 +253,11 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       );
     }
   }
-
 }
 
 class FakeTasksLocalRepository implements TasksLocalRepository {
   @override
   String get userId => 'test-user';
-
-  @override
-  Future<void> catchUpRecurringTasks() async {}
 
   @override
   Stream<List<TaskData>> watchTodayTasks() => const Stream.empty();
@@ -259,8 +267,7 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
       const Stream.empty();
 
   @override
-  Stream<List<TaskData>> watchNoteTasks(String noteId) =>
-      const Stream.empty();
+  Stream<List<TaskData>> watchNoteTasks(String noteId) => const Stream.empty();
 
   @override
   Future<List<TaskData>> getNoteTasks(String noteId) async => [];
@@ -285,7 +292,9 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
   }
 
   @override
-  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})> completeTask(String id) async => (nextDue: null, previousDue: null, previousHasTime: false);
+  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
+  completeTask(String id) async =>
+      (nextDue: null, previousDue: null, previousHasTime: false);
 
   @override
   Future<void> reopenTask(String id, {DateTime? originalDueDate}) async {}
@@ -308,12 +317,12 @@ class FakeUserNotePreferencesDao implements UserNotePreferencesDao {
       throw UnimplementedError('${invocation.memberName} not implemented');
   @override
   Stream<UserNotePreferenceData?> watchPreference(
-          String userId, String noteId) =>
-      const Stream.empty();
+    String userId,
+    String noteId,
+  ) => const Stream.empty();
 
   @override
-  Future<UserNotePreferenceData?> getPreference(
-          String userId, String noteId) =>
+  Future<UserNotePreferenceData?> getPreference(String userId, String noteId) =>
       Future.value(null);
 
   @override
@@ -324,17 +333,17 @@ class FakeUserNotePreferencesDao implements UserNotePreferencesDao {
   Future<void> clearDirtyFlag(String userId, String noteId) async {}
 
   @override
-  Future<void> setFavorite(
-      String userId, String noteId, bool favorite) async {}
+  Future<void> setFavorite(String userId, String noteId, bool favorite) async {}
 
   @override
-  Future<void> setArchived(
-      String userId, String noteId, bool archived) async {}
+  Future<void> setArchived(String userId, String noteId, bool archived) async {}
 
   @override
   Future<void> setHideCompleted(
-      String userId, String noteId, bool hideCompleted) async {}
-
+    String userId,
+    String noteId,
+    bool hideCompleted,
+  ) async {}
 }
 
 class FakeNoteLinksDao implements NoteLinksDao {

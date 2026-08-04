@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
+import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -25,7 +26,17 @@ class TaskMetadataBadges extends StatelessWidget {
   final DateTime? now;
 
   bool get _hasRecurrence => recurrence != null;
-  bool get _hasDueDate => dueDate != null;
+  DateTime? get _effectiveDueDate {
+    if (dueDate == null || recurrence == null || isCompleted) return dueDate;
+    return advanceRecurringDueDate(
+      from: dueDate!,
+      recurrence: recurrence!,
+      hasTime: hasTime,
+      now: now,
+    );
+  }
+
+  bool get _hasDueDate => _effectiveDueDate != null;
   bool get _hasActiveReminder => hasReminder && !isCompleted;
 
   @override
@@ -36,26 +47,27 @@ class TaskMetadataBadges extends StatelessWidget {
 
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final effectiveDueDate = _effectiveDueDate;
 
     return Wrap(
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (_hasDueDate)
+        if (effectiveDueDate != null)
           _MetadataPill(
             leading: Icon(
               Icons.event_outlined,
               size: 14,
-              color: _dueDateColor(context, dueDate!),
+              color: _dueDateColor(context, effectiveDueDate),
             ),
             label: formatDueDate(
-              dueDate!,
+              effectiveDueDate,
               hasTime: hasTime,
               isCompleted: isCompleted,
               now: now,
             ),
-            color: _dueDateColor(context, dueDate!),
+            color: _dueDateColor(context, effectiveDueDate),
           ),
         if (_hasRecurrence)
           _MetadataPill(

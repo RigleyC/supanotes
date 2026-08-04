@@ -9,12 +9,24 @@ Improve the user experience and data correctness when completing and editing rec
 
 ### Frontend (Flutter / Drift)
 
-#### [MODIFY] [tasks_dao.dart](file:///c:/Users/rigleyc/projects/supanotes/lib/core/database/daos/tasks_dao.dart)
-1. Add `catchUpRecurringTasks()` method to query all open recurring tasks and advance their due dates if they are in the past and their next occurrence has arrived (i.e. `nextDue <= today`).
-2. Run `catchUpRecurringTasks()` asynchronously:
-   * When initializing the repository/database.
-   * Inside `watchOpenTasks` and `watchTodayTasks` to ensure reactive UI catches up automatically.
-3. Update `completeTask(String id)`:
+#### [MODIFY] [recurrence.dart](file:///c:/Users/rigleyc/projects/supanotes/lib/core/utils/recurrence.dart)
+1. Add one pure function that returns the latest occurrence that has started.
+2. Skip missed occurrences instead of creating an overdue backlog.
+
+#### [MODIFY] [note_document_projector.dart](file:///c:/Users/rigleyc/projects/supanotes/lib/features/tasks/domain/note_document_projector.dart)
+3. Derive the current due date for open recurring tasks before writing the local
+   task projection.
+
+#### [MODIFY] [task_completion_command.dart](file:///c:/Users/rigleyc/projects/supanotes/lib/features/tasks/domain/task_completion_command.dart)
+4. Calculate the active occurrence before completing a recurring task.
+   Record the completion for that occurrence and calculate the next date from
+   it.
+
+#### [MODIFY] [task_model.dart](file:///c:/Users/rigleyc/projects/supanotes/lib/features/tasks/domain/task_model.dart)
+5. Apply the same derivation to rows read from the local projection. The DAO
+   does not write time-based catch-up data directly.
+
+6. Update `completeTask(String id)`:
    * Calculate the caught-up active occurrence date first if the task is recurring.
    * Record the completion event for that active date.
    * Calculate the next occurrence starting from the active date.
@@ -41,10 +53,10 @@ Improve the user experience and data correctness when completing and editing rec
 ## Verification Plan
 
 ### Automated Tests
-- Run `flutter test test/core/database/daos/tasks_dao_test.dart` to verify local recurrence calculations.
-- Run `go test ./internal/tasks/...` to verify backend recurrence calculations and database updates.
+- Run the recurrence, projection, occurrence, controller, and badge tests.
+- Run `go test ./internal/tasks/...` when backend task behavior changes.
 
 ### Manual Verification
-1. **Automatic Catch-Up**: Set a daily task due yesterday (e.g. June 29). Open the app today (June 30). Verify that the task's due date automatically changes to today (June 30) without showing the red "Atrasada" badge, and no completion history was added for yesterday.
+1. **Automatic Catch-Up**: Set a daily task due yesterday (e.g. June 29). Open the app today (June 30). Verify that the local projection shows today (June 30) without the red "Atrasada" badge, and no completion history was added for yesterday.
 2. **Click Catch-Up**: Set a daily task due yesterday. Complete it. Verify it completes for today and advances to tomorrow (July 1), logging exactly 1 completion.
 3. **Task Conversion**: Create a one-off task. Complete it. Edit it to add a daily recurrence. Verify that the task is re-opened, its due date is set to tomorrow, and the completion history still shows the completed one-off task.

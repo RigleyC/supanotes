@@ -46,24 +46,16 @@ abstract class ITasksRepository {
   });
   Future<void> deleteTask(String id);
   Future<void> reorderTasks(String noteId, List<String> orderedIds);
-  Future<void> catchUpRecurringTasks();
 }
 
 class TasksRepository implements ITasksRepository {
-  TasksRepository(this._local) {
-    // Fire-and-forget: advance overdue recurring tasks to today.
-    // Errors are swallowed — the fast-forward in _nextDueDate is a safety net.
-    _local.catchUpRecurringTasks();
-  }
+  TasksRepository(this._local);
 
   final TasksLocalRepository _local;
   final Uuid _uuid = const Uuid();
 
   @override
   String get userId => _local.userId;
-
-  @override
-  Future<void> catchUpRecurringTasks() => _local.catchUpRecurringTasks();
 
   // ---------------------------------------------------------------------------
   // Reads
@@ -159,9 +151,9 @@ class TasksRepository implements ITasksRepository {
     );
   }
 
-  /// Delegates to the DAO, which marks the row completed and, if the
-  /// task is recurring, schedules the next occurrence in the same
-  /// transaction.
+  /// Persists a completion in the legacy local-task API. The editor path uses
+  /// [TaskCompletionCommand] so recurring tasks advance before the document
+  /// projection is saved.
   @override
   Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
   completeTask(String id) => _local.completeTask(id);

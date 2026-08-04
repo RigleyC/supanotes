@@ -65,6 +65,43 @@ void main() {
     await controller.dispose();
   });
 
+  test(
+    'completes the current occurrence when the stored date is stale',
+    () async {
+      final controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+        nodes: [
+          TaskNode(
+            id: 'task-1',
+            text: AttributedText('Daily task'),
+            isComplete: false,
+            metadata: {
+              'dueDate': '2026-07-01T09:00:00.000',
+              'hasTime': true,
+              'recurrenceRule': 'daily',
+            },
+          ),
+        ],
+      );
+
+      final result = controller.completeTaskInEditor(
+        'task-1',
+        now: DateTime(2026, 7, 4, 12),
+      );
+
+      expect(result?.scheduledAt, DateTime(2026, 7, 4, 9));
+      expect(result?.nextDue, DateTime(2026, 7, 5, 9));
+      final task = controller.document.getNodeById('task-1')! as TaskNode;
+      expect(task.metadata['dueDate'], '2026-07-05T09:00:00.000');
+      expect(
+        (task.metadata['completions'] as Map).keys,
+        contains('2026-07-04T12:00:00.000Z'),
+      );
+      await controller.dispose();
+    },
+  );
+
   test('stale upload failure does not mutate an inactive editor', () async {
     final upload = Completer<void>();
     var active = true;

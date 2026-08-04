@@ -12,6 +12,14 @@
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
 
+> **Status: Superseded**
+>
+> The old DAO catch-up plan is no longer the implementation contract. The
+> current code derives the latest reached occurrence in the pure recurrence
+> helper and applies it to local task projections and reads. The canonical
+> document remains the source of writes; the DAO does not mutate due dates
+> only because time passed.
+
 ## Status
 
 - **Priority**: P1

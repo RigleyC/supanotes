@@ -7,13 +7,15 @@ relacional para consultas e UI, sem tomar posse da escrita canônica.
 
 - `domain/note_document_projector.dart`: calcula `content`, `excerpt` e tarefas
   a partir do snapshot REST/OT sem conhecer banco ou ciclo de vida do editor.
+  Para tarefas recorrentes abertas, a projeção avança a data para a ocorrência
+  atual quando uma ou mais ocorrências anteriores foram perdidas.
 - `domain/task_projection_engine.dart`: recebe o documento/snapshot, delega o
   cálculo ao `NoteDocumentProjector` e grava `tasks` e `task_completions` na
   mesma transação. É a fronteira de persistência para alterações vindas do
   editor; a hidratação remota do catálogo usa `AppDatabase.saveRemoteNote`.
-- `domain/task_occurrence.dart` e `task_recurrence.dart`: calculam ocorrências
-  de recorrência. Conclusões são eventos por ocorrência, não deslocamentos do
-  template.
+- `domain/task_occurrence.dart` e `task_recurrence.dart`: calculam a ocorrência
+  atual de uma recorrência. Ocorrências perdidas não ficam como uma fila de
+  atrasos; a ocorrência atual pode ficar atrasada até a próxima começar.
 - `data/`: repositório e consultas locais para listas de hoje, atrasadas e sem
   data.
 - `presentation/`: sheet de metadados, badges, tiles e feedback de conclusão.
