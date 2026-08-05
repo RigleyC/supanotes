@@ -9,7 +9,8 @@ import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
-import 'package:supanotes/features/notes/editor/presentation/note_stylesheet.dart';
+import 'package:supanotes/features/notes/editor/presentation/note_desktop_stylesheet.dart';
+import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
@@ -20,6 +21,8 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_t
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   final String noteId;
@@ -53,6 +56,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   EditorControls? _controls;
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
+  bool? _cachedIsDesktop;
 
   CustomTaskComponentBuilder? _taskComponentBuilder;
   List<ComponentBuilder>? _componentBuilders;
@@ -195,120 +199,138 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         _initControls();
         _initStableBuilders();
 
-        final theme = Theme.of(context);
-        final topPadding =
-            Scaffold.maybeOf(context)?.appBarMaxHeight ??
-            (MediaQuery.paddingOf(context).top + kToolbarHeight);
-        final docPadding = EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: topPadding,
-          bottom: widget.isReadOnly ? 24 : 140,
-        );
-
         final isDesktop = isDesktopPlatform() || isDesktopLayout(context);
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final availableWidth = constraints.maxWidth.isFinite
+                ? constraints.maxWidth
+                : MediaQuery.sizeOf(context).width;
+            final desktopSidePadding =
+                ((availableWidth - DesktopLayoutTokens.editorMaxWidth) / 2)
+                    .clamp(
+                      DesktopLayoutTokens.editorSidePaddingMin,
+                      DesktopLayoutTokens.editorSidePaddingMax,
+                    )
+                    .toDouble();
+            final topPadding = isDesktop
+                ? AppSpacing.lg
+                : Scaffold.maybeOf(context)?.appBarMaxHeight ??
+                      (MediaQuery.paddingOf(context).top + kToolbarHeight);
+            final docPadding = EdgeInsets.only(
+              left: isDesktop ? desktopSidePadding : 24,
+              right: isDesktop ? desktopSidePadding : 24,
+              top: topPadding,
+              bottom: widget.isReadOnly ? 24 : 140,
+            );
 
-        if (_cachedStylesheet == null ||
-            !identical(_cachedColorScheme, theme.colorScheme) ||
-            _cachedStylesheet!.documentPadding != docPadding) {
-          _cachedColorScheme = theme.colorScheme;
-          _cachedStylesheet = noteStylesheet(
-            context,
-            documentPadding: docPadding,
-            isDesktop: isDesktop,
-          );
-        }
+            final theme = Theme.of(context);
+            if (_cachedStylesheet == null ||
+                !identical(_cachedColorScheme, theme.colorScheme) ||
+                _cachedStylesheet!.documentPadding != docPadding ||
+                _cachedIsDesktop != isDesktop) {
+              _cachedColorScheme = theme.colorScheme;
+              _cachedIsDesktop = isDesktop;
+              _cachedStylesheet = isDesktop
+                  ? desktopNoteStylesheet(context, documentPadding: docPadding)
+                  : mobileNoteStylesheet(context, documentPadding: docPadding);
+            }
 
-        final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: SuperEditorAndroidControlsScope(
-                controller: _controls!.androidController,
-                child: SuperEditorIosControlsScope(
-                  controller: _controls!.iosController,
-                  child: TapRegion(
-                    groupId: noteEditorToolbarTapRegionGroup,
-                    child: SuperEditor(
-                      editor: controller.editor,
-                      focusNode: widget.isReadOnly
-                          ? null
-                          : controller.focusNode,
-                      autofocus:
-                          widget.requestInitialFocus && !widget.isReadOnly,
-                      inputSource: TextInputSource.ime,
-                      documentLayoutKey: _docLayoutKey,
-                      stylesheet: _cachedStylesheet!,
-                      selectionStyle: editorSelectionStyle(theme.colorScheme),
-                      documentOverlayBuilders: [
-                        ...defaultSuperEditorDocumentOverlayBuilders.where(
-                          (builder) => builder is! DefaultCaretOverlayBuilder,
-                        ),
-                        DefaultCaretOverlayBuilder(
-                          caretStyle: CaretStyle(
-                            color: theme.colorScheme.primary,
-                            width: 2.5,
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: SuperEditorAndroidControlsScope(
+                    controller: _controls!.androidController,
+                    child: SuperEditorIosControlsScope(
+                      controller: _controls!.iosController,
+                      child: TapRegion(
+                        groupId: noteEditorToolbarTapRegionGroup,
+                        child: SuperEditor(
+                          editor: controller.editor,
+                          focusNode: widget.isReadOnly
+                              ? null
+                              : controller.focusNode,
+                          autofocus:
+                              widget.requestInitialFocus && !widget.isReadOnly,
+                          inputSource: TextInputSource.ime,
+                          documentLayoutKey: _docLayoutKey,
+                          stylesheet: _cachedStylesheet!,
+                          selectionStyle: editorSelectionStyle(
+                            theme.colorScheme,
                           ),
+                          documentOverlayBuilders: [
+                            ...defaultSuperEditorDocumentOverlayBuilders.where(
+                              (builder) =>
+                                  builder is! DefaultCaretOverlayBuilder,
+                            ),
+                            DefaultCaretOverlayBuilder(
+                              caretStyle: CaretStyle(
+                                color: theme.colorScheme.primary,
+                                width: 2.5,
+                              ),
+                            ),
+                          ],
+                          contentTapDelegateFactories:
+                              _contentTapDelegateFactories,
+                          keyboardActions: editorKeyboardActions(
+                            slashCommandController: widget.isReadOnly
+                                ? null
+                                : _slashCommandController,
+                          ),
+                          componentBuilders: _componentBuilders!,
                         ),
-                      ],
-                      contentTapDelegateFactories: _contentTapDelegateFactories,
-                      keyboardActions: editorKeyboardActions(
-                        slashCommandController: widget.isReadOnly
-                            ? null
-                            : _slashCommandController,
                       ),
-                      componentBuilders: _componentBuilders!,
                     ),
                   ),
                 ),
-              ),
-            ),
-            if (!widget.isReadOnly) ...[
-              Positioned.fill(
-                child: SlashCommandOverlay(
-                  editor: controller.editor,
-                  composer: controller.composer,
-                  documentLayoutResolver: () =>
-                      _docLayoutKey.currentState as DocumentLayout,
-                  documentLayoutContextResolver: () =>
-                      _docLayoutKey.currentContext,
-                  controller: _slashCommandController,
-                  focusNode: controller.focusNode,
-                  onAttachFile: () =>
-                      controller.pickAndAttachFile(imageOnly: false),
-                  onAttachImage: () =>
-                      controller.pickAndAttachFile(imageOnly: true),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: bottomInset,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!isDesktop)
-                      NoteSuggestionOverlay(
-                        editor: controller.editor,
-                        composer: controller.composer,
-                        currentNoteId: widget.noteId,
-                        onPersist: () async {},
-                      ),
-                    NoteToolbar(
+                if (!widget.isReadOnly) ...[
+                  Positioned.fill(
+                    child: SlashCommandOverlay(
                       editor: controller.editor,
                       composer: controller.composer,
+                      documentLayoutResolver: () =>
+                          _docLayoutKey.currentState as DocumentLayout,
+                      documentLayoutContextResolver: () =>
+                          _docLayoutKey.currentContext,
+                      controller: _slashCommandController,
                       focusNode: controller.focusNode,
                       onAttachFile: () =>
                           controller.pickAndAttachFile(imageOnly: false),
                       onAttachImage: () =>
                           controller.pickAndAttachFile(imageOnly: true),
                     ),
-                  ],
-                ),
-              ),
-            ],
-          ],
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: bottomInset,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!isDesktop)
+                          NoteSuggestionOverlay(
+                            editor: controller.editor,
+                            composer: controller.composer,
+                            currentNoteId: widget.noteId,
+                            onPersist: () async {},
+                          ),
+                        NoteToolbar(
+                          editor: controller.editor,
+                          composer: controller.composer,
+                          focusNode: controller.focusNode,
+                          onAttachFile: () =>
+                              controller.pickAndAttachFile(imageOnly: false),
+                          onAttachImage: () =>
+                              controller.pickAndAttachFile(imageOnly: true),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         );
       },
     );

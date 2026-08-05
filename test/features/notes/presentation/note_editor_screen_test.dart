@@ -16,6 +16,8 @@ import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_note_chrome.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
@@ -242,13 +244,17 @@ void main() {
     expect(iosScope.controller.handleColor, primary);
   });
 
-  test('NoteEditor wires the custom note stylesheet', () {
-    final source = File(
-      'lib/features/notes/editor/presentation/widgets/note_editor.dart',
-    ).readAsStringSync();
+  test(
+    'NoteEditor wires explicit mobile and desktop stylesheet entrypoints',
+    () {
+      final source = File(
+        'lib/features/notes/editor/presentation/widgets/note_editor.dart',
+      ).readAsStringSync();
 
-    expect(source, contains('noteStylesheet'));
-  });
+      expect(source, contains('desktopNoteStylesheet'));
+      expect(source, contains('mobileNoteStylesheet'));
+    },
+  );
 
   testWidgets('requests initial focus for a newly created empty note', (
     tester,
@@ -375,6 +381,64 @@ void main() {
     expect(find.byType(NoteToolbar), findsOneWidget);
     expect(find.byType(NoteSuggestionOverlay), findsNothing);
   });
+
+  testWidgets(
+    'desktop screen uses compact chrome and centered editor viewport',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final streamController = StreamController<NoteModel?>();
+      addTearDown(streamController.close);
+      final controller = _createTestController([
+        ParagraphNode(id: '1', text: AttributedText('Desktop note')),
+      ]);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            notesRepositoryProvider.overrideWithValue(
+              _FakeNotesRepository(streamController),
+            ),
+            tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
+            currentUserIdProvider.overrideWithValue('test-user'),
+            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+            noteEditorSessionProvider.overrideWith(
+              (ref, noteId) async => _sessionFor(controller),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const NoteEditorScreen(noteId: 'note-1'),
+          ),
+        ),
+      );
+
+      streamController.add(
+        NoteModel(
+          id: 'note-1',
+          userId: 'test-user',
+          title: 'Desktop note',
+          content: 'Desktop note',
+          favorite: false,
+          archived: false,
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DesktopNoteChrome), findsOneWidget);
+      expect(find.byType(DesktopEditorViewport), findsOneWidget);
+      expect(find.byType(AppBar), findsNothing);
+      expect(find.byType(NoteToolbar), findsOneWidget);
+    },
+  );
 
   testWidgets('hideCompleted removes completed task components', (
     tester,

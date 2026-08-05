@@ -1,24 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
-/// Returns a [Stylesheet] that inherits from [defaultStylesheet] and only
-/// overrides what's needed: theme-adaptive colours, tighter list spacing,
-/// and the `task` block type.
-Stylesheet noteStylesheet(
+/// Builds the shared note stylesheet rules for one layout profile.
+///
+/// The mobile and desktop entry points provide the profile metrics. Keeping
+/// the block rules here prevents the two stylesheets from drifting apart while
+/// allowing their typography to evolve independently.
+Stylesheet buildNoteStylesheet(
   BuildContext context, {
-  EdgeInsets documentPadding = const EdgeInsets.symmetric(horizontal: 24),
-  bool isDesktop = false,
+  required EdgeInsets documentPadding,
+  required double bodySize,
+  required double h1Size,
+  required double h2Size,
+  required double h3Size,
+  required double quoteSize,
+  required double bodyLineHeight,
+  required double quoteLineHeight,
 }) {
   final colorScheme = Theme.of(context).colorScheme;
   final linkColor = colorScheme.primary;
   final onSurface = colorScheme.onSurface;
   final onSurfaceVariant = colorScheme.onSurfaceVariant;
-
-  final bodySize = isDesktop ? 15.0 : 18.0;
-  final h1Size = isDesktop ? 28.0 : 38.0;
-  final h2Size = isDesktop ? 22.0 : 26.0;
-  final h3Size = isDesktop ? 18.0 : 22.0;
-  final quoteSize = isDesktop ? 16.0 : 20.0;
 
   return defaultStylesheet.copyWith(
     documentPadding: documentPadding,
@@ -44,7 +46,7 @@ Stylesheet noteStylesheet(
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: bodySize,
-            height: 1.4,
+            height: bodyLineHeight,
           ),
         },
       ),
@@ -114,7 +116,7 @@ Stylesheet noteStylesheet(
             color: onSurfaceVariant,
             fontSize: quoteSize,
             fontWeight: FontWeight.bold,
-            height: 1.4,
+            height: quoteLineHeight,
           ),
         },
       ),
@@ -154,7 +156,7 @@ Stylesheet noteStylesheet(
               ..style = PaintingStyle.fill,
             fontSize: bodySize,
             fontWeight: FontWeight.bold,
-            height: 1.4,
+            height: bodyLineHeight,
           ),
         },
       ),
