@@ -3,18 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/utils/platform_utils.dart';
+import 'package:supanotes/features/notes/catalog/application/desktop_layout_preferences.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/desktop_content_surface.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/desktop_sidebar_surface.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_sidebar.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/resize_drag_handle.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 import 'package:uuid/uuid.dart';
-
-const _desktopSidebarWidthPreferenceKey = 'desktop_sidebar_width';
 
 class AdaptiveNotesShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -31,10 +30,9 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
   @override
   void initState() {
     super.initState();
-    final preferences = ref.read(sharedPreferencesProvider);
+    final preferences = ref.read(desktopLayoutPreferencesProvider);
     _sidebarWidth =
-        preferences.getDouble(_desktopSidebarWidthPreferenceKey) ??
-        DesktopLayoutTokens.sidebarInitialWidth;
+        preferences.sidebarWidth ?? DesktopLayoutTokens.sidebarInitialWidth;
   }
 
   void _updateSidebarWidth(double delta, double viewportWidth) {
@@ -47,10 +45,8 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
     setState(() {
       _sidebarWidth = nextWidth;
     });
-    final preferences = ref.read(sharedPreferencesProvider);
-    unawaited(
-      preferences.setDouble(_desktopSidebarWidthPreferenceKey, nextWidth),
-    );
+    final preferences = ref.read(desktopLayoutPreferencesProvider);
+    unawaited(preferences.saveSidebarWidth(nextWidth));
   }
 
   @override
@@ -103,7 +99,7 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
             ResizeDragHandle(
               onDrag: (delta) => _updateSidebarWidth(delta, viewportWidth),
             ),
-            Expanded(child: widget.child),
+            Expanded(child: DesktopContentSurface(child: widget.child)),
           ],
         ),
       ),

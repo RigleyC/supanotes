@@ -11,6 +11,7 @@ import 'package:supanotes/features/notes/editor/application/note_editor_delegate
 import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_desktop_stylesheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
@@ -21,7 +22,6 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_t
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
@@ -199,29 +199,36 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         _initControls();
         _initStableBuilders();
 
-        final isDesktop = isDesktopPlatform() || isDesktopLayout(context);
+        final desktopLayout = DesktopEditorLayoutScope.maybeOf(context);
+        final isDesktop = desktopLayout != null || isDesktopLayout(context);
         return LayoutBuilder(
           builder: (context, constraints) {
             final availableWidth = constraints.maxWidth.isFinite
                 ? constraints.maxWidth
                 : MediaQuery.sizeOf(context).width;
-            final desktopSidePadding =
-                ((availableWidth - DesktopLayoutTokens.editorMaxWidth) / 2)
-                    .clamp(
-                      DesktopLayoutTokens.editorSidePaddingMin,
-                      DesktopLayoutTokens.editorSidePaddingMax,
-                    )
-                    .toDouble();
-            final topPadding = isDesktop
-                ? AppSpacing.lg
-                : Scaffold.maybeOf(context)?.appBarMaxHeight ??
-                      (MediaQuery.paddingOf(context).top + kToolbarHeight);
-            final docPadding = EdgeInsets.only(
-              left: isDesktop ? desktopSidePadding : 24,
-              right: isDesktop ? desktopSidePadding : 24,
-              top: topPadding,
-              bottom: widget.isReadOnly ? 24 : 140,
-            );
+            final topPadding =
+                Scaffold.maybeOf(context)?.appBarMaxHeight ??
+                (MediaQuery.paddingOf(context).top + kToolbarHeight);
+            final desktopDocumentPadding = desktopLayout?.documentPadding;
+            final docPadding =
+                desktopDocumentPadding?.copyWith(
+                  bottom: widget.isReadOnly
+                      ? 24
+                      : desktopDocumentPadding.bottom,
+                ) ??
+                (isDesktop
+                    ? EdgeInsets.only(
+                        left: desktopEditorSidePaddingForWidth(availableWidth),
+                        right: desktopEditorSidePaddingForWidth(availableWidth),
+                        top: DesktopLayoutTokens.editorTopPadding,
+                        bottom: DesktopLayoutTokens.editorBottomPadding,
+                      )
+                    : EdgeInsets.only(
+                        left: 24,
+                        right: 24,
+                        top: topPadding,
+                        bottom: widget.isReadOnly ? 24 : 140,
+                      ));
 
             final theme = Theme.of(context);
             if (_cachedStylesheet == null ||

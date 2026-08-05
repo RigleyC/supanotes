@@ -115,14 +115,22 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
-    final note = noteWithTasksAsync.asData?.value.note;
+    final note = noteWithTasksAsync.when(
+      data: (noteWithTasks) => noteWithTasks.note,
+      loading: () => null,
+      error: (_, _) => null,
+    );
     final preferenceMutation = ref.watch(
       notePreferenceMutationControllerProvider(widget.noteId),
     );
     final sessionAsync = ref.watch(noteEditorSessionProvider(widget.noteId));
 
     final isDesktop = isDesktopLayout(context);
-    final editorFocusNode = sessionAsync.asData?.value.controller.focusNode;
+    final editorFocusNode = sessionAsync.when(
+      data: (session) => session.controller.focusNode,
+      loading: () => null,
+      error: (_, _) => null,
+    );
 
     return Scaffold(
       extendBodyBehindAppBar: !isDesktop,

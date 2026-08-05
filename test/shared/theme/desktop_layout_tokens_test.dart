@@ -6,6 +6,7 @@ void main() {
     test('limits the sidebar maximum to 35 percent of a small desktop', () {
       expect(DesktopLayoutTokens.maxSidebarWidth(900), closeTo(315, 0.001));
       expect(DesktopLayoutTokens.maxSidebarWidth(1200), closeTo(420, 0.001));
+      expect(DesktopLayoutTokens.maxSidebarWidth(1440), closeTo(420, 0.001));
     });
 
     test('clamps a restored width to the viewport-safe range', () {
@@ -17,6 +18,11 @@ void main() {
         DesktopLayoutTokens.clampSidebarWidth(900, viewportWidth: 1200),
         DesktopLayoutTokens.sidebarMaxWidth,
       );
+    });
+
+    test('uses a fixed row height when excerpts are visible', () {
+      expect(DesktopLayoutTokens.sidebarRowHeight, 56);
+      expect(DesktopLayoutTokens.chromeHeight, 48);
     });
   });
 }

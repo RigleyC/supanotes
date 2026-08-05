@@ -36,6 +36,16 @@ void main() {
       DesktopLayoutTokens.editorMaxWidth +
           (DesktopLayoutTokens.editorSidePaddingMax * 2),
     );
+    final layout = tester.widget<DesktopEditorLayoutScope>(
+      find.byType(DesktopEditorLayoutScope),
+    );
+    expect(layout.documentPadding.left, 64);
+    expect(layout.documentPadding.right, 64);
+    expect(layout.documentPadding.top, DesktopLayoutTokens.editorTopPadding);
+    expect(
+      layout.documentPadding.bottom,
+      DesktopLayoutTokens.editorBottomPadding,
+    );
   });
 
   testWidgets('desktop note chrome keeps note actions above the editor', (
@@ -70,7 +80,7 @@ void main() {
     expect(find.text('Nota desktop'), findsOneWidget);
     expect(
       tester.getSize(find.byKey(const ValueKey('desktop-note-chrome'))).height,
-      48,
+      DesktopLayoutTokens.chromeHeight,
     );
   });
 }

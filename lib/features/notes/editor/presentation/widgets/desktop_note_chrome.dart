@@ -5,6 +5,7 @@ import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 
 /// Compact desktop-only document chrome.
 ///
@@ -33,7 +34,7 @@ class DesktopNoteChrome extends StatelessWidget {
 
     return Container(
       key: const ValueKey('desktop-note-chrome'),
-      height: 48,
+      height: DesktopLayoutTokens.chromeHeight,
       decoration: BoxDecoration(
         color: scheme.surface,
         border: Border(
@@ -140,8 +141,8 @@ class _PreferenceStatusIndicator extends StatelessWidget {
     return switch (status) {
       NotePreferenceMutationStatus.idle => const SizedBox.shrink(),
       NotePreferenceMutationStatus.saving => const SizedBox(
-        width: 32,
-        height: 32,
+        width: DesktopLayoutTokens.chromeControlHeight,
+        height: DesktopLayoutTokens.chromeControlHeight,
         child: Padding(
           padding: EdgeInsets.all(8),
           child: CircularProgressIndicator(strokeWidth: 2),

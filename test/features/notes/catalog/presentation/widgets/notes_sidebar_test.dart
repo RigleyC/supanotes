@@ -2,9 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_sidebar.dart';
+import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
+
+class _StubAuthController extends AuthController {
+  @override
+  Future<User?> build() async =>
+      const User(id: 'user-1', email: 'user@example.com', name: 'User');
+}
 
 void main() {
   final notes = [
@@ -30,21 +40,29 @@ void main() {
     ),
   ];
 
-  Widget app({String? selectedNoteId}) {
+  Widget app({String? selectedNoteId, TextScaler? textScaler}) {
     return ProviderScope(
       overrides: [
         activeNotesProvider.overrideWith((ref) => Stream.value(notes)),
+        authControllerProvider.overrideWith(_StubAuthController.new),
       ],
       child: MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 300,
-            height: 600,
-            child: NotesSidebar(
-              selectedNoteId: selectedNoteId,
-              onNoteTap: (_) {},
-              onNewNote: () {},
-              onOpenSettings: () {},
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: textScaler ?? TextScaler.noScaling),
+              child: SizedBox(
+                width: 300,
+                height: 600,
+                child: NotesSidebar(
+                  selectedNoteId: selectedNoteId,
+                  onNoteTap: (_) {},
+                  onNewNote: () {},
+                  onOpenSettings: () {},
+                ),
+              ),
             ),
           ),
         ),
@@ -65,7 +83,34 @@ void main() {
     expect(find.text('Projeto desktop'), findsOneWidget);
     expect(find.text('Coluna centralizada'), findsOneWidget);
     expect(find.text('Configurações'), findsOneWidget);
+    expect(find.text('user@example.com'), findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('desktop-sidebar-filter-all')))
+          .height,
+      44,
+    );
+    expect(
+      tester
+          .getSize(
+            find.byKey(const ValueKey('desktop-sidebar-filter-favorites')),
+          )
+          .height,
+      44,
+    );
+    expect(
+      tester
+          .getSize(
+            find.byKey(const ValueKey('desktop-sidebar-settings-action')),
+          )
+          .height,
+      greaterThanOrEqualTo(44),
+    );
     expect(find.byKey(const ValueKey('note-a')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('note-a'))),
+      tester.getSize(find.byKey(const ValueKey('note-b'))),
+    );
   });
 
   testWidgets('search and favorite filter reduce the visible notes', (
@@ -84,5 +129,17 @@ void main() {
     await tester.pump();
     expect(find.text('Projeto desktop'), findsOneWidget);
     expect(find.text('Compras'), findsNothing);
+  });
+
+  testWidgets('note rows expand when desktop text is scaled up', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app(textScaler: TextScaler.linear(2)));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSize(find.byKey(const ValueKey('note-a'))).height,
+      greaterThan(DesktopLayoutTokens.sidebarRowHeight),
+    );
   });
 }

@@ -7,12 +7,14 @@ import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/application/desktop_layout_preferences.dart';
 import 'package:supanotes/features/notes/catalog/presentation/adaptive_notes_shell.dart';
 import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/resize_drag_handle.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
+import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 
 class _RecordingNotesRepository implements INotesRepository {
   String? createdNoteId;
@@ -138,7 +140,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    SharedPreferences.setMockInitialValues({'desktop_sidebar_width': 380.0});
+    SharedPreferences.setMockInitialValues({
+      desktopSidebarWidthPreferenceKey: 380.0,
+    });
     final preferences = await SharedPreferences.getInstance();
     final repository = _RecordingNotesRepository();
     final router = _routerFor(
@@ -150,6 +154,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(
+      find.byKey(const ValueKey('desktop-content-surface')),
+      findsOneWidget,
+    );
+
     final sidebar = find.byKey(const ValueKey('desktop-sidebar-container'));
     expect(tester.getSize(sidebar).width, 380);
 
@@ -157,6 +166,84 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.getSize(sidebar).width, 420);
-    expect(preferences.getDouble('desktop_sidebar_width'), 420);
+    expect(preferences.getDouble(desktopSidebarWidthPreferenceKey), 420);
+
+    final restoredRouter = _routerFor(
+      const AdaptiveNotesShell(child: SizedBox.shrink()),
+    );
+    await tester.pumpWidget(
+      _app(
+        router: restoredRouter,
+        repository: repository,
+        preferences: preferences,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(sidebar).width, 420);
+  });
+
+  testWidgets('desktop shell switches composition at the layout breakpoint', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(899, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repository = _RecordingNotesRepository();
+    final router = _routerFor(
+      const AdaptiveNotesShell(child: SizedBox.shrink()),
+    );
+
+    await tester.pumpWidget(
+      _app(router: router, repository: repository, preferences: preferences),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('desktop-sidebar-container')),
+      findsNothing,
+    );
+
+    tester.view.physicalSize = const Size(900, 800);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('desktop-sidebar-container')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('desktop shell keeps the content surface open at wide width', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repository = _RecordingNotesRepository();
+    final router = _routerFor(
+      const AdaptiveNotesShell(child: SizedBox.shrink()),
+    );
+
+    await tester.pumpWidget(
+      _app(router: router, repository: repository, preferences: preferences),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('desktop-content-surface')))
+          .width,
+      1440 -
+          DesktopLayoutTokens.sidebarInitialWidth -
+          DesktopLayoutTokens.resizeHitWidth,
+    );
   });
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
@@ -55,6 +57,7 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final notesAsync = ref.watch(activeNotesProvider);
+    final accountAsync = ref.watch(authControllerProvider);
 
     return ColoredBox(
       color: scheme.surfaceContainerLow,
@@ -97,7 +100,10 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
             ),
           ),
           if (widget.onOpenSettings != null)
-            _SidebarFooter(onOpenSettings: widget.onOpenSettings!),
+            _SidebarFooter(
+              accountAsync: accountAsync,
+              onOpenSettings: widget.onOpenSettings!,
+            ),
         ],
       ),
     );
@@ -222,16 +228,22 @@ class _SidebarFilterBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _SidebarFilterButton(
-            label: 'Todas',
-            selected: activeTab == NoteFilterTab.all,
-            onTap: () => onTabSelected(NoteFilterTab.all),
+          Expanded(
+            child: _SidebarFilterButton(
+              key: const ValueKey('desktop-sidebar-filter-all'),
+              label: 'Todas',
+              selected: activeTab == NoteFilterTab.all,
+              onTap: () => onTabSelected(NoteFilterTab.all),
+            ),
           ),
           const SizedBox(width: AppSpacing.xs),
-          _SidebarFilterButton(
-            label: 'Favoritas',
-            selected: activeTab == NoteFilterTab.favorites,
-            onTap: () => onTabSelected(NoteFilterTab.favorites),
+          Expanded(
+            child: _SidebarFilterButton(
+              key: const ValueKey('desktop-sidebar-filter-favorites'),
+              label: 'Favoritas',
+              selected: activeTab == NoteFilterTab.favorites,
+              onTap: () => onTabSelected(NoteFilterTab.favorites),
+            ),
           ),
         ],
       ),
@@ -241,6 +253,7 @@ class _SidebarFilterBar extends StatelessWidget {
 
 class _SidebarFilterButton extends StatelessWidget {
   const _SidebarFilterButton({
+    super.key,
     required this.label,
     required this.selected,
     required this.onTap,
@@ -258,22 +271,30 @@ class _SidebarFilterButton extends StatelessWidget {
       button: true,
       selected: selected,
       label: label,
-      child: Material(
-        color: selected
-            ? scheme.primary.withValues(alpha: 0.12)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(DesktopLayoutTokens.chromeRadius),
-        child: InkWell(
-          onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Material(
+          color: selected
+              ? scheme.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(DesktopLayoutTokens.chromeRadius),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: foreground,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(
+              DesktopLayoutTokens.chromeRadius,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  color: foreground,
+                ),
               ),
             ),
           ),
@@ -336,13 +357,23 @@ class _SidebarNotesList extends StatelessWidget {
 }
 
 class _SidebarFooter extends StatelessWidget {
-  const _SidebarFooter({required this.onOpenSettings});
+  const _SidebarFooter({
+    required this.accountAsync,
+    required this.onOpenSettings,
+  });
 
+  final AsyncValue<User?> accountAsync;
   final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final accountLabel = accountAsync.when(
+      data: (account) => account?.email ?? 'Conta desconectada',
+      loading: () => 'Carregando conta…',
+      error: (_, _) => 'Conta indisponível',
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.sm,
@@ -350,33 +381,82 @@ class _SidebarFooter extends StatelessWidget {
         AppSpacing.sm,
         AppSpacing.sm,
       ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(DesktopLayoutTokens.chromeRadius),
-        child: InkWell(
-          onTap: onOpenSettings,
-          borderRadius: BorderRadius.circular(DesktopLayoutTokens.chromeRadius),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            button: true,
+            label: 'Configurações',
+            child: ConstrainedBox(
+              key: const ValueKey('desktop-sidebar-settings-action'),
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(
+                  DesktopLayoutTokens.chromeRadius,
+                ),
+                child: InkWell(
+                  onTap: onOpenSettings,
+                  borderRadius: BorderRadius.circular(
+                    DesktopLayoutTokens.chromeRadius,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.settings_outlined,
+                          size: 18,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            'Configurações',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
               children: [
                 Icon(
-                  Icons.settings_outlined,
-                  size: 18,
+                  Icons.account_circle_outlined,
+                  size: 16,
                   color: scheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'Configurações',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurfaceVariant,
+                Expanded(
+                  child: Text(
+                    accountLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
