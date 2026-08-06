@@ -221,6 +221,51 @@ void main() {
         );
       }
     });
+
+    testWidgets('keeps the contextual popover compact and anchored', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        buildDesktopSelectionFormattingHarness(
+          selection: const DocumentSelection(
+            base: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            extent: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final popoverRect = tester.getRect(
+        find.bySemanticsLabel('Formatação da seleção'),
+      );
+      final selectionLink = tester
+          .widget<SuperEditor>(find.byType(SuperEditor))
+          .selectionLayerLinks!
+          .expandedSelectionBoundsLink;
+      final selectionRect = selectionLink.offset! & selectionLink.leaderSize!;
+      expect(popoverRect.height, lessThan(80));
+      expect(popoverRect.width, lessThan(220));
+      expect(popoverRect.top, greaterThanOrEqualTo(0));
+      expect(popoverRect.bottom, lessThanOrEqualTo(800));
+      expect(
+        popoverRect.bottom <= selectionRect.top - 8 ||
+            popoverRect.top >= selectionRect.bottom + 8,
+        isTrue,
+      );
+    });
   });
 
   group('List menu trigger state', () {

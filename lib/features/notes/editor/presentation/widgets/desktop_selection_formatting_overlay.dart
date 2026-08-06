@@ -235,31 +235,33 @@ class _DesktopSelectionFormattingPopover extends StatelessWidget {
           container: true,
           explicitChildNodes: true,
           label: 'Formatação da seleção',
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ToolbarButton(
-                icon: Icons.format_bold,
-                spacious: true,
-                isActive: isBold,
-                onPressed: onBold,
-                semanticLabel: 'Negrito',
-              ),
-              ToolbarButton(
-                icon: Icons.format_italic,
-                spacious: true,
-                isActive: isItalic,
-                onPressed: onItalic,
-                semanticLabel: 'Itálico',
-              ),
-              ToolbarButton(
-                icon: Icons.format_strikethrough,
-                spacious: true,
-                isActive: isStrikethrough,
-                onPressed: onStrikethrough,
-                semanticLabel: 'Tachado',
-              ),
-            ],
+          child: IntrinsicHeight(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ToolbarButton(
+                  icon: Icons.format_bold,
+                  spacious: true,
+                  isActive: isBold,
+                  onPressed: onBold,
+                  semanticLabel: 'Negrito',
+                ),
+                ToolbarButton(
+                  icon: Icons.format_italic,
+                  spacious: true,
+                  isActive: isItalic,
+                  onPressed: onItalic,
+                  semanticLabel: 'Itálico',
+                ),
+                ToolbarButton(
+                  icon: Icons.format_strikethrough,
+                  spacious: true,
+                  isActive: isStrikethrough,
+                  onPressed: onStrikethrough,
+                  semanticLabel: 'Tachado',
+                ),
+              ],
+            ),
           ),
         ),
       ),
