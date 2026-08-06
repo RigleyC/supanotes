@@ -295,7 +295,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                               DefaultCaretOverlayBuilder(
                                 caretStyle: CaretStyle(
                                   color: theme.colorScheme.primary,
-                                  width: 2.5,
+                                  width: 1.5,
                                 ),
                               ),
                             ],

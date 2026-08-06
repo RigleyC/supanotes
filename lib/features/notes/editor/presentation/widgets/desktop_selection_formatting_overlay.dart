@@ -128,16 +128,21 @@ class _DesktopSelectionFormattingOverlayState
     }
   }
 
-  void _toggleAttribution(Attribution attribution) {
+  bool _prepareEditorAction() {
     final selection = _selection;
     if (selection == null ||
         !isEditorSelectionValid(widget.editor.context.document, selection)) {
-      return;
+      return false;
     }
     widget.editorFocusNode.requestFocus();
     if (widget.composer.selection != selection) {
       widget.composer.setSelectionWithReason(selection);
     }
+    return true;
+  }
+
+  void _toggleAttribution(Attribution attribution) {
+    if (!_prepareEditorAction()) return;
     HapticFeedback.selectionClick();
     NoteEditorCommands.toggleInlineAttribution(
       widget.editor,
@@ -146,9 +151,38 @@ class _DesktopSelectionFormattingOverlayState
     );
   }
 
+  void _convertToListItem(ListItemType type) {
+    if (!_prepareEditorAction()) return;
+    HapticFeedback.selectionClick();
+    NoteEditorCommands.convertToListItem(widget.editor, widget.composer, type);
+  }
+
+  void _convertToTask() {
+    if (!_prepareEditorAction()) return;
+    HapticFeedback.selectionClick();
+    NoteEditorCommands.convertToTask(widget.editor, widget.composer);
+  }
+
   @override
   Widget build(BuildContext context) {
     final document = widget.editor.context.document;
+    final selectedNodes = NoteEditorCommands.selectedNodes(
+      document,
+      _selection,
+    );
+    final isBulleted =
+        selectedNodes.isNotEmpty &&
+        selectedNodes.every(
+          (node) => node is ListItemNode && node.type == ListItemType.unordered,
+        );
+    final isNumbered =
+        selectedNodes.isNotEmpty &&
+        selectedNodes.every(
+          (node) => node is ListItemNode && node.type == ListItemType.ordered,
+        );
+    final isTask =
+        selectedNodes.isNotEmpty &&
+        selectedNodes.every((node) => node is TaskNode);
     return OverlayPortal(
       controller: _popoverController,
       overlayChildBuilder: (context) => TapRegion(
@@ -181,10 +215,16 @@ class _DesktopSelectionFormattingOverlayState
                   _selection,
                   strikethroughAttribution,
                 ),
+                isBulleted: isBulleted,
+                isNumbered: isNumbered,
+                isTask: isTask,
                 onBold: () => _toggleAttribution(boldAttribution),
                 onItalic: () => _toggleAttribution(italicsAttribution),
                 onStrikethrough: () =>
                     _toggleAttribution(strikethroughAttribution),
+                onBulleted: () => _convertToListItem(ListItemType.unordered),
+                onNumbered: () => _convertToListItem(ListItemType.ordered),
+                onTask: _convertToTask,
               ),
             ),
           ),
@@ -200,17 +240,29 @@ class _DesktopSelectionFormattingPopover extends StatelessWidget {
     required this.isBold,
     required this.isItalic,
     required this.isStrikethrough,
+    required this.isBulleted,
+    required this.isNumbered,
+    required this.isTask,
     required this.onBold,
     required this.onItalic,
     required this.onStrikethrough,
+    required this.onBulleted,
+    required this.onNumbered,
+    required this.onTask,
   });
 
   final bool isBold;
   final bool isItalic;
   final bool isStrikethrough;
+  final bool isBulleted;
+  final bool isNumbered;
+  final bool isTask;
   final VoidCallback onBold;
   final VoidCallback onItalic;
   final VoidCallback onStrikethrough;
+  final VoidCallback onBulleted;
+  final VoidCallback onNumbered;
+  final VoidCallback onTask;
 
   @override
   Widget build(BuildContext context) {
@@ -220,17 +272,17 @@ class _DesktopSelectionFormattingPopover extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
               color: colorScheme.shadow.withValues(alpha: 0.18),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
           border: Border.all(color: colorScheme.outlineVariant),
         ),
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(2),
         child: Semantics(
           container: true,
           explicitChildNodes: true,
@@ -241,24 +293,46 @@ class _DesktopSelectionFormattingPopover extends StatelessWidget {
               children: [
                 ToolbarButton(
                   icon: Icons.format_bold,
-                  spacious: true,
+                  spacious: false,
                   isActive: isBold,
                   onPressed: onBold,
                   semanticLabel: 'Negrito',
                 ),
                 ToolbarButton(
                   icon: Icons.format_italic,
-                  spacious: true,
+                  spacious: false,
                   isActive: isItalic,
                   onPressed: onItalic,
                   semanticLabel: 'Itálico',
                 ),
                 ToolbarButton(
                   icon: Icons.format_strikethrough,
-                  spacious: true,
+                  spacious: false,
                   isActive: isStrikethrough,
                   onPressed: onStrikethrough,
                   semanticLabel: 'Tachado',
+                ),
+                const ToolbarDivider(),
+                ToolbarButton(
+                  icon: Icons.format_list_bulleted,
+                  spacious: false,
+                  isActive: isBulleted,
+                  onPressed: onBulleted,
+                  semanticLabel: 'Lista com marcadores',
+                ),
+                ToolbarButton(
+                  icon: Icons.format_list_numbered,
+                  spacious: false,
+                  isActive: isNumbered,
+                  onPressed: onNumbered,
+                  semanticLabel: 'Lista numerada',
+                ),
+                ToolbarButton(
+                  svgAsset: 'assets/icons/checkbox.svg',
+                  spacious: false,
+                  isActive: isTask,
+                  onPressed: onTask,
+                  semanticLabel: 'Checklist',
                 ),
               ],
             ),

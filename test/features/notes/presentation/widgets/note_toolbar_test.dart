@@ -168,6 +168,9 @@ void main() {
       expect(find.bySemanticsLabel('Negrito'), findsOneWidget);
       expect(find.bySemanticsLabel('Itálico'), findsOneWidget);
       expect(find.bySemanticsLabel('Tachado'), findsOneWidget);
+      expect(find.bySemanticsLabel('Lista com marcadores'), findsOneWidget);
+      expect(find.bySemanticsLabel('Lista numerada'), findsOneWidget);
+      expect(find.bySemanticsLabel('Checklist'), findsOneWidget);
     });
 
     testWidgets('hides the formatting popover for a collapsed selection', (
@@ -222,6 +225,89 @@ void main() {
       }
     });
 
+    testWidgets('converts the selected paragraph to a bulleted list', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildDesktopSelectionFormattingHarness(
+          selection: const DocumentSelection(
+            base: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            extent: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Lista com marcadores'));
+      await tester.pumpAndSettle();
+
+      final editor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+      final node = editor.editor.context.document.getNodeById('node-1');
+      expect(node, isA<ListItemNode>());
+      expect((node! as ListItemNode).type, ListItemType.unordered);
+    });
+
+    testWidgets('converts the selected paragraph to a numbered list', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildDesktopSelectionFormattingHarness(
+          selection: const DocumentSelection(
+            base: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            extent: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Lista numerada'));
+      await tester.pumpAndSettle();
+
+      final editor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+      final node = editor.editor.context.document.getNodeById('node-1');
+      expect(node, isA<ListItemNode>());
+      expect((node! as ListItemNode).type, ListItemType.ordered);
+    });
+
+    testWidgets('converts the selected paragraph to a task', (tester) async {
+      await tester.pumpWidget(
+        buildDesktopSelectionFormattingHarness(
+          selection: const DocumentSelection(
+            base: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            extent: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Checklist'));
+      await tester.pumpAndSettle();
+
+      final editor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+      expect(
+        editor.editor.context.document.getNodeById('node-1'),
+        isA<TaskNode>(),
+      );
+    });
+
     testWidgets('keeps the contextual popover compact and anchored', (
       tester,
     ) async {
@@ -256,8 +342,8 @@ void main() {
           .selectionLayerLinks!
           .expandedSelectionBoundsLink;
       final selectionRect = selectionLink.offset! & selectionLink.leaderSize!;
-      expect(popoverRect.height, lessThan(80));
-      expect(popoverRect.width, lessThan(220));
+      expect(popoverRect.height, lessThanOrEqualTo(48));
+      expect(popoverRect.width, lessThan(250));
       expect(popoverRect.top, greaterThanOrEqualTo(0));
       expect(popoverRect.bottom, lessThanOrEqualTo(800));
       expect(
