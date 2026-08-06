@@ -77,30 +77,23 @@ void main() {
     await tester.pumpWidget(app(selectedNoteId: 'note-a'));
     await tester.pumpAndSettle();
 
-    expect(find.text('SupaNotes'), findsOneWidget);
+    expect(find.text('SupaNotes'), findsNothing);
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Todas'), findsOneWidget);
-    expect(find.text('Favoritas'), findsOneWidget);
+    expect(find.text('Todas'), findsNothing);
+    expect(find.text('Favoritas'), findsNothing);
     expect(find.text('Projeto desktop'), findsOneWidget);
     expect(find.text('Coluna centralizada'), findsNothing);
-    expect(find.byTooltip('Coluna centralizada'), findsOneWidget);
+    expect(find.byTooltip('Coluna centralizada'), findsNothing);
     expect(find.byTooltip('Recolher sidebar'), findsOneWidget);
+    expect(find.byTooltip('Nova nota'), findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('desktop-sidebar-note-list-gap')))
+          .height,
+      8,
+    );
     expect(find.text('Configurações'), findsOneWidget);
     expect(find.text('user@example.com'), findsOneWidget);
-    expect(
-      tester
-          .getSize(find.byKey(const ValueKey('desktop-sidebar-filter-all')))
-          .height,
-      44,
-    );
-    expect(
-      tester
-          .getSize(
-            find.byKey(const ValueKey('desktop-sidebar-filter-favorites')),
-          )
-          .height,
-      44,
-    );
     expect(
       tester
           .getSize(
@@ -118,9 +111,24 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('note-a'))).height,
       DesktopLayoutTokens.sidebarRowHeight,
     );
+    expect(find.byIcon(Icons.star_rate_rounded), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('note-a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('note-b'))).dy),
+    );
+    expect(
+      tester
+          .getCenter(find.byKey(const ValueKey('desktop-sidebar-collapse')))
+          .dx,
+      lessThan(
+        tester
+            .getCenter(find.byKey(const ValueKey('desktop-sidebar-new-note')))
+            .dx,
+      ),
+    );
   });
 
-  testWidgets('search and favorite filter reduce the visible notes', (
+  testWidgets('search reduces the visible notes without a favorite filter', (
     tester,
   ) async {
     await tester.pumpWidget(app());
@@ -132,10 +140,9 @@ void main() {
     expect(find.text('Projeto desktop'), findsNothing);
 
     await tester.enterText(find.byType(TextField), '');
-    await tester.tap(find.text('Favoritas'));
     await tester.pump();
     expect(find.text('Projeto desktop'), findsOneWidget);
-    expect(find.text('Compras'), findsNothing);
+    expect(find.text('Compras'), findsOneWidget);
   });
 
   testWidgets('note rows expand when desktop text is scaled up', (

@@ -29,7 +29,7 @@ void main() {
     });
 
     test('uses Writer-like document spacing', () {
-      expect(DesktopLayoutTokens.editorTopPadding, 144);
+      expect(DesktopLayoutTokens.editorTopPadding, 96);
       expect(DesktopLayoutTokens.editorBottomPaddingForHeight(800), 320);
     });
   });

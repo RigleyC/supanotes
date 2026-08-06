@@ -26,7 +26,7 @@ class DesktopLayoutTokens {
   static const double editorMaxWidth = 734.0;
   static const double editorSidePaddingMin = 24.0;
   static const double editorSidePaddingMax = 64.0;
-  static const double editorTopPadding = 144.0;
+  static const double editorTopPadding = 96.0;
   static const double editorBottomPaddingFraction = 0.4;
 
   static double editorBottomPaddingForHeight(double viewportHeight) {
