@@ -44,7 +44,7 @@ void main() {
     expect(layout.documentPadding.top, DesktopLayoutTokens.editorTopPadding);
     expect(
       layout.documentPadding.bottom,
-      DesktopLayoutTokens.editorBottomPadding,
+      DesktopLayoutTokens.editorBottomPaddingForHeight(800),
     );
   });
 
@@ -77,7 +77,7 @@ void main() {
     );
 
     expect(find.byKey(const ValueKey('desktop-note-chrome')), findsOneWidget);
-    expect(find.text('Nota desktop'), findsOneWidget);
+    expect(find.text('Nota desktop'), findsNothing);
     expect(
       tester.getSize(find.byKey(const ValueKey('desktop-note-chrome'))).height,
       DesktopLayoutTokens.chromeHeight,

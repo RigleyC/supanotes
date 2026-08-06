@@ -18,5 +18,10 @@ Stylesheet mobileNoteStylesheet(
     quoteSize: 20,
     bodyLineHeight: 1.4,
     quoteLineHeight: 1.4,
+    letterSpacing: 0,
+    h1TopPadding: 24,
+    h2TopPadding: 20,
+    h3TopPadding: 16,
+    paragraphTopPadding: 24,
   );
 }

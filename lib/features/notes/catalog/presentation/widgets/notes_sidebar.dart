@@ -9,6 +9,7 @@ import 'package:supanotes/features/notes/catalog/presentation/widgets/note_conte
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 enum NoteFilterTab { all, favorites }
@@ -18,6 +19,7 @@ class NotesSidebar extends ConsumerStatefulWidget {
   final ValueChanged<NoteModel> onNoteTap;
   final VoidCallback onNewNote;
   final VoidCallback? onOpenSettings;
+  final VoidCallback? onToggleCollapsed;
 
   const NotesSidebar({
     super.key,
@@ -25,6 +27,7 @@ class NotesSidebar extends ConsumerStatefulWidget {
     required this.onNoteTap,
     required this.onNewNote,
     this.onOpenSettings,
+    this.onToggleCollapsed,
   });
 
   @override
@@ -55,97 +58,110 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final notesAsync = ref.watch(activeNotesProvider);
     final accountAsync = ref.watch(authControllerProvider);
 
-    return ColoredBox(
-      color: scheme.surfaceContainerLow,
-      child: Column(
-        children: [
-          _SidebarHeader(onNewNote: widget.onNewNote),
-          _SidebarSearchField(
-            onChanged: (query) => setState(() => _searchQuery = query.trim()),
-          ),
-          _SidebarFilterBar(
-            activeTab: _activeTab,
-            onTabSelected: (tab) => setState(() => _activeTab = tab),
-          ),
-          Divider(
-            height: DesktopLayoutTokens.dividerWidth,
-            thickness: DesktopLayoutTokens.dividerWidth,
-          ),
-          Expanded(
-            child: notesAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              error: (error, _) => AppErrorView(
-                title: 'Erro ao carregar notas',
-                subtitle: error.toString(),
-              ),
-              data: (notes) => _SidebarNotesList(
-                notes: _filterNotes(notes),
-                searchQuery: _searchQuery,
-                selectedNoteId: widget.selectedNoteId,
-                onNoteTap: widget.onNoteTap,
-                onToggleFavorite: (note) {
-                  ref.read(notesRepositoryProvider).toggleFavorite(note.id);
-                },
-                onDelete: (note) {
-                  ref.read(notesRepositoryProvider).softDelete(note.id);
-                  AppMessenger.showSuccess('Nota movida para a lixeira');
-                },
-              ),
+    return Column(
+      children: [
+        _SidebarHeader(
+          onNewNote: widget.onNewNote,
+          onToggleCollapsed: widget.onToggleCollapsed,
+        ),
+        _SidebarSearchField(
+          onChanged: (query) => setState(() => _searchQuery = query.trim()),
+        ),
+        _SidebarFilterBar(
+          activeTab: _activeTab,
+          onTabSelected: (tab) => setState(() => _activeTab = tab),
+        ),
+        Divider(
+          height: DesktopLayoutTokens.dividerWidth,
+          thickness: DesktopLayoutTokens.dividerWidth,
+        ),
+        Expanded(
+          child: notesAsync.when(
+            loading: () =>
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            error: (error, _) => AppErrorView(
+              title: 'Erro ao carregar notas',
+              subtitle: error.toString(),
+            ),
+            data: (notes) => _SidebarNotesList(
+              notes: _filterNotes(notes),
+              searchQuery: _searchQuery,
+              selectedNoteId: widget.selectedNoteId,
+              onNoteTap: widget.onNoteTap,
+              onToggleFavorite: (note) {
+                ref.read(notesRepositoryProvider).toggleFavorite(note.id);
+              },
+              onDelete: (note) {
+                ref.read(notesRepositoryProvider).softDelete(note.id);
+                AppMessenger.showSuccess('Nota movida para a lixeira');
+              },
             ),
           ),
-          if (widget.onOpenSettings != null)
-            _SidebarFooter(
-              accountAsync: accountAsync,
-              onOpenSettings: widget.onOpenSettings!,
-            ),
-        ],
-      ),
+        ),
+        if (widget.onOpenSettings != null)
+          _SidebarFooter(
+            accountAsync: accountAsync,
+            onOpenSettings: widget.onOpenSettings!,
+          ),
+      ],
     );
   }
 }
 
 class _SidebarHeader extends StatelessWidget {
-  const _SidebarHeader({required this.onNewNote});
+  const _SidebarHeader({
+    required this.onNewNote,
+    required this.onToggleCollapsed,
+  });
 
   final VoidCallback onNewNote;
+  final VoidCallback? onToggleCollapsed;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.xs,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'SupaNotes',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
+    return SizedBox(
+      height: DesktopLayoutTokens.chromeHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DesktopLayoutTokens.sidebarContentPadding,
+        ),
+        child: Row(
+          children: [
+            if (onToggleCollapsed != null)
+              AppIconButton(
+                icon: const Icon(Icons.chevron_left),
+                tooltip: 'Recolher sidebar',
+                onPressed: onToggleCollapsed,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
+                ),
+              ),
+            Expanded(
+              child: Text(
+                'SupaNotes',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.add, size: 20),
-            tooltip: 'Nova nota',
-            onPressed: onNewNote,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-            visualDensity: VisualDensity.compact,
-          ),
-        ],
+            AppIconButton(
+              icon: const Icon(Icons.add, size: 20),
+              tooltip: 'Nova nota',
+              onPressed: onNewNote,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -161,13 +177,13 @@ class _SidebarSearchField extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
+        DesktopLayoutTokens.sidebarContentPadding,
         AppSpacing.xs,
-        AppSpacing.md,
+        DesktopLayoutTokens.sidebarContentPadding,
         AppSpacing.xs,
       ),
       child: SizedBox(
-        height: 36,
+        height: DesktopLayoutTokens.chromeControlHeight,
         child: TextField(
           onChanged: onChanged,
           style: const TextStyle(fontSize: 13),
@@ -176,8 +192,8 @@ class _SidebarSearchField extends StatelessWidget {
             hintStyle: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
             prefixIcon: const Icon(Icons.search, size: 18),
             prefixIconConstraints: const BoxConstraints(
-              minWidth: 36,
-              minHeight: 36,
+              minWidth: DesktopLayoutTokens.chromeControlHeight,
+              minHeight: DesktopLayoutTokens.chromeControlHeight,
             ),
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -221,9 +237,9 @@ class _SidebarFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
+        DesktopLayoutTokens.sidebarContentPadding,
         AppSpacing.xs,
-        AppSpacing.md,
+        DesktopLayoutTokens.sidebarContentPadding,
         AppSpacing.xs,
       ),
       child: Row(
@@ -376,9 +392,9 @@ class _SidebarFooter extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
+        DesktopLayoutTokens.sidebarContentPadding,
         AppSpacing.xs,
-        AppSpacing.sm,
+        DesktopLayoutTokens.sidebarContentPadding,
         AppSpacing.sm,
       ),
       child: Column(
@@ -482,15 +498,13 @@ class _SidebarNoteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return NoteContextMenuWidget(
+    final excerpt = note.excerpt?.trim();
+    final tile = NoteContextMenuWidget(
       note: note,
       onToggleFavorite: onToggleFavorite,
       onDelete: onDelete,
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 1,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
         child: Material(
           color: isSelected
               ? scheme.surfaceContainerHighest.withValues(alpha: 0.8)
@@ -529,19 +543,6 @@ class _SidebarNoteTile extends StatelessWidget {
                               color: scheme.onSurface,
                             ),
                           ),
-                          if (note.excerpt != null && note.excerpt!.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                note.excerpt!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -562,5 +563,8 @@ class _SidebarNoteTile extends StatelessWidget {
         ),
       ),
     );
+    return excerpt == null || excerpt.isEmpty
+        ? tile
+        : Tooltip(message: excerpt, child: tile);
   }
 }

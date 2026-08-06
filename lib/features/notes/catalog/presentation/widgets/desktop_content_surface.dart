@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:supanotes/shared/widgets/desktop_translucent_surface.dart';
+
 /// Continuous desktop content surface for the selected note or route child.
 ///
 /// This widget owns only the visual boundary. Routing, note loading, editor
@@ -11,7 +13,7 @@ class DesktopContentSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
+    return DesktopTranslucentSurface(
       key: const ValueKey('desktop-content-surface'),
       color: Theme.of(context).colorScheme.surface,
       child: child,

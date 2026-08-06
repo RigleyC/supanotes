@@ -62,13 +62,16 @@ class DesktopEditorViewport extends StatelessWidget {
               final sidePadding = desktopEditorSidePaddingForWidth(
                 availableWidth,
               );
+              final viewportHeight = MediaQuery.sizeOf(context).height;
 
               return DesktopEditorLayoutScope(
                 documentPadding: EdgeInsets.only(
                   left: sidePadding,
                   right: sidePadding,
                   top: DesktopLayoutTokens.editorTopPadding,
-                  bottom: DesktopLayoutTokens.editorBottomPadding,
+                  bottom: DesktopLayoutTokens.editorBottomPaddingForHeight(
+                    viewportHeight,
+                  ),
                 ),
                 child: child,
               );

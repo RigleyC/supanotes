@@ -133,6 +133,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
 
     return Scaffold(
+      backgroundColor: isDesktop ? Colors.transparent : null,
       extendBodyBehindAppBar: !isDesktop,
       appBar: isDesktop
           ? null

@@ -20,9 +20,17 @@ void main() {
       );
     });
 
-    test('uses a fixed row height when excerpts are visible', () {
-      expect(DesktopLayoutTokens.sidebarRowHeight, 56);
-      expect(DesktopLayoutTokens.chromeHeight, 48);
+    test('uses Writer-like desktop density and chrome metrics', () {
+      expect(DesktopLayoutTokens.sidebarInitialWidth, 240);
+      expect(DesktopLayoutTokens.sidebarCollapsedWidth, 48);
+      expect(DesktopLayoutTokens.sidebarRowHeight, 32);
+      expect(DesktopLayoutTokens.chromeHeight, 56);
+      expect(DesktopLayoutTokens.chromeControlHeight, 32);
+    });
+
+    test('uses Writer-like document spacing', () {
+      expect(DesktopLayoutTokens.editorTopPadding, 144);
+      expect(DesktopLayoutTokens.editorBottomPaddingForHeight(800), 320);
     });
   });
 }

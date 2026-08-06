@@ -217,6 +217,50 @@ void main() {
     );
   });
 
+  testWidgets('desktop shell collapses and restores the sidebar rail', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repository = _RecordingNotesRepository();
+    final router = _routerFor(
+      const AdaptiveNotesShell(child: SizedBox.shrink()),
+    );
+
+    await tester.pumpWidget(
+      _app(router: router, repository: repository, preferences: preferences),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Recolher sidebar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('desktop-sidebar-rail')), findsOneWidget);
+    expect(find.byType(ResizeDragHandle), findsNothing);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('desktop-sidebar-container')))
+          .width,
+      DesktopLayoutTokens.sidebarCollapsedWidth,
+    );
+    expect(preferences.getBool(desktopSidebarCollapsedPreferenceKey), isTrue);
+
+    await tester.tap(find.byTooltip('Expandir sidebar'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('expanded-sidebar-surface')),
+      findsOneWidget,
+    );
+    expect(find.byType(ResizeDragHandle), findsOneWidget);
+    expect(preferences.getBool(desktopSidebarCollapsedPreferenceKey), isFalse);
+  });
+
   testWidgets('desktop shell keeps the content surface open at wide width', (
     tester,
   ) async {

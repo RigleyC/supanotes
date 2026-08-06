@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
+import 'package:supanotes/shared/widgets/app_icon_button.dart';
+import 'package:supanotes/shared/widgets/desktop_translucent_surface.dart';
 
 /// Compact desktop-only document chrome.
 ///
@@ -32,100 +33,98 @@ class DesktopNoteChrome extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final currentNote = note;
 
-    return Container(
+    return DesktopTranslucentSurface(
       key: const ValueKey('desktop-note-chrome'),
-      height: DesktopLayoutTokens.chromeHeight,
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: scheme.outlineVariant.withValues(alpha: 0.5),
+      color: scheme.surface,
+      child: Container(
+        height: DesktopLayoutTokens.chromeHeight,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.5),
+            ),
           ),
         ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              currentNote == null
-                  ? 'Nota'
-                  : currentNote.isReadOnly
-                  ? '${NoteStrings.sharedByPrefix} ${currentNote.sharedByEmail}'
-                  : currentNote.title.isEmpty
-                  ? 'Sem título'
-                  : currentNote.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DesktopLayoutTokens.sidebarContentPadding,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: currentNote?.isReadOnly == true
+                  ? Text(
+                      '${NoteStrings.sharedByPrefix} ${currentNote!.sharedByEmail}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    )
+                  : const SizedBox.shrink(),
             ),
-          ),
-          if (currentNote != null) ...[
-            AdaptivePopupMenuButton.icon<String>(
-              icon: PlatformInfo.isIOS26OrHigher()
-                  ? 'ellipsis'
-                  : Icons.more_vert,
-              items: [
-                if (currentNote.isOwner)
-                  AdaptivePopupMenuItem<String>(
-                    label: NoteStrings.shareLabel,
-                    icon: PlatformInfo.isIOS26OrHigher()
-                        ? 'square.and.arrow.up'
-                        : Icons.share_outlined,
-                    value: 'share',
-                  ),
-                AdaptivePopupMenuItem<String>(
-                  label: currentNote.hideCompleted
-                      ? NoteStrings.showCompleted
-                      : NoteStrings.hideCompleted,
-                  icon: PlatformInfo.isIOS26OrHigher()
-                      ? (currentNote.hideCompleted ? 'eye' : 'eye.slash')
-                      : (currentNote.hideCompleted
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined),
-                  value: 'hide_completed',
-                ),
-                if (currentNote.isOwner)
-                  AdaptivePopupMenuItem<String>(
-                    label: currentNote.collapseImages
-                        ? 'Expandir imagens'
-                        : 'Colapsar imagens',
-                    icon: PlatformInfo.isIOS26OrHigher()
-                        ? 'photo'
-                        : Icons.image_outlined,
-                    value: 'collapse_images',
-                  ),
-              ],
-              onSelected: (index, entry) {
-                final value = entry.value;
-                if (value != null) onMenuSelected(value);
-              },
-            ),
-            _PreferenceStatusIndicator(status: preferenceStatus),
-            if (!currentNote.isReadOnly && editorFocusNode != null)
-              AnimatedBuilder(
-                animation: editorFocusNode!,
-                builder: (context, _) {
-                  if (!editorFocusNode!.hasFocus) {
-                    return const SizedBox.shrink();
-                  }
-                  return IconButton(
-                    tooltip: 'Sair do foco',
-                    icon: const Icon(Icons.check, size: 20),
-                    onPressed: onExitFocus,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 44,
-                      height: 44,
+            if (currentNote != null) ...[
+              AdaptivePopupMenuButton.icon<String>(
+                icon: PlatformInfo.isIOS26OrHigher()
+                    ? 'ellipsis'
+                    : Icons.more_vert,
+                items: [
+                  if (currentNote.isOwner)
+                    AdaptivePopupMenuItem<String>(
+                      label: NoteStrings.shareLabel,
+                      icon: PlatformInfo.isIOS26OrHigher()
+                          ? 'square.and.arrow.up'
+                          : Icons.share_outlined,
+                      value: 'share',
                     ),
-                    visualDensity: VisualDensity.compact,
-                  );
+                  AdaptivePopupMenuItem<String>(
+                    label: currentNote.hideCompleted
+                        ? NoteStrings.showCompleted
+                        : NoteStrings.hideCompleted,
+                    icon: PlatformInfo.isIOS26OrHigher()
+                        ? (currentNote.hideCompleted ? 'eye' : 'eye.slash')
+                        : (currentNote.hideCompleted
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined),
+                    value: 'hide_completed',
+                  ),
+                  if (currentNote.isOwner)
+                    AdaptivePopupMenuItem<String>(
+                      label: currentNote.collapseImages
+                          ? 'Expandir imagens'
+                          : 'Colapsar imagens',
+                      icon: PlatformInfo.isIOS26OrHigher()
+                          ? 'photo'
+                          : Icons.image_outlined,
+                      value: 'collapse_images',
+                    ),
+                ],
+                onSelected: (index, entry) {
+                  final value = entry.value;
+                  if (value != null) onMenuSelected(value);
                 },
               ),
+              _PreferenceStatusIndicator(status: preferenceStatus),
+              if (!currentNote.isReadOnly && editorFocusNode != null)
+                AnimatedBuilder(
+                  animation: editorFocusNode!,
+                  builder: (context, _) {
+                    if (!editorFocusNode!.hasFocus) {
+                      return const SizedBox.shrink();
+                    }
+                    return AppIconButton(
+                      tooltip: 'Sair do foco',
+                      icon: const Icon(Icons.check, size: 20),
+                      onPressed: onExitFocus,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 44,
+                        height: 44,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    );
+                  },
+                ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

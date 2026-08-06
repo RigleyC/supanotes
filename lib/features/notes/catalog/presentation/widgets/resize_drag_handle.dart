@@ -3,8 +3,15 @@ import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 
 class ResizeDragHandle extends StatefulWidget {
   final ValueChanged<double> onDrag;
+  final VoidCallback? onDragStart;
+  final VoidCallback? onDragEnd;
 
-  const ResizeDragHandle({super.key, required this.onDrag});
+  const ResizeDragHandle({
+    super.key,
+    required this.onDrag,
+    this.onDragStart,
+    this.onDragEnd,
+  });
 
   @override
   State<ResizeDragHandle> createState() => _ResizeDragHandleState();
@@ -22,9 +29,12 @@ class _ResizeDragHandleState extends State<ResizeDragHandle> {
       onExit: (_) => setState(() => _isHovering = false),
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: (_) => widget.onDragStart?.call(),
         onHorizontalDragUpdate: (details) {
           widget.onDrag(details.delta.dx);
         },
+        onHorizontalDragEnd: (_) => widget.onDragEnd?.call(),
+        onHorizontalDragCancel: () => widget.onDragEnd?.call(),
         child: Container(
           width: DesktopLayoutTokens.resizeHitWidth,
           color: Colors.transparent,

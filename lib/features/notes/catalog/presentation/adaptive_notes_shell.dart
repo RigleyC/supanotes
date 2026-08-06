@@ -13,6 +13,7 @@ import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_side
 import 'package:supanotes/features/notes/catalog/presentation/widgets/resize_drag_handle.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
+import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:uuid/uuid.dart';
 
 class AdaptiveNotesShell extends ConsumerStatefulWidget {
@@ -26,6 +27,8 @@ class AdaptiveNotesShell extends ConsumerStatefulWidget {
 
 class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
   late double _sidebarWidth;
+  late bool _sidebarCollapsed;
+  bool _isSidebarResizing = false;
 
   @override
   void initState() {
@@ -33,6 +36,19 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
     final preferences = ref.read(desktopLayoutPreferencesProvider);
     _sidebarWidth =
         preferences.sidebarWidth ?? DesktopLayoutTokens.sidebarInitialWidth;
+    _sidebarCollapsed = preferences.sidebarCollapsed;
+  }
+
+  void _toggleSidebar() {
+    final nextCollapsed = !_sidebarCollapsed;
+    setState(() {
+      _sidebarCollapsed = nextCollapsed;
+    });
+    unawaited(
+      ref
+          .read(desktopLayoutPreferencesProvider)
+          .saveSidebarCollapsed(nextCollapsed),
+    );
   }
 
   void _updateSidebarWidth(double delta, double viewportWidth) {
@@ -47,6 +63,19 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
     });
     final preferences = ref.read(desktopLayoutPreferencesProvider);
     unawaited(preferences.saveSidebarWidth(nextWidth));
+  }
+
+  void _startSidebarResize() {
+    setState(() {
+      _isSidebarResizing = true;
+    });
+  }
+
+  void _endSidebarResize() {
+    if (!mounted) return;
+    setState(() {
+      _isSidebarResizing = false;
+    });
   }
 
   @override
@@ -64,44 +93,111 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
       _sidebarWidth,
       viewportWidth: viewportWidth,
     );
+    final visibleSidebarWidth = _sidebarCollapsed
+        ? DesktopLayoutTokens.sidebarCollapsedWidth
+        : sidebarWidth;
 
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: ColoredBox(
-        color: Theme.of(context).colorScheme.surface,
+        color: scheme.surfaceContainerLowest.withValues(
+          alpha: DesktopLayoutTokens.surfaceOpacity,
+        ),
         child: Row(
           children: [
-            SizedBox(
+            AnimatedContainer(
               key: const ValueKey('desktop-sidebar-container'),
-              width: sidebarWidth,
-              child: DesktopSidebarSurface(
-                child: NotesSidebar(
-                  selectedNoteId: selectedNoteId,
-                  onNoteTap: (note) {
-                    context.go(AppRoutes.note(note.id));
-                  },
-                  onNewNote: () async {
-                    final id = const Uuid().v4();
-                    await ref
-                        .read(notesRepositoryProvider)
-                        .createLocalNote(id: id);
-                    if (!context.mounted) return;
-                    context.go(
-                      AppRoutes.note(id),
-                      extra: const NoteEditorOpenOptions.newNote(),
-                    );
-                  },
-                  onOpenSettings: () {
-                    context.push(AppRoutes.settings);
-                  },
+              duration: _isSidebarResizing
+                  ? Duration.zero
+                  : const Duration(milliseconds: 140),
+              curve: Curves.easeOut,
+              width: visibleSidebarWidth,
+              child: ClipRect(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 140),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeOut,
+                  child: _sidebarCollapsed
+                      ? _CollapsedSidebarRail(
+                          key: const ValueKey('collapsed-sidebar-rail'),
+                          onExpand: _toggleSidebar,
+                        )
+                      : OverflowBox(
+                          alignment: Alignment.topLeft,
+                          minWidth: sidebarWidth,
+                          maxWidth: sidebarWidth,
+                          child: DesktopSidebarSurface(
+                            key: const ValueKey('expanded-sidebar-surface'),
+                            child: NotesSidebar(
+                              selectedNoteId: selectedNoteId,
+                              onNoteTap: (note) {
+                                context.go(AppRoutes.note(note.id));
+                              },
+                              onNewNote: () async {
+                                final id = const Uuid().v4();
+                                await ref
+                                    .read(notesRepositoryProvider)
+                                    .createLocalNote(id: id);
+                                if (!context.mounted) return;
+                                context.go(
+                                  AppRoutes.note(id),
+                                  extra: const NoteEditorOpenOptions.newNote(),
+                                );
+                              },
+                              onOpenSettings: () {
+                                context.push(AppRoutes.settings);
+                              },
+                              onToggleCollapsed: _toggleSidebar,
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ),
-            ResizeDragHandle(
-              onDrag: (delta) => _updateSidebarWidth(delta, viewportWidth),
-            ),
+            if (!_sidebarCollapsed)
+              ResizeDragHandle(
+                onDragStart: _startSidebarResize,
+                onDragEnd: _endSidebarResize,
+                onDrag: (delta) => _updateSidebarWidth(delta, viewportWidth),
+              ),
             Expanded(child: DesktopContentSurface(child: widget.child)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CollapsedSidebarRail extends StatelessWidget {
+  const _CollapsedSidebarRail({super.key, required this.onExpand});
+
+  final VoidCallback onExpand;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      key: const ValueKey('desktop-sidebar-rail'),
+      color: scheme.surfaceContainerLow,
+      child: Column(
+        children: [
+          SizedBox(
+            height: DesktopLayoutTokens.chromeHeight,
+            child: AppIconButton(
+              tooltip: 'Expandir sidebar',
+              icon: const Icon(Icons.chevron_right),
+              onPressed: onExpand,
+              constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          Divider(
+            height: DesktopLayoutTokens.dividerWidth,
+            thickness: DesktopLayoutTokens.dividerWidth,
+          ),
+          const Expanded(child: SizedBox()),
+        ],
       ),
     );
   }

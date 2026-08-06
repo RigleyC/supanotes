@@ -211,17 +211,16 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                 (MediaQuery.paddingOf(context).top + kToolbarHeight);
             final desktopDocumentPadding = desktopLayout?.documentPadding;
             final docPadding =
-                desktopDocumentPadding?.copyWith(
-                  bottom: widget.isReadOnly
-                      ? 24
-                      : desktopDocumentPadding.bottom,
-                ) ??
+                desktopDocumentPadding ??
                 (isDesktop
                     ? EdgeInsets.only(
                         left: desktopEditorSidePaddingForWidth(availableWidth),
                         right: desktopEditorSidePaddingForWidth(availableWidth),
                         top: DesktopLayoutTokens.editorTopPadding,
-                        bottom: DesktopLayoutTokens.editorBottomPadding,
+                        bottom:
+                            DesktopLayoutTokens.editorBottomPaddingForHeight(
+                              MediaQuery.sizeOf(context).height,
+                            ),
                       )
                     : EdgeInsets.only(
                         left: 24,

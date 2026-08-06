@@ -61,6 +61,7 @@ void main() {
                   onNoteTap: (_) {},
                   onNewNote: () {},
                   onOpenSettings: () {},
+                  onToggleCollapsed: () {},
                 ),
               ),
             ),
@@ -81,7 +82,9 @@ void main() {
     expect(find.text('Todas'), findsOneWidget);
     expect(find.text('Favoritas'), findsOneWidget);
     expect(find.text('Projeto desktop'), findsOneWidget);
-    expect(find.text('Coluna centralizada'), findsOneWidget);
+    expect(find.text('Coluna centralizada'), findsNothing);
+    expect(find.byTooltip('Coluna centralizada'), findsOneWidget);
+    expect(find.byTooltip('Recolher sidebar'), findsOneWidget);
     expect(find.text('Configurações'), findsOneWidget);
     expect(find.text('user@example.com'), findsOneWidget);
     expect(
@@ -110,6 +113,10 @@ void main() {
     expect(
       tester.getSize(find.byKey(const ValueKey('note-a'))),
       tester.getSize(find.byKey(const ValueKey('note-b'))),
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('note-a'))).height,
+      DesktopLayoutTokens.sidebarRowHeight,
     );
   });
 

@@ -16,10 +16,16 @@ Stylesheet buildNoteStylesheet(
   required double quoteSize,
   required double bodyLineHeight,
   required double quoteLineHeight,
+  required double letterSpacing,
+  required double h1TopPadding,
+  required double h2TopPadding,
+  required double h3TopPadding,
+  required double paragraphTopPadding,
 }) {
   final colorScheme = Theme.of(context).colorScheme;
   final linkColor = colorScheme.primary;
   final onSurface = colorScheme.onSurface;
+  final bodyColor = onSurface.withValues(alpha: 0.8);
   final onSurfaceVariant = colorScheme.onSurfaceVariant;
 
   return defaultStylesheet.copyWith(
@@ -44,9 +50,10 @@ Stylesheet buildNoteStylesheet(
         BlockSelector.all,
         (doc, docNode) => {
           Styles.textStyle: TextStyle(
-            color: onSurface,
+            color: bodyColor,
             fontSize: bodySize,
             height: bodyLineHeight,
+            letterSpacing: letterSpacing,
           ),
         },
       ),
@@ -60,39 +67,43 @@ Stylesheet buildNoteStylesheet(
             color: onSurface,
             fontSize: h1Size,
             fontWeight: FontWeight.bold,
+            letterSpacing: letterSpacing,
           ),
         },
       ),
       StyleRule(
         const BlockSelector('header1'),
         (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 24, bottom: 12),
+          Styles.padding: CascadingPadding.only(top: h1TopPadding, bottom: 12),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: h1Size,
             fontWeight: FontWeight.bold,
+            letterSpacing: letterSpacing,
           ),
         },
       ),
       StyleRule(
         const BlockSelector('header2'),
         (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 20, bottom: 12),
+          Styles.padding: CascadingPadding.only(top: h2TopPadding, bottom: 12),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: h2Size,
             fontWeight: FontWeight.bold,
+            letterSpacing: letterSpacing,
           ),
         },
       ),
       StyleRule(
         const BlockSelector('header3'),
         (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 16, bottom: 8),
+          Styles.padding: CascadingPadding.only(top: h3TopPadding, bottom: 8),
           Styles.textStyle: TextStyle(
             color: onSurface,
             fontSize: h3Size,
             fontWeight: FontWeight.bold,
+            letterSpacing: letterSpacing,
           ),
         },
       ),
@@ -117,6 +128,7 @@ Stylesheet buildNoteStylesheet(
             fontSize: quoteSize,
             fontWeight: FontWeight.bold,
             height: quoteLineHeight,
+            letterSpacing: letterSpacing,
           ),
         },
       ),
@@ -132,9 +144,10 @@ Stylesheet buildNoteStylesheet(
       StyleRule(const BlockSelector('task'), (doc, docNode) {
         return {
           Styles.textStyle: TextStyle(
-            color: onSurface,
+            color: bodyColor,
             fontSize: bodySize,
-            height: 1.4,
+            height: bodyLineHeight,
+            letterSpacing: letterSpacing,
           ),
         };
       }),
@@ -142,7 +155,7 @@ Stylesheet buildNoteStylesheet(
       StyleRule(
         const BlockSelector('paragraph'),
         (doc, docNode) => {
-          Styles.padding: const CascadingPadding.only(top: 24),
+          Styles.padding: CascadingPadding.only(top: paragraphTopPadding),
         },
       ),
       StyleRule(
@@ -157,6 +170,7 @@ Stylesheet buildNoteStylesheet(
             fontSize: bodySize,
             fontWeight: FontWeight.bold,
             height: bodyLineHeight,
+            letterSpacing: letterSpacing,
           ),
         },
       ),
