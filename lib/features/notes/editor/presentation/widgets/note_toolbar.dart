@@ -9,17 +9,16 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:motor/motor.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
+import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
-part 'note_toolbar_button.dart';
+import 'note_editor_interaction.dart';
+import 'note_toolbar_button.dart';
+import 'selection_formatting.dart';
+export 'note_editor_interaction.dart' show noteEditorToolbarTapRegionGroup;
 part 'note_toolbar_menus.dart';
-
-const noteEditorToolbarTapRegionGroup = Object();
 
 class NoteToolbar extends StatefulWidget {
   const NoteToolbar({
@@ -219,25 +218,25 @@ class _NoteToolbarState extends State<NoteToolbar> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _ToolbarButton(
+                              ToolbarButton(
                                 icon: Icons.text_format,
                                 isActive: false,
                                 onPressed: _openFormatting,
                                 semanticLabel: 'Abrir formatação',
                               ),
-                              const _ToolbarDivider(),
-                              _ToolbarButton(
+                              const ToolbarDivider(),
+                              ToolbarButton(
                                 icon: Icons.horizontal_rule,
                                 isActive: false,
                                 onPressed: _insertDivider,
                               ),
-                              const _ToolbarDivider(),
-                              _ToolbarButton(
+                              const ToolbarDivider(),
+                              ToolbarButton(
                                 icon: Icons.image,
                                 isActive: false,
                                 onPressed: onAttachImage,
                               ),
-                              _ToolbarButton(
+                              ToolbarButton(
                                 icon: Icons.attach_file,
                                 isActive: false,
                                 onPressed: onAttachFile,
@@ -255,13 +254,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   List<DocumentNode> _selectedNodes(DocumentSelection? selection) {
-    if (selection == null) return const [];
-    final document = editor.context.document;
-    if (document.getNodeById(selection.start.nodeId) == null ||
-        document.getNodeById(selection.end.nodeId) == null) {
-      return const [];
-    }
-    return NoteEditorCommands.selectedNodes(document, selection);
+    return editorSelectionNodes(editor.context.document, selection);
   }
 
   Attribution? _selectedBlockType(List<DocumentNode> nodes) {
@@ -304,31 +297,11 @@ class _NoteToolbarState extends State<NoteToolbar> {
     DocumentSelection? selection,
     Attribution attribution,
   ) {
-    if (selection == null || selection.isCollapsed) return false;
-    var containsText = false;
-    for (final node in _selectedNodes(selection).whereType<TextNode>()) {
-      final startPosition = selection.start.nodeId == node.id
-          ? selection.start.nodePosition
-          : null;
-      final endPosition = selection.end.nodeId == node.id
-          ? selection.end.nodePosition
-          : null;
-      final start = startPosition is TextNodePosition
-          ? startPosition.offset
-          : 0;
-      final end = endPosition is TextNodePosition
-          ? endPosition.offset
-          : node.text.length;
-      final safeStart = start.clamp(0, node.text.length);
-      final safeEnd = end.clamp(safeStart, node.text.length);
-      for (var index = safeStart; index < safeEnd; index++) {
-        containsText = true;
-        if (!node.text.hasAttributionAt(index, attribution: attribution)) {
-          return false;
-        }
-      }
-    }
-    return containsText;
+    return hasAttributionInEditorSelection(
+      editor.context.document,
+      selection,
+      attribution,
+    );
   }
 
   void _onFormattingBlockType(
@@ -363,9 +336,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   bool _selectionIsValid(DocumentSelection selection) {
-    final document = editor.context.document;
-    return document.getNodeById(selection.start.nodeId) != null &&
-        document.getNodeById(selection.end.nodeId) != null;
+    return isEditorSelectionValid(editor.context.document, selection);
   }
 
   void _convertToListItem(ListItemType type) {

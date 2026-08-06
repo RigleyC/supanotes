@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/presentation/widgets/custom_task_component.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_selection_formatting_overlay.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
 
 Widget buildEditorHarness({
   required List<DocumentNode> nodes,
@@ -48,17 +50,13 @@ DocumentSelection caretSelection(String nodeId) {
 Finder iconButtonWithIcon(IconData icon) {
   return find.ancestor(
     of: find.byIcon(icon),
-    matching: find.byWidgetPredicate(
-      (w) => w.runtimeType.toString() == '_ToolbarButton',
-    ),
+    matching: find.byType(ToolbarButton),
   );
 }
 
 Finder toolbarButtonWithSvgAsset(String asset) {
   return find.byWidgetPredicate(
-    (widget) =>
-        widget.runtimeType.toString() == '_ToolbarButton' &&
-        (widget as dynamic).svgAsset == asset,
+    (widget) => widget is ToolbarButton && widget.svgAsset == asset,
   );
 }
 
@@ -114,7 +112,117 @@ Widget buildConversionHarness({
   );
 }
 
+Widget buildDesktopSelectionFormattingHarness({DocumentSelection? selection}) {
+  final document = MutableDocument(
+    nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello world'))],
+  );
+  final composer = MutableDocumentComposer(initialSelection: selection);
+  final editor = createDefaultDocumentEditor(
+    document: document,
+    composer: composer,
+  );
+  final selectionLayerLinks = SelectionLayerLinks();
+  final focusNode = FocusNode();
+
+  return MaterialApp(
+    home: Scaffold(
+      body: DesktopSelectionFormattingOverlay(
+        enabled: true,
+        editor: editor,
+        composer: composer,
+        editorFocusNode: focusNode,
+        selectionLayerLinks: selectionLayerLinks,
+        viewportKey: GlobalKey(),
+        child: SuperEditor(
+          editor: editor,
+          focusNode: focusNode,
+          selectionLayerLinks: selectionLayerLinks,
+        ),
+      ),
+    ),
+  );
+}
+
 void main() {
+  group('Desktop contextual selection formatting', () {
+    testWidgets('shows the formatting popover for expanded text selection', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildDesktopSelectionFormattingHarness(
+          selection: const DocumentSelection(
+            base: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            extent: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Formatação da seleção'), findsOneWidget);
+      expect(find.bySemanticsLabel('Negrito'), findsOneWidget);
+      expect(find.bySemanticsLabel('Itálico'), findsOneWidget);
+      expect(find.bySemanticsLabel('Tachado'), findsOneWidget);
+    });
+
+    testWidgets('hides the formatting popover for a collapsed selection', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildDesktopSelectionFormattingHarness(
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Formatação da seleção'), findsNothing);
+    });
+
+    testWidgets('applies italic to the selected range', (tester) async {
+      await tester.pumpWidget(
+        buildDesktopSelectionFormattingHarness(
+          selection: const DocumentSelection(
+            base: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            extent: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Itálico'));
+      await tester.pumpAndSettle();
+
+      final editor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+      final paragraph =
+          editor.editor.context.document.getNodeById('node-1') as ParagraphNode;
+      for (var index = 0; index < 5; index++) {
+        expect(
+          paragraph.text.hasAttributionAt(
+            index,
+            attribution: italicsAttribution,
+          ),
+          isTrue,
+        );
+      }
+    });
+  });
+
   group('List menu trigger state', () {
     testWidgets('shows list controls only inside formatting mode', (
       tester,

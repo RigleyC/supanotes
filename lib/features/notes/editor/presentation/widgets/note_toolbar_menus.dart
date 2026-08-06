@@ -61,7 +61,7 @@ class _FormattingToolbarPanel extends StatelessWidget {
                   Semantics(
                     button: true,
                     label: 'Fechar formatação',
-                    child: _ToolbarButton(
+                    child: ToolbarButton(
                       icon: Icons.close,
                       spacious: true,
                       isActive: false,
@@ -92,14 +92,14 @@ class _FormattingToolbarPanel extends StatelessWidget {
                     onSelected: onListSelected,
                   ),
                   if (isListItem) ...[
-                    const _ToolbarDivider(),
-                    _ToolbarButton(
+                    const ToolbarDivider(),
+                    ToolbarButton(
                       icon: Icons.format_indent_increase,
                       isActive: false,
                       onPressed: onIndent,
                       semanticLabel: 'Aumentar recuo',
                     ),
-                    _ToolbarButton(
+                    ToolbarButton(
                       icon: Icons.format_indent_decrease,
                       isActive: false,
                       onPressed: onUnindent,
@@ -142,36 +142,36 @@ class _FormattingMenu extends StatelessWidget {
       label: 'Opções de formatação',
       child: _FormattingMenuRow(
         children: [
-          _ToolbarButton(
+          ToolbarButton(
             svgAsset: 'assets/icons/h1_icon.svg',
             spacious: true,
             isActive: blockType == header1Attribution,
             onPressed: () => onBlockType(header1Attribution),
             semanticLabel: 'Título 1',
           ),
-          _ToolbarButton(
+          ToolbarButton(
             svgAsset: 'assets/icons/h2_icon.svg',
             spacious: true,
             isActive: blockType == header2Attribution,
             onPressed: () => onBlockType(header2Attribution),
             semanticLabel: 'Título 2',
           ),
-          _ToolbarButton(
+          ToolbarButton(
             svgAsset: 'assets/icons/h3_icon.svg',
             spacious: true,
             isActive: blockType == header3Attribution,
             onPressed: () => onBlockType(header3Attribution),
             semanticLabel: 'Título 3',
           ),
-          _ToolbarButton(
+          ToolbarButton(
             icon: Icons.format_quote,
             spacious: true,
             isActive: blockType == blockquoteAttribution,
             onPressed: () => onBlockType(blockquoteAttribution),
             semanticLabel: 'Citação',
           ),
-          const _ToolbarDivider(),
-          _ToolbarButton(
+          const ToolbarDivider(),
+          ToolbarButton(
             icon: Icons.format_bold,
             spacious: true,
             isActive: isBold,
@@ -180,7 +180,7 @@ class _FormattingMenu extends StatelessWidget {
                 : null,
             semanticLabel: 'Negrito',
           ),
-          _ToolbarButton(
+          ToolbarButton(
             icon: Icons.format_italic,
             spacious: true,
             isActive: isItalic,
@@ -189,7 +189,7 @@ class _FormattingMenu extends StatelessWidget {
                 : null,
             semanticLabel: 'Itálico',
           ),
-          _ToolbarButton(
+          ToolbarButton(
             icon: Icons.format_strikethrough,
             spacious: true,
             isActive: isStrikethrough,
@@ -233,21 +233,21 @@ class _ListFormatMenu extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _ToolbarButton(
+          ToolbarButton(
             icon: Icons.format_list_bulleted,
             spacious: true,
             isActive: activeOption == _ListFormatOption.bulleted,
             onPressed: () => onSelected(_ListFormatOption.bulleted),
             semanticLabel: 'Lista com marcadores',
           ),
-          _ToolbarButton(
+          ToolbarButton(
             icon: Icons.format_list_numbered,
             spacious: true,
             isActive: activeOption == _ListFormatOption.numbered,
             onPressed: () => onSelected(_ListFormatOption.numbered),
             semanticLabel: 'Lista numerada',
           ),
-          _ToolbarButton(
+          ToolbarButton(
             svgAsset: 'assets/icons/checkbox.svg',
             spacious: true,
             isActive: activeOption == _ListFormatOption.checklist,

@@ -12,6 +12,7 @@ import 'package:supanotes/features/notes/editor/application/note_editor_provider
 import 'package:supanotes/features/notes/editor/presentation/note_desktop_stylesheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_selection_formatting_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
@@ -21,6 +22,7 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/notes/editor/document/markdown_task_shortcut_plugin.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 
@@ -53,6 +55,12 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   final SlashCommandController _slashCommandController =
       SlashCommandController();
   final _docLayoutKey = GlobalKey();
+  final _editorViewportKey = GlobalKey();
+  final _selectionLayerLinks = SelectionLayerLinks();
+  late final MarkdownInlineUpstreamSyntaxPlugin _markdownInlinePlugin =
+      MarkdownInlineUpstreamSyntaxPlugin();
+  late final MarkdownTaskShortcutPlugin _markdownTaskPlugin =
+      MarkdownTaskShortcutPlugin();
   EditorControls? _controls;
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
@@ -246,45 +254,60 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             return Stack(
               children: [
                 Positioned.fill(
-                  child: SuperEditorAndroidControlsScope(
-                    controller: _controls!.androidController,
-                    child: SuperEditorIosControlsScope(
-                      controller: _controls!.iosController,
-                      child: TapRegion(
-                        groupId: noteEditorToolbarTapRegionGroup,
-                        child: SuperEditor(
-                          editor: controller.editor,
-                          focusNode: widget.isReadOnly
-                              ? null
-                              : controller.focusNode,
-                          autofocus:
-                              widget.requestInitialFocus && !widget.isReadOnly,
-                          inputSource: TextInputSource.ime,
-                          documentLayoutKey: _docLayoutKey,
-                          stylesheet: _cachedStylesheet!,
-                          selectionStyle: editorSelectionStyle(
-                            theme.colorScheme,
-                          ),
-                          documentOverlayBuilders: [
-                            ...defaultSuperEditorDocumentOverlayBuilders.where(
-                              (builder) =>
-                                  builder is! DefaultCaretOverlayBuilder,
-                            ),
-                            DefaultCaretOverlayBuilder(
-                              caretStyle: CaretStyle(
-                                color: theme.colorScheme.primary,
-                                width: 2.5,
-                              ),
-                            ),
-                          ],
-                          contentTapDelegateFactories:
-                              _contentTapDelegateFactories,
-                          keyboardActions: editorKeyboardActions(
-                            slashCommandController: widget.isReadOnly
+                  child: DesktopSelectionFormattingOverlay(
+                    enabled: isDesktop && !widget.isReadOnly,
+                    editor: controller.editor,
+                    composer: controller.composer,
+                    editorFocusNode: controller.focusNode,
+                    selectionLayerLinks: _selectionLayerLinks,
+                    viewportKey: _editorViewportKey,
+                    child: SuperEditorAndroidControlsScope(
+                      controller: _controls!.androidController,
+                      child: SuperEditorIosControlsScope(
+                        controller: _controls!.iosController,
+                        child: TapRegion(
+                          groupId: noteEditorToolbarTapRegionGroup,
+                          child: SuperEditor(
+                            key: ValueKey<bool>(isDesktop),
+                            editor: controller.editor,
+                            plugins: isDesktop
+                                ? {_markdownInlinePlugin, _markdownTaskPlugin}
+                                : const {},
+                            focusNode: widget.isReadOnly
                                 ? null
-                                : _slashCommandController,
+                                : controller.focusNode,
+                            autofocus:
+                                widget.requestInitialFocus &&
+                                !widget.isReadOnly,
+                            inputSource: TextInputSource.ime,
+                            documentLayoutKey: _docLayoutKey,
+                            selectionLayerLinks: _selectionLayerLinks,
+                            stylesheet: _cachedStylesheet!,
+                            selectionStyle: editorSelectionStyle(
+                              theme.colorScheme,
+                            ),
+                            documentOverlayBuilders: [
+                              ...defaultSuperEditorDocumentOverlayBuilders
+                                  .where(
+                                    (builder) =>
+                                        builder is! DefaultCaretOverlayBuilder,
+                                  ),
+                              DefaultCaretOverlayBuilder(
+                                caretStyle: CaretStyle(
+                                  color: theme.colorScheme.primary,
+                                  width: 2.5,
+                                ),
+                              ),
+                            ],
+                            contentTapDelegateFactories:
+                                _contentTapDelegateFactories,
+                            keyboardActions: editorKeyboardActions(
+                              slashCommandController: widget.isReadOnly
+                                  ? null
+                                  : _slashCommandController,
+                            ),
+                            componentBuilders: _componentBuilders!,
                           ),
-                          componentBuilders: _componentBuilders!,
                         ),
                       ),
                     ),

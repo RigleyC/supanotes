@@ -34,6 +34,16 @@ class MarkdownTaskShortcutConversionReaction
         ),
       ),
       ConvertParagraphToTaskRequest(nodeId: paragraph.id),
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: paragraph.id,
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+        ),
+        SelectionChangeType.placeCaret,
+        SelectionReason.contentChange,
+      ),
     ]);
   }
 }

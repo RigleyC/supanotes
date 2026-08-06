@@ -382,6 +382,64 @@ void main() {
     expect(find.byType(NoteSuggestionOverlay), findsNothing);
   });
 
+  testWidgets('desktop NoteEditor attaches Markdown task shortcuts', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final controller = _createTestController([
+      ParagraphNode(id: 'paragraph-1', text: AttributedText()),
+    ]);
+    late StateSetter rebuildParent;
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _sessionFor(controller),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                rebuildParent = setState;
+                return NoteEditor(
+                  noteId: 'note-1',
+                  taskMetadata: const {},
+                  delegate: const NoteEditorDelegate(),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    rebuildParent(() {});
+    await tester.pumpAndSettle();
+
+    controller.editor.execute([
+      InsertTextRequest(
+        documentPosition: const DocumentPosition(
+          nodeId: 'paragraph-1',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+        textToInsert: '[] ',
+        attributions: const {},
+      ),
+    ]);
+    await tester.pump();
+
+    expect(controller.document.getNodeById('paragraph-1'), isA<TaskNode>());
+  });
+
   testWidgets(
     'desktop screen uses compact chrome and centered editor viewport',
     (tester) async {

@@ -1,7 +1,12 @@
-part of 'note_toolbar.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:motor/motor.dart';
 
-class _ToolbarButton extends StatefulWidget {
-  const _ToolbarButton({
+import 'package:supanotes/shared/theme/app_spacing.dart';
+
+class ToolbarButton extends StatefulWidget {
+  const ToolbarButton({
+    super.key,
     this.icon,
     this.svgAsset,
     this.semanticLabel,
@@ -21,10 +26,10 @@ class _ToolbarButton extends StatefulWidget {
   final VoidCallback? onPressed;
 
   @override
-  State<_ToolbarButton> createState() => _ToolbarButtonState();
+  State<ToolbarButton> createState() => _ToolbarButtonState();
 }
 
-class _ToolbarButtonState extends State<_ToolbarButton>
+class _ToolbarButtonState extends State<ToolbarButton>
     with TickerProviderStateMixin {
   late final SingleMotionController _activeMotion;
   late final SingleMotionController _iconMotion;
@@ -47,7 +52,7 @@ class _ToolbarButtonState extends State<_ToolbarButton>
   }
 
   @override
-  void didUpdateWidget(_ToolbarButton oldWidget) {
+  void didUpdateWidget(ToolbarButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive != widget.isActive) {
       _animateTo(_activeMotion, widget.isActive ? 1 : 0);
@@ -150,8 +155,8 @@ class _ToolbarButtonState extends State<_ToolbarButton>
   }
 }
 
-class _ToolbarDivider extends StatelessWidget {
-  const _ToolbarDivider();
+class ToolbarDivider extends StatelessWidget {
+  const ToolbarDivider({super.key});
 
   @override
   Widget build(BuildContext context) {
