@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:follow_the_leader/follow_the_leader.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
 import 'package:supanotes/features/notes/editor/document/slash_command_options.dart';
 
-/// Keyboard action to intercept ArrowUp, ArrowDown, Enter, Escape when slash menu is visible.
+/// Keyboard action for navigation and dismissal while the slash menu is visible.
 SuperEditorKeyboardAction slashMenuKeyboardHandler(
   SlashCommandController controller,
 ) {
@@ -42,6 +42,11 @@ SuperEditorKeyboardAction slashMenuKeyboardHandler(
       return ExecutionInstruction.haltExecution;
     }
 
+    if (keyEvent.logicalKey == LogicalKeyboardKey.tab) {
+      controller.dismiss();
+      return ExecutionInstruction.continueExecution;
+    }
+
     return ExecutionInstruction.continueExecution;
   };
 }
@@ -65,9 +70,7 @@ class SlashCommandController extends ChangeNotifier {
   }) {
     _isVisible = true;
     _filteredOptions = filteredOptions;
-    if (_selectedIndex >= _filteredOptions.length) {
-      _selectedIndex = 0;
-    }
+    _selectedIndex = 0;
     _onSelectOption = onSelectOption;
     _onDismiss = onDismiss;
     notifyListeners();
@@ -110,13 +113,11 @@ class SlashCommandController extends ChangeNotifier {
 }
 
 class _SlashMatch {
-  final String query;
   final String nodeId;
   final int slashOffset;
   final int caretOffset;
 
   const _SlashMatch({
-    required this.query,
     required this.nodeId,
     required this.slashOffset,
     required this.caretOffset,
@@ -126,8 +127,8 @@ class _SlashMatch {
 class SlashCommandOverlay extends StatefulWidget {
   final Editor editor;
   final DocumentComposer composer;
-  final DocumentLayout Function() documentLayoutResolver;
-  final BuildContext? Function() documentLayoutContextResolver;
+  final SelectionLayerLinks selectionLayerLinks;
+  final GlobalKey viewportKey;
   final SlashCommandController controller;
   final FocusNode? focusNode;
   final VoidCallback? onAttachImage;
@@ -137,8 +138,8 @@ class SlashCommandOverlay extends StatefulWidget {
     super.key,
     required this.editor,
     required this.composer,
-    required this.documentLayoutResolver,
-    required this.documentLayoutContextResolver,
+    required this.selectionLayerLinks,
+    required this.viewportKey,
     required this.controller,
     this.focusNode,
     this.onAttachImage,
@@ -150,13 +151,26 @@ class SlashCommandOverlay extends StatefulWidget {
 }
 
 class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
+  late final OverlayPortalController _menuPortalController;
+  late final FocusNode _menuFocusNode;
+  late final FollowerAligner _menuAligner;
+  late FollowerBoundary _viewportBoundary;
   _SlashMatch? _match;
-  Rect? _caretRect;
 
   @override
   void initState() {
     super.initState();
+    _menuPortalController = OverlayPortalController();
+    _menuFocusNode = FocusNode(debugLabel: 'slash-command-menu');
+    _menuAligner = PreferredPositionAligner.bottom(gap: 8);
     widget.composer.selectionNotifier.addListener(_onSelectionChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _viewportBoundary = WidgetFollowerBoundary(boundaryKey: widget.viewportKey);
+    _syncMenuVisibility();
   }
 
   @override
@@ -172,6 +186,7 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
   @override
   void dispose() {
     widget.composer.selectionNotifier.removeListener(_onSelectionChanged);
+    _menuFocusNode.dispose();
     super.dispose();
   }
 
@@ -205,9 +220,17 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
 
     final slashOffset = textBeforeCaret.lastIndexOf('/');
     final query = match.group(1) ?? '';
-    final filtered = defaultSlashCommandOptions
-        .where((opt) => opt.matches(query))
-        .toList();
+    final filtered =
+        defaultSlashCommandOptions.where((opt) => opt.matches(query)).toList()
+          ..sort((left, right) {
+            final score = right
+                .matchScore(query)
+                .compareTo(left.matchScore(query));
+            if (score != 0) return score;
+            return defaultSlashCommandOptions
+                .indexOf(left)
+                .compareTo(defaultSlashCommandOptions.indexOf(right));
+          });
 
     if (filtered.isEmpty) {
       if (_match != null) _clearMatch();
@@ -216,7 +239,6 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
 
     setState(() {
       _match = _SlashMatch(
-        query: query,
         nodeId: node.id,
         slashOffset: slashOffset,
         caretOffset: caretOffset,
@@ -228,48 +250,26 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
       onSelectOption: _applyOption,
       onDismiss: _clearMatch,
     );
-
-    // Calculate caret rect after layout updates
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _match == null) return;
-      _updateCaretRect(position);
-    });
-  }
-
-  void _updateCaretRect(DocumentPosition position) {
-    try {
-      final docLayout = widget.documentLayoutResolver();
-      final docContext = widget.documentLayoutContextResolver();
-      final docBox = docContext?.findRenderObject() as RenderBox?;
-      if (docBox != null && docBox.attached) {
-        final caretInDoc = docLayout.getRectForPosition(position);
-        if (caretInDoc != null) {
-          final globalCaretTopLeft = docBox.localToGlobal(caretInDoc.topLeft);
-          final overlayBox = context.findRenderObject() as RenderBox?;
-          if (overlayBox != null && overlayBox.attached) {
-            final overlayTopLeft = overlayBox.globalToLocal(globalCaretTopLeft);
-            setState(() {
-              _caretRect = Rect.fromLTWH(
-                overlayTopLeft.dx,
-                overlayTopLeft.dy,
-                caretInDoc.width,
-                caretInDoc.height,
-              );
-            });
-          }
-        }
-      }
-    } catch (_) {
-      // Layout not ready yet, ignore
-    }
+    _syncMenuVisibility();
   }
 
   void _clearMatch() {
-    setState(() {
-      _match = null;
-      _caretRect = null;
-    });
+    if (_match != null && mounted) {
+      setState(() => _match = null);
+    }
     widget.controller.hide();
+    if (_menuPortalController.isShowing) {
+      _menuPortalController.hide();
+    }
+  }
+
+  void _syncMenuVisibility() {
+    if (!mounted) return;
+    if (_match != null && widget.controller.isVisible) {
+      _menuPortalController.show();
+    } else if (_menuPortalController.isShowing) {
+      _menuPortalController.hide();
+    }
   }
 
   void _applyOption(SlashCommandOption option) {
@@ -402,67 +402,45 @@ class _SlashCommandOverlayState extends State<SlashCommandOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    if (_match == null) return const SizedBox.shrink();
+    return OverlayPortal(
+      controller: _menuPortalController,
+      overlayChildBuilder: (context) => ListenableBuilder(
+        listenable: widget.controller,
+        builder: (context, _) {
+          final options = widget.controller.filteredOptions;
+          if (_match == null ||
+              !widget.controller.isVisible ||
+              options.isEmpty) {
+            return const SizedBox.shrink();
+          }
 
-    final caretRect = _caretRect;
-
-    return ListenableBuilder(
-      listenable: widget.controller,
-      builder: (context, _) {
-        final options = widget.controller.filteredOptions;
-        if (!widget.controller.isVisible || options.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final menuCard = _SlashMenuCard(
-          options: options,
-          selectedIndex: widget.controller.selectedIndex,
-          onSelect: _applyOption,
-        );
-
-        final overlayBox = context.findRenderObject() as RenderBox?;
-        final overlaySize = overlayBox?.hasSize == true
-            ? overlayBox!.size
-            : null;
-
-        double left = 32.0;
-        double top = 80.0;
-        const menuWidth = 260.0;
-        const estimatedMenuHeight = 240.0;
-
-        if (caretRect != null && overlaySize != null) {
-          left = caretRect.left;
-          top = caretRect.bottom + 6.0;
-
-          final spaceBelow = overlaySize.height - caretRect.bottom;
-          final spaceAbove = caretRect.top;
-
-          if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
-            top = (caretRect.top - estimatedMenuHeight - 6.0).clamp(
-              16.0,
-              overlaySize.height - 60.0,
+          Widget menu = _SlashMenuCard(
+            options: options,
+            selectedIndex: widget.controller.selectedIndex,
+            onSelect: _applyOption,
+          );
+          final editorFocusNode = widget.focusNode;
+          if (editorFocusNode != null) {
+            menu = SuperEditorPopover(
+              popoverFocusNode: _menuFocusNode,
+              editorFocusNode: editorFocusNode,
+              child: menu,
             );
           }
 
-          left = left.clamp(
-            16.0,
-            (overlaySize.width - menuWidth - 16.0).clamp(16.0, double.infinity),
-          );
-        }
-
-        return Stack(
-          children: [
-            // Invisible tap catcher to dismiss menu
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _clearMatch,
-              ),
+          return TapRegion(
+            onTapOutside: (_) => _clearMatch(),
+            child: Follower.withAligner(
+              link: widget.selectionLayerLinks.caretLink,
+              aligner: _menuAligner,
+              boundary: _viewportBoundary,
+              showWhenUnlinked: false,
+              child: menu,
             ),
-            Positioned(left: left, top: top, child: menuCard),
-          ],
-        );
-      },
+          );
+        },
+      ),
+      child: const SizedBox.expand(),
     );
   }
 }
@@ -484,33 +462,39 @@ class _SlashMenuCard extends StatefulWidget {
 
 class _SlashMenuCardState extends State<_SlashMenuCard> {
   final ScrollController _scrollController = ScrollController();
+  final Map<SlashOptionType, GlobalKey> _itemKeys = {};
 
   @override
   void didUpdateWidget(_SlashMenuCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selectedIndex != oldWidget.selectedIndex) {
-      _scrollToIndex(widget.selectedIndex);
+    for (final option in widget.options) {
+      _itemKeys.putIfAbsent(option.type, GlobalKey.new);
+    }
+    if (widget.selectedIndex != oldWidget.selectedIndex ||
+        widget.options != oldWidget.options) {
+      _scheduleScrollToSelected();
     }
   }
 
-  void _scrollToIndex(int index) {
+  void _scheduleScrollToSelected() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scrollToSelected();
+    });
+  }
+
+  void _scrollToSelected() {
     if (!_scrollController.hasClients) return;
-    const itemExtent = 40.0;
-    final targetTop = index * itemExtent;
-    final targetBottom = targetTop + itemExtent;
-
-    final currentOffset = _scrollController.offset;
-    final viewportHeight = _scrollController.position.viewportDimension;
-
-    if (targetTop < currentOffset) {
-      _scrollController.animateTo(
-        targetTop,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
-      );
-    } else if (targetBottom > currentOffset + viewportHeight) {
-      _scrollController.animateTo(
-        targetBottom - viewportHeight + 12,
+    if (widget.selectedIndex < 0 ||
+        widget.selectedIndex >= widget.options.length) {
+      return;
+    }
+    final itemContext =
+        _itemKeys[widget.options[widget.selectedIndex].type]?.currentContext;
+    if (itemContext != null) {
+      Scrollable.ensureVisible(
+        itemContext,
+        alignment: 0.2,
         duration: const Duration(milliseconds: 100),
         curve: Curves.easeOut,
       );
@@ -526,62 +510,155 @@ class _SlashMenuCardState extends State<_SlashMenuCard> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final children = <Widget>[];
+    String? currentGroup;
+
+    for (var index = 0; index < widget.options.length; index++) {
+      final option = widget.options[index];
+      if (option.group != currentGroup) {
+        currentGroup = option.group;
+        children.add(
+          Padding(
+            padding: EdgeInsets.fromLTRB(12, index == 0 ? 8 : 10, 12, 4),
+            child: Text(
+              option.group,
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        );
+      }
+
+      children.add(
+        _SlashMenuItem(
+          key: _itemKeys.putIfAbsent(option.type, GlobalKey.new),
+          option: option,
+          isSelected: index == widget.selectedIndex,
+          onTap: () => widget.onSelect(option),
+        ),
+      );
+    }
 
     return Material(
-      elevation: 8,
+      elevation: 4,
       borderRadius: BorderRadius.circular(12),
-      color: scheme.surfaceContainerHigh,
-      shadowColor: scheme.shadow.withValues(alpha: 0.26),
+      color: scheme.surface,
+      shadowColor: scheme.shadow.withValues(alpha: 0.18),
+      clipBehavior: Clip.antiAlias,
       child: Container(
-        constraints: const BoxConstraints(maxHeight: 280, maxWidth: 260),
-        width: 260,
+        constraints: const BoxConstraints(maxHeight: 336, maxWidth: 300),
+        width: 300,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: scheme.outlineVariant),
         ),
-        child: ListView.builder(
+        child: ListView(
           controller: _scrollController,
           shrinkWrap: true,
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          itemCount: widget.options.length,
-          itemBuilder: (context, index) {
-            final option = widget.options[index];
-            final isSelected = index == widget.selectedIndex;
-            return InkWell(
-              onTap: () => widget.onSelect(option),
-              child: Container(
-                color: isSelected
-                    ? scheme.primary.withValues(alpha: 0.12)
-                    : Colors.transparent,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
+          padding: const EdgeInsets.only(bottom: 6),
+          children: children,
+        ),
+      ),
+    );
+  }
+}
+
+class _SlashMenuItem extends StatelessWidget {
+  const _SlashMenuItem({
+    super.key,
+    required this.option,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final SlashCommandOption option;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final itemLabel = option.description == null
+        ? option.label
+        : '${option.label}. ${option.description}';
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: itemLabel,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Material(
+          color: isSelected
+              ? scheme.primary.withValues(alpha: 0.10)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? scheme.primary.withValues(alpha: 0.14)
+                          : scheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
                       option.icon,
-                      size: 18,
-                      color: isSelected ? scheme.primary : scheme.onSurface,
+                      size: 17,
+                      color: isSelected
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        option.label,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.w500,
-                          color: isSelected ? scheme.primary : scheme.onSurface,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          option.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isSelected
+                                ? scheme.primary
+                                : scheme.onSurface,
+                            fontSize: 12.5,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w600,
+                          ),
                         ),
-                      ),
+                        if (option.description != null)
+                          Text(
+                            option.description!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );

@@ -318,10 +318,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                     child: SlashCommandOverlay(
                       editor: controller.editor,
                       composer: controller.composer,
-                      documentLayoutResolver: () =>
-                          _docLayoutKey.currentState as DocumentLayout,
-                      documentLayoutContextResolver: () =>
-                          _docLayoutKey.currentContext,
+                      selectionLayerLinks: _selectionLayerLinks,
+                      viewportKey: _editorViewportKey,
                       controller: _slashCommandController,
                       focusNode: controller.focusNode,
                       onAttachFile: () =>
