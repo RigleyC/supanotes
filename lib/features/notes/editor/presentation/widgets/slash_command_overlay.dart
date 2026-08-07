@@ -516,17 +516,25 @@ class _SlashMenuCardState extends State<_SlashMenuCard> {
     for (var index = 0; index < widget.options.length; index++) {
       final option = widget.options[index];
       if (option.group != currentGroup) {
+        if (currentGroup != null) {
+          children.add(
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: scheme.outlineVariant.withValues(alpha: 0.7),
+            ),
+          );
+        }
         currentGroup = option.group;
         children.add(
           Padding(
-            padding: EdgeInsets.fromLTRB(12, index == 0 ? 8 : 10, 12, 4),
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
             child: Text(
               option.group,
               style: TextStyle(
                 color: scheme.onSurfaceVariant,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.4,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -543,24 +551,29 @@ class _SlashMenuCardState extends State<_SlashMenuCard> {
       );
     }
 
-    return Material(
-      elevation: 4,
-      borderRadius: BorderRadius.circular(12),
-      color: scheme.surface,
-      shadowColor: scheme.shadow.withValues(alpha: 0.18),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 336, maxWidth: 300),
-        width: 300,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: ListView(
-          controller: _scrollController,
-          shrinkWrap: true,
-          padding: const EdgeInsets.only(bottom: 6),
-          children: children,
+    return Semantics(
+      container: true,
+      label: 'Sugestões',
+      child: Material(
+        key: const ValueKey('slash-command-card'),
+        elevation: 4,
+        borderRadius: BorderRadius.circular(18),
+        color: scheme.surface,
+        shadowColor: scheme.shadow.withValues(alpha: 0.18),
+        clipBehavior: Clip.antiAlias,
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 320, maxWidth: 256),
+          width: 256,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: ListView(
+            controller: _scrollController,
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(6),
+            children: children,
+          ),
         ),
       ),
     );
@@ -591,71 +604,44 @@ class _SlashMenuItem extends StatelessWidget {
       selected: isSelected,
       label: itemLabel,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: EdgeInsets.zero,
         child: Material(
           color: isSelected
               ? scheme.primary.withValues(alpha: 0.10)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           child: InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? scheme.primary.withValues(alpha: 0.14)
-                          : scheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(
+            child: SizedBox(
+              height: 32,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    Icon(
                       option.icon,
-                      size: 17,
+                      size: 16,
                       color: isSelected
                           ? scheme.primary
                           : scheme.onSurfaceVariant,
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          option.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isSelected
-                                ? scheme.primary
-                                : scheme.onSurface,
-                            fontSize: 12.5,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w600,
-                          ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        option.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isSelected ? scheme.primary : scheme.onSurface,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          height: 1.15,
                         ),
-                        if (option.description != null)
-                          Text(
-                            option.description!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: scheme.onSurfaceVariant,
-                              fontSize: 11,
-                            ),
-                          ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

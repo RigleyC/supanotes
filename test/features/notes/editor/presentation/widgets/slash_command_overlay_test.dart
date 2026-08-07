@@ -132,4 +132,21 @@ void main() {
     expect(find.text('Lista com marcadores'), findsOneWidget);
     expect(find.text('Lista numerada'), findsOneWidget);
   });
+
+  testWidgets('uses compact slash menu measurements', (tester) async {
+    final harness = _SlashMenuHarness();
+    addTearDown(harness.dispose);
+
+    await tester.pumpWidget(harness.build());
+    harness.composer.setSelectionWithReason(harness.selectionAt(1));
+    await tester.pumpAndSettle();
+
+    final menuCard = find.byKey(const ValueKey('slash-command-card'));
+    expect(menuCard, findsOneWidget);
+    expect(tester.getSize(menuCard).width, 256);
+    expect(tester.getSize(menuCard).height, lessThanOrEqualTo(320));
+
+    final titleIcon = tester.widget<Icon>(find.byIcon(Icons.title));
+    expect(titleIcon.size, 16);
+  });
 }

@@ -40,7 +40,7 @@ class SlashCommandOption {
     if (normalizedQuery.isEmpty) return 0;
 
     var bestScore = 0;
-    for (final value in [label, ...aliases]) {
+    for (final value in [label, ...aliases, ?description]) {
       final normalizedValue = value.toLowerCase();
       final score = normalizedValue == normalizedQuery
           ? 3
