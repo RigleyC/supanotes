@@ -94,6 +94,26 @@ void main() {
       expect(result.single.status, OccurrenceStatus.pending);
     });
 
+    test(
+      'matches completion history against the latest reached occurrence',
+      () {
+        final currentOccurrence = DateTime(2026, 7, 21);
+        final result = buildOccurrences(
+          taskId: 't1',
+          anchor: DateTime(2026, 7, 1),
+          recurrence: TaskRecurrence.daily,
+          hasTime: false,
+          now: DateTime(2026, 7, 21, 10),
+          completedScheduledAts: {currentOccurrence},
+        );
+
+        expect(result, hasLength(1));
+        expect(result.single.scheduledAt, currentOccurrence);
+        expect(result.single.status, OccurrenceStatus.completed);
+        expect(result.single.completedAt, currentOccurrence);
+      },
+    );
+
     test('respects hasTime in date comparison', () {
       final result = buildOccurrences(
         taskId: 't1',

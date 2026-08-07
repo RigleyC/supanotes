@@ -4,10 +4,9 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
-import 'package:supanotes/features/notes/data/local/notes_local_repository.dart';
-import 'package:supanotes/features/notes/data/notes_repository.dart';
+import 'package:supanotes/features/notes/catalog/data/local/notes_local_repository.dart';
+import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
-import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 void main() {
   group('NotesRepository lifecycle', () {
@@ -271,44 +270,6 @@ class FakeTasksLocalRepository implements TasksLocalRepository {
 
   @override
   Future<List<TaskData>> getNoteTasks(String noteId) async => [];
-
-  @override
-  Future<void> createTask({
-    required String id,
-    required String noteId,
-    required String title,
-    String status = 'pending',
-    String position = 'a0',
-    TaskRecurrence? recurrence,
-    DateTime? dueDate,
-  }) async {}
-
-  @override
-  Future<void> reorderTasksBatch(List<String> orderedIds) async {}
-
-  @override
-  Future<void> updateTask(TasksCompanion companion) async {
-    throw UnimplementedError('not used in these tests');
-  }
-
-  @override
-  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
-  completeTask(String id) async =>
-      (nextDue: null, previousDue: null, previousHasTime: false);
-
-  @override
-  Future<void> reopenTask(String id, {DateTime? originalDueDate}) async {}
-
-  @override
-  Future<void> softDeleteTask(String id) async {}
-
-  @override
-  Future<void> deleteTask(String id) async {}
-
-  @override
-  Future<void> runInTransaction(Future<void> Function() action) async {
-    await action();
-  }
 }
 
 class FakeUserNotePreferencesDao implements UserNotePreferencesDao {

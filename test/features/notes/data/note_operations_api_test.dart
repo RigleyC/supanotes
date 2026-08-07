@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 

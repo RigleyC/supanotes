@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 class NoteOp {
   final String operationId;
@@ -34,7 +35,9 @@ class NoteOp {
     quill.Delta? cachedDelta,
   }) {
     quill.Delta? delta = cachedDelta;
-    if (delta == null && kind == 'text_delta' && payload.containsKey('ops')) {
+    if (delta == null &&
+        kind == NoteOperationKind.textDelta.wireName &&
+        payload.containsKey('ops')) {
       final ops = payload['ops'];
       if (ops is List) {
         delta = quill.Delta.fromJson(ops);
@@ -88,7 +91,8 @@ class NoteOperationRebaser {
 
     if (inFlight != null && inFlight.isNotEmpty) {
       for (final inFlightData in inFlight) {
-        final payload = jsonDecode(inFlightData.payloadJson) as Map<String, dynamic>;
+        final payload =
+            jsonDecode(inFlightData.payloadJson) as Map<String, dynamic>;
         final inFlightOp = NoteOp.fromData(
           operationId: inFlightData.operationId,
           actorId: localActorId,
@@ -195,22 +199,25 @@ class NoteOperationRebaser {
     NoteOp appliedOp,
     bool opToTransformHasPriority,
   ) {
-    if (appliedOp.kind == 'delete_block' &&
+    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
         appliedOp.blockId != null &&
         appliedOp.blockId == opToTransform.blockId) {
       return null;
     }
 
-    if (opToTransform.kind == 'text_delta' && appliedOp.kind == 'text_delta') {
+    if (opToTransform.kind == NoteOperationKind.textDelta.wireName &&
+        appliedOp.kind == NoteOperationKind.textDelta.wireName) {
       if (opToTransform.blockId != appliedOp.blockId) return opToTransform;
 
       final opToTransformOps = opToTransform.payload['ops'];
       final appliedOps = appliedOp.payload['ops'];
       if (opToTransformOps == null || appliedOps == null) return opToTransform;
 
-      final opToTransformDelta = opToTransform.cachedDelta ??
+      final opToTransformDelta =
+          opToTransform.cachedDelta ??
           quill.Delta.fromJson(opToTransformOps as List<dynamic>);
-      final appliedDelta = appliedOp.cachedDelta ??
+      final appliedDelta =
+          appliedOp.cachedDelta ??
           quill.Delta.fromJson(appliedOps as List<dynamic>);
 
       final transformedDelta = appliedDelta.transform(
@@ -237,12 +244,13 @@ class NoteOperationRebaser {
     final rKind = appliedOp.kind;
     final rPayload = appliedOp.payload;
 
-    if (kind == 'create_block') {
+    if (kind == NoteOperationKind.createBlock.wireName) {
       final afterBlockId = payload['afterBlockId'] as String?;
-      if (rKind == 'delete_block' && afterBlockId == appliedOp.blockId) {
+      if (rKind == NoteOperationKind.deleteBlock.wireName &&
+          afterBlockId == appliedOp.blockId) {
         payload['afterBlockId'] = null;
       }
-      if (rKind == 'create_block') {
+      if (rKind == NoteOperationKind.createBlock.wireName) {
         final rAfter = rPayload['afterBlockId'] as String?;
         if (afterBlockId != null && afterBlockId == rAfter) {
           if (!opToTransformHasPriority) {
@@ -252,16 +260,18 @@ class NoteOperationRebaser {
       }
     }
 
-    if (kind == 'move_block') {
+    if (kind == NoteOperationKind.moveBlock.wireName) {
       final targetId = payload['blockId'] as String?;
-      if (rKind == 'delete_block' && targetId == appliedOp.blockId) {
+      if (rKind == NoteOperationKind.deleteBlock.wireName &&
+          targetId == appliedOp.blockId) {
         return null;
       }
       final afterBlockId = payload['afterBlockId'] as String?;
-      if (rKind == 'delete_block' && afterBlockId == appliedOp.blockId) {
+      if (rKind == NoteOperationKind.deleteBlock.wireName &&
+          afterBlockId == appliedOp.blockId) {
         payload['afterBlockId'] = null;
       }
-      if (rKind == 'move_block') {
+      if (rKind == NoteOperationKind.moveBlock.wireName) {
         final rTarget = rPayload['blockId'] as String?;
         if (targetId == rTarget) {
           if (!opToTransformHasPriority) {
@@ -271,15 +281,15 @@ class NoteOperationRebaser {
       }
     }
 
-    if (kind == 'delete_block') {
-      if (rKind == 'delete_block' &&
+    if (kind == NoteOperationKind.deleteBlock.wireName) {
+      if (rKind == NoteOperationKind.deleteBlock.wireName &&
           opToTransform.blockId == appliedOp.blockId) {
         return null;
       }
     }
 
-    if (kind == 'set_block_type') {
-      if (rKind == 'delete_block' &&
+    if (kind == NoteOperationKind.setBlockType.wireName) {
+      if (rKind == NoteOperationKind.deleteBlock.wireName &&
           opToTransform.blockId == appliedOp.blockId) {
         return null;
       }

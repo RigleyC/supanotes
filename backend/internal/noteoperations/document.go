@@ -72,6 +72,15 @@ func (d *Document) applyCompleteTaskOccurrence(blockID string, payload json.RawM
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return fmt.Errorf("parse complete task occurrence payload: %w", err)
 	}
+	if p.TaskID == "" || strings.TrimSpace(p.ScheduledAt) == "" {
+		return fmt.Errorf("complete task occurrence requires taskId and scheduledAt")
+	}
+	if p.CompletedAt != nil && strings.TrimSpace(*p.CompletedAt) == "" {
+		return fmt.Errorf("complete task occurrence completedAt must be null or non-empty")
+	}
+	if blockID != "" && blockID != p.TaskID {
+		return fmt.Errorf("complete task occurrence blockID does not match taskId")
+	}
 
 	targetID := blockID
 	if targetID == "" {
@@ -83,6 +92,9 @@ func (d *Document) applyCompleteTaskOccurrence(blockID string, payload json.RawM
 
 	for i := range d.Blocks {
 		if d.Blocks[i].ID == targetID {
+			if d.Blocks[i].Type != string(BlockTask) {
+				return fmt.Errorf("complete task occurrence requires a task block")
+			}
 			if d.Blocks[i].Metadata == nil {
 				d.Blocks[i].Metadata = make(map[string]any)
 			}

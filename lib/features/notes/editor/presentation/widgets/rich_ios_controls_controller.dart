@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
-import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_common_editor_operations.dart';
 
 /// A custom iOS editor controls controller that overrides native iOS popover toolbar
 /// paste actions with rich-text copy and paste behaviors.

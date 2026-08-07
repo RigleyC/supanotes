@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/domain/note_strings.dart';
+import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 
 void main() {
   group('deriveNoteTitle', () {

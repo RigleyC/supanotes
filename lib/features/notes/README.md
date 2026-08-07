@@ -12,9 +12,8 @@ link. O módulo foi dividido pelos fluxos que mudam juntos.
 | `sharing/` | permissões e lista de compartilhamentos | mudança de colaboração por usuário |
 | `preferences/` | preferências por nota | favoritos, ocultar concluídas e imagens |
 
-As antigas pastas `data/`, `domain/` e `presentation/` são apenas exports de
-compatibilidade. Não coloque implementação nova nelas. Migre o importador para
-o submódulo correto quando tocar nele e, no fim, esses exports poderão sumir.
+As antigas pastas `data/`, `domain/` e `presentation/` foram removidas após a
+migração dos importadores. Novos arquivos devem ficar no submódulo correto.
 
 ## Leitura recomendada
 

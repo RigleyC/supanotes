@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_list_row.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_list_row.dart';
 
 void main() {
   group('NoteListRow share indicator', () {

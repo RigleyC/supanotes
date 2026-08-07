@@ -5,9 +5,9 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_session_handle.dart';
-import 'package:supanotes/features/notes/domain/note_sync_session.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 
 class MockSyncService extends Mock implements NoteOperationsSyncService {}

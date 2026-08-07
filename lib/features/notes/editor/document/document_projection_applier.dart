@@ -3,6 +3,7 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 import 'note_document_codec.dart';
 import 'note_document_constants.dart';
 
@@ -135,7 +136,7 @@ class DocumentProjectionApplier {
     required Map<String, dynamic> payload,
   }) {
     switch (kind) {
-      case 'text_delta':
+      case NoteOperationWireNames.textDelta:
         if (blockId == null) return;
         final node = _document.getNodeById(blockId);
         if (node is TextNode) {
@@ -152,7 +153,7 @@ class DocumentProjectionApplier {
           }
         }
         break;
-      case 'create_block':
+      case NoteOperationWireNames.createBlock:
         final node = _codec.decodeNode(payload);
         if (_document.getNodeById(node.id) != null) {
           NoteSyncDebug.log(
@@ -175,14 +176,14 @@ class DocumentProjectionApplier {
           InsertNodeAtIndexRequest(newNode: node, nodeIndex: insertIndex),
         ]);
         break;
-      case 'delete_block':
+      case NoteOperationWireNames.deleteBlock:
         if (blockId == null) return;
         final node = _document.getNodeById(blockId);
         if (node != null && _document.nodeCount > 1) {
           _editor.execute([DeleteNodeRequest(nodeId: blockId)]);
         }
         break;
-      case 'move_block':
+      case NoteOperationWireNames.moveBlock:
         final moveBlockId = payload['blockId'] as String? ?? blockId;
         if (moveBlockId == null) return;
         final node = _document.getNodeById(moveBlockId);
@@ -203,7 +204,7 @@ class DocumentProjectionApplier {
           MoveNodeRequest(nodeId: moveBlockId, newIndex: targetIndex),
         ]);
         break;
-      case 'set_block_type':
+      case NoteOperationWireNames.setBlockType:
         if (blockId == null) return;
         final newType = payload['type'] as String? ?? 'paragraph';
         final node = _document.getNodeById(blockId);
@@ -221,7 +222,7 @@ class DocumentProjectionApplier {
           ]);
         }
         break;
-      case 'set_block_metadata':
+      case NoteOperationWireNames.setBlockMetadata:
         if (blockId == null) return;
         final node = _document.getNodeById(blockId);
         final meta = payload['metadata'] as Map<String, dynamic>?;
@@ -232,7 +233,7 @@ class DocumentProjectionApplier {
           ]);
         }
         break;
-      case 'complete_task_occurrence':
+      case NoteOperationWireNames.completeTaskOccurrence:
         final targetId = blockId ?? payload['taskId'] as String?;
         if (targetId == null) return;
         final node = _document.getNodeById(targetId);

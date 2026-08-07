@@ -151,6 +151,47 @@ void main() {
     },
   );
 
+  test('projects a completed task from the canonical document snapshot', () async {
+    const noteId = 'note-completed-task';
+    const userId = 'user-1';
+    final now = DateTime(2026, 8, 4, 12);
+
+    await db.notesDao.createNote(
+      NotesCompanion.insert(
+        id: noteId,
+        userId: userId,
+        content: 'Completed task',
+        excerpt: const Value('Completed task'),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    await engine.projectTasksFromSnapshot(
+      noteId: noteId,
+      snapshot: {
+        'blocks': [
+          {
+            'id': 'task-completed',
+            'type': 'task',
+            'metadata': {'isCompleted': true},
+            'content': [
+              {'insert': 'Completed task'},
+            ],
+          },
+        ],
+      },
+      userId: userId,
+    );
+
+    final task = await (db.select(db.tasks)
+          ..where((task) => task.id.equals('task-completed')))
+        .getSingle();
+
+    expect(task.status, 'done');
+    expect(task.completedAt, isNotNull);
+  });
+
   test(
     'clears content, sets excerpt to null, and deletes tasks when note becomes empty',
     () async {

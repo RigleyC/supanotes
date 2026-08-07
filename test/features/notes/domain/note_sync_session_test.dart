@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_sync_session.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
 
 void main() {
   group('NoteSyncSession error classification', () {

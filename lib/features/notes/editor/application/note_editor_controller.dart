@@ -4,12 +4,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/domain/attachment_nodes.dart';
+import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
 import 'package:supanotes/features/notes/editor/document/hidden_task_editing_guard.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
-import 'package:supanotes/features/notes/domain/note_editor_commands.dart'
+import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart'
     show RandomDividerConversionReaction;
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 

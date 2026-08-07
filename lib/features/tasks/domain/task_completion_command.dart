@@ -1,4 +1,3 @@
-import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
@@ -33,42 +32,19 @@ class TaskCompletionCommand {
   final DateTime Function() _clock;
 
   TaskCompletionResult complete(TaskSnapshot task, {DateTime? scheduledAt}) {
-    final now = _clock();
-    final completedAt = now.toUtc();
-
-    if (task.recurrence == null) {
-      return TaskCompletionResult(
-        completed: true,
-        nextDue: null,
-        completedAt: completedAt,
-        previousDue: task.dueDate,
-        previousHasTime: task.hasTime,
-        scheduledAt: scheduledAt,
-      );
-    }
-
-    // A recurring task remains open, but its due date moves to the next
-    // occurrence. The completion history retains the completed occurrence.
-    final occurrenceDate =
-        scheduledAt ??
-        (task.dueDate == null
-            ? DateTime(now.year, now.month, now.day)
-            : advanceRecurringDueDate(
-                from: task.dueDate!,
-                recurrence: task.recurrence!,
-                hasTime: task.hasTime,
-                now: now,
-              ));
+    final transition = TaskOccurrencePolicy(clock: _clock).complete(
+      dueDate: task.dueDate,
+      hasTime: task.hasTime,
+      recurrence: task.recurrence,
+      scheduledAt: scheduledAt,
+    );
     return TaskCompletionResult(
-      completed: false,
-      nextDue: nextOccurrenceDate(
-        from: occurrenceDate,
-        recurrence: task.recurrence!,
-      ),
-      completedAt: completedAt,
-      previousDue: task.dueDate,
-      previousHasTime: task.hasTime,
-      scheduledAt: occurrenceDate,
+      completed: transition.completed,
+      nextDue: transition.nextDue,
+      completedAt: transition.completedAt,
+      previousDue: transition.previousDue,
+      previousHasTime: transition.previousHasTime,
+      scheduledAt: transition.scheduledAt,
     );
   }
 }

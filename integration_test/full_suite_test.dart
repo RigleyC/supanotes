@@ -13,7 +13,7 @@ import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
 
 class _OfflineClient extends Mock implements NoteSyncClient {}

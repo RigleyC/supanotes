@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import '../../../features/notes/domain/note_strings.dart';
+import '../../../features/notes/catalog/model/note_strings.dart';
 import '../../../features/tasks/domain/task_recurrence.dart';
 import '../database.dart';
 import '../tables/notes.dart';

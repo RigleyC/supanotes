@@ -10,8 +10,8 @@ import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 
 final _testUserIdProvider = StateProvider<String?>((ref) => 'user-a');
 

@@ -6,9 +6,10 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/document/document_projection_applier.dart';
 import 'editor_operation_capture.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 
 class _RebuildRequest {
@@ -163,6 +164,17 @@ class NoteOperationAdapter {
       },
     );
     for (final req in requests) {
+      final contractError = NoteOperationContract.validate(
+        kind: req.kind,
+        blockId: req.blockId,
+        payload: req.payload,
+      );
+      if (contractError != null) {
+        throw StateError(
+          'Captured invalid note operation ${req.operationId}: '
+          '$contractError',
+        );
+      }
       _pendingOps.add(
         OperationRequest(
           operationId: req.operationId,

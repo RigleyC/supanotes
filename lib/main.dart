@@ -17,7 +17,7 @@ import 'package:timezone/data/latest.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
-import 'package:supanotes/features/notes/data/note_catalog_sync.dart';
+import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/utils/platform_utils.dart';
 

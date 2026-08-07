@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import '../../helpers/auth_interceptor_test_helper.dart';
 
 class _AllowLoopbackHttpOverrides extends HttpOverrides {}

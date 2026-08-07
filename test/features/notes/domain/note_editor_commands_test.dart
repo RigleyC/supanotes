@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/domain/note_editor_commands.dart';
+import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
 
 DocumentSelection caretSelection(String nodeId) {
   return DocumentSelection.collapsed(

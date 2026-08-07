@@ -2,8 +2,8 @@
 
 ## Goal
 
-Group the Notes implementation by the flows that change together. Keep all
-existing Dart import paths as temporary compatibility exports in this change.
+Group the Notes implementation by the flows that change together. Keep the
+legacy paths only until all callers have moved to the real module paths.
 
 ## Scope
 
@@ -11,8 +11,8 @@ existing Dart import paths as temporary compatibility exports in this change.
    `features/notes/editor/`.
 2. Move the catalog, attachments, sharing, and preferences flows to their
    named folders.
-3. Keep a one-line export at each old path. This avoids a behavior change and
-   permits later migration of callers by feature.
+3. Migrate callers to the real module paths, then remove the one-line
+   compatibility exports when no references remain.
 4. Verify the moved implementation with static analysis and focused tests.
 
 ## Non-goals
@@ -23,7 +23,7 @@ existing Dart import paths as temporary compatibility exports in this change.
 
 - The editor source is under `editor/application`, `editor/document`,
   `editor/sync`, or `editor/presentation`.
-- Old paths only export the new path.
+- No legacy `data/`, `domain/`, or `presentation/` compatibility paths remain.
 - `flutter analyze` and focused editor/session tests pass.
 
 ## Validation
@@ -32,5 +32,6 @@ existing Dart import paths as temporary compatibility exports in this change.
 - Focused editor and session tests: passed (34 passed, 1 skipped).
 - Focused catalog, sharing, preferences, and editor tests: passed (46 passed,
   1 skipped).
-- Full `flutter test`: did not finish within 63 seconds. It is not a passing
-  result and needs a later complete run.
+- Legacy import migration: passed (61 Dart files updated and 68 compatibility
+  exports removed).
+- Full `flutter test`: passed (563 passed, 1 skipped).

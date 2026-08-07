@@ -3,6 +3,7 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 
 class OperationRequestData {
   final String operationId;
@@ -127,9 +128,9 @@ class EditorOperationCapture {
       requests.add(
         OperationRequestData(
           operationId: _generateOpId(),
-          kind: 'delete_block',
+          kind: NoteOperationKind.deleteBlock.wireName,
           blockId: delId,
-          payload: {'blockId': delId},
+          payload: NoteOperationPayloads.deleteBlock(delId),
         ),
       );
       _mirrors.remove(delId);
@@ -146,15 +147,12 @@ class EditorOperationCapture {
         requests.add(
           OperationRequestData(
             operationId: _generateOpId(),
-            kind: 'create_block',
+            kind: NoteOperationKind.createBlock.wireName,
             blockId: node.id,
-            payload: {
-              'id': node.id,
-              'type': blockJson['type'],
-              'delta': blockJson['delta'],
-              'metadata': blockJson['metadata'],
-              'afterBlockId': afterBlockId,
-            },
+            payload: NoteOperationPayloads.createBlock(
+              block: blockJson,
+              afterBlockId: afterBlockId,
+            ),
           ),
         );
       } else {
@@ -169,9 +167,12 @@ class EditorOperationCapture {
           requests.add(
             OperationRequestData(
               operationId: _generateOpId(),
-              kind: 'move_block',
+              kind: NoteOperationKind.moveBlock.wireName,
               blockId: node.id,
-              payload: {'blockId': node.id, 'afterBlockId': expectedAfterId},
+              payload: NoteOperationPayloads.moveBlock(
+                blockId: node.id,
+                afterBlockId: expectedAfterId,
+              ),
             ),
           );
         }
@@ -208,9 +209,9 @@ class EditorOperationCapture {
           requests.add(
             OperationRequestData(
               operationId: _generateOpId(),
-              kind: 'text_delta',
+              kind: NoteOperationKind.textDelta.wireName,
               blockId: node.id,
-              payload: {'ops': deltaOps},
+              payload: NoteOperationPayloads.textDelta(ops: deltaOps),
             ),
           );
         }
@@ -222,9 +223,9 @@ class EditorOperationCapture {
         requests.add(
           OperationRequestData(
             operationId: _generateOpId(),
-            kind: 'set_block_type',
+            kind: NoteOperationKind.setBlockType.wireName,
             blockId: node.id,
-            payload: {'type': currentBType},
+            payload: NoteOperationPayloads.setBlockType(currentBType),
           ),
         );
         mirror.blockType = currentBType;
@@ -244,13 +245,13 @@ class EditorOperationCapture {
             requests.add(
               OperationRequestData(
                 operationId: _generateOpId(),
-                kind: 'complete_task_occurrence',
+                kind: NoteOperationKind.completeTaskOccurrence.wireName,
                 blockId: node.id,
-                payload: {
-                  'taskId': node.id,
-                  'scheduledAt': entry.key,
-                  'completedAt': entry.value,
-                },
+                payload: NoteOperationPayloads.completeTaskOccurrence(
+                  taskId: node.id,
+                  scheduledAt: entry.key,
+                  completedAt: entry.value as String?,
+                ),
               ),
             );
           }
@@ -261,13 +262,13 @@ class EditorOperationCapture {
             requests.add(
               OperationRequestData(
                 operationId: _generateOpId(),
-                kind: 'complete_task_occurrence',
+                kind: NoteOperationKind.completeTaskOccurrence.wireName,
                 blockId: node.id,
-                payload: {
-                  'taskId': node.id,
-                  'scheduledAt': key,
-                  'completedAt': null,
-                },
+                payload: NoteOperationPayloads.completeTaskOccurrence(
+                  taskId: node.id,
+                  scheduledAt: key,
+                  completedAt: null,
+                ),
               ),
             );
           }
@@ -286,9 +287,9 @@ class EditorOperationCapture {
           requests.add(
             OperationRequestData(
               operationId: _generateOpId(),
-              kind: 'set_block_metadata',
+              kind: NoteOperationKind.setBlockMetadata.wireName,
               blockId: node.id,
-              payload: {'metadata': otherCurMeta},
+              payload: NoteOperationPayloads.setBlockMetadata(otherCurMeta),
             ),
           );
         }

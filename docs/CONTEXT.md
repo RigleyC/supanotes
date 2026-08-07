@@ -14,6 +14,8 @@ An empty regular note is determined from block content, tasks, attachments, not 
 - Blocks are stored in `blocks` array, each with an immutable UUID `id`, `type`, `text`, and optional metadata (`checked`, `dueDate`, `dueTime`, `recurrence`, `spans`).
 - Tasks are blocks with type `task`. They are projected to the relational `tasks` table.
 - Task completion events populate `task_completions` derived by document projection.
+- Tasks may form a hierarchy within a note: a subtask belongs to one parent task and can be completed independently.
+- A parent task with subtasks reports partial progress, remains open while any subtask is open, and toggling its checkbox completes or reopens its subtasks.
 
 ## Projections
 

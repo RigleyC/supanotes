@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
 
 void main() {
   group('NoteOperationRebaser.rebase', () {

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
-import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_suggestion_handler.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_handler.dart';
 
 final noteSuggestionsProvider = Provider.family
     .autoDispose<List<NoteModel>, ({String query, String currentNoteId})>((

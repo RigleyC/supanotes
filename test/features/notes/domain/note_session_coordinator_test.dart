@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
-import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 
 void main() {
   group('NoteSessionCoordinator', () {

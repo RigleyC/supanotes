@@ -5,7 +5,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 class MockNoteOperationsDao extends Mock implements NoteOperationsDao {}
 

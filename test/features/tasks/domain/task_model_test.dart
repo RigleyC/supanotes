@@ -52,4 +52,28 @@ void main() {
 
     expect(model.dueDate, DateTime(2026, 8, 1));
   });
+
+  test('keeps a timed occurrence until its next scheduled time starts', () {
+    final model = TaskModel.fromData(
+      TaskData(
+        id: 'task-3',
+        userId: 'user-1',
+        noteId: 'note-1',
+        title: 'Timed daily task',
+        status: 'open',
+        position: '0',
+        dueDate: DateTime(2026, 8, 4, 9),
+        hasTime: true,
+        completedAt: null,
+        recurrence: TaskRecurrence.daily,
+        reminder: null,
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 8, 1),
+        deletedAt: null,
+      ),
+      now: DateTime(2026, 8, 4, 10),
+    );
+
+    expect(model.dueDate, DateTime(2026, 8, 4, 9));
+  });
 }

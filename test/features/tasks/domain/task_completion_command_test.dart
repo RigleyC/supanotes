@@ -30,5 +30,34 @@ void main() {
 
       expect(result.nextDue, DateTime(2026, 7, 27));
     });
+
+    test(
+      'uses the latest reached occurrence when the stored date is stale',
+      () {
+        final result = TaskCompletionCommand(() => DateTime(2026, 7, 4, 15))
+            .complete(
+              TaskSnapshot(
+                dueDate: DateTime(2026, 7, 1),
+                recurrence: TaskRecurrence.daily,
+              ),
+            );
+
+        expect(result.completed, isFalse);
+        expect(result.scheduledAt, DateTime(2026, 7, 4));
+        expect(result.nextDue, DateTime(2026, 7, 5));
+      },
+    );
+
+    test('completes a non-recurring task without a next occurrence', () {
+      final dueDate = DateTime(2026, 7, 1);
+      final result = TaskCompletionCommand(
+        () => DateTime(2026, 7, 4, 15),
+      ).complete(TaskSnapshot(dueDate: dueDate));
+
+      expect(result.completed, isTrue);
+      expect(result.previousDue, dueDate);
+      expect(result.nextDue, isNull);
+      expect(result.scheduledAt, isNull);
+    });
   });
 }

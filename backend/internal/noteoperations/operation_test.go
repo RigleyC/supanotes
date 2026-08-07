@@ -14,6 +14,8 @@ func TestValidKindConstants(t *testing.T) {
 	assert.True(t, ValidKinds[KindDeleteBlock])
 	assert.True(t, ValidKinds[KindMoveBlock])
 	assert.True(t, ValidKinds[KindSetBlockType])
+	assert.True(t, ValidKinds[KindSetBlockMetadata])
+	assert.True(t, ValidKinds[KindCompleteTaskOccurrence])
 	assert.False(t, ValidKinds["invalid"])
 }
 

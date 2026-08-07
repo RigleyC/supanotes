@@ -1,12 +1,9 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
-import '../../../core/database/database.dart';
+import '../../../core/database/database.dart' show TaskData;
 import '../../../core/utils/date_time_extensions.dart';
 import '../domain/task_date_filter.dart';
 import '../domain/task_model.dart';
-import '../domain/task_recurrence.dart';
 import 'local/tasks_local_repository.dart';
 
 /// Presentation-facing facade over the local tasks database.
@@ -22,37 +19,12 @@ abstract class ITasksRepository {
   Stream<List<TaskModel>> watchTodayDueTasks();
   Stream<List<TaskModel>> watchUndatedOpenTasks();
   Stream<List<TaskModel>> watchByNote(String noteId);
-  Future<TaskModel> createTask({
-    required String noteId,
-    required String title,
-    DateTime? dueDate,
-    TaskRecurrence? recurrence,
-    String position = 'a0',
-  });
-  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
-  completeTask(String id);
-  Future<void> reopenTask(String id, {DateTime? originalDueDate});
-  Future<void> updateTask(
-    String id, {
-    String? title,
-    DateTime? dueDate,
-    bool? hasTime,
-    TaskRecurrence? recurrence,
-    String? reminder,
-    String? position,
-    bool clearDueDate = false,
-    bool clearRecurrence = false,
-    bool clearReminder = false,
-  });
-  Future<void> deleteTask(String id);
-  Future<void> reorderTasks(String noteId, List<String> orderedIds);
 }
 
 class TasksRepository implements ITasksRepository {
   TasksRepository(this._local);
 
   final TasksLocalRepository _local;
-  final Uuid _uuid = const Uuid();
 
   @override
   String get userId => _local.userId;
@@ -109,113 +81,6 @@ class TasksRepository implements ITasksRepository {
         .watchNoteTasks(noteId)
         .map((list) => list.map(TaskModel.fromData).toList());
   }
-
-  // ---------------------------------------------------------------------------
-  // Writes
-  // ---------------------------------------------------------------------------
-
-  /// Inserts a brand-new task. Generates the UUID, stamps `userId` from
-  /// the bound repository, and marks the row dirty so the next sync round
-  /// pushes it to the backend.
-  @override
-  Future<TaskModel> createTask({
-    required String noteId,
-    required String title,
-    DateTime? dueDate,
-    TaskRecurrence? recurrence,
-    String position = 'a0',
-  }) async {
-    final id = _uuid.v4();
-    await _local.createTask(
-      id: id,
-      noteId: noteId,
-      title: title,
-      dueDate: dueDate,
-      recurrence: recurrence,
-      position: position,
-    );
-    return TaskModel(
-      id: id,
-      userId: _local.userId,
-      noteId: noteId,
-      title: title,
-      status: 'open',
-      position: position,
-      dueDate: dueDate,
-      completedAt: null,
-      recurrence: recurrence,
-      hasTime: false,
-      reminder: null,
-      createdAt: DateTime.now().toUtc(),
-      updatedAt: DateTime.now().toUtc(),
-    );
-  }
-
-  /// Persists a completion in the legacy local-task API. The editor path uses
-  /// [TaskCompletionCommand] so recurring tasks advance before the document
-  /// projection is saved.
-  @override
-  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
-  completeTask(String id) => _local.completeTask(id);
-
-  /// Reverses a completion: clears `completedAt` and re-opens the task.
-  @override
-  Future<void> reopenTask(String id, {DateTime? originalDueDate}) =>
-      _local.reopenTask(id, originalDueDate: originalDueDate);
-
-  /// Partial update of the task with [id]. Pass `null` for any field
-  /// that should not change. An explicit `Value(null)` (via the
-  /// [clearDueDate] / [clearRecurrence] helpers below) is required to
-  /// wipe a nullable column.
-  @override
-  Future<void> updateTask(
-    String id, {
-    String? title,
-    DateTime? dueDate,
-    bool? hasTime,
-    TaskRecurrence? recurrence,
-    String? reminder,
-    String? position,
-    bool clearDueDate = false,
-    bool clearRecurrence = false,
-    bool clearReminder = false,
-  }) async {
-    final companion = TasksCompanion(
-      id: Value(id),
-      title: title == null ? const Value.absent() : Value(title),
-      dueDate: clearDueDate
-          ? const Value(null)
-          : (dueDate == null ? const Value.absent() : Value(dueDate)),
-      hasTime: hasTime == null ? const Value.absent() : Value(hasTime),
-      recurrence: clearRecurrence
-          ? const Value(null)
-          : (recurrence == null ? const Value.absent() : Value(recurrence)),
-      reminder: clearReminder
-          ? const Value(null)
-          : (reminder == null ? const Value.absent() : Value(reminder)),
-      position: position == null ? const Value.absent() : Value(position),
-    );
-    await _local.updateTask(companion);
-  }
-
-  /// Soft-deletes the task. The row stays in the database with
-  /// `deletedAt` set so the tombstone reaches the backend on the next
-  /// sync round.
-  @override
-  Future<void> deleteTask(String id) => _local.softDeleteTask(id);
-
-  /// Rewrites the `position` of every task in [noteId] to match
-  /// [orderedIds]. Wrapped in a single transaction via DAO's batch update.
-  @override
-  Future<void> reorderTasks(String noteId, List<String> orderedIds) async {
-    // Requires exposing DAO from local repo, or passing down orderedIds.
-    // Let's call a new method on local repo:
-    await _local.reorderTasksBatch(orderedIds);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Internals
-  // ---------------------------------------------------------------------------
 
   List<TaskModel> _splitByDeadlineAndMap(List<TaskData> rows) {
     return rows.map(TaskModel.fromData).toList();

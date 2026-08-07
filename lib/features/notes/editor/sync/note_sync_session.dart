@@ -4,8 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_session_handle.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 import 'note_operation_adapter.dart';
 

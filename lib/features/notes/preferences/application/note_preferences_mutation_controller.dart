@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/legacy.dart';
 
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/features/notes/data/notes_repository.dart';
-import 'package:supanotes/features/notes/data/user_note_preferences_repository.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
+import 'package:supanotes/features/notes/preferences/data/user_note_preferences_repository.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 
 enum NotePreferenceMutationStatus { idle, saving, error }
 

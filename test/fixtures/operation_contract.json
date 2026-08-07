@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "operations": [
+    {
+      "kind": "text_delta",
+      "blockId": "b1",
+      "payload": {
+        "ops": [
+          {"retain": 2},
+          {"insert": "x"}
+        ]
+      }
+    },
+    {
+      "kind": "create_block",
+      "blockId": "b3",
+      "payload": {
+        "id": "b3",
+        "type": "paragraph",
+        "delta": [{"insert": "new block"}],
+        "metadata": {},
+        "afterBlockId": "b1"
+      }
+    },
+    {
+      "kind": "delete_block",
+      "blockId": "b2",
+      "payload": {"blockId": "b2"}
+    },
+    {
+      "kind": "move_block",
+      "blockId": "b2",
+      "payload": {"blockId": "b2", "afterBlockId": "b1"}
+    },
+    {
+      "kind": "set_block_type",
+      "blockId": "b1",
+      "payload": {"type": "header1"}
+    },
+    {
+      "kind": "set_block_metadata",
+      "blockId": "b1",
+      "payload": {
+        "metadata": {"dueDate": null, "hasTime": true}
+      }
+    },
+    {
+      "kind": "complete_task_occurrence",
+      "blockId": "task-1",
+      "payload": {
+        "taskId": "task-1",
+        "scheduledAt": "2026-07-27T09:00:00.000Z",
+        "completedAt": "2026-07-27T10:00:00.000Z"
+      }
+    }
+  ]
+}

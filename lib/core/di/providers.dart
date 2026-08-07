@@ -26,10 +26,10 @@ import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
-import 'package:supanotes/features/notes/domain/note_session_coordinator.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_session.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 
 // ---------------------------------------------------------------------------
 // API client

@@ -9,8 +9,8 @@ import 'package:uuid/uuid.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
 
 class SyncResult {
   final int acceptedCount;

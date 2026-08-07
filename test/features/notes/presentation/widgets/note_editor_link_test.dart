@@ -5,10 +5,10 @@ import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
-import 'package:supanotes/features/notes/presentation/controllers/notes_providers.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_link_tap_handler.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 
 void main() {
   group('NoteEditor link suggestions', () {

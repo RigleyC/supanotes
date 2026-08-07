@@ -413,12 +413,6 @@ LazyDatabase _openConnection() {
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
-  // Wire the cross-DAO dependencies that Drift cannot infer from the
-  // schema alone: [TasksDao.completeTask] appends a row to
-  // [LocalTaskCompletions], so it needs a reference to the
-  // [TaskCompletionsDao] instance. Drift exposes those via getters
-  // generated on [AppDatabase], so we can grab them after construction.
-  db.tasksDao.completionsDao = db.taskCompletionsDao;
   ref.onDispose(db.close);
   return db;
 });

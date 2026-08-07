@@ -16,6 +16,26 @@ persistir um novo snapshot canônico de forma atômica.
 | `transformer.go` | transforma operações concorrentes para preservar intenção |
 | `document.go` | aplica uma operação ao documento e deriva dados auxiliares |
 
+## Contrato dos payloads
+
+Os nomes wire e os builders usados pelo editor Flutter ficam em
+`lib/features/notes/editor/sync/note_operation_contract.dart`. O Go é o owner
+autoritativo da validação e da aplicação:
+
+| Operação | Regra de payload relevante |
+| --- | --- |
+| `text_delta` | `ops` é uma lista de operações Delta e exige `blockId`. |
+| `create_block` | `id`, `type` válido e `delta` são obrigatórios; `blockId`, quando enviado, deve coincidir com `id`. |
+| `delete_block` | Exige `blockId`; a remoção usa esse ID como alvo. |
+| `move_block` | Exige `blockId` no envelope e no payload, com o mesmo valor. |
+| `set_block_type` | Exige um tipo de bloco permitido. |
+| `set_block_metadata` | `metadata` deve ser objeto; valores `null` representam remoções explícitas. |
+| `complete_task_occurrence` | `taskId` deve coincidir com `blockId`, `scheduledAt` não pode ser vazio e o alvo deve ser um bloco `task`. |
+
+`test/fixtures/operation_contract.json` é consumido pelos testes Dart e Go.
+Ele cobre um exemplo válido de cada operação e evita que os dois adapters
+evoluam com vocabulários diferentes.
+
 ## Contrato de sync
 
 1. O cliente envia `knownRevision`, `clientId` e uma lista ordenada de

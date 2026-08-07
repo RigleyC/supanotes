@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:supanotes/core/debug/note_sync_debug.dart';
-import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
-import 'package:supanotes/features/notes/domain/note_session_handle.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 
-export 'package:supanotes/features/notes/domain/note_session_handle.dart';
+export 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 
 class NoteSessionSnapshot {
   const NoteSessionSnapshot({

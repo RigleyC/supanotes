@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/domain/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 
 void main() {
   group('OtDocumentCodec Delta Suffix & Attribution Tests', () {

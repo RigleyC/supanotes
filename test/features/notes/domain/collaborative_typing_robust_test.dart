@@ -4,8 +4,8 @@ import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
 
 /// Helper to convert payload JSON ops to quill.Delta
 quill.Delta deltaFromOps(List<dynamic> ops) {

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/auth/current_user.dart';
 import '../../../../core/database/database.dart';
 import '../../../../core/database/daos/tasks_dao.dart';
-import '../../domain/task_recurrence.dart';
 
 final tasksLocalRepositoryProvider = Provider.autoDispose<TasksLocalRepository>(
   (ref) {
@@ -40,65 +39,5 @@ class TasksLocalRepository {
 
   Future<List<TaskData>> getNoteTasks(String noteId) {
     return _dao.getNoteTasks(noteId);
-  }
-
-  Future<void> createTask({
-    required String id,
-    required String noteId,
-    required String title,
-    String status = 'open',
-    String position = 'a0',
-    TaskRecurrence? recurrence,
-    DateTime? dueDate,
-  }) async {
-    final now = DateTime.now().toUtc();
-    await _dao.insertTask(
-      TaskData(
-        id: id,
-        userId: _userId,
-        noteId: noteId,
-        title: title,
-        status: status,
-        position: position,
-        recurrence: recurrence,
-        dueDate: dueDate,
-        hasTime: false,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-      ),
-    );
-  }
-
-  Future<void> updateTask(TasksCompanion companion) async {
-    await _dao.updateTask(companion);
-  }
-
-  Future<({DateTime? nextDue, DateTime? previousDue, bool previousHasTime})>
-  completeTask(String id) async {
-    return await _dao.completeTask(id);
-  }
-
-  Future<void> reopenTask(String id, {DateTime? originalDueDate}) async {
-    await _dao.reopenTask(id, originalDueDate: originalDueDate);
-  }
-
-  Future<void> softDeleteTask(String id) async {
-    await _dao.softDeleteTask(id);
-  }
-
-  Future<void> reorderTasksBatch(List<String> orderedIds) async {
-    await _dao.reorderTasksBatch(orderedIds, _userId);
-  }
-
-  Future<void> deleteTask(String id) async {
-    await _dao.deleteTaskById(id);
-  }
-
-  /// Runs [action] inside a Drift [Transaction] so that all batched
-  /// task writes in a single save are either committed or rolled
-  /// back together.
-  Future<void> runInTransaction(Future<void> Function() action) async {
-    await _dao.runInTransaction(action);
   }
 }

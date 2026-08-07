@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/presentation/widgets/custom_divider_component.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
 
 void main() {
   Widget wrap(Widget child) {

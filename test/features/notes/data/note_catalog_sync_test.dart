@@ -5,9 +5,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/data/note_catalog_sync.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
-import 'package:supanotes/features/notes/domain/note_session_activity_tracker.dart';
+import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 

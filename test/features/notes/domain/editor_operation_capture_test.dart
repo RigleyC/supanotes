@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/features/notes/domain/editor_operation_capture.dart';
-import 'package:supanotes/features/notes/domain/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/sync/editor_operation_capture.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 
 void main() {
   group('EditorOperationCapture Formatting & Attributed Text Tests', () {
@@ -296,6 +296,110 @@ void main() {
       expect(metadata['hasTime'], null);
       expect(metadata['recurrenceRule'], null);
       expect(metadata['reminder'], null);
+    });
+  });
+
+  group('Task document mutations', () {
+    const codec = NoteDocumentCodec();
+
+    test('captures task creation as a create_block operation', () {
+      final doc = MutableDocument(nodes: [
+        ParagraphNode(id: 'p1', text: AttributedText('Before')),
+      ]);
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-create',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      ).start();
+
+      editor.execute([
+        InsertNodeAtIndexRequest(
+          newNode: TaskNode(
+            id: 't1',
+            text: AttributedText('New task'),
+            isComplete: false,
+            metadata: {'dueDate': '2026-08-04T09:00:00.000Z'},
+          ),
+          nodeIndex: 1,
+        ),
+      ]);
+
+      final operation = capturedOps.singleWhere(
+        (op) => op.kind == 'create_block',
+      );
+      expect(operation.blockId, 't1');
+      expect(operation.payload['type'], 'task');
+      expect(operation.payload['afterBlockId'], 'p1');
+      expect(
+        (operation.payload['metadata'] as Map<String, dynamic>)['dueDate'],
+        '2026-08-04T09:00:00.000Z',
+      );
+    });
+
+    test('captures task deletion as a delete_block operation', () {
+      final doc = MutableDocument(nodes: [
+        ParagraphNode(id: 'p1', text: AttributedText('Before')),
+        TaskNode(
+          id: 't1',
+          text: AttributedText('Delete me'),
+          isComplete: false,
+        ),
+      ]);
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-delete',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      ).start();
+
+      editor.execute([DeleteNodeRequest(nodeId: 't1')]);
+
+      expect(capturedOps.single.kind, 'delete_block');
+      expect(capturedOps.single.blockId, 't1');
+    });
+
+    test('captures task reordering as a move_block operation', () {
+      final doc = MutableDocument(nodes: [
+        ParagraphNode(id: 'p1', text: AttributedText('First')),
+        ParagraphNode(id: 'p2', text: AttributedText('Second')),
+        TaskNode(
+          id: 't1',
+          text: AttributedText('Move me'),
+          isComplete: false,
+        ),
+      ]);
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-move',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      ).start();
+
+      editor.execute([
+        MoveNodeRequest(nodeId: 't1', newIndex: 0),
+      ]);
+
+      final operation = capturedOps.firstWhere(
+        (op) => op.kind == 'move_block' && op.blockId == 't1',
+      );
+      expect(operation.payload['blockId'], 't1');
+      expect(operation.payload['afterBlockId'], null);
     });
   });
 }

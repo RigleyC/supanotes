@@ -1,6 +1,6 @@
 import '../../../core/database/database.dart';
 import '../../../core/utils/date_time_extensions.dart';
-import '../../../core/utils/recurrence.dart';
+import 'task_occurrence.dart';
 import 'task_recurrence.dart';
 
 /// Immutable view-model for a task shown in the presentation layer.
@@ -49,11 +49,12 @@ class TaskModel {
   factory TaskModel.fromData(TaskData d, {DateTime? now}) {
     final dueDate =
         d.status == 'open' && d.dueDate != null && d.recurrence != null
-        ? advanceRecurringDueDate(
-            from: d.dueDate!,
+        ? TaskOccurrencePolicy(
+            clock: now == null ? null : () => now,
+          ).currentScheduledAt(
+            anchor: d.dueDate,
             recurrence: d.recurrence!,
             hasTime: d.hasTime,
-            now: now,
           )
         : d.dueDate;
 

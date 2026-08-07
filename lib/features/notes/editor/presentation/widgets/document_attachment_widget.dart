@@ -4,8 +4,8 @@ import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:supanotes/core/utils/format_utils.dart';
-import 'package:supanotes/features/notes/data/attachments_repository.dart';
-import 'package:supanotes/features/notes/domain/attachment_model.dart';
+import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
+import 'package:supanotes/features/notes/attachments/model/attachment_model.dart';
 import 'attachment_renderers.dart';
 
 class DocumentAttachmentWidget extends ConsumerWidget {

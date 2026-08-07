@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 
 void main() {
   test('default document starts with the canonical init paragraph', () async {

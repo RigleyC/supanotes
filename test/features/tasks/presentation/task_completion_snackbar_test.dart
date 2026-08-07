@@ -2,26 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/tasks/data/tasks_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_delegate.dart';
-import 'package:supanotes/features/notes/presentation/widgets/note_editor.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_provider.dart';
-import 'package:supanotes/features/notes/domain/note_session_handle.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_session.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:intl/date_symbol_data_local.dart';
-
-class _MockTasksRepository extends Mock implements ITasksRepository {}
 
 NoteEditorController _createTestController(List<DocumentNode> nodes) {
   return NoteEditorController(
@@ -115,8 +111,6 @@ void main() {
   testWidgets(
     'creates a daily recurring task, clicks to complete, and snackbar disappears after default time',
     (tester) async {
-      final mockTasksRepo = _MockTasksRepository();
-
       // Create a daily recurring task
       final now = DateTime.now();
       final task = TaskModel(
@@ -135,24 +129,9 @@ void main() {
         updatedAt: now,
       );
 
-      when(() => mockTasksRepo.completeTask(any())).thenAnswer(
-        (_) async => (
-          nextDue: now.add(const Duration(days: 1)),
-          previousDue: now,
-          previousHasTime: false,
-        ),
-      );
-      when(
-        () => mockTasksRepo.reopenTask(
-          any(),
-          originalDueDate: any(named: 'originalDueDate'),
-        ),
-      ).thenAnswer((_) async {});
-
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            tasksRepositoryProvider.overrideWithValue(mockTasksRepo),
             currentUserIdProvider.overrideWithValue('user-1'),
             appDatabaseProvider.overrideWithValue(AppDatabase.test()),
             noteEditorSessionProvider.overrideWith(
@@ -176,17 +155,14 @@ void main() {
                   onTaskComplete: (taskId) =>
                       TaskSnackBarHelper.completeTaskWithFeedback(
                         onComplete: () async => (
-                          nextDue: task.dueDate,
-                          previousDue: task.dueDate,
+                          nextDue: now.add(const Duration(days: 1)),
+                          previousDue: now,
                           previousHasTime: task.hasTime,
-                          scheduledAt: task.dueDate,
+                          scheduledAt: now,
                         ),
-                        onUndo: (previousDue, _, _) => mockTasksRepo.reopenTask(
-                          taskId,
-                          originalDueDate: previousDue,
-                        ),
+                        onUndo: (previousDue, _, _) async {},
                       ),
-                  onTaskReopen: (taskId) => mockTasksRepo.reopenTask(taskId),
+                  onTaskReopen: (taskId) async {},
                 ),
               ),
             ),

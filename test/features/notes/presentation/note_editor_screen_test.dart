@@ -116,13 +116,6 @@ class _MockTasksRepository extends Mock implements ITasksRepository {}
 _MockTasksRepository _defaultMockTasksRepo() {
   final mock = _MockTasksRepository();
   when(() => mock.watchByNote(any())).thenAnswer((_) => Stream.value([]));
-  when(() => mock.completeTask(any())).thenAnswer(
-    (_) async => (nextDue: null, previousDue: null, previousHasTime: false),
-  );
-  when(
-    () =>
-        mock.reopenTask(any(), originalDueDate: any(named: 'originalDueDate')),
-  ).thenAnswer((_) async {});
   return mock;
 }
 
@@ -1052,7 +1045,7 @@ void main() {
     expect(find.text(NoteStrings.hideCompleted), findsOneWidget);
   });
 
-  testWidgets('tapping a task checkbox calls completeTask on the repository', (
+  testWidgets('tapping a task checkbox updates the canonical document', (
     tester,
   ) async {
     final streamController = StreamController<NoteModel?>();
@@ -1078,16 +1071,6 @@ void main() {
         ),
       ]),
     );
-    when(() => mockTasksRepo.completeTask(any())).thenAnswer(
-      (_) async => (nextDue: null, previousDue: null, previousHasTime: false),
-    );
-    when(
-      () => mockTasksRepo.reopenTask(
-        any(),
-        originalDueDate: any(named: 'originalDueDate'),
-      ),
-    ).thenAnswer((_) async {});
-
     const noteContent = '# Test note\n\n- [ ] buy milk <!-- task:task-1 -->\n';
 
     final testController = _createTestController([
@@ -1143,7 +1126,7 @@ void main() {
   });
 
   testWidgets(
-    'un-tapping a completed task checkbox calls reopenTask on the repository',
+    'un-tapping a completed task checkbox updates the canonical document',
     (tester) async {
       final streamController = StreamController<NoteModel?>();
       addTearDown(streamController.close);
@@ -1168,16 +1151,6 @@ void main() {
       when(
         () => mockTasksRepo.watchByNote(any()),
       ).thenAnswer((_) => Stream.value([task1]));
-      when(() => mockTasksRepo.completeTask(any())).thenAnswer(
-        (_) async => (nextDue: null, previousDue: null, previousHasTime: false),
-      );
-      when(
-        () => mockTasksRepo.reopenTask(
-          any(),
-          originalDueDate: any(named: 'originalDueDate'),
-        ),
-      ).thenAnswer((_) async {});
-
       const noteContent =
           '# Test note\n\n- [x] buy milk <!-- task:task-1 -->\n';
 

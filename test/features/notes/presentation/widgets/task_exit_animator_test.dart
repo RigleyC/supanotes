@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/presentation/widgets/task_exit_animator.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 
 void main() {
   testWidgets('does not animate when hideCompleted=false', (tester) async {

@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/data/shares_repository.dart';
-import 'package:supanotes/features/notes/domain/note_strings.dart';
-import 'package:supanotes/features/notes/domain/share_model.dart';
-import 'package:supanotes/features/notes/domain/share_permission.dart';
-import 'package:supanotes/features/notes/presentation/controllers/share_list_controller.dart';
-import 'package:supanotes/features/notes/presentation/widgets/share_note_sheet.dart';
+import 'package:supanotes/features/notes/sharing/data/shares_repository.dart';
+import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
+import 'package:supanotes/features/notes/sharing/model/share_model.dart';
+import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
+import 'package:supanotes/features/notes/sharing/application/share_list_controller.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 
 class _FakeSharesRepository implements SharesRepository {

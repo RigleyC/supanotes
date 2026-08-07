@@ -1,8 +1,8 @@
-import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 
 import 'projected_document.dart';
 import 'projected_task.dart';
+import 'task_occurrence.dart';
 import 'task_recurrence.dart';
 
 /// Calculates the local projections of the canonical REST/OT document.
@@ -24,6 +24,7 @@ class NoteDocumentProjector {
   }) {
     final projectedTasks = <ProjectedTask>[];
     final textBuffer = StringBuffer();
+    final occurrencePolicy = TaskOccurrencePolicy(clock: now);
 
     for (var i = 0; i < blocks.length; i++) {
       final blockData = blocks[i];
@@ -52,11 +53,10 @@ class NoteDocumentProjector {
       );
       final currentDueDate =
           !isCompleted && rawDueDate != null && recurrence != null
-          ? advanceRecurringDueDate(
-              from: rawDueDate,
+          ? occurrencePolicy.currentScheduledAt(
+              anchor: rawDueDate,
               recurrence: recurrence,
               hasTime: hasTime,
-              now: now?.call(),
             )
           : rawDueDate;
       final rawDueDateString = metadata['dueDate'] as String?;

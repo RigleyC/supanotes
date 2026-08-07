@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/domain/note_model.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 
 void main() {
   test('NoteModel.title is the field value, not derived from content', () {

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/domain/note_document_codec.dart';
-import 'package:supanotes/features/notes/domain/note_node.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_node.dart';
 
 void main() {
   test(

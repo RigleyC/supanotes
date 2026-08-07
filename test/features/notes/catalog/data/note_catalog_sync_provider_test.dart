@@ -8,8 +8,8 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:supanotes/features/notes/data/note_catalog_sync.dart';
-import 'package:supanotes/features/notes/data/note_sync_client.dart';
+import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 class _StubAuthController extends AuthController {
   @override

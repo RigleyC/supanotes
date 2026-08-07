@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:supanotes/features/notes/domain/note_session_handle.dart';
-import 'package:supanotes/features/notes/presentation/controllers/note_editor_controller.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 
 class NoteEditorSession implements NoteEditorSyncHandle {
   NoteEditorSession({

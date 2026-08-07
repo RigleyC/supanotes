@@ -7,11 +7,11 @@ import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 import 'package:super_native_extensions/src/native/context.dart';
 import 'package:irondash_message_channel/irondash_message_channel.dart';
-import 'package:supanotes/features/notes/presentation/widgets/rich_keyboard_actions.dart';
-import 'package:supanotes/features/notes/presentation/widgets/rich_common_editor_operations.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_keyboard_actions.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_common_editor_operations.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/rich_clipboard_serializers.dart';
-import 'package:supanotes/features/notes/presentation/widgets/clipboard_preprocessor.dart';
-import 'package:supanotes/features/notes/presentation/widgets/slash_command_overlay.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/clipboard_preprocessor.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/slash_command_overlay.dart';
 
 class MockEditor extends Mock implements Editor {}
 
