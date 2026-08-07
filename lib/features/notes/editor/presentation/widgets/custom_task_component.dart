@@ -11,9 +11,8 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badg
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
-const double _taskCheckboxGap = 0.0;
-const double _taskCheckboxTouchTarget = 44.0;
-const double _taskCheckboxVisualTopInset = 2.0;
+const double _taskCheckboxSize = 22.0;
+const double _taskCheckboxFallbackTopInset = 2.0;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
@@ -286,6 +285,19 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final colorScheme = Theme.of(context).colorScheme;
     final semantics = Theme.of(context).extension<AppSemanticColors>();
     final taskColor = semantics?.task ?? AppColors.taskAccent;
+    final textStyle = widget.viewModel.textStyleBuilder({});
+    final textLineHeight = MediaQuery.textScalerOf(
+      context,
+    ).scale((textStyle.fontSize ?? 16) * (textStyle.height ?? 1.0));
+    final checkboxTopInset = textStyle.height == null
+        ? _taskCheckboxFallbackTopInset
+        : (textLineHeight - _taskCheckboxSize) / 2;
+    // Keep task text on the same column as Super Editor's bullet and number
+    // markers. The marker itself remains inside the shared indentation slot.
+    final markerIndent = defaultListItemIndentCalculator(
+      textStyle,
+      widget.viewModel.indent,
+    );
 
     final content = Directionality(
       textDirection: widget.viewModel.textDirection,
@@ -297,13 +309,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width:
-                  defaultTaskIndentCalculator(
-                    widget.viewModel.textStyleBuilder({}),
-                    widget.viewModel.indent,
-                  ) +
-                  _taskCheckboxTouchTarget +
-                  _taskCheckboxGap,
+              width: markerIndent,
               child: Semantics(
                 button: true,
                 checked: _isComplete,
@@ -317,10 +323,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
-                      padding: const EdgeInsets.only(
-                        left: 11,
-                        top: _taskCheckboxVisualTopInset,
-                      ),
+                      padding: EdgeInsets.only(left: 11, top: checkboxTopInset),
                       child: AppTaskCheckbox(
                         value: _isComplete,
                         accentColor: taskColor,

@@ -168,7 +168,7 @@ void main() {
 
     final textLeft = tester.getTopLeft(find.byType(TextComponent)).dx;
 
-    expect(textLeft, 44.0);
+    expect(textLeft, closeTo(38.4, 0.1));
   });
 
   testWidgets('places checkbox at the top of the row', (tester) async {
