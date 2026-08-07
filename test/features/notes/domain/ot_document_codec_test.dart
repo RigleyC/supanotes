@@ -155,6 +155,39 @@ void main() {
       },
     );
 
+    test('round trips link attributions through the Delta contract', () {
+      final uri = Uri.parse('note://target-note');
+      final spans = AttributedSpans()
+        ..addAttribution(
+          newAttribution: LinkAttribution.fromUri(uri),
+          start: 0,
+          end: 3,
+        );
+      final source = AttributedText('Link text', spans);
+
+      final delta = codec.encodeAttributedTextToDelta(source);
+      final restored = codec.attributedFromDelta(delta);
+
+      expect(
+        restored.getAllAttributionsAt(1).whereType<LinkAttribution>().single,
+        LinkAttribution.fromUri(uri),
+      );
+      expect(restored.getAllAttributionsAt(4), isEmpty);
+    });
+
+    test('does not extend a link to the caret after inserted text', () {
+      final result = codec.applyDeltaToText(AttributedText(), [
+        {
+          'insert': 'Link',
+          'attributes': {'link:note://target-note': true},
+        },
+      ]);
+
+      expect(result, isNotNull);
+      expect(result!.getAllAttributionsAt(0), isNotEmpty);
+      expect(result.getAllAttributionsAt(4), isEmpty);
+    });
+
     test('round trips text block types through the OT delta contract', () {
       final cases = <Map<String, dynamic>>[
         {

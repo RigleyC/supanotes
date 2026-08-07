@@ -70,6 +70,11 @@ class NoteLinkTapHandler extends ContentTapDelegate {
       return null;
     }
 
+    if (nodePosition.offset < 0 ||
+        nodePosition.offset >= textNode.text.length) {
+      return null;
+    }
+
     final tappedAttributions = textNode.text.getAllAttributionsAt(
       nodePosition.offset,
     );

@@ -733,6 +733,9 @@ class NoteDocumentCodec {
     if (id == 'italics') return italicsAttribution;
     if (id == 'strikethrough') return strikethroughAttribution;
     if (id == 'underline') return underlineAttribution;
+    if (id.startsWith('link:')) {
+      return LinkAttribution.fromUri(Uri.parse(id.substring('link:'.length)));
+    }
     return null;
   }
 
@@ -821,7 +824,7 @@ class NoteDocumentCodec {
       for (final id in currentAttrs) {
         final attr = attributionFromId(id);
         if (attr != null) {
-          span.addAttribution(newAttribution: attr, start: pos, end: end);
+          span.addAttribution(newAttribution: attr, start: pos, end: end - 1);
         }
       }
       pos = end;

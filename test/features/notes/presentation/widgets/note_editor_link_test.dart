@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/auth/current_user.dart';
@@ -9,6 +10,8 @@ import 'package:supanotes/features/notes/editor/application/note_editor_delegate
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
+
+class _MockDocumentLayout extends Mock implements DocumentLayout {}
 
 void main() {
   group('NoteEditor link suggestions', () {
@@ -193,14 +196,78 @@ void main() {
 
       composer.setIsInteractionMode(true);
 
+      String? tappedNoteId;
       final handler = NoteLinkTapHandler(
         document,
         composer,
-        onNoteTap: (_) {},
+        onNoteTap: (noteId) => tappedNoteId = noteId,
       );
 
-      expect(handler, isA<NoteLinkTapHandler>());
+      final layout = _MockDocumentLayout();
+      when(
+        () => layout.getDocumentPositionNearestToOffset(Offset.zero),
+      ).thenReturn(
+        const DocumentPosition(
+          nodeId: 'test-node',
+          nodePosition: TextNodePosition(offset: 8),
+        ),
+      );
 
+      final result = handler.onTap(
+        DocumentTapDetails(
+          documentLayout: layout,
+          layoutOffset: Offset.zero,
+          globalOffset: Offset.zero,
+        ),
+      );
+
+      expect(result, TapHandlingInstruction.halt);
+      expect(tappedNoteId, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+
+      handler.dispose();
+      document.dispose();
+      composer.dispose();
+    });
+
+    test('NoteLinkTapHandler leaves the caret after a stale link boundary', () {
+      final uri = Uri.parse('note://aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(
+            id: 'test-node',
+            text: AttributedText(
+              'Click here',
+              // Simulate a stale inclusive span that reaches the caret.
+              AttributedSpans()..addAttribution(
+                newAttribution: LinkAttribution.fromUri(uri),
+                start: 6,
+                end: 10,
+              ),
+            ),
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer();
+      final layout = _MockDocumentLayout();
+      when(
+        () => layout.getDocumentPositionNearestToOffset(Offset.zero),
+      ).thenReturn(
+        const DocumentPosition(
+          nodeId: 'test-node',
+          nodePosition: TextNodePosition(offset: 10),
+        ),
+      );
+      final handler = NoteLinkTapHandler(document, composer, onNoteTap: (_) {});
+
+      final result = handler.onTap(
+        DocumentTapDetails(
+          documentLayout: layout,
+          layoutOffset: Offset.zero,
+          globalOffset: Offset.zero,
+        ),
+      );
+
+      expect(result, TapHandlingInstruction.continueHandling);
       handler.dispose();
       document.dispose();
       composer.dispose();

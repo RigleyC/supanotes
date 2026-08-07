@@ -268,7 +268,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                         child: TapRegion(
                           groupId: noteEditorToolbarTapRegionGroup,
                           child: SuperEditor(
-                            key: ValueKey<bool>(isDesktop),
+                            key: ValueKey<(bool, bool)>((
+                              isDesktop,
+                              widget.isReadOnly,
+                            )),
                             editor: controller.editor,
                             plugins: isDesktop
                                 ? {_markdownInlinePlugin, _markdownTaskPlugin}

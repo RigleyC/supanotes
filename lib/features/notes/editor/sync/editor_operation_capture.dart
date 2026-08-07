@@ -421,7 +421,7 @@ class EditorOperationCapture {
     if (text.toPlainText().isEmpty) return const {};
     final active = <String>{};
     for (final marker in text.spans.markers) {
-      final attrId = marker.attribution.id;
+      final attrId = NoteDocumentCodec.attributionToName(marker.attribution);
       if (attrId == 'composing') continue;
       if (marker.markerType == SpanMarkerType.start) {
         if (marker.offset <= offset) {

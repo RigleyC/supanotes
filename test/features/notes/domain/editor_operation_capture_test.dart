@@ -88,6 +88,49 @@ void main() {
       ]);
     });
 
+    test('captures the URI when a link attribution changes in place', () {
+      final doc = MutableDocument(
+        nodes: [ParagraphNode(id: 'n1', text: AttributedText('Link'))],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      final capture = EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-1',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      );
+      capture.start();
+
+      final uri = Uri.parse('note://target-note');
+      final spans = AttributedSpans()
+        ..addAttribution(
+          newAttribution: LinkAttribution.fromUri(uri),
+          start: 0,
+          end: 3,
+        );
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 'n1',
+          newNode: ParagraphNode(id: 'n1', text: AttributedText('Link', spans)),
+        ),
+      ]);
+
+      final textDeltaOp = capturedOps.firstWhere(
+        (op) => op.kind == 'text_delta',
+      );
+      final ops = textDeltaOp.payload['ops'] as List<dynamic>;
+      expect(ops, [
+        {
+          'retain': 4,
+          'attributes': {'link:note://target-note': true},
+        },
+      ]);
+    });
+
     test('does not inherit accidental bold on inserted text', () {
       final boldSpans = AttributedSpans()
         ..addAttribution(newAttribution: boldAttribution, start: 0, end: 6);
