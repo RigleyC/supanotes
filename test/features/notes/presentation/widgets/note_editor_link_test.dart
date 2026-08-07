@@ -70,20 +70,8 @@ void main() {
           ),
         ],
       );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'test-node',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-
-      composer.setIsInteractionMode(true);
-
       final handler = NoteLinkTapHandler(
         document,
-        composer,
         onNoteTap: (_) {},
       );
 
@@ -98,10 +86,11 @@ void main() {
 
       handler.dispose();
       document.dispose();
-      composer.dispose();
     });
 
-    testWidgets('NoteLinkTapHandler ignores non-note links', (tester) async {
+    testWidgets('NoteLinkTapHandler opens external URLs on click', (
+      tester,
+    ) async {
       final uri = Uri.parse('https://example.com');
       final document = MutableDocument(
         nodes: [
@@ -127,20 +116,8 @@ void main() {
           ),
         ],
       );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'test-node',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-
-      composer.setIsInteractionMode(true);
-
       final handler = NoteLinkTapHandler(
         document,
-        composer,
         onNoteTap: (_) {},
       );
 
@@ -150,11 +127,28 @@ void main() {
       );
 
       final cursor = handler.mouseCursorForContentHover(position);
-      expect(cursor, isNull);
+      expect(cursor, SystemMouseCursors.click);
+
+      final layout = _MockDocumentLayout();
+      when(
+        () => layout.getDocumentPositionNearestToOffset(Offset.zero),
+      ).thenReturn(
+        const DocumentPosition(
+          nodeId: 'test-node',
+          nodePosition: TextNodePosition(offset: 10),
+        ),
+      );
+      final result = handler.onTap(
+        DocumentTapDetails(
+          documentLayout: layout,
+          layoutOffset: Offset.zero,
+          globalOffset: Offset.zero,
+        ),
+      );
+      expect(result, TapHandlingInstruction.halt);
 
       handler.dispose();
       document.dispose();
-      composer.dispose();
     });
 
     testWidgets('NoteLinkTapHandler triggers onNoteTap for note links', (
@@ -185,21 +179,9 @@ void main() {
           ),
         ],
       );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'test-node',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-
-      composer.setIsInteractionMode(true);
-
       String? tappedNoteId;
       final handler = NoteLinkTapHandler(
         document,
-        composer,
         onNoteTap: (noteId) => tappedNoteId = noteId,
       );
 
@@ -226,7 +208,6 @@ void main() {
 
       handler.dispose();
       document.dispose();
-      composer.dispose();
     });
 
     test('NoteLinkTapHandler leaves the caret after a stale link boundary', () {
@@ -247,7 +228,6 @@ void main() {
           ),
         ],
       );
-      final composer = MutableDocumentComposer();
       final layout = _MockDocumentLayout();
       when(
         () => layout.getDocumentPositionNearestToOffset(Offset.zero),
@@ -257,7 +237,7 @@ void main() {
           nodePosition: TextNodePosition(offset: 10),
         ),
       );
-      final handler = NoteLinkTapHandler(document, composer, onNoteTap: (_) {});
+      final handler = NoteLinkTapHandler(document, onNoteTap: (_) {});
 
       final result = handler.onTap(
         DocumentTapDetails(
@@ -270,7 +250,6 @@ void main() {
       expect(result, TapHandlingInstruction.continueHandling);
       handler.dispose();
       document.dispose();
-      composer.dispose();
     });
   });
 }

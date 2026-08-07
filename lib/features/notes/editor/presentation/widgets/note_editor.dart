@@ -98,11 +98,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _contentTapDelegateFactories = [
       (editContext) => NoteLinkTapHandler(
         editContext.document,
-        editContext.composer,
-        allowExternalLinks: widget.isReadOnly,
         onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
       ),
-      if (!widget.isReadOnly) superEditorLaunchLinkTapHandlerFactory,
     ];
 
     _taskComponentBuilder = CustomTaskComponentBuilder(

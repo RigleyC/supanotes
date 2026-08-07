@@ -5,34 +5,16 @@ import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class NoteLinkTapHandler extends ContentTapDelegate {
-  NoteLinkTapHandler(
-    this.document,
-    this.composer, {
-    required this.onNoteTap,
-    this.allowExternalLinks = false,
-  }) {
-    composer.isInInteractionMode.addListener(notifyListeners);
-  }
+  NoteLinkTapHandler(this.document, {required this.onNoteTap});
 
   final Document document;
-  final DocumentComposer composer;
   final void Function(String noteId) onNoteTap;
-  final bool allowExternalLinks;
-
-  @override
-  void dispose() {
-    composer.isInInteractionMode.removeListener(notifyListeners);
-    super.dispose();
-  }
 
   @override
   MouseCursor? mouseCursorForContentHover(DocumentPosition hoverPosition) {
     final uri = _getLinkAtPosition(hoverPosition);
     if (uri == null) return null;
-    if (uri.scheme == 'note' || allowExternalLinks) {
-      return SystemMouseCursors.click;
-    }
-    return null;
+    return SystemMouseCursors.click;
   }
 
   @override
@@ -51,12 +33,8 @@ class NoteLinkTapHandler extends ContentTapDelegate {
       return TapHandlingInstruction.halt;
     }
 
-    if (allowExternalLinks) {
-      unawaited(launchUrl(uri));
-      return TapHandlingInstruction.halt;
-    }
-
-    return TapHandlingInstruction.continueHandling;
+    unawaited(launchUrl(uri));
+    return TapHandlingInstruction.halt;
   }
 
   Uri? _getLinkAtPosition(DocumentPosition position) {
