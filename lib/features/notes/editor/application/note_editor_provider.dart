@@ -7,7 +7,6 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
-import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 import 'note_editor_controller.dart';
@@ -92,19 +91,4 @@ final noteEditorSessionProvider = FutureProvider.autoDispose
         _noteEditorSessionOwnerProvider(noteId).future,
       );
       return session;
-    });
-
-final noteEditorSessionStatusProvider = StreamProvider.autoDispose
-    .family<NoteSessionStatus, String>((ref, noteId) {
-      final sessionCoordinator = ref.watch(noteSessionCoordinatorProvider);
-      ref.watch(_noteEditorSessionOwnerProvider(noteId));
-      return sessionCoordinator.statusChangesOf(noteId);
-    });
-
-final noteEditorControllerProvider = FutureProvider.autoDispose
-    .family<NoteEditorController, String>((ref, noteId) async {
-      final session = await ref.watch(
-        noteEditorSessionProvider(noteId).future,
-      );
-      return session.controller;
     });

@@ -26,3 +26,21 @@ Review fixes complete:
 - The final Flutter suite passed with 554 tests and 1 skipped test. The Windows
   integration suite passed with 4 tests, and the backend suite passed with 254
   tests in 25 packages.
+
+## Editor empty viewport focus
+
+Tapping the blank editor area below visible text now places the caret at the
+end of the last visible text block and opens the software keyboard. If trailing
+hidden tasks leave no visible text block, the editor inserts and selects an
+empty paragraph through the canonical editor request pipeline.
+
+The fix uses Super Editor's `ContentTapDelegate`, editor requests, focus node,
+and software keyboard controller. It does not add an outer gesture detector.
+Both mutating tap delegates are disabled in read-only mode.
+
+Verification:
+
+- Editor, link, task component, and toolbar test suites: passed.
+- Flutter analyze: passed with no issues.
+- Full Flutter test suite: 608 passed, 1 skipped.
+- Standards and specification reviews: no remaining findings.

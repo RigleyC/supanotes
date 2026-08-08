@@ -37,3 +37,14 @@ Status: complete.
 - [x] Identify the duplicated bottom spacing in the modal content.
 - [x] Reduce the explicit bottom gap while preserving safe-area spacing.
 - [x] Run the focused task metadata sheet test and analyzer.
+
+## Editor empty viewport focus
+
+Status: complete.
+
+- [x] Reproduce taps below the document but above the mobile toolbar.
+- [x] Add regression coverage for caret placement, focus, keyboard reopening,
+  and a document with only hidden tasks.
+- [x] Handle trailing hidden tasks through the Super Editor content-tap
+  delegate API.
+- [x] Run focused tests, analyzer, full suite, and two-axis code review.

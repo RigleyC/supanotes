@@ -18,6 +18,7 @@ import 'package:supanotes/features/notes/editor/application/note_editor_delegate
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_note_chrome.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
@@ -337,6 +338,139 @@ void main() {
       isFalse,
     );
   });
+
+  testWidgets(
+    'tap in empty viewport below document places caret at end and opens keyboard',
+    (tester) async {
+      const taskText = 'Comprar leite';
+      final controller = _createTestController([
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText(taskText),
+          isComplete: false,
+        ),
+        TaskNode(
+          id: 'task-hidden',
+          text: AttributedText('Concluída'),
+          isComplete: true,
+        ),
+      ]);
+      addTearDown(controller.dispose);
+      controller.composer.setSelectionWithReason(
+        const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'task-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+        SelectionReason.userInteraction,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            noteEditorSessionProvider.overrideWith(
+              (ref, noteId) => _sessionFor(controller),
+            ),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.android),
+            home: Scaffold(
+              body: NoteEditor(
+                noteId: 'note-1',
+                taskMetadata: const {},
+                hideCompleted: true,
+                delegate: const NoteEditorDelegate(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final taskRect = tester.getRect(find.byType(CustomTaskComponent).first);
+      await tester.tapAt(Offset(taskRect.center.dx, taskRect.bottom + 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.focusNode.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      controller.composer.setSelectionWithReason(
+        const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'task-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+        SelectionReason.userInteraction,
+      );
+      tester.testTextInput.hide();
+      await tester.pump(kDoubleTapTimeout + const Duration(milliseconds: 50));
+
+      expect(controller.focusNode.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isFalse);
+
+      final toolbarRect = tester.getRect(find.byType(NoteToolbar));
+      await tester.tapAt(Offset(toolbarRect.center.dx, toolbarRect.top - 10));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final selection = controller.composer.selection;
+      expect(selection, isNotNull);
+      expect(selection!.extent.nodeId, 'task-1');
+      expect(
+        (selection.extent.nodePosition as TextNodePosition).offset,
+        taskText.length,
+      );
+      expect(controller.focusNode.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+    },
+  );
+
+  testWidgets(
+    'tap below an entirely hidden document creates an editable paragraph',
+    (tester) async {
+      final controller = _createTestController([
+        TaskNode(
+          id: 'task-hidden',
+          text: AttributedText('Concluída'),
+          isComplete: true,
+        ),
+      ]);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            noteEditorSessionProvider.overrideWith(
+              (ref, noteId) => _sessionFor(controller),
+            ),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.android),
+            home: Scaffold(
+              body: NoteEditor(
+                noteId: 'note-1',
+                taskMetadata: const {},
+                hideCompleted: true,
+                delegate: const NoteEditorDelegate(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final toolbarRect = tester.getRect(find.byType(NoteToolbar));
+      await tester.tapAt(Offset(toolbarRect.center.dx, toolbarRect.top - 10));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final nodes = controller.document.toList();
+      expect(nodes, hasLength(2));
+      expect(nodes.last, isA<ParagraphNode>());
+      expect(controller.composer.selection!.extent.nodeId, nodes.last.id);
+      expect(controller.focusNode.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+    },
+  );
 
   testWidgets('shows the editor toolbar on desktop layout', (tester) async {
     tester.view.physicalSize = const Size(1200, 800);

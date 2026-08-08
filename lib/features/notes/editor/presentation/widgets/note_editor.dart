@@ -16,6 +16,7 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_sel
 import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/hidden_task_trailing_tap_handler.dart';
 import 'package:supanotes/core/utils/platform_utils.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/slash_command_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_config.dart';
@@ -57,6 +58,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   final _docLayoutKey = GlobalKey();
   final _editorViewportKey = GlobalKey();
   final _selectionLayerLinks = SelectionLayerLinks();
+  final _softwareKeyboardController = SoftwareKeyboardController();
+  final _formattingToolbarOpen = ValueNotifier<bool>(false);
   late final MarkdownInlineUpstreamSyntaxPlugin _markdownInlinePlugin =
       MarkdownInlineUpstreamSyntaxPlugin();
   late final MarkdownTaskShortcutPlugin _markdownTaskPlugin =
@@ -100,6 +103,17 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         editContext.document,
         onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
       ),
+      if (!widget.isReadOnly)
+        (editContext) => HiddenTaskTrailingTapHandler(
+          editContext: editContext,
+          isHiddenTask: _isHiddenTask,
+          openSoftwareKeyboard: () {
+            if (_softwareKeyboardController.hasDelegate) {
+              _softwareKeyboardController.open(viewId: View.of(context).viewId);
+            }
+          },
+        ),
+      if (!widget.isReadOnly) superEditorAddEmptyParagraphTapHandlerFactory,
     ];
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
@@ -129,13 +143,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     final controller = _controller;
     if (controller == null) return;
 
-    controller.setHiddenTaskPredicate(
-      (node) =>
-          widget.hideCompleted &&
-          node.isComplete &&
-          !isRecurringTaskNode(node, widget.taskMetadata[node.id]),
-    );
+    controller.setHiddenTaskPredicate(_isHiddenTask);
   }
+
+  bool _isHiddenTask(TaskNode node) =>
+      widget.hideCompleted &&
+      node.isComplete &&
+      !isRecurringTaskNode(node, widget.taskMetadata[node.id]);
 
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
@@ -177,6 +191,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _controller?.removeListener(_onControllerReady);
     _controller?.onHasContentChanged = null;
     _slashCommandController.dispose();
+    _formattingToolbarOpen.dispose();
     _controls?.dispose();
     super.dispose();
   }
@@ -264,49 +279,63 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                         controller: _controls!.iosController,
                         child: TapRegion(
                           groupId: noteEditorToolbarTapRegionGroup,
-                          child: SuperEditor(
-                            key: ValueKey<(bool, bool)>((
-                              isDesktop,
-                              widget.isReadOnly,
-                            )),
-                            editor: controller.editor,
-                            plugins: isDesktop
-                                ? {_markdownInlinePlugin, _markdownTaskPlugin}
-                                : const {},
-                            focusNode: widget.isReadOnly
-                                ? null
-                                : controller.focusNode,
-                            autofocus:
-                                widget.requestInitialFocus &&
-                                !widget.isReadOnly,
-                            inputSource: TextInputSource.ime,
-                            documentLayoutKey: _docLayoutKey,
-                            selectionLayerLinks: _selectionLayerLinks,
-                            stylesheet: _cachedStylesheet!,
-                            selectionStyle: editorSelectionStyle(
-                              theme.colorScheme,
-                            ),
-                            documentOverlayBuilders: [
-                              ...defaultSuperEditorDocumentOverlayBuilders
-                                  .where(
-                                    (builder) =>
-                                        builder is! DefaultCaretOverlayBuilder,
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: _formattingToolbarOpen,
+                            builder: (context, formattingToolbarOpen, child) =>
+                                SuperEditor(
+                                  key: ValueKey<(bool, bool)>((
+                                    isDesktop,
+                                    widget.isReadOnly,
+                                  )),
+                                  editor: controller.editor,
+                                  plugins: isDesktop
+                                      ? {
+                                          _markdownInlinePlugin,
+                                          _markdownTaskPlugin,
+                                        }
+                                      : const {},
+                                  focusNode: widget.isReadOnly
+                                      ? null
+                                      : controller.focusNode,
+                                  autofocus:
+                                      widget.requestInitialFocus &&
+                                      !widget.isReadOnly,
+                                  inputSource: TextInputSource.ime,
+                                  softwareKeyboardController:
+                                      _softwareKeyboardController,
+                                  imePolicies: SuperEditorImePolicies(
+                                    openKeyboardOnSelectionChange:
+                                        !formattingToolbarOpen,
                                   ),
-                              DefaultCaretOverlayBuilder(
-                                caretStyle: CaretStyle(
-                                  color: theme.colorScheme.primary,
-                                  width: 1.5,
+                                  documentLayoutKey: _docLayoutKey,
+                                  selectionLayerLinks: _selectionLayerLinks,
+                                  stylesheet: _cachedStylesheet!,
+                                  selectionStyle: editorSelectionStyle(
+                                    theme.colorScheme,
+                                  ),
+                                  documentOverlayBuilders: [
+                                    ...defaultSuperEditorDocumentOverlayBuilders
+                                        .where(
+                                          (builder) =>
+                                              builder
+                                                  is! DefaultCaretOverlayBuilder,
+                                        ),
+                                    DefaultCaretOverlayBuilder(
+                                      caretStyle: CaretStyle(
+                                        color: theme.colorScheme.primary,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ],
+                                  contentTapDelegateFactories:
+                                      _contentTapDelegateFactories,
+                                  keyboardActions: editorKeyboardActions(
+                                    slashCommandController: widget.isReadOnly
+                                        ? null
+                                        : _slashCommandController,
+                                  ),
+                                  componentBuilders: _componentBuilders!,
                                 ),
-                              ),
-                            ],
-                            contentTapDelegateFactories:
-                                _contentTapDelegateFactories,
-                            keyboardActions: editorKeyboardActions(
-                              slashCommandController: widget.isReadOnly
-                                  ? null
-                                  : _slashCommandController,
-                            ),
-                            componentBuilders: _componentBuilders!,
                           ),
                         ),
                       ),
@@ -346,6 +375,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                           editor: controller.editor,
                           composer: controller.composer,
                           focusNode: controller.focusNode,
+                          softwareKeyboardController:
+                              _softwareKeyboardController,
+                          onFormattingModeChanged: (isOpen) =>
+                              _formattingToolbarOpen.value = isOpen,
                           onAttachFile: () =>
                               controller.pickAndAttachFile(imageOnly: false),
                           onAttachImage: () =>

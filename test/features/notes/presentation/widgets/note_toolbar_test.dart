@@ -438,7 +438,7 @@ void main() {
       );
     });
 
-    testWidgets('opens with the three list options and dismisses outside', (
+    testWidgets('keeps the list options open after a tap outside', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -459,7 +459,7 @@ void main() {
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
+      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
     });
 
     testWidgets('dismisses with Escape', (tester) async {
@@ -1760,35 +1760,52 @@ void main() {
       expect(find.bySemanticsLabel('Abrir formatação'), findsNothing);
     });
 
-    testWidgets(
-      'closes the formatting panel from its close button or outside',
-      (tester) async {
-        await tester.pumpWidget(
-          buildEditorHarness(
-            nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-            selection: const DocumentSelection.collapsed(
-              position: DocumentPosition(
-                nodeId: 'node-1',
-                nodePosition: TextNodePosition(offset: 0),
-              ),
+    testWidgets('closes the formatting panel from its close button', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
             ),
           ),
-        );
-        await tester.pumpAndSettle();
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.bySemanticsLabel('Fechar formatação'));
-        await tester.pumpAndSettle();
-        expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Fechar formatação'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
+    });
 
-        await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-        await tester.pumpAndSettle();
-        await tester.tapAt(const Offset(8, 8));
-        await tester.pumpAndSettle();
-        expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
-      },
-    );
+    testWidgets('keeps the formatting panel open after a tap outside', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
+    });
 
     testWidgets('closes formatting mode with Escape and restores focus', (
       tester,

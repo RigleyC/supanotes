@@ -26,6 +26,8 @@ class NoteToolbar extends StatefulWidget {
     required this.editor,
     required this.composer,
     this.focusNode,
+    this.softwareKeyboardController,
+    this.onFormattingModeChanged,
     this.onAttachFile,
     this.onAttachImage,
   });
@@ -33,6 +35,8 @@ class NoteToolbar extends StatefulWidget {
   final Editor editor;
   final MutableDocumentComposer composer;
   final FocusNode? focusNode;
+  final SoftwareKeyboardController? softwareKeyboardController;
+  final ValueChanged<bool>? onFormattingModeChanged;
   final VoidCallback? onAttachFile;
   final VoidCallback? onAttachImage;
 
@@ -48,10 +52,15 @@ class _NoteToolbarState extends State<NoteToolbar> {
   VoidCallback? get onAttachFile => widget.onAttachFile;
   VoidCallback? get onAttachImage => widget.onAttachImage;
   FocusNode? get focusNode => widget.focusNode;
+  SoftwareKeyboardController? get softwareKeyboardController =>
+      widget.softwareKeyboardController;
+  ValueChanged<bool>? get onFormattingModeChanged =>
+      widget.onFormattingModeChanged;
 
   _ToolbarMode _mode = _ToolbarMode.compact;
   DocumentSelection? _selectionForFormatting;
   FocusNode? _focusBeforeFormatting;
+  bool _keyboardWasOpenBeforeFormatting = false;
 
   @override
   void initState() {
@@ -91,17 +100,34 @@ class _NoteToolbarState extends State<NoteToolbar> {
     if (_mode == _ToolbarMode.formatting) return;
     _focusBeforeFormatting = FocusManager.instance.primaryFocus;
     _selectionForFormatting = composer.selection;
+    _keyboardWasOpenBeforeFormatting =
+        MediaQuery.viewInsetsOf(context).bottom > 0;
     setState(() => _mode = _ToolbarMode.formatting);
+    onFormattingModeChanged?.call(true);
+    if (_keyboardWasOpenBeforeFormatting) {
+      softwareKeyboardController?.hide();
+    }
   }
 
   void _closeFormatting() {
     if (_mode == _ToolbarMode.compact) return;
+    final focusToRestore = _focusBeforeFormatting ?? focusNode;
+    final shouldRestoreKeyboard = _keyboardWasOpenBeforeFormatting;
     setState(() {
       _mode = _ToolbarMode.compact;
       _selectionForFormatting = null;
     });
-    (_focusBeforeFormatting ?? focusNode)?.requestFocus();
+    onFormattingModeChanged?.call(false);
+    if (shouldRestoreKeyboard) {
+      focusToRestore?.unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        focusToRestore?.requestFocus();
+        softwareKeyboardController?.open(viewId: View.of(context).viewId);
+      });
+    }
     _focusBeforeFormatting = null;
+    _keyboardWasOpenBeforeFormatting = false;
   }
 
   void _attachListeners(NoteToolbar toolbar) {
@@ -141,7 +167,6 @@ class _NoteToolbarState extends State<NoteToolbar> {
       },
       child: TapRegion(
         groupId: noteEditorToolbarTapRegionGroup,
-        onTapOutside: (_) => _closeFormatting(),
         child: Padding(
           padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
           child: ClipRRect(

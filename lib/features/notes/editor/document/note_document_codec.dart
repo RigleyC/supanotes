@@ -2,13 +2,7 @@ import 'package:dart_quill_delta/dart_quill_delta.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'attachment_nodes.dart';
-import 'note_node.dart';
 import 'note_document_constants.dart';
-
-const header4Attribution = NamedAttribution('header4');
-const header5Attribution = NamedAttribution('header5');
-const header6Attribution = NamedAttribution('header6');
-const corruptedAttribution = NamedAttribution('corrupted');
 
 class NoteDocumentCodec {
   const NoteDocumentCodec();
@@ -22,7 +16,7 @@ class NoteDocumentCodec {
   }
 
   // ---------------------------------------------------------------------------
-  // Static Helper Methods (formerly NodeCodec static methods)
+  // Attribution helpers
   // ---------------------------------------------------------------------------
 
   static String attributionToName(Attribution attribution) {
@@ -45,217 +39,6 @@ class NoteDocumentCodec {
       return LinkAttribution.fromUri(Uri.parse(name.substring(5)));
     }
     return NamedAttribution(name);
-  }
-
-  static Map<String, dynamic> serializeAttributedText(AttributedText text) {
-    final spansList = <Map<String, dynamic>>[];
-    for (final span in text.spans.markers) {
-      if (span.isStart) {
-        if (span.attribution.id == 'composing') continue;
-        spansList.add({
-          'attribution': attributionToName(span.attribution),
-          'start': span.offset,
-          'end': -1,
-        });
-      } else {
-        if (span.attribution.id == 'composing') continue;
-        final name = attributionToName(span.attribution);
-        for (int i = spansList.length - 1; i >= 0; i--) {
-          if (spansList[i]['attribution'] == name &&
-              spansList[i]['end'] == -1) {
-            spansList[i]['end'] = span.offset + 1;
-            break;
-          }
-        }
-      }
-    }
-    return {'text': text.toPlainText(), 'spans': spansList, 'spansVersion': 2};
-  }
-
-  static Map<String, dynamic> nodeData(DocumentNode node) {
-    if (node is TaskNode) {
-      return {...serializeAttributedText(node.text), 'indent': node.indent};
-    }
-    if (node is ParagraphNode) {
-      final blockType = node.metadata['blockType'];
-      if (blockType == header1Attribution ||
-          blockType == header2Attribution ||
-          blockType == header3Attribution ||
-          blockType == header4Attribution ||
-          blockType == header5Attribution ||
-          blockType == header6Attribution) {
-        int level = 1;
-        if (blockType == header2Attribution) level = 2;
-        if (blockType == header3Attribution) level = 3;
-        if (blockType == header4Attribution) level = 4;
-        if (blockType == header5Attribution) level = 5;
-        if (blockType == header6Attribution) level = 6;
-        return {...serializeAttributedText(node.text), 'level': level};
-      }
-      if (blockType == blockquoteAttribution) {
-        return {...serializeAttributedText(node.text)};
-      }
-      return {...serializeAttributedText(node.text)};
-    }
-    if (node is ListItemNode) {
-      return {
-        ...serializeAttributedText(node.text),
-        'type': node.type == ListItemType.ordered ? 'ordered' : 'unordered',
-        'indent': node.indent,
-      };
-    }
-    if (node is TextNode) {
-      return {...serializeAttributedText(node.text)};
-    }
-    if (node is ImageNode) {
-      return {'url': node.imageUrl, 'alt': node.altText};
-    }
-    if (node is HorizontalRuleNode) {
-      final dividerIndex = node.metadata['dividerIndex'];
-      return dividerIndex == null
-          ? <String, dynamic>{}
-          : <String, dynamic>{'dividerIndex': dividerIndex};
-    }
-    if (node is DocumentAttachmentNode) {
-      return {'id': node.id};
-    }
-    if (node is RichLinkNode) {
-      return {
-        'id': node.id,
-        if (node.url != null) 'url': node.url,
-        if (node.title != null) 'title': node.title,
-        if (node.description != null) 'description': node.description,
-        if (node.imageUrl != null) 'image_url': node.imageUrl,
-        if (node.domain != null) 'domain': node.domain,
-      };
-    }
-    return <String, dynamic>{};
-  }
-
-  static MutableDocument documentFromNodes(List<NoteNode> nodes) {
-    final documentNodes = <DocumentNode>[];
-    for (final node in nodes) {
-      final docNode = createNodeFromSchema(node);
-      documentNodes.add(docNode);
-    }
-    if (documentNodes.isEmpty) {
-      return MutableDocument(
-        nodes: [ParagraphNode(id: initialNoteBlockId, text: AttributedText())],
-      );
-    }
-    return MutableDocument(nodes: documentNodes);
-  }
-
-  static DocumentNode createNodeFromSchema(NoteNode schema) {
-    return createNode(id: schema.id, type: schema.type, data: schema.data);
-  }
-
-  static DocumentNode createNode({
-    required String id,
-    required String type,
-    required Map<String, dynamic> data,
-  }) {
-    final attributedText = deserializeAttributedText(data);
-
-    if (type == 'task') {
-      return TaskNode(
-        id: id,
-        text: attributedText,
-        isComplete: data['completed'] as bool? ?? false,
-        indent: data['indent'] as int? ?? 0,
-      );
-    }
-    if (type == 'list_item') {
-      return ListItemNode(
-        id: id,
-        itemType: (data['type'] as String?) == 'ordered'
-            ? ListItemType.ordered
-            : ListItemType.unordered,
-        text: attributedText,
-        indent: data['indent'] as int? ?? 0,
-      );
-    }
-    if (type == 'divider') {
-      final dividerIndex = data['dividerIndex'] as int?;
-      final metadata = Map<String, dynamic>.from(data);
-      if (dividerIndex != null) {
-        metadata['dividerIndex'] = dividerIndex;
-      }
-      return HorizontalRuleNode(id: id, metadata: metadata);
-    }
-    if (type == 'corrupted') {
-      return ParagraphNode(
-        id: id,
-        text: AttributedText(
-          'Conteúdo indisponível — Erro de Sincronização',
-          AttributedSpans(
-            attributions: [
-              const SpanMarker(
-                attribution: corruptedAttribution,
-                offset: 0,
-                markerType: SpanMarkerType.start,
-              ),
-              const SpanMarker(
-                attribution: corruptedAttribution,
-                offset: 44,
-                markerType: SpanMarkerType.end,
-              ),
-            ],
-          ),
-        ),
-        metadata: {'blockType': corruptedAttribution},
-      );
-    }
-    if (type == 'header') {
-      final level = data['level'] as int? ?? 1;
-      final blockType = switch (level) {
-        1 => header1Attribution,
-        2 => header2Attribution,
-        3 => header3Attribution,
-        4 => header4Attribution,
-        5 => header5Attribution,
-        _ => header6Attribution,
-      };
-      return ParagraphNode(
-        id: id,
-        text: attributedText,
-        metadata: {'blockType': blockType},
-      );
-    }
-    if (type == 'image') {
-      return ImageNode(
-        id: id,
-        imageUrl: data['url'] as String? ?? '',
-        altText: data['alt'] as String? ?? '',
-      );
-    }
-    return ParagraphNode(id: id, text: attributedText);
-  }
-
-  static SpanMarker parseSpan(Map<String, dynamic> spanMap) {
-    return SpanMarker(
-      attribution: attributionFromNameStatic(spanMap['attribution'] as String),
-      offset: spanMap['start'] as int,
-      markerType: SpanMarkerType.start,
-    );
-  }
-
-  static AttributedSpans deserializeSpans(List spansJson) {
-    final list = <SpanMarker>[];
-    for (final s in spansJson) {
-      final m = s as Map<String, dynamic>;
-      final end = m['end'] as int;
-      final parsed = parseSpan(m);
-      list.add(parsed);
-      list.add(
-        SpanMarker(
-          attribution: parsed.attribution,
-          offset: end,
-          markerType: SpanMarkerType.end,
-        ),
-      );
-    }
-    return AttributedSpans(attributions: list);
   }
 
   static AttributedText deserializeAttributedText(Map<String, dynamic> data) {
@@ -289,27 +72,6 @@ class NoteDocumentCodec {
     }
 
     return AttributedText(text, spans);
-  }
-
-  static String? nodeType(DocumentNode node) {
-    if (node is ParagraphNode) {
-      final rawBlockType = node.getMetadataValue('blockType');
-      final blockType = rawBlockType is Attribution
-          ? rawBlockType
-          : (rawBlockType is String
-                ? attributionFromNameStatic(rawBlockType)
-                : null);
-      if (blockType == corruptedAttribution) return 'corrupted';
-      if (blockType == null || blockType.id == 'paragraph') return 'paragraph';
-      if (blockType == blockquoteAttribution) return 'blockquote';
-      return 'header';
-    }
-    if (node is TaskNode) return 'task';
-    if (node is ListItemNode) return 'list_item';
-    if (node is HorizontalRuleNode) return 'divider';
-    if (node is ImageNode) return 'image';
-    if (node is DocumentAttachmentNode) return 'attachment';
-    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -485,9 +247,6 @@ class NoteDocumentCodec {
     return node;
   }
 
-  DocumentNode decodeBlock(Map<String, dynamic> blockData) =>
-      decodeNode(blockData);
-
   List<Map<String, dynamic>> encodeDocument(MutableDocument document) {
     final blocks = <Map<String, dynamic>>[];
     for (var i = 0; i < document.nodeCount; i++) {
@@ -497,10 +256,6 @@ class NoteDocumentCodec {
       }
     }
     return blocks;
-  }
-
-  List<Map<String, dynamic>> toOtBlocks(List<DocumentNode> nodes) {
-    return nodes.map(encodeNode).toList();
   }
 
   DocumentNode createNodeFromBlockType({
@@ -677,33 +432,6 @@ class NoteDocumentCodec {
     return attributes == null || attributes is Map;
   }
 
-  DocumentNode replaceTextNode(TextNode oldNode, AttributedText newText) {
-    if (oldNode is ParagraphNode) {
-      return ParagraphNode(
-        id: oldNode.id,
-        text: newText,
-        metadata: Map<String, dynamic>.from(oldNode.metadata),
-      );
-    }
-    if (oldNode is ListItemNode) {
-      return ListItemNode(
-        id: oldNode.id,
-        itemType: oldNode.type,
-        text: newText,
-        indent: oldNode.indent,
-      );
-    }
-    if (oldNode is TaskNode) {
-      return TaskNode(
-        id: oldNode.id,
-        text: newText,
-        isComplete: oldNode.isComplete,
-        indent: oldNode.indent,
-      );
-    }
-    return ParagraphNode(id: oldNode.id, text: newText);
-  }
-
   String? blockTypeName(DocumentNode node) {
     if (node is ParagraphNode) {
       final raw = node.getMetadataValue('blockType');
@@ -744,89 +472,5 @@ class NoteDocumentCodec {
     if (name == 'header3') return header3Attribution;
     if (name == 'quote') return blockquoteAttribution;
     return null;
-  }
-
-  bool mapsEqual(Map<String, dynamic> a, Map<String, dynamic> b) {
-    if (a.length != b.length) return false;
-    for (final key in a.keys) {
-      if (a[key] != b[key]) return false;
-    }
-    return true;
-  }
-
-  bool setEquals(Set<String> a, Set<String> b) {
-    if (a.length != b.length) return false;
-    for (final e in a) {
-      if (!b.contains(e)) return false;
-    }
-    return true;
-  }
-
-  int findSpanEnd(Iterable<SpanMarker> markers, SpanMarker startMarker) {
-    for (final marker in markers) {
-      if (marker.attribution.id == startMarker.attribution.id &&
-          marker.markerType == SpanMarkerType.end &&
-          marker.offset >= startMarker.offset) {
-        return marker.offset;
-      }
-    }
-    return -1;
-  }
-
-  Set<String> _getAttrIdsAt(AttributedText text, int pos) {
-    if (text.toPlainText().isEmpty) return const {};
-    final active = <String>{};
-    for (final marker in text.spans.markers) {
-      if (marker.attribution.id == 'composing') continue;
-      final attrId = attributionToName(marker.attribution);
-      if (marker.markerType == SpanMarkerType.start) {
-        if (marker.offset <= pos) {
-          active.add(attrId);
-        }
-      } else if (marker.markerType == SpanMarkerType.end) {
-        if (marker.offset < pos) {
-          active.remove(attrId);
-        }
-      }
-    }
-    return active;
-  }
-
-  void _applyAttrOverride(Set<String> dest, Map<String, dynamic> attrs) {
-    for (final entry in attrs.entries) {
-      if (entry.value == true) {
-        dest.add(entry.key);
-      } else if (entry.value == null) {
-        dest.remove(entry.key);
-      }
-    }
-  }
-
-  AttributedText _buildAttributedFromAttrs(
-    String text,
-    Map<int, Set<String>> attrs,
-  ) {
-    if (text.isEmpty) return AttributedText();
-    final span = AttributedSpans();
-    int pos = 0;
-    while (pos < text.length) {
-      final currentAttrs = attrs[pos] ?? <String>{};
-      int end = pos + 1;
-      while (end < text.length) {
-        if (setEquals(currentAttrs, attrs[end] ?? <String>{})) {
-          end++;
-        } else {
-          break;
-        }
-      }
-      for (final id in currentAttrs) {
-        final attr = attributionFromId(id);
-        if (attr != null) {
-          span.addAttribution(newAttribution: attr, start: pos, end: end - 1);
-        }
-      }
-      pos = end;
-    }
-    return AttributedText(text, span);
   }
 }

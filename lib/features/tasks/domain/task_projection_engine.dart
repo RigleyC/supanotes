@@ -18,21 +18,6 @@ class TaskProjectionEngine {
        _codec = codec,
        _projector = NoteDocumentProjector(codec: codec, now: now);
 
-  /// Projects tasks and note content from canonical REST/OT blocks into SQLite inside a single atomic transaction.
-  Future<void> projectTasksFromBlocks({
-    required String noteId,
-    required List<dynamic> blocks,
-    String userId = '',
-  }) async {
-    final projection = _projector.projectBlocks(noteId: noteId, blocks: blocks);
-
-    await _saveProjection(
-      noteId: noteId,
-      projection: projection,
-      userId: userId,
-    );
-  }
-
   /// Projects tasks from a canonical REST/OT document snapshot.
   Future<void> projectTasksFromSnapshot({
     required String noteId,

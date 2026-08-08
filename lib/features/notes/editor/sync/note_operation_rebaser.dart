@@ -184,14 +184,6 @@ class NoteOperationRebaser {
     return result;
   }
 
-  NoteOp? transformOp(
-    NoteOp opToTransform,
-    NoteOp appliedOp,
-    bool opToTransformHasPriority,
-  ) {
-    return _transformOp(opToTransform, appliedOp, opToTransformHasPriority);
-  }
-
   /// Transforms `opToTransform` against `appliedOp`.
   /// Returns null if `opToTransform` becomes a no-op.
   NoteOp? _transformOp(
