@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 class TaskSnackBarHelper {
@@ -23,18 +22,12 @@ class TaskSnackBarHelper {
   }) async {
     debugPrint('[TaskSnackBarHelper] completeTaskWithFeedback CALLED');
     final result = await onComplete();
-    debugPrint(
-      '[TaskSnackBarHelper] onComplete returned nextDue=${result.nextDue}',
-    );
+    debugPrint('[TaskSnackBarHelper] onComplete returned');
 
     final title = 'Concluída!';
-    final subtitle = result.nextDue != null
-        ? 'Próx. em: ${DateFormat.MMMMd('pt_BR').format(result.nextDue!)}'
-        : null;
 
     AppMessenger.showTaskCompletion(
       title: title,
-      subtitle: subtitle,
       action: SnackBarAction(
         label: 'Desfazer',
         onPressed: () {

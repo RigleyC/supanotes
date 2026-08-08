@@ -20,3 +20,12 @@ Review fixes:
 - [x] Separate pure document projection from database persistence.
 - [x] Test the real editor session opening from local storage.
 - [x] Run the final full suite, review, and commit the fixes.
+
+## Editor text and task completion snack
+
+Status: complete.
+
+- [x] Use white text for the editor document styles.
+- [x] Keep only the completion title and undo action in the task snack.
+- [x] Add focused coverage for hiding the next-occurrence message.
+- [x] Run focused tests and analyzer; the full suite timed out in the environment.

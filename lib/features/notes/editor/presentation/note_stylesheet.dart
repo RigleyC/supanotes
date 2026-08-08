@@ -24,9 +24,7 @@ Stylesheet buildNoteStylesheet(
 }) {
   final colorScheme = Theme.of(context).colorScheme;
   final linkColor = colorScheme.primary;
-  final onSurface = colorScheme.onSurface;
-  final bodyColor = onSurface.withValues(alpha: 0.8);
-  final onSurfaceVariant = colorScheme.onSurfaceVariant;
+  const editorTextColor = Colors.white;
 
   return defaultStylesheet.copyWith(
     documentPadding: documentPadding,
@@ -50,7 +48,7 @@ Stylesheet buildNoteStylesheet(
         BlockSelector.all,
         (doc, docNode) => {
           Styles.textStyle: TextStyle(
-            color: bodyColor,
+            color: editorTextColor,
             fontSize: bodySize,
             height: bodyLineHeight,
             letterSpacing: letterSpacing,
@@ -64,7 +62,7 @@ Stylesheet buildNoteStylesheet(
         (doc, docNode) => {
           Styles.padding: const CascadingPadding.only(bottom: 12),
           Styles.textStyle: TextStyle(
-            color: onSurface,
+            color: editorTextColor,
             fontSize: h1Size,
             fontWeight: FontWeight.bold,
             letterSpacing: letterSpacing,
@@ -76,7 +74,7 @@ Stylesheet buildNoteStylesheet(
         (doc, docNode) => {
           Styles.padding: CascadingPadding.only(top: h1TopPadding, bottom: 12),
           Styles.textStyle: TextStyle(
-            color: onSurface,
+            color: editorTextColor,
             fontSize: h1Size,
             fontWeight: FontWeight.bold,
             letterSpacing: letterSpacing,
@@ -88,7 +86,7 @@ Stylesheet buildNoteStylesheet(
         (doc, docNode) => {
           Styles.padding: CascadingPadding.only(top: h2TopPadding, bottom: 12),
           Styles.textStyle: TextStyle(
-            color: onSurface,
+            color: editorTextColor,
             fontSize: h2Size,
             fontWeight: FontWeight.bold,
             letterSpacing: letterSpacing,
@@ -100,7 +98,7 @@ Stylesheet buildNoteStylesheet(
         (doc, docNode) => {
           Styles.padding: CascadingPadding.only(top: h3TopPadding, bottom: 8),
           Styles.textStyle: TextStyle(
-            color: onSurface,
+            color: editorTextColor,
             fontSize: h3Size,
             fontWeight: FontWeight.bold,
             letterSpacing: letterSpacing,
@@ -124,7 +122,7 @@ Stylesheet buildNoteStylesheet(
         (doc, docNode) => {
           Styles.padding: const CascadingPadding.only(top: 8, bottom: 8),
           Styles.textStyle: TextStyle(
-            color: onSurfaceVariant,
+            color: editorTextColor,
             fontSize: quoteSize,
             fontWeight: FontWeight.bold,
             height: quoteLineHeight,
@@ -144,7 +142,7 @@ Stylesheet buildNoteStylesheet(
       StyleRule(const BlockSelector('task'), (doc, docNode) {
         return {
           Styles.textStyle: TextStyle(
-            color: bodyColor,
+            color: editorTextColor,
             fontSize: bodySize,
             height: bodyLineHeight,
             letterSpacing: letterSpacing,

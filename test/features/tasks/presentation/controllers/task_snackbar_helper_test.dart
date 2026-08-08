@@ -10,57 +10,75 @@ void main() {
     await initializeDateFormatting('pt_BR', null);
   });
 
-  testWidgets('TaskSnackBarHelper.completeTaskWithFeedback shows snackbar without next due date', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        scaffoldMessengerKey: AppMessenger.key,
-        builder: (context, child) => SnackOverlay(child: child!),
-        home: const Scaffold(body: SizedBox()),
-      ),
-    );
+  testWidgets(
+    'TaskSnackBarHelper.completeTaskWithFeedback shows snackbar without next due date',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          scaffoldMessengerKey: AppMessenger.key,
+          builder: (context, child) => SnackOverlay(child: child!),
+          home: const Scaffold(body: SizedBox()),
+        ),
+      );
 
-    bool completed = false;
+      bool completed = false;
 
-    await TaskSnackBarHelper.completeTaskWithFeedback(
-      onComplete: () async {
-        completed = true;
-        return (nextDue: null, previousDue: null, previousHasTime: false, scheduledAt: null);
-      },
-      onUndo: (_, _, _) {},
-    );
+      await TaskSnackBarHelper.completeTaskWithFeedback(
+        onComplete: () async {
+          completed = true;
+          return (
+            nextDue: null,
+            previousDue: null,
+            previousHasTime: false,
+            scheduledAt: null,
+          );
+        },
+        onUndo: (_, _, _) {},
+      );
 
-    await tester.pump();
-    await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pumpAndSettle();
 
-    expect(completed, isTrue);
-    expect(find.textContaining('Concluída!'), findsOneWidget);
-    expect(find.textContaining('Desfazer'), findsOneWidget);
+      expect(completed, isTrue);
+      expect(find.textContaining('Concluída!'), findsOneWidget);
+      expect(find.textContaining('Desfazer'), findsOneWidget);
+      expect(find.textContaining('Próx. em'), findsNothing);
 
-    await tester.pump(const Duration(seconds: 5));
-  });
+      await tester.pump(const Duration(seconds: 5));
+    },
+  );
 
-  testWidgets('TaskSnackBarHelper.completeTaskWithFeedback shows snackbar with next due date', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        scaffoldMessengerKey: AppMessenger.key,
-        builder: (context, child) => SnackOverlay(child: child!),
-        home: const Scaffold(body: SizedBox()),
-      ),
-    );
+  testWidgets(
+    'TaskSnackBarHelper.completeTaskWithFeedback shows snackbar with next due date',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          scaffoldMessengerKey: AppMessenger.key,
+          builder: (context, child) => SnackOverlay(child: child!),
+          home: const Scaffold(body: SizedBox()),
+        ),
+      );
 
-    final nextDue = DateTime(2030, 3, 15);
+      final nextDue = DateTime(2030, 3, 15);
 
-    await TaskSnackBarHelper.completeTaskWithFeedback(
-      onComplete: () async => (nextDue: nextDue, previousDue: null, previousHasTime: false, scheduledAt: null),
-      onUndo: (_, _, _) {},
-    );
+      await TaskSnackBarHelper.completeTaskWithFeedback(
+        onComplete: () async => (
+          nextDue: nextDue,
+          previousDue: null,
+          previousHasTime: false,
+          scheduledAt: null,
+        ),
+        onUndo: (_, _, _) {},
+      );
 
-    await tester.pump();
-    await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining('Concluída!'), findsOneWidget);
-    expect(find.textContaining('Desfazer'), findsOneWidget);
+      expect(find.textContaining('Concluída!'), findsOneWidget);
+      expect(find.textContaining('Desfazer'), findsOneWidget);
+      expect(find.textContaining('Próx. em'), findsNothing);
 
-    await tester.pump(const Duration(seconds: 5));
-  });
+      await tester.pump(const Duration(seconds: 5));
+    },
+  );
 }
