@@ -86,7 +86,7 @@ class TaskMetadataSheetBody extends ConsumerWidget {
     return Material(
       type: MaterialType.transparency,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+        margin: const EdgeInsets.only(top: 24, left: 24, right: 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,7 +161,7 @@ class TaskMetadataSheetBody extends ConsumerWidget {
               ),
               onClear: () => controller.setReminder(null),
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
           ],
         ),
       ),

@@ -29,3 +29,11 @@ Status: complete.
 - [x] Keep only the completion title and undo action in the task snack.
 - [x] Add focused coverage for hiding the next-occurrence message.
 - [x] Run focused tests and analyzer; the full suite timed out in the environment.
+
+## Task metadata sheet bottom spacing
+
+Status: complete.
+
+- [x] Identify the duplicated bottom spacing in the modal content.
+- [x] Reduce the explicit bottom gap while preserving safe-area spacing.
+- [x] Run the focused task metadata sheet test and analyzer.
