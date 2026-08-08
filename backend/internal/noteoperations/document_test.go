@@ -20,6 +20,11 @@ func TestNewEmptyDocument(t *testing.T) {
 	assert.Len(t, doc.Blocks, 1)
 	assert.Equal(t, "init", doc.Blocks[0].ID)
 	assert.Equal(t, string(BlockParagraph), doc.Blocks[0].Type)
+	assert.Empty(t, doc.Blocks[0].Delta)
+
+	encoded, err := json.Marshal(doc)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"schemaVersion":1,"blocks":[{"id":"init","type":"paragraph","delta":[],"metadata":{}}]}`, string(encoded))
 }
 
 func TestUnmarshalDocument(t *testing.T) {
@@ -39,6 +44,17 @@ func TestUnmarshalDocumentDefaultsSchemaVersion(t *testing.T) {
 	doc, err := UnmarshalDocument([]byte(jsonData))
 	require.NoError(t, err)
 	assert.Equal(t, 1, doc.SchemaVersion)
+}
+
+func TestUnmarshalDocumentNormalizesEmptyDeltaOperations(t *testing.T) {
+	doc, err := UnmarshalDocument([]byte(`{"schemaVersion":1,"blocks":[{"id":"b1","type":"paragraph","delta":[{}],"metadata":{}}]}`))
+	require.NoError(t, err)
+	require.Len(t, doc.Blocks, 1)
+	assert.Empty(t, doc.Blocks[0].Delta)
+
+	encoded, err := json.Marshal(doc)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"schemaVersion":1,"blocks":[{"id":"b1","type":"paragraph","delta":[],"metadata":{}}]}`, string(encoded))
 }
 
 func TestUnmarshalDocumentNormalizesEmptyBlocks(t *testing.T) {

@@ -1,3 +1,4 @@
+import 'package:dart_quill_delta/dart_quill_delta.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'attachment_nodes.dart';
@@ -414,38 +415,36 @@ class NoteDocumentCodec {
   }
 
   List<Map<String, dynamic>> encodeAttributedTextToDelta(AttributedText text) {
-    final deltaOps = <Map<String, dynamic>>[];
+    return _deltaFromAttributedText(text).toJson();
+  }
+
+  Delta _deltaFromAttributedText(AttributedText text) {
     final plainText = text.toPlainText();
-    if (plainText.isEmpty) return deltaOps;
+    final delta = Delta();
+    if (plainText.isEmpty) return delta;
 
-    int pos = 0;
-    while (pos < plainText.length) {
-      final attrIds = _getAttrIdsAt(text, pos);
-      int end = pos + 1;
-      while (end < plainText.length) {
-        if (setEquals(attrIds, _getAttrIdsAt(text, end))) {
-          end++;
-        } else {
-          break;
-        }
-      }
+    for (final span in text.computeAttributionSpans()) {
+      final start = span.start;
+      final end = span.end + 1;
+      if (start >= end || start >= plainText.length) continue;
 
-      final Map<String, dynamic> attrs = {};
-      for (final id in attrIds) {
+      final attributes = <String, dynamic>{};
+      for (final attribution in span.attributions) {
+        final id = attributionToName(attribution);
         if (id != 'composing') {
-          attrs[id] = true;
+          attributes[id] = true;
         }
       }
 
-      final Map<String, dynamic> op = {'insert': plainText.substring(pos, end)};
-      if (attrs.isNotEmpty) {
-        op['attributes'] = attrs;
-      }
-      deltaOps.add(op);
-      pos = end;
+      delta.insert(
+        plainText.substring(
+          start,
+          end > plainText.length ? plainText.length : end,
+        ),
+        attributes.isEmpty ? null : attributes,
+      );
     }
-
-    return deltaOps;
+    return delta;
   }
 
   DocumentNode decodeNode(Map<String, dynamic> blockData) {
@@ -593,15 +592,27 @@ class NoteDocumentCodec {
 
   AttributedText attributedFromDelta(List<dynamic>? delta) {
     if (delta == null || delta.isEmpty) return AttributedText();
+
+    final documentOperations = delta
+        .where((operation) => operation is! Map || operation.isNotEmpty)
+        .toList(growable: false);
+    if (documentOperations.isEmpty) return AttributedText();
+
+    return _attributedTextFromDelta(Delta.fromJson(documentOperations));
+  }
+
+  AttributedText _attributedTextFromDelta(Delta documentDelta) {
     final span = AttributedSpans();
     final buf = StringBuffer();
-    for (final op in delta) {
-      if (op is! Map) continue;
-      final insert = op['insert'] as String?;
-      if (insert == null || insert.isEmpty) continue;
+    for (final op in documentDelta.operations) {
+      if (!op.isInsert || op.data is! String || (op.data as String).isEmpty) {
+        continue;
+      }
+
+      final insert = op.data as String;
       final start = buf.length;
       buf.write(insert);
-      final attrs = op['attributes'] as Map<String, dynamic>?;
+      final attrs = op.attributes;
       if (attrs != null) {
         for (final entry in attrs.entries) {
           if (entry.value == true) {
@@ -624,59 +635,46 @@ class NoteDocumentCodec {
     AttributedText source,
     List<Map<String, dynamic>> ops,
   ) {
-    final srcText = source.toPlainText();
-    final buf = StringBuffer();
-    final resultAttrs = <int, Set<String>>{};
+    if (ops.any((operation) => !_isValidTextChangeOperation(operation))) {
+      return null;
+    }
 
-    int srcPos = 0;
-    int destPos = 0;
+    final sourceDelta = _deltaFromAttributedText(source);
+    final changeDelta = Delta.fromJson(ops);
+    var consumedSourceLength = 0;
 
-    for (final op in ops) {
-      if (op.containsKey('retain')) {
-        final n = op['retain'] as int;
-        if (srcPos + n > srcText.length) return null;
-        final retainAttrs = op['attributes'] as Map<String, dynamic>?;
-        for (int i = 0; i < n; i++) {
-          buf.write(srcText[srcPos]);
-          resultAttrs[destPos] = _getAttrIdsAt(source, srcPos);
-          if (retainAttrs != null) {
-            _applyAttrOverride(resultAttrs[destPos]!, retainAttrs);
-          }
-          srcPos++;
-          destPos++;
+    for (final operation in changeDelta.operations) {
+      if (operation.length == null || operation.length! < 0) return null;
+      if (operation.isInsert && operation.data is! String) return null;
+      if (operation.isRetain || operation.isDelete) {
+        consumedSourceLength += operation.length!;
+        if (consumedSourceLength > source.toPlainText().length) {
+          return null;
         }
-      } else if (op.containsKey('insert')) {
-        final text = op['insert'] as String;
-        final insertAttrs = op['attributes'] as Map<String, dynamic>?;
-        for (int i = 0; i < text.length; i++) {
-          buf.write(text[i]);
-          resultAttrs[destPos] = <String>{};
-          if (insertAttrs != null) {
-            for (final entry in insertAttrs.entries) {
-              if (entry.value == true) {
-                resultAttrs[destPos]!.add(entry.key);
-              }
-            }
-          }
-          destPos++;
-        }
-      } else if (op.containsKey('delete')) {
-        final n = op['delete'] as int;
-        if (srcPos + n > srcText.length) return null;
-        srcPos += n;
-      } else {
-        return null;
       }
     }
 
-    while (srcPos < srcText.length) {
-      buf.write(srcText[srcPos]);
-      resultAttrs[destPos] = _getAttrIdsAt(source, srcPos);
-      srcPos++;
-      destPos++;
+    final resultDelta = sourceDelta.compose(changeDelta);
+    return _attributedTextFromDelta(resultDelta);
+  }
+
+  bool _isValidTextChangeOperation(Map<String, dynamic> operation) {
+    final operationKeys = const {
+      'insert',
+      'retain',
+      'delete',
+    }.where(operation.containsKey).toList(growable: false);
+    if (operationKeys.length != 1) return false;
+
+    final value = operation[operationKeys.single];
+    if (operationKeys.single == 'insert') {
+      if (value is! String) return false;
+    } else if (value is! int || value < 0) {
+      return false;
     }
 
-    return _buildAttributedFromAttrs(buf.toString(), resultAttrs);
+    final attributes = operation['attributes'];
+    return attributes == null || attributes is Map;
   }
 
   DocumentNode replaceTextNode(TextNode oldNode, AttributedText newText) {

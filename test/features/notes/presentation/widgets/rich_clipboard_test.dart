@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 import 'package:super_native_extensions/src/native/context.dart';
@@ -16,6 +17,21 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/slash_comma
 class MockEditor extends Mock implements Editor {}
 
 class MockDocumentLayout extends Mock implements DocumentLayout {}
+
+class MockClipboard extends Mock implements SystemClipboard {}
+
+class MockClipboardReader extends Mock implements ClipboardReader {}
+
+class MockClipboardDataReader extends Mock implements ClipboardDataReader {}
+
+void _stubNoBitmapFormats(MockClipboardReader reader) {
+  when(() => reader.canProvide(Formats.png)).thenReturn(false);
+  when(() => reader.canProvide(Formats.jpeg)).thenReturn(false);
+  when(() => reader.canProvide(Formats.heic)).thenReturn(false);
+  when(() => reader.canProvide(Formats.gif)).thenReturn(false);
+  when(() => reader.canProvide(Formats.bmp)).thenReturn(false);
+  when(() => reader.canProvide(Formats.webp)).thenReturn(false);
+}
 
 void main() {
   setUpAll(() {
@@ -158,6 +174,169 @@ void main() {
       expect(document.nodeCount, 1);
       expect(document.first, isA<TaskNode>());
       expect((document.first as TaskNode).text.toPlainText(), 'Comprar leite');
+    });
+
+    test(
+      'preprocessed paste delegates task HTML to Markdown parsing',
+      () async {
+        final document = MutableDocument(
+          nodes: [ParagraphNode(id: 'target', text: AttributedText())],
+        );
+        final composer = MutableDocumentComposer(
+          initialSelection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'target',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        );
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+        );
+        final htmlItem = MockClipboardDataReader();
+        final reader = MockClipboardReader();
+        final clipboard = MockClipboard();
+
+        final html = '<ul><li><input type="checkbox"> Tarefa</li></ul>';
+        when(() => clipboard.read()).thenAnswer((_) async => reader);
+        when(() => reader.items).thenReturn([htmlItem]);
+        _stubNoBitmapFormats(reader);
+        when(() => htmlItem.canProvide(Formats.md)).thenReturn(false);
+        when(() => htmlItem.canProvide(Formats.htmlText)).thenReturn(true);
+        when(
+          () => htmlItem.readValue<String>(Formats.htmlText),
+        ).thenAnswer((_) async => html);
+
+        await pasteWithPreprocessing(editor, testClipboard: clipboard);
+
+        final tasks = document.toList().whereType<TaskNode>().toList();
+        expect(tasks, hasLength(1));
+        expect(tasks.single.text.toPlainText(), 'Tarefa');
+      },
+    );
+
+    test(
+      'preprocessed plain text still uses the package dispatch chain',
+      () async {
+        final document = MutableDocument(
+          nodes: [ParagraphNode(id: 'target', text: AttributedText())],
+        );
+        final composer = MutableDocumentComposer(
+          initialSelection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'target',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        );
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+        );
+        final plainItem = MockClipboardDataReader();
+        final reader = MockClipboardReader();
+        final clipboard = MockClipboard();
+
+        when(() => clipboard.read()).thenAnswer((_) async => reader);
+        when(() => reader.items).thenReturn([plainItem]);
+        _stubNoBitmapFormats(reader);
+        when(() => reader.canProvide(Formats.plainText)).thenReturn(true);
+        when(
+          () => reader.readValue<String>(Formats.plainText),
+        ).thenAnswer((_) async => 'Texto colado');
+        when(() => plainItem.canProvide(Formats.md)).thenReturn(false);
+        when(() => plainItem.canProvide(Formats.htmlText)).thenReturn(false);
+        when(() => plainItem.canProvide(Formats.uri)).thenReturn(false);
+
+        await pasteWithPreprocessing(editor, testClipboard: clipboard);
+
+        expect(document.first, isA<ParagraphNode>());
+        expect(
+          (document.first as ParagraphNode).text.toPlainText(),
+          'Texto colado',
+        );
+      },
+    );
+
+    test('preprocessed paste preserves the package URL fallback', () async {
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'target', text: AttributedText())],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'target',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      final urlItem = MockClipboardDataReader();
+      final reader = MockClipboardReader();
+      final clipboard = MockClipboard();
+      final uri = Uri.parse('https://example.com/note');
+
+      when(() => clipboard.read()).thenAnswer((_) async => reader);
+      when(() => reader.items).thenReturn([urlItem]);
+      _stubNoBitmapFormats(reader);
+      when(() => reader.canProvide(Formats.plainText)).thenReturn(false);
+      when(() => urlItem.canProvide(Formats.md)).thenReturn(false);
+      when(() => urlItem.canProvide(Formats.htmlText)).thenReturn(false);
+      when(() => urlItem.canProvide(Formats.uri)).thenReturn(true);
+      when(
+        () => urlItem.readValue<NamedUri>(Formats.uri),
+      ).thenAnswer((_) async => NamedUri(uri));
+
+      await pasteWithPreprocessing(editor, testClipboard: clipboard);
+
+      expect(
+        (document.first as ParagraphNode).text.toPlainText(),
+        uri.toString(),
+      );
+    });
+
+    test('preprocessed plain text replaces an expanded selection', () async {
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'target', text: AttributedText('Hello'))],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'target',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'target',
+            nodePosition: TextNodePosition(offset: 5),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      final plainItem = MockClipboardDataReader();
+      final reader = MockClipboardReader();
+      final clipboard = MockClipboard();
+
+      when(() => clipboard.read()).thenAnswer((_) async => reader);
+      when(() => reader.items).thenReturn([plainItem]);
+      _stubNoBitmapFormats(reader);
+      when(() => reader.canProvide(Formats.plainText)).thenReturn(true);
+      when(
+        () => reader.readValue<String>(Formats.plainText),
+      ).thenAnswer((_) async => 'World');
+      when(() => plainItem.canProvide(Formats.md)).thenReturn(false);
+      when(() => plainItem.canProvide(Formats.htmlText)).thenReturn(false);
+      when(() => plainItem.canProvide(Formats.uri)).thenReturn(false);
+
+      await pasteWithPreprocessing(editor, testClipboard: clipboard);
+
+      expect((document.first as ParagraphNode).text.toPlainText(), 'World');
     });
   });
 

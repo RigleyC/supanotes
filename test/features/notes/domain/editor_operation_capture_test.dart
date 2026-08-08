@@ -53,6 +53,43 @@ void main() {
       expect(opsList.first['attributes'], {'bold': true});
     });
 
+    test('captures bold formatting removal with the Quill null value', () {
+      final oldSpans = AttributedSpans()
+        ..addAttribution(newAttribution: boldAttribution, start: 0, end: 4);
+      final doc = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'n1', text: AttributedText('Hello', oldSpans)),
+        ],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      final capture = EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-1',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      );
+      capture.start();
+
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 'n1',
+          newNode: ParagraphNode(id: 'n1', text: AttributedText('Hello')),
+        ),
+      ]);
+
+      final ops = capturedOps.single.payload['ops'] as List<dynamic>;
+      expect(ops, [
+        {
+          'retain': 5,
+          'attributes': {'bold': null},
+        },
+      ]);
+    });
+
     test('does not emit formatting changes with a text insertion', () {
       final oldSpans = AttributedSpans()
         ..addAttribution(newAttribution: boldAttribution, start: 0, end: 4);
@@ -85,6 +122,46 @@ void main() {
       expect(ops, [
         {'retain': 5},
         {'insert': '!'},
+      ]);
+    });
+
+    test('bases consecutive text deltas on the latest captured text', () {
+      final doc = MutableDocument(
+        nodes: [ParagraphNode(id: 'n1', text: AttributedText('Hello'))],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      var operationId = 0;
+      EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-${operationId++}',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      ).start();
+
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 'n1',
+          newNode: ParagraphNode(id: 'n1', text: AttributedText('Hello!')),
+        ),
+      ]);
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: 'n1',
+          newNode: ParagraphNode(id: 'n1', text: AttributedText('Hello!?')),
+        ),
+      ]);
+
+      final textDeltas = capturedOps
+          .where((operation) => operation.kind == 'text_delta')
+          .toList();
+      expect(textDeltas, hasLength(2));
+      expect(textDeltas.last.payload['ops'], [
+        {'retain': 6},
+        {'insert': '?'},
       ]);
     });
 
@@ -443,6 +520,59 @@ void main() {
       );
       expect(operation.payload['blockId'], 't1');
       expect(operation.payload['afterBlockId'], null);
+    });
+
+    test('captures a move deferred while text is composing', () {
+      const composingAttribution = NamedAttribution('composing');
+      final composingSpans = AttributedSpans()
+        ..addAttribution(
+          newAttribution: composingAttribution,
+          start: 0,
+          end: 0,
+        );
+      final doc = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'p1', text: AttributedText('A', composingSpans)),
+          ParagraphNode(id: 'p2', text: AttributedText('B')),
+        ],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-move',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      ).start();
+
+      editor.execute([MoveNodeRequest(nodeId: 'p2', newIndex: 0)]);
+      expect(capturedOps, isEmpty);
+
+      editor.execute([
+        RemoveTextAttributionsRequest(
+          documentRange: const DocumentRange(
+            start: DocumentPosition(
+              nodeId: 'p1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+            end: DocumentPosition(
+              nodeId: 'p1',
+              nodePosition: TextNodePosition(offset: 1),
+            ),
+          ),
+          attributions: {composingAttribution},
+        ),
+      ]);
+
+      final move = capturedOps.firstWhere(
+        (operation) =>
+            operation.kind == 'move_block' && operation.blockId == 'p2',
+      );
+      expect(move.blockId, 'p2');
+      expect(move.payload['afterBlockId'], null);
     });
   });
 }

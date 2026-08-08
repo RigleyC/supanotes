@@ -3,7 +3,6 @@ package noteoperations
 import (
 	"encoding/json"
 
-	"github.com/fmpwizard/go-quilljs-delta/delta"
 	"github.com/google/uuid"
 )
 
@@ -31,7 +30,7 @@ func BuildReplaceContentOperations(
 	createPayload, err := json.Marshal(CreateBlockPayload{
 		ID:       InitialBlockID,
 		Type:     string(BlockParagraph),
-		Delta:    []delta.Op{{Insert: []rune(content)}},
+		Delta:    plainTextDelta(content),
 		Metadata: map[string]any{},
 	})
 	if err != nil {

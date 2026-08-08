@@ -31,6 +31,16 @@ class _BlockMirror {
   });
 }
 
+class _DocumentChangeSummary {
+  final Set<String> changedNodeIds;
+  final bool hasStructuralChange;
+
+  const _DocumentChangeSummary({
+    required this.changedNodeIds,
+    required this.hasStructuralChange,
+  });
+}
+
 class EditorOperationCapture {
   final MutableDocument _document;
   final String Function() _generateOpId;
@@ -39,7 +49,9 @@ class EditorOperationCapture {
   _onOperationsCaptured;
 
   final Map<String, _BlockMirror> _mirrors = {};
+  final Set<String> _deferredChangedNodeIds = {};
   List<String> _orderedNodeIds = [];
+  bool _hasDeferredStructuralChange = false;
   bool _suppress = false;
   bool _listening = false;
 
@@ -75,29 +87,46 @@ class EditorOperationCapture {
 
   void buildMirror() {
     _mirrors.clear();
-    _orderedNodeIds = [];
+    _deferredChangedNodeIds.clear();
+    _hasDeferredStructuralChange = false;
+    _orderedNodeIds = _document.map((node) => node.id).toList();
     for (final node in _document) {
-      _orderedNodeIds.add(node.id);
-      AttributedText attrText = AttributedText();
-      String? bType;
-      Map<String, dynamic> meta = {};
-
-      if (node is TextNode) {
-        attrText = node.text;
-      }
-      bType = _codec.blockTypeName(node);
-      if (node is TaskNode) {
-        meta = Map<String, dynamic>.from(node.metadata)
-          ..['isCompleted'] = node.isComplete;
-      } else {
-        meta = Map<String, dynamic>.from(node.metadata);
-      }
-      _mirrors[node.id] = _BlockMirror(
-        attributedText: attrText,
-        blockType: bType,
-        metadata: meta,
-      );
+      _mirrors[node.id] = _mirrorForNode(node);
     }
+  }
+
+  _BlockMirror _mirrorForNode(DocumentNode node) {
+    final metadata = Map<String, dynamic>.from(node.metadata);
+    if (node is TaskNode) {
+      metadata['isCompleted'] = node.isComplete;
+    }
+
+    return _BlockMirror(
+      attributedText: node is TextNode ? node.text : AttributedText(),
+      blockType: _codec.blockTypeName(node),
+      metadata: metadata,
+    );
+  }
+
+  _DocumentChangeSummary _summarizeChangeLog(DocumentChangeLog changeLog) {
+    final changedNodeIds = <String>{};
+    var hasStructuralChange = false;
+
+    for (final change in changeLog.changes) {
+      if (change is NodeDocumentChange) {
+        changedNodeIds.add(change.nodeId);
+      }
+      if (change is NodeInsertedEvent ||
+          change is NodeRemovedEvent ||
+          change is NodeMovedEvent) {
+        hasStructuralChange = true;
+      }
+    }
+
+    return _DocumentChangeSummary(
+      changedNodeIds: changedNodeIds,
+      hasStructuralChange: hasStructuralChange,
+    );
   }
 
   void _onDocumentChanged(DocumentChangeLog changeLog) {
@@ -112,17 +141,35 @@ class EditorOperationCapture {
     final requests = <OperationRequestData>[];
     final currentNodes = _document.toList();
     final currentIds = currentNodes.map((n) => n.id).toList();
+    final currentIdSet = currentIds.toSet();
+    final changeSummary = _summarizeChangeLog(changeLog);
+    final changedNodeIds = {
+      ..._deferredChangedNodeIds,
+      ...changeSummary.changedNodeIds,
+    };
+    final structuralChange =
+        _hasDeferredStructuralChange || changeSummary.hasStructuralChange;
+    final inspectAllNodes = structuralChange || changedNodeIds.isEmpty;
+    final nodesToInspect = inspectAllNodes
+        ? currentNodes
+        : currentNodes.where((node) => changedNodeIds.contains(node.id));
 
-    if (currentNodes.any(
+    if (nodesToInspect.any(
       (node) => node is TextNode && _hasComposingAttribution(node.text),
     )) {
+      _deferredChangedNodeIds
+        ..clear()
+        ..addAll(changedNodeIds);
+      _hasDeferredStructuralChange = structuralChange;
       NoteSyncDebug.log('capture.deferred_composing');
       return;
     }
+    _deferredChangedNodeIds.clear();
+    _hasDeferredStructuralChange = false;
 
     // 1. Deleted blocks
     final deletedIds = _orderedNodeIds
-        .where((id) => !currentIds.contains(id))
+        .where((id) => !currentIdSet.contains(id))
         .toList();
     for (final delId in deletedIds) {
       requests.add(
@@ -137,6 +184,9 @@ class EditorOperationCapture {
     }
 
     // 2. Created & Moved blocks
+    final oldIndexById = <String, int>{
+      for (var i = 0; i < _orderedNodeIds.length; i++) _orderedNodeIds[i]: i,
+    };
     for (int i = 0; i < currentNodes.length; i++) {
       final node = currentNodes[i];
       final afterBlockId = i == 0 ? null : currentNodes[i - 1].id;
@@ -155,15 +205,16 @@ class EditorOperationCapture {
             ),
           ),
         );
-      } else {
+        _mirrors[node.id] = _mirrorForNode(node);
+      } else if (structuralChange) {
         // Moved block
-        final prevIndexInOld = _orderedNodeIds.indexOf(node.id);
+        final prevIndexInOld = oldIndexById[node.id];
         final expectedAfterId = i == 0 ? null : currentNodes[i - 1].id;
-        final actualOldAfterId = prevIndexInOld <= 0
+        final actualOldAfterId = prevIndexInOld == null || prevIndexInOld <= 0
             ? null
             : _orderedNodeIds[prevIndexInOld - 1];
 
-        if (prevIndexInOld != -1 && expectedAfterId != actualOldAfterId) {
+        if (prevIndexInOld != null && expectedAfterId != actualOldAfterId) {
           requests.add(
             OperationRequestData(
               operationId: _generateOpId(),
@@ -180,24 +231,14 @@ class EditorOperationCapture {
     }
 
     // 3. Text & Type & Metadata changes
-    for (final node in currentNodes) {
+    for (final node in nodesToInspect) {
       final mirror = _mirrors[node.id];
       if (mirror == null) continue;
 
-      AttributedText currentAttrText = AttributedText();
-      String? currentBType;
-      Map<String, dynamic> currentMeta = {};
-
-      if (node is TextNode) {
-        currentAttrText = node.text;
-      }
-      currentBType = _codec.blockTypeName(node);
-      if (node is TaskNode) {
-        currentMeta = Map<String, dynamic>.from(node.metadata)
-          ..['isCompleted'] = node.isComplete;
-      } else {
-        currentMeta = Map<String, dynamic>.from(node.metadata);
-      }
+      final currentMirror = _mirrorForNode(node);
+      final currentAttrText = currentMirror.attributedText;
+      final currentBType = currentMirror.blockType;
+      final currentMeta = currentMirror.metadata;
 
       // Check attributed text change
       if (currentAttrText != mirror.attributedText) {
@@ -298,9 +339,7 @@ class EditorOperationCapture {
       }
     }
 
-    // A created node must enter the mirror before the next keystroke.
-    // Otherwise each text change is incorrectly captured as another create_block.
-    buildMirror();
+    _orderedNodeIds = currentIds;
 
     if (requests.isNotEmpty) {
       NoteSyncDebug.log(
@@ -456,7 +495,7 @@ class EditorOperationCapture {
     }
     for (final a in oldAttrs) {
       if (!newAttrs.contains(a)) {
-        diff[a] = false;
+        diff[a] = null;
       }
     }
     return diff;

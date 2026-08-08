@@ -50,6 +50,21 @@ void main() {
       },
     );
 
+    test('applies Quill null retain attributes as removals', () {
+      final spans = AttributedSpans()
+        ..addAttribution(newAttribution: boldAttribution, start: 0, end: 4);
+      final result = codec.applyDeltaToText(AttributedText('Hello', spans), [
+        {
+          'retain': 5,
+          'attributes': {'bold': null},
+        },
+      ]);
+
+      expect(result, isNotNull);
+      expect(result!.toPlainText(), 'Hello');
+      expect(result.getAllAttributionsAt(0), isEmpty);
+    });
+
     test('encodes task metadata as JSON values', () {
       final node = ParagraphNode(
         id: 'task-1',
@@ -103,6 +118,31 @@ void main() {
               as ParagraphNode;
 
       expect(node.getMetadataValue('blockType'), header1Attribution);
+    });
+
+    test('opens a block whose persisted Delta contains an empty operation', () {
+      final node =
+          codec.decodeNode({
+                'id': 'paragraph-1',
+                'type': 'paragraph',
+                'delta': <dynamic>[<String, dynamic>{}],
+              })
+              as ParagraphNode;
+
+      expect(node.text.toPlainText(), isEmpty);
+    });
+
+    test('rejects a non-empty malformed persisted Delta operation', () {
+      expect(
+        () => codec.attributedFromDelta([
+          {'attributes': <String, dynamic>{}},
+        ]),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects an empty text change operation without throwing', () {
+      expect(codec.applyDeltaToText(AttributedText('Text'), [{}]), isNull);
     });
 
     test(

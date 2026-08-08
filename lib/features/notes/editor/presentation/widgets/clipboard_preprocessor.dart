@@ -66,85 +66,108 @@ bool _isMarkdown(String text) {
   ).hasMatch(text);
 }
 
-Future<void> pasteWithPreprocessing(Editor editor) async {
+Future<void> pasteWithPreprocessing(
+  Editor editor, {
+  SystemClipboard? testClipboard,
+}) async {
   await pasteIntoEditorFromNativeClipboard(
     editor,
-    customInserter: (editor, reader) async {
-      if (_selectionIsInsideTask(editor) &&
-          reader.canProvide(Formats.plainText)) {
-        final text = await reader.readValue(Formats.plainText);
-        if (text != null && !text.contains(RegExp(r'[\r\n]'))) {
-          return pastePlainTextAtCurrentSelection(
-            editor,
-            preprocessClipboardText(text),
-          );
-        }
-      }
-
-      // 1. Try html
-      if (reader.canProvide(Formats.htmlText)) {
-        final html = await reader.readValue(Formats.htmlText);
-        if (html != null) {
-          if (RegExp(
-            r'''<input\b[^>]*\btype=["']?checkbox''',
-            caseSensitive: false,
-          ).hasMatch(html)) {
-            editor.pasteMarkdown(editor, clipboardHtmlToMarkdown(html));
-          } else {
-            editor.pasteHtml(editor, preprocessClipboardHtml(html));
-          }
-          return true;
-        }
-      }
-
-      // 2. Try markdown
-      if (reader.canProvide(Formats.md)) {
-        final completer = Completer<bool>();
-        final progress = reader.getFile(
-          Formats.md,
-          (file) async {
-            final data = await file.readAll();
-            final markdown = utf8.decode(data);
-            if (markdown.isNotEmpty) {
-              final preprocessedMarkdown = preprocessClipboardText(markdown);
-              editor.pasteMarkdown(editor, preprocessedMarkdown);
-              completer.complete(true);
-            } else {
-              completer.complete(false);
-            }
-          },
-          onError: (_) {
-            completer.complete(false);
-          },
-        );
-        if (progress != null) {
-          final success = await completer.future;
-          if (success) return true;
-        }
-      }
-
-      // 3. Try plain text
-      if (reader.canProvide(Formats.plainText)) {
-        final text = await reader.readValue(Formats.plainText);
-        if (text != null) {
-          final preprocessedText = preprocessClipboardText(text);
-          final isLikelyMarkdown = _isMarkdown(preprocessedText);
-
-          if (isLikelyMarkdown) {
-            editor.pasteMarkdown(editor, preprocessedText);
-            return true;
-          }
-
-          final selection = editor.composer.selection;
-          if (selection != null) {
-            return pastePlainTextAtCurrentSelection(editor, preprocessedText);
-          }
-        }
-      }
-
-      return false;
+    testClipboard: testClipboard,
+    customInserter: _pasteSingleLineTaskText,
+    customFileInserters: {Formats.md: _pastePreprocessedMarkdownFile},
+    customValueInserters: {
+      Formats.htmlText: _pastePreprocessedHtml,
+      Formats.plainText: _pastePreprocessedPlainText,
     },
   );
+}
+
+Future<bool> _pasteSingleLineTaskText(
+  Editor editor,
+  ClipboardReader reader,
+) async {
+  if (!_selectionIsInsideTask(editor) ||
+      !reader.canProvide(Formats.plainText)) {
+    return false;
+  }
+
+  final text = await reader.readValue(Formats.plainText);
+  if (text == null || text.contains(RegExp(r'[\r\n]'))) return false;
+
+  return pastePlainTextAtCurrentSelection(
+    editor,
+    preprocessClipboardText(text),
+  );
+}
+
+Future<bool> _pastePreprocessedHtml(
+  Editor editor,
+  ClipboardReader reader,
+) async {
+  for (final item in reader.items) {
+    if (!item.canProvide(Formats.htmlText)) continue;
+
+    final html = await item.readValue(Formats.htmlText);
+    if (html == null) continue;
+
+    if (_containsClipboardCheckbox(html)) {
+      editor.pasteMarkdown(editor, clipboardHtmlToMarkdown(html));
+    } else {
+      editor.pasteHtml(editor, preprocessClipboardHtml(html));
+    }
+    return true;
+  }
+
+  return false;
+}
+
+Future<bool> _pastePreprocessedMarkdownFile(
+  Editor editor,
+  ClipboardReader reader,
+) async {
+  for (final item in reader.items) {
+    if (!item.canProvide(Formats.md)) continue;
+
+    final completer = Completer<bool>();
+    final progress = item.getFile(Formats.md, (file) async {
+      final data = await file.readAll();
+      final markdown = utf8.decode(data);
+      if (markdown.isNotEmpty) {
+        editor.pasteMarkdown(editor, preprocessClipboardText(markdown));
+        completer.complete(true);
+      } else {
+        completer.complete(false);
+      }
+    }, onError: completer.completeError);
+    if (progress != null) return completer.future;
+  }
+
+  return false;
+}
+
+Future<bool> _pastePreprocessedPlainText(
+  Editor editor,
+  ClipboardReader reader,
+) async {
+  if (!reader.canProvide(Formats.plainText)) return false;
+
+  final text = await reader.readValue(Formats.plainText);
+  if (text == null) return false;
+
+  final preprocessedText = preprocessClipboardText(text);
+  if (_isMarkdown(preprocessedText)) {
+    editor.pasteMarkdown(editor, preprocessedText);
+    return true;
+  }
+
+  return pastePlainTextAtCurrentSelection(editor, preprocessedText);
+}
+
+bool _containsClipboardCheckbox(String html) {
+  return RegExp(
+    r'''<input\b[^>]*\btype=["']?checkbox''',
+    caseSensitive: false,
+  ).hasMatch(html);
 }
 
 bool _selectionIsInsideTask(Editor editor) {

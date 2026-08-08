@@ -295,7 +295,7 @@ func (d *Document) ensureMissingBlock(blockID string) bool {
 	d.Blocks = append(d.Blocks, Block{
 		ID:       blockID,
 		Type:     string(BlockParagraph),
-		Delta:    []delta.Op{{Insert: []rune("")}},
+		Delta:    plainTextDelta(""),
 		Metadata: make(map[string]any),
 	})
 	return true
@@ -370,11 +370,24 @@ func UnmarshalDocument(data []byte) (Document, error) {
 	if doc.SchemaVersion == 0 {
 		doc.SchemaVersion = 1
 	}
+	doc.normalizeEmptyDeltaOperations()
 	doc.removeDuplicateBlockIDs()
 	if len(doc.Blocks) == 0 {
 		doc = NewEmptyDocument()
 	}
 	return doc, nil
+}
+
+func (d *Document) normalizeEmptyDeltaOperations() {
+	for blockIndex := range d.Blocks {
+		operations := make([]delta.Op, 0, len(d.Blocks[blockIndex].Delta))
+		for _, operation := range d.Blocks[blockIndex].Delta {
+			if !operation.IsNil() {
+				operations = append(operations, operation)
+			}
+		}
+		d.Blocks[blockIndex].Delta = operations
+	}
 }
 
 func (d *Document) removeDuplicateBlockIDs() {
@@ -397,9 +410,16 @@ func NewEmptyDocument() Document {
 			{
 				ID:       InitialBlockID,
 				Type:     string(BlockParagraph),
-				Delta:    []delta.Op{{Insert: []rune("")}},
+				Delta:    plainTextDelta(""),
 				Metadata: make(map[string]any),
 			},
 		},
 	}
+}
+
+func plainTextDelta(content string) []delta.Op {
+	if content == "" {
+		return []delta.Op{}
+	}
+	return []delta.Op{{Insert: []rune(content)}}
 }
