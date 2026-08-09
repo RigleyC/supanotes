@@ -215,6 +215,35 @@ void main() {
       expect(restored.getAllAttributionsAt(4), isEmpty);
     });
 
+    test('round trips the real collaborative typing sentence without reordering', () {
+      const sentence =
+          'É bom começar a digitar e verificar como fica a implementação sempre.';
+      final source = AttributedText(sentence);
+
+      final delta = codec.encodeAttributedTextToDelta(source);
+      final restored = codec.attributedFromDelta(delta);
+
+      expect(delta, [
+        {'insert': sentence},
+      ]);
+      expect(restored.toPlainText(), sentence);
+    });
+
+    test('applies the real sentence as sequential remote character deltas', () {
+      const sentence =
+          'É bom começar a digitar e verificar como fica a implementação sempre.';
+      var text = AttributedText();
+
+      for (var i = 0; i < sentence.length; i++) {
+        text = codec.applyDeltaToText(text, [
+          if (i > 0) {'retain': i},
+          {'insert': sentence[i]},
+        ])!;
+      }
+
+      expect(text.toPlainText(), sentence);
+    });
+
     test('does not extend a link to the caret after inserted text', () {
       final result = codec.applyDeltaToText(AttributedText(), [
         {

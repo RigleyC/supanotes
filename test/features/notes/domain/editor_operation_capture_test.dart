@@ -165,6 +165,50 @@ void main() {
       ]);
     });
 
+    test('captures each character of the reported sentence at its current offset', () {
+      const sentence =
+          'É bom começar a digitar e verificar como fica a implementação sempre.';
+      final doc = MutableDocument(
+        nodes: [ParagraphNode(id: 'n1', text: AttributedText())],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-${capturedOps.length}',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      ).start();
+
+      for (var i = 0; i < sentence.length; i++) {
+        editor.execute([
+          InsertTextRequest(
+            documentPosition: DocumentPosition(
+              nodeId: 'n1',
+              nodePosition: TextNodePosition(offset: i),
+            ),
+            textToInsert: sentence[i],
+            attributions: const {},
+          ),
+        ]);
+      }
+
+      final textDeltas = capturedOps
+          .where((operation) => operation.kind == 'text_delta')
+          .toList();
+      expect(textDeltas, hasLength(sentence.length));
+      for (var i = 0; i < textDeltas.length; i++) {
+        expect(textDeltas[i].payload['ops'], [
+          if (i > 0) {'retain': i},
+          {'insert': sentence[i]},
+        ]);
+      }
+      expect((doc.first as TextNode).text.toPlainText(), sentence);
+    });
+
     test('captures the URI when a link attribution changes in place', () {
       final doc = MutableDocument(
         nodes: [ParagraphNode(id: 'n1', text: AttributedText('Link'))],
