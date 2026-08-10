@@ -63,6 +63,26 @@ func TestServiceReplacementCreatesNewToken(t *testing.T) {
 	}
 }
 
+func TestServiceResolvePublicPreservesRepositoryFailures(t *testing.T) {
+	t.Parallel()
+
+	databaseErr := errors.New("database unavailable")
+	repo := &fakeRepository{publicErr: databaseErr}
+	svc := NewService(repo, NewTokenSigner("secret"), "https://notes.example")
+	token, err := svc.signer.Sign(uuid.New())
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+
+	_, err = svc.ResolvePublic(context.Background(), token)
+	if !errors.Is(err, databaseErr) {
+		t.Fatalf("error: got %v, want repository error", err)
+	}
+	if errors.Is(err, ErrLinkNotFound) {
+		t.Fatalf("repository failure was hidden as not found: %v", err)
+	}
+}
+
 type fakeRepository struct {
 	ownerID     uuid.UUID
 	link        Link
@@ -70,9 +90,13 @@ type fakeRepository struct {
 	lastTokenID uuid.UUID
 	lastEnabled bool
 	publicNote  PublicNote
+	publicErr   error
 }
 
 func (r *fakeRepository) GetPublicNote(context.Context, uuid.UUID) (PublicNote, error) {
+	if r.publicErr != nil {
+		return PublicNote{}, r.publicErr
+	}
 	return r.publicNote, nil
 }
 

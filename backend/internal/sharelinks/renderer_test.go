@@ -40,3 +40,42 @@ func TestRenderDocumentUsesFallbackTitle(t *testing.T) {
 		t.Fatalf("title: got %q", page.Title)
 	}
 }
+
+func TestRenderDocumentGroupsConsecutiveListsAndIncludesFirstItemInPlainText(t *testing.T) {
+	page, err := RenderDocument([]byte(`{"schemaVersion":1,"blocks":[
+		{"id":"one","type":"bulletList","delta":[{"insert":"One"}],"metadata":{}},
+		{"id":"two","type":"bulletList","delta":[{"insert":"Two"}],"metadata":{}},
+		{"id":"three","type":"orderedList","delta":[{"insert":"Three"}],"metadata":{}}
+	]}`), RenderOptions{})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if strings.Count(page.HTML, "<ul>") != 1 || strings.Count(page.HTML, "</ul>") != 1 {
+		t.Fatalf("bullet list was fragmented: %s", page.HTML)
+	}
+	if strings.Count(page.HTML, "<ol>") != 1 || strings.Count(page.HTML, "</ol>") != 1 {
+		t.Fatalf("ordered list was fragmented: %s", page.HTML)
+	}
+	for _, item := range []string{"One", "Two", "Three"} {
+		if !strings.Contains(page.Text, item) {
+			t.Fatalf("plain text omitted %q: %q", item, page.Text)
+		}
+	}
+}
+
+func TestRenderDocumentOnlyLinksSafeHTTPURLs(t *testing.T) {
+	page, err := RenderDocument([]byte(`{"schemaVersion":1,"blocks":[
+		{"id":"safe","type":"paragraph","delta":[{"insert":"safe","attributes":{"link":"https://example.com"}}],"metadata":{}},
+		{"id":"unsafe","type":"paragraph","delta":[{"insert":"unsafe","attributes":{"link":"javascript:alert(1)"}}],"metadata":{}},
+		{"id":"internal","type":"paragraph","delta":[{"insert":"internal","attributes":{"link":"note://private"}}],"metadata":{}}
+	]}`), RenderOptions{})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(page.HTML, `href="https://example.com"`) {
+		t.Fatalf("safe link was not rendered: %s", page.HTML)
+	}
+	if strings.Contains(page.HTML, "javascript:") || strings.Contains(page.HTML, `href="note://`) {
+		t.Fatalf("unsafe or internal link became actionable: %s", page.HTML)
+	}
+}

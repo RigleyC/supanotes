@@ -73,13 +73,11 @@ func (h *Handler) Disable(c echo.Context) error {
 
 func (h *Handler) Public(c echo.Context) error {
 	token := c.Param("token")
-	note, err := h.svc.ResolvePublic(c.Request().Context(), token)
+	snapshot, err := h.svc.PublicSnapshot(c.Request().Context(), token, RenderOptions{
+		AttachmentBaseURL: "/s/" + token + "/attachments",
+	})
 	if err != nil {
-		return c.NoContent(http.StatusNotFound)
-	}
-	page, err := RenderDocument(note.Document, RenderOptions{AttachmentBaseURL: "/s/" + token + "/attachments"})
-	if err != nil {
-		return c.NoContent(http.StatusNotFound)
+		return h.mapPublicError(c, err)
 	}
 
 	response := c.Response()
@@ -88,22 +86,17 @@ func (h *Handler) Public(c echo.Context) error {
 	response.Header().Set("X-Robots-Tag", "noindex, nofollow, noarchive")
 	response.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; media-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 	response.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = response.Write([]byte(publicHTML(page)))
-	return nil
+	return c.Blob(http.StatusOK, "text/html; charset=utf-8", []byte(publicHTML(snapshot.Page)))
 }
 
 func (h *Handler) PublicDocument(c echo.Context) error {
-	publicNote, err := h.svc.ResolvePublic(c.Request().Context(), c.Param("token"))
+	snapshot, err := h.svc.PublicSnapshot(c.Request().Context(), c.Param("token"), RenderOptions{})
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound)
-	}
-	document, err := RenderDocument(publicNote.Document, RenderOptions{})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound)
+		return h.mapPublicError(c, err)
 	}
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	return c.JSON(http.StatusOK, PublicDocumentResponse{
-		Title: document.Title, Document: json.RawMessage(publicNote.Document),
+		Title: snapshot.Page.Title, Document: json.RawMessage(snapshot.Note.Document),
 	})
 }
 
@@ -140,4 +133,12 @@ func (h *Handler) mapError(c echo.Context, err error) error {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to manage share link")
 	}
+}
+
+func (h *Handler) mapPublicError(c echo.Context, err error) error {
+	if errors.Is(err, ErrLinkNotFound) {
+		return c.NoContent(http.StatusNotFound)
+	}
+	c.Logger().Error(err)
+	return c.NoContent(http.StatusInternalServerError)
 }

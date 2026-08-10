@@ -46,7 +46,7 @@ func RenderDocument(data []byte, options RenderOptions) (RenderedPage, error) {
 				end++
 			}
 			body.WriteString(renderList(doc.Blocks[index:end], listType))
-			for _, listBlock := range doc.Blocks[index+1 : end] {
+			for _, listBlock := range doc.Blocks[index:end] {
 				listText := blockText(listBlock.Delta)
 				if strings.TrimSpace(listText) != "" {
 					plain.WriteString(listText)

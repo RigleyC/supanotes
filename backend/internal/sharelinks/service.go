@@ -3,6 +3,7 @@ package sharelinks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -30,6 +31,14 @@ type LinkResult struct {
 type PublicNote struct {
 	ID       uuid.UUID
 	Document []byte
+}
+
+// PublicSnapshot is the single public delivery result used by both the HTML
+// reader and the native/API reader. The note snapshot is resolved and parsed
+// once, after token authorization, so the two transports cannot drift.
+type PublicSnapshot struct {
+	Note PublicNote
+	Page RenderedPage
 }
 
 type Repository interface {
@@ -101,9 +110,27 @@ func (s *Service) ResolvePublic(ctx context.Context, token string) (PublicNote, 
 	}
 	note, err := s.repo.GetPublicNote(ctx, tokenID)
 	if err != nil {
-		return PublicNote{}, ErrLinkNotFound
+		if errors.Is(err, ErrLinkNotFound) {
+			return PublicNote{}, ErrLinkNotFound
+		}
+		return PublicNote{}, fmt.Errorf("resolve public note: %w", err)
 	}
 	return note, nil
+}
+
+// PublicSnapshot resolves a token and renders the current canonical snapshot
+// for a transport. Rendering errors are returned to the caller instead of
+// becoming an empty note.
+func (s *Service) PublicSnapshot(ctx context.Context, token string, options RenderOptions) (PublicSnapshot, error) {
+	note, err := s.ResolvePublic(ctx, token)
+	if err != nil {
+		return PublicSnapshot{}, err
+	}
+	page, err := RenderDocument(note.Document, options)
+	if err != nil {
+		return PublicSnapshot{}, fmt.Errorf("render public note: %w", err)
+	}
+	return PublicSnapshot{Note: note, Page: page}, nil
 }
 
 func (s *Service) result(link Link) (LinkResult, error) {

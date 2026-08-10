@@ -65,6 +65,9 @@ func (r *sqlRepository) Disable(ctx context.Context, noteID uuid.UUID) error {
 func (r *sqlRepository) GetPublicNote(ctx context.Context, tokenID uuid.UUID) (PublicNote, error) {
 	value, err := r.q.GetPublicNoteByShareToken(ctx, toPGUUID(tokenID))
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return PublicNote{}, ErrLinkNotFound
+		}
 		return PublicNote{}, err
 	}
 	return PublicNote{ID: fromPGUUID(value.ID), Document: value.Document}, nil
