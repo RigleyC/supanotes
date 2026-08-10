@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supanotes/core/utils/platform_utils.dart';
 import 'package:super_context_menu/super_context_menu.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
@@ -8,6 +9,7 @@ class NoteContextMenuWidget extends StatelessWidget {
   final NoteModel note;
   final VoidCallback onToggleFavorite;
   final VoidCallback onDelete;
+  final VoidCallback? onEditIcon;
   final Widget child;
 
   const NoteContextMenuWidget({
@@ -15,15 +17,23 @@ class NoteContextMenuWidget extends StatelessWidget {
     required this.note,
     required this.onToggleFavorite,
     required this.onDelete,
+    this.onEditIcon,
     required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (!isDesktopLayout(context)) return child;
     return ContextMenuWidget(
       menuProvider: (request) {
         return Menu(
           children: [
+            if (onEditIcon != null && !note.isReadOnly)
+              MenuAction(
+                title: 'Alterar ícone',
+                image: MenuImage.icon(Icons.emoji_emotions_outlined),
+                callback: onEditIcon!,
+              ),
             MenuAction(
               title: note.favorite ? 'Remover favorito' : 'Favoritar',
               image: MenuImage.icon(

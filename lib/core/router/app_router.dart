@@ -18,6 +18,7 @@ import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.
 import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/settings/presentation/mcp_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_link_reader_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ValueNotifier<AsyncValue<User?>>(
@@ -66,6 +67,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const SettingsScreen(),
       ),
       GoRoute(path: AppRoutes.mcp, builder: (_, _) => const McpScreen()),
+      GoRoute(
+        path: AppRoutes.shareLink,
+        builder: (_, state) =>
+            ShareLinkReaderScreen(token: state.pathParameters['token']!),
+      ),
     ],
     redirect: (context, state) {
       final result = authGuardRedirect(

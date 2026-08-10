@@ -6,6 +6,7 @@ import 'package:supanotes/features/notes/catalog/application/notes_providers.dar
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_context_menu.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_view.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
@@ -18,6 +19,7 @@ class NotesSidebar extends ConsumerStatefulWidget {
   final VoidCallback onNewNote;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onToggleCollapsed;
+  final ValueChanged<NoteModel>? onEditIcon;
 
   const NotesSidebar({
     super.key,
@@ -26,6 +28,7 @@ class NotesSidebar extends ConsumerStatefulWidget {
     required this.onNewNote,
     this.onOpenSettings,
     this.onToggleCollapsed,
+    this.onEditIcon,
   });
 
   @override
@@ -90,6 +93,7 @@ class _NotesSidebarState extends ConsumerState<NotesSidebar> {
                 ref.read(notesRepositoryProvider).softDelete(note.id);
                 AppMessenger.showSuccess('Nota movida para a lixeira');
               },
+              onEditIcon: widget.onEditIcon,
             ),
           ),
         ),
@@ -217,6 +221,7 @@ class _SidebarNotesList extends StatelessWidget {
     required this.onNoteTap,
     required this.onToggleFavorite,
     required this.onDelete,
+    this.onEditIcon,
   });
 
   final List<NoteModel> notes;
@@ -225,6 +230,7 @@ class _SidebarNotesList extends StatelessWidget {
   final ValueChanged<NoteModel> onNoteTap;
   final ValueChanged<NoteModel> onToggleFavorite;
   final ValueChanged<NoteModel> onDelete;
+  final ValueChanged<NoteModel>? onEditIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +261,7 @@ class _SidebarNotesList extends StatelessWidget {
           onTap: () => onNoteTap(note),
           onToggleFavorite: () => onToggleFavorite(note),
           onDelete: () => onDelete(note),
+          onEditIcon: onEditIcon == null ? null : () => onEditIcon!(note),
         );
       },
     );
@@ -373,6 +380,7 @@ class _SidebarNoteTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onToggleFavorite;
   final VoidCallback onDelete;
+  final VoidCallback? onEditIcon;
 
   const _SidebarNoteTile({
     super.key,
@@ -381,6 +389,7 @@ class _SidebarNoteTile extends StatelessWidget {
     required this.onTap,
     required this.onToggleFavorite,
     required this.onDelete,
+    this.onEditIcon,
   });
 
   @override
@@ -391,6 +400,7 @@ class _SidebarNoteTile extends StatelessWidget {
       note: note,
       onToggleFavorite: onToggleFavorite,
       onDelete: onDelete,
+      onEditIcon: onEditIcon,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
         child: Material(
@@ -419,7 +429,13 @@ class _SidebarNoteTile extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
+                          Row(
+                            children: [
+                              if (note.noteIcon != null) ...[
+                                NoteIconView(icon: note.noteIcon!, size: 16),
+                                const SizedBox(width: 6),
+                              ],
+                              Expanded(child: Text(
                             note.title.isEmpty ? 'Sem título' : note.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -429,7 +445,8 @@ class _SidebarNoteTile extends StatelessWidget {
                                   ? FontWeight.w600
                                   : FontWeight.w500,
                               color: scheme.onSurface,
-                            ),
+                            ))),
+                            ],
                           ),
                         ],
                       ),

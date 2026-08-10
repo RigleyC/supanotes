@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -223,6 +224,10 @@ func (s *fakeStorage) Upload(_ context.Context, key string, r io.Reader, _ strin
 func (s *fakeStorage) Delete(_ context.Context, key string) error {
 	s.deleteCalls = append(s.deleteCalls, key)
 	return nil
+}
+
+func (s *fakeStorage) Open(_ context.Context, _ string) (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader("attachment")), nil
 }
 
 func (s *fakeStorage) deletedKeyPrefixes() []string {

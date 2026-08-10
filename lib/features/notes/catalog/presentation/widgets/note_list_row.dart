@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
-import 'note_context_menu.dart';
+import 'note_icon_view.dart';
 
 class NoteListRow extends StatelessWidget {
   const NoteListRow({
@@ -12,22 +12,22 @@ class NoteListRow extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onToggleFavorite,
+    this.onEditIcon,
   });
 
   final NoteModel note;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onToggleFavorite;
+  final VoidCallback? onEditIcon;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final title = note.title;
 
-    return NoteContextMenuWidget(
-      note: note,
-      onToggleFavorite: onToggleFavorite,
-      onDelete: onDelete,
+    return GestureDetector(
+      onLongPress: note.isReadOnly ? null : onEditIcon,
       child: Dismissible(
       key: ValueKey('note-${note.id}'),
       direction: DismissDirection.horizontal,
@@ -61,7 +61,7 @@ class NoteListRow extends StatelessWidget {
         if (confirmed) onDelete();
         return confirmed;
       },
-      child: InkWell(
+        child: InkWell(
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         onTap: onTap,
@@ -74,11 +74,21 @@ class NoteListRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
+                    Row(
+                      children: [
+                        if (note.noteIcon != null) ...[
+                          NoteIconView(icon: note.noteIcon!, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                      ],
                     ),
                     if (note.sharedByEmail != null)
                       Padding(

@@ -51,7 +51,7 @@ func TestService_UpdateNote_ContentChange(t *testing.T) {
 	}, nil)
 
 	newContent := "updated content"
-	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil)
+	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,4 +68,3 @@ func TestCreateNoteRejectsEmptyRegularNote(t *testing.T) {
 		t.Fatalf("expected ErrEmptyNote, got %v", err)
 	}
 }
-

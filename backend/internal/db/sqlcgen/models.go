@@ -77,6 +77,7 @@ type Note struct {
 	Revision         int64              `json:"revision"`
 	Document         []byte             `json:"document"`
 	SnapshotRevision int64              `json:"snapshot_revision"`
+	NoteIcon         []byte             `json:"note_icon"`
 }
 
 type NoteLink struct {

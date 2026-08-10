@@ -15,12 +15,14 @@ class NotesListView extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onToggleFavorite,
+    required this.onEditIcon,
   });
 
   final List<NoteModel> notes;
   final void Function(NoteModel note) onTap;
   final void Function(NoteModel note) onDelete;
   final void Function(NoteModel note) onToggleFavorite;
+  final void Function(NoteModel note) onEditIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +43,7 @@ class NotesListView extends StatelessWidget {
             onTap: () => onTap(note),
             onDelete: () => onDelete(note),
             onToggleFavorite: () => onToggleFavorite(note),
+            onEditIcon: () => onEditIcon(note),
           );
         },
       ),
