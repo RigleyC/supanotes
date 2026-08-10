@@ -13,14 +13,7 @@ final shareLinkAccessResolverProvider =
 
 final shareLinkAccessProvider = FutureProvider.autoDispose
     .family<ShareLinkAccessDecision, String>((ref, token) async {
-      User? user;
-      try {
-        user = await ref.watch(authControllerProvider.future);
-      } catch (_) {
-        // An unavailable session must not prevent a valid public link from
-        // opening the guest reader.
-        user = null;
-      }
+      final User? user = await ref.watch(authControllerProvider.future);
       return ref
           .watch(shareLinkAccessResolverProvider)
           .resolve(token, user: user);

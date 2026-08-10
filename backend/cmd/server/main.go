@@ -220,9 +220,6 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/notes/:id/share-link", shareLinksH.Activate)
 	protected.DELETE("/notes/:id/share-link", shareLinksH.Disable)
 	e.GET("/s/:token", shareLinksH.Public)
-	e.GET("/s/:token/access", shareLinksH.Access)
-	e.GET("/s/:token/document", shareLinksH.PublicDocument)
-	api.GET("/s/:token", shareLinksH.Public)
 	api.GET("/s/:token/access", shareLinksH.Access)
 	api.GET("/s/:token/document", shareLinksH.PublicDocument)
 

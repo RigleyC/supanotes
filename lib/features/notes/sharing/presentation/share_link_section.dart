@@ -109,10 +109,15 @@ class _ShareLinkSectionState extends ConsumerState<ShareLinkSection> {
                 children: [
                   const Text(ShareLinkStrings.inactiveDescription),
                   const SizedBox(height: 8),
-                  AppButton(
-                    text: ShareLinkStrings.activate,
-                    isLoading: _action.isLoading,
-                    onPressed: _action.isLoading ? null : _activate,
+                  _ShareLinkActionState(
+                    action: _action,
+                    buttons: _ShareLinkButtons(
+                      activate: _activate,
+                      copy: null,
+                      replace: null,
+                      revoke: null,
+                      activateLabel: ShareLinkStrings.activate,
+                    ),
                   ),
                 ],
               );
@@ -122,40 +127,115 @@ class _ShareLinkSectionState extends ConsumerState<ShareLinkSection> {
               children: [
                 SelectableText(link.url!),
                 const SizedBox(height: 8),
-                AppButton(
-                  text: ShareLinkStrings.copy,
-                  variant: AppButtonVariant.secondary,
-                  onPressed: _action.isLoading ? null : () => _copy(link.url!),
-                ),
-                const SizedBox(height: 8),
-                AppButton(
-                  text: ShareLinkStrings.replace,
-                  variant: AppButtonVariant.secondary,
-                  isLoading: _action.isLoading,
-                  onPressed: _action.isLoading
-                      ? null
-                      : () => _activate(replace: true),
-                ),
-                const SizedBox(height: 8),
-                AppButton(
-                  text: ShareLinkStrings.revoke,
-                  variant: AppButtonVariant.danger,
-                  isLoading: _action.isLoading,
-                  onPressed: _action.isLoading ? null : _disable,
+                _ShareLinkActionState(
+                  action: _action,
+                  buttons: _ShareLinkButtons(
+                    activate: null,
+                    copy: () => _copy(link.url!),
+                    replace: () => _activate(replace: true),
+                    revoke: _disable,
+                    activateLabel: ShareLinkStrings.activate,
+                  ),
                 ),
               ],
             );
           },
         ),
-        if (_action.hasError)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              ShareLinkStrings.actionError,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
       ],
+    );
+  }
+}
+
+class _ShareLinkActionState extends StatelessWidget {
+  const _ShareLinkActionState({required this.action, required this.buttons});
+
+  final AsyncValue<void> action;
+  final _ShareLinkButtons buttons;
+
+  @override
+  Widget build(BuildContext context) {
+    return action.when(
+      data: (_) => buttons,
+      loading: () => buttons.copyWith(isLoading: true),
+      error: (error, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppErrorView(
+            title: ShareLinkStrings.actionError,
+            subtitle: error.toString(),
+          ),
+          buttons,
+        ],
+      ),
+    );
+  }
+}
+
+class _ShareLinkButtons extends StatelessWidget {
+  const _ShareLinkButtons({
+    required this.activate,
+    required this.copy,
+    required this.replace,
+    required this.revoke,
+    required this.activateLabel,
+    this.isLoading = false,
+  });
+
+  final VoidCallback? activate;
+  final VoidCallback? copy;
+  final VoidCallback? replace;
+  final VoidCallback? revoke;
+  final String activateLabel;
+  final bool isLoading;
+
+  _ShareLinkButtons copyWith({required bool isLoading}) => _ShareLinkButtons(
+    activate: activate,
+    copy: copy,
+    replace: replace,
+    revoke: revoke,
+    activateLabel: activateLabel,
+    isLoading: isLoading,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final buttons = <Widget>[];
+    if (activate != null) {
+      buttons.add(
+        AppButton(
+          text: activateLabel,
+          isLoading: isLoading,
+          onPressed: activate,
+        ),
+      );
+    }
+    if (copy != null) {
+      buttons.addAll([
+        AppButton(
+          text: ShareLinkStrings.copy,
+          variant: AppButtonVariant.secondary,
+          isLoading: isLoading,
+          onPressed: copy,
+        ),
+        const SizedBox(height: 8),
+        AppButton(
+          text: ShareLinkStrings.replace,
+          variant: AppButtonVariant.secondary,
+          isLoading: isLoading,
+          onPressed: replace,
+        ),
+        const SizedBox(height: 8),
+        AppButton(
+          text: ShareLinkStrings.revoke,
+          variant: AppButtonVariant.danger,
+          isLoading: isLoading,
+          onPressed: revoke,
+        ),
+      ]);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: buttons,
     );
   }
 }
