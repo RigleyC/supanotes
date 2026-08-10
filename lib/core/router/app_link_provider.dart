@@ -3,16 +3,84 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+abstract interface class AppLinkSource {
+  Stream<Uri> get uriLinkStream;
+
+  Future<Uri?> getInitialLink();
+}
+
+final class _PlatformAppLinkSource implements AppLinkSource {
+  _PlatformAppLinkSource() : _links = AppLinks();
+
+  final AppLinks _links;
+
+  @override
+  Stream<Uri> get uriLinkStream => _links.uriLinkStream;
+
+  @override
+  Future<Uri?> getInitialLink() => _links.getInitialLink();
+}
+
+/// Merges the initial link and runtime links into one deduplicated stream.
+///
+/// A single stream owns the platform subscription. Cancelling the stream
+/// cancels that subscription, which prevents duplicate listeners when the
+/// provider is rebuilt or disposed.
+final class AppLinkStream {
+  AppLinkStream(this.source);
+
+  final AppLinkSource source;
+
+  Stream<Uri> stream() {
+    final controller = StreamController<Uri>();
+    final seenPaths = <String>{};
+    StreamSubscription<Uri>? subscription;
+    var closed = false;
+
+    void emit(Uri uri) {
+      if (closed || !isShareLinkUri(uri)) return;
+      if (seenPaths.add(uri.path)) controller.add(uri);
+    }
+
+    void emitError(Object error, StackTrace stack) {
+      if (!closed) controller.addError(error, stack);
+    }
+
+    try {
+      subscription = source.uriLinkStream.listen(
+        emit,
+        onError: (Object error, StackTrace stack) => emitError(error, stack),
+        onDone: () {
+          if (!closed) {
+            closed = true;
+            controller.close();
+          }
+        },
+      );
+    } catch (error, stack) {
+      emitError(error, stack);
+    }
+
+    source.getInitialLink().then((uri) {
+      if (uri != null) emit(uri);
+    }, onError: (Object error, StackTrace stack) => emitError(error, stack));
+
+    controller.onCancel = () async {
+      closed = true;
+      await subscription?.cancel();
+      await controller.close();
+    };
+    return controller.stream;
+  }
+}
+
+bool isShareLinkUri(Uri uri) {
+  final segments = uri.pathSegments;
+  return segments.length == 2 &&
+      segments.first == 's' &&
+      segments.last.isNotEmpty;
+}
+
 final appLinkProvider = StreamProvider.autoDispose<Uri>((ref) {
-  final controller = StreamController<Uri>();
-  final links = AppLinks();
-  final subscription = links.uriLinkStream.listen(controller.add);
-  links.getInitialLink().then((uri) {
-    if (uri != null) controller.add(uri);
-  });
-  ref.onDispose(() {
-    subscription.cancel();
-    controller.close();
-  });
-  return controller.stream;
+  return AppLinkStream(_PlatformAppLinkSource()).stream();
 });

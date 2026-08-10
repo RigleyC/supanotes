@@ -220,8 +220,10 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.POST("/notes/:id/share-link", shareLinksH.Activate)
 	protected.DELETE("/notes/:id/share-link", shareLinksH.Disable)
 	e.GET("/s/:token", shareLinksH.Public)
+	e.GET("/s/:token/access", shareLinksH.Access)
 	e.GET("/s/:token/document", shareLinksH.PublicDocument)
 	api.GET("/s/:token", shareLinksH.Public)
+	api.GET("/s/:token/access", shareLinksH.Access)
 	api.GET("/s/:token/document", shareLinksH.PublicDocument)
 
 	// Attachments
@@ -244,6 +246,9 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 		func(ctx context.Context, token string) (pgtype.UUID, error) {
 			publicNote, err := shareLinksSvc.ResolvePublic(ctx, token)
 			if err != nil {
+				if errors.Is(err, sharelinks.ErrLinkNotFound) {
+					return pgtype.UUID{}, attachments.ErrPublicLinkNotFound
+				}
 				return pgtype.UUID{}, err
 			}
 			return pgtype.UUID{Bytes: publicNote.ID, Valid: true}, nil
