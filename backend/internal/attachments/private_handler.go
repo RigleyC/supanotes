@@ -24,11 +24,11 @@ func (h *PrivateHandler) Download(c echo.Context) error {
 	}
 	attachmentID, err := uid.UUIDFromString(c.Param("id"))
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest)
+		return web.JSONError(c, http.StatusBadRequest, "invalid attachment id")
 	}
 	delivery, err := h.delivery.Authenticated(c.Request().Context(), userID, attachmentID)
 	if err != nil {
-		return echo.NewHTTPError(deliveryErrorStatus(err, false))
+		return web.JSONError(c, deliveryErrorStatus(err, false), deliveryErrorMessage(err))
 	}
 	return writeDelivery(c, delivery, "private, no-store", "")
 }

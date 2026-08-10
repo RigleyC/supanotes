@@ -72,7 +72,7 @@ func main() {
 	e.Use(echomw.RequestID())
 	e.Use(echomw.Recover())
 	e.Use(echomw.LoggerWithConfig(echomw.LoggerConfig{
-		Format: `{"time":"${time_rfc3339}","id":"${id}","method":"${method}","uri":"${uri}","status":${status},"latency":"${latency_human}","error":"${error}"}` + "\n",
+		Format: `{"time":"${time_rfc3339}","id":"${id}","method":"${method}","route":"${route}","status":${status},"latency":"${latency_human}","error":"${error}"}` + "\n",
 	}))
 	if len(cfg.CORSOrigins) > 0 {
 		e.Use(echomw.CORSWithConfig(echomw.CORSConfig{

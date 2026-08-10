@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -27,17 +29,24 @@ func (h *PublicHandler) Download(c echo.Context) error {
 	noteID, err := h.resolve(c.Request().Context(), c.Param("token"))
 	if err != nil {
 		if errors.Is(err, ErrPublicLinkNotFound) {
-			return echo.NewHTTPError(http.StatusNotFound)
+			return publicDownloadError(c, http.StatusNotFound, "share link not found")
 		}
-		return echo.NewHTTPError(http.StatusInternalServerError)
+		return publicDownloadError(c, http.StatusInternalServerError, "failed to resolve share link")
 	}
 	attachmentID, err := uid.UUIDFromString(c.Param("attachment_id"))
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound)
+		return publicDownloadError(c, http.StatusNotFound, "attachment not found")
 	}
 	delivery, err := h.delivery.Public(c.Request().Context(), noteID, attachmentID)
 	if err != nil {
-		return echo.NewHTTPError(deliveryErrorStatus(err, true))
+		return publicDownloadError(c, deliveryErrorStatus(err, true), deliveryErrorMessage(err))
 	}
 	return writeDelivery(c, delivery, "no-store", "no-referrer")
+}
+
+func publicDownloadError(c echo.Context, status int, message string) error {
+	if strings.HasPrefix(c.Request().URL.Path, "/api/v1/") {
+		return web.JSONError(c, status, message)
+	}
+	return echo.NewHTTPError(status, message)
 }

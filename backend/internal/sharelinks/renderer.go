@@ -2,6 +2,7 @@ package sharelinks
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html"
 	"net/url"
@@ -25,10 +26,41 @@ type RenderOptions struct {
 }
 
 func RenderDocument(data []byte, options RenderOptions) (RenderedPage, error) {
-	doc, err := noteoperations.UnmarshalDocument(data)
+	doc, err := decodePublicDocument(data)
 	if err != nil {
 		return RenderedPage{}, fmt.Errorf("decode document: %w", err)
 	}
+	return renderDocument(doc, options), nil
+}
+
+func decodePublicDocument(data []byte) (noteoperations.Document, error) {
+	var envelope struct {
+		SchemaVersion *int              `json:"schemaVersion"`
+		Blocks        []json.RawMessage `json:"blocks"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return noteoperations.Document{}, err
+	}
+	if envelope.SchemaVersion == nil {
+		return noteoperations.Document{}, fmt.Errorf("missing schemaVersion")
+	}
+	if *envelope.SchemaVersion != 1 {
+		return noteoperations.Document{}, fmt.Errorf("unsupported schemaVersion %d", *envelope.SchemaVersion)
+	}
+	if len(envelope.Blocks) == 0 {
+		return noteoperations.Document{}, fmt.Errorf("document has no blocks")
+	}
+	doc, err := noteoperations.UnmarshalDocument(data)
+	if err != nil {
+		return noteoperations.Document{}, err
+	}
+	if len(doc.Blocks) != len(envelope.Blocks) {
+		return noteoperations.Document{}, fmt.Errorf("document contains duplicate block ids")
+	}
+	return doc, nil
+}
+
+func renderDocument(doc noteoperations.Document, options RenderOptions) RenderedPage {
 	base := strings.TrimRight(options.AttachmentBaseURL, "/")
 
 	var body bytes.Buffer
@@ -66,7 +98,7 @@ func RenderDocument(data []byte, options RenderOptions) (RenderedPage, error) {
 	if title == "" {
 		title = fallbackTitle
 	}
-	return RenderedPage{Title: title, HTML: body.String(), Text: strings.TrimSpace(plain.String())}, nil
+	return RenderedPage{Title: title, HTML: body.String(), Text: strings.TrimSpace(plain.String())}
 }
 
 func renderList(blocks []noteoperations.Block, blockType noteoperations.BlockType) string {
@@ -120,6 +152,21 @@ func renderBlock(block noteoperations.Block, attachmentBaseURL string) string {
 			return "<p>Attachment</p>"
 		}
 		return `<p><a href="` + html.EscapeString(attachmentBaseURL+"/"+url.PathEscape(attachmentID)) + `">Attachment</a></p>`
+	case noteoperations.BlockRichLink:
+		richURL, _ := block.Metadata["url"].(string)
+		richTitle, _ := block.Metadata["title"].(string)
+		richDescription, _ := block.Metadata["description"].(string)
+		if !safeWebURL(richURL) {
+			return "<p>" + content + "</p>"
+		}
+		if strings.TrimSpace(richTitle) == "" {
+			richTitle = richURL
+		}
+		result := `<article class="rich-link"><a href="` + html.EscapeString(richURL) + `" target="_blank" rel="noopener noreferrer"><strong>` + html.EscapeString(richTitle) + `</strong>`
+		if strings.TrimSpace(richDescription) != "" {
+			result += `<br><span>` + html.EscapeString(richDescription) + `</span>`
+		}
+		return result + "</a></article>"
 	default:
 		if strings.TrimSpace(stripTags(content)) == "" {
 			return ""

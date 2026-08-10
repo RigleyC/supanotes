@@ -6,6 +6,7 @@ class ShareLinkStrings {
       'Qualquer pessoa com este link poderá ler a nota.';
   static const activate = 'Ativar link público';
   static const copy = 'Copiar';
+  static const share = 'Compartilhar';
   static const replace = 'Substituir';
   static const revoke = 'Revogar';
   static const copySuccess = 'Link copiado';
@@ -19,4 +20,6 @@ class ShareLinkStrings {
       'Quem tiver o link perderá o acesso imediatamente.';
   static const replaceConfirmLabel = 'Substituir';
   static const revokeConfirmLabel = 'Revogar';
+  static const accessErrorTitle = 'Este link é inválido ou foi revogado.';
+  static const accessErrorSubtitle = 'Peça ao proprietário uma nova permissão.';
 }

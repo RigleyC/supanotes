@@ -79,3 +79,30 @@ func TestRenderDocumentOnlyLinksSafeHTTPURLs(t *testing.T) {
 		t.Fatalf("unsafe or internal link became actionable: %s", page.HTML)
 	}
 }
+
+func TestRenderDocumentRejectsInvalidCanonicalSnapshots(t *testing.T) {
+	for _, snapshot := range []string{
+		`{}`,
+		`{"schemaVersion":2,"blocks":[]}`,
+		`{"schemaVersion":1,"blocks":[]}`,
+		`{"schemaVersion":1,"blocks":[{"id":"same","type":"paragraph","delta":[],"metadata":{}},{"id":"same","type":"paragraph","delta":[],"metadata":{}}]}`,
+	} {
+		if _, err := RenderDocument([]byte(snapshot), RenderOptions{}); err == nil {
+			t.Fatalf("snapshot was accepted: %s", snapshot)
+		}
+	}
+}
+
+func TestRenderDocumentIncludesSafeRichLinkMetadata(t *testing.T) {
+	page, err := RenderDocument([]byte(`{"schemaVersion":1,"blocks":[
+		{"id":"link","type":"rich_link","delta":[],"metadata":{"url":"https://example.com","title":"Example","description":"A safe link"}}
+	]}`), RenderOptions{})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	for _, fragment := range []string{`class="rich-link"`, `href="https://example.com"`, "Example", "A safe link"} {
+		if !strings.Contains(page.HTML, fragment) {
+			t.Fatalf("rich link omitted %q: %s", fragment, page.HTML)
+		}
+	}
+}

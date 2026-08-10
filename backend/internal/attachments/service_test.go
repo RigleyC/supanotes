@@ -202,6 +202,7 @@ type fakeStorage struct {
 	uploadCalls int
 	deleteCalls []string
 	readUpload  bool
+	openErr     error
 }
 
 func (s *fakeStorage) Upload(_ context.Context, key string, r io.Reader, _ string, _ int64) (StoredObject, error) {
@@ -227,6 +228,9 @@ func (s *fakeStorage) Delete(_ context.Context, key string) error {
 }
 
 func (s *fakeStorage) Open(_ context.Context, _ string) (io.ReadCloser, error) {
+	if s.openErr != nil {
+		return nil, s.openErr
+	}
 	return io.NopCloser(strings.NewReader("attachment")), nil
 }
 

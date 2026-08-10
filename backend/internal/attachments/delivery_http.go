@@ -31,3 +31,14 @@ func deliveryErrorStatus(err error, public bool) int {
 	}
 	return http.StatusInternalServerError
 }
+
+func deliveryErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, ErrAttachmentNotFound):
+		return "attachment not found"
+	case errors.Is(err, ErrAttachmentForbidden):
+		return "attachment access forbidden"
+	default:
+		return "failed to load attachment"
+	}
+}

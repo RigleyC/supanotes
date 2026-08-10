@@ -29,9 +29,18 @@ android {
         manifestPlaceholders["shareLinkHost"] = shareLinkHost.get()
     }
 
+    signingConfigs {
+        create("release") {
+            providers.gradleProperty("releaseStoreFile").orNull?.let { storeFile = file(it) }
+            storePassword = providers.gradleProperty("releaseStorePassword").orNull
+            keyAlias = providers.gradleProperty("releaseKeyAlias").orNull
+            keyPassword = providers.gradleProperty("releaseKeyPassword").orNull
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
+	"github.com/RigleyC/supanotes/internal/noteoperations"
 )
 
 var (
@@ -37,8 +39,9 @@ type PublicNote struct {
 // reader and the native/API reader. The note snapshot is resolved and parsed
 // once, after token authorization, so the two transports cannot drift.
 type PublicSnapshot struct {
-	Note PublicNote
-	Page RenderedPage
+	Note     PublicNote
+	Document noteoperations.Document
+	Page     RenderedPage
 }
 
 type Repository interface {
@@ -126,11 +129,12 @@ func (s *Service) PublicSnapshot(ctx context.Context, token string, options Rend
 	if err != nil {
 		return PublicSnapshot{}, err
 	}
-	page, err := RenderDocument(note.Document, options)
+	document, err := decodePublicDocument(note.Document)
 	if err != nil {
-		return PublicSnapshot{}, fmt.Errorf("render public note: %w", err)
+		return PublicSnapshot{}, fmt.Errorf("decode public note: %w", err)
 	}
-	return PublicSnapshot{Note: note, Page: page}, nil
+	page := renderDocument(document, options)
+	return PublicSnapshot{Note: note, Document: document, Page: page}, nil
 }
 
 func (s *Service) result(link Link) (LinkResult, error) {

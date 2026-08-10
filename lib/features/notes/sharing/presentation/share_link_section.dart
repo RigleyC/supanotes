@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:supanotes/features/notes/sharing/data/share_link_repository.dart';
 import 'package:supanotes/features/notes/sharing/domain/share_link_strings.dart';
@@ -75,6 +76,14 @@ class _ShareLinkSectionState extends ConsumerState<ShareLinkSection> {
     }
   }
 
+  Future<void> _share(String url) async {
+    try {
+      await SharePlus.instance.share(ShareParams(text: url));
+    } catch (_) {
+      if (mounted) AppMessenger.showError(ShareLinkStrings.actionError);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = ref.watch(shareLinkStatusProvider(widget.noteId));
@@ -114,6 +123,7 @@ class _ShareLinkSectionState extends ConsumerState<ShareLinkSection> {
                     buttons: _ShareLinkButtons(
                       activate: _activate,
                       copy: null,
+                      share: null,
                       replace: null,
                       revoke: null,
                       activateLabel: ShareLinkStrings.activate,
@@ -132,6 +142,7 @@ class _ShareLinkSectionState extends ConsumerState<ShareLinkSection> {
                   buttons: _ShareLinkButtons(
                     activate: null,
                     copy: () => _copy(link.url!),
+                    share: () => _share(link.url!),
                     replace: () => _activate(replace: true),
                     revoke: _disable,
                     activateLabel: ShareLinkStrings.activate,
@@ -175,6 +186,7 @@ class _ShareLinkButtons extends StatelessWidget {
   const _ShareLinkButtons({
     required this.activate,
     required this.copy,
+    required this.share,
     required this.replace,
     required this.revoke,
     required this.activateLabel,
@@ -183,6 +195,7 @@ class _ShareLinkButtons extends StatelessWidget {
 
   final VoidCallback? activate;
   final VoidCallback? copy;
+  final VoidCallback? share;
   final VoidCallback? replace;
   final VoidCallback? revoke;
   final String activateLabel;
@@ -191,6 +204,7 @@ class _ShareLinkButtons extends StatelessWidget {
   _ShareLinkButtons copyWith({required bool isLoading}) => _ShareLinkButtons(
     activate: activate,
     copy: copy,
+    share: share,
     replace: replace,
     revoke: revoke,
     activateLabel: activateLabel,
@@ -216,6 +230,13 @@ class _ShareLinkButtons extends StatelessWidget {
           variant: AppButtonVariant.secondary,
           isLoading: isLoading,
           onPressed: copy,
+        ),
+        const SizedBox(height: 8),
+        AppButton(
+          text: ShareLinkStrings.share,
+          variant: AppButtonVariant.secondary,
+          isLoading: isLoading,
+          onPressed: share,
         ),
         const SizedBox(height: 8),
         AppButton(

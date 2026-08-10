@@ -99,6 +99,7 @@ dependencies:
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
   unicode_emojis: ^0.5.1
+  share_plus: ^12.0.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

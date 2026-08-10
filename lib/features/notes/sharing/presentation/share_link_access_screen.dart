@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_provider.dart';
+import 'package:supanotes/features/notes/sharing/domain/share_link_strings.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_link_reader_screen.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 
@@ -31,8 +32,8 @@ class _ShareLinkAccessScreenState extends ConsumerState<ShareLinkAccessScreen> {
             child: access.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, _) => const AppErrorView(
-                title: 'Este link é inválido ou foi revogado.',
-                subtitle: 'Peça ao proprietário uma nova permissão.',
+                title: ShareLinkStrings.accessErrorTitle,
+                subtitle: ShareLinkStrings.accessErrorSubtitle,
               ),
               data: (decision) {
                 if (decision.canEdit) {

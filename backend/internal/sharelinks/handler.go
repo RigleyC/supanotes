@@ -95,8 +95,13 @@ func (h *Handler) PublicDocument(c echo.Context) error {
 		return h.mapPublicError(c, err)
 	}
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
+	document, err := json.Marshal(snapshot.Document)
+	if err != nil {
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to encode public note")
+	}
 	return c.JSON(http.StatusOK, PublicDocumentResponse{
-		Title: snapshot.Page.Title, Document: json.RawMessage(snapshot.Note.Document),
+		Title: snapshot.Page.Title, Document: json.RawMessage(document),
 	})
 }
 
@@ -136,9 +141,17 @@ func (h *Handler) mapError(c echo.Context, err error) error {
 }
 
 func (h *Handler) mapPublicError(c echo.Context, err error) error {
+	status := http.StatusInternalServerError
+	message := "failed to load public note"
 	if errors.Is(err, ErrLinkNotFound) {
-		return c.NoContent(http.StatusNotFound)
+		status = http.StatusNotFound
+		message = "share link not found"
 	}
-	c.Logger().Error(err)
-	return c.NoContent(http.StatusInternalServerError)
+	if status == http.StatusInternalServerError {
+		c.Logger().Error(err)
+	}
+	if strings.HasPrefix(c.Request().URL.Path, "/api/v1/") {
+		return web.JSONError(c, status, message)
+	}
+	return c.NoContent(status)
 }

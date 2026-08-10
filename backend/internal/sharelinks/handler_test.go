@@ -109,3 +109,24 @@ func TestPublicDocumentRejectsInvalidSnapshotExplicitly(t *testing.T) {
 		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 }
+
+func TestPublicDocumentUsesJSONErrorsForAPIRequests(t *testing.T) {
+	h := NewHandler(NewService(&fakeRepository{}, NewTokenSigner("secret"), "https://notes.example"))
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/s/invalid/document", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/api/v1/s/:token/document")
+	c.SetParamNames("token")
+	c.SetParamValues("invalid")
+
+	if err := h.PublicDocument(c); err != nil {
+		t.Fatalf("public document: %v", err)
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusNotFound)
+	}
+	if !strings.Contains(rec.Body.String(), `"error":"share link not found"`) {
+		t.Fatalf("response is not a JSON API error: %s", rec.Body.String())
+	}
+}

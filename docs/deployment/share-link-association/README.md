@@ -35,6 +35,9 @@ not change them.
   `supanotes.app` default in the project settings.
 - Android: pass `-PshareLinkHost=<host>` to Gradle. The manifest uses this
   value for the HTTPS intent filter and `/s/` path prefix.
+- Android release builds must provide a real signing configuration. Pass
+  `-PreleaseStoreFile`, `-PreleaseStorePassword`, `-PreleaseKeyAlias`, and
+  `-PreleaseKeyPassword`; a debug certificate is never accepted for release.
 
 The mobile host and `PUBLIC_BASE_URL` used by the backend must resolve to the
 same canonical HTTPS origin. A mismatch makes the OS association check fail
