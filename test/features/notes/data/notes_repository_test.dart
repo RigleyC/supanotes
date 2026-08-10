@@ -154,6 +154,12 @@ void main() {
       expect(saved!.note.isDirty, isFalse);
       expect(saved.note.noteIconDirty, isTrue);
       expect(saved.note.noteIconJson, contains('🙂'));
+
+      await repo.updateNoteIcon('note-1', null);
+
+      final cleared = await local.getNoteById('note-1');
+      expect(cleared!.note.noteIconDirty, isTrue);
+      expect(cleared.note.noteIconJson, isNull);
     });
   });
 }

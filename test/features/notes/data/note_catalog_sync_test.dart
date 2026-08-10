@@ -13,7 +13,11 @@ import 'package:supanotes/features/notes/editor/sync/note_session_activity_track
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
-Future<void> _noopNoteIconUpdate(String noteId, NoteIcon? icon) async {}
+Future<void> _noopNoteIconUpdate(
+  String noteId,
+  NoteIcon? icon,
+  DateTime? expectedUpdatedAt,
+) async {}
 
 void main() {
   test(
@@ -28,7 +32,7 @@ void main() {
         syncClient: client,
         database: database,
         activityTracker: activityTracker,
-        updateNoteIcon: (noteId, icon) async => updates.add((noteId, icon)),
+        updateNoteIcon: (noteId, icon, _) async => updates.add((noteId, icon)),
       );
       addTearDown(database.close);
 
@@ -157,6 +161,64 @@ void main() {
     expect(jsonDecode(saved!.noteIconJson!), {'kind': 'emoji', 'value': '🔥'});
     verifyNever(() => client.getDocument('active-owner-icon'));
   });
+
+  test(
+    'keeps the newer remote icon instead of pushing a stale local value',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final activityTracker = NoteSessionActivityTracker()
+        ..markActive('remote-wins-icon');
+      final pushed = <NoteIcon?>[];
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: activityTracker,
+        updateNoteIcon: (noteId, icon, expectedUpdatedAt) async {
+          pushed.add(icon);
+        },
+      );
+      addTearDown(database.close);
+
+      await database
+          .into(database.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: 'remote-wins-icon',
+              userId: 'owner-user',
+              content: 'Local content',
+              createdAt: DateTime.utc(2026, 7, 31),
+              updatedAt: DateTime.utc(2026, 7, 31, 12),
+              isDirty: const Value(false),
+              hasRemoteCopy: const Value(true),
+              noteIconDirty: const Value(true),
+              noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
+            ),
+          );
+      when(() => client.listNotes()).thenAnswer(
+        (_) async => [
+          {
+            'id': 'remote-wins-icon',
+            'user_id': 'owner-user',
+            'note_icon': {'kind': 'emoji', 'value': '🔥'},
+            'created_at': '2026-07-31T12:00:00.000Z',
+            'updated_at': '2026-07-31T12:01:00.000Z',
+          },
+        ],
+      );
+
+      await sync.pullRemoteNotes('owner-user');
+      await sync.pushDirtyNoteIcons();
+
+      final saved = await database.notesDao.getNoteById('remote-wins-icon');
+      expect(jsonDecode(saved!.noteIconJson!), {
+        'kind': 'emoji',
+        'value': '🔥',
+      });
+      expect(saved.noteIconDirty, isFalse);
+      expect(pushed, isEmpty);
+    },
+  );
 
   test('applies a remote icon clear when no local icon is pending', () async {
     final database = AppDatabase.test();

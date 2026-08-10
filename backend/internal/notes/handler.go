@@ -21,9 +21,10 @@ type CreateNoteRequest struct {
 }
 
 type UpdateNoteRequest struct {
-	Content        *string         `json:"content"`
-	CollapseImages *bool           `json:"collapse_images"`
-	NoteIcon       json.RawMessage `json:"note_icon"`
+	Content           *string         `json:"content"`
+	CollapseImages    *bool           `json:"collapse_images"`
+	NoteIcon          json.RawMessage `json:"note_icon"`
+	ExpectedUpdatedAt *time.Time      `json:"expected_updated_at"`
 }
 
 type NoteResponse struct {
@@ -163,8 +164,11 @@ func (h *Handler) Update(c echo.Context) error {
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, err.Error())
 	}
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, req.CollapseImages, noteIcon)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, req.CollapseImages, noteIcon, req.ExpectedUpdatedAt)
 	if err != nil {
+		if errors.Is(err, ErrNoteConflict) {
+			return web.JSONError(c, http.StatusConflict, "note changed remotely")
+		}
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
 		}

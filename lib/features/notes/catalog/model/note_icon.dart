@@ -66,6 +66,9 @@ class NoteIcon {
     if (value.trim().isEmpty) {
       throw ArgumentError.value(value, 'value', 'Emoji cannot be empty');
     }
+    if (!value.runes.any(_isEmojiCodePoint)) {
+      throw ArgumentError.value(value, 'value', 'Value must contain an emoji');
+    }
     if (utf8.encode(value).length > maxNoteIconBytes) {
       throw ArgumentError.value(value, 'value', 'Emoji is too long');
     }
@@ -132,4 +135,11 @@ class NoteIcon {
   };
 
   bool get isEmoji => kind == NoteIconKind.emoji;
+}
+
+bool _isEmojiCodePoint(int rune) {
+  return (rune >= 0x1F000 && rune <= 0x1FAFF) ||
+      (rune >= 0x2300 && rune <= 0x23FF) ||
+      (rune >= 0x2600 && rune <= 0x27BF) ||
+      (rune >= 0x2B00 && rune <= 0x2BFF);
 }

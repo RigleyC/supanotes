@@ -105,6 +105,11 @@ func TestValidateNoteIcon(t *testing.T) {
 			icon:    noteIconPayload{Kind: "emoji", Value: "   "},
 			wantErr: true,
 		},
+		{
+			name:    "plain text emoji",
+			icon:    noteIconPayload{Kind: "emoji", Value: "abc"},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

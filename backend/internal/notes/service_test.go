@@ -51,7 +51,7 @@ func TestService_UpdateNote_ContentChange(t *testing.T) {
 	}, nil)
 
 	newContent := "updated content"
-	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, omitNoteIcon())
+	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, omitNoteIcon(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,6 +75,7 @@ func TestService_UpdateNote_IconChange(t *testing.T) {
 		nil,
 		nil,
 		valueNoteIcon(icon),
+		nil,
 	); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

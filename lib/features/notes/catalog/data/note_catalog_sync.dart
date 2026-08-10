@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
 
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/database/database.dart';
@@ -10,7 +11,12 @@ import 'package:supanotes/features/notes/editor/sync/note_session_activity_track
 import 'package:supanotes/features/tasks/domain/note_document_projector.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 
-typedef NoteIconUpdater = Future<void> Function(String noteId, NoteIcon? icon);
+typedef NoteIconUpdater =
+    Future<void> Function(
+      String noteId,
+      NoteIcon? icon,
+      DateTime? expectedUpdatedAt,
+    );
 
 /// Typed metadata received from the catalog endpoint.
 ///
@@ -187,6 +193,7 @@ class NoteCatalogSync {
   final NoteSessionActivityTracker _activityTracker;
   final NoteIconUpdater _updateNoteIcon;
   final NoteDocumentProjector _documentProjector;
+  Map<String, _RemoteNoteMetadata> _remoteCatalog = const {};
 
   Future<void> pushDeletedNotes() async {
     final localOnlyDeletedNotes = await _database.notesDao
@@ -217,15 +224,50 @@ class NoteCatalogSync {
   Future<void> pushDirtyNoteIcons() async {
     final dirty = await _database.notesDao.getDirtyNoteIcons();
     for (final note in dirty) {
+      final remote = _remoteCatalog[note.id];
+      if (remote?.hasNoteIcon == true &&
+          remote!.updatedAt.isAfter(note.updatedAt)) {
+        await _database.notesDao.resolveRemoteNoteIcon(
+          id: note.id,
+          noteIconJson: remote.noteIconJson,
+          remoteUpdatedAt: remote.updatedAt,
+        );
+        continue;
+      }
       final icon = _decodeLocalNoteIcon(note.id, note.noteIconJson);
-      await _updateNoteIcon(note.id, icon);
+      try {
+        await _updateNoteIcon(note.id, icon, remote?.updatedAt);
+      } catch (error) {
+        if (!_isVersionConflict(error)) rethrow;
+        await _refreshRemoteCatalog();
+        final latest = _remoteCatalog[note.id];
+        if (latest == null || !latest.hasNoteIcon) rethrow;
+        await _database.notesDao.resolveRemoteNoteIcon(
+          id: note.id,
+          noteIconJson: latest.noteIconJson,
+          remoteUpdatedAt: latest.updatedAt,
+        );
+        continue;
+      }
       await _database.notesDao.clearNoteIconDirty(note.id, note.updatedAt);
     }
+  }
+
+  bool _isVersionConflict(Object error) {
+    return (error is NoteOperationsException && error.statusCode == 409) ||
+        (error is DioException && error.response?.statusCode == 409);
+  }
+
+  Future<void> _refreshRemoteCatalog() async {
+    final rows = await _listAllRemoteNotes();
+    final remoteNotes = rows.map(_RemoteNoteMetadata.fromJson).toList();
+    _remoteCatalog = {for (final remote in remoteNotes) remote.id: remote};
   }
 
   Future<void> pullRemoteNotes(String userId) async {
     final rows = await _listAllRemoteNotes();
     final remoteNotes = rows.map(_RemoteNoteMetadata.fromJson).toList();
+    _remoteCatalog = {for (final remote in remoteNotes) remote.id: remote};
     final remoteIds = remoteNotes.map((note) => note.id).toSet();
 
     Object? firstError;
@@ -406,20 +448,26 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
     syncClient: ref.watch(noteSyncClientProvider),
     database: ref.watch(appDatabaseProvider),
     activityTracker: ref.watch(noteSessionActivityTrackerProvider),
-    updateNoteIcon: (noteId, icon) async {
+    updateNoteIcon: (noteId, icon, expectedUpdatedAt) async {
       await ref
           .read(apiClientProvider)
           .patch<Map<String, dynamic>>(
             '/notes/$noteId',
-            data: {'note_icon': icon?.toJson()},
+            data: {
+              'note_icon': icon?.toJson(),
+              if (expectedUpdatedAt != null)
+                'expected_updated_at': expectedUpdatedAt
+                    .toUtc()
+                    .toIso8601String(),
+            },
           );
     },
   );
   while (true) {
     try {
       await sync.pushDeletedNotes();
-      await sync.pushDirtyNoteIcons();
       await sync.pullRemoteNotes(user.id);
+      await sync.pushDirtyNoteIcons();
       yield null;
     } catch (error, stackTrace) {
       if (error is NoteOperationsException && error.statusCode == 401) {

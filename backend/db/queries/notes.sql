@@ -24,6 +24,7 @@ SET content = COALESCE(sqlc.narg('content'), content),
     note_icon = CASE WHEN sqlc.narg('set_note_icon')::boolean THEN sqlc.narg('note_icon') ELSE note_icon END,
     updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
+  AND (sqlc.narg('expected_updated_at')::timestamptz IS NULL OR notes.updated_at = sqlc.narg('expected_updated_at'))
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
 RETURNING *;
 

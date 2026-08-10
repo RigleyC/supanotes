@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
@@ -80,6 +81,40 @@ func TestUpdateAcceptsExplicitIconClear(t *testing.T) {
 	}
 	if len(received.NoteIcon) != 0 {
 		t.Fatalf("note icon = %s, want null payload", received.NoteIcon)
+	}
+}
+
+func TestUpdateAcceptsColoredCatalogIcon(t *testing.T) {
+	var received sqlcgen.UpdateNoteParams
+	repo := &mockRepo{
+		updateNoteFn: func(_ context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
+			received = arg
+			return sqlcgen.Note{ID: arg.ID, UserID: arg.UserID}, nil
+		},
+	}
+	recorder := runUpdateRequest(t, NewHandler(NewService(repo, nil)), `{"note_icon":{"kind":"catalog","value":"star","color_key":"blue"}}`)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if string(received.NoteIcon) != `{"kind":"catalog","value":"star","color_key":"blue"}` {
+		t.Fatalf("note icon = %s, want catalog payload", received.NoteIcon)
+	}
+}
+
+func TestUpdateMapsStaleVersionToConflict(t *testing.T) {
+	repo := &mockRepo{
+		getNoteByIDFn: func(_ context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.GetNoteByIDRow, error) {
+			return sqlcgen.GetNoteByIDRow{ID: id, UserID: userID}, nil
+		},
+		updateNoteFn: func(_ context.Context, _ sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
+			return sqlcgen.Note{}, pgx.ErrNoRows
+		},
+	}
+	recorder := runUpdateRequest(t, NewHandler(NewService(repo, nil)), `{"note_icon":null,"expected_updated_at":"2026-07-31T12:01:00Z"}`)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusConflict)
 	}
 }
 

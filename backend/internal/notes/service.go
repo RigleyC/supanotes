@@ -16,6 +16,7 @@ import (
 
 var (
 	ErrNoteNotFound = errors.New("note not found")
+	ErrNoteConflict = errors.New("note changed remotely")
 	ErrEmptyNote    = errors.New("empty note")
 )
 
@@ -60,12 +61,15 @@ func (s *Service) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype
 	return note, nil
 }
 
-func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, collapseImages *bool, noteIcon NoteIconUpdate) (sqlcgen.Note, error) {
+func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, collapseImages *bool, noteIcon NoteIconUpdate, expectedUpdatedAt *time.Time) (sqlcgen.Note, error) {
 	arg := sqlcgen.UpdateNoteParams{
 		ID:          id,
 		UserID:      userID,
 		SetNoteIcon: pgtype.Bool{Bool: noteIcon.IsSet(), Valid: noteIcon.IsSet()},
 		NoteIcon:    noteIcon.JSON(),
+	}
+	if expectedUpdatedAt != nil {
+		arg.ExpectedUpdatedAt = pgtype.Timestamptz{Time: expectedUpdatedAt.UTC(), Valid: true}
 	}
 	if content != nil {
 		arg.Content = pgtype.Text{String: *content, Valid: true}
@@ -77,6 +81,11 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	note, err := s.repo.UpdateNote(ctx, arg)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			if expectedUpdatedAt != nil {
+				if _, lookupErr := s.repo.GetNoteByID(ctx, id, userID); lookupErr == nil {
+					return sqlcgen.Note{}, ErrNoteConflict
+				}
+			}
 			return sqlcgen.Note{}, ErrNoteNotFound
 		}
 		return sqlcgen.Note{}, err

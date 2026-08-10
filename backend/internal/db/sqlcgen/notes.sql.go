@@ -412,17 +412,19 @@ SET content = COALESCE($3, content),
     note_icon = CASE WHEN $5::boolean THEN $6 ELSE note_icon END,
     updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
+  AND ($7::timestamptz IS NULL OR notes.updated_at = $7)
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
 RETURNING id, user_id, content, excerpt, created_at, updated_at, deleted_at, collapse_images, revision, document, snapshot_revision, note_icon
 `
 
 type UpdateNoteParams struct {
-	ID             pgtype.UUID `json:"id"`
-	UserID         pgtype.UUID `json:"user_id"`
-	Content        pgtype.Text `json:"content"`
-	CollapseImages pgtype.Bool `json:"collapse_images"`
-	SetNoteIcon    pgtype.Bool `json:"set_note_icon"`
-	NoteIcon       []byte      `json:"note_icon"`
+	ID                pgtype.UUID        `json:"id"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	Content           pgtype.Text        `json:"content"`
+	CollapseImages    pgtype.Bool        `json:"collapse_images"`
+	SetNoteIcon       pgtype.Bool        `json:"set_note_icon"`
+	NoteIcon          []byte             `json:"note_icon"`
+	ExpectedUpdatedAt pgtype.Timestamptz `json:"expected_updated_at"`
 }
 
 func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error) {
@@ -433,6 +435,7 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		arg.CollapseImages,
 		arg.SetNoteIcon,
 		arg.NoteIcon,
+		arg.ExpectedUpdatedAt,
 	)
 	var i Note
 	err := row.Scan(

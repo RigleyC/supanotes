@@ -112,7 +112,7 @@ func validateNoteIcon(icon noteIconPayload) error {
 		if len(icon.ColorKey) > 0 {
 			return fmt.Errorf("emoji cannot have a color")
 		}
-		if !utf8.ValidString(icon.Value) || len(icon.Value) > maxNoteIconBytes {
+		if !utf8.ValidString(icon.Value) || !containsEmojiCodePoint(icon.Value) || len(icon.Value) > maxNoteIconBytes {
 			return fmt.Errorf("invalid emoji value")
 		}
 	case "catalog":
@@ -130,6 +130,18 @@ func validateNoteIcon(icon noteIconPayload) error {
 		return fmt.Errorf("unknown note icon kind")
 	}
 	return nil
+}
+
+func containsEmojiCodePoint(value string) bool {
+	for _, runeValue := range value {
+		if (runeValue >= 0x1F000 && runeValue <= 0x1FAFF) ||
+			(runeValue >= 0x2300 && runeValue <= 0x23FF) ||
+			(runeValue >= 0x2600 && runeValue <= 0x27BF) ||
+			(runeValue >= 0x2B00 && runeValue <= 0x2BFF) {
+			return true
+		}
+	}
+	return false
 }
 
 func noteIconColorKey(raw json.RawMessage) (string, bool) {

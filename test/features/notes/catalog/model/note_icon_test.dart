@@ -39,6 +39,14 @@ void main() {
     );
   });
 
+  test('rejects plain text as emoji metadata', () {
+    expect(() => NoteIcon.emoji('abc'), throwsArgumentError);
+    expect(
+      () => NoteIcon.fromJson({'kind': 'emoji', 'value': 'abc'}),
+      throwsFormatException,
+    );
+  });
+
   test('rejects a color on emoji metadata', () {
     expect(
       () => NoteIcon.fromJson({
