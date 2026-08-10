@@ -51,11 +51,39 @@ func TestService_UpdateNote_ContentChange(t *testing.T) {
 	}, nil)
 
 	newContent := "updated content"
-	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, nil, false)
+	note, err := svc.UpdateNote(context.Background(), pgtype.UUID{}, pgtype.UUID{}, &newContent, nil, omitNoteIcon())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	_ = note
+}
+
+func TestService_UpdateNote_IconChange(t *testing.T) {
+	var received sqlcgen.UpdateNoteParams
+	svc := NewService(&mockRepo{
+		updateNoteFn: func(_ context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {
+			received = arg
+			return sqlcgen.Note{ID: arg.ID}, nil
+		},
+	}, nil)
+
+	icon := []byte(`{"kind":"emoji","value":"🙂"}`)
+	if _, err := svc.UpdateNote(
+		context.Background(),
+		pgtype.UUID{},
+		pgtype.UUID{},
+		nil,
+		nil,
+		valueNoteIcon(icon),
+	); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !received.SetNoteIcon.Valid || !received.SetNoteIcon.Bool {
+		t.Fatal("icon update did not set the icon flag")
+	}
+	if string(received.NoteIcon) != string(icon) {
+		t.Fatalf("note icon = %s, want %s", received.NoteIcon, icon)
+	}
 }
 
 func TestCreateNoteRejectsEmptyRegularNote(t *testing.T) {

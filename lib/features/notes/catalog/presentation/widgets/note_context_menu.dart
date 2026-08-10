@@ -3,6 +3,7 @@ import 'package:supanotes/core/utils/platform_utils.dart';
 import 'package:super_context_menu/super_context_menu.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'note_icon_interaction_policy.dart';
 
 /// Shared wrapper for native context menus (right-click / long-press) on notes.
 class NoteContextMenuWidget extends StatelessWidget {
@@ -24,11 +25,15 @@ class NoteContextMenuWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!isDesktopLayout(context)) return child;
+    final canEditIcon = NoteIconInteractionPolicy.canEditIcon(
+      note: note,
+      onEditIcon: onEditIcon,
+    );
     return ContextMenuWidget(
       menuProvider: (request) {
         return Menu(
           children: [
-            if (onEditIcon != null && !note.isReadOnly)
+            if (canEditIcon)
               MenuAction(
                 title: 'Alterar ícone',
                 image: MenuImage.icon(Icons.emoji_emotions_outlined),

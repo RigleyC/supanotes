@@ -3,7 +3,6 @@ package notes
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,18 +27,20 @@ type UpdateNoteRequest struct {
 }
 
 type NoteResponse struct {
-	ID             string          `json:"id"`
-	Content        string          `json:"content"`
-	Excerpt        *string         `json:"excerpt,omitempty"`
-	Favorite       bool            `json:"favorite"`
-	Archived       bool            `json:"archived"`
-	CollapseImages bool            `json:"collapse_images"`
-	CreatedAt      string          `json:"created_at"`
-	UpdatedAt      string          `json:"updated_at"`
-	Permission     string          `json:"permission,omitempty"`
-	SharedByEmail  string          `json:"shared_by_email,omitempty"`
-	SharedByName   string          `json:"shared_by_name,omitempty"`
-	NoteIcon       json.RawMessage `json:"note_icon,omitempty"`
+	ID             string  `json:"id"`
+	Content        string  `json:"content"`
+	Excerpt        *string `json:"excerpt,omitempty"`
+	Favorite       bool    `json:"favorite"`
+	Archived       bool    `json:"archived"`
+	CollapseImages bool    `json:"collapse_images"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
+	Permission     string  `json:"permission,omitempty"`
+	SharedByEmail  string  `json:"shared_by_email,omitempty"`
+	SharedByName   string  `json:"shared_by_name,omitempty"`
+	// The field is always present so a remote clear is distinguishable from an
+	// older response that did not carry icon metadata.
+	NoteIcon json.RawMessage `json:"note_icon"`
 }
 
 type Handler struct {
@@ -113,7 +114,7 @@ func (h *Handler) List(c echo.Context) error {
 
 	res := make([]NoteResponse, 0, len(notes))
 	for _, n := range notes {
-		res = append(res, mapToNoteResponseFields(n))
+		res = append(res, mapToNoteResponse(noteResponseFieldsFromListRow(n)))
 	}
 
 	return c.JSON(http.StatusOK, res)
@@ -139,15 +140,7 @@ func (h *Handler) Get(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to get note")
 	}
 
-	return c.JSON(http.StatusOK, mapToNoteResponse(NoteResponseFields{
-		ID: note.ID, Content: note.Content,
-		Excerpt: note.Excerpt, Favorite: note.Favorite,
-		Archived: note.Archived, CollapseImages: note.CollapseImages,
-		CreatedAt: note.CreatedAt, UpdatedAt: note.UpdatedAt,
-		Permission: note.Permission, SharedByEmail: note.SharedByEmail,
-		SharedByName: note.SharedByName,
-		NoteIcon:     note.NoteIcon,
-	}))
+	return c.JSON(http.StatusOK, mapToNoteResponse(noteResponseFieldsFromGetRow(note)))
 }
 
 func (h *Handler) Update(c echo.Context) error {
@@ -166,19 +159,11 @@ func (h *Handler) Update(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	var noteIcon []byte
-	setNoteIcon := len(req.NoteIcon) > 0
-	if setNoteIcon && string(req.NoteIcon) != "null" {
-		var decoded map[string]any
-		if err := json.Unmarshal(req.NoteIcon, &decoded); err != nil {
-			return web.JSONError(c, http.StatusBadRequest, "invalid note icon")
-		}
-		if err := validateNoteIcon(decoded); err != nil {
-			return web.JSONError(c, http.StatusBadRequest, err.Error())
-		}
-		noteIcon = req.NoteIcon
+	noteIcon, err := parseNoteIconPayload(req.NoteIcon)
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, err.Error())
 	}
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, req.CollapseImages, noteIcon, setNoteIcon)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, req.CollapseImages, noteIcon)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
@@ -269,21 +254,16 @@ func noteToResponseFields(n sqlcgen.Note) NoteResponseFields {
 	}
 }
 
-func mapToNoteResponseFields(n sqlcgen.GetNotesRow) NoteResponse {
-	var exc *string
-	if n.Excerpt.Valid {
-		e := n.Excerpt.String
-		exc = &e
-	}
-	return NoteResponse{
-		ID:             uid.UUIDToString(n.ID),
-		Content:        "",
-		Excerpt:        exc,
+func noteResponseFieldsFromGetRow(n sqlcgen.GetNoteByIDRow) NoteResponseFields {
+	return NoteResponseFields{
+		ID:             n.ID,
+		Content:        n.Content,
+		Excerpt:        n.Excerpt,
 		Favorite:       n.Favorite,
 		Archived:       n.Archived,
 		CollapseImages: n.CollapseImages,
-		CreatedAt:      n.CreatedAt.Time.Format(time.RFC3339Nano),
-		UpdatedAt:      n.UpdatedAt.Time.Format(time.RFC3339Nano),
+		CreatedAt:      n.CreatedAt,
+		UpdatedAt:      n.UpdatedAt,
 		Permission:     n.Permission,
 		SharedByEmail:  n.SharedByEmail,
 		SharedByName:   n.SharedByName,
@@ -291,47 +271,18 @@ func mapToNoteResponseFields(n sqlcgen.GetNotesRow) NoteResponse {
 	}
 }
 
-func validateNoteIcon(icon map[string]any) error {
-	kind, ok := icon["kind"].(string)
-	if !ok {
-		return fmt.Errorf("note icon kind is required")
+func noteResponseFieldsFromListRow(n sqlcgen.GetNotesRow) NoteResponseFields {
+	return NoteResponseFields{
+		ID:             n.ID,
+		Excerpt:        n.Excerpt,
+		Favorite:       n.Favorite,
+		Archived:       n.Archived,
+		CollapseImages: n.CollapseImages,
+		CreatedAt:      n.CreatedAt,
+		UpdatedAt:      n.UpdatedAt,
+		Permission:     n.Permission,
+		SharedByEmail:  n.SharedByEmail,
+		SharedByName:   n.SharedByName,
+		NoteIcon:       n.NoteIcon,
 	}
-	value, ok := icon["value"].(string)
-	if !ok || value == "" {
-		return fmt.Errorf("note icon value is required")
-	}
-	switch kind {
-	case "emoji":
-		if _, hasColor := icon["color_key"]; hasColor {
-			return fmt.Errorf("emoji cannot have a color")
-		}
-	case "catalog":
-		if !catalogIconIDs[value] {
-			return fmt.Errorf("unknown catalog icon")
-		}
-		color, ok := icon["color_key"].(string)
-		if !ok || !catalogColorKeys[color] {
-			return fmt.Errorf("unknown catalog icon color")
-		}
-	default:
-		return fmt.Errorf("unknown note icon kind")
-	}
-	return nil
-}
-
-var catalogIconIDs = map[string]bool{
-	"wallet": true, "arrow_down": true, "star": true, "lock": true,
-	"home": true, "calendar": true, "basket": true, "travel": true,
-	"book": true, "bookmark": true, "code": true, "braces": true,
-	"building": true, "sparkles": true, "camera": true, "car": true,
-	"cart": true, "warning": true, "chart": true, "chat": true,
-	"cloud": true, "settings": true, "crown": true, "monitor": true,
-	"money": true, "globe": true, "eye": true, "fire": true,
-	"flag": true, "game": true,
-}
-
-var catalogColorKeys = map[string]bool{
-	"red": true, "orange": true, "yellow": true, "green": true,
-	"teal": true, "blue": true, "indigo": true, "purple": true,
-	"pink": true, "brown": true, "gray": true, "black": true,
 }

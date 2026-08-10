@@ -435,17 +435,22 @@ class _SidebarNoteTile extends StatelessWidget {
                                 NoteIconView(icon: note.noteIcon!, size: 16),
                                 const SizedBox(width: 6),
                               ],
-                              Expanded(child: Text(
-                            note.title.isEmpty ? 'Sem título' : note.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: scheme.onSurface,
-                            ))),
+                              Expanded(
+                                child: Text(
+                                  note.title.isEmpty
+                                      ? 'Sem título'
+                                      : note.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ],

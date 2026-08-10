@@ -19,25 +19,19 @@ import 'local/notes_local_repository.dart';
 ///
 /// Wraps the lower-level [NotesLocalRepository] and exposes operations
 /// in terms of [NoteModel] so widgets never have to import Drift types.
-/// Every mutation goes through here so the `isDirty` flag, the
-/// `updatedAt` timestamp, and the inbox singleton invariant are
-/// consistently maintained.
+/// Document mutations go through here so the `isDirty` flag, the
+/// `updatedAt` timestamp, and the inbox singleton invariant are consistently
+/// maintained. Shared metadata uses its own pending state.
 abstract class INotesRepository {
-  Stream<List<NoteModel>> watchNotes({
-    bool favoritesOnly = false,
-  });
+  Stream<List<NoteModel>> watchNotes({bool favoritesOnly = false});
   Stream<NoteModel?> watchNoteById(String id);
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId);
   Future<NoteModel?> getNoteById(String id);
-  Future<NoteModel> upsertNote({
-    required String id,
-    String content = '',
-  });
-  Future<void> updateNote(
-    String id, {
-    String? content,
-    bool? collapseImages,
-  });
+  Future<NoteModel> upsertNote({required String id, String content = ''});
+  Future<void> updateNote(String id, {String? content, bool? collapseImages});
+
+  /// Saves shared note icon metadata immediately. A `null` icon clears it.
+  Future<void> updateNoteIcon(String id, NoteIcon? icon);
   Future<void> toggleFavorite(String noteId);
   Future<void> softDelete(String id);
   Future<NoteModel> createLocalNote({required String id});
@@ -50,8 +44,7 @@ class NotesRepository implements INotesRepository {
   NotesRepository(
     this._local,
     this._tasksLocal,
-    this._prefsDao,
-    [
+    this._prefsDao, [
     this._noteLinksDao,
   ]);
 
@@ -64,9 +57,7 @@ class NotesRepository implements INotesRepository {
   /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
   /// to favorite notes.
   @override
-  Stream<List<NoteModel>> watchNotes({
-    bool favoritesOnly = false,
-  }) {
+  Stream<List<NoteModel>> watchNotes({bool favoritesOnly = false}) {
     final Stream<List<NoteQueryResult>> source;
     if (favoritesOnly) {
       source = _local.watchFavorites();
@@ -127,49 +118,45 @@ class NotesRepository implements INotesRepository {
     return NoteModel.fromQueryResult(saved!);
   }
 
-  /// Applies a partial update to the note with [id]. Only non-null
-  /// arguments are written. Bumps `updatedAt` and re-flips `isDirty`
-  /// so the change reaches the backend on the next sync round.
+  /// Applies a partial document update to the note with [id]. Only non-null
+  /// arguments are written. Bumps `updatedAt` and marks the document dirty.
   @override
   Future<void> updateNote(
     String id, {
     String? content,
     bool? collapseImages,
-    NoteIcon? noteIcon,
-    bool clearNoteIcon = false,
   }) async {
     final current = await _local.getNoteById(id);
     if (current == null) return;
 
-    final nextContent = content ?? current.note.content;
     final companion = NotesCompanion(
       id: Value(id),
-      content: content == null ? const Value.absent() : Value(nextContent),
+      content: content == null ? const Value.absent() : Value(content),
       excerpt: content == null
           ? const Value.absent()
-          : Value(_excerptFrom(nextContent)),
+          : Value(_excerptFrom(content)),
       collapseImages: collapseImages == null
           ? const Value.absent()
           : Value(collapseImages),
-      noteIconJson: clearNoteIcon
-          ? const Value(null)
-          : noteIcon == null
-          ? const Value.absent()
-          : Value(jsonEncode(noteIcon.toJson())),
-      noteIconDirty: (noteIcon != null || clearNoteIcon)
-          ? const Value(true)
-          : const Value.absent(),
       updatedAt: Value(DateTime.now().toUtc()),
       isDirty: const Value(true),
     );
     await _local.updateNoteRaw(companion);
   }
 
-  Future<void> updateNoteIcon(
-    String id, {
-    NoteIcon? icon,
-    bool clear = false,
-  }) => updateNote(id, noteIcon: icon, clearNoteIcon: clear);
+  @override
+  Future<void> updateNoteIcon(String id, NoteIcon? icon) async {
+    await _local.updateNoteRaw(
+      NotesCompanion(
+        id: Value(id),
+        noteIconJson: icon == null
+            ? const Value(null)
+            : Value(jsonEncode(icon.toJson())),
+        noteIconDirty: const Value(true),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
 
   /// Flips the favorite flag on the given note using the per-user
   /// preferences table. No-op if the row no longer exists.
@@ -281,17 +268,6 @@ class NotesRepository implements INotesRepository {
   }
 }
 
-Future<void> saveNoteIcon(
-  INotesRepository repository,
-  String id, {
-  NoteIcon? icon,
-  bool clear = false,
-}) async {
-  if (repository case final NotesRepository concrete) {
-    await concrete.updateNoteIcon(id, icon: icon, clear: clear);
-  }
-}
-
 /// Riverpod entry point for the feature-level [NotesRepository].
 ///
 /// Reads [currentUserIdProvider] and [appDatabaseProvider] directly instead
@@ -300,14 +276,11 @@ Future<void> saveNoteIcon(
 /// [NotesListScreen] first mounts and the intermediate provider is dirty.
 final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) throw StateError('notesRepositoryProvider: unauthenticated');
+  if (userId == null) {
+    throw StateError('notesRepositoryProvider: unauthenticated');
+  }
   final db = ref.watch(appDatabaseProvider);
   final local = NotesLocalRepository(db.notesDao, userId);
   final tasksLocal = TasksLocalRepository(db.tasksDao, userId);
-  return NotesRepository(
-    local,
-    tasksLocal,
-    db.userNotePreferencesDao,
-  
-  );
+  return NotesRepository(local, tasksLocal, db.userNotePreferencesDao);
 });

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
@@ -6,12 +7,325 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
+import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
+Future<void> _noopNoteIconUpdate(String noteId, NoteIcon? icon) async {}
+
 void main() {
+  test(
+    'pushes an active dirty note icon without changing document dirtiness',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final updates = <(String, NoteIcon?)>[];
+      final activityTracker = NoteSessionActivityTracker()
+        ..markActive('icon-note');
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: activityTracker,
+        updateNoteIcon: (noteId, icon) async => updates.add((noteId, icon)),
+      );
+      addTearDown(database.close);
+
+      await database
+          .into(database.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: 'icon-note',
+              userId: 'user-a',
+              content: 'Note',
+              createdAt: DateTime.utc(2026, 7, 31),
+              updatedAt: DateTime.utc(2026, 7, 31, 12),
+              isDirty: const Value(false),
+              noteIconDirty: const Value(true),
+              noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
+            ),
+          );
+
+      await sync.pushDirtyNoteIcons();
+
+      expect(updates, hasLength(1));
+      expect(updates.single.$1, 'icon-note');
+      expect(updates.single.$2?.toJson(), {'kind': 'emoji', 'value': '🙂'});
+      final saved = await database.notesDao.getNoteById('icon-note');
+      expect(saved!.noteIconDirty, isFalse);
+      expect(saved.isDirty, isFalse);
+    },
+  );
+
+  test(
+    'preserves a local icon while refreshing active share metadata',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final activityTracker = NoteSessionActivityTracker()
+        ..markActive('active-icon-note');
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: activityTracker,
+        updateNoteIcon: _noopNoteIconUpdate,
+      );
+      addTearDown(database.close);
+
+      await database
+          .into(database.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: 'active-icon-note',
+              userId: 'owner-user',
+              content: 'Local content',
+              createdAt: DateTime.utc(2026, 7, 31),
+              updatedAt: DateTime.utc(2026, 7, 31),
+              isDirty: const Value(false),
+              hasRemoteCopy: const Value(true),
+              permission: const Value('view'),
+              noteIconDirty: const Value(true),
+              noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
+            ),
+          );
+      when(() => client.listNotes()).thenAnswer(
+        (_) async => [
+          {
+            'id': 'active-icon-note',
+            'user_id': 'owner-user',
+            'permission': 'view',
+            'shared_by_email': 'owner@example.com',
+            'shared_by_name': 'Owner',
+            'note_icon': {'kind': 'emoji', 'value': '🔥'},
+            'created_at': '2026-07-31T12:00:00.000Z',
+            'updated_at': '2026-07-31T12:01:00.000Z',
+          },
+        ],
+      );
+
+      await sync.pullRemoteNotes('viewer-user');
+
+      final saved = await database.notesDao.getNoteById('active-icon-note');
+      expect(saved!.noteIconDirty, isTrue);
+      expect(jsonDecode(saved.noteIconJson!), {'kind': 'emoji', 'value': '🙂'});
+    },
+  );
+
+  test('applies an active owner icon update without share fields', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final activityTracker = NoteSessionActivityTracker()
+      ..markActive('active-owner-icon');
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: activityTracker,
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+
+    await database
+        .into(database.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: 'active-owner-icon',
+            userId: 'owner-user',
+            content: 'Local content',
+            createdAt: DateTime.utc(2026, 7, 31),
+            updatedAt: DateTime.utc(2026, 7, 31),
+            isDirty: const Value(false),
+            hasRemoteCopy: const Value(true),
+            noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
+          ),
+        );
+    when(() => client.listNotes()).thenAnswer(
+      (_) async => [
+        {
+          'id': 'active-owner-icon',
+          'user_id': 'owner-user',
+          'note_icon': {'kind': 'emoji', 'value': '🔥'},
+          'created_at': '2026-07-31T12:00:00.000Z',
+          'updated_at': '2026-07-31T12:01:00.000Z',
+        },
+      ],
+    );
+
+    await sync.pullRemoteNotes('owner-user');
+
+    final saved = await database.notesDao.getNoteById('active-owner-icon');
+    expect(jsonDecode(saved!.noteIconJson!), {'kind': 'emoji', 'value': '🔥'});
+    verifyNever(() => client.getDocument('active-owner-icon'));
+  });
+
+  test('applies a remote icon clear when no local icon is pending', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+
+    await database
+        .into(database.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: 'remote-icon-clear',
+            userId: 'owner-user',
+            content: 'Local content',
+            createdAt: DateTime.utc(2026, 7, 31),
+            updatedAt: DateTime.utc(2026, 7, 31),
+            isDirty: const Value(false),
+            hasRemoteCopy: const Value(true),
+            noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
+          ),
+        );
+    when(() => client.listNotes()).thenAnswer(
+      (_) async => [
+        {
+          'id': 'remote-icon-clear',
+          'user_id': 'owner-user',
+          'note_icon': null,
+          'created_at': '2026-07-31T12:00:00.000Z',
+          'updated_at': '2026-07-31T12:01:00.000Z',
+        },
+      ],
+    );
+    when(() => client.getDocument('remote-icon-clear')).thenAnswer(
+      (_) async => NoteDocumentResponse(
+        noteId: 'remote-icon-clear',
+        revision: 2,
+        document: const {
+          'schemaVersion': 1,
+          'blocks': [
+            {
+              'id': 'paragraph',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'Remote content'},
+              ],
+              'metadata': {},
+            },
+          ],
+        },
+        serverTime: DateTime.utc(2026, 7, 31, 12, 2),
+      ),
+    );
+
+    await sync.pullRemoteNotes('owner-user');
+
+    final saved = await database.notesDao.getNoteById('remote-icon-clear');
+    expect(saved!.noteIconJson, isNull);
+    expect(saved.noteIconDirty, isFalse);
+  });
+
+  test('surfaces an invalid remote icon for the next sync retry', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+
+    when(() => client.listNotes()).thenAnswer(
+      (_) async => [
+        {
+          'id': 'invalid-remote-icon',
+          'user_id': 'owner-user',
+          'note_icon': {
+            'kind': 'catalog',
+            'value': 'not-a-catalog-icon',
+            'color_key': 'blue',
+          },
+          'created_at': '2026-07-31T12:00:00.000Z',
+          'updated_at': '2026-07-31T12:01:00.000Z',
+        },
+      ],
+    );
+
+    await expectLater(
+      sync.pullRemoteNotes('owner-user'),
+      throwsA(isA<FormatException>()),
+    );
+    verifyNever(() => client.getDocument('invalid-remote-icon'));
+  });
+
+  test(
+    'hydrates remote content while preserving a pending local icon',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
+      );
+      addTearDown(database.close);
+
+      await database
+          .into(database.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: 'dirty-icon-content',
+              userId: 'owner-user',
+              content: 'Old content',
+              createdAt: DateTime.utc(2026, 7, 31),
+              updatedAt: DateTime.utc(2026, 7, 31),
+              isDirty: const Value(false),
+              hasRemoteCopy: const Value(true),
+              noteIconDirty: const Value(true),
+              noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
+            ),
+          );
+      when(() => client.listNotes()).thenAnswer(
+        (_) async => [
+          {
+            'id': 'dirty-icon-content',
+            'user_id': 'owner-user',
+            'note_icon': {'kind': 'emoji', 'value': '🔥'},
+            'created_at': '2026-07-31T12:00:00.000Z',
+            'updated_at': '2026-07-31T12:01:00.000Z',
+          },
+        ],
+      );
+      when(() => client.getDocument('dirty-icon-content')).thenAnswer(
+        (_) async => NoteDocumentResponse(
+          noteId: 'dirty-icon-content',
+          revision: 2,
+          document: const {
+            'schemaVersion': 1,
+            'blocks': [
+              {
+                'id': 'paragraph',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'Remote content'},
+                ],
+                'metadata': {},
+              },
+            ],
+          },
+          serverTime: DateTime.utc(2026, 7, 31, 12, 2),
+        ),
+      );
+
+      await sync.pullRemoteNotes('owner-user');
+
+      final saved = await database.notesDao.getNoteById('dirty-icon-content');
+      expect(saved!.content, 'Remote content');
+      expect(jsonDecode(saved.noteIconJson!), {'kind': 'emoji', 'value': '🙂'});
+      expect(saved.noteIconDirty, isTrue);
+      expect(saved.updatedAt.toUtc(), DateTime.utc(2026, 7, 31));
+    },
+  );
+
   test(
     'removes a remote note that disappeared from the server catalog',
     () async {
@@ -21,6 +335,7 @@ void main() {
         syncClient: client,
         database: database,
         activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
       );
       addTearDown(database.close);
 
@@ -52,6 +367,7 @@ void main() {
       syncClient: client,
       database: database,
       activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
     );
     addTearDown(database.close);
 
@@ -114,6 +430,7 @@ void main() {
       syncClient: client,
       database: database,
       activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
     );
     addTearDown(database.close);
 
@@ -148,6 +465,7 @@ void main() {
         syncClient: client,
         database: database,
         activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
       );
       addTearDown(database.close);
 
@@ -183,6 +501,7 @@ void main() {
       syncClient: client,
       database: database,
       activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
     );
     addTearDown(database.close);
 
@@ -230,6 +549,7 @@ void main() {
         syncClient: client,
         database: database,
         activityTracker: activityTracker,
+        updateNoteIcon: _noopNoteIconUpdate,
       );
       addTearDown(database.close);
 
@@ -271,6 +591,7 @@ void main() {
         syncClient: client,
         database: database,
         activityTracker: activityTracker,
+        updateNoteIcon: _noopNoteIconUpdate,
       );
       addTearDown(database.close);
 
@@ -302,6 +623,7 @@ void main() {
       syncClient: client,
       database: database,
       activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
     );
     addTearDown(database.close);
 
@@ -382,6 +704,7 @@ void main() {
         syncClient: client,
         database: database,
         activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
       );
       addTearDown(database.close);
 
@@ -466,6 +789,7 @@ void main() {
         syncClient: client,
         database: database,
         activityTracker: activityTracker,
+        updateNoteIcon: _noopNoteIconUpdate,
       );
       addTearDown(database.close);
 
@@ -531,6 +855,7 @@ void main() {
         syncClient: client,
         database: firstDatabase,
         activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
       );
 
       when(() => client.listNotes()).thenAnswer(
@@ -591,6 +916,7 @@ void main() {
         syncClient: client,
         database: database,
         activityTracker: activityTracker,
+        updateNoteIcon: _noopNoteIconUpdate,
       );
       addTearDown(database.close);
 

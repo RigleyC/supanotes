@@ -6,6 +6,7 @@ import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/features/notes/catalog/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
+import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 
 void main() {
@@ -138,6 +139,21 @@ void main() {
       final saved = await local.getNoteById('note-1');
       expect(saved, isNotNull);
       expect(saved!.note.content, content);
+    });
+
+    test('updateNoteIcon stores only icon dirtiness', () async {
+      final prefsDao = FakeUserNotePreferencesDao();
+      final local = FakeNotesLocalRepository();
+      await local.createNoteWithId('note-1');
+      final tasksLocal = FakeTasksLocalRepository();
+      final repo = NotesRepository(local, tasksLocal, prefsDao);
+
+      await repo.updateNoteIcon('note-1', NoteIcon.emoji('🙂'));
+
+      final saved = await local.getNoteById('note-1');
+      expect(saved!.note.isDirty, isFalse);
+      expect(saved.note.noteIconDirty, isTrue);
+      expect(saved.note.noteIconJson, contains('🙂'));
     });
   });
 }

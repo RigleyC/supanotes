@@ -276,24 +276,47 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   }
 
   /// Updates only the share metadata present in the remote catalog response.
+  /// Pending local icon changes are preserved by leaving [noteIconDirty]
+  /// untouched.
   Future<bool> updateRemoteShareMetadata({
     required String id,
     Value<String?> permission = const Value.absent(),
     Value<String?> sharedByEmail = const Value.absent(),
     Value<String?> sharedByName = const Value.absent(),
     Value<String?> noteIconJson = const Value.absent(),
-  }) async {
-    final updatedRows = await (update(notes)..where((t) => t.id.equals(id)))
-        .write(
-          NotesCompanion(
-            permission: permission,
-            sharedByEmail: sharedByEmail,
-            sharedByName: sharedByName,
-            noteIconJson: noteIconJson,
-            noteIconDirty: const Value(false),
-          ),
-        );
-    return updatedRows == 1;
+  }) {
+    return attachedDatabase.transaction(() async {
+      final hasShareMetadata =
+          permission.present || sharedByEmail.present || sharedByName.present;
+      if (hasShareMetadata) {
+        final updatedRows = await (update(notes)..where((t) => t.id.equals(id)))
+            .write(
+              NotesCompanion(
+                permission: permission,
+                sharedByEmail: sharedByEmail,
+                sharedByName: sharedByName,
+              ),
+            );
+        if (updatedRows != 1) return false;
+      }
+
+      if (!noteIconJson.present) return hasShareMetadata;
+
+      // The write transaction makes this check and the icon update atomic with
+      // the metadata refresh. A local icon mutation either wins before this
+      // check or runs after this transaction and overwrites the remote value.
+      final iconRows =
+          await (update(notes)
+                ..where((t) => t.id.equals(id) & t.noteIconDirty.equals(false)))
+              .write(NotesCompanion(noteIconJson: noteIconJson));
+      if (iconRows == 1 || hasShareMetadata) return true;
+
+      // An icon-only update can be skipped because a local icon is pending.
+      // Confirm that the row still exists so the caller can distinguish that
+      // race from a note deleted while the catalog request was in flight.
+      final row = await getNoteById(id);
+      return row != null;
+    });
   }
 
   /// Updates content, excerpt and updatedAt for a projected note in SQLite.

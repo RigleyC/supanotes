@@ -1,11 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:unicode_emojis/unicode_emojis.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_catalog.dart';
 import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
+
+part 'note_icon_picker_components.dart';
 
 Future<void> showNoteIconPicker({
   required BuildContext context,
@@ -18,10 +23,7 @@ Future<void> showNoteIconPicker({
     isDismissible: true,
     enableDrag: true,
     contentBackgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
-    builder: (_) => NoteIconPickerRootPage(
-      note: note,
-      onSelected: onSelected,
-    ),
+    builder: (_) => NoteIconPickerRootPage(note: note, onSelected: onSelected),
   );
 }
 
@@ -53,6 +55,7 @@ class NoteIconPickerRootPage extends StatelessWidget {
             NoteEmojiPickerPage(onSelected: (icon) => _select(context, icon)),
           ),
         ),
+        const SizedBox(height: 8),
         _PickerAction(
           icon: Icons.star_outline_rounded,
           label: 'Usar ícone',
@@ -63,6 +66,7 @@ class NoteIconPickerRootPage extends StatelessWidget {
             ),
           ),
         ),
+        if (hasIcon) const SizedBox(height: 8),
         if (hasIcon)
           _PickerAction(
             icon: Icons.remove_circle_outline,
@@ -96,44 +100,34 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
   @override
   Widget build(BuildContext context) {
     final emojis = _query.isEmpty
-        ? UnicodeEmojis.allEmojis.toList()
+        ? UnicodeEmojis.allEmojis
         : UnicodeEmojis.search(_query, limit: 240);
-    return _PickerPage(
+    return _PickerScrollPage(
       title: 'Escolher emoji',
       onBack: () => FamilyModalSheet.of(context).popPage(),
-      children: [
+      headerChildren: [
         AppInput(
           controller: _searchController,
           prefixIcon: const Icon(Icons.search),
           hintText: 'Buscar emojis',
           onChanged: (value) => setState(() => _query = value.trim()),
         ),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: emojis.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 8,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 4,
-          ),
-          itemBuilder: (context, index) {
-            final emoji = emojis[index];
-            return Semantics(
-              button: true,
-              label: emoji.name,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => widget.onSelected(NoteIcon.emoji(emoji.emoji)),
-                child: Center(
-                  child: Text(emoji.emoji, style: const TextStyle(fontSize: 28)),
-                ),
-              ),
-            );
-          },
-        ),
       ],
+      itemCount: emojis.length,
+      itemBuilder: (context, index) {
+        final emoji = emojis[index];
+        return Semantics(
+          button: true,
+          label: emoji.name,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => widget.onSelected(NoteIcon.emoji(emoji.emoji)),
+            child: Center(
+              child: Text(emoji.emoji, style: const TextStyle(fontSize: 28)),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -168,15 +162,15 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
   Widget build(BuildContext context) {
     final entries = catalogIcons.entries.where((entry) {
       if (_query.isEmpty) return true;
-      return (catalogIconLabels[entry.key] ?? entry.key)
-          .toLowerCase()
-          .contains(_query.toLowerCase());
+      return (catalogIconLabels[entry.key] ?? entry.key).toLowerCase().contains(
+        _query.toLowerCase(),
+      );
     }).toList();
     final scheme = Theme.of(context).colorScheme;
-    return _PickerPage(
+    return _PickerScrollPage(
       title: 'Escolher ícone',
       onBack: () => FamilyModalSheet.of(context).popPage(),
-      children: [
+      headerChildren: [
         AppInput(
           controller: _searchController,
           prefixIcon: const Icon(Icons.search),
@@ -185,7 +179,7 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 42,
+          height: 48,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: noteIconColors.length,
@@ -197,17 +191,25 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
                 button: true,
                 selected: selected,
                 label: 'Cor ${key == 'gray' ? 'cinza' : key}',
-                child: InkWell(
-                  onTap: () => setState(() => _colorKey = key),
-                  borderRadius: BorderRadius.circular(21),
-                  child: Container(
-                    width: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: noteIconColors[key]!.resolve(scheme.brightness),
-                      border: selected
-                          ? Border.all(color: scheme.onSurface, width: 3)
-                          : null,
+                child: SizedBox.square(
+                  dimension: 48,
+                  child: InkWell(
+                    onTap: () => setState(() => _colorKey = key),
+                    borderRadius: BorderRadius.circular(24),
+                    child: Center(
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: noteIconColors[key]!.resolve(
+                            scheme.brightness,
+                          ),
+                          border: selected
+                              ? Border.all(color: scheme.onSurface, width: 3)
+                              : null,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -215,113 +217,26 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
             },
           ),
         ),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: entries.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 8,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 4,
-          ),
-          itemBuilder: (context, index) {
-            final entry = entries[index];
-            return Semantics(
-              button: true,
-              label: catalogIconLabels[entry.key] ?? entry.key,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => widget.onSelected(
-                  NoteIcon.catalog(id: entry.key, colorKey: _colorKey),
-                ),
-                child: Icon(
-                  entry.value,
-                  size: 28,
-                  color: noteIconColors[_colorKey]!.resolve(scheme.brightness),
-                ),
-              ),
-            );
-          },
-        ),
       ],
-    );
-  }
-}
-
-class _PickerPage extends StatelessWidget {
-  const _PickerPage({
-    required this.title,
-    required this.children,
-    this.onBack,
-  });
-
-  final String title;
-  final List<Widget> children;
-  final VoidCallback? onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (onBack != null)
-                    AppIconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back)),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                ],
-              ),
-              const Divider(),
-              ...children,
-            ],
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        return Semantics(
+          button: true,
+          label: catalogIconLabels[entry.key] ?? entry.key,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => widget.onSelected(
+              NoteIcon.catalog(id: entry.key, colorKey: _colorKey),
+            ),
+            child: Icon(
+              entry.value,
+              size: 28,
+              color: noteIconColors[_colorKey]!.resolve(scheme.brightness),
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PickerAction extends StatelessWidget {
-  const _PickerAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Icon(icon),
-              const SizedBox(width: 12),
-              Text(label, style: Theme.of(context).textTheme.titleMedium),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

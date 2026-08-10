@@ -5,11 +5,168 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 import 'package:supanotes/features/tasks/domain/note_document_projector.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
+
+typedef NoteIconUpdater = Future<void> Function(String noteId, NoteIcon? icon);
+
+/// Typed metadata received from the catalog endpoint.
+///
+/// The catalog endpoint returns a partial note shape. The `has*` fields keep
+/// the difference between an omitted field and an explicit `null`, which is
+/// required for remote icon clears and partial metadata updates.
+final class _RemoteNoteMetadata {
+  const _RemoteNoteMetadata({
+    required this.id,
+    required this.userId,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.hasCollapseImages,
+    required this.collapseImages,
+    required this.hasPermission,
+    required this.permission,
+    required this.hasSharedByEmail,
+    required this.sharedByEmail,
+    required this.hasSharedByName,
+    required this.sharedByName,
+    required this.hasNoteIcon,
+    required this.noteIcon,
+  });
+
+  factory _RemoteNoteMetadata.fromJson(Map<String, dynamic> json) {
+    final id = _requiredString(json, 'id');
+    return _RemoteNoteMetadata(
+      id: id,
+      userId: _optionalString(json, 'user_id'),
+      createdAt: _requiredDateTime(json, 'created_at'),
+      updatedAt: _requiredDateTime(json, 'updated_at'),
+      hasCollapseImages: json.containsKey('collapse_images'),
+      collapseImages: _optionalBool(json, 'collapse_images'),
+      hasPermission: json.containsKey('permission'),
+      permission: _optionalString(json, 'permission'),
+      hasSharedByEmail: json.containsKey('shared_by_email'),
+      sharedByEmail: _optionalString(json, 'shared_by_email'),
+      hasSharedByName: json.containsKey('shared_by_name'),
+      sharedByName: _optionalString(json, 'shared_by_name'),
+      hasNoteIcon: json.containsKey('note_icon'),
+      noteIcon: _optionalNoteIcon(json, 'note_icon', noteId: id),
+    );
+  }
+
+  final String id;
+  final String? userId;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final bool hasCollapseImages;
+  final bool? collapseImages;
+  final bool hasPermission;
+  final String? permission;
+  final bool hasSharedByEmail;
+  final String? sharedByEmail;
+  final bool hasSharedByName;
+  final String? sharedByName;
+  final bool hasNoteIcon;
+  final NoteIcon? noteIcon;
+
+  bool get hasShareMetadata =>
+      hasPermission || hasSharedByEmail || hasSharedByName;
+
+  String? get noteIconJson =>
+      noteIcon == null ? null : jsonEncode(noteIcon!.toJson());
+
+  Value<String?> get permissionValue =>
+      hasPermission ? Value(permission) : const Value<String?>.absent();
+
+  Value<String?> get sharedByEmailValue =>
+      hasSharedByEmail ? Value(sharedByEmail) : const Value<String?>.absent();
+
+  Value<String?> get sharedByNameValue =>
+      hasSharedByName ? Value(sharedByName) : const Value<String?>.absent();
+
+  Value<String?> noteIconValue({required bool apply}) =>
+      apply ? Value(noteIconJson) : const Value<String?>.absent();
+
+  NotesCompanion toRemoteNoteCompanion({
+    required String userId,
+    required String content,
+    required String? excerpt,
+    required DateTime updatedAt,
+    required bool noteIconDirty,
+    required bool applyNoteIcon,
+  }) {
+    return NotesCompanion(
+      id: Value(id),
+      userId: Value(userId),
+      content: Value(content),
+      excerpt: Value(excerpt),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      isDirty: const Value(false),
+      hasRemoteCopy: const Value(true),
+      collapseImages: hasCollapseImages
+          ? Value(collapseImages ?? false)
+          : const Value.absent(),
+      permission: permissionValue,
+      sharedByEmail: sharedByEmailValue,
+      sharedByName: sharedByNameValue,
+      noteIconJson: noteIconValue(apply: applyNoteIcon),
+      noteIconDirty: Value(noteIconDirty),
+    );
+  }
+}
+
+String _requiredString(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value is String && value.isNotEmpty) return value;
+  throw FormatException('Remote note field "$key" must be a non-empty string');
+}
+
+String? _optionalString(Map<String, dynamic> json, String key) {
+  if (!json.containsKey(key)) return null;
+  final value = json[key];
+  if (value == null) return null;
+  if (value is String) return value;
+  throw FormatException('Remote note field "$key" must be a string or null');
+}
+
+bool? _optionalBool(Map<String, dynamic> json, String key) {
+  if (!json.containsKey(key)) return null;
+  final value = json[key];
+  if (value == null) return null;
+  if (value is bool) return value;
+  throw FormatException('Remote note field "$key" must be a boolean or null');
+}
+
+DateTime _requiredDateTime(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value is! String) {
+    throw FormatException('Remote note field "$key" must be an ISO date');
+  }
+  try {
+    return DateTime.parse(value).toUtc();
+  } on FormatException catch (error) {
+    throw FormatException('Remote note field "$key" is invalid: $error');
+  }
+}
+
+NoteIcon? _optionalNoteIcon(
+  Map<String, dynamic> json,
+  String key, {
+  required String noteId,
+}) {
+  if (!json.containsKey(key) || json[key] == null) return null;
+  final value = json[key];
+  if (value is! Map) {
+    throw FormatException('Remote note icon for "$noteId" must be an object');
+  }
+  try {
+    return NoteIcon.fromJson(Map<String, dynamic>.from(value));
+  } on Object catch (error) {
+    throw FormatException('Remote note icon for "$noteId" is invalid: $error');
+  }
+}
 
 class NoteCatalogSync {
   static const _pageSize = 100;
@@ -18,17 +175,17 @@ class NoteCatalogSync {
     required NoteSyncClient syncClient,
     required AppDatabase database,
     required NoteSessionActivityTracker activityTracker,
-    NoteIconSyncClient? iconSyncClient,
+    required NoteIconUpdater updateNoteIcon,
   }) : _syncClient = syncClient,
        _database = database,
        _activityTracker = activityTracker,
-       _iconSyncClient = iconSyncClient,
+       _updateNoteIcon = updateNoteIcon,
        _documentProjector = const NoteDocumentProjector();
 
   final NoteSyncClient _syncClient;
   final AppDatabase _database;
   final NoteSessionActivityTracker _activityTracker;
-  final NoteIconSyncClient? _iconSyncClient;
+  final NoteIconUpdater _updateNoteIcon;
   final NoteDocumentProjector _documentProjector;
 
   Future<void> pushDeletedNotes() async {
@@ -60,35 +217,50 @@ class NoteCatalogSync {
   Future<void> pushDirtyNoteIcons() async {
     final dirty = await _database.notesDao.getDirtyNoteIcons();
     for (final note in dirty) {
-      if (_activityTracker.isActive(note.id)) continue;
-      final raw = note.noteIconJson;
-      final icon = raw == null
-          ? null
-          : jsonDecode(raw) as Map<String, dynamic>;
-      final iconSyncClient = _iconSyncClient;
-      if (iconSyncClient == null) continue;
-      await iconSyncClient.update(note.id, icon);
+      final icon = _decodeLocalNoteIcon(note.id, note.noteIconJson);
+      await _updateNoteIcon(note.id, icon);
       await _database.notesDao.clearNoteIconDirty(note.id, note.updatedAt);
     }
   }
 
   Future<void> pullRemoteNotes(String userId) async {
     final rows = await _listAllRemoteNotes();
-    final remoteIds = rows.map((raw) => raw['id'] as String).toSet();
+    final remoteNotes = rows.map(_RemoteNoteMetadata.fromJson).toList();
+    final remoteIds = remoteNotes.map((note) => note.id).toSet();
 
-    for (final raw in rows) {
+    Object? firstError;
+    StackTrace? firstStackTrace;
+    for (final remote in remoteNotes) {
       try {
-        await _pullRemoteNote(userId: userId, json: raw);
+        await _pullRemoteNote(userId: userId, catalog: remote);
       } catch (error, stackTrace) {
         dev.log(
-          '[NoteCatalogSync] Failed to hydrate ${raw['id']}',
+          '[NoteCatalogSync] Failed to hydrate ${remote.id}',
           error: error,
           stackTrace: stackTrace,
         );
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
       }
     }
     await _removeMissingRemoteNotes(userId, remoteIds);
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStackTrace!);
+    }
     dev.log('[NoteCatalogSync] Pulled ${rows.length} remote notes');
+  }
+
+  NoteIcon? _decodeLocalNoteIcon(String noteId, String? raw) {
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        throw FormatException('note_icon must be an object or null');
+      }
+      return NoteIcon.fromJson(Map<String, dynamic>.from(decoded));
+    } on Object catch (error) {
+      throw FormatException('Local note icon for "$noteId" is invalid: $error');
+    }
   }
 
   Future<List<Map<String, dynamic>>> _listAllRemoteNotes() async {
@@ -135,42 +307,22 @@ class NoteCatalogSync {
 
   Future<void> _pullRemoteNote({
     required String userId,
-    required Map<String, dynamic> json,
+    required _RemoteNoteMetadata catalog,
   }) async {
-    final id = json['id'] as String;
+    final id = catalog.id;
     final existing = await _database.notesDao.getNoteById(id);
-    final hasShareMetadata =
-        json.containsKey('permission') ||
-        json.containsKey('shared_by_email') ||
-        json.containsKey('shared_by_name');
-    final permission = json['permission'] as String?;
-    final sharedByEmail = json['shared_by_email'] as String?;
-    final sharedByName = json['shared_by_name'] as String?;
-    final hasNoteIcon = json.containsKey('note_icon');
-    final noteIconJson = hasNoteIcon && json['note_icon'] != null
-        ? jsonEncode(
-            NoteIcon.fromJson(
-              Map<String, dynamic>.from(json['note_icon'] as Map),
-            ).toJson(),
-          )
-        : null;
+    final shouldReadRemoteIcon =
+        catalog.hasNoteIcon && !(existing?.noteIconDirty ?? false);
 
     if (_activityTracker.isActive(id)) {
-      if (existing != null && (hasShareMetadata || hasNoteIcon)) {
+      if (existing != null &&
+          (catalog.hasShareMetadata || catalog.hasNoteIcon)) {
         await _database.notesDao.updateRemoteShareMetadata(
           id: id,
-          permission: json.containsKey('permission')
-              ? Value(permission)
-              : const Value.absent(),
-          sharedByEmail: json.containsKey('shared_by_email')
-              ? Value(sharedByEmail)
-              : const Value.absent(),
-          sharedByName: json.containsKey('shared_by_name')
-              ? Value(sharedByName)
-              : const Value.absent(),
-          noteIconJson: hasNoteIcon
-              ? Value(noteIconJson)
-              : const Value.absent(),
+          permission: catalog.permissionValue,
+          sharedByEmail: catalog.sharedByEmailValue,
+          sharedByName: catalog.sharedByNameValue,
+          noteIconJson: catalog.noteIconValue(apply: shouldReadRemoteIcon),
         );
       }
       dev.log('[NoteCatalogSync] Skipping active note content $id');
@@ -180,21 +332,19 @@ class NoteCatalogSync {
     final localDocument = await (_database.select(
       _database.localNoteDocuments,
     )..where((document) => document.noteId.equals(id))).getSingleOrNull();
-    final createdAt = DateTime.parse(json['created_at'] as String).toUtc();
-    final updatedAt = DateTime.parse(json['updated_at'] as String).toUtc();
 
     if (existing != null &&
-        (existing.isDirty || existing.noteIconDirty ||
+        (existing.isDirty ||
             (existing.hasRemoteCopy &&
                 localDocument != null &&
-                !updatedAt.isAfter(existing.updatedAt)))) {
+                !catalog.updatedAt.isAfter(existing.updatedAt)))) {
       return;
     }
 
-    final remote = await _syncClient.getDocument(id);
-    if (remote.noteId != id) {
+    final documentResponse = await _syncClient.getDocument(id);
+    if (documentResponse.noteId != id) {
       throw StateError(
-        'Remote document id ${remote.noteId} does not match catalog id $id',
+        'Remote document id ${documentResponse.noteId} does not match catalog id $id',
       );
     }
     if (_activityTracker.isActive(id)) {
@@ -204,16 +354,15 @@ class NoteCatalogSync {
 
     final projection = _documentProjector.projectBlocks(
       noteId: id,
-      blocks: remote.document['blocks'] as List<dynamic>? ?? [],
+      blocks: documentResponse.document['blocks'] as List<dynamic>? ?? [],
     );
     final document = LocalNoteDocumentsCompanion.insert(
-      noteId: remote.noteId,
-      revision: remote.revision,
-      documentJson: jsonEncode(remote.document),
-      updatedAt: remote.serverTime,
+      noteId: documentResponse.noteId,
+      revision: documentResponse.revision,
+      documentJson: jsonEncode(documentResponse.document),
+      updatedAt: documentResponse.serverTime,
     );
-    final ownerUserId =
-        existing?.userId ?? json['user_id'] as String? ?? userId;
+    final ownerUserId = existing?.userId ?? catalog.userId ?? userId;
     final applied = await _database.saveRemoteNote(
       noteId: id,
       mode: existing == null
@@ -222,31 +371,18 @@ class NoteCatalogSync {
       document: document,
       tasks: projection.tasks,
       userId: userId,
-      note: NotesCompanion(
-        id: Value(id),
-        userId: Value(ownerUserId),
-        content: Value(projection.content),
-        excerpt: Value(projection.excerpt),
-        createdAt: Value(createdAt),
-        updatedAt: Value(updatedAt),
-        isDirty: const Value(false),
-        hasRemoteCopy: const Value(true),
-        collapseImages: json.containsKey('collapse_images')
-            ? Value(json['collapse_images'] as bool? ?? false)
-            : const Value.absent(),
-        permission: json.containsKey('permission')
-            ? Value(permission)
-            : const Value.absent(),
-        sharedByEmail: json.containsKey('shared_by_email')
-            ? Value(sharedByEmail)
-            : const Value.absent(),
-        sharedByName: json.containsKey('shared_by_name')
-            ? Value(sharedByName)
-            : const Value.absent(),
-        noteIconJson: hasNoteIcon
-            ? Value(noteIconJson)
-            : const Value.absent(),
-        noteIconDirty: const Value(false),
+      note: catalog.toRemoteNoteCompanion(
+        userId: ownerUserId,
+        content: projection.content,
+        excerpt: projection.excerpt,
+        // Keep the local timestamp while an icon mutation is pending. The
+        // shared metadata is then retried against the same local version and
+        // cannot be mistaken for a fully accepted remote snapshot.
+        updatedAt: existing?.noteIconDirty == true
+            ? existing!.updatedAt
+            : catalog.updatedAt,
+        noteIconDirty: existing?.noteIconDirty ?? false,
+        applyNoteIcon: shouldReadRemoteIcon,
       ),
     );
     if (!applied) {
@@ -270,7 +406,14 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
     syncClient: ref.watch(noteSyncClientProvider),
     database: ref.watch(appDatabaseProvider),
     activityTracker: ref.watch(noteSessionActivityTrackerProvider),
-    iconSyncClient: NoteIconSyncClient(apiClient: ref.watch(apiClientProvider)),
+    updateNoteIcon: (noteId, icon) async {
+      await ref
+          .read(apiClientProvider)
+          .patch<Map<String, dynamic>>(
+            '/notes/$noteId',
+            data: {'note_icon': icon?.toJson()},
+          );
+    },
   );
   while (true) {
     try {
@@ -292,16 +435,3 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
     await Future<void>.delayed(const Duration(seconds: 15));
   }
 });
-
-class NoteIconSyncClient {
-  const NoteIconSyncClient({required ApiClient apiClient}) : _apiClient = apiClient;
-
-  final ApiClient _apiClient;
-
-  Future<void> update(String noteId, Map<String, dynamic>? icon) async {
-    await _apiClient.patch<Map<String, dynamic>>(
-      '/notes/$noteId',
-      data: {'note_icon': icon},
-    );
-  }
-}

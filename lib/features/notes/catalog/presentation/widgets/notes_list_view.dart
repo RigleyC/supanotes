@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'note_context_menu.dart';
 import 'note_list_row.dart';
 
 /// List representation of the notes list.
@@ -37,13 +38,19 @@ class NotesListView extends StatelessWidget {
         itemCount: notes.length,
         itemBuilder: (context, index) {
           final note = notes[index];
-          return NoteListRow(
-            key: ValueKey(note.id),
+          return NoteContextMenuWidget(
             note: note,
-            onTap: () => onTap(note),
-            onDelete: () => onDelete(note),
             onToggleFavorite: () => onToggleFavorite(note),
+            onDelete: () => onDelete(note),
             onEditIcon: () => onEditIcon(note),
+            child: NoteListRow(
+              key: ValueKey(note.id),
+              note: note,
+              onTap: () => onTap(note),
+              onDelete: () => onDelete(note),
+              onToggleFavorite: () => onToggleFavorite(note),
+              onEditIcon: () => onEditIcon(note),
+            ),
           );
         },
       ),

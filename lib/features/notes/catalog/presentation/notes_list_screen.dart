@@ -200,12 +200,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     await showNoteIconPicker(
       context: context,
       note: note,
-      onSelected: (icon) => saveNoteIcon(
-        ref.read(notesRepositoryProvider),
-        note.id,
-        icon: icon,
-        clear: icon == null,
-      ),
+      onSelected: (icon) =>
+          ref.read(notesRepositoryProvider).updateNoteIcon(note.id, icon),
     );
   }
 

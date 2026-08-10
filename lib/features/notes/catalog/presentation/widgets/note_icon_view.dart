@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_catalog.dart';
 
 class NoteIconView extends StatelessWidget {
   const NoteIconView({super.key, required this.icon, this.size = 20});
@@ -16,12 +17,13 @@ class NoteIconView extends StatelessWidget {
         child: Text(icon.value, style: TextStyle(fontSize: size)),
       );
     }
+    final theme = Theme.of(context);
     return Semantics(
-      label: 'Ícone ${catalogIconLabels[icon.value] ?? icon.value}',
+      label: 'Ícone ${catalogIconLabelFor(icon.value)}',
       child: Icon(
-        icon.catalogIcon,
+        catalogIconFor(icon.value),
         size: size,
-        color: icon.colorFor(Theme.of(context).colorScheme),
+        color: noteIconColorFor(icon.colorKey!).resolve(theme.brightness),
       ),
     );
   }
