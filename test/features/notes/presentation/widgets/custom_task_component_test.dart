@@ -1,7 +1,9 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:super_editor/super_editor_test.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
@@ -121,7 +123,7 @@ void main() {
     expect(completed, isNull);
   });
 
-  testWidgets('long-press on text opens task actions', (tester) async {
+  testWidgets('long-press on text does not open task actions', (tester) async {
     var openedActions = false;
 
     await tester.pumpWidget(
@@ -136,7 +138,7 @@ void main() {
     await tester.longPress(find.byType(TextComponent), warnIfMissed: false);
     await tester.pump();
 
-    expect(openedActions, isTrue);
+    expect(openedActions, isFalse);
   });
 
   testWidgets('secondary click on text opens task actions', (tester) async {
@@ -583,5 +585,69 @@ void main() {
           .value,
       isFalse,
     );
+  });
+
+  testWidgets('iOS long-press drag selects text across task blocks', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      final document = MutableDocument(
+        nodes: [
+          for (var index = 1; index <= 10; index += 1)
+            TaskNode(
+              id: 'task-$index',
+              text: AttributedText('Task $index selectable text'),
+              isComplete: false,
+            ),
+        ],
+      );
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
+      var openedTaskActions = false;
+
+      await tester.pumpWidget(
+        wrap(
+          SizedBox(
+            height: 400,
+            child: SuperEditor(
+              editor: editor,
+              scrollController: scrollController,
+              componentBuilders: [
+                CustomTaskComponentBuilder(
+                  onTaskLongPress: (_) => openedTaskActions = true,
+                ),
+                ...defaultComponentBuilders,
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(scrollController.position.maxScrollExtent, greaterThan(0));
+
+      final gesture = await tester.longPressDownInParagraph('task-1', 3);
+      for (var index = 0; index < 8; index += 1) {
+        await gesture.moveBy(const Offset(0, 50));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump(const Duration(seconds: 1));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(openedTaskActions, isFalse);
+      expect(scrollController.offset, greaterThan(0));
+      expect(composer.selection, isNotNull);
+      expect(composer.selection!.isCollapsed, isFalse);
+      expect(composer.selection!.base.nodeId, 'task-1');
+      expect(composer.selection!.extent.nodeId, isNot('task-1'));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

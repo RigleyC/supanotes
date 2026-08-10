@@ -48,3 +48,13 @@ Status: complete.
 - [x] Handle trailing hidden tasks through the Super Editor content-tap
   delegate API.
 - [x] Run focused tests, analyzer, full suite, and two-axis code review.
+
+## iOS task text selection
+
+Status: complete.
+
+- [x] Reproduce the long-press conflict between task actions and iOS text selection.
+- [x] Restrict task action long press to the checkbox.
+- [x] Preserve secondary-click task actions on desktop.
+- [x] Add iOS selection regression coverage across task blocks.
+- [x] Run focused tests, analyzer, full suite, code review, and commit.

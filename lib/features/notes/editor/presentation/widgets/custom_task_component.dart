@@ -303,7 +303,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       textDirection: widget.viewModel.textDirection,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onLongPress: widget.onLongPress,
         onSecondaryTap: widget.onLongPress,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,6 +319,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: _isUpdatingCompletion ? null : _onCheckboxTap,
+                  onLongPress: widget.onLongPress,
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(

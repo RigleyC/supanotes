@@ -44,3 +44,20 @@ Verification:
 - Flutter analyze: passed with no issues.
 - Full Flutter test suite: 608 passed, 1 skipped.
 - Standards and specification reviews: no remaining findings.
+
+## iOS task text selection
+
+Task text no longer captures the long-press gesture that the iOS editor uses
+to begin and extend a text selection. Long press on the task checkbox still
+opens task metadata, and secondary click on task text still opens metadata on
+desktop. Regression coverage drags the selection across task blocks at the
+viewport edge, confirms that the editor auto-scrolls, and confirms that the
+selection remains expanded.
+
+Verification:
+
+- Custom task component tests: 16 passed.
+- Note editor screen tests: 23 passed, 1 skipped.
+- Flutter analyze: no issues found.
+- Full Flutter suite: 620 passed, 1 skipped.
+- Existing Drift and Google Fonts warnings remained non-failing.
