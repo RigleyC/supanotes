@@ -20,34 +20,67 @@ type RenderedPage struct {
 	Text  string
 }
 
-func RenderDocument(data []byte, attachmentBaseURL ...string) (RenderedPage, error) {
+type RenderOptions struct {
+	AttachmentBaseURL string
+}
+
+func RenderDocument(data []byte, options RenderOptions) (RenderedPage, error) {
 	doc, err := noteoperations.UnmarshalDocument(data)
 	if err != nil {
 		return RenderedPage{}, fmt.Errorf("decode document: %w", err)
 	}
-	base := ""
-	if len(attachmentBaseURL) > 0 {
-		base = strings.TrimRight(attachmentBaseURL[0], "/")
-	}
+	base := strings.TrimRight(options.AttachmentBaseURL, "/")
 
 	var body bytes.Buffer
 	var plain strings.Builder
 	title := ""
-	for _, block := range doc.Blocks {
+	for index := 0; index < len(doc.Blocks); {
+		block := doc.Blocks[index]
 		text := blockText(block.Delta)
 		if title == "" && strings.TrimSpace(text) != "" {
 			title = strings.TrimSpace(text)
+		}
+		if listType := noteoperations.BlockType(block.Type); listType == noteoperations.BlockBulletList || listType == noteoperations.BlockOrderedList {
+			end := index
+			for end < len(doc.Blocks) && noteoperations.BlockType(doc.Blocks[end].Type) == listType {
+				end++
+			}
+			body.WriteString(renderList(doc.Blocks[index:end], listType))
+			for _, listBlock := range doc.Blocks[index+1 : end] {
+				listText := blockText(listBlock.Delta)
+				if strings.TrimSpace(listText) != "" {
+					plain.WriteString(listText)
+					plain.WriteString("\n")
+				}
+			}
+			index = end
+			continue
 		}
 		body.WriteString(renderBlock(block, base))
 		if strings.TrimSpace(text) != "" {
 			plain.WriteString(text)
 			plain.WriteString("\n")
 		}
+		index++
 	}
 	if title == "" {
 		title = fallbackTitle
 	}
 	return RenderedPage{Title: title, HTML: body.String(), Text: strings.TrimSpace(plain.String())}, nil
+}
+
+func renderList(blocks []noteoperations.Block, blockType noteoperations.BlockType) string {
+	tag := "ul"
+	if blockType == noteoperations.BlockOrderedList {
+		tag = "ol"
+	}
+	var body strings.Builder
+	for _, block := range blocks {
+		body.WriteString("<li>")
+		body.WriteString(renderInline(block.Delta))
+		body.WriteString("</li>")
+	}
+	return "<" + tag + ">" + body.String() + "</" + tag + ">"
 }
 
 func renderBlock(block noteoperations.Block, attachmentBaseURL string) string {
@@ -61,10 +94,8 @@ func renderBlock(block noteoperations.Block, attachmentBaseURL string) string {
 		return "<h3>" + content + "</h3>"
 	case noteoperations.BlockQuote:
 		return "<blockquote>" + content + "</blockquote>"
-	case noteoperations.BlockBulletList:
-		return "<ul><li>" + content + "</li></ul>"
-	case noteoperations.BlockOrderedList:
-		return "<ol><li>" + content + "</li></ol>"
+	case noteoperations.BlockBulletList, noteoperations.BlockOrderedList:
+		return "<p>" + content + "</p>"
 	case noteoperations.BlockTask:
 		checked := false
 		if value, ok := block.Metadata["isCompleted"].(bool); ok {

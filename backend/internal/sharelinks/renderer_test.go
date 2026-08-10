@@ -13,7 +13,7 @@ func TestRenderDocumentEscapesTextAndDerivesTitle(t *testing.T) {
         {"id":"task","type":"task","delta":[{"insert":"Read this"}],"metadata":{"isCompleted":true}},
         {"id":"divider","type":"divider","delta":[],"metadata":{}}
       ]
-    }`))
+	}`), RenderOptions{})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestRenderDocumentEscapesTextAndDerivesTitle(t *testing.T) {
 }
 
 func TestRenderDocumentUsesFallbackTitle(t *testing.T) {
-	page, err := RenderDocument([]byte(`{"schemaVersion":1,"blocks":[{"id":"p","type":"paragraph","delta":[],"metadata":{}}]}`))
+	page, err := RenderDocument([]byte(`{"schemaVersion":1,"blocks":[{"id":"p","type":"paragraph","delta":[],"metadata":{}}]}`), RenderOptions{})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}

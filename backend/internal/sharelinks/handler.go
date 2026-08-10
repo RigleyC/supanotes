@@ -25,6 +25,11 @@ type activateRequest struct {
 	Replace bool `json:"replace"`
 }
 
+type PublicDocumentResponse struct {
+	Title    string          `json:"title"`
+	Document json.RawMessage `json:"document"`
+}
+
 func (h *Handler) Status(c echo.Context) error {
 	userID, noteID, err := h.ids(c)
 	if err != nil {
@@ -72,7 +77,7 @@ func (h *Handler) Public(c echo.Context) error {
 	if err != nil {
 		return c.NoContent(http.StatusNotFound)
 	}
-	page, err := RenderDocument(note.Document, "/s/"+token+"/attachments")
+	page, err := RenderDocument(note.Document, RenderOptions{AttachmentBaseURL: "/s/" + token + "/attachments"})
 	if err != nil {
 		return c.NoContent(http.StatusNotFound)
 	}
@@ -92,14 +97,13 @@ func (h *Handler) PublicDocument(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
-	document, err := RenderDocument(publicNote.Document, "")
+	document, err := RenderDocument(publicNote.Document, RenderOptions{})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
-	return c.JSON(http.StatusOK, map[string]any{
-		"title":    document.Title,
-		"document": json.RawMessage(publicNote.Document),
+	return c.JSON(http.StatusOK, PublicDocumentResponse{
+		Title: document.Title, Document: json.RawMessage(publicNote.Document),
 	})
 }
 
