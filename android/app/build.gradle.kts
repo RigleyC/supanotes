@@ -8,6 +8,12 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    // Override with `-PshareLinkHost=<host>` for each environment. The
+    // default keeps local builds usable while production must use the
+    // canonical HTTPS Share Link host.
+    val shareLinkHost = providers.gradleProperty("shareLinkHost")
+        .orElse("supanotes.app")
+
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
@@ -20,6 +26,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["shareLinkHost"] = shareLinkHost.get()
     }
 
     buildTypes {
