@@ -7,7 +7,11 @@ WHERE note_id = $1;
 INSERT INTO note_share_links (note_id, token_id, enabled)
 VALUES ($1, $2, TRUE)
 ON CONFLICT (note_id) DO UPDATE
-SET token_id = EXCLUDED.token_id,
+SET token_id = CASE
+        WHEN sqlc.arg('replace')::boolean OR NOT note_share_links.enabled
+        THEN EXCLUDED.token_id
+        ELSE note_share_links.token_id
+    END,
     enabled = TRUE,
     updated_at = NOW()
 RETURNING note_id, token_id, enabled, created_at, updated_at;

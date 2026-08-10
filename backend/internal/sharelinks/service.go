@@ -17,6 +17,7 @@ type Link struct {
 	NoteID  uuid.UUID
 	TokenID uuid.UUID
 	Enabled bool
+	Replace bool
 }
 
 type LinkResult struct {
@@ -34,11 +35,8 @@ type PublicNote struct {
 type Repository interface {
 	GetOwner(ctx context.Context, noteID uuid.UUID) (uuid.UUID, error)
 	GetByNote(ctx context.Context, noteID uuid.UUID) (Link, error)
-	Upsert(ctx context.Context, link Link) (Link, error)
+	Upsert(ctx context.Context, link Link, replace bool) (Link, error)
 	Disable(ctx context.Context, noteID uuid.UUID) error
-}
-
-type PublicRepository interface {
 	GetPublicNote(ctx context.Context, tokenID uuid.UUID) (PublicNote, error)
 }
 
@@ -46,30 +44,26 @@ type Service struct {
 	repo    Repository
 	signer  TokenSigner
 	baseURL string
-	public  PublicRepository
 }
 
 func NewService(repo Repository, signer TokenSigner, baseURL string) *Service {
-	service := &Service{repo: repo, signer: signer, baseURL: strings.TrimRight(baseURL, "/")}
-	if publicRepo, ok := repo.(PublicRepository); ok {
-		service.public = publicRepo
+	return &Service{
+		repo:    repo,
+		signer:  signer,
+		baseURL: strings.TrimRight(baseURL, "/"),
 	}
-	return service
 }
 
 func (s *Service) Activate(ctx context.Context, userID, noteID uuid.UUID, replace bool) (LinkResult, error) {
 	if err := s.requireOwner(ctx, userID, noteID); err != nil {
 		return LinkResult{}, err
 	}
-	if existing, err := s.repo.GetByNote(ctx, noteID); err == nil {
-		if existing.Enabled && !replace {
-			return s.result(existing)
-		}
-	} else if !errors.Is(err, ErrLinkNotFound) {
-		return LinkResult{}, err
-	}
 
-	link, err := s.repo.Upsert(ctx, Link{NoteID: noteID, TokenID: uuid.New(), Enabled: true})
+	link, err := s.repo.Upsert(
+		ctx,
+		Link{NoteID: noteID, TokenID: uuid.New(), Enabled: true},
+		replace,
+	)
 	if err != nil {
 		return LinkResult{}, err
 	}
@@ -101,14 +95,11 @@ func (s *Service) Status(ctx context.Context, userID, noteID uuid.UUID) (LinkRes
 }
 
 func (s *Service) ResolvePublic(ctx context.Context, token string) (PublicNote, error) {
-	if s.public == nil {
-		return PublicNote{}, ErrLinkNotFound
-	}
 	tokenID, err := s.signer.Verify(token)
 	if err != nil {
 		return PublicNote{}, ErrLinkNotFound
 	}
-	note, err := s.public.GetPublicNote(ctx, tokenID)
+	note, err := s.repo.GetPublicNote(ctx, tokenID)
 	if err != nil {
 		return PublicNote{}, ErrLinkNotFound
 	}

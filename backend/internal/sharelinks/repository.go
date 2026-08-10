@@ -42,10 +42,11 @@ func (r *sqlRepository) GetByNote(ctx context.Context, noteID uuid.UUID) (Link, 
 	}, nil
 }
 
-func (r *sqlRepository) Upsert(ctx context.Context, link Link) (Link, error) {
+func (r *sqlRepository) Upsert(ctx context.Context, link Link, replace bool) (Link, error) {
 	value, err := r.q.UpsertNoteShareLink(ctx, sqlcgen.UpsertNoteShareLinkParams{
 		NoteID:  toPGUUID(link.NoteID),
 		TokenID: toPGUUID(link.TokenID),
+		Replace: replace,
 	})
 	if err != nil {
 		return Link{}, err

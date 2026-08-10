@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"mime"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -153,23 +152,10 @@ func (s *service) Delete(ctx context.Context, userID, attachmentID pgtype.UUID) 
 }
 
 func storageKeyFromURL(raw string) (string, error) {
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return "", fmt.Errorf("parse attachment URL: %w", err)
+	if !strings.HasPrefix(raw, "attachments/") {
+		return "", fmt.Errorf("attachment storage key is invalid")
 	}
-	if strings.HasPrefix(raw, "attachments/") {
-		return raw, nil
-	}
-	marker := "/attachments/"
-	index := strings.Index(parsed.Path, marker)
-	if index < 0 {
-		return "", fmt.Errorf("attachment URL does not contain storage key")
-	}
-	key, err := url.PathUnescape(strings.TrimPrefix(parsed.Path[index:], "/"))
-	if err != nil {
-		return "", fmt.Errorf("decode attachment storage key: %w", err)
-	}
-	return key, nil
+	return raw, nil
 }
 
 func (s *service) Metrics() Metrics {

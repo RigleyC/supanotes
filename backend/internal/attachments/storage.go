@@ -20,8 +20,7 @@ type StorageService interface {
 }
 
 type StoredObject struct {
-	Key       string
-	PublicURL string
+	Key string
 }
 
 type s3Storage struct {

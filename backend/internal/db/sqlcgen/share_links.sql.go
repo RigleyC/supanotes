@@ -67,7 +67,11 @@ const upsertNoteShareLink = `-- name: UpsertNoteShareLink :one
 INSERT INTO note_share_links (note_id, token_id, enabled)
 VALUES ($1, $2, TRUE)
 ON CONFLICT (note_id) DO UPDATE
-SET token_id = EXCLUDED.token_id,
+SET token_id = CASE
+        WHEN $3::boolean OR NOT note_share_links.enabled
+        THEN EXCLUDED.token_id
+        ELSE note_share_links.token_id
+    END,
     enabled = TRUE,
     updated_at = NOW()
 RETURNING note_id, token_id, enabled, created_at, updated_at
@@ -76,10 +80,11 @@ RETURNING note_id, token_id, enabled, created_at, updated_at
 type UpsertNoteShareLinkParams struct {
 	NoteID  pgtype.UUID `json:"note_id"`
 	TokenID pgtype.UUID `json:"token_id"`
+	Replace bool        `json:"replace"`
 }
 
 func (q *Queries) UpsertNoteShareLink(ctx context.Context, arg UpsertNoteShareLinkParams) (NoteShareLink, error) {
-	row := q.db.QueryRow(ctx, upsertNoteShareLink, arg.NoteID, arg.TokenID)
+	row := q.db.QueryRow(ctx, upsertNoteShareLink, arg.NoteID, arg.TokenID, arg.Replace)
 	var i NoteShareLink
 	err := row.Scan(
 		&i.NoteID,

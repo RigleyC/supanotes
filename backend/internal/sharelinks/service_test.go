@@ -87,7 +87,7 @@ func (r *fakeRepository) GetByNote(context.Context, uuid.UUID) (Link, error) {
 	return r.link, nil
 }
 
-func (r *fakeRepository) Upsert(_ context.Context, link Link) (Link, error) {
+func (r *fakeRepository) Upsert(_ context.Context, link Link, _ bool) (Link, error) {
 	r.upsertCalls++
 	r.lastTokenID = link.TokenID
 	r.lastEnabled = link.Enabled

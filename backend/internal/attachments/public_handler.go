@@ -1,6 +1,7 @@
 package attachments
 
 import (
+	"context"
 	"errors"
 	"mime"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 )
 
 // PublicNoteResolver validates a share token and returns its note id.
-type PublicNoteResolver func(ctx echo.Context, token string) (pgtype.UUID, error)
+type PublicNoteResolver func(ctx context.Context, token string) (pgtype.UUID, error)
 
 type PublicHandler struct {
 	repo    Repository
@@ -26,7 +27,7 @@ func NewPublicHandler(repo Repository, storage StorageService, resolve PublicNot
 }
 
 func (h *PublicHandler) Download(c echo.Context) error {
-	noteID, err := h.resolve(c, c.Param("token"))
+	noteID, err := h.resolve(c.Request().Context(), c.Param("token"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
@@ -55,7 +56,9 @@ func (h *PublicHandler) Download(c echo.Context) error {
 	defer body.Close()
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	c.Response().Header().Set("Referrer-Policy", "no-referrer")
-	if disposition := mime.FormatMediaType("inline", map[string]string{"filename": attachment.Filename}); disposition != "" {
+	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
+	c.Response().Header().Set("Content-Security-Policy", "sandbox")
+	if disposition := mime.FormatMediaType("attachment", map[string]string{"filename": attachment.Filename}); disposition != "" {
 		c.Response().Header().Set(echo.HeaderContentDisposition, disposition)
 	}
 	return c.Stream(http.StatusOK, attachment.MimeType, body)

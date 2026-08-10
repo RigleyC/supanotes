@@ -241,8 +241,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	publicAttachmentsH := attachments.NewPublicHandler(
 		attachmentsRepo,
 		storageBackend,
-		func(c echo.Context, token string) (pgtype.UUID, error) {
-			publicNote, err := shareLinksSvc.ResolvePublic(c.Request().Context(), token)
+		func(ctx context.Context, token string) (pgtype.UUID, error) {
+			publicNote, err := shareLinksSvc.ResolvePublic(ctx, token)
 			if err != nil {
 				return pgtype.UUID{}, err
 			}

@@ -218,7 +218,7 @@ func (s *fakeStorage) Upload(_ context.Context, key string, r io.Reader, _ strin
 			}
 		}
 	}
-	return StoredObject{Key: key, PublicURL: "https://cdn.example.com/" + key}, nil
+	return StoredObject{Key: key}, nil
 }
 
 func (s *fakeStorage) Delete(_ context.Context, key string) error {
