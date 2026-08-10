@@ -9,11 +9,14 @@ import (
 )
 
 const devJWTSecret = "dev-only-jwt-secret-change-me-in-production-32+chars"
+const devShareLinkSecret = "dev-only-share-link-secret-change-me-in-production-32+chars"
 
 type Config struct {
 	Port               string
 	DatabaseURL        string
 	JWTSecret          string
+	ShareLinkSecret    string
+	PublicBaseURL      string
 	JWTIssuer          string
 	JWTAudience        string
 	CORSOrigins        []string
@@ -54,6 +57,20 @@ func Load() (*Config, error) {
 	}
 	jwtIssuer := firstNonEmpty(strings.TrimSpace(os.Getenv("JWT_ISSUER")), "supanotes-api")
 	jwtAudience := firstNonEmpty(strings.TrimSpace(os.Getenv("JWT_AUDIENCE")), "supanotes-client")
+	shareLinkSecret := strings.TrimSpace(os.Getenv("SHARE_LINK_SECRET"))
+	if shareLinkSecret == "" {
+		if env != "dev" {
+			return nil, fmt.Errorf("config: SHARE_LINK_SECRET is required outside dev")
+		}
+		shareLinkSecret = devShareLinkSecret
+	}
+	publicBaseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL")), "/")
+	if publicBaseURL == "" {
+		if env != "dev" {
+			return nil, fmt.Errorf("config: PUBLIC_BASE_URL is required outside dev")
+		}
+		publicBaseURL = "http://localhost:8080"
+	}
 
 	corsOrigins := parseCORSOrigins(os.Getenv("CORS_ORIGINS"), env)
 
@@ -66,6 +83,8 @@ func Load() (*Config, error) {
 		AlexaRedirectURIs:  parseList(os.Getenv("ALEXA_REDIRECT_URIS")),
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
 		JWTSecret:          jwtSecret,
+		ShareLinkSecret:    shareLinkSecret,
+		PublicBaseURL:      publicBaseURL,
 		JWTIssuer:          jwtIssuer,
 		JWTAudience:        jwtAudience,
 		CORSOrigins:        corsOrigins,

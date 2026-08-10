@@ -32,6 +32,7 @@ type Querier interface {
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteTaskByNodeID(ctx context.Context, arg DeleteTaskByNodeIDParams) error
 	DeleteTasksByNoteID(ctx context.Context, arg DeleteTasksByNoteIDParams) error
+	DisableNoteShareLink(ctx context.Context, noteID pgtype.UUID) error
 	GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesForMigrationRow, error)
 	GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attachment, error)
 	GetLastOperation(ctx context.Context, noteID pgtype.UUID) (NoteOperation, error)
@@ -41,9 +42,11 @@ type Querier interface {
 	GetNoteOperationByOpID(ctx context.Context, arg GetNoteOperationByOpIDParams) (NoteOperation, error)
 	GetNoteOwner(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 	GetNoteShareForUser(ctx context.Context, arg GetNoteShareForUserParams) (NoteShare, error)
+	GetNoteShareLink(ctx context.Context, noteID pgtype.UUID) (NoteShareLink, error)
 	GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]GetNoteSharesRow, error)
 	GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesRow, error)
 	GetOperationsSince(ctx context.Context, arg GetOperationsSinceParams) ([]NoteOperation, error)
+	GetPublicNoteByShareToken(ctx context.Context, tokenID pgtype.UUID) (GetPublicNoteByShareTokenRow, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]GetRecentNotesRow, error)
 	GetRecentlyCompletedTasks(ctx context.Context, arg GetRecentlyCompletedTasksParams) ([]Task, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
@@ -71,6 +74,7 @@ type Querier interface {
 	UpdateNoteDocument(ctx context.Context, arg UpdateNoteDocumentParams) error
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error)
+	UpsertNoteShareLink(ctx context.Context, arg UpsertNoteShareLinkParams) (NoteShareLink, error)
 	UpsertTasksBatch(ctx context.Context, arg UpsertTasksBatchParams) error
 }
 

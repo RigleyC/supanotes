@@ -11,6 +11,7 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
@@ -29,6 +30,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/noteoperations"
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/settings"
+	"github.com/RigleyC/supanotes/internal/sharelinks"
 	"github.com/RigleyC/supanotes/internal/shares"
 	"github.com/RigleyC/supanotes/internal/shoppinglist"
 	"github.com/RigleyC/supanotes/internal/tasks"
@@ -206,6 +208,22 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.GET("/notes/:id/shares", sharesH.ListNoteShares)
 	protected.DELETE("/notes/:id/shares/:user_id", sharesH.DeleteNoteShare)
 
+	// Share links
+	shareLinksRepo := sharelinks.NewRepository(queries)
+	shareLinksSvc := sharelinks.NewService(
+		shareLinksRepo,
+		sharelinks.NewTokenSigner(cfg.ShareLinkSecret),
+		cfg.PublicBaseURL,
+	)
+	shareLinksH := sharelinks.NewHandler(shareLinksSvc)
+	protected.GET("/notes/:id/share-link", shareLinksH.Status)
+	protected.POST("/notes/:id/share-link", shareLinksH.Activate)
+	protected.DELETE("/notes/:id/share-link", shareLinksH.Disable)
+	e.GET("/s/:token", shareLinksH.Public)
+	e.GET("/s/:token/document", shareLinksH.PublicDocument)
+	api.GET("/s/:token", shareLinksH.Public)
+	api.GET("/s/:token/document", shareLinksH.PublicDocument)
+
 	// Attachments
 	storageBackend, err := attachments.NewS3Storage(
 		cfg.S3Endpoint, cfg.S3Region, cfg.S3Bucket,
@@ -218,6 +236,19 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	attachmentsSvc := attachments.NewService(attachmentsRepo, storageBackend)
 	attachmentsH := attachments.NewHandler(attachmentsSvc)
 	protected.POST("/attachments/upload", attachmentsH.Upload)
+	publicAttachmentsH := attachments.NewPublicHandler(
+		attachmentsRepo,
+		storageBackend,
+		func(c echo.Context, token string) (pgtype.UUID, error) {
+			publicNote, err := shareLinksSvc.ResolvePublic(c.Request().Context(), token)
+			if err != nil {
+				return pgtype.UUID{}, err
+			}
+			return pgtype.UUID{Bytes: publicNote.ID, Valid: true}, nil
+		},
+	)
+	e.GET("/s/:token/attachments/:attachment_id", publicAttachmentsH.Download)
+	api.GET("/s/:token/attachments/:attachment_id", publicAttachmentsH.Download)
 
 	// Link preview (OG scraping)
 	linkPreviewSvc := linkpreview.NewService()

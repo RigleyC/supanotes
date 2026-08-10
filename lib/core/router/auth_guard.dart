@@ -12,6 +12,7 @@ String? authGuardRedirect({
   final isAuthPage =
       currentLocation == AppRoutes.login ||
       currentLocation == AppRoutes.register;
+  final isPublicShareLink = currentLocation.startsWith('/s/');
 
   return authState.when(
     data: (user) {
@@ -25,17 +26,21 @@ String? authGuardRedirect({
         return null;
       }
 
+      if (isPublicShareLink) return null;
+
       if (isAuthPage) return null;
       return AppRoutes.login;
     },
     loading: () {
-      if (isAuthPage || currentLocation == AppRoutes.splash) {
+      if (isAuthPage ||
+          isPublicShareLink ||
+          currentLocation == AppRoutes.splash) {
         return null;
       }
       return AppRoutes.splash;
     },
     error: (_, _) {
-      if (isAuthPage) return null;
+      if (isAuthPage || isPublicShareLink) return null;
       return AppRoutes.login;
     },
   );

@@ -15,6 +15,7 @@ import (
 
 type StorageService interface {
 	Upload(ctx context.Context, key string, r io.Reader, mimeType string, size int64) (StoredObject, error)
+	Open(ctx context.Context, key string) (io.ReadCloser, error)
 	Delete(ctx context.Context, key string) error
 }
 
@@ -78,6 +79,14 @@ func (s *s3Storage) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+func (s *s3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	if err != nil {
+		return nil, fmt.Errorf("s3 get object: %w", err)
+	}
+	return result.Body, nil
+}
+
 type noopStorage struct{}
 
 func (n *noopStorage) Upload(_ context.Context, _ string, _ io.Reader, _ string, _ int64) (StoredObject, error) {
@@ -86,4 +95,8 @@ func (n *noopStorage) Upload(_ context.Context, _ string, _ io.Reader, _ string,
 
 func (n *noopStorage) Delete(_ context.Context, _ string) error {
 	return nil
+}
+
+func (n *noopStorage) Open(_ context.Context, _ string) (io.ReadCloser, error) {
+	return nil, fmt.Errorf("storage not configured: set S3_BUCKET and related env vars")
 }
