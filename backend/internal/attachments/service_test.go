@@ -173,12 +173,12 @@ func (r *fakeAttachmentRepo) Insert(_ context.Context, noteID pgtype.UUID, filen
 		return sqlcgen.Attachment{}, r.insertErr
 	}
 	return sqlcgen.Attachment{
-		ID:        testUUID(3),
-		NoteID:    noteID,
-		Filename:  filename,
-		Url:       url,
-		MimeType:  mimeType,
-		SizeBytes: sizeBytes,
+		ID:         testUUID(3),
+		NoteID:     noteID,
+		Filename:   filename,
+		StorageKey: url,
+		MimeType:   mimeType,
+		SizeBytes:  sizeBytes,
 		CreatedAt: pgtype.Timestamptz{
 			Time:  time.Unix(0, 0).UTC(),
 			Valid: true,

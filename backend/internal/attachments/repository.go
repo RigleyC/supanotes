@@ -10,7 +10,7 @@ import (
 
 type Repository interface {
 	CheckNotePermission(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (string, error)
-	Insert(ctx context.Context, noteID pgtype.UUID, filename, url, mimeType string, sizeBytes int64) (sqlcgen.Attachment, error)
+	Insert(ctx context.Context, noteID pgtype.UUID, filename, storageKey, mimeType string, sizeBytes int64) (sqlcgen.Attachment, error)
 	ListByNote(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.Attachment, error)
 	GetByID(ctx context.Context, id pgtype.UUID) (sqlcgen.Attachment, error)
 	Delete(ctx context.Context, id pgtype.UUID) error
@@ -38,13 +38,13 @@ func (r *repository) CheckNotePermission(ctx context.Context, noteID pgtype.UUID
 	return "", nil
 }
 
-func (r *repository) Insert(ctx context.Context, noteID pgtype.UUID, filename, url, mimeType string, sizeBytes int64) (sqlcgen.Attachment, error) {
+func (r *repository) Insert(ctx context.Context, noteID pgtype.UUID, filename, storageKey, mimeType string, sizeBytes int64) (sqlcgen.Attachment, error) {
 	return r.q.InsertAttachment(ctx, sqlcgen.InsertAttachmentParams{
-		NoteID:    noteID,
-		Filename:  filename,
-		Url:       url,
-		MimeType:  mimeType,
-		SizeBytes: sizeBytes,
+		NoteID:     noteID,
+		Filename:   filename,
+		StorageKey: storageKey,
+		MimeType:   mimeType,
+		SizeBytes:  sizeBytes,
 	})
 }
 

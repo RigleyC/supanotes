@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -138,11 +139,10 @@ func (s *service) Delete(ctx context.Context, userID, attachmentID pgtype.UUID) 
 	if permission != "owner" && permission != "edit" {
 		return ErrNoPermission
 	}
-	key, err := storageKeyFromURL(attachment.Url)
-	if err != nil {
+	if err := validateStorageKey(attachment.StorageKey); err != nil {
 		return err
 	}
-	if err := s.storage.Delete(ctx, key); err != nil {
+	if err := s.storage.Delete(ctx, attachment.StorageKey); err != nil {
 		return fmt.Errorf("delete attachment object: %w", err)
 	}
 	if err := s.repo.Delete(ctx, attachmentID); err != nil {
@@ -151,11 +151,11 @@ func (s *service) Delete(ctx context.Context, userID, attachmentID pgtype.UUID) 
 	return nil
 }
 
-func storageKeyFromURL(raw string) (string, error) {
-	if !strings.HasPrefix(raw, "attachments/") {
-		return "", fmt.Errorf("attachment storage key is invalid")
+func validateStorageKey(key string) error {
+	if key == "" || len(key) > 1024 || !strings.HasPrefix(key, "attachments/") || strings.Contains(key, "\\") || path.Clean(key) != key {
+		return fmt.Errorf("attachment storage key is invalid")
 	}
-	return raw, nil
+	return nil
 }
 
 func (s *service) Metrics() Metrics {

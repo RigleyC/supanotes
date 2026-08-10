@@ -1,10 +1,8 @@
 package attachments
 
 import (
-	"errors"
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
 
 	"github.com/RigleyC/supanotes/internal/web"
@@ -12,12 +10,11 @@ import (
 )
 
 type PrivateHandler struct {
-	repo    Repository
-	storage StorageService
+	delivery *DeliveryService
 }
 
 func NewPrivateHandler(repo Repository, storage StorageService) *PrivateHandler {
-	return &PrivateHandler{repo: repo, storage: storage}
+	return &PrivateHandler{delivery: NewDeliveryService(repo, storage)}
 }
 
 func (h *PrivateHandler) Download(c echo.Context) error {
@@ -29,32 +26,9 @@ func (h *PrivateHandler) Download(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest)
 	}
-	attachment, err := h.repo.GetByID(c.Request().Context(), attachmentID)
+	delivery, err := h.delivery.Authenticated(c.Request().Context(), userID, attachmentID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusNotFound)
-		}
-		return echo.NewHTTPError(http.StatusInternalServerError)
+		return echo.NewHTTPError(deliveryErrorStatus(err, false))
 	}
-	permission, err := h.repo.CheckNotePermission(c.Request().Context(), attachment.NoteID, userID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError)
-	}
-	if permission == "not_found" {
-		return echo.NewHTTPError(http.StatusNotFound)
-	}
-	if permission != "owner" && permission != "edit" && permission != "view" {
-		return echo.NewHTTPError(http.StatusForbidden)
-	}
-	key, err := storageKeyFromURL(attachment.Url)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound)
-	}
-	body, err := h.storage.Open(c.Request().Context(), key)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound)
-	}
-	defer body.Close()
-	c.Response().Header().Set(echo.HeaderCacheControl, "private, no-store")
-	return c.Stream(http.StatusOK, attachment.MimeType, body)
+	return writeDelivery(c, delivery, "private, no-store", "")
 }

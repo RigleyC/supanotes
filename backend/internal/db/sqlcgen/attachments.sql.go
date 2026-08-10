@@ -21,7 +21,7 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getAttachmentByID = `-- name: GetAttachmentByID :one
-SELECT id, note_id, filename, url, mime_type, size_bytes, created_at FROM attachments
+SELECT id, note_id, filename, storage_key, mime_type, size_bytes, created_at FROM attachments
 WHERE id = $1
 `
 
@@ -32,7 +32,7 @@ func (q *Queries) GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attach
 		&i.ID,
 		&i.NoteID,
 		&i.Filename,
-		&i.Url,
+		&i.StorageKey,
 		&i.MimeType,
 		&i.SizeBytes,
 		&i.CreatedAt,
@@ -41,24 +41,24 @@ func (q *Queries) GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attach
 }
 
 const insertAttachment = `-- name: InsertAttachment :one
-INSERT INTO attachments (note_id, filename, url, mime_type, size_bytes)
+INSERT INTO attachments (note_id, filename, storage_key, mime_type, size_bytes)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, note_id, filename, url, mime_type, size_bytes, created_at
+RETURNING id, note_id, filename, storage_key, mime_type, size_bytes, created_at
 `
 
 type InsertAttachmentParams struct {
-	NoteID    pgtype.UUID `json:"note_id"`
-	Filename  string      `json:"filename"`
-	Url       string      `json:"url"`
-	MimeType  string      `json:"mime_type"`
-	SizeBytes int64       `json:"size_bytes"`
+	NoteID     pgtype.UUID `json:"note_id"`
+	Filename   string      `json:"filename"`
+	StorageKey string      `json:"storage_key"`
+	MimeType   string      `json:"mime_type"`
+	SizeBytes  int64       `json:"size_bytes"`
 }
 
 func (q *Queries) InsertAttachment(ctx context.Context, arg InsertAttachmentParams) (Attachment, error) {
 	row := q.db.QueryRow(ctx, insertAttachment,
 		arg.NoteID,
 		arg.Filename,
-		arg.Url,
+		arg.StorageKey,
 		arg.MimeType,
 		arg.SizeBytes,
 	)
@@ -67,7 +67,7 @@ func (q *Queries) InsertAttachment(ctx context.Context, arg InsertAttachmentPara
 		&i.ID,
 		&i.NoteID,
 		&i.Filename,
-		&i.Url,
+		&i.StorageKey,
 		&i.MimeType,
 		&i.SizeBytes,
 		&i.CreatedAt,
@@ -76,7 +76,7 @@ func (q *Queries) InsertAttachment(ctx context.Context, arg InsertAttachmentPara
 }
 
 const listAttachmentsByNote = `-- name: ListAttachmentsByNote :many
-SELECT id, note_id, filename, url, mime_type, size_bytes, created_at FROM attachments
+SELECT id, note_id, filename, storage_key, mime_type, size_bytes, created_at FROM attachments
 WHERE note_id = $1
 ORDER BY created_at ASC
 `
@@ -94,7 +94,7 @@ func (q *Queries) ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID)
 			&i.ID,
 			&i.NoteID,
 			&i.Filename,
-			&i.Url,
+			&i.StorageKey,
 			&i.MimeType,
 			&i.SizeBytes,
 			&i.CreatedAt,

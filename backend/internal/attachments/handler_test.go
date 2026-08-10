@@ -23,12 +23,12 @@ func TestUploadHandlerPassesAuthenticatedUserToService(t *testing.T) {
 
 	svc := &fakeUploadService{
 		attachment: sqlcgen.Attachment{
-			ID:        testUUID(3),
-			NoteID:    testUUID(1),
-			Filename:  "file.txt",
-			Url:       "https://cdn.example.com/file.txt",
-			MimeType:  "text/plain; charset=utf-8",
-			SizeBytes: 5,
+			ID:         testUUID(3),
+			NoteID:     testUUID(1),
+			Filename:   "file.txt",
+			StorageKey: "attachments/note/file.txt",
+			MimeType:   "text/plain; charset=utf-8",
+			SizeBytes:  5,
 			CreatedAt: pgtype.Timestamptz{
 				Time:  time.Unix(0, 0).UTC(),
 				Valid: true,

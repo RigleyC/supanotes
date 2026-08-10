@@ -1,5 +1,5 @@
 -- name: InsertAttachment :one
-INSERT INTO attachments (note_id, filename, url, mime_type, size_bytes)
+INSERT INTO attachments (note_id, filename, storage_key, mime_type, size_bytes)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 

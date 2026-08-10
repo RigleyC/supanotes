@@ -11,13 +11,13 @@ import (
 )
 
 type AttachmentResponse struct {
-	ID        string `json:"id"`
-	NoteID    string `json:"note_id"`
-	Filename  string `json:"filename"`
-	URL       string `json:"url"`
-	MimeType  string `json:"mime_type"`
-	SizeBytes int64  `json:"size_bytes"`
-	CreatedAt string `json:"created_at"`
+	ID          string `json:"id"`
+	NoteID      string `json:"note_id"`
+	Filename    string `json:"filename"`
+	DownloadURL string `json:"download_url"`
+	MimeType    string `json:"mime_type"`
+	SizeBytes   int64  `json:"size_bytes"`
+	CreatedAt   string `json:"created_at"`
 }
 
 type Handler struct {
@@ -101,12 +101,12 @@ func (h *Handler) Upload(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, AttachmentResponse{
-		ID:        uid.UUIDToString(attachment.ID),
-		NoteID:    uid.UUIDToString(attachment.NoteID),
-		Filename:  attachment.Filename,
-		URL:       "/api/v1/attachments/" + uid.UUIDToString(attachment.ID) + "/content",
-		MimeType:  attachment.MimeType,
-		SizeBytes: attachment.SizeBytes,
-		CreatedAt: attachment.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		ID:          uid.UUIDToString(attachment.ID),
+		NoteID:      uid.UUIDToString(attachment.NoteID),
+		Filename:    attachment.Filename,
+		DownloadURL: "/api/v1/attachments/" + uid.UUIDToString(attachment.ID) + "/content",
+		MimeType:    attachment.MimeType,
+		SizeBytes:   attachment.SizeBytes,
+		CreatedAt:   attachment.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 	})
 }
