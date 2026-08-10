@@ -13,12 +13,15 @@ class Notes extends Table {
   BoolColumn get isDirty => boolean().withDefault(const Constant(true))();
   BoolColumn get hasRemoteCopy =>
       boolean().withDefault(const Constant(false))();
+  BoolColumn get noteIconDirty =>
+      boolean().withDefault(const Constant(false))();
   BoolColumn get collapseImages =>
       boolean().withDefault(const Constant(false))();
 
   TextColumn get permission => text().nullable()();
   TextColumn get sharedByEmail => text().nullable()();
   TextColumn get sharedByName => text().nullable()();
+  TextColumn get noteIconJson => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

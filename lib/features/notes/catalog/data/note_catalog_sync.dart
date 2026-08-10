@@ -5,9 +5,11 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 import 'package:supanotes/features/tasks/domain/note_document_projector.dart';
+import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 
 class NoteCatalogSync {
   static const _pageSize = 100;
@@ -16,14 +18,17 @@ class NoteCatalogSync {
     required NoteSyncClient syncClient,
     required AppDatabase database,
     required NoteSessionActivityTracker activityTracker,
+    NoteIconSyncClient? iconSyncClient,
   }) : _syncClient = syncClient,
        _database = database,
        _activityTracker = activityTracker,
+       _iconSyncClient = iconSyncClient,
        _documentProjector = const NoteDocumentProjector();
 
   final NoteSyncClient _syncClient;
   final AppDatabase _database;
   final NoteSessionActivityTracker _activityTracker;
+  final NoteIconSyncClient? _iconSyncClient;
   final NoteDocumentProjector _documentProjector;
 
   Future<void> pushDeletedNotes() async {
@@ -49,6 +54,21 @@ class NoteCatalogSync {
       }
       await _database.deleteNoteData(note.id);
       dev.log('[NoteCatalogSync] Deleted ${note.id} remotely');
+    }
+  }
+
+  Future<void> pushDirtyNoteIcons() async {
+    final dirty = await _database.notesDao.getDirtyNoteIcons();
+    for (final note in dirty) {
+      if (_activityTracker.isActive(note.id)) continue;
+      final raw = note.noteIconJson;
+      final icon = raw == null
+          ? null
+          : jsonDecode(raw) as Map<String, dynamic>;
+      final iconSyncClient = _iconSyncClient;
+      if (iconSyncClient == null) continue;
+      await iconSyncClient.update(note.id, icon);
+      await _database.notesDao.clearNoteIconDirty(note.id, note.updatedAt);
     }
   }
 
@@ -126,9 +146,17 @@ class NoteCatalogSync {
     final permission = json['permission'] as String?;
     final sharedByEmail = json['shared_by_email'] as String?;
     final sharedByName = json['shared_by_name'] as String?;
+    final hasNoteIcon = json.containsKey('note_icon');
+    final noteIconJson = hasNoteIcon && json['note_icon'] != null
+        ? jsonEncode(
+            NoteIcon.fromJson(
+              Map<String, dynamic>.from(json['note_icon'] as Map),
+            ).toJson(),
+          )
+        : null;
 
     if (_activityTracker.isActive(id)) {
-      if (existing != null && hasShareMetadata) {
+      if (existing != null && (hasShareMetadata || hasNoteIcon)) {
         await _database.notesDao.updateRemoteShareMetadata(
           id: id,
           permission: json.containsKey('permission')
@@ -139,6 +167,9 @@ class NoteCatalogSync {
               : const Value.absent(),
           sharedByName: json.containsKey('shared_by_name')
               ? Value(sharedByName)
+              : const Value.absent(),
+          noteIconJson: hasNoteIcon
+              ? Value(noteIconJson)
               : const Value.absent(),
         );
       }
@@ -153,7 +184,7 @@ class NoteCatalogSync {
     final updatedAt = DateTime.parse(json['updated_at'] as String).toUtc();
 
     if (existing != null &&
-        (existing.isDirty ||
+        (existing.isDirty || existing.noteIconDirty ||
             (existing.hasRemoteCopy &&
                 localDocument != null &&
                 !updatedAt.isAfter(existing.updatedAt)))) {
@@ -212,6 +243,10 @@ class NoteCatalogSync {
         sharedByName: json.containsKey('shared_by_name')
             ? Value(sharedByName)
             : const Value.absent(),
+        noteIconJson: hasNoteIcon
+            ? Value(noteIconJson)
+            : const Value.absent(),
+        noteIconDirty: const Value(false),
       ),
     );
     if (!applied) {
@@ -235,10 +270,12 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
     syncClient: ref.watch(noteSyncClientProvider),
     database: ref.watch(appDatabaseProvider),
     activityTracker: ref.watch(noteSessionActivityTrackerProvider),
+    iconSyncClient: NoteIconSyncClient(apiClient: ref.watch(apiClientProvider)),
   );
   while (true) {
     try {
       await sync.pushDeletedNotes();
+      await sync.pushDirtyNoteIcons();
       await sync.pullRemoteNotes(user.id);
       yield null;
     } catch (error, stackTrace) {
@@ -255,3 +292,16 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
     await Future<void>.delayed(const Duration(seconds: 15));
   }
 });
+
+class NoteIconSyncClient {
+  const NoteIconSyncClient({required ApiClient apiClient}) : _apiClient = apiClient;
+
+  final ApiClient _apiClient;
+
+  Future<void> update(String noteId, Map<String, dynamic>? icon) async {
+    await _apiClient.patch<Map<String, dynamic>>(
+      '/notes/$noteId',
+      data: {'note_icon': icon},
+    );
+  }
+}

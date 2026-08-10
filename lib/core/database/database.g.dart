@@ -111,6 +111,21 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _noteIconDirtyMeta = const VerificationMeta(
+    'noteIconDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> noteIconDirty = GeneratedColumn<bool>(
+    'note_icon_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("note_icon_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _collapseImagesMeta = const VerificationMeta(
     'collapseImages',
   );
@@ -159,6 +174,17 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _noteIconJsonMeta = const VerificationMeta(
+    'noteIconJson',
+  );
+  @override
+  late final GeneratedColumn<String> noteIconJson = GeneratedColumn<String>(
+    'note_icon_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -170,10 +196,12 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     deletedAt,
     isDirty,
     hasRemoteCopy,
+    noteIconDirty,
     collapseImages,
     permission,
     sharedByEmail,
     sharedByName,
+    noteIconJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -251,6 +279,15 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         ),
       );
     }
+    if (data.containsKey('note_icon_dirty')) {
+      context.handle(
+        _noteIconDirtyMeta,
+        noteIconDirty.isAcceptableOrUnknown(
+          data['note_icon_dirty']!,
+          _noteIconDirtyMeta,
+        ),
+      );
+    }
     if (data.containsKey('collapse_images')) {
       context.handle(
         _collapseImagesMeta,
@@ -281,6 +318,15 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         sharedByName.isAcceptableOrUnknown(
           data['shared_by_name']!,
           _sharedByNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('note_icon_json')) {
+      context.handle(
+        _noteIconJsonMeta,
+        noteIconJson.isAcceptableOrUnknown(
+          data['note_icon_json']!,
+          _noteIconJsonMeta,
         ),
       );
     }
@@ -329,6 +375,10 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         DriftSqlType.bool,
         data['${effectivePrefix}has_remote_copy'],
       )!,
+      noteIconDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}note_icon_dirty'],
+      )!,
       collapseImages: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}collapse_images'],
@@ -344,6 +394,10 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
       sharedByName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}shared_by_name'],
+      ),
+      noteIconJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_icon_json'],
       ),
     );
   }
@@ -364,10 +418,12 @@ class NoteData extends DataClass implements Insertable<NoteData> {
   final DateTime? deletedAt;
   final bool isDirty;
   final bool hasRemoteCopy;
+  final bool noteIconDirty;
   final bool collapseImages;
   final String? permission;
   final String? sharedByEmail;
   final String? sharedByName;
+  final String? noteIconJson;
   const NoteData({
     required this.id,
     required this.userId,
@@ -378,10 +434,12 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     this.deletedAt,
     required this.isDirty,
     required this.hasRemoteCopy,
+    required this.noteIconDirty,
     required this.collapseImages,
     this.permission,
     this.sharedByEmail,
     this.sharedByName,
+    this.noteIconJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -399,6 +457,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     }
     map['is_dirty'] = Variable<bool>(isDirty);
     map['has_remote_copy'] = Variable<bool>(hasRemoteCopy);
+    map['note_icon_dirty'] = Variable<bool>(noteIconDirty);
     map['collapse_images'] = Variable<bool>(collapseImages);
     if (!nullToAbsent || permission != null) {
       map['permission'] = Variable<String>(permission);
@@ -408,6 +467,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     }
     if (!nullToAbsent || sharedByName != null) {
       map['shared_by_name'] = Variable<String>(sharedByName);
+    }
+    if (!nullToAbsent || noteIconJson != null) {
+      map['note_icon_json'] = Variable<String>(noteIconJson);
     }
     return map;
   }
@@ -427,6 +489,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           : Value(deletedAt),
       isDirty: Value(isDirty),
       hasRemoteCopy: Value(hasRemoteCopy),
+      noteIconDirty: Value(noteIconDirty),
       collapseImages: Value(collapseImages),
       permission: permission == null && nullToAbsent
           ? const Value.absent()
@@ -437,6 +500,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       sharedByName: sharedByName == null && nullToAbsent
           ? const Value.absent()
           : Value(sharedByName),
+      noteIconJson: noteIconJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(noteIconJson),
     );
   }
 
@@ -455,10 +521,12 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       isDirty: serializer.fromJson<bool>(json['isDirty']),
       hasRemoteCopy: serializer.fromJson<bool>(json['hasRemoteCopy']),
+      noteIconDirty: serializer.fromJson<bool>(json['noteIconDirty']),
       collapseImages: serializer.fromJson<bool>(json['collapseImages']),
       permission: serializer.fromJson<String?>(json['permission']),
       sharedByEmail: serializer.fromJson<String?>(json['sharedByEmail']),
       sharedByName: serializer.fromJson<String?>(json['sharedByName']),
+      noteIconJson: serializer.fromJson<String?>(json['noteIconJson']),
     );
   }
   @override
@@ -474,10 +542,12 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'isDirty': serializer.toJson<bool>(isDirty),
       'hasRemoteCopy': serializer.toJson<bool>(hasRemoteCopy),
+      'noteIconDirty': serializer.toJson<bool>(noteIconDirty),
       'collapseImages': serializer.toJson<bool>(collapseImages),
       'permission': serializer.toJson<String?>(permission),
       'sharedByEmail': serializer.toJson<String?>(sharedByEmail),
       'sharedByName': serializer.toJson<String?>(sharedByName),
+      'noteIconJson': serializer.toJson<String?>(noteIconJson),
     };
   }
 
@@ -491,10 +561,12 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     Value<DateTime?> deletedAt = const Value.absent(),
     bool? isDirty,
     bool? hasRemoteCopy,
+    bool? noteIconDirty,
     bool? collapseImages,
     Value<String?> permission = const Value.absent(),
     Value<String?> sharedByEmail = const Value.absent(),
     Value<String?> sharedByName = const Value.absent(),
+    Value<String?> noteIconJson = const Value.absent(),
   }) => NoteData(
     id: id ?? this.id,
     userId: userId ?? this.userId,
@@ -505,12 +577,14 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     isDirty: isDirty ?? this.isDirty,
     hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
+    noteIconDirty: noteIconDirty ?? this.noteIconDirty,
     collapseImages: collapseImages ?? this.collapseImages,
     permission: permission.present ? permission.value : this.permission,
     sharedByEmail: sharedByEmail.present
         ? sharedByEmail.value
         : this.sharedByEmail,
     sharedByName: sharedByName.present ? sharedByName.value : this.sharedByName,
+    noteIconJson: noteIconJson.present ? noteIconJson.value : this.noteIconJson,
   );
   NoteData copyWithCompanion(NotesCompanion data) {
     return NoteData(
@@ -525,6 +599,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       hasRemoteCopy: data.hasRemoteCopy.present
           ? data.hasRemoteCopy.value
           : this.hasRemoteCopy,
+      noteIconDirty: data.noteIconDirty.present
+          ? data.noteIconDirty.value
+          : this.noteIconDirty,
       collapseImages: data.collapseImages.present
           ? data.collapseImages.value
           : this.collapseImages,
@@ -537,6 +614,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       sharedByName: data.sharedByName.present
           ? data.sharedByName.value
           : this.sharedByName,
+      noteIconJson: data.noteIconJson.present
+          ? data.noteIconJson.value
+          : this.noteIconJson,
     );
   }
 
@@ -552,10 +632,12 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ..write('deletedAt: $deletedAt, ')
           ..write('isDirty: $isDirty, ')
           ..write('hasRemoteCopy: $hasRemoteCopy, ')
+          ..write('noteIconDirty: $noteIconDirty, ')
           ..write('collapseImages: $collapseImages, ')
           ..write('permission: $permission, ')
           ..write('sharedByEmail: $sharedByEmail, ')
-          ..write('sharedByName: $sharedByName')
+          ..write('sharedByName: $sharedByName, ')
+          ..write('noteIconJson: $noteIconJson')
           ..write(')'))
         .toString();
   }
@@ -571,10 +653,12 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     deletedAt,
     isDirty,
     hasRemoteCopy,
+    noteIconDirty,
     collapseImages,
     permission,
     sharedByEmail,
     sharedByName,
+    noteIconJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -589,10 +673,12 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           other.deletedAt == this.deletedAt &&
           other.isDirty == this.isDirty &&
           other.hasRemoteCopy == this.hasRemoteCopy &&
+          other.noteIconDirty == this.noteIconDirty &&
           other.collapseImages == this.collapseImages &&
           other.permission == this.permission &&
           other.sharedByEmail == this.sharedByEmail &&
-          other.sharedByName == this.sharedByName);
+          other.sharedByName == this.sharedByName &&
+          other.noteIconJson == this.noteIconJson);
 }
 
 class NotesCompanion extends UpdateCompanion<NoteData> {
@@ -605,10 +691,12 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   final Value<DateTime?> deletedAt;
   final Value<bool> isDirty;
   final Value<bool> hasRemoteCopy;
+  final Value<bool> noteIconDirty;
   final Value<bool> collapseImages;
   final Value<String?> permission;
   final Value<String?> sharedByEmail;
   final Value<String?> sharedByName;
+  final Value<String?> noteIconJson;
   final Value<int> rowid;
   const NotesCompanion({
     this.id = const Value.absent(),
@@ -620,10 +708,12 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.deletedAt = const Value.absent(),
     this.isDirty = const Value.absent(),
     this.hasRemoteCopy = const Value.absent(),
+    this.noteIconDirty = const Value.absent(),
     this.collapseImages = const Value.absent(),
     this.permission = const Value.absent(),
     this.sharedByEmail = const Value.absent(),
     this.sharedByName = const Value.absent(),
+    this.noteIconJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NotesCompanion.insert({
@@ -636,10 +726,12 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.deletedAt = const Value.absent(),
     this.isDirty = const Value.absent(),
     this.hasRemoteCopy = const Value.absent(),
+    this.noteIconDirty = const Value.absent(),
     this.collapseImages = const Value.absent(),
     this.permission = const Value.absent(),
     this.sharedByEmail = const Value.absent(),
     this.sharedByName = const Value.absent(),
+    this.noteIconJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        userId = Value(userId),
@@ -656,10 +748,12 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Expression<DateTime>? deletedAt,
     Expression<bool>? isDirty,
     Expression<bool>? hasRemoteCopy,
+    Expression<bool>? noteIconDirty,
     Expression<bool>? collapseImages,
     Expression<String>? permission,
     Expression<String>? sharedByEmail,
     Expression<String>? sharedByName,
+    Expression<String>? noteIconJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -672,10 +766,12 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (isDirty != null) 'is_dirty': isDirty,
       if (hasRemoteCopy != null) 'has_remote_copy': hasRemoteCopy,
+      if (noteIconDirty != null) 'note_icon_dirty': noteIconDirty,
       if (collapseImages != null) 'collapse_images': collapseImages,
       if (permission != null) 'permission': permission,
       if (sharedByEmail != null) 'shared_by_email': sharedByEmail,
       if (sharedByName != null) 'shared_by_name': sharedByName,
+      if (noteIconJson != null) 'note_icon_json': noteIconJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -690,10 +786,12 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Value<DateTime?>? deletedAt,
     Value<bool>? isDirty,
     Value<bool>? hasRemoteCopy,
+    Value<bool>? noteIconDirty,
     Value<bool>? collapseImages,
     Value<String?>? permission,
     Value<String?>? sharedByEmail,
     Value<String?>? sharedByName,
+    Value<String?>? noteIconJson,
     Value<int>? rowid,
   }) {
     return NotesCompanion(
@@ -706,10 +804,12 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       deletedAt: deletedAt ?? this.deletedAt,
       isDirty: isDirty ?? this.isDirty,
       hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
+      noteIconDirty: noteIconDirty ?? this.noteIconDirty,
       collapseImages: collapseImages ?? this.collapseImages,
       permission: permission ?? this.permission,
       sharedByEmail: sharedByEmail ?? this.sharedByEmail,
       sharedByName: sharedByName ?? this.sharedByName,
+      noteIconJson: noteIconJson ?? this.noteIconJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -744,6 +844,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     if (hasRemoteCopy.present) {
       map['has_remote_copy'] = Variable<bool>(hasRemoteCopy.value);
     }
+    if (noteIconDirty.present) {
+      map['note_icon_dirty'] = Variable<bool>(noteIconDirty.value);
+    }
     if (collapseImages.present) {
       map['collapse_images'] = Variable<bool>(collapseImages.value);
     }
@@ -755,6 +858,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     }
     if (sharedByName.present) {
       map['shared_by_name'] = Variable<String>(sharedByName.value);
+    }
+    if (noteIconJson.present) {
+      map['note_icon_json'] = Variable<String>(noteIconJson.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -774,10 +880,12 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
           ..write('deletedAt: $deletedAt, ')
           ..write('isDirty: $isDirty, ')
           ..write('hasRemoteCopy: $hasRemoteCopy, ')
+          ..write('noteIconDirty: $noteIconDirty, ')
           ..write('collapseImages: $collapseImages, ')
           ..write('permission: $permission, ')
           ..write('sharedByEmail: $sharedByEmail, ')
           ..write('sharedByName: $sharedByName, ')
+          ..write('noteIconJson: $noteIconJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5609,10 +5717,12 @@ typedef $$NotesTableCreateCompanionBuilder =
       Value<DateTime?> deletedAt,
       Value<bool> isDirty,
       Value<bool> hasRemoteCopy,
+      Value<bool> noteIconDirty,
       Value<bool> collapseImages,
       Value<String?> permission,
       Value<String?> sharedByEmail,
       Value<String?> sharedByName,
+      Value<String?> noteIconJson,
       Value<int> rowid,
     });
 typedef $$NotesTableUpdateCompanionBuilder =
@@ -5626,10 +5736,12 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<DateTime?> deletedAt,
       Value<bool> isDirty,
       Value<bool> hasRemoteCopy,
+      Value<bool> noteIconDirty,
       Value<bool> collapseImages,
       Value<String?> permission,
       Value<String?> sharedByEmail,
       Value<String?> sharedByName,
+      Value<String?> noteIconJson,
       Value<int> rowid,
     });
 
@@ -5686,6 +5798,11 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get noteIconDirty => $composableBuilder(
+    column: $table.noteIconDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<bool> get collapseImages => $composableBuilder(
     column: $table.collapseImages,
     builder: (column) => ColumnFilters(column),
@@ -5703,6 +5820,11 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<String> get sharedByName => $composableBuilder(
     column: $table.sharedByName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get noteIconJson => $composableBuilder(
+    column: $table.noteIconJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5761,6 +5883,11 @@ class $$NotesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get noteIconDirty => $composableBuilder(
+    column: $table.noteIconDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get collapseImages => $composableBuilder(
     column: $table.collapseImages,
     builder: (column) => ColumnOrderings(column),
@@ -5778,6 +5905,11 @@ class $$NotesTableOrderingComposer
 
   ColumnOrderings<String> get sharedByName => $composableBuilder(
     column: $table.sharedByName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get noteIconJson => $composableBuilder(
+    column: $table.noteIconJson,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -5820,6 +5952,11 @@ class $$NotesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get noteIconDirty => $composableBuilder(
+    column: $table.noteIconDirty,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get collapseImages => $composableBuilder(
     column: $table.collapseImages,
     builder: (column) => column,
@@ -5837,6 +5974,11 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<String> get sharedByName => $composableBuilder(
     column: $table.sharedByName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get noteIconJson => $composableBuilder(
+    column: $table.noteIconJson,
     builder: (column) => column,
   );
 }
@@ -5878,10 +6020,12 @@ class $$NotesTableTableManager
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<bool> isDirty = const Value.absent(),
                 Value<bool> hasRemoteCopy = const Value.absent(),
+                Value<bool> noteIconDirty = const Value.absent(),
                 Value<bool> collapseImages = const Value.absent(),
                 Value<String?> permission = const Value.absent(),
                 Value<String?> sharedByEmail = const Value.absent(),
                 Value<String?> sharedByName = const Value.absent(),
+                Value<String?> noteIconJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotesCompanion(
                 id: id,
@@ -5893,10 +6037,12 @@ class $$NotesTableTableManager
                 deletedAt: deletedAt,
                 isDirty: isDirty,
                 hasRemoteCopy: hasRemoteCopy,
+                noteIconDirty: noteIconDirty,
                 collapseImages: collapseImages,
                 permission: permission,
                 sharedByEmail: sharedByEmail,
                 sharedByName: sharedByName,
+                noteIconJson: noteIconJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5910,10 +6056,12 @@ class $$NotesTableTableManager
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<bool> isDirty = const Value.absent(),
                 Value<bool> hasRemoteCopy = const Value.absent(),
+                Value<bool> noteIconDirty = const Value.absent(),
                 Value<bool> collapseImages = const Value.absent(),
                 Value<String?> permission = const Value.absent(),
                 Value<String?> sharedByEmail = const Value.absent(),
                 Value<String?> sharedByName = const Value.absent(),
+                Value<String?> noteIconJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotesCompanion.insert(
                 id: id,
@@ -5925,10 +6073,12 @@ class $$NotesTableTableManager
                 deletedAt: deletedAt,
                 isDirty: isDirty,
                 hasRemoteCopy: hasRemoteCopy,
+                noteIconDirty: noteIconDirty,
                 collapseImages: collapseImages,
                 permission: permission,
                 sharedByEmail: sharedByEmail,
                 sharedByName: sharedByName,
+                noteIconJson: noteIconJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

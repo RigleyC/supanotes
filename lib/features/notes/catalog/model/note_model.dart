@@ -1,4 +1,7 @@
 import 'package:supanotes/core/database/daos/notes_dao.dart';
+import 'dart:convert';
+
+import 'note_icon.dart';
 
 class NoteModel {
   const NoteModel({
@@ -16,6 +19,7 @@ class NoteModel {
     this.permission,
     this.sharedByEmail,
     this.sharedByName,
+    this.noteIcon,
   });
 
   final String id;
@@ -32,6 +36,7 @@ class NoteModel {
   final String? permission;
   final String? sharedByEmail;
   final String? sharedByName;
+  final NoteIcon? noteIcon;
 
   bool get isOwner => permission == null;
   bool get isReadOnly => permission == 'view';
@@ -52,6 +57,7 @@ class NoteModel {
     String? permission,
     String? sharedByEmail,
     String? sharedByName,
+    NoteIcon? noteIcon,
   }) => NoteModel(
     id: id ?? this.id,
     userId: userId ?? this.userId,
@@ -67,6 +73,7 @@ class NoteModel {
     permission: permission ?? this.permission,
     sharedByEmail: sharedByEmail ?? this.sharedByEmail,
     sharedByName: sharedByName ?? this.sharedByName,
+    noteIcon: noteIcon ?? this.noteIcon,
   );
 
   factory NoteModel.fromQueryResult(NoteQueryResult qr) {
@@ -91,6 +98,11 @@ class NoteModel {
       sharedByName: qr.note.sharedByName?.isNotEmpty == true
           ? qr.note.sharedByName
           : null,
+      noteIcon: qr.note.noteIconJson == null
+          ? null
+          : NoteIcon.fromJson(
+              jsonDecode(qr.note.noteIconJson!) as Map<String, dynamic>,
+            ),
     );
   }
 }

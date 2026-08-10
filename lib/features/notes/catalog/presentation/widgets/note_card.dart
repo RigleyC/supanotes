@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 import 'note_context_menu.dart';
+import 'note_icon_view.dart';
 
 class NoteCard extends StatelessWidget {
   const NoteCard({
@@ -12,12 +13,14 @@ class NoteCard extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onToggleFavorite,
+    this.onEditIcon,
   });
 
   final NoteModel note;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onToggleFavorite;
+  final VoidCallback? onEditIcon;
 
   static const _deleteTitle = 'Apagar nota?';
   static const _deleteMessage = 'Esta acao nao pode ser desfeita.';
@@ -34,8 +37,10 @@ class NoteCard extends StatelessWidget {
       note: note,
       onToggleFavorite: onToggleFavorite,
       onDelete: () => _confirmDelete(context),
+      onEditIcon: onEditIcon,
       child: GestureDetector(
         onTap: onTap,
+        onLongPress: note.isReadOnly ? null : onEditIcon,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -104,7 +109,14 @@ class NoteCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Hero(
+            Row(
+              children: [
+                if (note.noteIcon != null) ...[
+                  NoteIconView(icon: note.noteIcon!, size: 22),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Hero(
               tag: titleHeroTag(note.id),
               child: Material(
                 type: MaterialType.transparency,
@@ -115,6 +127,9 @@ class NoteCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+                ),
+                ),
+              ],
             ),
             if (note.excerpt != null) ...[
               const SizedBox(height: 4),

@@ -21,6 +21,7 @@ WHERE n.id = $1 AND n.deleted_at IS NULL
 UPDATE notes
 SET content = COALESCE(sqlc.narg('content'), content),
     collapse_images = COALESCE(sqlc.narg('collapse_images'), collapse_images),
+    note_icon = CASE WHEN sqlc.narg('set_note_icon')::boolean THEN sqlc.narg('note_icon') ELSE note_icon END,
     updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
@@ -44,7 +45,8 @@ SELECT
   n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
   n.collapse_images,
-  COALESCE(NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''), '')::text AS title,
+  n.note_icon,
+  COALESCE(NULLIF(regexp_replace(regexp_replace(split_part(ltrim(n.content, E' \t\r\n'), E'\n', 1), '^#+\s*', ''), '^[-*]\s*(\[[ xX]\]\s*)?', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived,
   COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
@@ -67,7 +69,8 @@ SELECT
   n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
   n.collapse_images,
-  COALESCE(NULLIF(regexp_replace(split_part(n.content, E'\n', 1), '^#+\s*', ''), ''), '')::text AS title,
+  n.note_icon,
+  COALESCE(NULLIF(regexp_replace(regexp_replace(split_part(ltrim(n.content, E' \t\r\n'), E'\n', 1), '^#+\s*', ''), '^[-*]\s*(\[[ xX]\]\s*)?', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived
 FROM notes n

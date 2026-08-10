@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,6 +9,7 @@ import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
@@ -132,6 +135,8 @@ class NotesRepository implements INotesRepository {
     String id, {
     String? content,
     bool? collapseImages,
+    NoteIcon? noteIcon,
+    bool clearNoteIcon = false,
   }) async {
     final current = await _local.getNoteById(id);
     if (current == null) return;
@@ -146,11 +151,25 @@ class NotesRepository implements INotesRepository {
       collapseImages: collapseImages == null
           ? const Value.absent()
           : Value(collapseImages),
+      noteIconJson: clearNoteIcon
+          ? const Value(null)
+          : noteIcon == null
+          ? const Value.absent()
+          : Value(jsonEncode(noteIcon.toJson())),
+      noteIconDirty: (noteIcon != null || clearNoteIcon)
+          ? const Value(true)
+          : const Value.absent(),
       updatedAt: Value(DateTime.now().toUtc()),
       isDirty: const Value(true),
     );
     await _local.updateNoteRaw(companion);
   }
+
+  Future<void> updateNoteIcon(
+    String id, {
+    NoteIcon? icon,
+    bool clear = false,
+  }) => updateNote(id, noteIcon: icon, clearNoteIcon: clear);
 
   /// Flips the favorite flag on the given note using the per-user
   /// preferences table. No-op if the row no longer exists.
@@ -259,6 +278,17 @@ class NotesRepository implements INotesRepository {
 
   bool _isTextEmpty(NoteData note) {
     return note.content.trim().isEmpty;
+  }
+}
+
+Future<void> saveNoteIcon(
+  INotesRepository repository,
+  String id, {
+  NoteIcon? icon,
+  bool clear = false,
+}) async {
+  if (repository case final NotesRepository concrete) {
+    await concrete.updateNoteIcon(id, icon: icon, clear: clear);
   }
 }
 

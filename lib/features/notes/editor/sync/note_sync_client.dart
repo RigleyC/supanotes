@@ -258,6 +258,7 @@ class NoteSyncClient {
     }
   }
 
+
   Future<OperationsListResponse> getOperationsSince(
     String noteId,
     int afterRevision,

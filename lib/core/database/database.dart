@@ -199,7 +199,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 25;
+  int get schemaVersion => 27;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -390,6 +390,20 @@ class AppDatabase extends _$AppDatabase {
           noteSyncErrors,
           'note_sync_errors',
           noteSyncErrors.ownerUserId,
+        );
+      }
+      if (from < 26) {
+        await addColumnIfMissing(
+          notes,
+          'notes',
+          notes.noteIconJson,
+        );
+      }
+      if (from < 27) {
+        await addColumnIfMissing(
+          notes,
+          'notes',
+          notes.noteIconDirty,
         );
       }
     },

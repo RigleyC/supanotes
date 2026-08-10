@@ -15,6 +15,7 @@ import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_grid_view.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_list_view.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -195,6 +196,19 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     ref.read(notesRepositoryProvider).toggleFavorite(note.id);
   }
 
+  Future<void> _editNoteIcon(NoteModel note) async {
+    await showNoteIconPicker(
+      context: context,
+      note: note,
+      onSelected: (icon) => saveNoteIcon(
+        ref.read(notesRepositoryProvider),
+        note.id,
+        icon: icon,
+        clear: icon == null,
+      ),
+    );
+  }
+
   Future<void> _toggleViewMode() async {
     try {
       await ref
@@ -214,6 +228,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
             onTap: _openNote,
             onDelete: _deleteNote,
             onToggleFavorite: _toggleFavorite,
+            onEditIcon: _editNoteIcon,
           )
         : NotesListView(
             key: const ValueKey('list'),
@@ -221,6 +236,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
             onTap: _openNote,
             onDelete: _deleteNote,
             onToggleFavorite: _toggleFavorite,
+            onEditIcon: _editNoteIcon,
           );
   }
 }

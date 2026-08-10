@@ -7,9 +7,11 @@ import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/utils/platform_utils.dart';
 import 'package:supanotes/features/notes/catalog/application/desktop_layout_preferences.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/desktop_content_surface.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/desktop_sidebar_surface.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_sidebar.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/resize_drag_handle.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
@@ -76,6 +78,19 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
     setState(() {
       _isSidebarResizing = false;
     });
+  }
+
+  Future<void> _editNoteIcon(NoteModel note) async {
+    await showNoteIconPicker(
+      context: context,
+      note: note,
+      onSelected: (icon) => saveNoteIcon(
+        ref.read(notesRepositoryProvider),
+        note.id,
+        icon: icon,
+        clear: icon == null,
+      ),
+    );
   }
 
   @override
@@ -148,6 +163,7 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
                               onOpenSettings: () {
                                 context.push(AppRoutes.settings);
                               },
+                              onEditIcon: _editNoteIcon,
                               onToggleCollapsed: _toggleSidebar,
                             ),
                           ),

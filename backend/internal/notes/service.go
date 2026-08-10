@@ -60,10 +60,12 @@ func (s *Service) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype
 	return note, nil
 }
 
-func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, collapseImages *bool) (sqlcgen.Note, error) {
+func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, collapseImages *bool, noteIcon []byte, setNoteIcon bool) (sqlcgen.Note, error) {
 	arg := sqlcgen.UpdateNoteParams{
-		ID:     id,
-		UserID: userID,
+		ID:          id,
+		UserID:      userID,
+		SetNoteIcon: pgtype.Bool{Bool: setNoteIcon, Valid: setNoteIcon},
+		NoteIcon:    noteIcon,
 	}
 	if content != nil {
 		arg.Content = pgtype.Text{String: *content, Valid: true}

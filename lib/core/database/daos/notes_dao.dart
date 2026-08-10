@@ -163,10 +163,12 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       deletedAt: row.read<DateTime?>('deleted_at'),
       isDirty: row.read<bool>('is_dirty'),
       hasRemoteCopy: row.read<bool>('has_remote_copy'),
+      noteIconDirty: row.read<bool>('note_icon_dirty'),
       collapseImages: row.read<bool>('collapse_images'),
       permission: row.read<String?>('permission'),
       sharedByEmail: row.read<String?>('shared_by_email'),
       sharedByName: row.read<String?>('shared_by_name'),
+      noteIconJson: row.read<String?>('note_icon_json'),
     );
     return (
       note: note,
@@ -279,6 +281,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     Value<String?> permission = const Value.absent(),
     Value<String?> sharedByEmail = const Value.absent(),
     Value<String?> sharedByName = const Value.absent(),
+    Value<String?> noteIconJson = const Value.absent(),
   }) async {
     final updatedRows = await (update(notes)..where((t) => t.id.equals(id)))
         .write(
@@ -286,6 +289,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
             permission: permission,
             sharedByEmail: sharedByEmail,
             sharedByName: sharedByName,
+            noteIconJson: noteIconJson,
+            noteIconDirty: const Value(false),
           ),
         );
     return updatedRows == 1;
@@ -369,6 +374,16 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     await (update(notes)
           ..where((t) => t.id.equals(id) & t.updatedAt.equals(pushedUpdatedAt)))
         .write(const NotesCompanion(isDirty: Value(false)));
+  }
+
+  Future<List<NoteData>> getDirtyNoteIcons() {
+    return (select(notes)..where((t) => t.noteIconDirty.equals(true))).get();
+  }
+
+  Future<void> clearNoteIconDirty(String id, DateTime pushedUpdatedAt) async {
+    await (update(notes)
+          ..where((t) => t.id.equals(id) & t.updatedAt.equals(pushedUpdatedAt)))
+        .write(const NotesCompanion(noteIconDirty: Value(false)));
   }
 
   /// Permanently removes a note from the local database.

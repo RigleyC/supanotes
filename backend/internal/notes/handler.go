@@ -1,7 +1,9 @@
 package notes
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -20,22 +22,24 @@ type CreateNoteRequest struct {
 }
 
 type UpdateNoteRequest struct {
-	Content        *string `json:"content"`
-	CollapseImages *bool   `json:"collapse_images"`
+	Content        *string         `json:"content"`
+	CollapseImages *bool           `json:"collapse_images"`
+	NoteIcon       json.RawMessage `json:"note_icon"`
 }
 
 type NoteResponse struct {
-	ID             string  `json:"id"`
-	Content        string  `json:"content"`
-	Excerpt        *string `json:"excerpt,omitempty"`
-	Favorite       bool    `json:"favorite"`
-	Archived       bool    `json:"archived"`
-	CollapseImages bool    `json:"collapse_images"`
-	CreatedAt      string  `json:"created_at"`
-	UpdatedAt      string  `json:"updated_at"`
-	Permission     string  `json:"permission,omitempty"`
-	SharedByEmail  string  `json:"shared_by_email,omitempty"`
-	SharedByName   string  `json:"shared_by_name,omitempty"`
+	ID             string          `json:"id"`
+	Content        string          `json:"content"`
+	Excerpt        *string         `json:"excerpt,omitempty"`
+	Favorite       bool            `json:"favorite"`
+	Archived       bool            `json:"archived"`
+	CollapseImages bool            `json:"collapse_images"`
+	CreatedAt      string          `json:"created_at"`
+	UpdatedAt      string          `json:"updated_at"`
+	Permission     string          `json:"permission,omitempty"`
+	SharedByEmail  string          `json:"shared_by_email,omitempty"`
+	SharedByName   string          `json:"shared_by_name,omitempty"`
+	NoteIcon       json.RawMessage `json:"note_icon,omitempty"`
 }
 
 type Handler struct {
@@ -142,6 +146,7 @@ func (h *Handler) Get(c echo.Context) error {
 		CreatedAt: note.CreatedAt, UpdatedAt: note.UpdatedAt,
 		Permission: note.Permission, SharedByEmail: note.SharedByEmail,
 		SharedByName: note.SharedByName,
+		NoteIcon:     note.NoteIcon,
 	}))
 }
 
@@ -161,7 +166,19 @@ func (h *Handler) Update(c echo.Context) error {
 		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, req.CollapseImages)
+	var noteIcon []byte
+	setNoteIcon := len(req.NoteIcon) > 0
+	if setNoteIcon && string(req.NoteIcon) != "null" {
+		var decoded map[string]any
+		if err := json.Unmarshal(req.NoteIcon, &decoded); err != nil {
+			return web.JSONError(c, http.StatusBadRequest, "invalid note icon")
+		}
+		if err := validateNoteIcon(decoded); err != nil {
+			return web.JSONError(c, http.StatusBadRequest, err.Error())
+		}
+		noteIcon = req.NoteIcon
+	}
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, req.CollapseImages, noteIcon, setNoteIcon)
 	if err != nil {
 		if errors.Is(err, ErrNoteNotFound) {
 			return web.JSONError(c, http.StatusNotFound, "note not found")
@@ -215,6 +232,7 @@ type NoteResponseFields struct {
 	Permission     string
 	SharedByEmail  string
 	SharedByName   string
+	NoteIcon       []byte
 }
 
 func mapToNoteResponse(f NoteResponseFields) NoteResponse {
@@ -235,6 +253,7 @@ func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 		Permission:     f.Permission,
 		SharedByEmail:  f.SharedByEmail,
 		SharedByName:   f.SharedByName,
+		NoteIcon:       json.RawMessage(f.NoteIcon),
 	}
 }
 
@@ -246,6 +265,7 @@ func noteToResponseFields(n sqlcgen.Note) NoteResponseFields {
 		CollapseImages: n.CollapseImages,
 		CreatedAt:      n.CreatedAt,
 		UpdatedAt:      n.UpdatedAt,
+		NoteIcon:       n.NoteIcon,
 	}
 }
 
@@ -267,5 +287,51 @@ func mapToNoteResponseFields(n sqlcgen.GetNotesRow) NoteResponse {
 		Permission:     n.Permission,
 		SharedByEmail:  n.SharedByEmail,
 		SharedByName:   n.SharedByName,
+		NoteIcon:       n.NoteIcon,
 	}
+}
+
+func validateNoteIcon(icon map[string]any) error {
+	kind, ok := icon["kind"].(string)
+	if !ok {
+		return fmt.Errorf("note icon kind is required")
+	}
+	value, ok := icon["value"].(string)
+	if !ok || value == "" {
+		return fmt.Errorf("note icon value is required")
+	}
+	switch kind {
+	case "emoji":
+		if _, hasColor := icon["color_key"]; hasColor {
+			return fmt.Errorf("emoji cannot have a color")
+		}
+	case "catalog":
+		if !catalogIconIDs[value] {
+			return fmt.Errorf("unknown catalog icon")
+		}
+		color, ok := icon["color_key"].(string)
+		if !ok || !catalogColorKeys[color] {
+			return fmt.Errorf("unknown catalog icon color")
+		}
+	default:
+		return fmt.Errorf("unknown note icon kind")
+	}
+	return nil
+}
+
+var catalogIconIDs = map[string]bool{
+	"wallet": true, "arrow_down": true, "star": true, "lock": true,
+	"home": true, "calendar": true, "basket": true, "travel": true,
+	"book": true, "bookmark": true, "code": true, "braces": true,
+	"building": true, "sparkles": true, "camera": true, "car": true,
+	"cart": true, "warning": true, "chart": true, "chat": true,
+	"cloud": true, "settings": true, "crown": true, "monitor": true,
+	"money": true, "globe": true, "eye": true, "fire": true,
+	"flag": true, "game": true,
+}
+
+var catalogColorKeys = map[string]bool{
+	"red": true, "orange": true, "yellow": true, "green": true,
+	"teal": true, "blue": true, "indigo": true, "purple": true,
+	"pink": true, "brown": true, "gray": true, "black": true,
 }
