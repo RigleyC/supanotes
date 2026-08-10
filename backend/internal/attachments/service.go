@@ -110,7 +110,7 @@ func (s *service) Upload(ctx context.Context, noteID pgtype.UUID, userID pgtype.
 		}
 		return sqlcgen.Attachment{}, ErrInvalidFileSize
 	}
-	attachment, err := s.repo.Insert(ctx, noteID, filename, object.PublicURL, mimeType, counted.bytesRead)
+	attachment, err := s.repo.Insert(ctx, noteID, filename, object.Key, mimeType, counted.bytesRead)
 	if err != nil {
 		if deleteErr := s.storage.Delete(ctx, object.Key); deleteErr != nil {
 			return sqlcgen.Attachment{}, fmt.Errorf("insert attachment metadata: %w; cleanup uploaded object: %v", err, deleteErr)
@@ -156,6 +156,9 @@ func storageKeyFromURL(raw string) (string, error) {
 	parsed, err := url.Parse(raw)
 	if err != nil {
 		return "", fmt.Errorf("parse attachment URL: %w", err)
+	}
+	if strings.HasPrefix(raw, "attachments/") {
+		return raw, nil
 	}
 	marker := "/attachments/"
 	index := strings.Index(parsed.Path, marker)

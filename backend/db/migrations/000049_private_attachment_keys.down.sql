@@ -1,0 +1,1 @@
+-- Attachment URLs remain private storage keys after this migration.

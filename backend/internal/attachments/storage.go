@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type StorageService interface {
@@ -25,12 +25,11 @@ type StoredObject struct {
 }
 
 type s3Storage struct {
-	client     *s3.Client
-	bucket     string
-	publicBase string
+	client *s3.Client
+	bucket string
 }
 
-func NewS3Storage(endpoint, region, bucket, accessKey, secretKey, publicBase string) (StorageService, error) {
+func NewS3Storage(endpoint, region, bucket, accessKey, secretKey string) (StorageService, error) {
 	if bucket == "" {
 		return &noopStorage{}, nil
 	}
@@ -49,7 +48,7 @@ func NewS3Storage(endpoint, region, bucket, accessKey, secretKey, publicBase str
 			o.UsePathStyle = true
 		}
 	})
-	return &s3Storage{client: client, bucket: bucket, publicBase: publicBase}, nil
+	return &s3Storage{client: client, bucket: bucket}, nil
 }
 
 func (s *s3Storage) Upload(ctx context.Context, key string, r io.Reader, mimeType string, size int64) (StoredObject, error) {
@@ -57,6 +56,7 @@ func (s *s3Storage) Upload(ctx context.Context, key string, r io.Reader, mimeTyp
 	_, err := uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(s.bucket),
 		Key:           aws.String(key),
+		ACL:           types.ObjectCannedACLPrivate,
 		Body:          r,
 		ContentType:   aws.String(mimeType),
 		ContentLength: aws.Int64(size),
@@ -64,8 +64,7 @@ func (s *s3Storage) Upload(ctx context.Context, key string, r io.Reader, mimeTyp
 	if err != nil {
 		return StoredObject{}, fmt.Errorf("s3 upload: %w", err)
 	}
-	encodedKey := url.PathEscape(key)
-	return StoredObject{Key: key, PublicURL: fmt.Sprintf("%s/%s", s.publicBase, encodedKey)}, nil
+	return StoredObject{Key: key}, nil
 }
 
 func (s *s3Storage) Delete(ctx context.Context, key string) error {

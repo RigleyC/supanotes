@@ -32,7 +32,6 @@ type Config struct {
 	S3Bucket          string // S3_BUCKET
 	S3AccessKeyID     string // S3_ACCESS_KEY_ID
 	S3SecretAccessKey string // S3_SECRET_ACCESS_KEY
-	S3PublicBaseURL   string // S3_PUBLIC_BASE_URL — public URL prefix for serving files
 }
 
 func Load() (*Config, error) {
@@ -93,15 +92,7 @@ func Load() (*Config, error) {
 		S3Bucket:           firstNonEmpty(os.Getenv("S3_BUCKET"), os.Getenv("BUCKET_NAME")),
 		S3AccessKeyID:      firstNonEmpty(os.Getenv("S3_ACCESS_KEY_ID"), os.Getenv("AWS_ACCESS_KEY_ID")),
 		S3SecretAccessKey:  firstNonEmpty(os.Getenv("S3_SECRET_ACCESS_KEY"), os.Getenv("AWS_SECRET_ACCESS_KEY")),
-		S3PublicBaseURL:    firstNonEmpty(os.Getenv("S3_PUBLIC_BASE_URL"), buildTigrisPublicBaseURL(firstNonEmpty(os.Getenv("S3_BUCKET"), os.Getenv("BUCKET_NAME")), firstNonEmpty(os.Getenv("S3_ENDPOINT"), os.Getenv("AWS_ENDPOINT_URL_S3")))),
 	}, nil
-}
-
-func buildTigrisPublicBaseURL(bucket, endpoint string) string {
-	if bucket != "" && strings.Contains(endpoint, "tigris.dev") {
-		return fmt.Sprintf("https://%s.fly.storage.tigris.dev", bucket)
-	}
-	return ""
 }
 
 func (c *Config) IsDev() bool {

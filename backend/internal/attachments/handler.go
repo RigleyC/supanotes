@@ -104,7 +104,7 @@ func (h *Handler) Upload(c echo.Context) error {
 		ID:        uid.UUIDToString(attachment.ID),
 		NoteID:    uid.UUIDToString(attachment.NoteID),
 		Filename:  attachment.Filename,
-		URL:       attachment.Url,
+		URL:       "/api/v1/attachments/" + uid.UUIDToString(attachment.ID) + "/content",
 		MimeType:  attachment.MimeType,
 		SizeBytes: attachment.SizeBytes,
 		CreatedAt: attachment.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),

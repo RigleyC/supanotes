@@ -8,6 +8,7 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
 import 'share_list_section.dart';
+import 'share_link_section.dart';
 
 class ShareNoteSheet extends ConsumerStatefulWidget {
   final String noteId;
@@ -114,6 +115,8 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
         const SizedBox(height: AppSpacing.xxl),
 
         ShareListSection(noteId: widget.noteId),
+        const SizedBox(height: AppSpacing.xxl),
+        ShareLinkSection(noteId: widget.noteId),
       ],
     );
   }

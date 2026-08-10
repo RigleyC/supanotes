@@ -227,7 +227,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	// Attachments
 	storageBackend, err := attachments.NewS3Storage(
 		cfg.S3Endpoint, cfg.S3Region, cfg.S3Bucket,
-		cfg.S3AccessKeyID, cfg.S3SecretAccessKey, cfg.S3PublicBaseURL,
+		cfg.S3AccessKeyID, cfg.S3SecretAccessKey,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to init storage backend")
@@ -236,6 +236,8 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	attachmentsSvc := attachments.NewService(attachmentsRepo, storageBackend)
 	attachmentsH := attachments.NewHandler(attachmentsSvc)
 	protected.POST("/attachments/upload", attachmentsH.Upload)
+	privateAttachmentsH := attachments.NewPrivateHandler(attachmentsRepo, storageBackend)
+	protected.GET("/attachments/:id/content", privateAttachmentsH.Download)
 	publicAttachmentsH := attachments.NewPublicHandler(
 		attachmentsRepo,
 		storageBackend,

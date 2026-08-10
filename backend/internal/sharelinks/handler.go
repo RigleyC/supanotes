@@ -1,6 +1,7 @@
 package sharelinks
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -96,7 +97,10 @@ func (h *Handler) PublicDocument(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound)
 	}
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
-	return c.JSON(http.StatusOK, map[string]string{"title": document.Title, "text": document.Text})
+	return c.JSON(http.StatusOK, map[string]any{
+		"title":    document.Title,
+		"document": json.RawMessage(publicNote.Document),
+	})
 }
 
 func publicHTML(page RenderedPage) string {
