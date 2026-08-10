@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' hide isNotNull;
@@ -9,6 +10,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
@@ -19,6 +21,8 @@ import 'package:supanotes/features/notes/editor/application/note_editor_provider
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
+class _MockApiClient extends Mock implements ApiClient {}
+
 class _MockAttachmentsRepository extends Mock
     implements AttachmentsRepository {}
 
@@ -28,6 +32,7 @@ void main() {
   Future<ProviderContainer> buildContainer({
     AppDatabase? database,
     NoteSyncClient? syncClient,
+    ApiClient? apiClient,
     bool registerTearDown = true,
   }) async {
     SharedPreferences.setMockInitialValues({});
@@ -43,6 +48,7 @@ void main() {
         noteSyncClientProvider.overrideWithValue(
           syncClient ?? _MockNoteSyncClient(),
         ),
+        apiClientProvider.overrideWithValue(apiClient ?? _MockApiClient()),
         attachmentsRepositoryProvider.overrideWithValue(
           _MockAttachmentsRepository(),
         ),
@@ -100,6 +106,103 @@ void main() {
     );
 
     expect(session.captureLocalOperations, isTrue);
+  });
+
+  test(
+    'share-link viewer cannot capture with an editable local catalog row',
+    () async {
+      final container = await buildContainer();
+      final db = container.read(appDatabaseProvider);
+      await insertNote(db, id: 'note-share-viewer');
+
+      final session = await container.read(
+        noteEditorReadOnlySessionProvider('note-share-viewer').future,
+      );
+
+      expect(session.captureLocalOperations, isFalse);
+    },
+  );
+
+  test('share-link editor captures before local catalog hydration', () async {
+    final container = await buildContainer();
+
+    final session = await container.read(
+      noteEditorEditableSessionProvider('note-share-editor').future,
+    );
+
+    expect(session.captureLocalOperations, isTrue);
+  });
+
+  test(
+    'share-link session hydrates the canonical snapshot before local catalog sync',
+    () async {
+      final apiClient = _MockApiClient();
+      when(
+        () => apiClient.get<Map<String, dynamic>>(
+          '/s/share-token/document',
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/s/share-token/document'),
+          data: const {
+            'title': 'Shared note',
+            'document': {
+              'schemaVersion': 1,
+              'blocks': [
+                {
+                  'id': 'shared-block',
+                  'type': 'paragraph',
+                  'delta': [
+                    {'insert': 'Loaded from share link'},
+                  ],
+                },
+              ],
+            },
+          },
+        ),
+      );
+      final container = await buildContainer(apiClient: apiClient);
+
+      final session = await container.read(
+        noteEditorReadOnlyShareLinkSessionProvider((
+          noteId: 'note-share-hydration',
+          token: 'share-token',
+        )).future,
+      );
+
+      expect(
+        (session.controller.document.first as TextNode).text.toPlainText(),
+        'Loaded from share link',
+      );
+      verify(
+        () => apiClient.get<Map<String, dynamic>>(
+          '/s/share-token/document',
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
+    },
+  );
+
+  test('share-link access modes do not share a mutable session', () async {
+    final container = await buildContainer();
+    final db = container.read(appDatabaseProvider);
+    await insertNote(db, id: 'note-share-isolation');
+
+    final editable = await container.read(
+      noteEditorEditableSessionProvider('note-share-isolation').future,
+    );
+    final viewer = await container.read(
+      noteEditorReadOnlySessionProvider('note-share-isolation').future,
+    );
+
+    expect(identical(editable, viewer), isFalse);
+    expect(editable.captureLocalOperations, isTrue);
+    expect(viewer.captureLocalOperations, isFalse);
   });
 
   test(

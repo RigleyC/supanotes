@@ -20,6 +20,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.composer,
     this.taskMetadataById = const {},
     this.hideCompleted = false,
+    this.readOnly = false,
     this.onTaskLongPress,
     this.onTaskComplete,
     this.onTaskReopen,
@@ -30,6 +31,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final MutableDocumentComposer? composer;
   Map<String, TaskModel> taskMetadataById;
   bool hideCompleted;
+  final bool readOnly;
   ValueChanged<String>? onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
@@ -53,6 +55,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     }
 
     Future<void> updateCompletion(bool isComplete) async {
+      if (readOnly) return;
       HapticFeedback.lightImpact();
       if (isComplete) {
         if (hideCompleted && !isRecurring) {
@@ -99,9 +102,10 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       viewModel: componentViewModel,
       taskMetadata: taskMetadataById[nodeId],
       isRecurring: _recurringTaskIds.contains(nodeId),
+      isReadOnly: readOnly,
       onCompletionChange: _completionHandlers[nodeId],
       hideCompleted: hideCompleted,
-      onLongPress: onTaskLongPress == null
+      onLongPress: readOnly || onTaskLongPress == null
           ? null
           : () {
               HapticFeedback.mediumImpact();
@@ -112,11 +116,14 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 }
 
 bool isRecurringTaskNode(TaskNode node, TaskModel? metadata) {
-  return TaskRecurrence.parse(
-            node.metadata['recurrenceRule'] as String? ??
-                node.metadata['recurrence'] as String?,
-          ) !=
-          null ||
+  final recurrenceRule = node.metadata['recurrenceRule'];
+  final recurrence = node.metadata['recurrence'];
+  final recurrenceValue = recurrenceRule is String
+      ? recurrenceRule
+      : recurrence is String
+      ? recurrence
+      : null;
+  return TaskRecurrence.parse(recurrenceValue) != null ||
       metadata?.recurrence != null;
 }
 
@@ -156,6 +163,7 @@ class CustomTaskComponent extends StatefulWidget {
   const CustomTaskComponent({
     super.key,
     required this.viewModel,
+    this.isReadOnly = false,
     this.isRecurring = false,
     this.taskMetadata,
     this.hideCompleted = false,
@@ -164,6 +172,7 @@ class CustomTaskComponent extends StatefulWidget {
   });
 
   final TaskComponentViewModel viewModel;
+  final bool isReadOnly;
   final bool isRecurring;
   final TaskModel? taskMetadata;
   final bool hideCompleted;
@@ -207,7 +216,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   }
 
   Future<void> _onCheckboxTap() async {
-    if (_isUpdatingCompletion) {
+    if (widget.isReadOnly || _isUpdatingCompletion) {
       return;
     }
 
@@ -312,14 +321,16 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
               child: Semantics(
                 button: true,
                 checked: _isComplete,
-                enabled: !_isUpdatingCompletion,
+                enabled: !widget.isReadOnly && !_isUpdatingCompletion,
                 label: _isComplete
                     ? 'Marcar tarefa como pendente'
                     : 'Concluir tarefa',
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: _isUpdatingCompletion ? null : _onCheckboxTap,
-                  onLongPress: widget.onLongPress,
+                  onTap: widget.isReadOnly || _isUpdatingCompletion
+                      ? null
+                      : _onCheckboxTap,
+                  onLongPress: widget.isReadOnly ? null : widget.onLongPress,
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
@@ -329,7 +340,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                         accentColor: taskColor,
                         inactiveColor: colorScheme.outline,
                         shape: AppTaskCheckboxShape.rounded,
-                        onCheckAnimationCompleted: _isRecurring
+                        onCheckAnimationCompleted:
+                            !widget.isReadOnly && _isRecurring
                             ? _onCheckAnimationCompleted
                             : null,
                       ),

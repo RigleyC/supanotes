@@ -22,4 +22,6 @@ class ShareLinkStrings {
   static const revokeConfirmLabel = 'Revogar';
   static const accessErrorTitle = 'Este link é inválido ou foi revogado.';
   static const accessErrorSubtitle = 'Peça ao proprietário uma nova permissão.';
+  static const sharedNoteTitle = 'Nota compartilhada';
+  static const readerErrorTitle = 'Não foi possível abrir esta nota.';
 }

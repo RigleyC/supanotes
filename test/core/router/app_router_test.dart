@@ -76,9 +76,7 @@ Future<ProviderContainer> _makeLoadingContainer({
       sharedPreferencesProvider.overrideWithValue(sharedPreferences),
       authLocalStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWithValue(repository),
-      authControllerProvider.overrideWith(
-        () => _LoadingAuthController(),
-      ),
+      authControllerProvider.overrideWith(() => _LoadingAuthController()),
     ],
   );
   addTearDown(container.dispose);
@@ -101,8 +99,6 @@ Widget _wrapRouter(ProviderContainer container) {
     ),
   );
 }
-
-
 
 void main() {
   test('note route keeps transient editor options out of the URL', () {
@@ -138,6 +134,31 @@ void main() {
     expect(editorScreen.requestInitialFocus, isTrue);
   });
 
+  testWidgets('note route receives read-only share-link access', (
+    tester,
+  ) async {
+    final container = await _makeContainer(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    router.push(
+      AppRoutes.note('note-1'),
+      extra: const NoteEditorOpenOptions(
+        accessMode: NoteEditorAccessMode.readOnly,
+      ),
+    );
+    await settleRedirect(tester);
+
+    final editorScreen = tester.widget<NoteEditorScreen>(
+      find.byType(NoteEditorScreen),
+    );
+    expect(editorScreen.accessMode, NoteEditorAccessMode.readOnly);
+  });
+
   testWidgets('starting with loading auth lands on /splash', (tester) async {
     final container = await _makeLoadingContainer();
 
@@ -151,8 +172,9 @@ void main() {
     );
   });
 
-  testWidgets('starting on /splash with unauth auth redirects to /login',
-      (tester) async {
+  testWidgets('starting on /splash with unauth auth redirects to /login', (
+    tester,
+  ) async {
     final container = await _makeContainer(null);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -165,7 +187,9 @@ void main() {
     );
   });
 
-  testWidgets('starting on /splash with auth redirects to /home', (tester) async {
+  testWidgets('starting on /splash with auth redirects to /home', (
+    tester,
+  ) async {
     final container = await _makeContainer(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
@@ -180,8 +204,9 @@ void main() {
     );
   });
 
-  testWidgets('starting on /login with unauth auth stays on /login',
-      (tester) async {
+  testWidgets('starting on /login with unauth auth stays on /login', (
+    tester,
+  ) async {
     final container = await _makeContainer(null);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -194,7 +219,9 @@ void main() {
     );
   });
 
-  testWidgets('starting on /login with auth redirects to /home', (tester) async {
+  testWidgets('starting on /login with auth redirects to /home', (
+    tester,
+  ) async {
     final container = await _makeContainer(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
@@ -209,8 +236,9 @@ void main() {
     );
   });
 
-  testWidgets('unauthenticated user on /home is redirected to /login',
-      (tester) async {
+  testWidgets('unauthenticated user on /home is redirected to /login', (
+    tester,
+  ) async {
     final container = await _makeContainer(null);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -226,8 +254,9 @@ void main() {
     );
   });
 
-  testWidgets('unauthenticated user on /register is left at /register',
-      (tester) async {
+  testWidgets('unauthenticated user on /register is left at /register', (
+    tester,
+  ) async {
     final container = await _makeContainer(null);
 
     await tester.pumpWidget(_wrapRouter(container));
@@ -243,8 +272,9 @@ void main() {
     );
   });
 
-  testWidgets('authenticated user on /login is redirected to /home',
-      (tester) async {
+  testWidgets('authenticated user on /login is redirected to /home', (
+    tester,
+  ) async {
     final container = await _makeContainer(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
@@ -262,8 +292,9 @@ void main() {
     );
   });
 
-  testWidgets('authenticated user on /register is redirected to /home',
-      (tester) async {
+  testWidgets('authenticated user on /register is redirected to /home', (
+    tester,
+  ) async {
     final container = await _makeContainer(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
@@ -298,5 +329,4 @@ void main() {
       AppRoutes.home,
     );
   });
-
 }

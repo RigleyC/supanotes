@@ -15,6 +15,7 @@ import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_note_chrome.dart';
@@ -1426,5 +1427,48 @@ void main() {
 
     expect(find.byType(SlashCommandOverlay), findsNothing);
     expect(find.byType(NoteToolbar), findsNothing);
+    expect(find.byType(SuperReader), findsOneWidget);
+    expect(find.byType(SuperEditor), findsNothing);
   });
+
+  testWidgets(
+    'share-link read-only handoff opens the editor before catalog hydration',
+    (tester) async {
+      final streamController = StreamController<NoteModel?>();
+      addTearDown(streamController.close);
+      final controller = _createTestController([
+        ParagraphNode(id: '1', text: AttributedText('shared content')),
+      ]);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            notesRepositoryProvider.overrideWithValue(
+              _FakeNotesRepository(streamController),
+            ),
+            tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
+            currentUserIdProvider.overrideWithValue('test-user'),
+            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
+            noteEditorReadOnlySessionProvider.overrideWith(
+              (ref, noteId) async => _sessionFor(controller),
+            ),
+          ],
+          child: const MaterialApp(
+            home: NoteEditorScreen(
+              noteId: 'note-1',
+              accessMode: NoteEditorAccessMode.readOnly,
+            ),
+          ),
+        ),
+      );
+
+      streamController.add(null);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NoteEditor), findsOneWidget);
+      expect(find.byType(SuperReader), findsOneWidget);
+      expect(find.text(NoteStrings.errorNotFound), findsNothing);
+    },
+  );
 }

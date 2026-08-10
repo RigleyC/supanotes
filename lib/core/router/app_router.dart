@@ -57,6 +57,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 requestInitialFocus:
                     openOptions is NoteEditorOpenOptions &&
                     openOptions.requestInitialFocus,
+                accessMode: openOptions is NoteEditorOpenOptions
+                    ? openOptions.accessMode
+                    : null,
+                shareLinkToken: openOptions is NoteEditorOpenOptions
+                    ? openOptions.shareLinkToken
+                    : null,
               );
             },
           ),

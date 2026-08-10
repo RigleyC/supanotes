@@ -17,7 +17,9 @@ import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
@@ -33,11 +35,15 @@ import 'package:supanotes/core/utils/platform_utils.dart';
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
   final bool requestInitialFocus;
+  final NoteEditorAccessMode? accessMode;
+  final String? shareLinkToken;
 
   const NoteEditorScreen({
     super.key,
     required this.noteId,
     this.requestInitialFocus = false,
+    this.accessMode,
+    this.shareLinkToken,
   });
 
   @override
@@ -53,10 +59,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final projected = tasks[taskId];
     if (projected != null) return projected;
 
-    final controller = ref
-        .read(noteEditorSessionProvider(widget.noteId))
-        .value
-        ?.controller;
+    final controller = _readSession().value?.controller;
     final node = controller?.document.getNodeById(taskId);
     if (node is! TaskNode) return null;
 
@@ -90,6 +93,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     NoteModel note,
     bool hideCompleted,
   ) async {
+    if (_isReadOnlyFor(note)) return;
+
     final mutationController = ref.read(
       notePreferenceMutationControllerProvider(widget.noteId).notifier,
     );
@@ -112,6 +117,39 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
   }
 
+  FutureProvider<NoteEditorSession> get _sessionProvider {
+    final shareLinkToken = widget.shareLinkToken;
+    if (shareLinkToken != null) {
+      final request = (noteId: widget.noteId, token: shareLinkToken);
+      return switch (widget.accessMode) {
+        NoteEditorAccessMode.readOnly =>
+          noteEditorReadOnlyShareLinkSessionProvider(request),
+        NoteEditorAccessMode.editable =>
+          noteEditorEditableShareLinkSessionProvider(request),
+        null => noteEditorSessionProvider(widget.noteId),
+      };
+    }
+    return switch (widget.accessMode) {
+      NoteEditorAccessMode.readOnly => noteEditorReadOnlySessionProvider(
+        widget.noteId,
+      ),
+      NoteEditorAccessMode.editable => noteEditorEditableSessionProvider(
+        widget.noteId,
+      ),
+      null => noteEditorSessionProvider(widget.noteId),
+    };
+  }
+
+  bool _isReadOnlyFor(NoteModel? note) {
+    return switch (widget.accessMode) {
+      NoteEditorAccessMode.readOnly => true,
+      NoteEditorAccessMode.editable => false,
+      null => note?.isReadOnly ?? false,
+    };
+  }
+
+  AsyncValue<NoteEditorSession> _readSession() => ref.read(_sessionProvider);
+
   @override
   Widget build(BuildContext context) {
     final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
@@ -120,10 +158,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       loading: () => null,
       error: (_, _) => null,
     );
+    final screenIsReadOnly = _isReadOnlyFor(note);
     final preferenceMutation = ref.watch(
       notePreferenceMutationControllerProvider(widget.noteId),
     );
-    final sessionAsync = ref.watch(noteEditorSessionProvider(widget.noteId));
+    final sessionAsync = ref.watch(_sessionProvider);
 
     final isDesktop = isDesktopLayout(context);
     final editorFocusNode = sessionAsync.when(
@@ -157,11 +196,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   child: Container(color: Colors.transparent),
                 ),
               ),
-              title: note?.isReadOnly == true
+              title: screenIsReadOnly && note?.sharedByEmail != null
                   ? Text('${NoteStrings.sharedByPrefix} ${note!.sharedByEmail}')
                   : null,
               actions: [
-                if (note != null) ...[
+                if (note != null && !screenIsReadOnly) ...[
                   AdaptivePopupMenuButton.icon<String>(
                     icon: PlatformInfo.isIOS26OrHigher()
                         ? 'ellipsis'
@@ -223,7 +262,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   else if (preferenceMutation.status ==
                       NotePreferenceMutationStatus.error)
                     const Icon(Icons.error_outline),
-                  if (!note.isReadOnly)
+                  if (!screenIsReadOnly)
                     sessionAsync.when(
                       data: (session) => AnimatedBuilder(
                         animation: session.controller.focusNode,
@@ -253,6 +292,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           if (isDesktop)
             DesktopNoteChrome(
               note: note,
+              readOnlyOverride: widget.accessMode == null
+                  ? null
+                  : screenIsReadOnly,
               preferenceStatus: preferenceMutation.status,
               editorFocusNode: editorFocusNode,
               onMenuSelected: (value) {
@@ -279,20 +321,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 data: (noteWithTasks) {
                   final tasksMap = noteWithTasks.taskById;
                   final noteData = noteWithTasks.note;
-                  if (noteData == null) {
+                  if (noteData == null && widget.accessMode == null) {
                     return Center(child: Text(NoteStrings.errorNotFound));
                   }
 
-                  final isReadOnly = noteData.isReadOnly;
+                  final isReadOnly = _isReadOnlyFor(noteData);
                   final editor = NoteEditor(
                     noteId: widget.noteId,
                     requestInitialFocus: widget.requestInitialFocus,
                     taskMetadata: tasksMap,
-                    hideCompleted: noteData.hideCompleted,
-                    collapseImages: noteData.collapseImages,
+                    hideCompleted: noteData?.hideCompleted ?? false,
+                    collapseImages: noteData?.collapseImages ?? false,
                     isReadOnly: isReadOnly,
+                    allowInternalNoteLinks:
+                        widget.accessMode != NoteEditorAccessMode.readOnly,
+                    sessionAccessMode: widget.accessMode,
+                    shareLinkToken: widget.shareLinkToken,
                     delegate: NoteEditorDelegate(
-                      onTaskLongPress: isReadOnly
+                      onTaskLongPress: isReadOnly || noteData == null
                           ? null
                           : (taskId) async {
                               final task = _taskForMetadata(
@@ -312,14 +358,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                                       required recurrence,
                                       required reminder,
                                     }) async {
-                                      final controller = ref
-                                          .read(
-                                            noteEditorSessionProvider(
-                                              widget.noteId,
-                                            ),
-                                          )
-                                          .value
-                                          ?.controller;
+                                      final controller =
+                                          _readSession().value?.controller;
                                       controller?.updateTaskMetadataInEditor(
                                         taskId,
                                         dueDate: dueDate,
@@ -333,57 +373,55 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                                     },
                               );
                             },
-                      onTaskComplete: (taskId) {
-                        return TaskSnackBarHelper.completeTaskWithFeedback(
-                          onComplete: () async {
-                            final controller = ref
-                                .read(noteEditorSessionProvider(widget.noteId))
-                                .value
-                                ?.controller;
-                            if (controller == null) {
-                              return (
-                                nextDue: null,
-                                previousDue: null,
-                                previousHasTime: false,
-                                scheduledAt: null,
+                      onTaskComplete: isReadOnly
+                          ? null
+                          : (taskId) {
+                              return TaskSnackBarHelper.completeTaskWithFeedback(
+                                onComplete: () async {
+                                  final controller =
+                                      _readSession().value?.controller;
+                                  if (controller == null) {
+                                    return (
+                                      nextDue: null as DateTime?,
+                                      previousDue: null as DateTime?,
+                                      previousHasTime: false,
+                                      scheduledAt: null as DateTime?,
+                                    );
+                                  }
+                                  final result = controller
+                                      .completeTaskInEditor(taskId);
+                                  return (
+                                    nextDue: result?.nextDue,
+                                    previousDue: result?.previousDue,
+                                    previousHasTime:
+                                        result?.previousHasTime ?? false,
+                                    scheduledAt: result?.scheduledAt,
+                                  );
+                                },
+                                onUndo: (previousDue, previousHasTime, scheduledAt) {
+                                  final controller =
+                                      _readSession().value?.controller;
+                                  if (controller != null) {
+                                    // For recurring tasks, the template's dueDate is the
+                                    // anchor and never changes — only remove the completion.
+                                    controller.reopenTaskInEditor(
+                                      taskId,
+                                      previousDue: previousDue,
+                                      scheduledAt: scheduledAt,
+                                    );
+                                  }
+                                },
                               );
-                            }
-                            final result = controller.completeTaskInEditor(
-                              taskId,
-                            );
-                            return (
-                              nextDue: result?.nextDue,
-                              previousDue: result?.previousDue,
-                              previousHasTime: result?.previousHasTime ?? false,
-                              scheduledAt: result?.scheduledAt,
-                            );
-                          },
-                          onUndo: (previousDue, previousHasTime, scheduledAt) {
-                            final controller = ref
-                                .read(noteEditorSessionProvider(widget.noteId))
-                                .value
-                                ?.controller;
-                            if (controller != null) {
-                              // For recurring tasks, the template's dueDate is the
-                              // anchor and never changes — only remove the completion.
-                              controller.reopenTaskInEditor(
-                                taskId,
-                                previousDue: previousDue,
-                                scheduledAt: scheduledAt,
-                              );
-                            }
-                          },
-                        );
-                      },
-                      onTaskReopen: (taskId) async {
-                        final controller = ref
-                            .read(noteEditorSessionProvider(widget.noteId))
-                            .value
-                            ?.controller;
-                        if (controller != null) {
-                          controller.reopenTaskInEditor(taskId);
-                        }
-                      },
+                            },
+                      onTaskReopen: isReadOnly
+                          ? null
+                          : (taskId) async {
+                              final controller =
+                                  _readSession().value?.controller;
+                              if (controller != null) {
+                                controller.reopenTaskInEditor(taskId);
+                              }
+                            },
                     ),
                   );
                   return isDesktop

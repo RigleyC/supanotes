@@ -13,16 +13,20 @@ class DocumentAttachmentWidget extends ConsumerWidget {
     super.key,
     required this.componentKey,
     required this.nodeId,
-    required this.onDelete,
+    this.onDelete,
     required this.collapseImages,
+    this.fallbackUrl,
+    this.fallbackFileName,
     this.selection,
     required this.selectionColor,
   });
 
   final GlobalKey componentKey;
   final String nodeId;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final bool collapseImages;
+  final String? fallbackUrl;
+  final String? fallbackFileName;
   final UpstreamDownstreamNodeSelection? selection;
   final Color selectionColor;
 
@@ -30,13 +34,26 @@ class DocumentAttachmentWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final attachmentAsync = ref.watch(attachmentByIdProvider(nodeId));
 
+    Widget fallbackAttachment() {
+      final url = fallbackUrl;
+      if (url == null || url.isEmpty) {
+        return AttachmentUploadingCapsule(
+          fileName: fallbackFileName ?? '...',
+          onCancel: onDelete,
+        );
+      }
+      return AttachmentFilePill(
+        fileName: fallbackFileName ?? 'Anexo',
+        subtitle: 'Anexo compartilhado',
+        icon: Icons.attach_file,
+        onTap: () => launchUrl(Uri.parse(url)),
+      );
+    }
+
     final Widget child = attachmentAsync.when(
       data: (model) {
         if (model == null) {
-          return AttachmentUploadingCapsule(
-            fileName: '...',
-            onCancel: onDelete,
-          );
+          return fallbackAttachment();
         }
 
         switch (model.status) {
@@ -64,7 +81,10 @@ class DocumentAttachmentWidget extends ConsumerWidget {
                   onTap: () => launchUrl(Uri.parse(url)),
                 );
               }
-              return AttachmentExpandedImage(url: url, localPath: model.localPath);
+              return AttachmentExpandedImage(
+                url: url,
+                localPath: model.localPath,
+              );
             }
 
             return AttachmentFilePill(
@@ -77,9 +97,8 @@ class DocumentAttachmentWidget extends ConsumerWidget {
             );
         }
       },
-      loading: () =>
-          AttachmentUploadingCapsule(fileName: '...', onCancel: onDelete),
-      error: (_, _) => const SizedBox.shrink(),
+      loading: fallbackAttachment,
+      error: (_, _) => fallbackAttachment(),
     );
 
     return SelectableBox(

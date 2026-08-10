@@ -10,11 +10,11 @@ class AttachmentUploadingCapsule extends StatelessWidget {
   const AttachmentUploadingCapsule({
     super.key,
     required this.fileName,
-    required this.onCancel,
+    this.onCancel,
   });
 
   final String fileName;
-  final VoidCallback onCancel;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -70,13 +70,15 @@ class AttachmentUploadingCapsule extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: onCancel,
-            color: cs.outline,
-            tooltip: 'Cancelar envio',
-          ),
+          if (onCancel != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: onCancel,
+              color: cs.outline,
+              tooltip: 'Cancelar envio',
+            ),
+          ],
         ],
       ),
     );
@@ -87,11 +89,11 @@ class AttachmentFailedCapsule extends StatelessWidget {
   const AttachmentFailedCapsule({
     super.key,
     required this.fileName,
-    required this.onDelete,
+    this.onDelete,
   });
 
   final String fileName;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -140,13 +142,15 @@ class AttachmentFailedCapsule extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: onDelete,
-            color: cs.error,
-            tooltip: 'Remover',
-          ),
+          if (onDelete != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: onDelete,
+              color: cs.error,
+              tooltip: 'Remover',
+            ),
+          ],
         ],
       ),
     );
@@ -225,11 +229,7 @@ class AttachmentFilePill extends StatelessWidget {
 }
 
 class AttachmentExpandedImage extends StatelessWidget {
-  const AttachmentExpandedImage({
-    super.key,
-    required this.url,
-    this.localPath,
-  });
+  const AttachmentExpandedImage({super.key, required this.url, this.localPath});
 
   final String url;
   final String? localPath;
@@ -294,18 +294,26 @@ class AttachmentRichLinkCard extends StatelessWidget {
     required this.node,
     this.selection,
     required this.selectionColor,
+    this.allowInternalNoteLinks = true,
   });
 
   final GlobalKey componentKey;
   final RichLinkNode node;
   final UpstreamDownstreamNodeSelection? selection;
   final Color selectionColor;
+  final bool allowInternalNoteLinks;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final hasPreview = node.title != null || node.description != null;
     final linkUrl = node.url ?? '';
+    final parsedLink = Uri.tryParse(linkUrl);
+    final canOpenLink =
+        parsedLink != null &&
+        (parsedLink.scheme == 'http' ||
+            parsedLink.scheme == 'https' ||
+            (allowInternalNoteLinks && parsedLink.scheme == 'note'));
 
     return SelectableBox(
       selection: selection,
@@ -315,9 +323,7 @@ class AttachmentRichLinkCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: InkWell(
-            onTap: linkUrl.isNotEmpty
-                ? () => launchUrl(Uri.parse(linkUrl))
-                : null,
+            onTap: canOpenLink ? () => launchUrl(parsedLink) : null,
             borderRadius: BorderRadius.circular(12),
             child: Container(
               clipBehavior: Clip.antiAlias,

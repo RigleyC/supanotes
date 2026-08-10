@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_link_attachment_component.dart';
 import 'attachment_renderers.dart';
 import 'document_attachment_widget.dart';
 
@@ -9,10 +10,16 @@ class AttachmentComponentBuilder implements ComponentBuilder {
   const AttachmentComponentBuilder({
     required this.editor,
     required this.collapseImages,
+    this.readOnly = false,
+    this.allowInternalNoteLinks = true,
+    this.shareLinkToken,
   });
 
   final Editor editor;
   final bool collapseImages;
+  final bool readOnly;
+  final bool allowInternalNoteLinks;
+  final String? shareLinkToken;
 
   @override
   SingleColumnLayoutComponentViewModel? createViewModel(
@@ -25,9 +32,26 @@ class AttachmentComponentBuilder implements ComponentBuilder {
       node: node,
       createdAt: node.metadata[NodeMetadata.createdAt],
       collapseImages: collapseImages,
-      onDelete: () {
-        editor.execute([DeleteNodeRequest(nodeId: node.id)]);
-      },
+      allowInternalNoteLinks: allowInternalNoteLinks,
+      fallbackAttachmentUrl:
+          node is DocumentAttachmentNode && shareLinkToken != null
+          ? publicShareLinkAttachmentUrl(
+              shareLinkToken!,
+              node.metadata['attachmentId'] is String &&
+                      (node.metadata['attachmentId'] as String).isNotEmpty
+                  ? node.metadata['attachmentId'] as String
+                  : node.id,
+            ).toString()
+          : null,
+      fallbackAttachmentName:
+          node is DocumentAttachmentNode && node.metadata['filename'] is String
+          ? node.metadata['filename'] as String
+          : null,
+      onDelete: readOnly
+          ? null
+          : () {
+              editor.execute([DeleteNodeRequest(nodeId: node.id)]);
+            },
     );
   }
 
@@ -47,6 +71,8 @@ class AttachmentComponentBuilder implements ComponentBuilder {
         selectionColor: viewModel.selectionColor,
         onDelete: viewModel.onDelete,
         collapseImages: viewModel.collapseImages,
+        fallbackUrl: viewModel.fallbackAttachmentUrl,
+        fallbackFileName: viewModel.fallbackAttachmentName,
       ),
       RichLinkNode n => AttachmentRichLinkCard(
         componentKey: context.componentKey,
@@ -55,6 +81,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
             viewModel.selection?.nodeSelection
                 as UpstreamDownstreamNodeSelection?,
         selectionColor: viewModel.selectionColor,
+        allowInternalNoteLinks: viewModel.allowInternalNoteLinks,
       ),
       _ => null,
     };
@@ -68,6 +95,9 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     required this.node,
     required this.onDelete,
     required this.collapseImages,
+    required this.allowInternalNoteLinks,
+    required this.fallbackAttachmentUrl,
+    required this.fallbackAttachmentName,
     super.createdAt,
     super.padding = EdgeInsets.zero,
     DocumentNodeSelection? selection,
@@ -78,8 +108,11 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
   }
 
   final AttachmentNode node;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final bool collapseImages;
+  final bool allowInternalNoteLinks;
+  final String? fallbackAttachmentUrl;
+  final String? fallbackAttachmentName;
 
   @override
   _AttachmentViewModel copy() => _AttachmentViewModel(
@@ -87,6 +120,9 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     node: node,
     onDelete: onDelete,
     collapseImages: collapseImages,
+    allowInternalNoteLinks: allowInternalNoteLinks,
+    fallbackAttachmentUrl: fallbackAttachmentUrl,
+    fallbackAttachmentName: fallbackAttachmentName,
     selection: selection,
     selectionColor: selectionColor,
   );

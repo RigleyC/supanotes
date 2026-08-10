@@ -100,6 +100,45 @@ void main() {
     expect(completed, isTrue);
   });
 
+  testWidgets('does not toggle completion in read-only mode', (tester) async {
+    bool? completed;
+    final vm = TaskComponentViewModel(
+      nodeId: 'task-1',
+      padding: EdgeInsets.zero,
+      indent: 0,
+      isComplete: false,
+      setComplete: (value) => completed = value,
+      text: AttributedText('Enviar relatorio'),
+      textDirection: TextDirection.ltr,
+      textAlignment: TextAlign.left,
+      textStyleBuilder: (_) => const TextStyle(fontSize: 16),
+      selectionColor: Colors.transparent,
+    );
+
+    await tester.pumpWidget(
+      wrap(CustomTaskComponent(viewModel: vm, isReadOnly: true)),
+    );
+
+    await tester.tap(find.byType(AppTaskCheckbox));
+    await tester.pump();
+
+    expect(completed, isNull);
+    expect(
+      tester
+          .widget<Semantics>(
+            find
+                .ancestor(
+                  of: find.byType(AppTaskCheckbox),
+                  matching: find.byType(Semantics),
+                )
+                .first,
+          )
+          .properties
+          .enabled,
+      isFalse,
+    );
+  });
+
   testWidgets('tap on text does not toggle completion', (tester) async {
     bool? completed;
     final vm = TaskComponentViewModel(

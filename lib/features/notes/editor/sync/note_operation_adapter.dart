@@ -25,11 +25,13 @@ class NoteOperationAdapter {
     required String noteId,
     required Editor editor,
     bool captureLocalOperations = true,
+    Map<String, dynamic>? initialSnapshot,
     NoteDocumentCodec codec = const NoteDocumentCodec(),
   }) : _syncService = syncService,
        _noteId = noteId,
        _document = document,
        _captureLocalOperations = captureLocalOperations,
+       _initialSnapshot = initialSnapshot,
        _codec = codec {
     _applier = DocumentProjectionApplier(
       document: document,
@@ -48,6 +50,7 @@ class NoteOperationAdapter {
   final String _noteId;
   final MutableDocument _document;
   bool _captureLocalOperations;
+  final Map<String, dynamic>? _initialSnapshot;
   final NoteDocumentCodec _codec;
 
   late final DocumentProjectionApplier _applier;
@@ -120,13 +123,15 @@ class NoteOperationAdapter {
     try {
       final doc = _confirmedDocument;
       final pending = await _syncService.loadPendingProjection(_noteId);
-      if (doc == null && pending.isEmpty) return;
-      if (doc == null && !_codec.isEmptyDocumentPlaceholder(_document)) {
+      if (doc == null && pending.isEmpty && _initialSnapshot == null) return;
+      if (doc == null &&
+          _initialSnapshot == null &&
+          !_codec.isEmptyDocumentPlaceholder(_document)) {
         return;
       }
 
       final snapshot = doc == null
-          ? const <String, dynamic>{'blocks': <dynamic>[]}
+          ? _initialSnapshot ?? const <String, dynamic>{'blocks': <dynamic>[]}
           : jsonDecode(doc.documentJson) as Map<String, dynamic>;
       await _applier.rebuildFromSnapshot(
         snapshot: snapshot,

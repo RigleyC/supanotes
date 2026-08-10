@@ -36,7 +36,10 @@ class NoteDocumentCodec {
     if (name == 'strikethrough') return strikethroughAttribution;
     if (name == 'underline') return underlineAttribution;
     if (name.startsWith('link:')) {
-      return LinkAttribution.fromUri(Uri.parse(name.substring(5)));
+      final uri = Uri.tryParse(name.substring(5));
+      return uri == null
+          ? NamedAttribution(name)
+          : LinkAttribution.fromUri(uri);
     }
     return NamedAttribution(name);
   }
@@ -155,6 +158,7 @@ class NoteDocumentCodec {
       if (node.title != null) metadata['title'] = node.title;
       if (node.description != null) metadata['description'] = node.description;
       if (node.imageUrl != null) metadata['imageUrl'] = node.imageUrl;
+      if (node.domain != null) metadata['domain'] = node.domain;
     } else if (node is ImageNode) {
       type = 'attachment';
       metadata['url'] = node.imageUrl;
@@ -281,6 +285,18 @@ class NoteDocumentCodec {
     if (type == 'attachment') {
       return DocumentAttachmentNode(id: nodeId, metadata: metadata ?? {});
     }
+    if (type == 'rich_link') {
+      final richLinkMetadata = metadata ?? const <String, dynamic>{};
+      return RichLinkNode(
+        id: nodeId,
+        url: richLinkMetadata['url'] as String?,
+        title: richLinkMetadata['title'] as String?,
+        description: richLinkMetadata['description'] as String?,
+        imageUrl: richLinkMetadata['imageUrl'] as String?,
+        domain: richLinkMetadata['domain'] as String?,
+        metadata: richLinkMetadata,
+      );
+    }
     if (type == 'bulletList') {
       return ListItemNode(
         id: nodeId,
@@ -370,15 +386,19 @@ class NoteDocumentCodec {
       final attrs = op.attributes;
       if (attrs != null) {
         for (final entry in attrs.entries) {
-          if (entry.value == true) {
-            final attr = attributionFromId(entry.key);
-            if (attr != null) {
-              span.addAttribution(
-                newAttribution: attr,
-                start: start,
-                end: buf.length - 1,
-              );
-            }
+          Attribution? attr;
+          if (entry.key == 'link' && entry.value is String) {
+            final uri = Uri.tryParse(entry.value as String);
+            if (uri != null) attr = LinkAttribution.fromUri(uri);
+          } else if (entry.value == true) {
+            attr = attributionFromId(entry.key);
+          }
+          if (attr != null) {
+            span.addAttribution(
+              newAttribution: attr,
+              start: start,
+              end: buf.length - 1,
+            );
           }
         }
       }
@@ -460,7 +480,8 @@ class NoteDocumentCodec {
     if (id == 'strikethrough') return strikethroughAttribution;
     if (id == 'underline') return underlineAttribution;
     if (id.startsWith('link:')) {
-      return LinkAttribution.fromUri(Uri.parse(id.substring('link:'.length)));
+      final uri = Uri.tryParse(id.substring('link:'.length));
+      return uri == null ? null : LinkAttribution.fromUri(uri);
     }
     return null;
   }

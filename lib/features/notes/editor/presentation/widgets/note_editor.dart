@@ -8,6 +8,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_desktop_stylesheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
@@ -24,6 +25,7 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_t
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/document/markdown_task_shortcut_plugin.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_link_attachment_component.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 
@@ -33,6 +35,9 @@ class NoteEditor extends ConsumerStatefulWidget {
   final bool hideCompleted;
   final bool collapseImages;
   final bool isReadOnly;
+  final bool allowInternalNoteLinks;
+  final NoteEditorAccessMode? sessionAccessMode;
+  final String? shareLinkToken;
   final bool requestInitialFocus;
   final NoteEditorDelegate delegate;
 
@@ -43,9 +48,18 @@ class NoteEditor extends ConsumerStatefulWidget {
     this.hideCompleted = false,
     this.collapseImages = false,
     this.isReadOnly = false,
+    this.allowInternalNoteLinks = true,
+    this.sessionAccessMode,
+    this.shareLinkToken,
     this.requestInitialFocus = false,
     required this.delegate,
   });
+
+  bool get effectiveIsReadOnly => switch (sessionAccessMode) {
+    NoteEditorAccessMode.readOnly => true,
+    NoteEditorAccessMode.editable => false,
+    null => isReadOnly,
+  };
 
   @override
   ConsumerState<NoteEditor> createState() => _NoteEditorState();
@@ -101,9 +115,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _contentTapDelegateFactories = [
       (editContext) => NoteLinkTapHandler(
         editContext.document,
+        allowInternalNoteLinks: widget.allowInternalNoteLinks,
         onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
       ),
-      if (!widget.isReadOnly)
+      if (!widget.effectiveIsReadOnly)
         (editContext) => HiddenTaskTrailingTapHandler(
           editContext: editContext,
           isHiddenTask: _isHiddenTask,
@@ -113,7 +128,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
             }
           },
         ),
-      if (!widget.isReadOnly) superEditorAddEmptyParagraphTapHandlerFactory,
+      if (!widget.effectiveIsReadOnly) superEditorAddEmptyParagraphTapHandlerFactory,
     ];
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
@@ -121,7 +136,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       composer: controller.composer,
       taskMetadataById: widget.taskMetadata,
       hideCompleted: widget.hideCompleted,
-      onTaskLongPress: widget.isReadOnly
+      readOnly: widget.effectiveIsReadOnly,
+      onTaskLongPress: widget.effectiveIsReadOnly
           ? null
           : widget.delegate.onTaskLongPress,
       onTaskComplete: widget.delegate.onTaskComplete,
@@ -131,10 +147,16 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _componentBuilders = [
       const CustomDividerComponentBuilder(),
       _taskComponentBuilder!,
-      AttachmentComponentBuilder(
-        editor: controller.editor,
-        collapseImages: widget.collapseImages,
-      ),
+      if (widget.effectiveIsReadOnly && widget.shareLinkToken != null)
+        ShareLinkAttachmentComponentBuilder(token: widget.shareLinkToken!)
+      else
+        AttachmentComponentBuilder(
+          editor: controller.editor,
+          collapseImages: widget.collapseImages,
+          readOnly: widget.effectiveIsReadOnly,
+          allowInternalNoteLinks: widget.allowInternalNoteLinks,
+          shareLinkToken: widget.shareLinkToken,
+        ),
       ...defaultComponentBuilders,
     ];
   }
@@ -162,7 +184,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
     if (widget.hideCompleted != oldWidget.hideCompleted ||
         widget.collapseImages != oldWidget.collapseImages ||
-        widget.isReadOnly != oldWidget.isReadOnly) {
+        widget.effectiveIsReadOnly != oldWidget.effectiveIsReadOnly ||
+        widget.allowInternalNoteLinks != oldWidget.allowInternalNoteLinks ||
+        widget.shareLinkToken != oldWidget.shareLinkToken) {
       if (widget.hideCompleted && !oldWidget.hideCompleted) {
         final selection = _controller?.composer.selection;
         final selectedNode = selection == null
@@ -198,7 +222,15 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(noteEditorSessionProvider(widget.noteId));
+    final sessionAsync = ref.watch(switch (widget.sessionAccessMode) {
+      NoteEditorAccessMode.readOnly => noteEditorReadOnlySessionProvider(
+        widget.noteId,
+      ),
+      NoteEditorAccessMode.editable => noteEditorEditableSessionProvider(
+        widget.noteId,
+      ),
+      null => noteEditorSessionProvider(widget.noteId),
+    });
 
     return sessionAsync.when(
       loading: () =>
@@ -216,7 +248,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           _configureHiddenTaskEditing();
         }
 
-        _initControls();
+        if (!widget.effectiveIsReadOnly) {
+          _initControls();
+        }
         _initStableBuilders();
 
         final desktopLayout = DesktopEditorLayoutScope.maybeOf(context);
@@ -246,7 +280,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                         left: 24,
                         right: 24,
                         top: topPadding,
-                        bottom: widget.isReadOnly ? 24 : 140,
+                        bottom: widget.effectiveIsReadOnly ? 24 : 140,
                       ));
 
             final theme = Theme.of(context);
@@ -267,82 +301,105 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
               children: [
                 Positioned.fill(
                   child: DesktopSelectionFormattingOverlay(
-                    enabled: isDesktop && !widget.isReadOnly,
+                    enabled: isDesktop && !widget.effectiveIsReadOnly,
                     editor: controller.editor,
                     composer: controller.composer,
                     editorFocusNode: controller.focusNode,
                     selectionLayerLinks: _selectionLayerLinks,
                     viewportKey: _editorViewportKey,
-                    child: SuperEditorAndroidControlsScope(
-                      controller: _controls!.androidController,
-                      child: SuperEditorIosControlsScope(
-                        controller: _controls!.iosController,
-                        child: TapRegion(
-                          groupId: noteEditorToolbarTapRegionGroup,
-                          child: ValueListenableBuilder<bool>(
-                            valueListenable: _formattingToolbarOpen,
-                            builder: (context, formattingToolbarOpen, child) =>
-                                SuperEditor(
-                                  key: ValueKey<(bool, bool)>((
-                                    isDesktop,
-                                    widget.isReadOnly,
-                                  )),
-                                  editor: controller.editor,
-                                  plugins: isDesktop
-                                      ? {
-                                          _markdownInlinePlugin,
-                                          _markdownTaskPlugin,
-                                        }
-                                      : const {},
-                                  focusNode: widget.isReadOnly
-                                      ? null
-                                      : controller.focusNode,
-                                  autofocus:
-                                      widget.requestInitialFocus &&
-                                      !widget.isReadOnly,
-                                  inputSource: TextInputSource.ime,
-                                  softwareKeyboardController:
-                                      _softwareKeyboardController,
-                                  imePolicies: SuperEditorImePolicies(
-                                    openKeyboardOnSelectionChange:
-                                        !formattingToolbarOpen,
-                                  ),
-                                  documentLayoutKey: _docLayoutKey,
-                                  selectionLayerLinks: _selectionLayerLinks,
-                                  stylesheet: _cachedStylesheet!,
-                                  selectionStyle: editorSelectionStyle(
-                                    theme.colorScheme,
-                                  ),
-                                  documentOverlayBuilders: [
-                                    ...defaultSuperEditorDocumentOverlayBuilders
-                                        .where(
-                                          (builder) =>
-                                              builder
-                                                  is! DefaultCaretOverlayBuilder,
-                                        ),
-                                    DefaultCaretOverlayBuilder(
-                                      caretStyle: CaretStyle(
-                                        color: theme.colorScheme.primary,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                  ],
-                                  contentTapDelegateFactories:
-                                      _contentTapDelegateFactories,
-                                  keyboardActions: editorKeyboardActions(
-                                    slashCommandController: widget.isReadOnly
-                                        ? null
-                                        : _slashCommandController,
-                                  ),
-                                  componentBuilders: _componentBuilders!,
+                    child: widget.effectiveIsReadOnly
+                        ? SuperReader(
+                            key: ValueKey<(bool, bool)>((
+                              isDesktop,
+                              widget.effectiveIsReadOnly,
+                            )),
+                            editor: controller.editor,
+                            documentLayoutKey: _docLayoutKey,
+                            selectionLayerLinks: _selectionLayerLinks,
+                            stylesheet: _cachedStylesheet!,
+                            selectionStyle: editorSelectionStyle(
+                              theme.colorScheme,
+                            ),
+                            componentBuilders: _componentBuilders!,
+                            contentTapDelegateFactory: (readerContext) =>
+                                NoteLinkTapHandler(
+                                  readerContext.document,
+                                  allowInternalNoteLinks:
+                                      widget.allowInternalNoteLinks,
+                                  onNoteTap: (targetId) =>
+                                      context.push(AppRoutes.note(targetId)),
                                 ),
+                          )
+                        : SuperEditorAndroidControlsScope(
+                            controller: _controls!.androidController,
+                            child: SuperEditorIosControlsScope(
+                              controller: _controls!.iosController,
+                              child: TapRegion(
+                                groupId: noteEditorToolbarTapRegionGroup,
+                                child: ValueListenableBuilder<bool>(
+                                  valueListenable: _formattingToolbarOpen,
+                                  builder:
+                                      (
+                                        context,
+                                        formattingToolbarOpen,
+                                        child,
+                                      ) => SuperEditor(
+                                        key: ValueKey<(bool, bool)>((
+                                          isDesktop,
+                                          widget.effectiveIsReadOnly,
+                                        )),
+                                        editor: controller.editor,
+                                        plugins: isDesktop
+                                            ? {
+                                                _markdownInlinePlugin,
+                                                _markdownTaskPlugin,
+                                              }
+                                            : const {},
+                                        focusNode: controller.focusNode,
+                                        autofocus: widget.requestInitialFocus,
+                                        inputSource: TextInputSource.ime,
+                                        softwareKeyboardController:
+                                            _softwareKeyboardController,
+                                        imePolicies: SuperEditorImePolicies(
+                                          openKeyboardOnSelectionChange:
+                                              !formattingToolbarOpen,
+                                        ),
+                                        documentLayoutKey: _docLayoutKey,
+                                        selectionLayerLinks:
+                                            _selectionLayerLinks,
+                                        stylesheet: _cachedStylesheet!,
+                                        selectionStyle: editorSelectionStyle(
+                                          theme.colorScheme,
+                                        ),
+                                        documentOverlayBuilders: [
+                                          ...defaultSuperEditorDocumentOverlayBuilders
+                                              .where(
+                                                (builder) =>
+                                                    builder
+                                                        is! DefaultCaretOverlayBuilder,
+                                              ),
+                                          DefaultCaretOverlayBuilder(
+                                            caretStyle: CaretStyle(
+                                              color: theme.colorScheme.primary,
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                        ],
+                                        contentTapDelegateFactories:
+                                            _contentTapDelegateFactories,
+                                        keyboardActions: editorKeyboardActions(
+                                          slashCommandController:
+                                              _slashCommandController,
+                                        ),
+                                        componentBuilders: _componentBuilders!,
+                                      ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
                   ),
                 ),
-                if (!widget.isReadOnly) ...[
+                if (!widget.effectiveIsReadOnly) ...[
                   Positioned.fill(
                     child: SlashCommandOverlay(
                       editor: controller.editor,

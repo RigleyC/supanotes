@@ -16,6 +16,7 @@ class DesktopNoteChrome extends StatelessWidget {
   final NoteModel? note;
   final NotePreferenceMutationStatus preferenceStatus;
   final FocusNode? editorFocusNode;
+  final bool? readOnlyOverride;
   final ValueChanged<String> onMenuSelected;
   final VoidCallback onExitFocus;
 
@@ -24,6 +25,7 @@ class DesktopNoteChrome extends StatelessWidget {
     required this.note,
     required this.preferenceStatus,
     required this.editorFocusNode,
+    this.readOnlyOverride,
     required this.onMenuSelected,
     required this.onExitFocus,
   });
@@ -32,6 +34,7 @@ class DesktopNoteChrome extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final currentNote = note;
+    final isReadOnly = readOnlyOverride ?? currentNote?.isReadOnly ?? false;
 
     return DesktopTranslucentSurface(
       key: const ValueKey('desktop-note-chrome'),
@@ -51,7 +54,7 @@ class DesktopNoteChrome extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: currentNote?.isReadOnly == true
+              child: isReadOnly && currentNote?.sharedByEmail != null
                   ? Text(
                       '${NoteStrings.sharedByPrefix} ${currentNote!.sharedByEmail}',
                       maxLines: 1,
@@ -61,48 +64,49 @@ class DesktopNoteChrome extends StatelessWidget {
                   : const SizedBox.shrink(),
             ),
             if (currentNote != null) ...[
-              AdaptivePopupMenuButton.icon<String>(
-                icon: PlatformInfo.isIOS26OrHigher()
-                    ? 'ellipsis'
-                    : Icons.more_vert,
-                items: [
-                  if (currentNote.isOwner)
+              if (!isReadOnly)
+                AdaptivePopupMenuButton.icon<String>(
+                  icon: PlatformInfo.isIOS26OrHigher()
+                      ? 'ellipsis'
+                      : Icons.more_vert,
+                  items: [
+                    if (currentNote.isOwner)
+                      AdaptivePopupMenuItem<String>(
+                        label: NoteStrings.shareLabel,
+                        icon: PlatformInfo.isIOS26OrHigher()
+                            ? 'square.and.arrow.up'
+                            : Icons.share_outlined,
+                        value: 'share',
+                      ),
                     AdaptivePopupMenuItem<String>(
-                      label: NoteStrings.shareLabel,
+                      label: currentNote.hideCompleted
+                          ? NoteStrings.showCompleted
+                          : NoteStrings.hideCompleted,
                       icon: PlatformInfo.isIOS26OrHigher()
-                          ? 'square.and.arrow.up'
-                          : Icons.share_outlined,
-                      value: 'share',
+                          ? (currentNote.hideCompleted ? 'eye' : 'eye.slash')
+                          : (currentNote.hideCompleted
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined),
+                      value: 'hide_completed',
                     ),
-                  AdaptivePopupMenuItem<String>(
-                    label: currentNote.hideCompleted
-                        ? NoteStrings.showCompleted
-                        : NoteStrings.hideCompleted,
-                    icon: PlatformInfo.isIOS26OrHigher()
-                        ? (currentNote.hideCompleted ? 'eye' : 'eye.slash')
-                        : (currentNote.hideCompleted
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined),
-                    value: 'hide_completed',
-                  ),
-                  if (currentNote.isOwner)
-                    AdaptivePopupMenuItem<String>(
-                      label: currentNote.collapseImages
-                          ? 'Expandir imagens'
-                          : 'Colapsar imagens',
-                      icon: PlatformInfo.isIOS26OrHigher()
-                          ? 'photo'
-                          : Icons.image_outlined,
-                      value: 'collapse_images',
-                    ),
-                ],
-                onSelected: (index, entry) {
-                  final value = entry.value;
-                  if (value != null) onMenuSelected(value);
-                },
-              ),
+                    if (currentNote.isOwner)
+                      AdaptivePopupMenuItem<String>(
+                        label: currentNote.collapseImages
+                            ? 'Expandir imagens'
+                            : 'Colapsar imagens',
+                        icon: PlatformInfo.isIOS26OrHigher()
+                            ? 'photo'
+                            : Icons.image_outlined,
+                        value: 'collapse_images',
+                      ),
+                  ],
+                  onSelected: (index, entry) {
+                    final value = entry.value;
+                    if (value != null) onMenuSelected(value);
+                  },
+                ),
               _PreferenceStatusIndicator(status: preferenceStatus),
-              if (!currentNote.isReadOnly && editorFocusNode != null)
+              if (!isReadOnly && editorFocusNode != null)
                 AnimatedBuilder(
                   animation: editorFocusNode!,
                   builder: (context, _) {
