@@ -1,6 +1,7 @@
 package sharelinks
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -58,5 +59,53 @@ func TestPublicRejectsInvalidToken(t *testing.T) {
 	}
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status: got %d", rec.Code)
+	}
+}
+
+func TestPublicDoesNotHideRepositoryFailureAsNotFound(t *testing.T) {
+	signer := NewTokenSigner("secret")
+	token, err := signer.Sign(uuid.New())
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	repo := &fakeRepository{publicErr: errors.New("database unavailable")}
+	h := NewHandler(NewService(repo, signer, "https://notes.example"))
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/s/"+token, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/s/:token")
+	c.SetParamNames("token")
+	c.SetParamValues(token)
+
+	if err := h.Public(c); err != nil {
+		t.Fatalf("public: %v", err)
+	}
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestPublicDocumentRejectsInvalidSnapshotExplicitly(t *testing.T) {
+	signer := NewTokenSigner("secret")
+	token, err := signer.Sign(uuid.New())
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	repo := &fakeRepository{publicNote: PublicNote{Document: []byte("not-json")}}
+	h := NewHandler(NewService(repo, signer, "https://notes.example"))
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/s/"+token+"/document", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/s/:token/document")
+	c.SetParamNames("token")
+	c.SetParamValues(token)
+
+	if err := h.PublicDocument(c); err != nil {
+		t.Fatalf("public document: %v", err)
+	}
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 }
