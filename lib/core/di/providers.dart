@@ -30,6 +30,7 @@ import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
+import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
 
 // ---------------------------------------------------------------------------
 // API client
@@ -96,6 +97,10 @@ final localNotificationServiceProvider = Provider<LocalNotificationService>((
 final noteOperationsDaoProvider = Provider<NoteOperationsDao>((ref) {
   return ref.watch(appDatabaseProvider).noteOperationsDao;
 });
+
+final noteLifecycleStoreProvider = Provider.autoDispose<NoteLifecycleStore>(
+  (ref) => DatabaseNoteLifecycleStore(ref.watch(appDatabaseProvider)),
+);
 
 // ---------------------------------------------------------------------------
 // Note sync client

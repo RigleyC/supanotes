@@ -22,13 +22,14 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
   final userId = ref.watch(currentUserIdProvider)!;
   final sessionCoordinator = ref.read(noteSessionCoordinatorProvider);
   final notesRepository = ref.watch(notesRepositoryProvider);
+  final lifecycleStore = ref.watch(noteLifecycleStoreProvider);
 
   bool isDisposed = false;
   StreamSubscription? permissionSubscription;
 
   Future<void> closeSession() async {
     await sessionCoordinator.close(noteId);
-    await notesRepository.discardLocalDraft(noteId);
+    await lifecycleStore.discardLocalDraft(noteId);
   }
 
   ref.onDispose(() {

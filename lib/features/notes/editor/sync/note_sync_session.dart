@@ -127,9 +127,11 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     }
   }
 
-  Future<void> _enqueueProjection() {
+  Future<void> _enqueueProjection({bool allowWhenDisposed = false}) {
     _projectionTail = _projectionTail.then((_) async {
-      if (_disposed || taskProjectionEngine == null) return;
+      if ((!allowWhenDisposed && _disposed) || taskProjectionEngine == null) {
+        return;
+      }
       try {
         await taskProjectionEngine!.projectTasksFromDocument(
           noteId: noteId,
@@ -244,13 +246,14 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   @override
   Future<void> dispose() async {
+    _disposed = true;
     _setStatus(NoteSessionStatus.closing);
     _pollTimer?.cancel();
     try {
       // Persist the editor before waiting for a network request that may be
       // slow or unavailable. Closing must not discard an in-memory edit.
       await adapter.flushNow();
-      await _projectionTail;
+      await _enqueueProjection(allowWhenDisposed: true);
       // The outbox is durable now. Do not wait for the network queue during
       // teardown; the next session or catalog sync will retry it.
     } catch (error, stackTrace) {

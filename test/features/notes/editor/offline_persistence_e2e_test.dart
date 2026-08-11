@@ -60,9 +60,11 @@ void main() {
         editor: editor,
         taskProjectionEngine: TaskProjectionEngine(database: database),
         userId: 'user-1',
+        captureLocalOperations: false,
       );
 
       await session.start();
+      session.setCaptureLocalOperations(true);
       editor.execute([
         InsertTextRequest(
           documentPosition: const DocumentPosition(
@@ -74,6 +76,8 @@ void main() {
         ),
       ]);
       await session.dispose();
+
+      verifyNever(() => client.syncOperations(any(), any()));
 
       expect(
         (await database.notesDao.getNoteById('close-note'))!.content,

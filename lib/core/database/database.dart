@@ -15,6 +15,7 @@ import 'daos/notes_dao.dart';
 import 'daos/task_completions_dao.dart';
 import 'daos/tasks_dao.dart';
 import 'daos/user_note_preferences_dao.dart';
+import 'note_lifecycle_policy.dart';
 import 'tables/attachments.dart';
 import 'tables/local_note_documents.dart';
 import 'tables/note_links.dart';
@@ -97,30 +98,22 @@ class AppDatabase extends _$AppDatabase {
   /// Deletes an untouched local draft and its complete aggregate atomically.
   Future<bool> discardLocalDraftIfUntouched(String noteId) {
     return transaction(() async {
-      final note = await (select(
-        notes,
-      )..where((row) => row.id.equals(noteId))).getSingleOrNull();
-      if (note == null ||
-          note.hasRemoteCopy ||
-          note.content.trim().isNotEmpty) {
+      final matchingDraft = await customSelect(
+        'SELECT n.id FROM notes n '
+        'WHERE n.id = ? AND $untouchedLocalDraftPredicate '
+        'AND NOT EXISTS ('
+        '  SELECT 1 FROM pending_note_operations p '
+        '  WHERE p.note_id = n.id'
+        ') '
+        'AND NOT EXISTS ('
+        '  SELECT 1 FROM sync_sessions s '
+        '  WHERE s.note_id = n.id'
+        ')',
+        variables: [Variable.withString(noteId)],
+      ).get();
+      if (matchingDraft.isEmpty) {
         return false;
       }
-
-      final hasTasks =
-          await (select(tasks)
-                ..where(
-                  (row) => row.noteId.equals(noteId) & row.deletedAt.isNull(),
-                )
-                ..limit(1))
-              .getSingleOrNull();
-      if (hasTasks != null) return false;
-
-      final hasAttachments =
-          await (select(attachments)
-                ..where((row) => row.noteId.equals(noteId))
-                ..limit(1))
-              .getSingleOrNull();
-      if (hasAttachments != null) return false;
 
       await _deleteNoteData(noteId);
       return true;

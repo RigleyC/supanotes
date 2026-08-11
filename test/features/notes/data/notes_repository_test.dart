@@ -5,7 +5,6 @@ import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/features/notes/catalog/data/local/notes_local_repository.dart';
-import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 
@@ -26,19 +25,51 @@ void main() {
       final database = AppDatabase.test();
       addTearDown(database.close);
       final local = NotesLocalRepository(database.notesDao, 'test-user');
-      final repo = NotesRepository(
-        local,
-        database.userNotePreferencesDao,
-        lifecycleStore: DatabaseNoteLifecycleStore(database),
-      );
+      final repo = NotesRepository(local, database.userNotePreferencesDao);
 
       await repo.createLocalNote(id: 'draft-1');
-      await repo.discardLocalDraft('draft-1');
+      await database.discardLocalDraftIfUntouched('draft-1');
 
       expect(await database.notesDao.getNoteById('draft-1'), isNull);
       expect(
         await database.noteOperationsDao.getPendingOperations('draft-1'),
         isEmpty,
+      );
+    });
+
+    test('discardLocalDraft keeps a draft with pending operations', () async {
+      final database = AppDatabase.test();
+      addTearDown(database.close);
+      final local = NotesLocalRepository(database.notesDao, 'test-user');
+      final repo = NotesRepository(local, database.userNotePreferencesDao);
+
+      await repo.createLocalNote(id: 'draft-with-outbox');
+      await database.noteOperationsDao.insertPendingOperation(
+        PendingNoteOperationsCompanion.insert(
+          operationId: 'operation-1',
+          noteId: 'draft-with-outbox',
+          baseRevision: 0,
+          ordinal: 0,
+          kind: 'text_delta',
+          payloadJson: '{}',
+          createdAt: DateTime.utc(2026, 8, 11),
+        ),
+      );
+
+      final discarded = await database.discardLocalDraftIfUntouched(
+        'draft-with-outbox',
+      );
+
+      expect(discarded, isFalse);
+      expect(
+        await database.notesDao.getNoteById('draft-with-outbox'),
+        isNotNull,
+      );
+      expect(
+        await database.noteOperationsDao.getPendingOperations(
+          'draft-with-outbox',
+        ),
+        isNotEmpty,
       );
     });
 
@@ -146,17 +177,7 @@ NotesRepository _repo(
   UserNotePreferencesDao preferences, {
   NoteLinksDao? noteLinksDao,
 }) {
-  return NotesRepository(
-    local,
-    preferences,
-    lifecycleStore: _NoopNoteLifecycleStore(),
-    noteLinksDao: noteLinksDao,
-  );
-}
-
-class _NoopNoteLifecycleStore implements NoteLifecycleStore {
-  @override
-  Future<void> discardLocalDraft(String noteId) async {}
+  return NotesRepository(local, preferences, noteLinksDao: noteLinksDao);
 }
 
 class FakeNotesLocalRepository implements NotesLocalRepository {

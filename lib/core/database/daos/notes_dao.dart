@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../note_lifecycle_policy.dart';
 import '../../../features/notes/catalog/model/note_strings.dart';
 import '../../../features/tasks/domain/task_recurrence.dart';
 import '../database.dart';
@@ -62,9 +63,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
-      "AND NOT (n.has_remote_copy = 0 AND TRIM(n.content) = '' "
-      "AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.note_id = n.id AND t.deleted_at IS NULL) "
-      "AND NOT EXISTS (SELECT 1 FROM attachments a WHERE a.note_id = n.id)) "
+      'AND NOT ($untouchedLocalDraftPredicate) '
       'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC, n.id DESC',
       userId,
     );
@@ -148,9 +147,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
-      "AND NOT (n.has_remote_copy = 0 AND TRIM(n.content) = '' "
-      "AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.note_id = n.id AND t.deleted_at IS NULL) "
-      "AND NOT EXISTS (SELECT 1 FROM attachments a WHERE a.note_id = n.id)) "
+      'AND NOT ($untouchedLocalDraftPredicate) '
       'ORDER BY n.updated_at DESC, n.id DESC',
       userId,
     );

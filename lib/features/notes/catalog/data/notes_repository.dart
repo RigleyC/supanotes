@@ -13,7 +13,6 @@ import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'local/notes_local_repository.dart';
-import 'local/note_lifecycle_store.dart';
 
 /// Presentation-facing facade over the local notes database.
 ///
@@ -36,22 +35,15 @@ abstract class INotesRepository {
   Future<void> softDelete(String id);
   Future<NoteModel> createLocalNote({required String id});
   Future<void> saveNoteSnapshot({required String id, required String content});
-  Future<void> discardLocalDraft(String id);
 }
 
 class NotesRepository implements INotesRepository {
-  NotesRepository(
-    this._local,
-    this._prefsDao, {
-    required NoteLifecycleStore lifecycleStore,
-    NoteLinksDao? noteLinksDao,
-  }) : _noteLinksDao = noteLinksDao,
-       _lifecycleStore = lifecycleStore;
+  NotesRepository(this._local, this._prefsDao, {NoteLinksDao? noteLinksDao})
+    : _noteLinksDao = noteLinksDao;
 
   final NotesLocalRepository _local;
   final UserNotePreferencesDao _prefsDao;
   final NoteLinksDao? _noteLinksDao;
-  final NoteLifecycleStore _lifecycleStore;
 
   /// Streams active (non-archived, non-deleted) notes, mapped
   /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
@@ -224,11 +216,6 @@ class NotesRepository implements INotesRepository {
     }
   }
 
-  @override
-  Future<void> discardLocalDraft(String id) async {
-    await _lifecycleStore.discardLocalDraft(id);
-  }
-
   String? _excerptFrom(String content) {
     if (content.isEmpty) return null;
     final lines = content.split('\n');
@@ -264,7 +251,6 @@ final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   return NotesRepository(
     local,
     db.userNotePreferencesDao,
-    lifecycleStore: DatabaseNoteLifecycleStore(db),
     noteLinksDao: db.noteLinksDao,
   );
 });
