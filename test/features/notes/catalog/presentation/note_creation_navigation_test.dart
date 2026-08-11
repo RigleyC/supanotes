@@ -12,7 +12,6 @@ import 'package:supanotes/features/notes/catalog/presentation/adaptive_notes_she
 import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/resize_drag_handle.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
-import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 
@@ -31,6 +30,7 @@ class _RecordingNotesRepository implements INotesRepository {
       archived: false,
       createdAt: now,
       updatedAt: now,
+      hasRemoteCopy: false,
     );
   }
 
@@ -48,13 +48,7 @@ GoRouter _routerFor(Widget screen) {
           GoRoute(path: AppRoutes.home, builder: (_, _) => screen),
           GoRoute(
             path: AppRoutes.note(':id'),
-            builder: (_, state) {
-              final openOptions = state.extra;
-              final requestsInitialFocus =
-                  openOptions is NoteEditorOpenOptions &&
-                  openOptions.requestInitialFocus;
-              return Text('${state.uri}:$requestsInitialFocus');
-            },
+            builder: (_, state) => Text(state.uri.toString()),
           ),
         ],
       ),
@@ -83,7 +77,7 @@ Widget _app({
 }
 
 void main() {
-  testWidgets('mobile new-note action requests initial editor focus', (
+  testWidgets('mobile new-note action creates an id and navigates', (
     tester,
   ) async {
     final repository = _RecordingNotesRepository();
@@ -96,13 +90,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.createdNoteId, isNotNull);
-    expect(
-      find.text('/notes/${repository.createdNoteId}:true'),
-      findsOneWidget,
-    );
+    expect(find.text('/notes/${repository.createdNoteId}'), findsOneWidget);
   });
 
-  testWidgets('desktop sidebar new-note action requests initial editor focus', (
+  testWidgets('desktop sidebar new-note action creates an id and navigates', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1200, 800);
@@ -126,10 +117,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.createdNoteId, isNotNull);
-    expect(
-      find.text('/notes/${repository.createdNoteId}:true'),
-      findsOneWidget,
-    );
+    expect(find.text('/notes/${repository.createdNoteId}'), findsOneWidget);
   });
 
   testWidgets('desktop shell restores and persists a safe sidebar width', (

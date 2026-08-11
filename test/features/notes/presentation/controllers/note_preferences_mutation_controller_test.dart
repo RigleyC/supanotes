@@ -112,7 +112,10 @@ void main() {
       };
 
       final op1 = controller.setHideCompleted(current: notes.note, value: true);
-      final op2 = controller.setCollapseImages(current: notes.note, value: true);
+      final op2 = controller.setCollapseImages(
+        current: notes.note,
+        value: true,
+      );
 
       await op1; // op1 fails immediately
       expect(controller.state.status, NotePreferenceMutationStatus.error);
@@ -151,6 +154,7 @@ NoteModel _note({bool hideCompleted = false, bool collapseImages = false}) {
     collapseImages: collapseImages,
     createdAt: DateTime.utc(2026, 7, 26),
     updatedAt: DateTime.utc(2026, 7, 26),
+    hasRemoteCopy: true,
   );
 }
 

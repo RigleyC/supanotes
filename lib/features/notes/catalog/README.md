@@ -7,7 +7,7 @@ busca e hidratação remota.
 
 - `data/notes_repository.dart`: interface `INotesRepository` e implementação
   que compõe DAOs locais. Métodos como `createLocalNote`, `watchNotes`,
-  `watchNoteWithTasks` e `deleteIfEmptyOrTombstone` são a porta para telas.
+  `watchNoteWithTasks` e `discardLocalDraft` são a porta para telas.
 - `data/local/notes_local_repository.dart`: chamadas de baixo nível ao DAO,
   sempre limitadas ao usuário autenticado.
 - `data/note_catalog_sync.dart`: sincroniza todas as páginas do catálogo e
@@ -24,9 +24,11 @@ busca e hidratação remota.
 
 ## Por que criar localmente antes de abrir?
 
-O usuário pode abrir e editar sem rede. A nota começa sem cópia remota; se ela
-ficar vazia, `deleteIfEmptyOrTombstone` decide entre apagar localmente e criar
-um tombstone para uma nota que já existia no servidor.
+O usuário pode abrir e editar sem rede. A nota recebe um ID local estável antes
+da navegação, mas não aparece no catálogo enquanto não tiver conteúdo. Se o
+usuário sair sem escrever, `discardLocalDraft` remove todo o agregado local.
+Quando existe conteúdo, a primeira operação aceita pelo REST/OT marca a linha
+como cópia remota e a nota passa a ter o ciclo de vida normal.
 
 ## Ligações
 

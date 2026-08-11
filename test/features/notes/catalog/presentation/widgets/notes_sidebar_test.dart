@@ -27,6 +27,7 @@ void main() {
       archived: false,
       createdAt: DateTime(2026),
       updatedAt: DateTime(2026),
+      hasRemoteCopy: true,
     ),
     NoteModel(
       id: 'note-b',
@@ -37,6 +38,7 @@ void main() {
       archived: false,
       createdAt: DateTime(2026),
       updatedAt: DateTime(2026),
+      hasRemoteCopy: true,
     ),
   ];
 

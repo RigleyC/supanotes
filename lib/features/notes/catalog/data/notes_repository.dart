@@ -11,9 +11,9 @@ import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
-import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'local/notes_local_repository.dart';
+import 'local/note_lifecycle_store.dart';
 
 /// Presentation-facing facade over the local notes database.
 ///
@@ -36,22 +36,22 @@ abstract class INotesRepository {
   Future<void> softDelete(String id);
   Future<NoteModel> createLocalNote({required String id});
   Future<void> saveNoteSnapshot({required String id, required String content});
-  Future<void> deleteIfEmptyOrTombstone(String id);
-  Future<void> markHasRemoteCopy(String id);
+  Future<void> discardLocalDraft(String id);
 }
 
 class NotesRepository implements INotesRepository {
   NotesRepository(
     this._local,
-    this._tasksLocal,
-    this._prefsDao, [
-    this._noteLinksDao,
-  ]);
+    this._prefsDao, {
+    required NoteLifecycleStore lifecycleStore,
+    NoteLinksDao? noteLinksDao,
+  }) : _noteLinksDao = noteLinksDao,
+       _lifecycleStore = lifecycleStore;
 
   final NotesLocalRepository _local;
-  final TasksLocalRepository _tasksLocal;
   final UserNotePreferencesDao _prefsDao;
   final NoteLinksDao? _noteLinksDao;
+  final NoteLifecycleStore _lifecycleStore;
 
   /// Streams active (non-archived, non-deleted) notes, mapped
   /// to [NoteModel]. When [favoritesOnly] is true, the result is filtered
@@ -225,24 +225,8 @@ class NotesRepository implements INotesRepository {
   }
 
   @override
-  Future<void> deleteIfEmptyOrTombstone(String id) async {
-    final qr = await _local.getNoteById(id);
-    if (qr == null) return;
-    if (!_isTextEmpty(qr.note)) return;
-
-    final tasks = await _tasksLocal.getNoteTasks(id);
-    if (tasks.isNotEmpty) return;
-
-    if (qr.note.hasRemoteCopy) {
-      await _local.softDeleteNote(id);
-    } else {
-      await _local.hardDeleteNote(id);
-    }
-  }
-
-  @override
-  Future<void> markHasRemoteCopy(String id) {
-    return _local.markHasRemoteCopy(id);
+  Future<void> discardLocalDraft(String id) async {
+    await _lifecycleStore.discardLocalDraft(id);
   }
 
   String? _excerptFrom(String content) {
@@ -262,10 +246,6 @@ class NotesRepository implements INotesRepository {
     if (flat.length <= 120) return flat;
     return '${flat.substring(0, 120)}…';
   }
-
-  bool _isTextEmpty(NoteData note) {
-    return note.content.trim().isEmpty;
-  }
 }
 
 /// Riverpod entry point for the feature-level [NotesRepository].
@@ -281,6 +261,10 @@ final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   }
   final db = ref.watch(appDatabaseProvider);
   final local = NotesLocalRepository(db.notesDao, userId);
-  final tasksLocal = TasksLocalRepository(db.tasksDao, userId);
-  return NotesRepository(local, tasksLocal, db.userNotePreferencesDao);
+  return NotesRepository(
+    local,
+    db.userNotePreferencesDao,
+    lifecycleStore: DatabaseNoteLifecycleStore(db),
+    noteLinksDao: db.noteLinksDao,
+  );
 });

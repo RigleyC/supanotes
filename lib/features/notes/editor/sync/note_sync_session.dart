@@ -244,7 +244,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   @override
   Future<void> dispose() async {
-    _disposed = true;
     _setStatus(NoteSessionStatus.closing);
     _pollTimer?.cancel();
     try {
@@ -261,6 +260,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         stackTrace: stackTrace,
       );
     } finally {
+      _disposed = true;
       adapter.dispose();
       _setStatus(NoteSessionStatus.closed);
       unawaited(_statusController.close());

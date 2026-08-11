@@ -38,6 +38,30 @@ Status: complete.
 - [x] Reduce the explicit bottom gap while preserving safe-area spacing.
 - [x] Run the focused task metadata sheet test and analyzer.
 
+## Note draft lifecycle and initial focus
+
+Status: complete.
+
+- [x] Represent a newly opened local note as a draft until its canonical document has meaningful content.
+- [x] Keep drafts out of catalog lists while preserving the stable note ID for the editor session and REST/OT outbox.
+- [x] Commit drafts from canonical document projection and discard untouched drafts as a complete local aggregate.
+- [x] Mark a note as having a remote copy after successful REST/OT sync.
+- [x] Derive initial focus from draft state and remove the router-level new-note focus flag.
+- [x] Add focused lifecycle, catalog, editor, and sync tests.
+- [x] Run analyzer, focused tests, and diff checks.
+
+## Draft lifecycle quality corrections
+
+Status: complete.
+
+- [x] Project the final editor flush before allowing draft cleanup.
+- [x] Make untouched-draft validation and aggregate deletion atomic.
+- [x] Use one database lifecycle store instead of optional repository fallbacks.
+- [x] Keep attachment drafts visible and distinguish editor autofocus from
+  aggregate lifecycle state.
+- [x] Make `hasRemoteCopy` explicit in every `NoteModel` construction.
+- [x] Add regression coverage for immediate close and attachment visibility.
+
 ## Editor empty viewport focus
 
 Status: complete.

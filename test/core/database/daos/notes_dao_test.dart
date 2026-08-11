@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/drift.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
@@ -35,7 +36,9 @@ void main() {
     final db = AppDatabase.test();
     final now = DateTime(2026, 7, 6);
 
-    await db.into(db.notes).insert(
+    await db
+        .into(db.notes)
+        .insert(
           NotesCompanion.insert(
             id: 'note-title-1',
             userId: 'user-1',
@@ -56,13 +59,16 @@ void main() {
     final db = AppDatabase.test();
     final now = DateTime(2026, 7, 6);
 
-    await db.into(db.notes).insert(
+    await db
+        .into(db.notes)
+        .insert(
           NotesCompanion.insert(
             id: 'note-title-2',
             userId: 'user-1',
             content: '',
             createdAt: now,
             updatedAt: now,
+            hasRemoteCopy: const Value(true),
           ),
         );
 
@@ -72,4 +78,55 @@ void main() {
 
     await db.close();
   });
+
+  test(
+    'watchAllActiveNotes hides untouched drafts but keeps attachments',
+    () async {
+      final db = AppDatabase.test();
+      final now = DateTime(2026, 7, 6);
+
+      await db
+          .into(db.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: 'empty-draft',
+              userId: 'user-1',
+              content: '',
+              createdAt: now,
+              updatedAt: now,
+              hasRemoteCopy: const Value(false),
+            ),
+          );
+      await db
+          .into(db.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: 'attachment-draft',
+              userId: 'user-1',
+              content: '',
+              createdAt: now,
+              updatedAt: now,
+              hasRemoteCopy: const Value(false),
+            ),
+          );
+      await db
+          .into(db.attachments)
+          .insert(
+            AttachmentsCompanion.insert(
+              id: 'attachment-1',
+              noteId: 'attachment-draft',
+              fileName: 'image.png',
+              mimeType: 'image/png',
+              fileSize: 1,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      final notes = await db.notesDao.watchAllActiveNotes('user-1').first;
+      expect(notes.map((note) => note.note.id), ['attachment-draft']);
+
+      await db.close();
+    },
+  );
 }

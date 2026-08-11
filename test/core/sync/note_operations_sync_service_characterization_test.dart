@@ -97,6 +97,16 @@ void main() {
     test(
       'sync creates persisted session then clears it after accepted response',
       () async {
+        await db.notesDao.createNote(
+          NotesCompanion.insert(
+            id: 'note-sync',
+            userId: 'user-1',
+            content: '',
+            createdAt: DateTime.utc(2026, 7, 26),
+            updatedAt: DateTime.utc(2026, 7, 26),
+            hasRemoteCopy: const Value(false),
+          ),
+        );
         await seedConfirmedDocument(db, 'note-sync', revision: 4);
         await seedPendingOperation(db, 'note-sync', 'op-sync', baseRevision: 4);
         client.syncResponses.add(
@@ -134,6 +144,10 @@ void main() {
             .first;
         expect(confirmed!.revision, 5);
         expect(confirmed.documentJson, contains('server'));
+        expect(
+          (await db.notesDao.getNoteById('note-sync'))!.hasRemoteCopy,
+          isTrue,
+        );
       },
     );
 

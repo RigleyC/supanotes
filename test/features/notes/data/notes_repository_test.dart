@@ -5,17 +5,16 @@ import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/features/notes/catalog/data/local/notes_local_repository.dart';
+import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
-import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 
 void main() {
   group('NotesRepository lifecycle', () {
     test('createLocalNote creates an empty local-only note by id', () async {
       final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
-      final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = _repo(local, prefsDao);
 
       final note = await repo.createLocalNote(id: 'note-1');
       expect(note.id, 'note-1');
@@ -23,49 +22,31 @@ void main() {
       expect(note.content, isEmpty);
     });
 
-    test('deleteIfEmpty hard-deletes empty local-only notes', () async {
-      final prefsDao = FakeUserNotePreferencesDao();
-      final local = FakeNotesLocalRepository();
-      await local.createNoteWithId('note-1');
-      final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+    test('discardLocalDraft removes the complete local aggregate', () async {
+      final database = AppDatabase.test();
+      addTearDown(database.close);
+      final local = NotesLocalRepository(database.notesDao, 'test-user');
+      final repo = NotesRepository(
+        local,
+        database.userNotePreferencesDao,
+        lifecycleStore: DatabaseNoteLifecycleStore(database),
+      );
 
-      await repo.deleteIfEmptyOrTombstone('note-1');
-      expect(local.hardDeletedIds, contains('note-1'));
-      expect(local.softDeletedIds, isEmpty);
-    });
+      await repo.createLocalNote(id: 'draft-1');
+      await repo.discardLocalDraft('draft-1');
 
-    test('deleteIfEmpty tombstones remote notes', () async {
-      final prefsDao = FakeUserNotePreferencesDao();
-      final local = FakeNotesLocalRepository();
-      await local.createNoteWithId('note-1');
-      await local.markHasRemoteCopy('note-1');
-      final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
-
-      await repo.deleteIfEmptyOrTombstone('note-1');
-      expect(local.softDeletedIds, contains('note-1'));
-      expect(local.hardDeletedIds, isEmpty);
-    });
-
-    test('deleteIfEmpty does nothing for non-empty notes', () async {
-      final prefsDao = FakeUserNotePreferencesDao();
-      final local = FakeNotesLocalRepository();
-      await local.createNoteWithId('note-1', content: 'Hello');
-      final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
-
-      await repo.deleteIfEmptyOrTombstone('note-1');
-      expect(local.hardDeletedIds, isEmpty);
-      expect(local.softDeletedIds, isEmpty);
+      expect(await database.notesDao.getNoteById('draft-1'), isNull);
+      expect(
+        await database.noteOperationsDao.getPendingOperations('draft-1'),
+        isEmpty,
+      );
     });
 
     test('saveSnapshot writes content and tasks together', () async {
       final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
-      final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = _repo(local, prefsDao);
 
       await repo.saveNoteSnapshot(id: 'note-1', content: 'B');
 
@@ -78,9 +59,8 @@ void main() {
       final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('source-1');
-      final tasksLocal = FakeTasksLocalRepository();
       final linksDao = FakeNoteLinksDao();
-      final repo = NotesRepository(local, tasksLocal, prefsDao, linksDao);
+      final repo = _repo(local, prefsDao, noteLinksDao: linksDao);
 
       const content =
           'Check out [Note A](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890) '
@@ -104,7 +84,6 @@ void main() {
       final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('source-1');
-      final tasksLocal = FakeTasksLocalRepository();
       final linksDao = FakeNoteLinksDao();
 
       await linksDao.createLink(
@@ -112,7 +91,7 @@ void main() {
         targetId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       );
 
-      final repo = NotesRepository(local, tasksLocal, prefsDao, linksDao);
+      final repo = _repo(local, prefsDao, noteLinksDao: linksDao);
 
       const content =
           'Only [New Note](note://bbbbbbbb-cccc-dddd-eeee-ffffffffffff)';
@@ -128,8 +107,7 @@ void main() {
       final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
-      final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = _repo(local, prefsDao);
 
       const content = '[Test](note://a1b2c3d4-e5f6-7890-abcd-ef1234567890)';
 
@@ -145,8 +123,7 @@ void main() {
       final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
       await local.createNoteWithId('note-1');
-      final tasksLocal = FakeTasksLocalRepository();
-      final repo = NotesRepository(local, tasksLocal, prefsDao);
+      final repo = _repo(local, prefsDao);
 
       await repo.updateNoteIcon('note-1', NoteIcon.emoji('🙂'));
 
@@ -164,10 +141,26 @@ void main() {
   });
 }
 
+NotesRepository _repo(
+  NotesLocalRepository local,
+  UserNotePreferencesDao preferences, {
+  NoteLinksDao? noteLinksDao,
+}) {
+  return NotesRepository(
+    local,
+    preferences,
+    lifecycleStore: _NoopNoteLifecycleStore(),
+    noteLinksDao: noteLinksDao,
+  );
+}
+
+class _NoopNoteLifecycleStore implements NoteLifecycleStore {
+  @override
+  Future<void> discardLocalDraft(String noteId) async {}
+}
+
 class FakeNotesLocalRepository implements NotesLocalRepository {
   final Map<String, NoteData> _store = {};
-  final List<String> hardDeletedIds = [];
-  final List<String> softDeletedIds = [];
 
   @override
   String get userId => 'test-user';
@@ -245,20 +238,11 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
 
   @override
   Future<void> hardDeleteNote(String id) async {
-    hardDeletedIds.add(id);
     _store.remove(id);
   }
 
   @override
-  Future<void> markHasRemoteCopy(String id) async {
-    if (_store.containsKey(id)) {
-      _store[id] = _store[id]!.copyWith(hasRemoteCopy: true);
-    }
-  }
-
-  @override
   Future<void> softDeleteNote(String id) async {
-    softDeletedIds.add(id);
     if (_store.containsKey(id)) {
       _store[id] = _store[id]!.copyWith(
         deletedAt: Value(DateTime.now().toUtc()),
@@ -275,24 +259,6 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       );
     }
   }
-}
-
-class FakeTasksLocalRepository implements TasksLocalRepository {
-  @override
-  String get userId => 'test-user';
-
-  @override
-  Stream<List<TaskData>> watchTodayTasks() => const Stream.empty();
-
-  @override
-  Stream<List<TaskData>> watchOpenTasks({String? userId}) =>
-      const Stream.empty();
-
-  @override
-  Stream<List<TaskData>> watchNoteTasks(String noteId) => const Stream.empty();
-
-  @override
-  Future<List<TaskData>> getNoteTasks(String noteId) async => [];
 }
 
 class FakeUserNotePreferencesDao implements UserNotePreferencesDao {

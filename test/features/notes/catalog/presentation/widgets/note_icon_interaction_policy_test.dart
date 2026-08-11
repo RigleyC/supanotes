@@ -13,6 +13,7 @@ void main() {
     archived: false,
     createdAt: DateTime(2026),
     updatedAt: DateTime(2026),
+    hasRemoteCopy: true,
   );
   final readOnlyNote = NoteModel(
     id: 'note-2',
@@ -23,6 +24,7 @@ void main() {
     archived: false,
     createdAt: DateTime(2026),
     updatedAt: DateTime(2026),
+    hasRemoteCopy: true,
   );
 
   Widget host({required double width, required Widget child}) {

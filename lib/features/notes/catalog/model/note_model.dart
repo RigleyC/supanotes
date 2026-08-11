@@ -20,6 +20,7 @@ class NoteModel {
     this.sharedByEmail,
     this.sharedByName,
     this.noteIcon,
+    required this.hasRemoteCopy,
   });
 
   final String id;
@@ -37,6 +38,10 @@ class NoteModel {
   final String? sharedByEmail;
   final String? sharedByName;
   final NoteIcon? noteIcon;
+  final bool hasRemoteCopy;
+
+  /// Opens a newly-created empty local note ready for typing.
+  bool get shouldAutofocus => !hasRemoteCopy && (content ?? '').trim().isEmpty;
 
   bool get isOwner => permission == null;
   bool get isReadOnly => permission == 'view';
@@ -58,6 +63,7 @@ class NoteModel {
     String? sharedByEmail,
     String? sharedByName,
     NoteIcon? noteIcon,
+    bool? hasRemoteCopy,
   }) => NoteModel(
     id: id ?? this.id,
     userId: userId ?? this.userId,
@@ -74,6 +80,7 @@ class NoteModel {
     sharedByEmail: sharedByEmail ?? this.sharedByEmail,
     sharedByName: sharedByName ?? this.sharedByName,
     noteIcon: noteIcon ?? this.noteIcon,
+    hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
   );
 
   factory NoteModel.fromQueryResult(NoteQueryResult qr) {
@@ -103,6 +110,7 @@ class NoteModel {
           : NoteIcon.fromJson(
               jsonDecode(qr.note.noteIconJson!) as Map<String, dynamic>,
             ),
+      hasRemoteCopy: qr.note.hasRemoteCopy,
     );
   }
 }

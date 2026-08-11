@@ -14,11 +14,12 @@ void main() {
         userId: 'user-1',
         content: 'Dark note\nReadable excerpt',
         title: 'Dark note',
-        
+
         favorite: false,
         archived: false,
         createdAt: DateTime(2026),
         updatedAt: DateTime(2026),
+        hasRemoteCopy: true,
       );
 
       await tester.pumpWidget(

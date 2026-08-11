@@ -8,11 +8,12 @@ void main() {
       userId: 'u',
       content: 'some content that is NOT the title',
       title: 'From Node',
-      
+
       favorite: false,
       archived: false,
       createdAt: DateTime(2026, 7, 6),
       updatedAt: DateTime(2026, 7, 6),
+      hasRemoteCopy: true,
     );
 
     expect(model.title, 'From Node');
@@ -24,11 +25,12 @@ void main() {
       userId: 'u',
       content: 'body',
       title: 'Kept Title',
-      
+
       favorite: false,
       archived: false,
       createdAt: DateTime(2026, 7, 6),
       updatedAt: DateTime(2026, 7, 6),
+      hasRemoteCopy: true,
     );
 
     final updated = model.copyWith(content: 'new body');

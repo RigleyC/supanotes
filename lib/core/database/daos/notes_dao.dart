@@ -62,6 +62,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
+      "AND NOT (n.has_remote_copy = 0 AND TRIM(n.content) = '' "
+      "AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.note_id = n.id AND t.deleted_at IS NULL) "
+      "AND NOT EXISTS (SELECT 1 FROM attachments a WHERE a.note_id = n.id)) "
       'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC, n.id DESC',
       userId,
     );
@@ -145,6 +148,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
+      "AND NOT (n.has_remote_copy = 0 AND TRIM(n.content) = '' "
+      "AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.note_id = n.id AND t.deleted_at IS NULL) "
+      "AND NOT EXISTS (SELECT 1 FROM attachments a WHERE a.note_id = n.id)) "
       'ORDER BY n.updated_at DESC, n.id DESC',
       userId,
     );
@@ -221,7 +227,12 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return customSelect(
       sql,
       variables: [Variable.withString(userId), ...extraVariables],
-      readsFrom: {notes, userNotePreferences},
+      readsFrom: {
+        notes,
+        userNotePreferences,
+        attachedDatabase.tasks,
+        attachedDatabase.attachments,
+      },
     ).watch().map((rows) {
       final result = <NoteQueryResult>[];
       for (final row in rows) {
@@ -445,14 +456,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Permanently removes a note from the local database.
   Future<void> hardDeleteNote(String id) async {
     await (delete(notes)..where((t) => t.id.equals(id))).go();
-  }
-
-  /// Marks that the server holds a copy of this note so future sync
-  /// rounds know it can be pushed.
-  Future<void> markHasRemoteCopy(String id) async {
-    await (update(notes)..where((t) => t.id.equals(id))).write(
-      const NotesCompanion(hasRemoteCopy: Value(true)),
-    );
   }
 
   /// Stores a note that came back from the backend. Uses

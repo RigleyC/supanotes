@@ -11,6 +11,23 @@ Verification:
 - Full Flutter test suite: 554 passed, 1 skipped.
 - `git diff --check`: passed.
 
+## Thermonuclear review corrections
+
+The final editor flush now updates the canonical local projection before the
+session becomes disposed. Draft cleanup runs through a required lifecycle
+store, and the database rechecks remote state, projected text, tasks, and
+attachments in the same transaction that removes the aggregate.
+
+Catalog queries use the same untouched-draft conditions and keep attachment
+notes visible. `NoteModel.hasRemoteCopy` is explicit, while editor autofocus is
+named as a UI decision instead of being used as the lifecycle policy.
+
+Verification:
+
+- Flutter analyze: no issues found.
+- Lifecycle and sync tests: 32 passed.
+- `git diff --check`: passed.
+
 Review fixes complete:
 
 - Remote hydration now uses a version-checked compare-and-set update. Local edits, deleted rows, or notes opened during the request are not overwritten.
@@ -61,3 +78,22 @@ Verification:
 - Flutter analyze: no issues found.
 - Full Flutter suite: 620 passed, 1 skipped.
 - Existing Drift and Google Fonts warnings remained non-failing.
+
+## Note draft lifecycle and initial focus
+
+Creating a note still allocates its stable ID before navigation. The ID is
+needed by the local editor session and the REST/OT pending-operation queue. The
+new row is local-only and empty, so catalog queries hide it until content is
+projected.
+
+The editor now derives initial focus from that local draft state. The router
+only navigates to `/notes/:id`; it no longer transports a transient focus flag.
+If the user leaves without meaningful content, the editor removes the complete
+local aggregate. Once a canonical operation is accepted by REST/OT, the local
+row is marked as having a remote copy and follows the normal note lifecycle.
+
+Verification:
+
+- Flutter analyze: no issues found.
+- Focused Flutter suite: 69 passed, 1 skipped.
+- `git diff --check`: passed.

@@ -13,11 +13,12 @@ void main() {
         userId: 'user1',
         content: 'My Note',
         title: 'My Note',
-        
+
         favorite: false,
         archived: false,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        hasRemoteCopy: true,
         sharedByEmail: null,
       );
 
@@ -44,11 +45,12 @@ void main() {
         userId: 'user2',
         content: 'Shared Note',
         title: 'Shared Note',
-        
+
         favorite: false,
         archived: false,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        hasRemoteCopy: true,
         sharedByEmail: 'owner@example.com',
       );
 
@@ -78,11 +80,12 @@ void main() {
         userId: 'user1',
         content: 'Favorite Note',
         title: 'Favorite Note',
-        
+
         favorite: true,
         archived: false,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        hasRemoteCopy: true,
         sharedByEmail: null,
       );
 
@@ -111,11 +114,12 @@ void main() {
         userId: 'user1',
         content: 'Non-favorite Note',
         title: 'Non-favorite Note',
-        
+
         favorite: false,
         archived: false,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        hasRemoteCopy: true,
         sharedByEmail: null,
       );
 

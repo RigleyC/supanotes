@@ -110,10 +110,6 @@ class NotesLocalRepository {
     return _dao.hardDeleteNote(id);
   }
 
-  Future<void> markHasRemoteCopy(String id) {
-    return _dao.markHasRemoteCopy(id);
-  }
-
   Future<void> softDeleteNote(String id) {
     return _dao.softDeleteNote(id);
   }
@@ -130,5 +126,4 @@ class NotesLocalRepository {
     );
     await _dao.updateNote(companion);
   }
-
 }

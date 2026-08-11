@@ -16,7 +16,6 @@ import 'package:supanotes/features/notes/catalog/application/notes_providers.dar
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_grid_view.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_list_view.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
-import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
@@ -180,10 +179,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final id = const Uuid().v4();
     await ref.read(notesRepositoryProvider).createLocalNote(id: id);
     if (!context.mounted) return;
-    context.push(
-      AppRoutes.note(id),
-      extra: const NoteEditorOpenOptions.newNote(),
-    );
+    context.push(AppRoutes.note(id));
   }
 
   void _deleteNote(NoteModel note) {

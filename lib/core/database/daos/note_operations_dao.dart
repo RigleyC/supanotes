@@ -40,6 +40,12 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.noteId.equals(noteId))).go();
   }
 
+  Future<void> markNoteHasRemoteCopy(String noteId) async {
+    await (update(notes)..where((note) => note.id.equals(noteId))).write(
+      const NotesCompanion(hasRemoteCopy: Value(true)),
+    );
+  }
+
   Future<void> insertPendingOperation(PendingNoteOperationsCompanion op) {
     return into(
       pendingNoteOperations,

@@ -113,9 +113,6 @@ class _FakeNotesRepository implements INotesRepository {
   }) async {}
 
   @override
-  Future<void> deleteIfEmptyOrTombstone(String id) async {}
-
-  @override
   Stream<NoteWithTasks> watchNoteWithTasks(String noteId) =>
       _broadcast.map((note) => NoteWithTasks(note: note, tasks: tasks));
 
@@ -162,6 +159,7 @@ void main() {
 
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 11),
+          hasRemoteCopy: true,
           hideCompleted: false,
         ),
       );
@@ -181,6 +179,7 @@ void main() {
 
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 12),
+          hasRemoteCopy: true,
           hideCompleted: false,
         ),
       );
@@ -232,6 +231,7 @@ void main() {
 
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
+        hasRemoteCopy: true,
         hideCompleted: false,
       ),
     );
@@ -350,6 +350,51 @@ void main() {
       tester.widget<SuperEditor>(find.byType(SuperEditor)).autofocus,
       isFalse,
     );
+  });
+
+  testWidgets('screen derives initial focus from a local empty draft', (
+    tester,
+  ) async {
+    final streamController = StreamController<NoteModel?>();
+    addTearDown(streamController.close);
+    final controller = _createTestController([]);
+    final session = _sessionFor(controller);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserIdProvider.overrideWithValue('u-1'),
+          notesRepositoryProvider.overrideWithValue(
+            _FakeNotesRepository(streamController),
+          ),
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => session,
+          ),
+        ],
+        child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
+      ),
+    );
+
+    streamController.add(
+      NoteModel(
+        id: 'note-1',
+        userId: 'u-1',
+        content: '',
+        title: 'Sem título',
+        favorite: false,
+        archived: false,
+        createdAt: DateTime(2026, 6, 11),
+        updatedAt: DateTime(2026, 6, 11),
+        hasRemoteCopy: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<SuperEditor>(find.byType(SuperEditor)).autofocus,
+      isTrue,
+    );
+    expect(controller.focusNode.hasFocus, isTrue);
   });
 
   testWidgets(
@@ -631,6 +676,7 @@ void main() {
           archived: false,
           createdAt: DateTime(2026),
           updatedAt: DateTime(2026),
+          hasRemoteCopy: true,
         ),
       );
       await tester.pumpAndSettle();
@@ -1222,6 +1268,7 @@ void main() {
 
         createdAt: DateTime(2026, 6, 17),
         updatedAt: DateTime(2026, 6, 17),
+        hasRemoteCopy: true,
         hideCompleted: false,
       ),
     );
@@ -1300,6 +1347,7 @@ void main() {
 
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
+        hasRemoteCopy: true,
         hideCompleted: false,
       ),
     );
@@ -1381,6 +1429,7 @@ void main() {
 
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 11),
+          hasRemoteCopy: true,
           hideCompleted: false,
         ),
       );

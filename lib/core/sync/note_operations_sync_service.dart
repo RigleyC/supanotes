@@ -460,6 +460,7 @@ class NoteOperationsSyncService {
           updatedAt: response.serverTime,
         ),
       );
+      await _dao.markNoteHasRemoteCopy(noteId);
       await _dao.deletePendingOpsByStatus(
         noteId,
         'pending',

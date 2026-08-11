@@ -35,13 +35,11 @@ import 'package:supanotes/core/utils/platform_utils.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
-  final bool requestInitialFocus;
   final AttachmentDelivery? attachmentDelivery;
 
   const NoteEditorScreen({
     super.key,
     required this.noteId,
-    this.requestInitialFocus = false,
     this.attachmentDelivery,
   });
 
@@ -307,7 +305,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       final editor = NoteEditor(
                         noteId: widget.noteId,
                         session: session,
-                        requestInitialFocus: widget.requestInitialFocus,
+                        requestInitialFocus: noteData.shouldAutofocus,
                         taskMetadata: tasksMap,
                         hideCompleted: noteData.hideCompleted,
                         collapseImages: noteData.collapseImages,

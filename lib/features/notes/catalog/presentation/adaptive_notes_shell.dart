@@ -13,7 +13,6 @@ import 'package:supanotes/features/notes/catalog/presentation/widgets/desktop_si
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_sidebar.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/resize_drag_handle.dart';
-import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/shared/theme/desktop_layout_tokens.dart';
 import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:uuid/uuid.dart';
@@ -151,10 +150,7 @@ class _AdaptiveNotesShellState extends ConsumerState<AdaptiveNotesShell> {
                                     .read(notesRepositoryProvider)
                                     .createLocalNote(id: id);
                                 if (!context.mounted) return;
-                                context.go(
-                                  AppRoutes.note(id),
-                                  extra: const NoteEditorOpenOptions.newNote(),
-                                );
+                                context.go(AppRoutes.note(id));
                               },
                               onOpenSettings: () {
                                 context.push(AppRoutes.settings);

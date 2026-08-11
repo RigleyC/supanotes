@@ -26,10 +26,15 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
   bool isDisposed = false;
   StreamSubscription? permissionSubscription;
 
+  Future<void> closeSession() async {
+    await sessionCoordinator.close(noteId);
+    await notesRepository.discardLocalDraft(noteId);
+  }
+
   ref.onDispose(() {
     isDisposed = true;
     unawaited(permissionSubscription?.cancel());
-    unawaited(sessionCoordinator.close(noteId));
+    unawaited(closeSession());
   });
 
   final note = await ref.watch(_notePermissionProvider(noteId).future);
@@ -72,7 +77,7 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
   });
 
   if (isDisposed) {
-    unawaited(sessionCoordinator.close(noteId));
+    unawaited(closeSession());
     throw StateError('Provider disposed during session opening');
   }
 

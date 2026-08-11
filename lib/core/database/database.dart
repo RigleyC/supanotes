@@ -91,42 +91,76 @@ class AppDatabase extends _$AppDatabase {
   /// must be removed together so a deleted note cannot keep producing local
   /// results or notifications.
   Future<void> deleteNoteData(String noteId) async {
-    await transaction(() async {
-      final noteTasks = await (select(
-        tasks,
-      )..where((task) => task.noteId.equals(noteId))).get();
-      for (final task in noteTasks) {
-        await (delete(
-          localTaskCompletions,
-        )..where((completion) => completion.taskId.equals(task.id))).go();
+    await transaction(() => _deleteNoteData(noteId));
+  }
+
+  /// Deletes an untouched local draft and its complete aggregate atomically.
+  Future<bool> discardLocalDraftIfUntouched(String noteId) {
+    return transaction(() async {
+      final note = await (select(
+        notes,
+      )..where((row) => row.id.equals(noteId))).getSingleOrNull();
+      if (note == null ||
+          note.hasRemoteCopy ||
+          note.content.trim().isNotEmpty) {
+        return false;
       }
 
-      await (delete(
-        attachments,
-      )..where((attachment) => attachment.noteId.equals(noteId))).go();
-      await (delete(noteLinks)..where(
-            (link) =>
-                link.sourceId.equals(noteId) | link.targetId.equals(noteId),
-          ))
-          .go();
-      await (delete(
-        userNotePreferences,
-      )..where((preference) => preference.noteId.equals(noteId))).go();
-      await (delete(tasks)..where((task) => task.noteId.equals(noteId))).go();
-      await (delete(
-        localNoteDocuments,
-      )..where((document) => document.noteId.equals(noteId))).go();
-      await (delete(
-        pendingNoteOperations,
-      )..where((operation) => operation.noteId.equals(noteId))).go();
-      await (delete(
-        noteSyncErrors,
-      )..where((error) => error.noteId.equals(noteId))).go();
-      await (delete(
-        syncSessions,
-      )..where((session) => session.noteId.equals(noteId))).go();
-      await (delete(notes)..where((note) => note.id.equals(noteId))).go();
+      final hasTasks =
+          await (select(tasks)
+                ..where(
+                  (row) => row.noteId.equals(noteId) & row.deletedAt.isNull(),
+                )
+                ..limit(1))
+              .getSingleOrNull();
+      if (hasTasks != null) return false;
+
+      final hasAttachments =
+          await (select(attachments)
+                ..where((row) => row.noteId.equals(noteId))
+                ..limit(1))
+              .getSingleOrNull();
+      if (hasAttachments != null) return false;
+
+      await _deleteNoteData(noteId);
+      return true;
     });
+  }
+
+  Future<void> _deleteNoteData(String noteId) async {
+    final noteTasks = await (select(
+      tasks,
+    )..where((task) => task.noteId.equals(noteId))).get();
+    for (final task in noteTasks) {
+      await (delete(
+        localTaskCompletions,
+      )..where((completion) => completion.taskId.equals(task.id))).go();
+    }
+
+    await (delete(
+      attachments,
+    )..where((attachment) => attachment.noteId.equals(noteId))).go();
+    await (delete(noteLinks)..where(
+          (link) => link.sourceId.equals(noteId) | link.targetId.equals(noteId),
+        ))
+        .go();
+    await (delete(
+      userNotePreferences,
+    )..where((preference) => preference.noteId.equals(noteId))).go();
+    await (delete(tasks)..where((task) => task.noteId.equals(noteId))).go();
+    await (delete(
+      localNoteDocuments,
+    )..where((document) => document.noteId.equals(noteId))).go();
+    await (delete(
+      pendingNoteOperations,
+    )..where((operation) => operation.noteId.equals(noteId))).go();
+    await (delete(
+      noteSyncErrors,
+    )..where((error) => error.noteId.equals(noteId))).go();
+    await (delete(
+      syncSessions,
+    )..where((session) => session.noteId.equals(noteId))).go();
+    await (delete(notes)..where((note) => note.id.equals(noteId))).go();
   }
 
   /// Saves note content/excerpt projection and synced tasks in a single atomic transaction.

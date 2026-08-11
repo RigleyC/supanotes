@@ -54,9 +54,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               final openOptions = state.extra;
               return NoteEditorScreen(
                 noteId: state.pathParameters['id']!,
-                requestInitialFocus:
-                    openOptions is NoteEditorOpenOptions &&
-                    openOptions.requestInitialFocus,
                 attachmentDelivery: openOptions is NoteEditorOpenOptions
                     ? openOptions.attachmentDelivery
                     : null,
