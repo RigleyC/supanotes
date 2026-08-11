@@ -1,11 +1,256 @@
+import 'dart:collection';
+
 import 'package:dart_quill_delta/dart_quill_delta.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'attachment_nodes.dart';
 import 'note_document_constants.dart';
 
+/// Strict, transport-independent representation of a canonical note
+/// snapshot. Sharing and sync envelopes may carry this value, but only this
+/// document layer validates and decodes its block contract.
+dynamic _freezeJsonValue(dynamic value) {
+  if (value is Map) {
+    return Map<String, dynamic>.unmodifiable({
+      for (final entry in value.entries)
+        entry.key.toString(): _freezeJsonValue(entry.value),
+    });
+  }
+  if (value is List) {
+    return UnmodifiableListView<dynamic>(value.map(_freezeJsonValue));
+  }
+  return value;
+}
+
+final class NoteDocumentSnapshot {
+  NoteDocumentSnapshot._(List<NoteDocumentBlock> blocks)
+    : blocks = UnmodifiableListView<NoteDocumentBlock>(blocks);
+
+  factory NoteDocumentSnapshot.fromJson(Map<String, dynamic> json) =>
+      const NoteDocumentCodec().parseSnapshot(json);
+
+  final List<NoteDocumentBlock> blocks;
+
+  Map<String, dynamic> toJson() => {
+    'schemaVersion': 1,
+    'blocks': blocks.map((block) => block.toJson()).toList(growable: false),
+  };
+
+  MutableDocument toMutableDocument() =>
+      const NoteDocumentCodec().decodeSnapshot(this);
+}
+
+final class NoteDocumentBlock {
+  NoteDocumentBlock({
+    required this.id,
+    required this.type,
+    required List<Map<String, dynamic>> delta,
+    required Map<String, dynamic> metadata,
+  }) : delta = UnmodifiableListView<Map<String, dynamic>>(
+         delta.map(
+           (operation) => _freezeJsonValue(operation) as Map<String, dynamic>,
+         ),
+       ),
+       metadata = _freezeJsonValue(metadata) as Map<String, dynamic>;
+
+  final String id;
+  final String type;
+  final List<Map<String, dynamic>> delta;
+  final Map<String, dynamic> metadata;
+
+  String get text =>
+      delta.map((operation) => operation['insert']).whereType<String>().join();
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'type': type,
+    'delta': delta,
+    if (metadata.isNotEmpty) 'metadata': metadata,
+  };
+}
+
 class NoteDocumentCodec {
   const NoteDocumentCodec();
+
+  static const supportedBlockTypes = {
+    'paragraph',
+    'header1',
+    'header2',
+    'header3',
+    'quote',
+    'bulletList',
+    'orderedList',
+    'task',
+    'divider',
+    'attachment',
+    'rich_link',
+  };
+
+  NoteDocumentSnapshot parseSnapshot(Map<String, dynamic> json) {
+    if (json['schemaVersion'] != 1) {
+      throw const FormatException(
+        'Note document has an unsupported schema version',
+      );
+    }
+    final rawBlocks = json['blocks'];
+    if (rawBlocks is! List || rawBlocks.isEmpty) {
+      throw const FormatException('Note document has no blocks');
+    }
+
+    final ids = <String>{};
+    final blocks = rawBlocks
+        .map((rawBlock) {
+          if (rawBlock is! Map) {
+            throw const FormatException(
+              'Note document contains an invalid block',
+            );
+          }
+          final block = _parseBlock(Map<String, dynamic>.from(rawBlock));
+          if (!ids.add(block.id)) {
+            throw const FormatException(
+              'Note document contains duplicate block ids',
+            );
+          }
+          return block;
+        })
+        .toList(growable: false);
+    return NoteDocumentSnapshot._(blocks);
+  }
+
+  MutableDocument decodeSnapshot(NoteDocumentSnapshot snapshot) {
+    return MutableDocument(
+      nodes: snapshot.blocks
+          .map((block) => decodeNode(block.toJson()))
+          .toList(growable: false),
+    );
+  }
+
+  NoteDocumentBlock _parseBlock(Map<String, dynamic> json) {
+    final rawId = json['id'];
+    final rawType = json['type'];
+    if (rawId is! String || rawId.isEmpty) {
+      throw const FormatException('Note document block has no id');
+    }
+    if (rawType is! String || rawType.isEmpty) {
+      throw const FormatException('Note document block has no type');
+    }
+    if (!supportedBlockTypes.contains(rawType)) {
+      throw FormatException('Unsupported note document block type: $rawType');
+    }
+
+    final rawDelta = json['delta'];
+    if (rawDelta is! List) {
+      throw const FormatException('Note document block has no delta');
+    }
+    final delta = rawDelta
+        .map((rawOperation) {
+          if (rawOperation is! Map) {
+            throw const FormatException(
+              'Note document block contains an invalid delta',
+            );
+          }
+          final operation = Map<String, dynamic>.from(rawOperation);
+          if (operation['insert'] is! String) {
+            throw const FormatException(
+              'Note document block contains a non-text delta operation',
+            );
+          }
+          final rawAttributes = operation['attributes'];
+          if (rawAttributes != null && rawAttributes is! Map) {
+            throw const FormatException(
+              'Note document block contains invalid delta attributes',
+            );
+          }
+          if (rawAttributes is Map) {
+            for (final entry in rawAttributes.entries) {
+              if (entry.key is! String) {
+                throw const FormatException(
+                  'Note document block contains invalid delta attribute names',
+                );
+              }
+              if (entry.key == 'link') {
+                final uri = entry.value is String
+                    ? Uri.tryParse(entry.value as String)
+                    : null;
+                if (uri == null) {
+                  throw const FormatException(
+                    'Note document block contains an invalid link attribute',
+                  );
+                }
+              } else if (entry.key.toString().startsWith('link:') &&
+                  entry.value == true &&
+                  Uri.tryParse(entry.key.toString().substring(5)) == null) {
+                throw const FormatException(
+                  'Note document block contains an invalid link attribution',
+                );
+              }
+            }
+          }
+          return operation;
+        })
+        .toList(growable: false);
+
+    final rawMetadata = json['metadata'];
+    if (rawMetadata != null && rawMetadata is! Map) {
+      throw const FormatException('Note document block has invalid metadata');
+    }
+    final metadata = rawMetadata == null
+        ? const <String, dynamic>{}
+        : Map<String, dynamic>.from(rawMetadata);
+    _validateMetadata(rawType, metadata);
+    return NoteDocumentBlock(
+      id: rawId,
+      type: rawType,
+      delta: delta,
+      metadata: metadata,
+    );
+  }
+
+  static void _validateMetadata(String type, Map<String, dynamic> metadata) {
+    void requireType(String key, bool condition) {
+      if (metadata[key] != null && !condition) {
+        throw FormatException('Invalid $key metadata for $type block');
+      }
+    }
+
+    switch (type) {
+      case 'rich_link':
+        for (final key in const [
+          'url',
+          'title',
+          'description',
+          'imageUrl',
+          'domain',
+        ]) {
+          requireType(key, metadata[key] is String);
+        }
+      case 'task':
+        requireType('isCompleted', metadata['isCompleted'] is bool);
+        requireType('checked', metadata['checked'] is bool);
+        requireType('indent', metadata['indent'] is int);
+        for (final key in const [
+          'dueDate',
+          'recurrenceRule',
+          'recurrence',
+          'reminder',
+        ]) {
+          requireType(key, metadata[key] is String);
+        }
+        requireType('hasTime', metadata['hasTime'] is bool);
+      case 'bulletList' || 'orderedList':
+        requireType('indent', metadata['indent'] is int);
+      case 'attachment':
+        for (final key in const [
+          'attachmentId',
+          'filename',
+          'mimeType',
+          'url',
+        ]) {
+          requireType(key, metadata[key] is String);
+        }
+        requireType('fileSize', metadata['fileSize'] is int);
+    }
+  }
 
   bool isEmptyDocumentPlaceholder(MutableDocument document) {
     if (document.nodeCount != 1) return false;

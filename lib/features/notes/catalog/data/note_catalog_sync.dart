@@ -4,6 +4,7 @@ import 'dart:developer' as dev;
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
@@ -23,8 +24,8 @@ typedef NoteIconUpdater =
 /// The catalog endpoint returns a partial note shape. The `has*` fields keep
 /// the difference between an omitted field and an explicit `null`, which is
 /// required for remote icon clears and partial metadata updates.
-final class _RemoteNoteMetadata {
-  const _RemoteNoteMetadata({
+final class RemoteNoteMetadata {
+  const RemoteNoteMetadata({
     required this.id,
     required this.userId,
     required this.createdAt,
@@ -41,9 +42,9 @@ final class _RemoteNoteMetadata {
     required this.noteIcon,
   });
 
-  factory _RemoteNoteMetadata.fromJson(Map<String, dynamic> json) {
+  factory RemoteNoteMetadata.fromJson(Map<String, dynamic> json) {
     final id = _requiredString(json, 'id');
-    return _RemoteNoteMetadata(
+    return RemoteNoteMetadata(
       id: id,
       userId: _optionalString(json, 'user_id'),
       createdAt: _requiredDateTime(json, 'created_at'),
@@ -79,23 +80,36 @@ final class _RemoteNoteMetadata {
   bool get hasShareMetadata =>
       hasPermission || hasSharedByEmail || hasSharedByName;
 
+  bool hasShareMetadataFor(String currentUserId) =>
+      hasShareMetadata || userId == currentUserId;
+
   String? get noteIconJson =>
       noteIcon == null ? null : jsonEncode(noteIcon!.toJson());
 
   Value<String?> get permissionValue =>
       hasPermission ? Value(permission) : const Value<String?>.absent();
 
+  Value<String?> permissionValueFor(String currentUserId) =>
+      userId == currentUserId ? const Value<String?>(null) : permissionValue;
+
   Value<String?> get sharedByEmailValue =>
       hasSharedByEmail ? Value(sharedByEmail) : const Value<String?>.absent();
 
+  Value<String?> sharedByEmailValueFor(String currentUserId) =>
+      userId == currentUserId ? const Value<String?>(null) : sharedByEmailValue;
+
   Value<String?> get sharedByNameValue =>
       hasSharedByName ? Value(sharedByName) : const Value<String?>.absent();
+
+  Value<String?> sharedByNameValueFor(String currentUserId) =>
+      userId == currentUserId ? const Value<String?>(null) : sharedByNameValue;
 
   Value<String?> noteIconValue({required bool apply}) =>
       apply ? Value(noteIconJson) : const Value<String?>.absent();
 
   NotesCompanion toRemoteNoteCompanion({
     required String userId,
+    required String currentUserId,
     required String content,
     required String? excerpt,
     required DateTime updatedAt,
@@ -114,9 +128,9 @@ final class _RemoteNoteMetadata {
       collapseImages: hasCollapseImages
           ? Value(collapseImages ?? false)
           : const Value.absent(),
-      permission: permissionValue,
-      sharedByEmail: sharedByEmailValue,
-      sharedByName: sharedByNameValue,
+      permission: permissionValueFor(currentUserId),
+      sharedByEmail: sharedByEmailValueFor(currentUserId),
+      sharedByName: sharedByNameValueFor(currentUserId),
       noteIconJson: noteIconValue(apply: applyNoteIcon),
       noteIconDirty: Value(noteIconDirty),
     );
@@ -193,7 +207,7 @@ class NoteCatalogSync {
   final NoteSessionActivityTracker _activityTracker;
   final NoteIconUpdater _updateNoteIcon;
   final NoteDocumentProjector _documentProjector;
-  Map<String, _RemoteNoteMetadata> _remoteCatalog = const {};
+  Map<String, RemoteNoteMetadata> _remoteCatalog = const {};
 
   Future<void> pushDeletedNotes() async {
     final localOnlyDeletedNotes = await _database.notesDao
@@ -260,13 +274,13 @@ class NoteCatalogSync {
 
   Future<void> _refreshRemoteCatalog() async {
     final rows = await _listAllRemoteNotes();
-    final remoteNotes = rows.map(_RemoteNoteMetadata.fromJson).toList();
+    final remoteNotes = rows.map(RemoteNoteMetadata.fromJson).toList();
     _remoteCatalog = {for (final remote in remoteNotes) remote.id: remote};
   }
 
   Future<void> pullRemoteNotes(String userId) async {
     final rows = await _listAllRemoteNotes();
-    final remoteNotes = rows.map(_RemoteNoteMetadata.fromJson).toList();
+    final remoteNotes = rows.map(RemoteNoteMetadata.fromJson).toList();
     _remoteCatalog = {for (final remote in remoteNotes) remote.id: remote};
     final remoteIds = remoteNotes.map((note) => note.id).toSet();
 
@@ -347,40 +361,82 @@ class NoteCatalogSync {
     }
   }
 
-  Future<void> _pullRemoteNote({
+  /// Hydrates one note through the authenticated document endpoint.
+  ///
+  /// Share-link handoff uses this entry point before routing to the normal
+  /// editor. The document and its server revision are persisted by the same
+  /// transaction as the catalog metadata and task projection, so the editor
+  /// never starts an editable session from an unversioned public snapshot.
+  Future<void> hydrateRemoteNoteFromJson({
     required String userId,
-    required _RemoteNoteMetadata catalog,
+    required Map<String, dynamic> metadata,
+  }) {
+    return hydrateRemoteNote(
+      userId: userId,
+      metadata: RemoteNoteMetadata.fromJson(metadata),
+    );
+  }
+
+  Future<void> hydrateRemoteNote({
+    required String userId,
+    required RemoteNoteMetadata metadata,
+  }) async {
+    final applied = await _pullRemoteNote(
+      userId: userId,
+      catalog: metadata,
+      forceDocumentHydration: true,
+    );
+    if (!applied) {
+      throw StateError(
+        'Remote note ${metadata.id} changed while its document was loading',
+      );
+    }
+  }
+
+  Future<bool> _pullRemoteNote({
+    required String userId,
+    required RemoteNoteMetadata catalog,
+    bool forceDocumentHydration = false,
   }) async {
     final id = catalog.id;
     final existing = await _database.notesDao.getNoteById(id);
     final shouldReadRemoteIcon =
         catalog.hasNoteIcon && !(existing?.noteIconDirty ?? false);
-
-    if (_activityTracker.isActive(id)) {
-      if (existing != null &&
-          (catalog.hasShareMetadata || catalog.hasNoteIcon)) {
-        await _database.notesDao.updateRemoteShareMetadata(
-          id: id,
-          permission: catalog.permissionValue,
-          sharedByEmail: catalog.sharedByEmailValue,
-          sharedByName: catalog.sharedByNameValue,
-          noteIconJson: catalog.noteIconValue(apply: shouldReadRemoteIcon),
-        );
-      }
-      dev.log('[NoteCatalogSync] Skipping active note content $id');
-      return;
-    }
-
     final localDocument = await (_database.select(
       _database.localNoteDocuments,
     )..where((document) => document.noteId.equals(id))).getSingleOrNull();
 
+    if (_activityTracker.isActive(id)) {
+      if (existing != null &&
+          (catalog.hasShareMetadataFor(userId) || catalog.hasNoteIcon)) {
+        await _database.notesDao.updateRemoteShareMetadata(
+          id: id,
+          permission: catalog.permissionValueFor(userId),
+          sharedByEmail: catalog.sharedByEmailValueFor(userId),
+          sharedByName: catalog.sharedByNameValueFor(userId),
+          noteIconJson: catalog.noteIconValue(apply: shouldReadRemoteIcon),
+        );
+      }
+      dev.log('[NoteCatalogSync] Skipping active note content $id');
+      return localDocument != null;
+    }
+
     if (existing != null &&
-        (existing.isDirty ||
-            (existing.hasRemoteCopy &&
-                localDocument != null &&
-                !catalog.updatedAt.isAfter(existing.updatedAt)))) {
-      return;
+        (!forceDocumentHydration &&
+            (existing.isDirty ||
+                (existing.hasRemoteCopy &&
+                    localDocument != null &&
+                    !catalog.updatedAt.isAfter(existing.updatedAt))))) {
+      if (catalog.hasShareMetadataFor(userId) || catalog.hasNoteIcon) {
+        await _database.notesDao.updateRemoteShareMetadata(
+          id: id,
+          permission: catalog.permissionValueFor(userId),
+          sharedByEmail: catalog.sharedByEmailValueFor(userId),
+          sharedByName: catalog.sharedByNameValueFor(userId),
+          noteIconJson: catalog.noteIconValue(apply: shouldReadRemoteIcon),
+        );
+      }
+      return false;
     }
 
     final documentResponse = await _syncClient.getDocument(id);
@@ -391,7 +447,7 @@ class NoteCatalogSync {
     }
     if (_activityTracker.isActive(id)) {
       dev.log('[NoteCatalogSync] Note became active during hydration $id');
-      return;
+      return localDocument != null;
     }
 
     final projection = _documentProjector.projectBlocks(
@@ -415,6 +471,7 @@ class NoteCatalogSync {
       userId: userId,
       note: catalog.toRemoteNoteCompanion(
         userId: ownerUserId,
+        currentUserId: userId,
         content: projection.content,
         excerpt: projection.excerpt,
         // Keep the local timestamp while an icon mutation is pending. The
@@ -429,9 +486,10 @@ class NoteCatalogSync {
     );
     if (!applied) {
       dev.log('[NoteCatalogSync] Skipped stale remote hydration $id');
-      return;
+      return false;
     }
     dev.log('[NoteCatalogSync] Hydrated $id from remote snapshot');
+    return true;
   }
 }
 
@@ -440,11 +498,13 @@ class NoteCatalogSync {
 /// The root app listens to this provider so every catalog page is hydrated in
 /// the background while the UI continues reading Drift. It must stay alive
 /// across widget rebuilds; opening a note never waits for this provider.
-final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
-  final user = ref.watch(authControllerProvider).asData?.value;
-  if (user == null) return;
-
-  final sync = NoteCatalogSync(
+final noteCatalogSyncServiceProvider = Provider.autoDispose<NoteCatalogSync>((
+  ref,
+) {
+  if (ref.watch(currentUserIdProvider) == null) {
+    throw StateError('NoteCatalogSync requires an authenticated user');
+  }
+  return NoteCatalogSync(
     syncClient: ref.watch(noteSyncClientProvider),
     database: ref.watch(appDatabaseProvider),
     activityTracker: ref.watch(noteSessionActivityTrackerProvider),
@@ -463,6 +523,13 @@ final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
           );
     },
   );
+});
+
+final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
+  final user = ref.watch(authControllerProvider).asData?.value;
+  if (user == null) return;
+
+  final sync = ref.watch(noteCatalogSyncServiceProvider);
   while (true) {
     try {
       await sync.pushDeletedNotes();

@@ -27,7 +27,7 @@ NoteEditorController _createTestController(List<DocumentNode> nodes) {
   );
 }
 
-Future<NoteEditorSession> _createTestSession(List<DocumentNode> nodes) async {
+NoteEditorSession _createTestSession(List<DocumentNode> nodes) {
   return NoteEditorSession(
     noteId: 'note-1',
     controller: _createTestController(nodes),
@@ -150,6 +150,13 @@ void main() {
             home: Scaffold(
               body: NoteEditor(
                 noteId: 'note-1',
+                session: _createTestSession([
+                  TaskNode(
+                    id: 'task-1',
+                    text: AttributedText('Tarefa recorrente'),
+                    isComplete: false,
+                  ),
+                ]),
                 taskMetadata: {'task-1': task},
                 delegate: NoteEditorDelegate(
                   onTaskComplete: (taskId) =>

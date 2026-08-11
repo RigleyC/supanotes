@@ -1,29 +1,15 @@
-/// Transient options used when opening the note editor.
-///
-/// These options are navigation state, not note data. They are intentionally
-/// passed as route extras so they do not become part of a shareable note URL.
-enum NoteEditorAccessMode { readOnly, editable }
+import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 
 class NoteEditorOpenOptions {
   const NoteEditorOpenOptions({
     this.requestInitialFocus = false,
-    this.accessMode,
-    this.shareLinkToken,
+    this.attachmentDelivery,
   });
 
   const NoteEditorOpenOptions.newNote()
     : requestInitialFocus = true,
-      accessMode = NoteEditorAccessMode.editable,
-      shareLinkToken = null;
+      attachmentDelivery = null;
 
   final bool requestInitialFocus;
-
-  /// Optional access decision supplied by a share-link handoff.
-  ///
-  /// `null` keeps the permission stored in the local note catalog. A value
-  /// from the authenticated share-link resolver is authoritative for this
-  /// navigation and also allows a note to open before catalog hydration.
-  final NoteEditorAccessMode? accessMode;
-
-  final String? shareLinkToken;
+  final AttachmentDelivery? attachmentDelivery;
 }

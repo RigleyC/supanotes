@@ -75,7 +75,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     this.taskProjectionEngine,
     this.userId = '',
     bool captureLocalOperations = true,
-    Map<String, dynamic>? initialSnapshot,
     this.onTransientError,
     this.onProtocolError,
   }) : adapter = NoteOperationAdapter(
@@ -84,7 +83,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
          noteId: noteId,
          editor: editor,
          captureLocalOperations: captureLocalOperations,
-         initialSnapshot: initialSnapshot,
        ),
        _captureLocalOperations = captureLocalOperations;
 

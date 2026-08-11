@@ -9,10 +9,11 @@ import 'package:supanotes/features/notes/editor/presentation/note_desktop_styles
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
+import 'package:supanotes/features/notes/sharing/data/share_link_attachment_url.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/sharing/domain/share_link_strings.dart';
 import 'package:supanotes/features/notes/sharing/model/share_link_document.dart';
-import 'package:supanotes/features/notes/sharing/presentation/share_link_attachment_component.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 
 final _shareLinkDocumentProvider = FutureProvider.autoDispose
@@ -85,7 +86,7 @@ class _ShareLinkDocumentReaderState extends State<_ShareLinkDocumentReader> {
   void initState() {
     super.initState();
     _editor = createDefaultDocumentEditor(
-      document: widget.document.toMutableDocument(),
+      document: widget.document.snapshot.toMutableDocument(),
     );
   }
 
@@ -112,7 +113,13 @@ class _ShareLinkDocumentReaderState extends State<_ShareLinkDocumentReader> {
           composer: _editor.composer,
           readOnly: true,
         ),
-        ShareLinkAttachmentComponentBuilder(token: widget.token),
+        AttachmentComponentBuilder(
+          editor: _editor,
+          collapseImages: false,
+          readOnly: true,
+          allowInternalNoteLinks: false,
+          attachmentDelivery: ShareLinkAttachmentDelivery(widget.token),
+        ),
         ...defaultComponentBuilders,
       ],
       contentTapDelegateFactory: (readerContext) => NoteLinkTapHandler(

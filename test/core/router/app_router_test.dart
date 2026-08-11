@@ -134,31 +134,6 @@ void main() {
     expect(editorScreen.requestInitialFocus, isTrue);
   });
 
-  testWidgets('note route receives read-only share-link access', (
-    tester,
-  ) async {
-    final container = await _makeContainer(
-      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
-    );
-
-    await tester.pumpWidget(_wrapRouter(container));
-    await settleRedirect(tester);
-
-    final router = container.read(goRouterProvider);
-    router.push(
-      AppRoutes.note('note-1'),
-      extra: const NoteEditorOpenOptions(
-        accessMode: NoteEditorAccessMode.readOnly,
-      ),
-    );
-    await settleRedirect(tester);
-
-    final editorScreen = tester.widget<NoteEditorScreen>(
-      find.byType(NoteEditorScreen),
-    );
-    expect(editorScreen.accessMode, NoteEditorAccessMode.readOnly);
-  });
-
   testWidgets('starting with loading auth lands on /splash', (tester) async {
     final container = await _makeLoadingContainer();
 

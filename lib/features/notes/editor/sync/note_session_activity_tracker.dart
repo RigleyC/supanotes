@@ -1,23 +1,13 @@
 class NoteSessionActivityTracker {
-  final Map<String, Set<String>> _activeSessionKeysByNote = {};
+  final Set<String> _activeNoteIds = {};
 
-  bool isActive(String noteId) =>
-      _activeSessionKeysByNote[noteId]?.isNotEmpty ?? false;
+  bool isActive(String noteId) => _activeNoteIds.contains(noteId);
 
-  int get activeCount => _activeSessionKeysByNote.length;
+  int get activeCount => _activeNoteIds.length;
 
-  Set<String> get activeNoteIds =>
-      Set.unmodifiable(_activeSessionKeysByNote.keys.toSet());
+  Set<String> get activeNoteIds => Set.unmodifiable(_activeNoteIds);
 
-  void markActive(String noteId, {String? sessionKey}) {
-    final keys = _activeSessionKeysByNote.putIfAbsent(noteId, () => {});
-    keys.add(sessionKey ?? noteId);
-  }
+  void markActive(String noteId) => _activeNoteIds.add(noteId);
 
-  void markInactive(String noteId, {String? sessionKey}) {
-    final keys = _activeSessionKeysByNote[noteId];
-    if (keys == null) return;
-    keys.remove(sessionKey ?? noteId);
-    if (keys.isEmpty) _activeSessionKeysByNote.remove(noteId);
-  }
+  void markInactive(String noteId) => _activeNoteIds.remove(noteId);
 }

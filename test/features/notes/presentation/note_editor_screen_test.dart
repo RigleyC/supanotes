@@ -15,7 +15,6 @@ import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
-import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_note_chrome.dart';
@@ -41,7 +40,7 @@ NoteEditorController _createTestController(List<DocumentNode> nodes) {
   );
 }
 
-Future<NoteEditorSession> _createTestSession(List<DocumentNode> nodes) async {
+NoteEditorSession _createTestSession(List<DocumentNode> nodes) {
   return NoteEditorSession(
     noteId: 'note-1',
     controller: _createTestController(nodes),
@@ -49,7 +48,7 @@ Future<NoteEditorSession> _createTestSession(List<DocumentNode> nodes) async {
   );
 }
 
-Future<NoteEditorSession> _sessionFor(NoteEditorController controller) async {
+NoteEditorSession _sessionFor(NoteEditorController controller) {
   return NoteEditorSession(
     noteId: 'note-1',
     controller: controller,
@@ -268,6 +267,7 @@ void main() {
           home: Scaffold(
             body: NoteEditor(
               noteId: 'note-1',
+              session: _sessionFor(controller),
               taskMetadata: const {},
               requestInitialFocus: true,
               delegate: const NoteEditorDelegate(),
@@ -324,6 +324,7 @@ void main() {
           home: Scaffold(
             body: NoteEditor(
               noteId: 'note-1',
+              session: _sessionFor(controller),
               taskMetadata: const {},
               delegate: const NoteEditorDelegate(),
             ),
@@ -379,6 +380,7 @@ void main() {
             home: Scaffold(
               body: NoteEditor(
                 noteId: 'note-1',
+                session: _sessionFor(controller),
                 taskMetadata: const {},
                 hideCompleted: true,
                 delegate: const NoteEditorDelegate(),
@@ -450,6 +452,7 @@ void main() {
             home: Scaffold(
               body: NoteEditor(
                 noteId: 'note-1',
+                session: _sessionFor(controller),
                 taskMetadata: const {},
                 hideCompleted: true,
                 delegate: const NoteEditorDelegate(),
@@ -497,6 +500,7 @@ void main() {
           home: Scaffold(
             body: NoteEditor(
               noteId: 'note-1',
+              session: _sessionFor(controller),
               taskMetadata: const {},
               delegate: const NoteEditorDelegate(),
             ),
@@ -540,6 +544,7 @@ void main() {
                 rebuildParent = setState;
                 return NoteEditor(
                   noteId: 'note-1',
+                  session: _sessionFor(controller),
                   taskMetadata: const {},
                   delegate: const NoteEditorDelegate(),
                 );
@@ -649,6 +654,14 @@ void main() {
           home: Scaffold(
             body: NoteEditor(
               noteId: 'note-1',
+              session: _createTestSession([
+                TaskNode(
+                  id: '1',
+                  text: AttributedText('tarefa concluida'),
+                  isComplete: true,
+                ),
+                ParagraphNode(id: '2', text: AttributedText('texto visivel')),
+              ]),
               taskMetadata: const {},
               hideCompleted: true,
               delegate: const NoteEditorDelegate(),
@@ -705,6 +718,17 @@ void main() {
                     Expanded(
                       child: NoteEditor(
                         noteId: 'note-1',
+                        session: _createTestSession([
+                          ParagraphNode(
+                            id: '1',
+                            text: AttributedText('texto visivel'),
+                          ),
+                          TaskNode(
+                            id: '2',
+                            text: AttributedText('tarefa concluida'),
+                            isComplete: true,
+                          ),
+                        ]),
                         taskMetadata: const {},
                         hideCompleted: hideCompleted,
                         delegate: const NoteEditorDelegate(),
@@ -771,6 +795,7 @@ void main() {
           home: Scaffold(
             body: NoteEditor(
               noteId: 'note-1',
+              session: _sessionFor(controller),
               taskMetadata: const {},
               hideCompleted: true,
               delegate: const NoteEditorDelegate(),
@@ -818,6 +843,7 @@ void main() {
             home: Scaffold(
               body: NoteEditor(
                 noteId: 'note-1',
+                session: _sessionFor(controller),
                 taskMetadata: const {},
                 hideCompleted: true,
                 delegate: const NoteEditorDelegate(),
@@ -871,6 +897,7 @@ void main() {
           home: Scaffold(
             body: NoteEditor(
               noteId: 'note-1',
+              session: _sessionFor(controller),
               taskMetadata: const {},
               hideCompleted: true,
               delegate: const NoteEditorDelegate(),
@@ -929,6 +956,7 @@ void main() {
                     Expanded(
                       child: NoteEditor(
                         noteId: 'note-1',
+                        session: _sessionFor(controller),
                         taskMetadata: const {},
                         hideCompleted: hideCompleted,
                         delegate: const NoteEditorDelegate(),
@@ -994,6 +1022,17 @@ void main() {
                     Expanded(
                       child: NoteEditor(
                         noteId: 'note-1',
+                        session: _createTestSession([
+                          TaskNode(
+                            id: '1',
+                            text: AttributedText('tarefa concluida'),
+                            isComplete: true,
+                          ),
+                          ParagraphNode(
+                            id: '2',
+                            text: AttributedText('texto visivel'),
+                          ),
+                        ]),
                         taskMetadata: const {},
                         hideCompleted: hideCompleted,
                         delegate: const NoteEditorDelegate(),
@@ -1080,6 +1119,7 @@ void main() {
                       Expanded(
                         child: NoteEditor(
                           noteId: 'note-1',
+                          session: _sessionFor(controller),
                           taskMetadata: const {},
                           hideCompleted: hideCompleted,
                           delegate: delegate,
@@ -1342,64 +1382,6 @@ void main() {
     },
   );
 
-  testWidgets('NoteEditor shows loading while the session is opening', (
-    tester,
-  ) async {
-    final sessionCompleter = Completer<NoteEditorSession>();
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          noteEditorSessionProvider.overrideWith(
-            (ref, noteId) => sessionCompleter.future,
-          ),
-        ],
-        child: MaterialApp(
-          home: NoteEditor(
-            noteId: 'note-1',
-            taskMetadata: const {},
-            isReadOnly: true,
-            delegate: NoteEditorDelegate(),
-          ),
-        ),
-      ),
-    );
-
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
-    sessionCompleter.complete(
-      _createTestSession([
-        ParagraphNode(id: '1', text: AttributedText('ready')),
-      ]),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-  });
-
-  testWidgets('NoteEditor exposes recoverable session errors', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          noteEditorSessionProvider.overrideWith(
-            (ref, noteId) async => throw StateError('network failed'),
-          ),
-        ],
-        child: MaterialApp(
-          home: NoteEditor(
-            noteId: 'note-1',
-            taskMetadata: const {},
-            delegate: NoteEditorDelegate(),
-          ),
-        ),
-      ),
-    );
-
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('network failed'), findsOneWidget);
-  });
-
   testWidgets('NoteEditor read-only mode does not install mutation UI', (
     tester,
   ) async {
@@ -1415,6 +1397,9 @@ void main() {
         child: MaterialApp(
           home: NoteEditor(
             noteId: 'note-1',
+            session: _createTestSession([
+              ParagraphNode(id: '1', text: AttributedText('read only')),
+            ]),
             taskMetadata: const {},
             isReadOnly: true,
             delegate: NoteEditorDelegate(),
@@ -1430,45 +1415,4 @@ void main() {
     expect(find.byType(SuperReader), findsOneWidget);
     expect(find.byType(SuperEditor), findsNothing);
   });
-
-  testWidgets(
-    'share-link read-only handoff opens the editor before catalog hydration',
-    (tester) async {
-      final streamController = StreamController<NoteModel?>();
-      addTearDown(streamController.close);
-      final controller = _createTestController([
-        ParagraphNode(id: '1', text: AttributedText('shared content')),
-      ]);
-      addTearDown(controller.dispose);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            notesRepositoryProvider.overrideWithValue(
-              _FakeNotesRepository(streamController),
-            ),
-            tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
-            currentUserIdProvider.overrideWithValue('test-user'),
-            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-            noteEditorReadOnlySessionProvider.overrideWith(
-              (ref, noteId) async => _sessionFor(controller),
-            ),
-          ],
-          child: const MaterialApp(
-            home: NoteEditorScreen(
-              noteId: 'note-1',
-              accessMode: NoteEditorAccessMode.readOnly,
-            ),
-          ),
-        ),
-      );
-
-      streamController.add(null);
-      await tester.pumpAndSettle();
-
-      expect(find.byType(NoteEditor), findsOneWidget);
-      expect(find.byType(SuperReader), findsOneWidget);
-      expect(find.text(NoteStrings.errorNotFound), findsNothing);
-    },
-  );
 }

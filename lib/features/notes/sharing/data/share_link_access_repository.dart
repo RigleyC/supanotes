@@ -35,18 +35,27 @@ class ShareLinkAccessRepository implements ShareLinkAccessGateway {
   @override
   Future<String?> permissionFor(String noteId) async {
     try {
+      final data = await getNoteMetadata(noteId);
+      return data['permission'] as String? ?? 'owner';
+    } on NotFoundException catch (_) {
+      return null;
+    } on UnauthorizedException catch (_) {
+      return null;
+    }
+  }
+
+  /// Returns the authenticated catalog metadata needed to hydrate a note
+  /// before the normal editor route is opened.
+  Future<Map<String, dynamic>> getNoteMetadata(String noteId) async {
+    try {
       final response = await _api.get<Map<String, dynamic>>('/notes/$noteId');
       final data = response.data;
       if (data == null) {
         throw const FormatException('Empty note response');
       }
-      return data['permission'] as String? ?? 'owner';
+      return Map<String, dynamic>.from(data);
     } on DioException catch (error) {
-      final mapped = fromDioError(error);
-      if (mapped is NotFoundException || mapped is UnauthorizedException) {
-        return null;
-      }
-      throw mapped;
+      throw fromDioError(error);
     }
   }
 }

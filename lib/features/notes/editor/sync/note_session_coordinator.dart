@@ -34,15 +34,12 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     return entry.session!.status;
   }
 
-  NoteSessionStatus statusOf(String noteId, {String? sessionKey}) {
-    return _entryStatus(_entries[sessionKey ?? noteId]);
+  NoteSessionStatus statusOf(String noteId) {
+    return _entryStatus(_entries[noteId]);
   }
 
-  Stream<NoteSessionStatus> statusChangesOf(
-    String noteId, {
-    String? sessionKey,
-  }) {
-    final entry = _entries[sessionKey ?? noteId];
+  Stream<NoteSessionStatus> statusChangesOf(String noteId) {
+    final entry = _entries[noteId];
     if (entry == null || entry.session == null) {
       return Stream<NoteSessionStatus>.value(_entryStatus(entry));
     }
@@ -63,16 +60,11 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     );
   }
 
-  Future<T> open(
-    String noteId,
-    FutureOr<T> Function() create, {
-    String? sessionKey,
-  }) async {
+  Future<T> open(String noteId, FutureOr<T> Function() create) async {
     _assertCoordinatorOpen();
-    final key = sessionKey ?? noteId;
 
     while (true) {
-      final current = _entries[key];
+      final current = _entries[noteId];
       if (current == null) {
         break;
       }
@@ -83,9 +75,9 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
       }
     }
 
-    final entry = _SessionEntry<T>(noteId: noteId, key: key);
-    _entries[key] = entry;
-    _activityTracker?.markActive(noteId, sessionKey: key);
+    final entry = _SessionEntry<T>(noteId: noteId);
+    _entries[noteId] = entry;
+    _activityTracker?.markActive(noteId);
 
     NoteSyncDebug.log(
       'session.open',
@@ -112,9 +104,9 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
         openCompleter.complete(session);
       } catch (error, stack) {
         await entry.disposeSessionOnce();
-        if (_entries[key] == entry) {
-          _entries.remove(key);
-          _activityTracker?.markInactive(noteId, sessionKey: key);
+        if (_entries[noteId] == entry) {
+          _entries.remove(noteId);
+          _activityTracker?.markInactive(noteId);
         }
         NoteSyncDebug.log(
           'session.open.error',
@@ -128,9 +120,8 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     return openCompleter.future;
   }
 
-  Future<void> close(String noteId, {String? sessionKey}) async {
-    final key = sessionKey ?? noteId;
-    final entry = _entries[key];
+  Future<void> close(String noteId) async {
+    final entry = _entries[noteId];
     if (entry == null) return;
     if (entry.isClosing) {
       return entry.closeFuture;
@@ -146,9 +137,9 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
         }
         await entry.disposeSessionOnce();
       } finally {
-        if (_entries[key] == entry) {
-          _entries.remove(key);
-          _activityTracker?.markInactive(noteId, sessionKey: entry.key);
+        if (_entries[noteId] == entry) {
+          _entries.remove(noteId);
+          _activityTracker?.markInactive(noteId);
         }
       }
     }();
@@ -160,9 +151,7 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     if (_disposed) return;
     _disposed = true;
     final entries = List<_SessionEntry<T>>.from(_entries.values);
-    await Future.wait(
-      entries.map((entry) => close(entry.noteId, sessionKey: entry.key)),
-    );
+    await Future.wait(entries.map((entry) => close(entry.noteId)));
   }
 
   void _assertCoordinatorOpen() {
@@ -173,10 +162,9 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
 }
 
 class _SessionEntry<T extends NoteSessionHandle> {
-  _SessionEntry({required this.noteId, required this.key});
+  _SessionEntry({required this.noteId});
 
   final String noteId;
-  final String key;
   T? session;
   late Future<T> openFuture;
   Future<void>? closeFuture;

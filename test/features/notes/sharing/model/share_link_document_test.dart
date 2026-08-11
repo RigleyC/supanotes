@@ -27,11 +27,11 @@ void main() {
       },
     });
 
-    expect(document.blocks.single.id, 'block-1');
-    expect(document.blocks.single.text, 'Hello world');
-    expect(document.blocks.single.delta, hasLength(2));
-    expect(document.toSnapshot()['schemaVersion'], 1);
-    expect(document.toSnapshot()['blocks'], hasLength(1));
+    expect(document.snapshot.blocks.single.id, 'block-1');
+    expect(document.snapshot.blocks.single.text, 'Hello world');
+    expect(document.snapshot.blocks.single.delta, hasLength(2));
+    expect(document.snapshot.toJson()['schemaVersion'], 1);
+    expect(document.snapshot.toJson()['blocks'], hasLength(1));
   });
 
   test('rejects a response without a canonical document', () {
@@ -195,7 +195,7 @@ void main() {
       },
     });
 
-    final mutableDocument = document.toMutableDocument();
+    final mutableDocument = document.snapshot.toMutableDocument();
 
     expect(mutableDocument.getNodeById('header-1'), isA<ParagraphNode>());
     expect(mutableDocument.getNodeById('link-1'), isA<RichLinkNode>());

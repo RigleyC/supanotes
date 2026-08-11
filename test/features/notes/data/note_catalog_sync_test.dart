@@ -1020,4 +1020,173 @@ void main() {
       verifyNever(() => client.getDocument('active-shared-note'));
     },
   );
+
+  test(
+    'hydrates an authenticated share handoff with its REST/OT revision',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
+      );
+      addTearDown(database.close);
+
+      when(() => client.getDocument('handoff-note')).thenAnswer(
+        (_) async => NoteDocumentResponse(
+          noteId: 'handoff-note',
+          revision: 17,
+          document: const {
+            'schemaVersion': 1,
+            'blocks': [
+              {
+                'id': 'handoff-block',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'Authenticated handoff'},
+                ],
+              },
+            ],
+          },
+          serverTime: DateTime.utc(2026, 8, 10, 12),
+        ),
+      );
+
+      await sync.hydrateRemoteNote(
+        userId: 'viewer-user',
+        metadata: RemoteNoteMetadata.fromJson(const {
+          'id': 'handoff-note',
+          'user_id': 'owner-user',
+          'permission': 'view',
+          'shared_by_email': 'owner@example.com',
+          'created_at': '2026-08-10T11:00:00.000Z',
+          'updated_at': '2026-08-10T12:00:00.000Z',
+        }),
+      );
+
+      final note = await database.notesDao.getNoteById('handoff-note');
+      expect(note?.permission, 'view');
+      expect(note?.content, 'Authenticated handoff');
+      final document = await (database.select(
+        database.localNoteDocuments,
+      )..where((row) => row.noteId.equals('handoff-note'))).getSingle();
+      expect(document.revision, 17);
+      verify(() => client.getDocument('handoff-note')).called(1);
+    },
+  );
+
+  test(
+    'refreshes share permission when clean content has the same timestamp',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
+      );
+      addTearDown(database.close);
+
+      final updatedAt = DateTime.utc(2026, 8, 10, 12);
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'permission-refresh-note',
+          userId: 'owner-user',
+          content: 'Cached content',
+          createdAt: updatedAt,
+          updatedAt: updatedAt,
+          permission: const Value('edit'),
+          hasRemoteCopy: const Value(true),
+          isDirty: const Value(false),
+        ),
+      );
+      await database.noteOperationsDao.upsertNoteDocument(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: 'permission-refresh-note',
+          revision: 9,
+          documentJson: '{"schemaVersion":1,"blocks":[]}',
+          updatedAt: updatedAt,
+        ),
+      );
+      when(() => client.listNotes()).thenAnswer(
+        (_) async => [
+          {
+            'id': 'permission-refresh-note',
+            'user_id': 'owner-user',
+            'permission': 'view',
+            'shared_by_email': 'owner@example.com',
+            'created_at': '2026-08-10T11:00:00.000Z',
+            'updated_at': '2026-08-10T12:00:00.000Z',
+          },
+        ],
+      );
+
+      await sync.pullRemoteNotes('viewer-user');
+
+      final note = await database.notesDao.getNoteById(
+        'permission-refresh-note',
+      );
+      expect(note!.permission, 'view');
+      expect(note.sharedByEmail, 'owner@example.com');
+      expect(note.content, 'Cached content');
+      verifyNever(() => client.getDocument('permission-refresh-note'));
+    },
+  );
+
+  test('clears stale share metadata when the owner opens the note', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+
+    final updatedAt = DateTime.utc(2026, 8, 10, 12);
+    await database.notesDao.createNote(
+      NotesCompanion.insert(
+        id: 'owner-metadata-refresh-note',
+        userId: 'owner-user',
+        content: 'Owner content',
+        createdAt: updatedAt,
+        updatedAt: updatedAt,
+        permission: const Value('view'),
+        sharedByEmail: const Value('owner@example.com'),
+        hasRemoteCopy: const Value(true),
+        isDirty: const Value(false),
+      ),
+    );
+    await database.noteOperationsDao.upsertNoteDocument(
+      LocalNoteDocumentsCompanion.insert(
+        noteId: 'owner-metadata-refresh-note',
+        revision: 4,
+        documentJson: '{"schemaVersion":1,"blocks":[]}',
+        updatedAt: updatedAt,
+      ),
+    );
+    when(() => client.listNotes()).thenAnswer(
+      (_) async => [
+        {
+          'id': 'owner-metadata-refresh-note',
+          'user_id': 'owner-user',
+          'created_at': '2026-08-10T11:00:00.000Z',
+          'updated_at': '2026-08-10T12:00:00.000Z',
+        },
+      ],
+    );
+
+    await sync.pullRemoteNotes('owner-user');
+
+    final note = await database.notesDao.getNoteById(
+      'owner-metadata-refresh-note',
+    );
+    expect(note!.permission, isNull);
+    expect(note.sharedByEmail, isNull);
+    verifyNever(() => client.getDocument('owner-metadata-refresh-note'));
+  });
 }

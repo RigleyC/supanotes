@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
-import 'package:supanotes/features/notes/sharing/presentation/share_link_attachment_component.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'attachment_renderers.dart';
 import 'document_attachment_widget.dart';
 
@@ -12,14 +12,14 @@ class AttachmentComponentBuilder implements ComponentBuilder {
     required this.collapseImages,
     this.readOnly = false,
     this.allowInternalNoteLinks = true,
-    this.shareLinkToken,
+    this.attachmentDelivery,
   });
 
   final Editor editor;
   final bool collapseImages;
   final bool readOnly;
   final bool allowInternalNoteLinks;
-  final String? shareLinkToken;
+  final AttachmentDelivery? attachmentDelivery;
 
   @override
   SingleColumnLayoutComponentViewModel? createViewModel(
@@ -33,15 +33,15 @@ class AttachmentComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt],
       collapseImages: collapseImages,
       allowInternalNoteLinks: allowInternalNoteLinks,
-      fallbackAttachmentUrl:
-          node is DocumentAttachmentNode && shareLinkToken != null
-          ? publicShareLinkAttachmentUrl(
-              shareLinkToken!,
-              node.metadata['attachmentId'] is String &&
-                      (node.metadata['attachmentId'] as String).isNotEmpty
-                  ? node.metadata['attachmentId'] as String
-                  : node.id,
-            ).toString()
+      fallbackAttachmentUrl: node is DocumentAttachmentNode
+          ? attachmentDelivery
+                ?.urlFor(
+                  node.metadata['attachmentId'] is String &&
+                          (node.metadata['attachmentId'] as String).isNotEmpty
+                      ? node.metadata['attachmentId'] as String
+                      : node.id,
+                )
+                ?.toString()
           : null,
       fallbackAttachmentName:
           node is DocumentAttachmentNode && node.metadata['filename'] is String

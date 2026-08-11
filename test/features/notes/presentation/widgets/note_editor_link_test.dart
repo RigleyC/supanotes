@@ -1,47 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
-import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 
 class _MockDocumentLayout extends Mock implements DocumentLayout {}
 
 void main() {
   group('NoteEditor link suggestions', () {
-    testWidgets('NoteEditor renders with provider scope', (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            activeNotesProvider.overrideWith((ref) => const Stream.empty()),
-            currentUserIdProvider.overrideWithValue('test-user'),
-            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-          ],
-          child: MaterialApp(
-            home: Scaffold(
-              body: NoteEditor(
-                noteId: 'test-note',
-                taskMetadata: const {},
-                delegate: const NoteEditorDelegate(),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      // Editor renders without crashing
-      expect(find.byType(NoteEditor), findsOneWidget);
-    });
-
     testWidgets('NoteLinkTapHandler extracts noteId from LinkAttribution', (
       tester,
     ) async {
@@ -70,10 +37,7 @@ void main() {
           ),
         ],
       );
-      final handler = NoteLinkTapHandler(
-        document,
-        onNoteTap: (_) {},
-      );
+      final handler = NoteLinkTapHandler(document, onNoteTap: (_) {});
 
       final position = DocumentPosition(
         nodeId: 'test-node',
@@ -116,10 +80,7 @@ void main() {
           ),
         ],
       );
-      final handler = NoteLinkTapHandler(
-        document,
-        onNoteTap: (_) {},
-      );
+      final handler = NoteLinkTapHandler(document, onNoteTap: (_) {});
 
       final position = DocumentPosition(
         nodeId: 'test-node',

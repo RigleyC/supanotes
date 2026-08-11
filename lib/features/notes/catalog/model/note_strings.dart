@@ -3,6 +3,7 @@ class NoteStrings {
 
   static const String fallbackTitle = 'Sem título';
   static const String errorNotFound = 'Nota não encontrada';
+  static const String editorErrorTitle = 'Não foi possível abrir a nota';
   static const String sharedByPrefix = 'Compartilhada por';
   static const String sharedFromPrefix = 'De:';
   static const String showCompleted = 'Mostrar concluídas';

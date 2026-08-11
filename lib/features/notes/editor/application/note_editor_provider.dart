@@ -10,44 +10,15 @@ import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
-import 'package:supanotes/features/notes/sharing/model/share_link_document.dart';
 import 'note_editor_controller.dart';
 import 'note_editor_session.dart';
-import 'note_editor_open_options.dart';
-
-typedef _NoteEditorSessionRequest = ({
-  String noteId,
-  NoteEditorAccessMode? accessMode,
-  String? shareLinkToken,
-});
-
-typedef NoteEditorShareLinkSessionRequest = ({String noteId, String token});
-
-Future<Map<String, dynamic>?> _loadShareLinkSnapshot(
-  Ref ref,
-  String? token,
-) async {
-  if (token == null) return null;
-  final response = await ref
-      .read(apiClientProvider)
-      .get<Map<String, dynamic>>('/s/${Uri.encodeComponent(token)}/document');
-  final document = ShareLinkDocument.fromJson(response.data ?? const {});
-  return document.toSnapshot();
-}
 
 final _notePermissionProvider = FutureProvider.autoDispose
     .family<NoteModel?, String>(
       (ref, noteId) => ref.watch(notesRepositoryProvider).getNoteById(noteId),
     );
 
-Future<NoteEditorSession> _openNoteEditorSession(
-  Ref ref,
-  _NoteEditorSessionRequest request,
-) async {
-  final noteId = request.noteId;
-  final sessionKey = request.accessMode == null
-      ? noteId
-      : '$noteId:${request.accessMode!.name}';
+Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
   final userId = ref.watch(currentUserIdProvider)!;
   final sessionCoordinator = ref.read(noteSessionCoordinatorProvider);
   final notesRepository = ref.watch(notesRepositoryProvider);
@@ -58,14 +29,10 @@ Future<NoteEditorSession> _openNoteEditorSession(
   ref.onDispose(() {
     isDisposed = true;
     unawaited(permissionSubscription?.cancel());
-    unawaited(sessionCoordinator.close(noteId, sessionKey: sessionKey));
+    unawaited(sessionCoordinator.close(noteId));
   });
 
   final note = await ref.watch(_notePermissionProvider(noteId).future);
-  final initialSnapshot = await _loadShareLinkSnapshot(
-    ref,
-    request.shareLinkToken,
-  );
   if (isDisposed) {
     throw StateError('Provider disposed before session opening');
   }
@@ -94,11 +61,7 @@ Future<NoteEditorSession> _openNoteEditorSession(
       editor: controller.editor,
       taskProjectionEngine: taskProjectionEngine,
       userId: userId,
-      captureLocalOperations: _canCaptureLocalOperations(
-        request.accessMode,
-        note,
-      ),
-      initialSnapshot: initialSnapshot,
+      captureLocalOperations: _canCaptureLocalOperations(note),
     );
 
     return NoteEditorSession(
@@ -106,92 +69,26 @@ Future<NoteEditorSession> _openNoteEditorSession(
       controller: controller,
       syncSession: syncSession,
     );
-  }, sessionKey: sessionKey);
+  });
 
   if (isDisposed) {
-    unawaited(sessionCoordinator.close(noteId, sessionKey: sessionKey));
+    unawaited(sessionCoordinator.close(noteId));
     throw StateError('Provider disposed during session opening');
   }
 
   permissionSubscription = notesRepository.watchNoteById(noteId).listen((note) {
-    session.setCaptureLocalOperations(
-      _canCaptureLocalOperations(request.accessMode, note),
-    );
+    session.setCaptureLocalOperations(_canCaptureLocalOperations(note));
   });
 
   return session;
 }
 
-bool _canCaptureLocalOperations(
-  NoteEditorAccessMode? accessMode,
-  NoteModel? note,
-) {
-  return switch (accessMode) {
-    NoteEditorAccessMode.readOnly => false,
-    NoteEditorAccessMode.editable => true,
-    null => note != null && !note.isReadOnly,
-  };
+bool _canCaptureLocalOperations(NoteModel? note) {
+  return note != null && !note.isReadOnly;
 }
 
-final _noteEditorSessionOwnerProvider = FutureProvider.autoDispose
-    .family<NoteEditorSession, _NoteEditorSessionRequest>(
-      (ref, request) => _openNoteEditorSession(ref, request),
-    );
-
+/// The sole owner of an editor session for a note.
 final noteEditorSessionProvider = FutureProvider.autoDispose
-    .family<NoteEditorSession, String>((ref, noteId) async {
-      final session = await ref.watch(
-        _noteEditorSessionOwnerProvider((
-          noteId: noteId,
-          accessMode: null,
-          shareLinkToken: null,
-        )).future,
-      );
-      return session;
-    });
-
-final noteEditorReadOnlySessionProvider = FutureProvider.autoDispose
-    .family<NoteEditorSession, String>((ref, noteId) async {
-      final session = await ref.watch(
-        _noteEditorSessionOwnerProvider((
-          noteId: noteId,
-          accessMode: NoteEditorAccessMode.readOnly,
-          shareLinkToken: null,
-        )).future,
-      );
-      return session;
-    });
-
-final noteEditorEditableSessionProvider = FutureProvider.autoDispose
-    .family<NoteEditorSession, String>((ref, noteId) async {
-      final session = await ref.watch(
-        _noteEditorSessionOwnerProvider((
-          noteId: noteId,
-          accessMode: NoteEditorAccessMode.editable,
-          shareLinkToken: null,
-        )).future,
-      );
-      return session;
-    });
-
-final noteEditorReadOnlyShareLinkSessionProvider = FutureProvider.autoDispose
-    .family<NoteEditorSession, NoteEditorShareLinkSessionRequest>(
-      (ref, request) => ref.watch(
-        _noteEditorSessionOwnerProvider((
-          noteId: request.noteId,
-          accessMode: NoteEditorAccessMode.readOnly,
-          shareLinkToken: request.token,
-        )).future,
-      ),
-    );
-
-final noteEditorEditableShareLinkSessionProvider = FutureProvider.autoDispose
-    .family<NoteEditorSession, NoteEditorShareLinkSessionRequest>(
-      (ref, request) => ref.watch(
-        _noteEditorSessionOwnerProvider((
-          noteId: request.noteId,
-          accessMode: NoteEditorAccessMode.editable,
-          shareLinkToken: request.token,
-        )).future,
-      ),
+    .family<NoteEditorSession, String>(
+      (ref, noteId) => _openNoteEditorSession(ref, noteId),
     );

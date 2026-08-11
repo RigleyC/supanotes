@@ -52,6 +52,9 @@ class DocumentAttachmentWidget extends ConsumerWidget {
 
     final Widget child = attachmentAsync.when(
       data: (model) {
+        if (fallbackUrl != null) {
+          return fallbackAttachment();
+        }
         if (model == null) {
           return fallbackAttachment();
         }
