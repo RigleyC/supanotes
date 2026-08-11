@@ -1,4 +1,5 @@
 import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
 
 enum ShareLinkAccessMode { editor, viewer, guest }
 
@@ -17,10 +18,15 @@ class ShareLinkTarget {
 }
 
 class ShareLinkAccessDecision {
-  const ShareLinkAccessDecision({required this.noteId, required this.mode});
+  const ShareLinkAccessDecision({
+    required this.noteId,
+    required this.mode,
+    this.metadata,
+  });
 
   final String noteId;
   final ShareLinkAccessMode mode;
+  final RemoteNoteMetadata? metadata;
 
   bool get canEdit => mode == ShareLinkAccessMode.editor;
 }
@@ -28,9 +34,9 @@ class ShareLinkAccessDecision {
 abstract interface class ShareLinkAccessGateway {
   Future<ShareLinkTarget> validateToken(String token);
 
-  /// Returns `owner`, `edit`, `view`, or null when the session has no direct
+  /// Returns authenticated metadata, or null when the session has no direct
   /// access. A missing direct share does not block the public link.
-  Future<String?> permissionFor(String noteId);
+  Future<RemoteNoteMetadata?> metadataFor(String noteId);
 }
 
 class ShareLinkAccessResolver {
@@ -47,12 +53,17 @@ class ShareLinkAccessResolver {
       );
     }
 
-    final permission = await gateway.permissionFor(target.noteId);
+    final metadata = await gateway.metadataFor(target.noteId);
+    final permission = metadata == null ? null : metadata.permission ?? 'owner';
     final mode = switch (permission) {
       'owner' || 'edit' => ShareLinkAccessMode.editor,
       'view' => ShareLinkAccessMode.viewer,
       _ => ShareLinkAccessMode.guest,
     };
-    return ShareLinkAccessDecision(noteId: target.noteId, mode: mode);
+    return ShareLinkAccessDecision(
+      noteId: target.noteId,
+      mode: mode,
+      metadata: metadata,
+    );
   }
 }

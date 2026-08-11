@@ -92,3 +92,15 @@ final noteEditorSessionProvider = FutureProvider.autoDispose
     .family<NoteEditorSession, String>(
       (ref, noteId) => _openNoteEditorSession(ref, noteId),
     );
+
+/// Reactive access capability for the editor chrome and document widgets.
+///
+/// Permission can change while a session is open, for example after a 403 or
+/// a catalog refresh. Consumers must not infer access from a one-time note
+/// model read.
+final noteEditorCaptureProvider = StreamProvider.autoDispose
+    .family<bool, String>((ref, noteId) async* {
+      final session = await ref.watch(noteEditorSessionProvider(noteId).future);
+      yield session.captureLocalOperations;
+      yield* session.captureLocalOperationsChanges;
+    });

@@ -36,6 +36,8 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   final StreamController<NoteSessionStatus> _statusController =
       StreamController<NoteSessionStatus>.broadcast();
+  final StreamController<bool> _captureController =
+      StreamController<bool>.broadcast();
 
   @override
   Stream<NoteSessionStatus> get statusChanges {
@@ -67,6 +69,9 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   @override
   bool get captureLocalOperations => _captureLocalOperations;
 
+  @override
+  Stream<bool> get captureLocalOperationsChanges => _captureController.stream;
+
   NoteSyncSession({
     required this.noteId,
     required this.syncService,
@@ -88,9 +93,10 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   @override
   void setCaptureLocalOperations(bool captureLocalOperations) {
-    if (_captureLocalOperations == captureLocalOperations) return;
+    if (_disposed || _captureLocalOperations == captureLocalOperations) return;
     _captureLocalOperations = captureLocalOperations;
     adapter.setCaptureLocalOperations(captureLocalOperations);
+    _captureController.add(captureLocalOperations);
   }
 
   @override
@@ -258,6 +264,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
       adapter.dispose();
       _setStatus(NoteSessionStatus.closed);
       unawaited(_statusController.close());
+      unawaited(_captureController.close());
     }
   }
 

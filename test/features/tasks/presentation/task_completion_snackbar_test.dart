@@ -49,6 +49,9 @@ class _FakeEditorSyncHandle implements NoteEditorSyncHandle {
   bool get captureLocalOperations => _captureLocalOperations;
 
   @override
+  Stream<bool> get captureLocalOperationsChanges => const Stream.empty();
+
+  @override
   void setCaptureLocalOperations(bool captureLocalOperations) {
     _captureLocalOperations = captureLocalOperations;
   }

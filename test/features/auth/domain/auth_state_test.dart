@@ -33,6 +33,9 @@ class _LifecycleSyncHandle implements NoteEditorSyncHandle {
   bool get captureLocalOperations => true;
 
   @override
+  Stream<bool> get captureLocalOperationsChanges => const Stream.empty();
+
+  @override
   void setCaptureLocalOperations(bool captureLocalOperations) {}
 
   @override

@@ -34,6 +34,20 @@ class ApiConstants {
     return _prodBaseUrl;
   }
 
+  /// The origin used by browser destinations such as Share Links.
+  ///
+  /// API requests use `/api/v1`, while browser routes live at the host root.
+  /// Keeping that distinction here prevents feature presentation code from
+  /// rewriting transport paths.
+  static Uri get publicBaseUri {
+    final base = Uri.parse(baseUrl);
+    const apiPath = '/api/v1';
+    if (!base.path.endsWith(apiPath)) return base;
+    return base.replace(
+      path: base.path.substring(0, base.path.length - apiPath.length),
+    );
+  }
+
   static const int connectTimeoutMs = 30000; // 30s for initial connection
   static const int receiveTimeoutMs = 30000; // 30s for response
 }

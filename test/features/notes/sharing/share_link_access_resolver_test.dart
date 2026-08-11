@@ -1,13 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
 
 class _FakeGateway implements ShareLinkAccessGateway {
-  _FakeGateway({this.permission});
+  _FakeGateway({this.permission, this.ownerResponse = false});
 
   final String? permission;
+  final bool ownerResponse;
   int validationCalls = 0;
-  int permissionCalls = 0;
+  int metadataCalls = 0;
 
   @override
   Future<ShareLinkTarget> validateToken(String token) async {
@@ -16,9 +18,25 @@ class _FakeGateway implements ShareLinkAccessGateway {
   }
 
   @override
-  Future<String?> permissionFor(String noteId) async {
-    permissionCalls++;
-    return permission;
+  Future<RemoteNoteMetadata?> metadataFor(String noteId) async {
+    metadataCalls++;
+    if (permission == null && !ownerResponse) return null;
+    return RemoteNoteMetadata(
+      id: noteId,
+      userId: 'owner',
+      createdAt: DateTime.utc(2024),
+      updatedAt: DateTime.utc(2024),
+      hasCollapseImages: false,
+      collapseImages: null,
+      hasPermission: !ownerResponse,
+      permission: permission,
+      hasSharedByEmail: false,
+      sharedByEmail: null,
+      hasSharedByName: false,
+      sharedByName: null,
+      hasNoteIcon: false,
+      noteIcon: null,
+    );
   }
 }
 
@@ -32,7 +50,7 @@ void main() {
     expect(result.noteId, 'note-1');
     expect(result.mode, ShareLinkAccessMode.guest);
     expect(gateway.validationCalls, 1);
-    expect(gateway.permissionCalls, 0);
+    expect(gateway.metadataCalls, 0);
   });
 
   test('opens the normal note flow for an authenticated owner', () async {
@@ -43,6 +61,18 @@ void main() {
 
     expect(result.mode, ShareLinkAccessMode.editor);
   });
+
+  test(
+    'treats an authenticated note without permission as owner access',
+    () async {
+      final gateway = _FakeGateway(ownerResponse: true);
+      final result = await ShareLinkAccessResolver(
+        gateway,
+      ).resolve('token', user: guest);
+
+      expect(result.mode, ShareLinkAccessMode.editor);
+    },
+  );
 
   test('opens the normal note flow for an authenticated editor', () async {
     final gateway = _FakeGateway(permission: 'edit');

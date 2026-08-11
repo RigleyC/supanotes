@@ -47,6 +47,9 @@ class AttachmentComponentBuilder implements ComponentBuilder {
           node is DocumentAttachmentNode && node.metadata['filename'] is String
           ? node.metadata['filename'] as String
           : null,
+      attachmentDeliveryPreference:
+          attachmentDelivery?.preference ??
+          AttachmentDeliveryPreference.localFirst,
       onDelete: readOnly
           ? null
           : () {
@@ -73,6 +76,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
         collapseImages: viewModel.collapseImages,
         fallbackUrl: viewModel.fallbackAttachmentUrl,
         fallbackFileName: viewModel.fallbackAttachmentName,
+        deliveryPreference: viewModel.attachmentDeliveryPreference,
       ),
       RichLinkNode n => AttachmentRichLinkCard(
         componentKey: context.componentKey,
@@ -98,6 +102,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     required this.allowInternalNoteLinks,
     required this.fallbackAttachmentUrl,
     required this.fallbackAttachmentName,
+    required this.attachmentDeliveryPreference,
     super.createdAt,
     super.padding = EdgeInsets.zero,
     DocumentNodeSelection? selection,
@@ -113,6 +118,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
   final bool allowInternalNoteLinks;
   final String? fallbackAttachmentUrl;
   final String? fallbackAttachmentName;
+  final AttachmentDeliveryPreference attachmentDeliveryPreference;
 
   @override
   _AttachmentViewModel copy() => _AttachmentViewModel(
@@ -123,14 +129,28 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     allowInternalNoteLinks: allowInternalNoteLinks,
     fallbackAttachmentUrl: fallbackAttachmentUrl,
     fallbackAttachmentName: fallbackAttachmentName,
+    attachmentDeliveryPreference: attachmentDeliveryPreference,
     selection: selection,
     selectionColor: selectionColor,
   );
 
   @override
   bool operator ==(Object other) =>
-      other is _AttachmentViewModel && other.node.id == node.id;
+      other is _AttachmentViewModel &&
+      other.node.id == node.id &&
+      other.collapseImages == collapseImages &&
+      other.allowInternalNoteLinks == allowInternalNoteLinks &&
+      other.fallbackAttachmentUrl == fallbackAttachmentUrl &&
+      other.fallbackAttachmentName == fallbackAttachmentName &&
+      other.attachmentDeliveryPreference == attachmentDeliveryPreference;
 
   @override
-  int get hashCode => node.id.hashCode;
+  int get hashCode => Object.hash(
+    node.id,
+    collapseImages,
+    allowInternalNoteLinks,
+    fallbackAttachmentUrl,
+    fallbackAttachmentName,
+    attachmentDeliveryPreference,
+  );
 }

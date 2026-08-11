@@ -4,6 +4,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:supanotes/core/utils/format_utils.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/attachments/model/attachment_model.dart';
 import 'attachment_renderers.dart';
@@ -17,6 +18,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
     required this.collapseImages,
     this.fallbackUrl,
     this.fallbackFileName,
+    this.deliveryPreference = AttachmentDeliveryPreference.localFirst,
     this.selection,
     required this.selectionColor,
   });
@@ -27,6 +29,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
   final bool collapseImages;
   final String? fallbackUrl;
   final String? fallbackFileName;
+  final AttachmentDeliveryPreference deliveryPreference;
   final UpstreamDownstreamNodeSelection? selection;
   final Color selectionColor;
 
@@ -52,7 +55,8 @@ class DocumentAttachmentWidget extends ConsumerWidget {
 
     final Widget child = attachmentAsync.when(
       data: (model) {
-        if (fallbackUrl != null) {
+        if (deliveryPreference == AttachmentDeliveryPreference.externalFirst &&
+            fallbackUrl != null) {
           return fallbackAttachment();
         }
         if (model == null) {

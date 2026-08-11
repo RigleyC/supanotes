@@ -92,7 +92,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     NoteModel note,
     bool hideCompleted,
   ) async {
-    if (_isReadOnlyFor(note)) return;
+    final session = _readSession().value;
+    if (session == null || !session.captureLocalOperations) return;
 
     final mutationController = ref.read(
       notePreferenceMutationControllerProvider(widget.noteId).notifier,
@@ -116,8 +117,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
   }
 
-  bool _isReadOnlyFor(NoteModel? note) => note?.isReadOnly ?? false;
-
   AsyncValue<NoteEditorSession> _readSession() =>
       ref.read(noteEditorSessionProvider(widget.noteId));
 
@@ -129,11 +128,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       loading: () => null,
       error: (_, _) => null,
     );
-    final screenIsReadOnly = _isReadOnlyFor(note);
+    final sessionAsync = ref.watch(noteEditorSessionProvider(widget.noteId));
+    final captureAsync = ref.watch(noteEditorCaptureProvider(widget.noteId));
+    final screenIsReadOnly = captureAsync.when(
+      data: (capture) => !capture,
+      loading: () => note?.isReadOnly ?? true,
+      error: (_, _) => true,
+    );
     final preferenceMutation = ref.watch(
       notePreferenceMutationControllerProvider(widget.noteId),
     );
-    final sessionAsync = ref.watch(noteEditorSessionProvider(widget.noteId));
 
     final isDesktop = isDesktopLayout(context);
     final editorFocusNode = sessionAsync.when(
@@ -294,12 +298,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     return Center(child: Text(NoteStrings.errorNotFound));
                   }
 
-                  final isReadOnly = _isReadOnlyFor(noteData);
                   return sessionAsync.when(
                     loading: () => const SizedBox.shrink(),
                     error: (_, _) =>
                         const AppErrorView(title: NoteStrings.editorErrorTitle),
                     data: (session) {
+                      final isReadOnly = !session.captureLocalOperations;
                       final editor = NoteEditor(
                         noteId: widget.noteId,
                         session: session,
@@ -307,7 +311,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         taskMetadata: tasksMap,
                         hideCompleted: noteData.hideCompleted,
                         collapseImages: noteData.collapseImages,
-                        isReadOnly: isReadOnly,
                         attachmentDelivery: widget.attachmentDelivery,
                         delegate: NoteEditorDelegate(
                           onTaskLongPress: isReadOnly

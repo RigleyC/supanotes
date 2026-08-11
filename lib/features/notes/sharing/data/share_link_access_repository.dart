@@ -5,6 +5,7 @@ import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
+import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
 
 final shareLinkAccessRepositoryProvider =
     Provider.autoDispose<ShareLinkAccessRepository>(
@@ -33,27 +34,18 @@ class ShareLinkAccessRepository implements ShareLinkAccessGateway {
   }
 
   @override
-  Future<String?> permissionFor(String noteId) async {
-    try {
-      final data = await getNoteMetadata(noteId);
-      return data['permission'] as String? ?? 'owner';
-    } on NotFoundException catch (_) {
-      return null;
-    } on UnauthorizedException catch (_) {
-      return null;
-    }
-  }
-
-  /// Returns the authenticated catalog metadata needed to hydrate a note
-  /// before the normal editor route is opened.
-  Future<Map<String, dynamic>> getNoteMetadata(String noteId) async {
+  Future<RemoteNoteMetadata?> metadataFor(String noteId) async {
     try {
       final response = await _api.get<Map<String, dynamic>>('/notes/$noteId');
       final data = response.data;
       if (data == null) {
         throw const FormatException('Empty note response');
       }
-      return Map<String, dynamic>.from(data);
+      return RemoteNoteMetadata.fromJson(Map<String, dynamic>.from(data));
+    } on NotFoundException catch (_) {
+      return null;
+    } on UnauthorizedException catch (_) {
+      return null;
     } on DioException catch (error) {
       throw fromDioError(error);
     }

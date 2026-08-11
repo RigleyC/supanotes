@@ -119,13 +119,41 @@ class NoteDocumentCodec {
 
   MutableDocument decodeSnapshot(NoteDocumentSnapshot snapshot) {
     return MutableDocument(
-      nodes: snapshot.blocks
-          .map((block) => decodeNode(block.toJson()))
-          .toList(growable: false),
+      nodes: snapshot.blocks.map(_decodeSnapshotBlock).toList(growable: false),
     );
   }
 
-  NoteDocumentBlock _parseBlock(Map<String, dynamic> json) {
+  DocumentNode _decodeSnapshotBlock(NoteDocumentBlock block) {
+    final metadata = Map<String, dynamic>.from(block.metadata);
+    var type = block.type;
+    if (type == 'paragraph') {
+      final rawBlockType = metadata['blockType'];
+      final blockType = rawBlockType is Attribution
+          ? rawBlockType
+          : (rawBlockType is String ? attributionFromName(rawBlockType) : null);
+      if (blockType != null) {
+        type = blockType.id == blockquoteAttribution.id
+            ? 'quote'
+            : blockType.id;
+        metadata['blockType'] = blockType;
+      } else {
+        metadata.remove('blockType');
+      }
+    }
+
+    return createNodeFromBlockType(
+      nodeId: block.id,
+      type: type,
+      text: attributedFromDelta(block.delta),
+      isTaskComplete: metadata['isCompleted'] as bool? ?? false,
+      metadata: metadata,
+    );
+  }
+
+  NoteDocumentBlock _parseBlock(
+    Map<String, dynamic> json, {
+    bool allowEmptyDeltaOperations = false,
+  }) {
     final rawId = json['id'];
     final rawType = json['type'];
     if (rawId is! String || rawId.isEmpty) {
@@ -150,6 +178,9 @@ class NoteDocumentCodec {
             );
           }
           final operation = Map<String, dynamic>.from(rawOperation);
+          if (allowEmptyDeltaOperations && operation.isEmpty) {
+            return <String, dynamic>{'insert': ''};
+          }
           if (operation['insert'] is! String) {
             throw const FormatException(
               'Note document block contains a non-text delta operation',
@@ -459,41 +490,14 @@ class NoteDocumentCodec {
   }
 
   DocumentNode decodeNode(Map<String, dynamic> blockData) {
-    final String nodeId = blockData['id'] as String? ?? Editor.createNodeId();
-    String type = blockData['type'] as String? ?? 'paragraph';
-    final List<dynamic>? content =
-        (blockData['content'] ?? blockData['delta']) as List<dynamic>?;
-    final Map<String, dynamic> metadata = Map<String, dynamic>.from(
-      blockData['metadata'] as Map? ?? {},
-    );
-    if (type == 'paragraph') {
-      final rawBlockType = metadata['blockType'];
-      final blockType = rawBlockType is Attribution
-          ? rawBlockType
-          : (rawBlockType is String ? attributionFromName(rawBlockType) : null);
-      if (blockType != null) {
-        type = blockType.id == blockquoteAttribution.id
-            ? 'quote'
-            : blockType.id;
-        metadata['blockType'] = blockType;
-      } else {
-        metadata.remove('blockType');
-      }
+    final normalized = Map<String, dynamic>.from(blockData);
+    normalized['id'] ??= Editor.createNodeId();
+    if (normalized['delta'] == null && normalized['content'] is List) {
+      normalized['delta'] = normalized['content'];
     }
-
-    final AttributedText text = (content != null && content.isNotEmpty)
-        ? attributedFromDelta(content)
-        : deserializeAttributedText(blockData);
-    final bool isTaskComplete = metadata['isCompleted'] as bool? ?? false;
-
-    final node = createNodeFromBlockType(
-      nodeId: nodeId,
-      type: type,
-      text: text,
-      isTaskComplete: isTaskComplete,
-      metadata: metadata,
+    return _decodeSnapshotBlock(
+      _parseBlock(normalized, allowEmptyDeltaOperations: true),
     );
-    return node;
   }
 
   List<Map<String, dynamic>> encodeDocument(MutableDocument document) {

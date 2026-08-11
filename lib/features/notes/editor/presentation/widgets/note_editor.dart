@@ -1,5 +1,7 @@
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:super_editor/super_editor.dart';
@@ -33,7 +35,6 @@ class NoteEditor extends StatefulWidget {
   final Map<String, TaskModel> taskMetadata;
   final bool hideCompleted;
   final bool collapseImages;
-  final bool isReadOnly;
   final AttachmentDelivery? attachmentDelivery;
   final bool requestInitialFocus;
   final NoteEditorDelegate delegate;
@@ -45,7 +46,6 @@ class NoteEditor extends StatefulWidget {
     required this.taskMetadata,
     this.hideCompleted = false,
     this.collapseImages = false,
-    this.isReadOnly = false,
     this.attachmentDelivery,
     this.requestInitialFocus = false,
     required this.delegate,
@@ -76,6 +76,10 @@ class _NoteEditorState extends State<NoteEditor> {
   CustomTaskComponentBuilder? _taskComponentBuilder;
   List<ComponentBuilder>? _componentBuilders;
   List<SuperEditorContentTapDelegateFactory>? _contentTapDelegateFactories;
+  StreamSubscription<bool>? _captureSubscription;
+  NoteEditorSession? _attachedSession;
+
+  bool get _isReadOnly => !widget.session.captureLocalOperations;
 
   @override
   void initState() {
@@ -85,10 +89,23 @@ class _NoteEditorState extends State<NoteEditor> {
 
   void _attachSession(NoteEditorSession session) {
     final controller = session.controller;
-    if (_controller == controller) return;
+    if (identical(_attachedSession, session)) return;
     _controller?.removeListener(_onControllerReady);
     _controller?.onHasContentChanged = null;
+    unawaited(_captureSubscription?.cancel());
+    _attachedSession = session;
     _controller = controller;
+    _captureSubscription = session.captureLocalOperationsChanges.listen((_) {
+      if (!mounted) return;
+      if (_isReadOnly) {
+        _controls?.dispose();
+        _controls = null;
+      }
+      _componentBuilders = null;
+      _contentTapDelegateFactories = null;
+      _taskComponentBuilder = null;
+      setState(() {});
+    });
     _controller!.addListener(_onControllerReady);
     _controller!.onHasContentChanged = (hasContent) {
       widget.delegate.onHasContentChanged?.call(hasContent);
@@ -119,10 +136,10 @@ class _NoteEditorState extends State<NoteEditor> {
     _contentTapDelegateFactories = [
       (editContext) => NoteLinkTapHandler(
         editContext.document,
-        allowInternalNoteLinks: !widget.isReadOnly,
+        allowInternalNoteLinks: !_isReadOnly,
         onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
       ),
-      if (!widget.isReadOnly)
+      if (!_isReadOnly)
         (editContext) => HiddenTaskTrailingTapHandler(
           editContext: editContext,
           isHiddenTask: _isHiddenTask,
@@ -132,7 +149,7 @@ class _NoteEditorState extends State<NoteEditor> {
             }
           },
         ),
-      if (!widget.isReadOnly) superEditorAddEmptyParagraphTapHandlerFactory,
+      if (!_isReadOnly) superEditorAddEmptyParagraphTapHandlerFactory,
     ];
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
@@ -140,10 +157,8 @@ class _NoteEditorState extends State<NoteEditor> {
       composer: controller.composer,
       taskMetadataById: widget.taskMetadata,
       hideCompleted: widget.hideCompleted,
-      readOnly: widget.isReadOnly,
-      onTaskLongPress: widget.isReadOnly
-          ? null
-          : widget.delegate.onTaskLongPress,
+      readOnly: _isReadOnly,
+      onTaskLongPress: _isReadOnly ? null : widget.delegate.onTaskLongPress,
       onTaskComplete: widget.delegate.onTaskComplete,
       onTaskReopen: widget.delegate.onTaskReopen,
     );
@@ -154,8 +169,8 @@ class _NoteEditorState extends State<NoteEditor> {
       AttachmentComponentBuilder(
         editor: controller.editor,
         collapseImages: widget.collapseImages,
-        readOnly: widget.isReadOnly,
-        allowInternalNoteLinks: !widget.isReadOnly,
+        readOnly: _isReadOnly,
+        allowInternalNoteLinks: !_isReadOnly,
         attachmentDelivery: widget.attachmentDelivery,
       ),
       ...defaultComponentBuilders,
@@ -194,7 +209,6 @@ class _NoteEditorState extends State<NoteEditor> {
 
     if (widget.hideCompleted != oldWidget.hideCompleted ||
         widget.collapseImages != oldWidget.collapseImages ||
-        widget.isReadOnly != oldWidget.isReadOnly ||
         widget.attachmentDelivery != oldWidget.attachmentDelivery) {
       if (widget.hideCompleted && !oldWidget.hideCompleted) {
         final selection = _controller?.composer.selection;
@@ -223,6 +237,7 @@ class _NoteEditorState extends State<NoteEditor> {
   void dispose() {
     _controller?.removeListener(_onControllerReady);
     _controller?.onHasContentChanged = null;
+    unawaited(_captureSubscription?.cancel());
     _slashCommandController.dispose();
     _formattingToolbarOpen.dispose();
     _controls?.dispose();
@@ -233,7 +248,7 @@ class _NoteEditorState extends State<NoteEditor> {
   Widget build(BuildContext context) {
     final controller = widget.session.controller;
 
-    if (!widget.isReadOnly) {
+    if (!_isReadOnly) {
       _initControls();
     }
     _initStableBuilders();
@@ -264,7 +279,7 @@ class _NoteEditorState extends State<NoteEditor> {
                     left: 24,
                     right: 24,
                     top: topPadding,
-                    bottom: widget.isReadOnly ? 24 : 140,
+                    bottom: _isReadOnly ? 24 : 140,
                   ));
 
         final theme = Theme.of(context);
@@ -285,18 +300,15 @@ class _NoteEditorState extends State<NoteEditor> {
           children: [
             Positioned.fill(
               child: DesktopSelectionFormattingOverlay(
-                enabled: isDesktop && !widget.isReadOnly,
+                enabled: isDesktop && !_isReadOnly,
                 editor: controller.editor,
                 composer: controller.composer,
                 editorFocusNode: controller.focusNode,
                 selectionLayerLinks: _selectionLayerLinks,
                 viewportKey: _editorViewportKey,
-                child: widget.isReadOnly
+                child: _isReadOnly
                     ? SuperReader(
-                        key: ValueKey<(bool, bool)>((
-                          isDesktop,
-                          widget.isReadOnly,
-                        )),
+                        key: ValueKey<(bool, bool)>((isDesktop, _isReadOnly)),
                         editor: controller.editor,
                         documentLayoutKey: _docLayoutKey,
                         selectionLayerLinks: _selectionLayerLinks,
@@ -306,7 +318,7 @@ class _NoteEditorState extends State<NoteEditor> {
                         contentTapDelegateFactory: (readerContext) =>
                             NoteLinkTapHandler(
                               readerContext.document,
-                              allowInternalNoteLinks: !widget.isReadOnly,
+                              allowInternalNoteLinks: !_isReadOnly,
                               onNoteTap: (targetId) =>
                                   context.push(AppRoutes.note(targetId)),
                             ),
@@ -327,7 +339,7 @@ class _NoteEditorState extends State<NoteEditor> {
                                   ) => SuperEditor(
                                     key: ValueKey<(bool, bool)>((
                                       isDesktop,
-                                      widget.isReadOnly,
+                                      _isReadOnly,
                                     )),
                                     editor: controller.editor,
                                     plugins: isDesktop
@@ -379,7 +391,7 @@ class _NoteEditorState extends State<NoteEditor> {
                       ),
               ),
             ),
-            if (!widget.isReadOnly) ...[
+            if (!_isReadOnly) ...[
               Positioned.fill(
                 child: SlashCommandOverlay(
                   editor: controller.editor,

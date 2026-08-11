@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,6 +9,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
+import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 
@@ -1136,6 +1138,81 @@ void main() {
     },
   );
 
+  test(
+    'serializes mandatory hydration with the periodic catalog pull',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
+      );
+      addTearDown(database.close);
+
+      final fetchStarted = Completer<void>();
+      final releaseFetch = Completer<void>();
+      final response = NoteDocumentResponse(
+        noteId: 'serialized-note',
+        revision: 3,
+        document: const {
+          'schemaVersion': 1,
+          'blocks': [
+            {
+              'id': 'serialized-block',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'Serialized handoff'},
+              ],
+            },
+          ],
+        },
+        serverTime: DateTime.utc(2026, 8, 10, 12),
+      );
+      when(() => client.getDocument('serialized-note')).thenAnswer((_) async {
+        fetchStarted.complete();
+        await releaseFetch.future;
+        return response;
+      });
+      when(() => client.listNotes()).thenAnswer(
+        (_) async => [
+          {
+            'id': 'serialized-note',
+            'user_id': 'owner-user',
+            'permission': 'view',
+            'shared_by_email': 'owner@example.com',
+            'created_at': '2026-08-10T11:00:00.000Z',
+            'updated_at': '2026-08-10T12:00:00.000Z',
+          },
+        ],
+      );
+
+      final metadata = RemoteNoteMetadata.fromJson(const {
+        'id': 'serialized-note',
+        'user_id': 'owner-user',
+        'permission': 'view',
+        'shared_by_email': 'owner@example.com',
+        'created_at': '2026-08-10T11:00:00.000Z',
+        'updated_at': '2026-08-10T12:00:00.000Z',
+      });
+      final hydration = sync.hydrateRemoteNote(
+        userId: 'viewer-user',
+        metadata: metadata,
+      );
+      await fetchStarted.future;
+      final periodicPull = sync.pullRemoteNotes('viewer-user');
+
+      releaseFetch.complete();
+      await Future.wait([hydration, periodicPull]);
+
+      verify(() => client.getDocument('serialized-note')).called(1);
+      final note = await database.notesDao.getNoteById('serialized-note');
+      expect(note?.content, 'Serialized handoff');
+      expect(note?.permission, 'view');
+    },
+  );
+
   test('clears stale share metadata when the owner opens the note', () async {
     final database = AppDatabase.test();
     final client = _MockNoteSyncClient();
@@ -1173,7 +1250,6 @@ void main() {
       (_) async => [
         {
           'id': 'owner-metadata-refresh-note',
-          'user_id': 'owner-user',
           'created_at': '2026-08-10T11:00:00.000Z',
           'updated_at': '2026-08-10T12:00:00.000Z',
         },

@@ -7,11 +7,8 @@ import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.
 /// only receive the resolved URI and never need to know that the API client
 /// base path contains `/api/v1`.
 Uri shareLinkAttachmentUrl(String token, String attachmentId) {
-  final base = Uri.parse(ApiConstants.baseUrl);
-  const apiPath = '/api/v1';
-  final rootPath = base.path.endsWith(apiPath)
-      ? base.path.substring(0, base.path.length - apiPath.length)
-      : base.path;
+  final base = ApiConstants.publicBaseUri;
+  final rootPath = base.path;
   return base.replace(
     path:
         '${rootPath.isEmpty ? '' : rootPath}/s/${Uri.encodeComponent(token)}/attachments/${Uri.encodeComponent(attachmentId)}',
@@ -21,9 +18,15 @@ Uri shareLinkAttachmentUrl(String token, String attachmentId) {
 }
 
 final class ShareLinkAttachmentDelivery implements AttachmentDelivery {
-  const ShareLinkAttachmentDelivery(this.token);
+  const ShareLinkAttachmentDelivery(
+    this.token, {
+    this.preference = AttachmentDeliveryPreference.externalFirst,
+  });
 
   final String token;
+
+  @override
+  final AttachmentDeliveryPreference preference;
 
   @override
   Uri urlFor(String attachmentId) =>

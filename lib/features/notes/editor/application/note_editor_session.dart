@@ -24,6 +24,10 @@ class NoteEditorSession implements NoteEditorSyncHandle {
   bool get captureLocalOperations => syncSession.captureLocalOperations;
 
   @override
+  Stream<bool> get captureLocalOperationsChanges =>
+      syncSession.captureLocalOperationsChanges;
+
+  @override
   void setCaptureLocalOperations(bool captureLocalOperations) {
     syncSession.setCaptureLocalOperations(captureLocalOperations);
   }

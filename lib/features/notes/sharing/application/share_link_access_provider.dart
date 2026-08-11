@@ -26,14 +26,17 @@ final shareLinkAccessProvider = FutureProvider.autoDispose
 /// The route only opens after this completes. That keeps the editor's
 /// existing session provider and REST/OT revision path authoritative.
 final shareLinkNoteHydrationProvider = FutureProvider.autoDispose
-    .family<void, String>((ref, noteId) async {
+    .family<void, String>((ref, token) async {
       final userId = ref.watch(currentUserIdProvider);
       if (userId == null) {
         throw StateError('Share-link hydration requires authentication');
       }
-      final repository = ref.watch(shareLinkAccessRepositoryProvider);
-      final metadata = await repository.getNoteMetadata(noteId);
+      final decision = await ref.watch(shareLinkAccessProvider(token).future);
+      final metadata = decision.metadata;
+      if (metadata == null || decision.mode == ShareLinkAccessMode.guest) {
+        throw StateError('Share link has no authenticated note access');
+      }
       await ref
           .watch(noteCatalogSyncServiceProvider)
-          .hydrateRemoteNoteFromJson(userId: userId, metadata: metadata);
+          .hydrateRemoteNote(userId: userId, metadata: metadata);
     });

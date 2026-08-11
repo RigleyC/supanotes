@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/sharing/data/share_link_attachment_url.dart';
 
 void main() {
@@ -9,5 +10,14 @@ void main() {
     expect(url.query, isEmpty);
     expect(url.fragment, isEmpty);
     expect(url.path, isNot(contains('/api/v1')));
+  });
+
+  test('allows authenticated handoff to prefer local attachment metadata', () {
+    const delivery = ShareLinkAttachmentDelivery(
+      'token',
+      preference: AttachmentDeliveryPreference.localFirst,
+    );
+
+    expect(delivery.preference, AttachmentDeliveryPreference.localFirst);
   });
 }

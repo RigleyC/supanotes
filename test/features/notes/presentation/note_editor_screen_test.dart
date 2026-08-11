@@ -40,11 +40,16 @@ NoteEditorController _createTestController(List<DocumentNode> nodes) {
   );
 }
 
-NoteEditorSession _createTestSession(List<DocumentNode> nodes) {
+NoteEditorSession _createTestSession(
+  List<DocumentNode> nodes, {
+  bool captureLocalOperations = true,
+}) {
   return NoteEditorSession(
     noteId: 'note-1',
     controller: _createTestController(nodes),
-    syncSession: _FakeEditorSyncHandle(),
+    syncSession: _FakeEditorSyncHandle(
+      captureLocalOperations: captureLocalOperations,
+    ),
   );
 }
 
@@ -57,7 +62,10 @@ NoteEditorSession _sessionFor(NoteEditorController controller) {
 }
 
 class _FakeEditorSyncHandle implements NoteEditorSyncHandle {
-  bool _captureLocalOperations = true;
+  _FakeEditorSyncHandle({bool captureLocalOperations = true})
+    : _captureLocalOperations = captureLocalOperations;
+
+  bool _captureLocalOperations;
 
   @override
   NoteSessionStatus get status => NoteSessionStatus.ready;
@@ -68,6 +76,9 @@ class _FakeEditorSyncHandle implements NoteEditorSyncHandle {
 
   @override
   bool get captureLocalOperations => _captureLocalOperations;
+
+  @override
+  Stream<bool> get captureLocalOperationsChanges => const Stream.empty();
 
   @override
   void setCaptureLocalOperations(bool captureLocalOperations) {
@@ -1188,6 +1199,11 @@ void main() {
             _FakeNotesRepository(streamController),
           ),
           tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
+          noteEditorSessionProvider.overrideWith(
+            (ref, noteId) async => _createTestSession([
+              ParagraphNode(id: '1', text: AttributedText('Plain content')),
+            ]),
+          ),
           currentUserIdProvider.overrideWithValue('test-user'),
           appDatabaseProvider.overrideWithValue(AppDatabase.test()),
         ],
@@ -1399,9 +1415,8 @@ void main() {
             noteId: 'note-1',
             session: _createTestSession([
               ParagraphNode(id: '1', text: AttributedText('read only')),
-            ]),
+            ], captureLocalOperations: false),
             taskMetadata: const {},
-            isReadOnly: true,
             delegate: NoteEditorDelegate(),
           ),
         ),

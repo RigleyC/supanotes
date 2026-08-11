@@ -21,5 +21,6 @@ abstract interface class NoteSessionHandle {
 
 abstract interface class NoteEditorSyncHandle implements NoteSessionHandle {
   bool get captureLocalOperations;
+  Stream<bool> get captureLocalOperationsChanges;
   void setCaptureLocalOperations(bool captureLocalOperations);
 }
