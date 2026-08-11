@@ -29,6 +29,7 @@ import (
 	mcpapp "github.com/RigleyC/supanotes/internal/mcp"
 	"github.com/RigleyC/supanotes/internal/noteoperations"
 	"github.com/RigleyC/supanotes/internal/notes"
+	"github.com/RigleyC/supanotes/internal/platformlinks"
 	"github.com/RigleyC/supanotes/internal/settings"
 	"github.com/RigleyC/supanotes/internal/sharelinks"
 	"github.com/RigleyC/supanotes/internal/shares"
@@ -157,6 +158,12 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 	api := e.Group("/api/v1")
 	api.GET("/health", handler.Health(pool))
+	platformLinksH := platformlinks.NewHandler(platformlinks.Config{
+		AppleTeamID:                   cfg.AppleTeamID,
+		AndroidSHA256CertFingerprints: cfg.AndroidSHA256CertFingerprints,
+	})
+	e.GET("/.well-known/apple-app-site-association", platformLinksH.AppleAppSiteAssociation)
+	e.GET("/.well-known/assetlinks.json", platformLinksH.AssetLinks)
 
 	if pool == nil {
 		log.Warn().Msg("skipping /auth routes (no DB)")

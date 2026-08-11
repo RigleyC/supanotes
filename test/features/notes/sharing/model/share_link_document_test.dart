@@ -166,6 +166,31 @@ void main() {
     }
   });
 
+  test('rejects link attributions whose value is not true', () {
+    expect(
+      () => ShareLinkDocument.fromJson(const {
+        'title': 'Shared note',
+        'document': {
+          'schemaVersion': 1,
+          'blocks': [
+            {
+              'id': 'link-1',
+              'type': 'paragraph',
+              'delta': [
+                {
+                  'insert': 'link',
+                  'attributes': {'link:https://example.com': false},
+                },
+              ],
+              'metadata': {},
+            },
+          ],
+        },
+      }),
+      throwsFormatException,
+    );
+  });
+
   test('converts the canonical snapshot to the Super Editor document', () {
     final document = ShareLinkDocument.fromJson(const {
       'title': 'Shared note',

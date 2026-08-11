@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/notes/sharing/data/share_link_access_repository.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
@@ -15,14 +14,10 @@ final shareLinkAccessResolverProvider =
 
 final shareLinkAccessProvider = FutureProvider.autoDispose
     .family<ShareLinkAccessDecision, String>((ref, token) async {
-      final auth = ref.watch(authControllerProvider);
-      // Authentication is optional for a public capability link. A local
-      // restore failure must not turn a valid public link into an access error.
-      final User? user = auth.when(
-        data: (value) => value,
-        loading: () => null,
-        error: (_, _) => null,
-      );
+      // Wait for auth restoration. A resolved null user is the explicit guest
+      // state; an auth error must remain an error instead of silently
+      // downgrading an owner/editor to public read-only access.
+      final user = await ref.watch(authControllerProvider.future);
       return ref
           .watch(shareLinkAccessResolverProvider)
           .resolve(token, user: user);

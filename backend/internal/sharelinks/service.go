@@ -35,13 +35,18 @@ type PublicNote struct {
 	Document []byte
 }
 
-// PublicSnapshot is the single public delivery result used by both the HTML
-// reader and the native/API reader. The note snapshot is resolved and parsed
-// once, after token authorization, so the two transports cannot drift.
+// PublicSnapshot is the HTML delivery result. The native/API reader uses
+// PublicDocument so it does not build an unused HTML page.
 type PublicSnapshot struct {
 	Note     PublicNote
 	Document noteoperations.Document
 	Page     RenderedPage
+}
+
+type PublicDocument struct {
+	Note     PublicNote
+	Document noteoperations.Document
+	Title    string
 }
 
 type Repository interface {
@@ -141,31 +146,27 @@ func (s *Service) ResolvePublicID(ctx context.Context, token string) (uuid.UUID,
 // for a transport. Rendering errors are returned to the caller instead of
 // becoming an empty note.
 func (s *Service) PublicSnapshot(ctx context.Context, token string, options RenderOptions) (PublicSnapshot, error) {
-	note, err := s.ResolvePublic(ctx, token)
+	document, err := s.PublicDocument(ctx, token)
 	if err != nil {
 		return PublicSnapshot{}, err
 	}
-	document, err := decodePublicDocument(note.Document)
-	if err != nil {
-		return PublicSnapshot{}, fmt.Errorf("decode public note: %w", err)
-	}
-	page := renderDocument(document, options)
-	return PublicSnapshot{Note: note, Document: document, Page: page}, nil
+	page := renderDocument(document.Document, options)
+	return PublicSnapshot{Note: document.Note, Document: document.Document, Page: page}, nil
 }
 
-func (s *Service) PublicDocument(ctx context.Context, token string) (PublicSnapshot, error) {
+func (s *Service) PublicDocument(ctx context.Context, token string) (PublicDocument, error) {
 	note, err := s.ResolvePublic(ctx, token)
 	if err != nil {
-		return PublicSnapshot{}, err
+		return PublicDocument{}, err
 	}
-	document, err := decodePublicDocument(note.Document)
+	document, err := noteoperations.DecodeCanonicalDocument(note.Document)
 	if err != nil {
-		return PublicSnapshot{}, fmt.Errorf("decode public note: %w", err)
+		return PublicDocument{}, fmt.Errorf("decode public note: %w", err)
 	}
-	return PublicSnapshot{
+	return PublicDocument{
 		Note:     note,
 		Document: document,
-		Page:     RenderedPage{Title: documentTitle(document)},
+		Title:    documentTitle(document),
 	}, nil
 }
 

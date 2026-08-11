@@ -27,36 +27,21 @@ final class _PlatformAppLinkSource implements AppLinkSource {
 /// cancels that subscription, which prevents duplicate listeners when the
 /// provider is rebuilt or disposed.
 final class AppLinkStream {
-  AppLinkStream(
-    this.source, {
-    this.deduplicationDuration = const Duration(seconds: 1),
-  });
+  AppLinkStream(this.source);
 
   final AppLinkSource source;
-  final Duration deduplicationDuration;
 
   Stream<Uri> stream() {
     final controller = StreamController<Uri>();
     StreamSubscription<Uri>? subscription;
-    Timer? deduplicationWindow;
-    String? lastPath;
-    var duplicateSuppressed = false;
+    final bufferedRuntimeLinks = <Uri>[];
+    String? initialPath;
+    var initialResolved = false;
+    var initialEchoPending = false;
     var closed = false;
 
     void emit(Uri uri) {
       if (closed || !isShareLinkUri(uri)) return;
-      if (uri.path == lastPath && deduplicationWindow != null) {
-        if (!duplicateSuppressed) {
-          duplicateSuppressed = true;
-          return;
-        }
-      }
-      lastPath = uri.path;
-      duplicateSuppressed = false;
-      deduplicationWindow?.cancel();
-      deduplicationWindow = Timer(deduplicationDuration, () {
-        deduplicationWindow = null;
-      });
       controller.add(uri);
     }
 
@@ -64,9 +49,35 @@ final class AppLinkStream {
       if (!closed) controller.addError(error, stack);
     }
 
+    void emitRuntime(Uri uri) {
+      if (closed || !isShareLinkUri(uri)) return;
+      // app_links can emit the initial URI again through the runtime stream.
+      // Suppress only that one known echo. Every later event is a deliberate
+      // open, including opening the same path again after an error or login.
+      if (initialEchoPending && uri.path == initialPath) {
+        initialEchoPending = false;
+        return;
+      }
+      emit(uri);
+    }
+
+    void flushBufferedRuntimeLinks() {
+      final pending = List<Uri>.of(bufferedRuntimeLinks);
+      bufferedRuntimeLinks.clear();
+      for (final uri in pending) {
+        emitRuntime(uri);
+      }
+    }
+
     try {
       subscription = source.uriLinkStream.listen(
-        emit,
+        (uri) {
+          if (!initialResolved) {
+            bufferedRuntimeLinks.add(uri);
+            return;
+          }
+          emitRuntime(uri);
+        },
         onError: (Object error, StackTrace stack) => emitError(error, stack),
         onDone: () {
           if (!closed) {
@@ -79,13 +90,27 @@ final class AppLinkStream {
       emitError(error, stack);
     }
 
-    source.getInitialLink().then((uri) {
-      if (uri != null) emit(uri);
-    }, onError: (Object error, StackTrace stack) => emitError(error, stack));
+    source.getInitialLink().then(
+      (uri) {
+        if (closed) return;
+        initialResolved = true;
+        if (uri != null && isShareLinkUri(uri)) {
+          initialPath = uri.path;
+          initialEchoPending = true;
+          emit(uri);
+        }
+        flushBufferedRuntimeLinks();
+      },
+      onError: (Object error, StackTrace stack) {
+        if (closed) return;
+        initialResolved = true;
+        flushBufferedRuntimeLinks();
+        emitError(error, stack);
+      },
+    );
 
     controller.onCancel = () async {
       closed = true;
-      deduplicationWindow?.cancel();
       await subscription?.cancel();
       await controller.close();
     };

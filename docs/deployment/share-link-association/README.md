@@ -13,8 +13,11 @@ Publish the rendered templates below on the Share Link host:
 | `/.well-known/apple-app-site-association` | `apple-app-site-association.json.tmpl` | `application/json` |
 | `/.well-known/assetlinks.json` | `assetlinks.json.tmpl` | `application/json` |
 
-The files must be served over HTTPS without a redirect. Do not publish the
-`.tmpl` files or leave a placeholder in a production response.
+The backend serves these documents at the paths above when `IOS_TEAM_ID` and
+`ANDROID_SHA256_CERT` are configured. They must be served over HTTPS without a
+redirect. Do not publish the `.tmpl` files or leave a placeholder in a
+production response. The templates remain useful for an external edge, but the
+backend endpoints are the default owner of publication.
 
 ## Required values
 
@@ -25,6 +28,11 @@ Replace these placeholders during deployment:
 - `{{ANDROID_RELEASE_SHA256}}`: the SHA-256 fingerprint of the certificate
   that signs the release `com.example.supanotes` APK/AAB. Use one entry for
   each accepted signing certificate when key rotation is active.
+
+Set the corresponding backend values as `IOS_TEAM_ID` and a comma-separated
+`ANDROID_SHA256_CERT` before deploying. Each endpoint returns `503` until its
+signing value is present, so a deployment cannot silently publish a placeholder
+association document.
 
 The package and bundle IDs are existing project identifiers. This ticket does
 not change them.

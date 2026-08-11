@@ -90,38 +90,58 @@ class NoteCatalogSync {
   Future<void> pushDirtyNoteIcons() async {
     final dirty = await _database.notesDao.getDirtyNoteIcons();
     for (final note in dirty) {
-      await _remoteNoteQueue.run(note.id, () => _pushDirtyNoteIcon(note));
+      await _remoteNoteQueue.run(note.id, () => _pushDirtyNoteIcon(note.id));
     }
   }
 
-  Future<void> _pushDirtyNoteIcon(NoteData note) async {
-    final remote = _remoteCatalog[note.id];
-    if (remote != null && remote.updatedAt.isAfter(note.updatedAt)) {
-      await _database.notesDao.resolveRemoteNoteIcon(
-        id: note.id,
-        noteIconJson: remote.noteIconJson,
-        remoteUpdatedAt: remote.updatedAt,
-        expectedUpdatedAt: note.updatedAt,
+  Future<void> _pushDirtyNoteIcon(String noteId) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final note = await _database.notesDao.getNoteById(noteId);
+      if (note == null || !note.noteIconDirty) return;
+
+      final remote = _remoteCatalog[noteId];
+      if (remote != null && remote.updatedAt.isAfter(note.updatedAt)) {
+        final resolved = await _database.notesDao.resolveRemoteNoteIcon(
+          id: noteId,
+          noteIconJson: remote.noteIconJson,
+          remoteUpdatedAt: remote.updatedAt,
+          expectedUpdatedAt: note.updatedAt,
+          expectedNoteIconJson: note.noteIconJson,
+        );
+        if (resolved) return;
+        // The local row changed while the catalog was being refreshed. Read it
+        // again and push the newest local icon instead of overwriting it.
+        continue;
+      }
+
+      final icon = _decodeLocalNoteIcon(noteId, note.noteIconJson);
+      try {
+        await _updateNoteIcon(noteId, icon, remote?.updatedAt);
+      } catch (error) {
+        if (!_isVersionConflict(error)) rethrow;
+        await _refreshRemoteCatalog();
+        final latest = _remoteCatalog[noteId];
+        if (latest == null) rethrow;
+        final resolved = await _database.notesDao.resolveRemoteNoteIcon(
+          id: noteId,
+          noteIconJson: latest.noteIconJson,
+          remoteUpdatedAt: latest.updatedAt,
+          expectedUpdatedAt: note.updatedAt,
+          expectedNoteIconJson: note.noteIconJson,
+        );
+        if (resolved) return;
+        // A newer local icon exists. Retry with its current timestamp and the
+        // refreshed server version.
+        continue;
+      }
+      await _database.notesDao.clearNoteIconDirty(
+        noteId,
+        note.updatedAt,
+        expectedNoteIconJson: note.noteIconJson,
       );
       return;
     }
-    final icon = _decodeLocalNoteIcon(note.id, note.noteIconJson);
-    try {
-      await _updateNoteIcon(note.id, icon, remote?.updatedAt);
-    } catch (error) {
-      if (!_isVersionConflict(error)) rethrow;
-      await _refreshRemoteCatalog();
-      final latest = _remoteCatalog[note.id];
-      if (latest == null) rethrow;
-      await _database.notesDao.resolveRemoteNoteIcon(
-        id: note.id,
-        noteIconJson: latest.noteIconJson,
-        remoteUpdatedAt: latest.updatedAt,
-        expectedUpdatedAt: note.updatedAt,
-      );
-      return;
-    }
-    await _database.notesDao.clearNoteIconDirty(note.id, note.updatedAt);
+    throw StateError('Note icon changed while it was being synchronized');
   }
 
   bool _isVersionConflict(Object error) {

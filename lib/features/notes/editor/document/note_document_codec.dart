@@ -208,12 +208,13 @@ class NoteDocumentCodec {
                     'Note document block contains an invalid link attribute',
                   );
                 }
-              } else if (entry.key.toString().startsWith('link:') &&
-                  entry.value == true &&
-                  Uri.tryParse(entry.key.toString().substring(5)) == null) {
-                throw const FormatException(
-                  'Note document block contains an invalid link attribution',
-                );
+              } else if (entry.key.toString().startsWith('link:')) {
+                if (entry.value != true ||
+                    Uri.tryParse(entry.key.toString().substring(5)) == null) {
+                  throw const FormatException(
+                    'Note document block contains an invalid link attribution',
+                  );
+                }
               }
             }
           }

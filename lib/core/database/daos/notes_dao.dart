@@ -413,9 +413,19 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return (select(notes)..where((t) => t.noteIconDirty.equals(true))).get();
   }
 
-  Future<void> clearNoteIconDirty(String id, DateTime pushedUpdatedAt) async {
-    await (update(notes)
-          ..where((t) => t.id.equals(id) & t.updatedAt.equals(pushedUpdatedAt)))
+  Future<void> clearNoteIconDirty(
+    String id,
+    DateTime pushedUpdatedAt, {
+    required String? expectedNoteIconJson,
+  }) async {
+    await (update(notes)..where(
+          (t) =>
+              t.id.equals(id) &
+              t.updatedAt.equals(pushedUpdatedAt) &
+              (expectedNoteIconJson == null
+                  ? t.noteIconJson.isNull()
+                  : t.noteIconJson.equals(expectedNoteIconJson)),
+        ))
         .write(const NotesCompanion(noteIconDirty: Value(false)));
   }
 
@@ -427,17 +437,26 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     required String? noteIconJson,
     required DateTime remoteUpdatedAt,
     required DateTime expectedUpdatedAt,
+    required String? expectedNoteIconJson,
   }) async {
     return attachedDatabase.transaction(() async {
       final local = await getNoteById(id);
       if (local == null || !local.noteIconDirty) return false;
+
+      // A local icon edited after the server version was fetched must remain
+      // pending. The server timestamp is not a local mutation timestamp, so
+      // it cannot win over a newer local row.
+      if (local.updatedAt.isAfter(remoteUpdatedAt)) return false;
 
       final updated =
           await (update(notes)..where(
                 (t) =>
                     t.id.equals(id) &
                     t.updatedAt.equals(expectedUpdatedAt) &
-                    t.noteIconDirty.equals(true),
+                    t.noteIconDirty.equals(true) &
+                    (expectedNoteIconJson == null
+                        ? t.noteIconJson.isNull()
+                        : t.noteIconJson.equals(expectedNoteIconJson)),
               ))
               .write(
                 NotesCompanion(

@@ -1,0 +1,82 @@
+[
+  {
+    "name": "valid paragraph with inline link",
+    "valid": true,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "paragraph-1",
+          "type": "paragraph",
+          "delta": [
+            { "insert": "Hello ", "attributes": { "bold": true } },
+            { "insert": "world", "attributes": { "link": "https://example.com" } }
+          ],
+          "metadata": {}
+        }
+      ]
+    }
+  },
+  {
+    "name": "valid task metadata",
+    "valid": true,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "task-1",
+          "type": "task",
+          "delta": [{ "insert": "Ship the note" }],
+          "metadata": { "isCompleted": false, "indent": 0 }
+        }
+      ]
+    }
+  },
+  {
+    "name": "rejects link attribution with false value",
+    "valid": false,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "paragraph-1",
+          "type": "paragraph",
+          "delta": [
+            { "insert": "bad", "attributes": { "link:https://example.com": false } }
+          ],
+          "metadata": {}
+        }
+      ]
+    }
+  },
+  {
+    "name": "rejects embedded delta values",
+    "valid": false,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "paragraph-1",
+          "type": "paragraph",
+          "delta": [{ "insert": { "image": "https://example.com/a.png" } }],
+          "metadata": {}
+        }
+      ]
+    }
+  },
+  {
+    "name": "rejects malformed task metadata",
+    "valid": false,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "task-1",
+          "type": "task",
+          "delta": [{ "insert": "bad" }],
+          "metadata": { "isCompleted": "false" }
+        }
+      ]
+    }
+  }
+]

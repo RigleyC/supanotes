@@ -89,6 +89,7 @@ func TestRenderDocumentRejectsInvalidCanonicalSnapshots(t *testing.T) {
 		`{"schemaVersion":1,"blocks":[{"id":"unknown","type":"future","delta":[],"metadata":{}}]}`,
 		`{"schemaVersion":1,"blocks":[{"id":"embed","type":"paragraph","delta":[{"insert":{"image":"x"}}],"metadata":{}}]}`,
 		`{"schemaVersion":1,"blocks":[{"id":"task","type":"task","delta":[],"metadata":{"isCompleted":"yes"}}]}`,
+		`{"schemaVersion":1,"blocks":[{"id":"link","type":"paragraph","delta":[{"insert":"link","attributes":{"link:https://example.com":false}}],"metadata":{}}]}`,
 	} {
 		if _, err := RenderDocument([]byte(snapshot), RenderOptions{}); err == nil {
 			t.Fatalf("snapshot was accepted: %s", snapshot)

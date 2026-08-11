@@ -5,7 +5,7 @@ import (
 )
 
 func TestLoad_Defaults(t *testing.T) {
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS"} {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS", "IOS_TEAM_ID", "ANDROID_SHA256_CERT"} {
 		t.Setenv(k, "")
 	}
 
@@ -41,6 +41,8 @@ func TestLoad_FromEnv(t *testing.T) {
 	t.Setenv("JWT_SECRET", "prod-secret-at-least-32-characters-long")
 	t.Setenv("SHARE_LINK_SECRET", "prod-share-secret-at-least-32-characters-long")
 	t.Setenv("PUBLIC_BASE_URL", "https://notes.example")
+	t.Setenv("IOS_TEAM_ID", "TEAM123")
+	t.Setenv("ANDROID_SHA256_CERT", "AA:BB, CC:DD")
 	t.Setenv("JWT_ISSUER", "custom-api")
 	t.Setenv("JWT_AUDIENCE", "custom-client")
 	t.Setenv("ALEXA_REDIRECT_URIS", "https://example.com/one, https://example.com/two")
@@ -65,6 +67,9 @@ func TestLoad_FromEnv(t *testing.T) {
 	if cfg.ShareLinkSecret != "prod-share-secret-at-least-32-characters-long" || cfg.PublicBaseURL != "https://notes.example" {
 		t.Errorf("share link config mismatch: secret=%q base=%q", cfg.ShareLinkSecret, cfg.PublicBaseURL)
 	}
+	if cfg.AppleTeamID != "TEAM123" || len(cfg.AndroidSHA256CertFingerprints) != 2 {
+		t.Errorf("platform association config mismatch: team=%q fingerprints=%v", cfg.AppleTeamID, cfg.AndroidSHA256CertFingerprints)
+	}
 	if cfg.JWTIssuer != "custom-api" || cfg.JWTAudience != "custom-client" {
 		t.Errorf("JWT claims mismatch: issuer=%q audience=%q", cfg.JWTIssuer, cfg.JWTAudience)
 	}
@@ -74,7 +79,7 @@ func TestLoad_FromEnv(t *testing.T) {
 }
 
 func TestLoad_ProdRequiresJWTSecret(t *testing.T) {
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS"} {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS", "IOS_TEAM_ID", "ANDROID_SHA256_CERT"} {
 		t.Setenv(k, "")
 	}
 	t.Setenv("ENVIRONMENT", "prod")
@@ -85,7 +90,7 @@ func TestLoad_ProdRequiresJWTSecret(t *testing.T) {
 }
 
 func TestLoad_ProdRejectsShortShareLinkSecret(t *testing.T) {
-	for _, k := range []string{"PORT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS"} {
+	for _, k := range []string{"PORT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS", "IOS_TEAM_ID", "ANDROID_SHA256_CERT"} {
 		t.Setenv(k, "")
 	}
 	t.Setenv("ENVIRONMENT", "prod")

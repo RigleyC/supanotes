@@ -101,7 +101,7 @@ func (h *Handler) PublicDocument(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "failed to encode public note")
 	}
 	return c.JSON(http.StatusOK, PublicDocumentResponse{
-		Title: snapshot.Page.Title, Document: json.RawMessage(document),
+		Title: snapshot.Title, Document: json.RawMessage(document),
 	})
 }
 

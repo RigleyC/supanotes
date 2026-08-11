@@ -202,6 +202,19 @@ jobs:
           # Navigate to iOS project
           cd "${GITHUB_WORKSPACE}/${IOS_PATH}"
 
+          if [[ ! "$SHARE_LINK_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "SHARE_LINK_DOMAIN must be a hostname: $SHARE_LINK_DOMAIN"
+            exit 1
+          fi
+          # Flutter's signed build does not expose arbitrary xcodebuild
+          # settings. Replace the checked-in local default in the CI checkout
+          # so Runner.entitlements resolves to the same host as the API.
+          if [ -f "Runner.xcodeproj/project.pbxproj" ]; then
+            sed -i.bak "s/SHARE_LINK_DOMAIN = supanotes.app;/SHARE_LINK_DOMAIN = $SHARE_LINK_DOMAIN;/g" \
+              Runner.xcodeproj/project.pbxproj
+            rm -f Runner.xcodeproj/project.pbxproj.bak
+          fi
+
           # Find workspace or project
           WORKSPACE=$(find . -maxdepth 1 -name "*.xcworkspace" | head -1)
           PROJECT=$(find . -maxdepth 1 -name "*.xcodeproj" | head -1)

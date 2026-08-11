@@ -12,19 +12,21 @@ const devJWTSecret = "dev-only-jwt-secret-change-me-in-production-32+chars"
 const devShareLinkSecret = "dev-only-share-link-secret-change-me-in-production-32+chars"
 
 type Config struct {
-	Port               string
-	DatabaseURL        string
-	JWTSecret          string
-	ShareLinkSecret    string
-	PublicBaseURL      string
-	JWTIssuer          string
-	JWTAudience        string
-	CORSOrigins        []string
-	Environment        string
-	AlexaApplicationID string
-	AlexaClientID      string
-	AlexaClientSecret  string
-	AlexaRedirectURIs  []string
+	Port                          string
+	DatabaseURL                   string
+	JWTSecret                     string
+	ShareLinkSecret               string
+	PublicBaseURL                 string
+	AppleTeamID                   string
+	AndroidSHA256CertFingerprints []string
+	JWTIssuer                     string
+	JWTAudience                   string
+	CORSOrigins                   []string
+	Environment                   string
+	AlexaApplicationID            string
+	AlexaClientID                 string
+	AlexaClientSecret             string
+	AlexaRedirectURIs             []string
 
 	// Storage (S3-compatible: AWS, MinIO, Supabase, GCS)
 	S3Endpoint        string // S3_ENDPOINT — e.g. https://s3.amazonaws.com or http://minio:9000
@@ -73,28 +75,32 @@ func Load() (*Config, error) {
 		}
 		publicBaseURL = "http://localhost:8080"
 	}
+	appleTeamID := strings.TrimSpace(os.Getenv("IOS_TEAM_ID"))
+	androidSHA256CertFingerprints := parseList(os.Getenv("ANDROID_SHA256_CERT"))
 
 	corsOrigins := parseCORSOrigins(os.Getenv("CORS_ORIGINS"), env)
 
 	return &Config{
-		Port:               port,
-		Environment:        env,
-		AlexaApplicationID: strings.TrimSpace(os.Getenv("ALEXA_APPLICATION_ID")),
-		AlexaClientID:      strings.TrimSpace(os.Getenv("ALEXA_CLIENT_ID")),
-		AlexaClientSecret:  strings.TrimSpace(os.Getenv("ALEXA_CLIENT_SECRET")),
-		AlexaRedirectURIs:  parseList(os.Getenv("ALEXA_REDIRECT_URIS")),
-		DatabaseURL:        os.Getenv("DATABASE_URL"),
-		JWTSecret:          jwtSecret,
-		ShareLinkSecret:    shareLinkSecret,
-		PublicBaseURL:      publicBaseURL,
-		JWTIssuer:          jwtIssuer,
-		JWTAudience:        jwtAudience,
-		CORSOrigins:        corsOrigins,
-		S3Endpoint:         firstNonEmpty(os.Getenv("S3_ENDPOINT"), os.Getenv("AWS_ENDPOINT_URL_S3")),
-		S3Region:           firstNonEmpty(os.Getenv("S3_REGION"), os.Getenv("AWS_REGION")),
-		S3Bucket:           firstNonEmpty(os.Getenv("S3_BUCKET"), os.Getenv("BUCKET_NAME")),
-		S3AccessKeyID:      firstNonEmpty(os.Getenv("S3_ACCESS_KEY_ID"), os.Getenv("AWS_ACCESS_KEY_ID")),
-		S3SecretAccessKey:  firstNonEmpty(os.Getenv("S3_SECRET_ACCESS_KEY"), os.Getenv("AWS_SECRET_ACCESS_KEY")),
+		Port:                          port,
+		Environment:                   env,
+		AlexaApplicationID:            strings.TrimSpace(os.Getenv("ALEXA_APPLICATION_ID")),
+		AlexaClientID:                 strings.TrimSpace(os.Getenv("ALEXA_CLIENT_ID")),
+		AlexaClientSecret:             strings.TrimSpace(os.Getenv("ALEXA_CLIENT_SECRET")),
+		AlexaRedirectURIs:             parseList(os.Getenv("ALEXA_REDIRECT_URIS")),
+		DatabaseURL:                   os.Getenv("DATABASE_URL"),
+		JWTSecret:                     jwtSecret,
+		ShareLinkSecret:               shareLinkSecret,
+		PublicBaseURL:                 publicBaseURL,
+		AppleTeamID:                   appleTeamID,
+		AndroidSHA256CertFingerprints: androidSHA256CertFingerprints,
+		JWTIssuer:                     jwtIssuer,
+		JWTAudience:                   jwtAudience,
+		CORSOrigins:                   corsOrigins,
+		S3Endpoint:                    firstNonEmpty(os.Getenv("S3_ENDPOINT"), os.Getenv("AWS_ENDPOINT_URL_S3")),
+		S3Region:                      firstNonEmpty(os.Getenv("S3_REGION"), os.Getenv("AWS_REGION")),
+		S3Bucket:                      firstNonEmpty(os.Getenv("S3_BUCKET"), os.Getenv("BUCKET_NAME")),
+		S3AccessKeyID:                 firstNonEmpty(os.Getenv("S3_ACCESS_KEY_ID"), os.Getenv("AWS_ACCESS_KEY_ID")),
+		S3SecretAccessKey:             firstNonEmpty(os.Getenv("S3_SECRET_ACCESS_KEY"), os.Getenv("AWS_SECRET_ACCESS_KEY")),
 	}, nil
 }
 

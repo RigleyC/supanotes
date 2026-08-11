@@ -48,14 +48,16 @@ jobs:
         env:
           BUILD_ID: ${{ inputs.build_id || github.run_id }}
           SHARE_LINK_DOMAIN: ${{ vars.SHARE_LINK_DOMAIN || 'supanotes.app' }}
-        run: flutter build apk --debug --build-number=$BUILD_ID
+        run: flutter build apk --debug --build-number=$BUILD_ID \
+          --android-project-arg "shareLinkHost=$SHARE_LINK_DOMAIN"
 
       - name: Build App Bundle (release unsigned)
         env:
           BUILD_ID: ${{ inputs.build_id || github.run_id }}
           SHARE_LINK_DOMAIN: ${{ vars.SHARE_LINK_DOMAIN || 'supanotes.app' }}
         run: |
-          flutter build appbundle --release --build-number=$BUILD_ID || \
+          flutter build appbundle --release --build-number=$BUILD_ID \
+            --android-project-arg "shareLinkHost=$SHARE_LINK_DOMAIN" || \
             echo "App bundle build failed (likely missing signing); APK above is the main artifact"
 
       - name: Upload APK artifact
