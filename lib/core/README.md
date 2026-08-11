@@ -9,7 +9,7 @@ adaptadores que várias features usam.
 | `auth/` | Identidade autenticada corrente | DI, router e repositórios por usuário |
 | `database/` | Drift, tabelas e DAOs do dispositivo | Catálogo, tarefas e sync |
 | `di/` | Providers de longa duração e composição de dependências | Todas as features |
-| `router/` | Rotas, guarda de autenticação e shell desktop | Telas de `features` |
+| `router/` | Rotas e guarda de autenticação | Telas de `features` |
 | `sync/` | Outbox e protocolo REST/OT independente da UI | Editor de notes |
 | `notifications/` | Agendamento local de lembretes | Tasks |
 | `utils/`, `validators/`, `constants/`, `debug/` | Funções puras, validação e observabilidade | Chamadores específicos |

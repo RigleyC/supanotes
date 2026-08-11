@@ -4,7 +4,6 @@ import 'package:super_editor/super_editor.dart';
 import 'rich_common_editor_operations.dart';
 import 'rich_ios_controls_controller.dart';
 import 'rich_keyboard_actions.dart';
-import 'slash_command_overlay.dart';
 
 class EditorControls {
   final RichCommonEditorOperations richOps;
@@ -69,14 +68,9 @@ SelectionStyles editorSelectionStyle(ColorScheme colorScheme) {
   );
 }
 
-List<SuperEditorKeyboardAction> editorKeyboardActions({
-  SlashCommandController? slashCommandController,
-}) {
+List<SuperEditorKeyboardAction> editorKeyboardActions() {
   return buildRichKeyboardActions(
-    slashCommandController: slashCommandController,
-    // SuperEditor uses the IME by default on every supported platform. Keep
-    // the keyboard actions aligned with that input source instead of choosing
-    // a different list only because the platform is desktop.
+    // SuperEditor uses the IME by default on every supported platform.
     baseActions: defaultImeKeyboardActions,
   );
 }

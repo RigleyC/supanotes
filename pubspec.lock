@@ -611,7 +611,7 @@ packages:
     source: sdk
     version: "0.0.0"
   follow_the_leader:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: follow_the_leader
       sha256: "5cc5676008b786e8a34725874c750489c778431d2f9c423f0cc3c18527535236"
@@ -1407,14 +1407,6 @@ packages:
     description:
       name: super_clipboard
       sha256: e73f3bb7e66cc9260efa1dc507f979138e7e106c3521e2dda2d0311f6d728a16
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.1"
-  super_context_menu:
-    dependency: "direct main"
-    description:
-      name: super_context_menu
-      sha256: "44570d342bea2381c57520f181016207c0ffde401f05f641e6dfec495fa728fe"
       url: "https://pub.dev"
     source: hosted
     version: "0.9.1"

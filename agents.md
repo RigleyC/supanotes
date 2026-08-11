@@ -7,7 +7,7 @@ This file defines the conventions, architecture decisions, and rules all agents 
 ## Project Overview
 
 **SupaNotes** is a personal notes app with proactive AI capabilities.  
-- **Frontend**: Flutter (mobile + desktop)  
+- **Frontend**: Flutter (mobile)
 - **Backend**: Go (REST API, AI proxy, business logic)
 
 ---

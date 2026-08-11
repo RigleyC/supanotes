@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
@@ -27,93 +26,23 @@ void main() {
     hasRemoteCopy: true,
   );
 
-  Widget host({required double width, required Widget child}) {
-    return MaterialApp(
-      home: MediaQuery(
-        data: MediaQueryData(size: Size(width, 600)),
-        child: Scaffold(body: child),
-      ),
-    );
-  }
-
-  testWidgets(
-    'allows icon editing by long press only on editable mobile notes',
-    (tester) async {
-      late BuildContext context;
-      await tester.pumpWidget(
-        host(
-          width: 360,
-          child: Builder(
-            builder: (builderContext) {
-              context = builderContext;
-              return const SizedBox();
-            },
-          ),
-        ),
-      );
-
-      expect(
-        NoteIconInteractionPolicy.canUseMobileLongPress(
-          context: context,
-          note: editableNote,
-          onEditIcon: () {},
-        ),
-        isTrue,
-      );
-      expect(
-        NoteIconInteractionPolicy.canUseMobileLongPress(
-          context: context,
-          note: readOnlyNote,
-          onEditIcon: () {},
-        ),
-        isFalse,
-      );
-      expect(
-        NoteIconInteractionPolicy.canUseMobileLongPress(
-          context: context,
-          note: editableNote,
-          onEditIcon: null,
-        ),
-        isFalse,
-      );
-    },
-  );
-
-  testWidgets('allows icon editing from the context menu only on desktop', (
-    tester,
-  ) async {
-    late BuildContext context;
-    await tester.pumpWidget(
-      host(
-        width: 1200,
-        child: Builder(
-          builder: (builderContext) {
-            context = builderContext;
-            return const SizedBox();
-          },
-        ),
-      ),
-    );
-
+  test('allows icon editing only on editable notes with a handler', () {
     expect(
-      NoteIconInteractionPolicy.canUseDesktopContextMenu(
-        context: context,
+      NoteIconInteractionPolicy.canUseLongPress(
         note: editableNote,
         onEditIcon: () {},
       ),
       isTrue,
     );
     expect(
-      NoteIconInteractionPolicy.canUseDesktopContextMenu(
-        context: context,
+      NoteIconInteractionPolicy.canUseLongPress(
         note: readOnlyNote,
         onEditIcon: () {},
       ),
       isFalse,
     );
     expect(
-      NoteIconInteractionPolicy.canUseDesktopContextMenu(
-        context: context,
+      NoteIconInteractionPolicy.canUseLongPress(
         note: editableNote,
         onEditIcon: null,
       ),

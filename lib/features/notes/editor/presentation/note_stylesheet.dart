@@ -3,9 +3,8 @@ import 'package:super_editor/super_editor.dart';
 
 /// Builds the shared note stylesheet rules for one layout profile.
 ///
-/// The mobile and desktop entry points provide the profile metrics. Keeping
-/// the block rules here prevents the two stylesheets from drifting apart while
-/// allowing their typography to evolve independently.
+/// The mobile entry point provides the profile metrics. Keeping the block
+/// rules in one place prevents duplicate stylesheets from drifting apart.
 Stylesheet buildNoteStylesheet(
   BuildContext context, {
   required EdgeInsets documentPadding,

@@ -57,7 +57,7 @@ timeout, falha HTTP e troca de conta não podem apagar uma operação nem expô-
 
 Os testes automatizados simulam queda de rede, latência e morte do processo
 criando uma nova sessão sobre o mesmo SQLite. Ainda é necessário um smoke test
-manual em Android/iOS/Desktop para: forçar encerramento pelo sistema durante
+manual em Android/iOS para: forçar encerramento pelo sistema durante
 digitação, suspensão/retomada, troca real de Wi-Fi/dados móveis e falta de
 espaço no disco. Esses testes não devem substituir as asserções de outbox e
 snapshot desta matriz.

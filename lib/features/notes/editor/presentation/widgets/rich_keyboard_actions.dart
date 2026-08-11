@@ -6,7 +6,6 @@ import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 
 import 'clipboard_preprocessor.dart';
 import 'rich_clipboard_serializers.dart';
-import 'slash_command_overlay.dart';
 
 ExecutionInstruction insertEmptyTaskBeforeMetadataTaskOnEnter({
   required SuperEditorContext editContext,
@@ -140,12 +139,9 @@ ExecutionInstruction pastePreprocessedRichText({
 /// Prepends rich copy, cut, and paste actions to the list of [baseActions].
 List<SuperEditorKeyboardAction> buildRichKeyboardActions({
   required List<SuperEditorKeyboardAction> baseActions,
-  SlashCommandController? slashCommandController,
 }) {
   configureRichClipboardSerializers();
   return [
-    if (slashCommandController != null)
-      slashMenuKeyboardHandler(slashCommandController),
     copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed,
     cutAsRichTextWhenCmdXOrCtrlXIsPressed,
     pastePreprocessedRichText,

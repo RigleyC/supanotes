@@ -22,16 +22,12 @@ esse estado é documentada no controller, provider ou repositório indicado.
 | `catalog/data/notes_repository.dart` | `INotesRepository`, `NotesRepository` | Interface usada por UI; `watchNotes`, `watchNoteById`, `watchNoteWithTasks` expõem leitura; `createLocalNote` cria antes da navegação; `saveSnapshot` mantém conteúdo, links e projeção juntos; `deleteIfEmptyOrTombstone` diferencia nota local vazia de nota remota. |
 | `catalog/data/note_catalog_sync.dart` | `NoteCatalogSync`, `noteCatalogSyncProvider` | `pullRemoteNotes` hidrata o catálogo; `_pullRemoteNote` ignora notas ativas, calcula a projeção com `tasks/domain/note_document_projector.dart` e usa `AppDatabase.saveRemoteNote` para gravar snapshot e projeções atomicamente. A atualização remota usa comparação de versão e recusa linhas sujas, excluídas, ausentes ou alteradas durante a requisição. |
 | `catalog/application/notes_providers.dart` | `activeNotesProvider`, `noteWithTasksProvider` | Convertem os streams do repositório em `AsyncValue`; a tela não decide como consultar Drift. |
-| `catalog/presentation/adaptive_notes_shell.dart` | `AdaptiveNotesShell` | `build` monta sidebar + conteúdo em desktop; `onNewNote` usa criação local antes de `go`. |
 | `catalog/presentation/notes_list_screen.dart` | `NotesListScreen` | `_openSearch`/`_closeSearch` controlam somente UI; `_onSearchQueryChanged` aplica debounce; `_openNewNote`, `_deleteNote`, `_toggleFavorite` delegam ao repositório; `build` combina `AsyncValue` com grid/lista. |
-| `catalog/presentation/widgets/notes_sidebar.dart` | `NotesSidebar` | `_filterNotes` limita o catálogo a todas/favoritas; `build` observa o provider e navega, sem criar sessão de editor. |
 | `catalog/presentation/widgets/notes_grid_view.dart` | `NotesGridView` | `build` apenas distribui `NoteCard` em grid; callbacks continuam pertencendo à tela. |
 | `catalog/presentation/widgets/notes_list_view.dart` | `NotesListView` | `build` distribui `NoteListRow` em lista. |
 | `catalog/presentation/widgets/note_card.dart` | `NoteCard` | `build` exibe resumo; `_confirmDelete` pede confirmação antes de delegar exclusão. |
 | `catalog/presentation/widgets/note_list_row.dart` | `NoteListRow` | `build` exibe título, excerpt, favorito e compartilhamento; não busca dados adicionais. |
-| `catalog/presentation/widgets/note_context_menu.dart` | `NoteContextMenuWidget` | Converte gestos/context menu em callbacks de catálogo. |
 | `catalog/presentation/widgets/notes_more_menu.dart` | `NotesMoreMenu` | `build` oferece modo de exibição, settings e logout; não implementa essas ações. |
-| `catalog/presentation/widgets/resize_drag_handle.dart` | `ResizeDragHandle` | Possui apenas estado visual de arraste; o shell é dono da largura. |
 
 ## Editor: application
 
@@ -52,7 +48,6 @@ esse estado é documentada no controller, provider ou repositório indicado.
 | `editor/document/document_projection_applier.dart` | `DocumentProjectionApplier` | `rebuildFromSnapshot` aplica snapshot + operações locais; `applyFullDocument` e `applyOperationPayload` transformam mudanças em comandos do editor; preserva seleção e atualiza texto/metadata sem disparar captura remota. |
 | `editor/document/note_editor_commands.dart` | `NoteEditorCommands`, `RandomDividerConversionReaction` | Comandos de alto nível para inserir task, divider, links e metadata; reactions automatizam padrões de digitação sem colocar regra no widget. |
 | `editor/document/keep_first_line_as_title_reaction.dart` | `KeepFirstLineAsTitleReaction` | Mantém a convenção de título derivado do primeiro bloco; não cria campo `title` independente. |
-| `editor/document/slash_command_options.dart` | `SlashCommandOption`, `SlashOptionType` | Catálogo tipado de comandos; `matches` centraliza filtragem do overlay. |
 
 ## Editor: sync
 

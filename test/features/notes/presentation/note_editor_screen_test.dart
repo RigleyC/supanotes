@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -16,13 +15,9 @@ import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_note_chrome.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/slash_command_overlay.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/features/tasks/data/tasks_repository.dart';
@@ -248,18 +243,6 @@ void main() {
     expect(androidScope.controller.controlsColor, primary);
     expect(iosScope.controller.handleColor, primary);
   });
-
-  test(
-    'NoteEditor wires explicit mobile and desktop stylesheet entrypoints',
-    () {
-      final source = File(
-        'lib/features/notes/editor/presentation/widgets/note_editor.dart',
-      ).readAsStringSync();
-
-      expect(source, contains('desktopNoteStylesheet'));
-      expect(source, contains('mobileNoteStylesheet'));
-    },
-  );
 
   testWidgets('requests initial focus for a newly created empty note', (
     tester,
@@ -532,162 +515,6 @@ void main() {
     },
   );
 
-  testWidgets('shows the editor toolbar on desktop layout', (tester) async {
-    tester.view.physicalSize = const Size(1200, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-
-    final controller = _createTestController([
-      ParagraphNode(id: '1', text: AttributedText('Desktop note')),
-    ]);
-    addTearDown(controller.dispose);
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          noteEditorSessionProvider.overrideWith(
-            (ref, noteId) async => _sessionFor(controller),
-          ),
-        ],
-        child: MaterialApp(
-          home: Scaffold(
-            body: NoteEditor(
-              noteId: 'note-1',
-              session: _sessionFor(controller),
-              taskMetadata: const {},
-              delegate: const NoteEditorDelegate(),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(NoteToolbar), findsOneWidget);
-    expect(find.byType(NoteSuggestionOverlay), findsNothing);
-  });
-
-  testWidgets('desktop NoteEditor attaches Markdown task shortcuts', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(1200, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-
-    final controller = _createTestController([
-      ParagraphNode(id: 'paragraph-1', text: AttributedText()),
-    ]);
-    late StateSetter rebuildParent;
-    addTearDown(controller.dispose);
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          noteEditorSessionProvider.overrideWith(
-            (ref, noteId) async => _sessionFor(controller),
-          ),
-        ],
-        child: MaterialApp(
-          home: Scaffold(
-            body: StatefulBuilder(
-              builder: (context, setState) {
-                rebuildParent = setState;
-                return NoteEditor(
-                  noteId: 'note-1',
-                  session: _sessionFor(controller),
-                  taskMetadata: const {},
-                  delegate: const NoteEditorDelegate(),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    rebuildParent(() {});
-    await tester.pumpAndSettle();
-
-    controller.editor.execute([
-      InsertTextRequest(
-        documentPosition: const DocumentPosition(
-          nodeId: 'paragraph-1',
-          nodePosition: TextNodePosition(offset: 0),
-        ),
-        textToInsert: '[] ',
-        attributions: const {},
-      ),
-    ]);
-    await tester.pump();
-
-    expect(controller.document.getNodeById('paragraph-1'), isA<TaskNode>());
-  });
-
-  testWidgets(
-    'desktop screen uses compact chrome and centered editor viewport',
-    (tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      final streamController = StreamController<NoteModel?>();
-      addTearDown(streamController.close);
-      final controller = _createTestController([
-        ParagraphNode(id: '1', text: AttributedText('Desktop note')),
-      ]);
-      addTearDown(controller.dispose);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            notesRepositoryProvider.overrideWithValue(
-              _FakeNotesRepository(streamController),
-            ),
-            tasksRepositoryProvider.overrideWithValue(_defaultMockTasksRepo()),
-            currentUserIdProvider.overrideWithValue('test-user'),
-            appDatabaseProvider.overrideWithValue(AppDatabase.test()),
-            noteEditorSessionProvider.overrideWith(
-              (ref, noteId) async => _sessionFor(controller),
-            ),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: const NoteEditorScreen(noteId: 'note-1'),
-          ),
-        ),
-      );
-
-      streamController.add(
-        NoteModel(
-          id: 'note-1',
-          userId: 'test-user',
-          title: 'Desktop note',
-          content: 'Desktop note',
-          favorite: false,
-          archived: false,
-          createdAt: DateTime(2026),
-          updatedAt: DateTime(2026),
-          hasRemoteCopy: true,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(DesktopNoteChrome), findsOneWidget);
-      expect(find.byType(DesktopEditorViewport), findsOneWidget);
-      expect(find.byType(AppBar), findsNothing);
-      expect(find.byType(NoteToolbar), findsOneWidget);
-    },
-  );
-
   testWidgets('hideCompleted removes completed task components', (
     tester,
   ) async {
@@ -741,7 +568,7 @@ void main() {
     );
   });
 
-  testWidgets('hideCompleted keeps the last task valid for desktop hover', (
+  testWidgets('hideCompleted keeps the last task valid for caret placement', (
     tester,
   ) async {
     var hideCompleted = false;
@@ -1474,7 +1301,6 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.byType(SlashCommandOverlay), findsNothing);
     expect(find.byType(NoteToolbar), findsNothing);
     expect(find.byType(SuperReader), findsOneWidget);
     expect(find.byType(SuperEditor), findsNothing);

@@ -21,7 +21,7 @@ busca e hidratação remota.
   remota ser ignorada.
 - `model/`: `NoteModel`, `NoteWithTasks` e textos compartilhados do catálogo.
 - `application/notes_providers.dart`: streams reativos para lista e detalhe.
-- `presentation/`: shell desktop, lista e widgets de cartão/barra lateral.
+- `presentation/`: shell, lista e widgets de cartão.
 
 ## Por que criar localmente antes de abrir?
 

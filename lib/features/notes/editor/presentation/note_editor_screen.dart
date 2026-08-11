@@ -22,16 +22,12 @@ import 'package:supanotes/features/notes/editor/application/note_editor_provider
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_editor_viewport.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/desktop_note_chrome.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
-
-import 'package:supanotes/core/utils/platform_utils.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
@@ -137,32 +133,20 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       notePreferenceMutationControllerProvider(widget.noteId),
     );
 
-    final isDesktop = isDesktopLayout(context);
-    final editorFocusNode = sessionAsync.when(
-      data: (session) => session.controller.focusNode,
-      loading: () => null,
-      error: (_, _) => null,
-    );
-
     return Scaffold(
-      backgroundColor: isDesktop ? Colors.transparent : null,
-      extendBodyBehindAppBar: !isDesktop,
-      appBar: isDesktop
-          ? null
-          : AppBar(
-              automaticallyImplyLeading: false,
-              leading: !isDesktop
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () {
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          context.go(AppRoutes.home);
-                        }
-                      },
-                    )
-                  : null,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
+        ),
               flexibleSpace: ClipRect(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
@@ -262,28 +246,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             ),
       body: Column(
         children: [
-          if (isDesktop)
-            DesktopNoteChrome(
-              note: note,
-              readOnlyOverride: screenIsReadOnly,
-              preferenceStatus: preferenceMutation.status,
-              editorFocusNode: editorFocusNode,
-              onMenuSelected: (value) {
-                final currentNote = note;
-                if (currentNote == null) return;
-                _handleMenuValue(
-                  context,
-                  ref,
-                  value,
-                  currentNote,
-                  currentNote.hideCompleted,
-                );
-              },
-              onExitFocus: () {
-                editorFocusNode?.unfocus();
-                SystemChannels.textInput.invokeMethod('TextInput.hide');
-              },
-            ),
           Expanded(
             child: SafeArea(
               top: false,
@@ -404,9 +366,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                                 },
                         ),
                       );
-                      return isDesktop
-                          ? DesktopEditorViewport(child: editor)
-                          : editor;
+                      return editor;
                     },
                   );
                 },

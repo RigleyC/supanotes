@@ -85,7 +85,7 @@ Status: complete.
 
 ## Remove desktop version features
 
-Status: in progress (plan awaiting approval).
+Status: complete (see `walkthrough.md`).
 
 Decisions confirmed with the user:
 - Keep the `windows/` platform folder — the app stays buildable on Windows; only the desktop *features* are removed.
@@ -150,6 +150,8 @@ NOT desktop (keep as-is, clarified):
 6. **Update living docs** to remove desktop references: `AGENTS.md` ("mobile + desktop"), `CONTEXT.md`, `docs/architecture/notes-file-reference.md`, `docs/e2e-test-scenario-matrix.md`, `implementation_plan.md`, `walkthrough.md`. Historical specs stay.
 
 7. **Verification**: `flutter analyze` clean; run mobile-focused test suite (`notes`, `catalog`, `editor`, `tasks`); confirm no remaining imports of removed symbols via grep; update `task.md`.
+
+Status: **complete** (desktop features removed). See `walkthrough.md`.
 
 ## Note sharing hardening
 

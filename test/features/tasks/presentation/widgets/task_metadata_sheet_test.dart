@@ -140,7 +140,7 @@ void main() {
     expect(find.text('Cancelar'), findsNothing);
   });
 
-  testWidgets('modal selections persist date and recurrence on desktop', (
+  testWidgets('modal selections persist date and recurrence', (
     tester,
   ) async {
     final task = _taskWithoutMetadata(id: 'task-modal-selection');

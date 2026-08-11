@@ -97,3 +97,45 @@ Verification:
 - Flutter analyze: no issues found.
 - Focused Flutter suite: 69 passed, 1 skipped.
 - `git diff --check`: passed.
+
+## Remove desktop version features
+
+Desktop-only features were removed from the Flutter app: split-view shell
+(`AdaptiveNotesShell` + `ShellRoute`), sidebar and drag handle, desktop editor
+chrome/viewport/stylesheet, selection formatting popover, native context menus
+(`super_context_menu`), markdown task shortcuts, and the slash command menu.
+The router, shared screens, and `note_editor.dart` are now mobile-only; the
+Windows platform folder and window bootstrap stay so the app remains buildable.
+
+Removed deps: `super_context_menu` and the direct `follow_the_leader` entry
+(still resolved transitively via `super_editor`). Removed 8 desktop test files
+and stripped desktop/slash cases from shared tests. Historical specs
+(`docs/superpowers/specs/`, `plans/003-*.md`, `.scratch/`) were kept.
+
+Verification:
+
+- Flutter analyze: no issues found.
+- Full Flutter test suite: 630 passed, 1 skipped (1 unrelated failure in the
+  other agent's draft-lifecycle test).
+- `git diff --check`: passed.
+
+## Remove desktop version features
+
+Desktop-only features were removed from the Flutter app: split-view shell
+(`AdaptiveNotesShell` + `ShellRoute`), sidebar and drag handle, desktop editor
+chrome/viewport/stylesheet, selection formatting popover, native context menus
+(`super_context_menu`), markdown task shortcuts, and the slash command menu.
+The router, shared screens, and `note_editor.dart` are now mobile-only; the
+Windows platform folder and window bootstrap stay so the app remains buildable.
+
+Removed deps: `super_context_menu` and the direct `follow_the_leader` entry
+(still resolved transitively via `super_editor`). Removed 8 desktop test files
+and stripped desktop/slash cases from shared tests. Historical specs
+(`docs/superpowers/specs/`, `plans/003-*.md`, `.scratch/`) were kept.
+
+Verification:
+
+- Flutter analyze: no issues found.
+- Focused mobile suite: 82 passed, 1 skipped (validated in an isolated
+  worktree at HEAD with only this commit's changes).
+- `git diff --check`: passed.

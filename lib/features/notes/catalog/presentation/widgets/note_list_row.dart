@@ -27,8 +27,7 @@ class NoteListRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final title = note.title;
     final canLongPressToEditIcon =
-        NoteIconInteractionPolicy.canUseMobileLongPress(
-          context: context,
+        NoteIconInteractionPolicy.canUseLongPress(
           note: note,
           onEditIcon: onEditIcon,
         );

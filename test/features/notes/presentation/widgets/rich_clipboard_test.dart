@@ -12,7 +12,6 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/rich_keyboa
 import 'package:supanotes/features/notes/editor/presentation/widgets/rich_common_editor_operations.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/rich_clipboard_serializers.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/clipboard_preprocessor.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/slash_command_overlay.dart';
 
 class MockEditor extends Mock implements Editor {}
 
@@ -358,35 +357,6 @@ void main() {
       expect(richActions[3], equals(insertEmptyTaskBeforeMetadataTaskOnEnter));
       expect(richActions[4], equals(doNothingWhenThereIsNoSelection));
     });
-
-    test(
-      'buildRichKeyboardActions injects slash handler when scoped controller exists',
-      () {
-        final baseActions = <SuperEditorKeyboardAction>[
-          doNothingWhenThereIsNoSelection,
-        ];
-        final slashController = SlashCommandController();
-        addTearDown(slashController.dispose);
-
-        final richActions = buildRichKeyboardActions(
-          baseActions: baseActions,
-          slashCommandController: slashController,
-        );
-
-        expect(richActions.length, equals(6));
-        expect(
-          richActions[1],
-          equals(copyAsRichTextWithMarkdownFallbackWhenShortcutIsPressed),
-        );
-        expect(richActions[2], equals(cutAsRichTextWhenCmdXOrCtrlXIsPressed));
-        expect(richActions[3], equals(pastePreprocessedRichText));
-        expect(
-          richActions[4],
-          equals(insertEmptyTaskBeforeMetadataTaskOnEnter),
-        );
-        expect(richActions[5], equals(doNothingWhenThereIsNoSelection));
-      },
-    );
 
     test('enter at task start keeps metadata with the task text', () {
       final original = TaskNode(
