@@ -7,6 +7,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
+import 'package:supanotes/core/async/keyed_async_queue.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
@@ -73,28 +74,14 @@ class NoteSyncTelemetrySnapshot {
   final bool hasPersistedSession;
 }
 
-class _NoteSyncQueue {
-  final Map<String, Future<void>> _tails = {};
-
-  Future<T> run<T>(String noteId, Future<T> Function() fn) {
-    final previous = _tails[noteId] ?? Future<void>.value();
-    final result = previous.then((_) => fn());
-    final tail = result.then<void>((_) {}, onError: (_, _) {});
-    _tails[noteId] = tail;
-    return result.whenComplete(() {
-      if (identical(_tails[noteId], tail)) _tails.remove(noteId);
-    });
-  }
-}
-
 class NoteOperationsSyncService {
   final NoteSyncClient _syncClient;
   final NoteOperationsDao _dao;
   final String _clientId;
   final String _actorId;
   final Uuid _uuid = const Uuid();
-  final _NoteSyncQueue _syncQueue = _NoteSyncQueue();
-  final _NoteSyncQueue _outboxQueue = _NoteSyncQueue();
+  final _syncQueue = KeyedAsyncQueue();
+  final _outboxQueue = KeyedAsyncQueue();
   late final NoteOperationRebaser _rebaser;
 
   NoteOperationsSyncService({

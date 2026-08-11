@@ -8,4 +8,5 @@ enum AttachmentDeliveryPreference { localFirst, externalFirst }
 abstract interface class AttachmentDelivery {
   AttachmentDeliveryPreference get preference;
   Uri? urlFor(String attachmentId);
+  Future<void> open(String attachmentId, Uri uri, {String? fileName});
 }

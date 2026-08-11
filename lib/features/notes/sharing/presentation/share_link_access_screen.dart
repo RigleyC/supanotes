@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_provider.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
-import 'package:supanotes/features/notes/sharing/data/share_link_attachment_url.dart';
-import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
+import 'package:supanotes/features/notes/attachments/data/authenticated_attachment_delivery.dart';
 import 'package:supanotes/features/notes/sharing/domain/share_link_strings.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_link_reader_screen.dart';
@@ -76,9 +76,8 @@ class _ShareLinkAccessScreenState extends ConsumerState<ShareLinkAccessScreen> {
       context.go(
         AppRoutes.note(noteId),
         extra: NoteEditorOpenOptions(
-          attachmentDelivery: ShareLinkAttachmentDelivery(
-            widget.token,
-            preference: AttachmentDeliveryPreference.localFirst,
+          attachmentDelivery: AuthenticatedAttachmentDelivery(
+            ref.read(apiClientProvider),
           ),
         ),
       );

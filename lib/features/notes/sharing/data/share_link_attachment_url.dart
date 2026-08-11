@@ -1,5 +1,6 @@
 import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Builds the browser-deliverable attachment URL for a public share token.
 ///
@@ -31,4 +32,8 @@ final class ShareLinkAttachmentDelivery implements AttachmentDelivery {
   @override
   Uri urlFor(String attachmentId) =>
       shareLinkAttachmentUrl(token, attachmentId);
+
+  @override
+  Future<void> open(String attachmentId, Uri uri, {String? fileName}) =>
+      launchUrl(uri);
 }

@@ -29,6 +29,12 @@ class AttachmentComponentBuilder implements ComponentBuilder {
     if (node is! AttachmentNode) return null;
     return _AttachmentViewModel(
       nodeId: node.id,
+      attachmentId:
+          node is DocumentAttachmentNode &&
+              node.metadata['attachmentId'] is String &&
+              (node.metadata['attachmentId'] as String).isNotEmpty
+          ? node.metadata['attachmentId'] as String
+          : node.id,
       node: node,
       createdAt: node.metadata[NodeMetadata.createdAt],
       collapseImages: collapseImages,
@@ -47,6 +53,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
           node is DocumentAttachmentNode && node.metadata['filename'] is String
           ? node.metadata['filename'] as String
           : null,
+      attachmentDelivery: attachmentDelivery,
       attachmentDeliveryPreference:
           attachmentDelivery?.preference ??
           AttachmentDeliveryPreference.localFirst,
@@ -68,6 +75,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
       DocumentAttachmentNode n => DocumentAttachmentWidget(
         componentKey: context.componentKey,
         nodeId: n.id,
+        attachmentId: viewModel.attachmentId,
         selection:
             viewModel.selection?.nodeSelection
                 as UpstreamDownstreamNodeSelection?,
@@ -77,6 +85,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
         fallbackUrl: viewModel.fallbackAttachmentUrl,
         fallbackFileName: viewModel.fallbackAttachmentName,
         deliveryPreference: viewModel.attachmentDeliveryPreference,
+        attachmentDelivery: viewModel.attachmentDelivery,
       ),
       RichLinkNode n => AttachmentRichLinkCard(
         componentKey: context.componentKey,
@@ -96,6 +105,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     with SelectionAwareViewModelMixin {
   _AttachmentViewModel({
     required super.nodeId,
+    required this.attachmentId,
     required this.node,
     required this.onDelete,
     required this.collapseImages,
@@ -103,6 +113,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     required this.fallbackAttachmentUrl,
     required this.fallbackAttachmentName,
     required this.attachmentDeliveryPreference,
+    required this.attachmentDelivery,
     super.createdAt,
     super.padding = EdgeInsets.zero,
     DocumentNodeSelection? selection,
@@ -113,16 +124,19 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
   }
 
   final AttachmentNode node;
+  final String attachmentId;
   final VoidCallback? onDelete;
   final bool collapseImages;
   final bool allowInternalNoteLinks;
   final String? fallbackAttachmentUrl;
   final String? fallbackAttachmentName;
   final AttachmentDeliveryPreference attachmentDeliveryPreference;
+  final AttachmentDelivery? attachmentDelivery;
 
   @override
   _AttachmentViewModel copy() => _AttachmentViewModel(
     nodeId: nodeId,
+    attachmentId: attachmentId,
     node: node,
     onDelete: onDelete,
     collapseImages: collapseImages,
@@ -130,6 +144,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     fallbackAttachmentUrl: fallbackAttachmentUrl,
     fallbackAttachmentName: fallbackAttachmentName,
     attachmentDeliveryPreference: attachmentDeliveryPreference,
+    attachmentDelivery: attachmentDelivery,
     selection: selection,
     selectionColor: selectionColor,
   );
@@ -138,19 +153,23 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
   bool operator ==(Object other) =>
       other is _AttachmentViewModel &&
       other.node.id == node.id &&
+      other.attachmentId == attachmentId &&
       other.collapseImages == collapseImages &&
       other.allowInternalNoteLinks == allowInternalNoteLinks &&
       other.fallbackAttachmentUrl == fallbackAttachmentUrl &&
       other.fallbackAttachmentName == fallbackAttachmentName &&
-      other.attachmentDeliveryPreference == attachmentDeliveryPreference;
+      other.attachmentDeliveryPreference == attachmentDeliveryPreference &&
+      other.attachmentDelivery == attachmentDelivery;
 
   @override
   int get hashCode => Object.hash(
     node.id,
+    attachmentId,
     collapseImages,
     allowInternalNoteLinks,
     fallbackAttachmentUrl,
     fallbackAttachmentName,
     attachmentDeliveryPreference,
+    attachmentDelivery,
   );
 }

@@ -54,11 +54,11 @@ class ShareLinkAccessResolver {
     }
 
     final metadata = await gateway.metadataFor(target.noteId);
-    final permission = metadata == null ? null : metadata.permission ?? 'owner';
-    final mode = switch (permission) {
-      'owner' || 'edit' => ShareLinkAccessMode.editor,
-      'view' => ShareLinkAccessMode.viewer,
-      _ => ShareLinkAccessMode.guest,
+    final mode = switch (metadata?.access) {
+      RemoteNoteAccess.owner ||
+      RemoteNoteAccess.edit => ShareLinkAccessMode.editor,
+      RemoteNoteAccess.view => ShareLinkAccessMode.viewer,
+      null => ShareLinkAccessMode.guest,
     };
     return ShareLinkAccessDecision(
       noteId: target.noteId,

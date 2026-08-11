@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/async/keyed_async_queue.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
@@ -34,6 +35,13 @@ final class _LocalRemoteNoteState {
 
 enum _RemoteNoteWriteOutcome { applied, becameActive, stale }
 
+final class _RemoteNoteWriteResult {
+  const _RemoteNoteWriteResult(this.outcome, {this.fetchedRevision});
+
+  final _RemoteNoteWriteOutcome outcome;
+  final int? fetchedRevision;
+}
+
 class NoteCatalogSync {
   static const _pageSize = 100;
 
@@ -54,57 +62,28 @@ class NoteCatalogSync {
   final NoteIconUpdater _updateNoteIcon;
   final NoteDocumentProjector _documentProjector;
   Map<String, RemoteNoteMetadata> _remoteCatalog = const {};
-  final Map<String, Future<void>> _remoteNoteTails = {};
-
-  Future<T> _serializeNoteOperation<T>(
-    String noteId,
-    Future<T> Function() operation,
-  ) {
-    final previous = _remoteNoteTails[noteId] ?? Future<void>.value();
-    final current = previous.then((_) => operation());
-    final tail = current.then<void>(
-      (_) {},
-      onError: (Object _, StackTrace _) {},
-    );
-    _remoteNoteTails[noteId] = tail;
-    current.then<void>(
-      (_) {
-        if (identical(_remoteNoteTails[noteId], tail)) {
-          _remoteNoteTails.remove(noteId);
-        }
-      },
-      onError: (Object _, StackTrace _) {
-        if (identical(_remoteNoteTails[noteId], tail)) {
-          _remoteNoteTails.remove(noteId);
-        }
-      },
-    );
-    return current;
-  }
+  final _remoteNoteQueue = KeyedAsyncQueue();
 
   Future<void> pushDeletedNotes() async {
     final localOnlyDeletedNotes = await _database.notesDao
         .getDirtyLocalOnlyDeletedNotes();
     for (final note in localOnlyDeletedNotes) {
-      if (_activityTracker.isActive(note.id)) {
-        continue;
-      }
-      await _database.deleteNoteData(note.id);
-      dev.log('[NoteCatalogSync] Removed local-only note ${note.id}');
+      await _remoteNoteQueue.run(note.id, () async {
+        if (_activityTracker.isActive(note.id)) return;
+        await _database.deleteNoteData(note.id);
+        dev.log('[NoteCatalogSync] Removed local-only note ${note.id}');
+      });
     }
 
     final deletedNotes = await _database.notesDao.getDirtyDeletedNotes();
     for (final note in deletedNotes) {
-      if (_activityTracker.isActive(note.id)) {
-        continue;
-      }
-
-      await _syncClient.deleteNote(note.id);
-      if (_activityTracker.isActive(note.id)) {
-        continue;
-      }
-      await _database.deleteNoteData(note.id);
-      dev.log('[NoteCatalogSync] Deleted ${note.id} remotely');
+      await _remoteNoteQueue.run(note.id, () async {
+        if (_activityTracker.isActive(note.id)) return;
+        await _syncClient.deleteNote(note.id);
+        if (_activityTracker.isActive(note.id)) return;
+        await _database.deleteNoteData(note.id);
+        dev.log('[NoteCatalogSync] Deleted ${note.id} remotely');
+      });
     }
   }
 
@@ -227,11 +206,11 @@ class NoteCatalogSync {
       if (remoteIds.contains(note.id)) {
         continue;
       }
-      if (_activityTracker.isActive(note.id)) {
-        continue;
-      }
-      await _database.deleteNoteData(note.id);
-      dev.log('[NoteCatalogSync] Removed locally deleted note ${note.id}');
+      await _remoteNoteQueue.run(note.id, () async {
+        if (_activityTracker.isActive(note.id)) return;
+        await _database.deleteNoteData(note.id);
+        dev.log('[NoteCatalogSync] Removed locally deleted note ${note.id}');
+      });
     }
   }
 
@@ -244,7 +223,7 @@ class NoteCatalogSync {
   Future<void> hydrateRemoteNote({
     required String userId,
     required RemoteNoteMetadata metadata,
-  }) => _serializeNoteOperation(
+  }) => _remoteNoteQueue.run(
     metadata.id,
     () => _hydrateRemoteNote(userId: userId, metadata: metadata),
   );
@@ -259,12 +238,12 @@ class NoteCatalogSync {
       return;
     }
 
-    final outcome = await _fetchAndSaveRemoteNote(
+    final result = await _fetchAndSaveRemoteNote(
       userId: userId,
       catalog: metadata,
       local: local,
     );
-    switch (outcome) {
+    switch (result.outcome) {
       case _RemoteNoteWriteOutcome.applied:
         return;
       case _RemoteNoteWriteOutcome.becameActive:
@@ -278,9 +257,10 @@ class NoteCatalogSync {
       case _RemoteNoteWriteOutcome.stale:
         final current = await _readLocalRemoteNote(metadata);
         if (current.localDocument != null &&
-            current.existing?.isDirty == false) {
+            current.existing?.isDirty == false &&
+            result.fetchedRevision != null &&
+            current.localDocument!.revision >= result.fetchedRevision!) {
           await _updateRemoteMetadata(
-            userId: userId,
             catalog: metadata,
             shouldReadRemoteIcon: current.shouldReadRemoteIcon,
           );
@@ -295,7 +275,7 @@ class NoteCatalogSync {
   Future<void> _pullRemoteNote({
     required String userId,
     required RemoteNoteMetadata catalog,
-  }) => _serializeNoteOperation(
+  }) => _remoteNoteQueue.run(
     catalog.id,
     () => _pullRemoteNoteNow(userId: userId, catalog: catalog),
   );
@@ -308,7 +288,6 @@ class NoteCatalogSync {
 
     if (_activityTracker.isActive(catalog.id)) {
       await _updateRemoteMetadata(
-        userId: userId,
         catalog: catalog,
         shouldReadRemoteIcon: local.shouldReadRemoteIcon,
       );
@@ -322,7 +301,6 @@ class NoteCatalogSync {
                 local.localDocument != null &&
                 !catalog.updatedAt.isAfter(local.existing!.updatedAt)))) {
       await _updateRemoteMetadata(
-        userId: userId,
         catalog: catalog,
         shouldReadRemoteIcon: local.shouldReadRemoteIcon,
       );
@@ -353,25 +331,20 @@ class NoteCatalogSync {
   }
 
   Future<void> _updateRemoteMetadata({
-    required String userId,
     required RemoteNoteMetadata catalog,
     required bool shouldReadRemoteIcon,
   }) async {
-    if (!catalog.hasShareMetadataFor(userId) && !catalog.hasNoteIcon) return;
     await _database.notesDao.updateRemoteShareMetadata(
       id: catalog.id,
-      permission: _permissionValueFor(catalog, userId),
-      sharedByEmail: _sharedByEmailValueFor(catalog, userId),
-      sharedByName: _sharedByNameValueFor(catalog, userId),
+      permission: _permissionValueFor(catalog),
+      sharedByEmail: _sharedByEmailValueFor(catalog),
+      sharedByName: _sharedByNameValueFor(catalog),
       noteIconJson: _noteIconValue(catalog, apply: shouldReadRemoteIcon),
     );
   }
 
-  Value<String?> _permissionValueFor(
-    RemoteNoteMetadata catalog,
-    String currentUserId,
-  ) {
-    if (catalog.isOwner || catalog.userId == currentUserId) {
+  Value<String?> _permissionValueFor(RemoteNoteMetadata catalog) {
+    if (catalog.isOwner) {
       return const Value<String?>(null);
     }
     return catalog.hasPermission
@@ -379,11 +352,8 @@ class NoteCatalogSync {
         : const Value<String?>.absent();
   }
 
-  Value<String?> _sharedByEmailValueFor(
-    RemoteNoteMetadata catalog,
-    String currentUserId,
-  ) {
-    if (catalog.isOwner || catalog.userId == currentUserId) {
+  Value<String?> _sharedByEmailValueFor(RemoteNoteMetadata catalog) {
+    if (catalog.isOwner) {
       return const Value<String?>(null);
     }
     return catalog.hasSharedByEmail
@@ -391,11 +361,8 @@ class NoteCatalogSync {
         : const Value<String?>.absent();
   }
 
-  Value<String?> _sharedByNameValueFor(
-    RemoteNoteMetadata catalog,
-    String currentUserId,
-  ) {
-    if (catalog.isOwner || catalog.userId == currentUserId) {
+  Value<String?> _sharedByNameValueFor(RemoteNoteMetadata catalog) {
+    if (catalog.isOwner) {
       return const Value<String?>(null);
     }
     return catalog.hasSharedByName
@@ -410,7 +377,7 @@ class NoteCatalogSync {
     return apply ? Value(catalog.noteIconJson) : const Value<String?>.absent();
   }
 
-  Future<_RemoteNoteWriteOutcome> _fetchAndSaveRemoteNote({
+  Future<_RemoteNoteWriteResult> _fetchAndSaveRemoteNote({
     required String userId,
     required RemoteNoteMetadata catalog,
     required _LocalRemoteNoteState local,
@@ -424,7 +391,7 @@ class NoteCatalogSync {
     }
     if (_activityTracker.isActive(id)) {
       dev.log('[NoteCatalogSync] Note became active during hydration $id');
-      return _RemoteNoteWriteOutcome.becameActive;
+      return const _RemoteNoteWriteResult(_RemoteNoteWriteOutcome.becameActive);
     }
 
     final projection = _documentProjector.projectBlocks(
@@ -462,9 +429,9 @@ class NoteCatalogSync {
         collapseImages: catalog.hasCollapseImages
             ? Value(catalog.collapseImages ?? false)
             : const Value.absent(),
-        permission: _permissionValueFor(catalog, userId),
-        sharedByEmail: _sharedByEmailValueFor(catalog, userId),
-        sharedByName: _sharedByNameValueFor(catalog, userId),
+        permission: _permissionValueFor(catalog),
+        sharedByEmail: _sharedByEmailValueFor(catalog),
+        sharedByName: _sharedByNameValueFor(catalog),
         noteIconJson: _noteIconValue(
           catalog,
           apply: local.shouldReadRemoteIcon,
@@ -474,10 +441,13 @@ class NoteCatalogSync {
     );
     if (!applied) {
       dev.log('[NoteCatalogSync] Skipped stale remote hydration $id');
-      return _RemoteNoteWriteOutcome.stale;
+      return _RemoteNoteWriteResult(
+        _RemoteNoteWriteOutcome.stale,
+        fetchedRevision: documentResponse.revision,
+      );
     }
     dev.log('[NoteCatalogSync] Hydrated $id from remote snapshot');
-    return _RemoteNoteWriteOutcome.applied;
+    return const _RemoteNoteWriteResult(_RemoteNoteWriteOutcome.applied);
   }
 
   Future<void> _reuseActiveNote({
@@ -491,7 +461,6 @@ class NoteCatalogSync {
       );
     }
     await _updateRemoteMetadata(
-      userId: userId,
       catalog: metadata,
       shouldReadRemoteIcon: local.shouldReadRemoteIcon,
     );

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:developer' as dev;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_editor/super_editor.dart';
@@ -14,28 +17,32 @@ class DocumentAttachmentWidget extends ConsumerWidget {
     super.key,
     required this.componentKey,
     required this.nodeId,
+    required this.attachmentId,
     this.onDelete,
     required this.collapseImages,
     this.fallbackUrl,
     this.fallbackFileName,
     this.deliveryPreference = AttachmentDeliveryPreference.localFirst,
+    this.attachmentDelivery,
     this.selection,
     required this.selectionColor,
   });
 
   final GlobalKey componentKey;
   final String nodeId;
+  final String attachmentId;
   final VoidCallback? onDelete;
   final bool collapseImages;
   final String? fallbackUrl;
   final String? fallbackFileName;
   final AttachmentDeliveryPreference deliveryPreference;
+  final AttachmentDelivery? attachmentDelivery;
   final UpstreamDownstreamNodeSelection? selection;
   final Color selectionColor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final attachmentAsync = ref.watch(attachmentByIdProvider(nodeId));
+    final attachmentAsync = ref.watch(attachmentByIdProvider(attachmentId));
 
     Widget fallbackAttachment() {
       final url = fallbackUrl;
@@ -49,7 +56,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
         fileName: fallbackFileName ?? 'Anexo',
         subtitle: 'Anexo compartilhado',
         icon: Icons.attach_file,
-        onTap: () => launchUrl(Uri.parse(url)),
+        onTap: () => _openAttachment(url, fileName: fallbackFileName),
       );
     }
 
@@ -85,7 +92,11 @@ class DocumentAttachmentWidget extends ConsumerWidget {
                   fileName: model.fileName,
                   subtitle: 'Imagem',
                   icon: Icons.image_outlined,
-                  onTap: () => launchUrl(Uri.parse(url)),
+                  onTap: () => _openAttachment(
+                    url,
+                    useDelivery: model.remoteUrl != null,
+                    fileName: model.fileName,
+                  ),
                 );
               }
               return AttachmentExpandedImage(
@@ -100,7 +111,13 @@ class DocumentAttachmentWidget extends ConsumerWidget {
               icon: model.type == AttachmentType.video
                   ? Icons.play_circle_outline
                   : Icons.insert_drive_file,
-              onTap: url.isNotEmpty ? () => launchUrl(Uri.parse(url)) : () {},
+              onTap: url.isNotEmpty
+                  ? () => _openAttachment(
+                      url,
+                      useDelivery: model.remoteUrl != null,
+                      fileName: model.fileName,
+                    )
+                  : () {},
             );
         }
       },
@@ -118,6 +135,29 @@ class DocumentAttachmentWidget extends ConsumerWidget {
           child: child,
         ),
       ),
+    );
+  }
+
+  void _openAttachment(
+    String url, {
+    bool useDelivery = true,
+    String? fileName,
+  }) {
+    final delivery = useDelivery ? attachmentDelivery : null;
+    if (delivery == null) {
+      launchUrl(Uri.parse(url));
+      return;
+    }
+    unawaited(
+      delivery
+          .open(attachmentId, Uri.parse(url), fileName: fileName)
+          .catchError((Object error, StackTrace stackTrace) {
+            dev.log(
+              'Failed to open attachment $attachmentId',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          }),
     );
   }
 }

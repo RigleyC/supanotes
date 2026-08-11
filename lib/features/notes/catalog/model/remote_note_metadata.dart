@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 
+enum RemoteNoteAccess { owner, edit, view }
+
 /// The typed subset of a catalog response needed to hydrate a remote note.
 ///
 /// This model belongs to the catalog boundary. It contains no Drift companion
@@ -61,13 +63,16 @@ final class RemoteNoteMetadata {
   final NoteIcon? noteIcon;
 
   /// The notes endpoint omits permission for the authenticated owner.
-  bool get isOwner => !hasPermission && permission == null;
+  RemoteNoteAccess get access => switch (permission) {
+    null || 'owner' => RemoteNoteAccess.owner,
+    'edit' => RemoteNoteAccess.edit,
+    'view' => RemoteNoteAccess.view,
+    _ => throw FormatException(
+      'Unsupported remote note permission "$permission"',
+    ),
+  };
 
-  bool get hasShareMetadata =>
-      hasPermission || hasSharedByEmail || hasSharedByName;
-
-  bool hasShareMetadataFor(String currentUserId) =>
-      hasShareMetadata || isOwner || userId == currentUserId;
+  bool get isOwner => access == RemoteNoteAccess.owner;
 
   String? get noteIconJson =>
       noteIcon == null ? null : jsonEncode(noteIcon!.toJson());
