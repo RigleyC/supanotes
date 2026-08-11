@@ -63,6 +63,9 @@ func Load() (*Config, error) {
 		}
 		shareLinkSecret = devShareLinkSecret
 	}
+	if len([]byte(shareLinkSecret)) < 32 {
+		return nil, fmt.Errorf("config: SHARE_LINK_SECRET must contain at least 32 bytes")
+	}
 	publicBaseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL")), "/")
 	if publicBaseURL == "" {
 		if env != "dev" {

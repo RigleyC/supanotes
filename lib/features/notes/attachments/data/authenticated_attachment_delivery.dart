@@ -22,21 +22,36 @@ final class AuthenticatedAttachmentDelivery implements AttachmentDelivery {
   final AttachmentDeliveryPreference preference;
 
   @override
-  @override
   Future<void> open(AttachmentReference attachment) async {
-    final response = await _api.get<List<int>>(
+    final response = await _api.get<ResponseBody>(
       '/attachments/${Uri.encodeComponent(attachment.id)}/content',
-      options: Options(responseType: ResponseType.bytes),
+      options: Options(responseType: ResponseType.stream),
     );
-    final bytes = response.data;
-    if (bytes == null) throw StateError('Attachment response has no content');
+    final body = response.data;
+    if (body == null) throw StateError('Attachment response has no content');
     final directory = await getTemporaryDirectory();
     final safeName = attachment.fileName.replaceAll(
       RegExp(r'[^A-Za-z0-9._-]'),
       '_',
     );
     final file = File('${directory.path}/supanotes-${attachment.id}-$safeName');
-    await file.writeAsBytes(bytes, flush: true);
+    IOSink? sink;
+    try {
+      sink = file.openWrite();
+      await for (final chunk in body.stream) {
+        sink.add(chunk);
+      }
+      await sink.close();
+      sink = null;
+    } catch (_) {
+      await sink?.close();
+      try {
+        await file.delete();
+      } catch (_) {
+        // The partial file is best-effort cleanup after a failed download.
+      }
+      rethrow;
+    }
     if (!await launchUrl(Uri.file(file.path))) {
       throw StateError('Could not open downloaded attachment ${attachment.id}');
     }

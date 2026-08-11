@@ -5,7 +5,7 @@ import (
 )
 
 func TestLoad_Defaults(t *testing.T) {
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS"} {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS"} {
 		t.Setenv(k, "")
 	}
 
@@ -81,6 +81,20 @@ func TestLoad_ProdRequiresJWTSecret(t *testing.T) {
 
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() in prod with no JWT_SECRET: want error, got nil")
+	}
+}
+
+func TestLoad_ProdRejectsShortShareLinkSecret(t *testing.T) {
+	for _, k := range []string{"PORT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("ENVIRONMENT", "prod")
+	t.Setenv("JWT_SECRET", "prod-jwt-secret-at-least-32-characters-long")
+	t.Setenv("SHARE_LINK_SECRET", "too-short")
+	t.Setenv("PUBLIC_BASE_URL", "https://notes.example")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() with short SHARE_LINK_SECRET: want error, got nil")
 	}
 }
 

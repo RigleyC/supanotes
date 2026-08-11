@@ -13,9 +13,9 @@ type AccessResponse struct {
 }
 
 func (h *Handler) Access(c echo.Context) error {
-	note, err := h.svc.ResolvePublic(c.Request().Context(), c.Param("token"))
+	noteID, err := h.svc.ResolvePublicID(c.Request().Context(), c.Param("token"))
 	if err != nil {
 		return h.mapPublicError(c, err)
 	}
-	return c.JSON(http.StatusOK, AccessResponse{NoteID: note.ID.String()})
+	return c.JSON(http.StatusOK, AccessResponse{NoteID: noteID.String()})
 }

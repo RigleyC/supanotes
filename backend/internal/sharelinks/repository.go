@@ -73,6 +73,17 @@ func (r *sqlRepository) GetPublicNote(ctx context.Context, tokenID uuid.UUID) (P
 	return PublicNote{ID: fromPGUUID(value.ID), Document: value.Document}, nil
 }
 
+func (r *sqlRepository) GetPublicNoteID(ctx context.Context, tokenID uuid.UUID) (uuid.UUID, error) {
+	value, err := r.q.GetPublicNoteIDByShareToken(ctx, toPGUUID(tokenID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, ErrLinkNotFound
+		}
+		return uuid.Nil, err
+	}
+	return fromPGUUID(value), nil
+}
+
 func toPGUUID(value uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: value, Valid: value != uuid.Nil}
 }

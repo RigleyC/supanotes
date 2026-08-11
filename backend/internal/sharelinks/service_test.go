@@ -100,6 +100,13 @@ func (r *fakeRepository) GetPublicNote(context.Context, uuid.UUID) (PublicNote, 
 	return r.publicNote, nil
 }
 
+func (r *fakeRepository) GetPublicNoteID(context.Context, uuid.UUID) (uuid.UUID, error) {
+	if r.publicErr != nil {
+		return uuid.Nil, r.publicErr
+	}
+	return r.publicNote.ID, nil
+}
+
 func (r *fakeRepository) GetOwner(context.Context, uuid.UUID) (uuid.UUID, error) {
 	return r.ownerID, nil
 }

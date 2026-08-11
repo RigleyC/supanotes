@@ -194,19 +194,31 @@ class _LogInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (kDebugMode) {
-      debugPrint('[ApiClient Error] ${err.toString()}');
-      if (err.response?.data != null) {
-        debugPrint('[ApiClient Response Data] ${err.response?.data}');
-      }
+      debugPrint(
+        '[ApiClient Error] ${err.requestOptions.method} '
+        '${_redactedUri(err.requestOptions.uri)} -> '
+        '${err.response?.statusCode ?? "no-response"} ${err.type}',
+      );
     }
 
     dev.log(
       '[ApiClient] ${err.requestOptions.method} '
-      '${err.requestOptions.uri} -> '
+      '${_redactedUri(err.requestOptions.uri)} -> '
       '${err.response?.statusCode ?? "no-response"} '
       '${err.message ?? ""}',
       name: 'ApiClient',
     );
     handler.next(err);
   }
+}
+
+Uri _redactedUri(Uri uri) {
+  final segments = [...uri.pathSegments];
+  for (var index = 0; index + 1 < segments.length; index++) {
+    if (segments[index] == 's') {
+      segments[index + 1] = '<share-token-redacted>';
+      break;
+    }
+  }
+  return uri.replace(pathSegments: segments, queryParameters: const {});
 }

@@ -28,3 +28,11 @@ JOIN note_share_links sl ON sl.note_id = n.id
 WHERE sl.token_id = $1
   AND sl.enabled = TRUE
   AND n.deleted_at IS NULL;
+
+-- name: GetPublicNoteIDByShareToken :one
+SELECT sl.note_id
+FROM note_share_links sl
+JOIN notes n ON n.id = sl.note_id
+WHERE sl.token_id = $1
+  AND sl.enabled = TRUE
+  AND n.deleted_at IS NULL;

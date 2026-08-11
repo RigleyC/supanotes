@@ -412,24 +412,33 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Applies the remote icon when its note version is newer than a pending
   /// local icon mutation. Content dirtiness and its local timestamp remain
   /// untouched so the document sync can continue independently.
-  Future<void> resolveRemoteNoteIcon({
+  Future<bool> resolveRemoteNoteIcon({
     required String id,
     required String? noteIconJson,
     required DateTime remoteUpdatedAt,
+    required DateTime expectedUpdatedAt,
   }) async {
-    await attachedDatabase.transaction(() async {
+    return attachedDatabase.transaction(() async {
       final local = await getNoteById(id);
-      if (local == null || !local.noteIconDirty) return;
+      if (local == null || !local.noteIconDirty) return false;
 
-      await (update(notes)..where((t) => t.id.equals(id))).write(
-        NotesCompanion(
-          noteIconJson: Value(noteIconJson),
-          noteIconDirty: const Value(false),
-          updatedAt: local.isDirty
-              ? const Value.absent()
-              : Value(remoteUpdatedAt),
-        ),
-      );
+      final updated =
+          await (update(notes)..where(
+                (t) =>
+                    t.id.equals(id) &
+                    t.updatedAt.equals(expectedUpdatedAt) &
+                    t.noteIconDirty.equals(true),
+              ))
+              .write(
+                NotesCompanion(
+                  noteIconJson: Value(noteIconJson),
+                  noteIconDirty: const Value(false),
+                  updatedAt: local.isDirty
+                      ? const Value.absent()
+                      : Value(remoteUpdatedAt),
+                ),
+              );
+      return updated > 0;
     });
   }
 

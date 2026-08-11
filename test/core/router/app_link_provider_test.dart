@@ -30,7 +30,10 @@ void main() {
         ..initialLink = Uri.parse('https://notes.example/s/token-1');
       addTearDown(source.close);
 
-      final stream = AppLinkStream(source).stream();
+      final stream = AppLinkStream(
+        source,
+        deduplicationDuration: const Duration(milliseconds: 1),
+      ).stream();
       final values = <Uri>[];
       final subscription = stream.listen(values.add);
       addTearDown(subscription.cancel);
@@ -43,6 +46,15 @@ void main() {
 
       expect(values.map((value) => value.path), ['/s/token-1', '/s/token-2']);
       expect(source.initialCalls, 1);
+
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      source.events.add(Uri.parse('https://notes.example/s/token-1'));
+      await Future<void>.delayed(Duration.zero);
+      expect(values.map((value) => value.path), [
+        '/s/token-1',
+        '/s/token-2',
+        '/s/token-1',
+      ]);
     },
   );
 

@@ -50,6 +50,7 @@ type Repository interface {
 	Upsert(ctx context.Context, link Link, replace bool) (Link, error)
 	Disable(ctx context.Context, noteID uuid.UUID) error
 	GetPublicNote(ctx context.Context, tokenID uuid.UUID) (PublicNote, error)
+	GetPublicNoteID(ctx context.Context, tokenID uuid.UUID) (uuid.UUID, error)
 }
 
 type Service struct {
@@ -119,6 +120,21 @@ func (s *Service) ResolvePublic(ctx context.Context, token string) (PublicNote, 
 		return PublicNote{}, fmt.Errorf("resolve public note: %w", err)
 	}
 	return note, nil
+}
+
+func (s *Service) ResolvePublicID(ctx context.Context, token string) (uuid.UUID, error) {
+	tokenID, err := s.signer.Verify(token)
+	if err != nil {
+		return uuid.Nil, ErrLinkNotFound
+	}
+	noteID, err := s.repo.GetPublicNoteID(ctx, tokenID)
+	if err != nil {
+		if errors.Is(err, ErrLinkNotFound) {
+			return uuid.Nil, ErrLinkNotFound
+		}
+		return uuid.Nil, fmt.Errorf("resolve public note id: %w", err)
+	}
+	return noteID, nil
 }
 
 // PublicSnapshot resolves a token and renders the current canonical snapshot

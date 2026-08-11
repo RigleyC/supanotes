@@ -42,12 +42,10 @@ class ShareLinkAccessRepository implements ShareLinkAccessGateway {
         throw const FormatException('Empty note response');
       }
       return RemoteNoteMetadata.fromJson(Map<String, dynamic>.from(data));
-    } on NotFoundException catch (_) {
-      return null;
-    } on UnauthorizedException catch (_) {
-      return null;
     } on DioException catch (error) {
-      throw fromDioError(error);
+      final mapped = fromDioError(error);
+      if (mapped is NotFoundException) return null;
+      throw mapped;
     }
   }
 }

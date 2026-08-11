@@ -63,6 +63,22 @@ func (q *Queries) GetPublicNoteByShareToken(ctx context.Context, tokenID pgtype.
 	return i, err
 }
 
+const getPublicNoteIDByShareToken = `-- name: GetPublicNoteIDByShareToken :one
+SELECT sl.note_id
+FROM note_share_links sl
+JOIN notes n ON n.id = sl.note_id
+WHERE sl.token_id = $1
+  AND sl.enabled = TRUE
+  AND n.deleted_at IS NULL
+`
+
+func (q *Queries) GetPublicNoteIDByShareToken(ctx context.Context, tokenID pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getPublicNoteIDByShareToken, tokenID)
+	var noteID pgtype.UUID
+	err := row.Scan(&noteID)
+	return noteID, err
+}
+
 const upsertNoteShareLink = `-- name: UpsertNoteShareLink :one
 INSERT INTO note_share_links (note_id, token_id, enabled)
 VALUES ($1, $2, TRUE)

@@ -47,6 +47,7 @@ type Querier interface {
 	GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesRow, error)
 	GetOperationsSince(ctx context.Context, arg GetOperationsSinceParams) ([]NoteOperation, error)
 	GetPublicNoteByShareToken(ctx context.Context, tokenID pgtype.UUID) (GetPublicNoteByShareTokenRow, error)
+	GetPublicNoteIDByShareToken(ctx context.Context, tokenID pgtype.UUID) (pgtype.UUID, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]GetRecentNotesRow, error)
 	GetRecentlyCompletedTasks(ctx context.Context, arg GetRecentlyCompletedTasksParams) ([]Task, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)

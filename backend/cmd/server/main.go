@@ -241,14 +241,14 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 		attachmentsRepo,
 		storageBackend,
 		func(ctx context.Context, token string) (pgtype.UUID, error) {
-			publicNote, err := shareLinksSvc.ResolvePublic(ctx, token)
+			noteID, err := shareLinksSvc.ResolvePublicID(ctx, token)
 			if err != nil {
 				if errors.Is(err, sharelinks.ErrLinkNotFound) {
 					return pgtype.UUID{}, attachments.ErrPublicLinkNotFound
 				}
 				return pgtype.UUID{}, err
 			}
-			return pgtype.UUID{Bytes: publicNote.ID, Valid: true}, nil
+			return pgtype.UUID{Bytes: noteID, Valid: true}, nil
 		},
 	)
 	e.GET("/s/:token/attachments/:attachment_id", publicAttachmentsH.Download)

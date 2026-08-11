@@ -101,6 +101,7 @@ class NoteCatalogSync {
         id: note.id,
         noteIconJson: remote.noteIconJson,
         remoteUpdatedAt: remote.updatedAt,
+        expectedUpdatedAt: note.updatedAt,
       );
       return;
     }
@@ -116,6 +117,7 @@ class NoteCatalogSync {
         id: note.id,
         noteIconJson: latest.noteIconJson,
         remoteUpdatedAt: latest.updatedAt,
+        expectedUpdatedAt: note.updatedAt,
       );
       return;
     }

@@ -27,19 +27,30 @@ final class _PlatformAppLinkSource implements AppLinkSource {
 /// cancels that subscription, which prevents duplicate listeners when the
 /// provider is rebuilt or disposed.
 final class AppLinkStream {
-  AppLinkStream(this.source);
+  AppLinkStream(
+    this.source, {
+    this.deduplicationDuration = const Duration(seconds: 1),
+  });
 
   final AppLinkSource source;
+  final Duration deduplicationDuration;
 
   Stream<Uri> stream() {
     final controller = StreamController<Uri>();
-    final seenPaths = <String>{};
     StreamSubscription<Uri>? subscription;
+    Timer? deduplicationWindow;
+    String? lastPath;
     var closed = false;
 
     void emit(Uri uri) {
       if (closed || !isShareLinkUri(uri)) return;
-      if (seenPaths.add(uri.path)) controller.add(uri);
+      if (uri.path == lastPath && deduplicationWindow != null) return;
+      lastPath = uri.path;
+      deduplicationWindow?.cancel();
+      deduplicationWindow = Timer(deduplicationDuration, () {
+        deduplicationWindow = null;
+      });
+      controller.add(uri);
     }
 
     void emitError(Object error, StackTrace stack) {
@@ -67,6 +78,7 @@ final class AppLinkStream {
 
     controller.onCancel = () async {
       closed = true;
+      deduplicationWindow?.cancel();
       await subscription?.cancel();
       await controller.close();
     };
