@@ -90,33 +90,36 @@ class NoteCatalogSync {
   Future<void> pushDirtyNoteIcons() async {
     final dirty = await _database.notesDao.getDirtyNoteIcons();
     for (final note in dirty) {
-      final remote = _remoteCatalog[note.id];
-      if (remote?.hasNoteIcon == true &&
-          remote!.updatedAt.isAfter(note.updatedAt)) {
-        await _database.notesDao.resolveRemoteNoteIcon(
-          id: note.id,
-          noteIconJson: remote.noteIconJson,
-          remoteUpdatedAt: remote.updatedAt,
-        );
-        continue;
-      }
-      final icon = _decodeLocalNoteIcon(note.id, note.noteIconJson);
-      try {
-        await _updateNoteIcon(note.id, icon, remote?.updatedAt);
-      } catch (error) {
-        if (!_isVersionConflict(error)) rethrow;
-        await _refreshRemoteCatalog();
-        final latest = _remoteCatalog[note.id];
-        if (latest == null || !latest.hasNoteIcon) rethrow;
-        await _database.notesDao.resolveRemoteNoteIcon(
-          id: note.id,
-          noteIconJson: latest.noteIconJson,
-          remoteUpdatedAt: latest.updatedAt,
-        );
-        continue;
-      }
-      await _database.notesDao.clearNoteIconDirty(note.id, note.updatedAt);
+      await _remoteNoteQueue.run(note.id, () => _pushDirtyNoteIcon(note));
     }
+  }
+
+  Future<void> _pushDirtyNoteIcon(NoteData note) async {
+    final remote = _remoteCatalog[note.id];
+    if (remote != null && remote.updatedAt.isAfter(note.updatedAt)) {
+      await _database.notesDao.resolveRemoteNoteIcon(
+        id: note.id,
+        noteIconJson: remote.noteIconJson,
+        remoteUpdatedAt: remote.updatedAt,
+      );
+      return;
+    }
+    final icon = _decodeLocalNoteIcon(note.id, note.noteIconJson);
+    try {
+      await _updateNoteIcon(note.id, icon, remote?.updatedAt);
+    } catch (error) {
+      if (!_isVersionConflict(error)) rethrow;
+      await _refreshRemoteCatalog();
+      final latest = _remoteCatalog[note.id];
+      if (latest == null) rethrow;
+      await _database.notesDao.resolveRemoteNoteIcon(
+        id: note.id,
+        noteIconJson: latest.noteIconJson,
+        remoteUpdatedAt: latest.updatedAt,
+      );
+      return;
+    }
+    await _database.notesDao.clearNoteIconDirty(note.id, note.updatedAt);
   }
 
   bool _isVersionConflict(Object error) {
@@ -325,8 +328,7 @@ class NoteCatalogSync {
     return _LocalRemoteNoteState(
       existing: existing,
       localDocument: localDocument,
-      shouldReadRemoteIcon:
-          catalog.hasNoteIcon && !(existing?.noteIconDirty ?? false),
+      shouldReadRemoteIcon: !(existing?.noteIconDirty ?? false),
     );
   }
 
@@ -347,27 +349,21 @@ class NoteCatalogSync {
     if (catalog.isOwner) {
       return const Value<String?>(null);
     }
-    return catalog.hasPermission
-        ? Value(catalog.permission)
-        : const Value<String?>.absent();
+    return Value(catalog.access == RemoteNoteAccess.edit ? 'edit' : 'view');
   }
 
   Value<String?> _sharedByEmailValueFor(RemoteNoteMetadata catalog) {
     if (catalog.isOwner) {
       return const Value<String?>(null);
     }
-    return catalog.hasSharedByEmail
-        ? Value(catalog.sharedByEmail)
-        : const Value<String?>.absent();
+    return Value(catalog.sharedByEmail);
   }
 
   Value<String?> _sharedByNameValueFor(RemoteNoteMetadata catalog) {
     if (catalog.isOwner) {
       return const Value<String?>(null);
     }
-    return catalog.hasSharedByName
-        ? Value(catalog.sharedByName)
-        : const Value<String?>.absent();
+    return Value(catalog.sharedByName);
   }
 
   Value<String?> _noteIconValue(
@@ -404,7 +400,7 @@ class NoteCatalogSync {
       documentJson: jsonEncode(documentResponse.document),
       updatedAt: documentResponse.serverTime,
     );
-    final ownerUserId = local.existing?.userId ?? catalog.userId ?? userId;
+    final ownerUserId = local.existing?.userId ?? userId;
     final applied = await _database.saveRemoteNote(
       noteId: id,
       mode: local.existing == null
@@ -426,9 +422,7 @@ class NoteCatalogSync {
         ),
         isDirty: const Value(false),
         hasRemoteCopy: const Value(true),
-        collapseImages: catalog.hasCollapseImages
-            ? Value(catalog.collapseImages ?? false)
-            : const Value.absent(),
+        collapseImages: Value(catalog.collapseImages),
         permission: _permissionValueFor(catalog),
         sharedByEmail: _sharedByEmailValueFor(catalog),
         sharedByName: _sharedByNameValueFor(catalog),

@@ -12,18 +12,12 @@ enum RemoteNoteAccess { owner, edit, view }
 final class RemoteNoteMetadata {
   const RemoteNoteMetadata({
     required this.id,
-    required this.userId,
     required this.createdAt,
     required this.updatedAt,
-    required this.hasCollapseImages,
     required this.collapseImages,
-    required this.hasPermission,
-    required this.permission,
-    required this.hasSharedByEmail,
+    required this.access,
     required this.sharedByEmail,
-    required this.hasSharedByName,
     required this.sharedByName,
-    required this.hasNoteIcon,
     required this.noteIcon,
   });
 
@@ -31,52 +25,39 @@ final class RemoteNoteMetadata {
     final id = _requiredString(json, 'id');
     return RemoteNoteMetadata(
       id: id,
-      userId: _optionalString(json, 'user_id'),
       createdAt: _requiredDateTime(json, 'created_at'),
       updatedAt: _requiredDateTime(json, 'updated_at'),
-      hasCollapseImages: json.containsKey('collapse_images'),
-      collapseImages: _optionalBool(json, 'collapse_images'),
-      hasPermission: json.containsKey('permission'),
-      permission: _optionalString(json, 'permission'),
-      hasSharedByEmail: json.containsKey('shared_by_email'),
+      collapseImages: _optionalBool(json, 'collapse_images') ?? false,
+      access: _parseAccess(_optionalString(json, 'permission')),
       sharedByEmail: _optionalString(json, 'shared_by_email'),
-      hasSharedByName: json.containsKey('shared_by_name'),
       sharedByName: _optionalString(json, 'shared_by_name'),
-      hasNoteIcon: json.containsKey('note_icon'),
       noteIcon: _optionalNoteIcon(json, 'note_icon', noteId: id),
     );
   }
 
   final String id;
-  final String? userId;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final bool hasCollapseImages;
-  final bool? collapseImages;
-  final bool hasPermission;
-  final String? permission;
-  final bool hasSharedByEmail;
+  final bool collapseImages;
+  final RemoteNoteAccess access;
   final String? sharedByEmail;
-  final bool hasSharedByName;
   final String? sharedByName;
-  final bool hasNoteIcon;
   final NoteIcon? noteIcon;
-
-  /// The notes endpoint omits permission for the authenticated owner.
-  RemoteNoteAccess get access => switch (permission) {
-    null || 'owner' => RemoteNoteAccess.owner,
-    'edit' => RemoteNoteAccess.edit,
-    'view' => RemoteNoteAccess.view,
-    _ => throw FormatException(
-      'Unsupported remote note permission "$permission"',
-    ),
-  };
 
   bool get isOwner => access == RemoteNoteAccess.owner;
 
   String? get noteIconJson =>
       noteIcon == null ? null : jsonEncode(noteIcon!.toJson());
 }
+
+RemoteNoteAccess _parseAccess(String? permission) => switch (permission) {
+  null || 'owner' => RemoteNoteAccess.owner,
+  'edit' => RemoteNoteAccess.edit,
+  'view' => RemoteNoteAccess.view,
+  _ => throw FormatException(
+    'Unsupported remote note permission "$permission"',
+  ),
+};
 
 String _requiredString(Map<String, dynamic> json, String key) {
   final value = json[key];

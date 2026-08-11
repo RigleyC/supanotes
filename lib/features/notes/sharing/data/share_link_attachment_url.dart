@@ -30,10 +30,7 @@ final class ShareLinkAttachmentDelivery implements AttachmentDelivery {
   final AttachmentDeliveryPreference preference;
 
   @override
-  Uri urlFor(String attachmentId) =>
-      shareLinkAttachmentUrl(token, attachmentId);
-
   @override
-  Future<void> open(String attachmentId, Uri uri, {String? fileName}) =>
-      launchUrl(uri);
+  Future<void> open(AttachmentReference attachment) =>
+      launchUrl(shareLinkAttachmentUrl(token, attachment.id));
 }

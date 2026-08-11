@@ -39,19 +39,18 @@ class AttachmentComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt],
       collapseImages: collapseImages,
       allowInternalNoteLinks: allowInternalNoteLinks,
-      fallbackAttachmentUrl: node is DocumentAttachmentNode
-          ? attachmentDelivery
-                ?.urlFor(
+      fallbackAttachment:
+          node is DocumentAttachmentNode && attachmentDelivery != null
+          ? AttachmentReference(
+              id:
                   node.metadata['attachmentId'] is String &&
-                          (node.metadata['attachmentId'] as String).isNotEmpty
-                      ? node.metadata['attachmentId'] as String
-                      : node.id,
-                )
-                ?.toString()
-          : null,
-      fallbackAttachmentName:
-          node is DocumentAttachmentNode && node.metadata['filename'] is String
-          ? node.metadata['filename'] as String
+                      (node.metadata['attachmentId'] as String).isNotEmpty
+                  ? node.metadata['attachmentId'] as String
+                  : node.id,
+              fileName: node.metadata['filename'] is String
+                  ? node.metadata['filename'] as String
+                  : 'Anexo',
+            )
           : null,
       attachmentDelivery: attachmentDelivery,
       attachmentDeliveryPreference:
@@ -82,8 +81,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
         selectionColor: viewModel.selectionColor,
         onDelete: viewModel.onDelete,
         collapseImages: viewModel.collapseImages,
-        fallbackUrl: viewModel.fallbackAttachmentUrl,
-        fallbackFileName: viewModel.fallbackAttachmentName,
+        fallbackAttachment: viewModel.fallbackAttachment,
         deliveryPreference: viewModel.attachmentDeliveryPreference,
         attachmentDelivery: viewModel.attachmentDelivery,
       ),
@@ -110,8 +108,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     required this.onDelete,
     required this.collapseImages,
     required this.allowInternalNoteLinks,
-    required this.fallbackAttachmentUrl,
-    required this.fallbackAttachmentName,
+    required this.fallbackAttachment,
     required this.attachmentDeliveryPreference,
     required this.attachmentDelivery,
     super.createdAt,
@@ -128,8 +125,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
   final VoidCallback? onDelete;
   final bool collapseImages;
   final bool allowInternalNoteLinks;
-  final String? fallbackAttachmentUrl;
-  final String? fallbackAttachmentName;
+  final AttachmentReference? fallbackAttachment;
   final AttachmentDeliveryPreference attachmentDeliveryPreference;
   final AttachmentDelivery? attachmentDelivery;
 
@@ -141,8 +137,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     onDelete: onDelete,
     collapseImages: collapseImages,
     allowInternalNoteLinks: allowInternalNoteLinks,
-    fallbackAttachmentUrl: fallbackAttachmentUrl,
-    fallbackAttachmentName: fallbackAttachmentName,
+    fallbackAttachment: fallbackAttachment,
     attachmentDeliveryPreference: attachmentDeliveryPreference,
     attachmentDelivery: attachmentDelivery,
     selection: selection,
@@ -156,8 +151,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
       other.attachmentId == attachmentId &&
       other.collapseImages == collapseImages &&
       other.allowInternalNoteLinks == allowInternalNoteLinks &&
-      other.fallbackAttachmentUrl == fallbackAttachmentUrl &&
-      other.fallbackAttachmentName == fallbackAttachmentName &&
+      other.fallbackAttachment == fallbackAttachment &&
       other.attachmentDeliveryPreference == attachmentDeliveryPreference &&
       other.attachmentDelivery == attachmentDelivery;
 
@@ -167,8 +161,7 @@ class _AttachmentViewModel extends SingleColumnLayoutComponentViewModel
     attachmentId,
     collapseImages,
     allowInternalNoteLinks,
-    fallbackAttachmentUrl,
-    fallbackAttachmentName,
+    fallbackAttachment,
     attachmentDeliveryPreference,
     attachmentDelivery,
   );

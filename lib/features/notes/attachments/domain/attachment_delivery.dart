@@ -1,5 +1,21 @@
 enum AttachmentDeliveryPreference { localFirst, externalFirst }
 
+final class AttachmentReference {
+  const AttachmentReference({required this.id, required this.fileName});
+
+  final String id;
+  final String fileName;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AttachmentReference &&
+      other.id == id &&
+      other.fileName == fileName;
+
+  @override
+  int get hashCode => Object.hash(id, fileName);
+}
+
 /// Resolves a download URL for an attachment that is not present locally.
 ///
 /// The editor only depends on this delivery contract. Public share links and
@@ -7,6 +23,5 @@ enum AttachmentDeliveryPreference { localFirst, externalFirst }
 /// the composition boundary.
 abstract interface class AttachmentDelivery {
   AttachmentDeliveryPreference get preference;
-  Uri? urlFor(String attachmentId);
-  Future<void> open(String attachmentId, Uri uri, {String? fileName});
+  Future<void> open(AttachmentReference attachment);
 }

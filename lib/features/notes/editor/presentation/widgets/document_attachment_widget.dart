@@ -20,8 +20,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
     required this.attachmentId,
     this.onDelete,
     required this.collapseImages,
-    this.fallbackUrl,
-    this.fallbackFileName,
+    this.fallbackAttachment,
     this.deliveryPreference = AttachmentDeliveryPreference.localFirst,
     this.attachmentDelivery,
     this.selection,
@@ -33,8 +32,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
   final String attachmentId;
   final VoidCallback? onDelete;
   final bool collapseImages;
-  final String? fallbackUrl;
-  final String? fallbackFileName;
+  final AttachmentReference? fallbackAttachment;
   final AttachmentDeliveryPreference deliveryPreference;
   final AttachmentDelivery? attachmentDelivery;
   final UpstreamDownstreamNodeSelection? selection;
@@ -44,30 +42,30 @@ class DocumentAttachmentWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final attachmentAsync = ref.watch(attachmentByIdProvider(attachmentId));
 
-    Widget fallbackAttachment() {
-      final url = fallbackUrl;
-      if (url == null || url.isEmpty) {
+    Widget buildFallbackAttachment() {
+      final attachment = fallbackAttachment;
+      if (attachment == null || attachment.id.isEmpty) {
         return AttachmentUploadingCapsule(
-          fileName: fallbackFileName ?? '...',
+          fileName: attachment?.fileName ?? '...',
           onCancel: onDelete,
         );
       }
       return AttachmentFilePill(
-        fileName: fallbackFileName ?? 'Anexo',
+        fileName: attachment.fileName,
         subtitle: 'Anexo compartilhado',
         icon: Icons.attach_file,
-        onTap: () => _openAttachment(url, fileName: fallbackFileName),
+        onTap: () => _openAttachment(null, attachment: attachment),
       );
     }
 
     final Widget child = attachmentAsync.when(
       data: (model) {
         if (deliveryPreference == AttachmentDeliveryPreference.externalFirst &&
-            fallbackUrl != null) {
-          return fallbackAttachment();
+            fallbackAttachment != null) {
+          return buildFallbackAttachment();
         }
         if (model == null) {
-          return fallbackAttachment();
+          return buildFallbackAttachment();
         }
 
         switch (model.status) {
@@ -94,8 +92,12 @@ class DocumentAttachmentWidget extends ConsumerWidget {
                   icon: Icons.image_outlined,
                   onTap: () => _openAttachment(
                     url,
-                    useDelivery: model.remoteUrl != null,
-                    fileName: model.fileName,
+                    attachment: model.remoteUrl == null
+                        ? null
+                        : AttachmentReference(
+                            id: attachmentId,
+                            fileName: model.fileName,
+                          ),
                   ),
                 );
               }
@@ -114,15 +116,19 @@ class DocumentAttachmentWidget extends ConsumerWidget {
               onTap: url.isNotEmpty
                   ? () => _openAttachment(
                       url,
-                      useDelivery: model.remoteUrl != null,
-                      fileName: model.fileName,
+                      attachment: model.remoteUrl == null
+                          ? null
+                          : AttachmentReference(
+                              id: attachmentId,
+                              fileName: model.fileName,
+                            ),
                     )
                   : () {},
             );
         }
       },
-      loading: fallbackAttachment,
-      error: (_, _) => fallbackAttachment(),
+      loading: buildFallbackAttachment,
+      error: (_, _) => buildFallbackAttachment(),
     );
 
     return SelectableBox(
@@ -138,26 +144,24 @@ class DocumentAttachmentWidget extends ConsumerWidget {
     );
   }
 
-  void _openAttachment(
-    String url, {
-    bool useDelivery = true,
-    String? fileName,
-  }) {
-    final delivery = useDelivery ? attachmentDelivery : null;
+  void _openAttachment(String? url, {AttachmentReference? attachment}) {
+    final delivery = attachmentDelivery;
     if (delivery == null) {
-      launchUrl(Uri.parse(url));
+      if (url != null) launchUrl(Uri.parse(url));
       return;
     }
+    if (attachment == null) return;
     unawaited(
-      delivery
-          .open(attachmentId, Uri.parse(url), fileName: fileName)
-          .catchError((Object error, StackTrace stackTrace) {
-            dev.log(
-              'Failed to open attachment $attachmentId',
-              error: error,
-              stackTrace: stackTrace,
-            );
-          }),
+      delivery.open(attachment).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        dev.log(
+          'Failed to open attachment $attachmentId',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }),
     );
   }
 }

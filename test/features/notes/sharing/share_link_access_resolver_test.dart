@@ -23,18 +23,18 @@ class _FakeGateway implements ShareLinkAccessGateway {
     if (permission == null && !ownerResponse) return null;
     return RemoteNoteMetadata(
       id: noteId,
-      userId: 'owner',
       createdAt: DateTime.utc(2024),
       updatedAt: DateTime.utc(2024),
-      hasCollapseImages: false,
-      collapseImages: null,
-      hasPermission: !ownerResponse,
-      permission: permission,
-      hasSharedByEmail: false,
+      collapseImages: false,
+      access: ownerResponse
+          ? RemoteNoteAccess.owner
+          : switch (permission) {
+              'edit' => RemoteNoteAccess.edit,
+              'view' => RemoteNoteAccess.view,
+              _ => RemoteNoteAccess.owner,
+            },
       sharedByEmail: null,
-      hasSharedByName: false,
       sharedByName: null,
-      hasNoteIcon: false,
       noteIcon: null,
     );
   }

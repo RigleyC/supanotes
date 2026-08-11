@@ -5,7 +5,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:supanotes/core/api/api_client.dart';
-import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 
 /// Resolves attachments through the authenticated attachment endpoint.
@@ -23,33 +22,23 @@ final class AuthenticatedAttachmentDelivery implements AttachmentDelivery {
   final AttachmentDeliveryPreference preference;
 
   @override
-  Uri urlFor(String attachmentId) {
-    final base = Uri.parse(ApiConstants.baseUrl);
-    return base.replace(
-      path:
-          '${base.path}/attachments/${Uri.encodeComponent(attachmentId)}/content',
-      query: null,
-      fragment: null,
-    );
-  }
-
   @override
-  Future<void> open(String attachmentId, Uri uri, {String? fileName}) async {
+  Future<void> open(AttachmentReference attachment) async {
     final response = await _api.get<List<int>>(
-      '/attachments/${Uri.encodeComponent(attachmentId)}/content',
+      '/attachments/${Uri.encodeComponent(attachment.id)}/content',
       options: Options(responseType: ResponseType.bytes),
     );
     final bytes = response.data;
     if (bytes == null) throw StateError('Attachment response has no content');
     final directory = await getTemporaryDirectory();
-    final safeName = (fileName ?? 'attachment').replaceAll(
+    final safeName = attachment.fileName.replaceAll(
       RegExp(r'[^A-Za-z0-9._-]'),
       '_',
     );
-    final file = File('${directory.path}/supanotes-$attachmentId-$safeName');
+    final file = File('${directory.path}/supanotes-${attachment.id}-$safeName');
     await file.writeAsBytes(bytes, flush: true);
     if (!await launchUrl(Uri.file(file.path))) {
-      throw StateError('Could not open downloaded attachment');
+      throw StateError('Could not open downloaded attachment ${attachment.id}');
     }
   }
 }
