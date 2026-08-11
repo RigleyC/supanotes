@@ -90,7 +90,7 @@ func (h *Handler) Public(c echo.Context) error {
 }
 
 func (h *Handler) PublicDocument(c echo.Context) error {
-	snapshot, err := h.svc.PublicSnapshot(c.Request().Context(), c.Param("token"), RenderOptions{})
+	snapshot, err := h.svc.PublicDocument(c.Request().Context(), c.Param("token"))
 	if err != nil {
 		return h.mapPublicError(c, err)
 	}

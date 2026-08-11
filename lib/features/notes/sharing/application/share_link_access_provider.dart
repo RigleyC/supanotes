@@ -15,7 +15,14 @@ final shareLinkAccessResolverProvider =
 
 final shareLinkAccessProvider = FutureProvider.autoDispose
     .family<ShareLinkAccessDecision, String>((ref, token) async {
-      final User? user = await ref.watch(authControllerProvider.future);
+      final auth = ref.watch(authControllerProvider);
+      // Authentication is optional for a public capability link. A local
+      // restore failure must not turn a valid public link into an access error.
+      final User? user = auth.when(
+        data: (value) => value,
+        loading: () => null,
+        error: (_, _) => null,
+      );
       return ref
           .watch(shareLinkAccessResolverProvider)
           .resolve(token, user: user);

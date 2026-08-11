@@ -138,8 +138,8 @@ func TestShareNote_UserNotFound(t *testing.T) {
 	rec := do(t, e, http.MethodPost, "/api/v1/notes/00000000-0000-0000-0000-000000000000/share",
 		`{"email":"missing@example.com","permission":"view"}`)
 
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status: want 404, got %d (body=%s)", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d (body=%s)", rec.Code, rec.Body.String())
 	}
 }
 

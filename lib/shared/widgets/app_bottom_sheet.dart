@@ -25,13 +25,17 @@ Future<T?> showAppBottomSheet<T>({
       ),
     ),
     builder: (ctx) {
-      return Padding(
-        padding: EdgeInsets.only(
-          left: AppSpacing.lg,
-          right: AppSpacing.lg,
-          bottom: AppSpacing.lg + MediaQuery.of(ctx).viewInsets.bottom,
+      return FractionallySizedBox(
+        heightFactor: maxHeightFactor,
+        widthFactor: 1,
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: AppSpacing.lg + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: builder(ctx),
         ),
-        child: builder(ctx),
       );
     },
   );

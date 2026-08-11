@@ -9,6 +9,9 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_provider.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_link_access_screen.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_link_reader_screen.dart';
+import 'package:supanotes/features/notes/sharing/model/share_link_document.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/sharing/domain/share_link_strings.dart';
 
 import '../../../../helpers/auth_interceptor_test_helper.dart';
@@ -27,6 +30,59 @@ ApiClient _testApiClient() {
 }
 
 void main() {
+  testWidgets('renders the guest reader with one page shell', (tester) async {
+    final router = GoRouter(
+      initialLocation: '/s/token',
+      routes: [
+        GoRoute(
+          path: '/s/:token',
+          builder: (_, state) =>
+              ShareLinkAccessScreen(token: state.pathParameters['token']!),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    final document = ShareLinkDocument(
+      title: 'Public note',
+      snapshot: NoteDocumentSnapshot.fromJson(const {
+        'schemaVersion': 1,
+        'blocks': [
+          {
+            'id': 'p1',
+            'type': 'paragraph',
+            'delta': [
+              {'insert': 'Hello'},
+            ],
+            'metadata': {},
+          },
+        ],
+      }),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          shareLinkAccessProvider('token').overrideWithValue(
+            const AsyncData(
+              ShareLinkAccessDecision(
+                noteId: 'note-1',
+                mode: ShareLinkAccessMode.guest,
+              ),
+            ),
+          ),
+          shareLinkDocumentProvider(
+            'token',
+          ).overrideWithValue(AsyncData(document)),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(Scaffold), findsOneWidget);
+    expect(find.text('Public note'), findsAtLeastNWidgets(1));
+  });
+
   testWidgets('shows hydration errors before opening the editor', (
     tester,
   ) async {

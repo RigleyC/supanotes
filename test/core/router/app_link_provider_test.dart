@@ -58,6 +58,26 @@ void main() {
     },
   );
 
+  test('allows a second intentional open after the initial echo', () async {
+    final source = _FakeAppLinkSource()
+      ..initialLink = Uri.parse('https://notes.example/s/token-1');
+    addTearDown(source.close);
+
+    final values = <Uri>[];
+    final subscription = AppLinkStream(
+      source,
+      deduplicationDuration: const Duration(seconds: 1),
+    ).stream().listen(values.add);
+    addTearDown(subscription.cancel);
+
+    await Future<void>.delayed(Duration.zero);
+    source.events.add(Uri.parse('https://notes.example/s/token-1'));
+    source.events.add(Uri.parse('https://notes.example/s/token-1'));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(values.map((value) => value.path), ['/s/token-1', '/s/token-1']);
+  });
+
   test(
     'propagates initial-link errors and cancels the runtime listener',
     () async {

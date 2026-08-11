@@ -10,12 +10,12 @@ import 'package:sqlite3/sqlite3.dart';
 
 import 'daos/attachments_dao.dart';
 import 'daos/note_links_dao.dart';
+import 'daos/note_lifecycle_dao.dart';
 import 'daos/note_operations_dao.dart';
 import 'daos/notes_dao.dart';
 import 'daos/task_completions_dao.dart';
 import 'daos/tasks_dao.dart';
 import 'daos/user_note_preferences_dao.dart';
-import 'note_lifecycle_policy.dart';
 import 'tables/attachments.dart';
 import 'tables/local_note_documents.dart';
 import 'tables/note_links.dart';
@@ -75,6 +75,8 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
     : super(executor ?? NativeDatabase.memory());
 
+  late final noteLifecycleDao = NoteLifecycleDao(this);
+
   Future<void> clearAllData() async {
     await transaction(() async {
       for (final entity in allSchemaEntities) {
@@ -92,68 +94,7 @@ class AppDatabase extends _$AppDatabase {
   /// must be removed together so a deleted note cannot keep producing local
   /// results or notifications.
   Future<void> deleteNoteData(String noteId) async {
-    await transaction(() => _deleteNoteData(noteId));
-  }
-
-  /// Deletes an untouched local draft and its complete aggregate atomically.
-  Future<bool> discardLocalDraftIfUntouched(String noteId) {
-    return transaction(() async {
-      final matchingDraft = await customSelect(
-        'SELECT n.id FROM notes n '
-        'WHERE n.id = ? AND $untouchedLocalDraftPredicate '
-        'AND NOT EXISTS ('
-        '  SELECT 1 FROM pending_note_operations p '
-        '  WHERE p.note_id = n.id'
-        ') '
-        'AND NOT EXISTS ('
-        '  SELECT 1 FROM sync_sessions s '
-        '  WHERE s.note_id = n.id'
-        ')',
-        variables: [Variable.withString(noteId)],
-      ).get();
-      if (matchingDraft.isEmpty) {
-        return false;
-      }
-
-      await _deleteNoteData(noteId);
-      return true;
-    });
-  }
-
-  Future<void> _deleteNoteData(String noteId) async {
-    final noteTasks = await (select(
-      tasks,
-    )..where((task) => task.noteId.equals(noteId))).get();
-    for (final task in noteTasks) {
-      await (delete(
-        localTaskCompletions,
-      )..where((completion) => completion.taskId.equals(task.id))).go();
-    }
-
-    await (delete(
-      attachments,
-    )..where((attachment) => attachment.noteId.equals(noteId))).go();
-    await (delete(noteLinks)..where(
-          (link) => link.sourceId.equals(noteId) | link.targetId.equals(noteId),
-        ))
-        .go();
-    await (delete(
-      userNotePreferences,
-    )..where((preference) => preference.noteId.equals(noteId))).go();
-    await (delete(tasks)..where((task) => task.noteId.equals(noteId))).go();
-    await (delete(
-      localNoteDocuments,
-    )..where((document) => document.noteId.equals(noteId))).go();
-    await (delete(
-      pendingNoteOperations,
-    )..where((operation) => operation.noteId.equals(noteId))).go();
-    await (delete(
-      noteSyncErrors,
-    )..where((error) => error.noteId.equals(noteId))).go();
-    await (delete(
-      syncSessions,
-    )..where((session) => session.noteId.equals(noteId))).go();
-    await (delete(notes)..where((note) => note.id.equals(noteId))).go();
+    await noteLifecycleDao.deleteNoteData(noteId);
   }
 
   /// Saves note content/excerpt projection and synced tasks in a single atomic transaction.

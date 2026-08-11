@@ -12,6 +12,7 @@ android {
     // default keeps local builds usable while production must use the
     // canonical HTTPS Share Link host.
     val shareLinkHost = providers.gradleProperty("shareLinkHost")
+        .orElse(providers.environmentVariable("SHARE_LINK_DOMAIN"))
         .orElse("supanotes.app")
 
     compileOptions {

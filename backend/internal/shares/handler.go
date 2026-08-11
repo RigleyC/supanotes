@@ -47,7 +47,8 @@ func (h *Handler) ShareNote(c echo.Context) error {
 		case errors.Is(err, ErrNotOwner):
 			return web.JSONError(c, http.StatusForbidden, "only the note owner can share")
 		case errors.Is(err, ErrUserNotFound):
-			return web.JSONError(c, http.StatusNotFound, "user not found")
+			// Do not reveal whether an email belongs to a SupaNotes account.
+			return web.JSONError(c, http.StatusBadRequest, "unable to share note with this address")
 		case errors.Is(err, ErrCannotShareWithSelf):
 			return web.JSONError(c, http.StatusBadRequest, "cannot share with yourself")
 		default:

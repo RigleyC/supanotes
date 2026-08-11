@@ -47,11 +47,13 @@ jobs:
       - name: Build APK (debug)
         env:
           BUILD_ID: ${{ inputs.build_id || github.run_id }}
+          SHARE_LINK_DOMAIN: ${{ vars.SHARE_LINK_DOMAIN || 'supanotes.app' }}
         run: flutter build apk --debug --build-number=$BUILD_ID
 
       - name: Build App Bundle (release unsigned)
         env:
           BUILD_ID: ${{ inputs.build_id || github.run_id }}
+          SHARE_LINK_DOMAIN: ${{ vars.SHARE_LINK_DOMAIN || 'supanotes.app' }}
         run: |
           flutter build appbundle --release --build-number=$BUILD_ID || \
             echo "App bundle build failed (likely missing signing); APK above is the main artifact"

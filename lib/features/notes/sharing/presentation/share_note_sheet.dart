@@ -43,8 +43,10 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
         .read(shareNoteControllerProvider(widget.noteId).notifier)
         .share(email: email, permission: _permission);
 
-    final state = ref.read(shareNoteControllerProvider(widget.noteId));
-    if (state.hasValue && mounted) {
+    final succeeded = ref
+        .read(shareNoteControllerProvider(widget.noteId))
+        .when(data: (_) => true, loading: () => false, error: (_, _) => false);
+    if (succeeded && mounted) {
       ref.invalidate(shareListProvider(widget.noteId));
       _emailCtrl.clear();
     }
@@ -54,70 +56,133 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
   Widget build(BuildContext context) {
     final shareState = ref.watch(shareNoteControllerProvider(widget.noteId));
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Compartilhar Nota',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        AppInput(
-          controller: _emailCtrl,
-          labelText: 'E-mail',
-          errorText: _validationError,
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        InputDecorator(
-          decoration: const InputDecoration(),
-          child: DropdownButton<SharePermission>(
-            value: _permission,
-            isExpanded: true,
-            underline: const SizedBox.shrink(),
-            isDense: true,
-
-            items: const [
-              DropdownMenuItem(
-                value: SharePermission.view,
-                child: Text('Visualizar'),
-              ),
-              DropdownMenuItem(
-                value: SharePermission.edit,
-                child: Text('Editar'),
-              ),
-            ],
-            onChanged: shareState.isLoading
-                ? null
-                : (val) => setState(() {
-                    if (val != null) _permission = val;
-                  }),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Compartilhar Nota',
+            style: Theme.of(context).textTheme.titleSmall,
           ),
-        ),
-        if (shareState.hasError)
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.sm),
-            child: Text(
-              shareState.error.toString(),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
+          const SizedBox(height: AppSpacing.md),
+          AppInput(
+            controller: _emailCtrl,
+            labelText: 'E-mail',
+            errorText: _validationError,
+            keyboardType: TextInputType.emailAddress,
           ),
-        const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
+          _ShareSubmissionControls(
+            state: shareState,
+            permission: _permission,
+            onPermissionChanged: (value) => setState(() => _permission = value),
+            onSubmit: _submit,
+          ),
+          const SizedBox(height: AppSpacing.xxl),
 
-        AppButton(
-          text: 'Adicionar',
-          isLoading: shareState.isLoading,
-          onPressed: shareState.isLoading ? null : _submit,
-        ),
-        const SizedBox(height: AppSpacing.xxl),
-
-        ShareListSection(noteId: widget.noteId),
-        const SizedBox(height: AppSpacing.xxl),
-        ShareLinkSection(noteId: widget.noteId),
-      ],
+          ShareListSection(noteId: widget.noteId),
+          const SizedBox(height: AppSpacing.xxl),
+          ShareLinkSection(noteId: widget.noteId),
+        ],
+      ),
     );
   }
+}
+
+class _ShareSubmissionControls extends StatelessWidget {
+  const _ShareSubmissionControls({
+    required this.state,
+    required this.permission,
+    required this.onPermissionChanged,
+    required this.onSubmit,
+  });
+
+  final AsyncValue<void> state;
+  final SharePermission permission;
+  final ValueChanged<SharePermission> onPermissionChanged;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) => state.when(
+    data: (_) => _ShareSubmissionFields(
+      permission: permission,
+      onPermissionChanged: onPermissionChanged,
+      onSubmit: onSubmit,
+    ),
+    loading: () => _ShareSubmissionFields(
+      permission: permission,
+      onPermissionChanged: onPermissionChanged,
+      onSubmit: onSubmit,
+      isLoading: true,
+    ),
+    error: (error, _) => _ShareSubmissionFields(
+      permission: permission,
+      onPermissionChanged: onPermissionChanged,
+      onSubmit: onSubmit,
+      errorText: error.toString(),
+    ),
+  );
+}
+
+class _ShareSubmissionFields extends StatelessWidget {
+  const _ShareSubmissionFields({
+    required this.permission,
+    required this.onPermissionChanged,
+    required this.onSubmit,
+    this.isLoading = false,
+    this.errorText,
+  });
+
+  final SharePermission permission;
+  final ValueChanged<SharePermission> onPermissionChanged;
+  final VoidCallback onSubmit;
+  final bool isLoading;
+  final String? errorText;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      InputDecorator(
+        decoration: const InputDecoration(),
+        child: DropdownButton<SharePermission>(
+          value: permission,
+          isExpanded: true,
+          underline: const SizedBox.shrink(),
+          isDense: true,
+          items: const [
+            DropdownMenuItem(
+              value: SharePermission.view,
+              child: Text('Visualizar'),
+            ),
+            DropdownMenuItem(
+              value: SharePermission.edit,
+              child: Text('Editar'),
+            ),
+          ],
+          onChanged: isLoading
+              ? null
+              : (value) {
+                  if (value != null) onPermissionChanged(value);
+                },
+        ),
+      ),
+      if (errorText != null)
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.sm),
+          child: Text(
+            errorText!,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ),
+      const SizedBox(height: AppSpacing.lg),
+      AppButton(
+        text: 'Adicionar',
+        isLoading: isLoading,
+        onPressed: isLoading ? null : onSubmit,
+      ),
+    ],
+  );
 }

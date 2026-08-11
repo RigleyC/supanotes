@@ -4,6 +4,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
+import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
 import 'package:supanotes/features/notes/catalog/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
@@ -28,7 +29,7 @@ void main() {
       final repo = NotesRepository(local, database.userNotePreferencesDao);
 
       await repo.createLocalNote(id: 'draft-1');
-      await database.discardLocalDraftIfUntouched('draft-1');
+      await DatabaseNoteLifecycleStore(database).discardLocalDraft('draft-1');
 
       expect(await database.notesDao.getNoteById('draft-1'), isNull);
       expect(
@@ -56,9 +57,9 @@ void main() {
         ),
       );
 
-      final discarded = await database.discardLocalDraftIfUntouched(
-        'draft-with-outbox',
-      );
+      final discarded = await DatabaseNoteLifecycleStore(
+        database,
+      ).discardLocalDraft('draft-with-outbox');
 
       expect(discarded, isFalse);
       expect(

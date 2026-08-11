@@ -229,6 +229,8 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         userNotePreferences,
         attachedDatabase.tasks,
         attachedDatabase.attachments,
+        attachedDatabase.pendingNoteOperations,
+        attachedDatabase.syncSessions,
       },
     ).watch().map((rows) {
       final result = <NoteQueryResult>[];

@@ -13,9 +13,9 @@ import 'package:supanotes/features/auth/presentation/login_screen.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/features/auth/presentation/splash_screen.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
-import 'package:supanotes/features/notes/catalog/presentation/adaptive_notes_shell.dart';
 import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
-import 'package:supanotes/features/notes/editor/application/note_editor_open_options.dart';
+import 'package:supanotes/features/notes/attachments/data/authenticated_attachment_delivery.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/settings/presentation/mcp_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_link_access_screen.dart';
@@ -41,26 +41,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.register,
         builder: (_, _) => const RegisterScreen(),
       ),
-      ShellRoute(
-        builder: (context, state, child) => AdaptiveNotesShell(child: child),
-        routes: [
-          GoRoute(
-            path: AppRoutes.home,
-            builder: (_, _) => const NotesListScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.note(':id'),
-            builder: (_, state) {
-              final openOptions = state.extra;
-              return NoteEditorScreen(
-                noteId: state.pathParameters['id']!,
-                attachmentDelivery: openOptions is NoteEditorOpenOptions
-                    ? openOptions.attachmentDelivery
-                    : null,
-              );
-            },
-          ),
-        ],
+      GoRoute(path: AppRoutes.home, builder: (_, _) => const NotesListScreen()),
+      GoRoute(
+        path: AppRoutes.note(':id'),
+        builder: (_, state) {
+          return NoteEditorScreen(
+            noteId: state.pathParameters['id']!,
+            attachmentDelivery: AuthenticatedAttachmentDelivery(
+              ref.read(apiClientProvider),
+              preference: AttachmentDeliveryPreference.localFirst,
+            ),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.settings,

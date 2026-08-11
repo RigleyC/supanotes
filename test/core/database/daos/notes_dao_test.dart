@@ -101,6 +101,18 @@ void main() {
           .into(db.notes)
           .insert(
             NotesCompanion.insert(
+              id: 'outbox-draft',
+              userId: 'user-1',
+              content: '',
+              createdAt: now,
+              updatedAt: now,
+              hasRemoteCopy: const Value(false),
+            ),
+          );
+      await db
+          .into(db.notes)
+          .insert(
+            NotesCompanion.insert(
               id: 'attachment-draft',
               userId: 'user-1',
               content: '',
@@ -122,9 +134,23 @@ void main() {
               updatedAt: now,
             ),
           );
+      await db.noteOperationsDao.insertPendingOperation(
+        PendingNoteOperationsCompanion.insert(
+          operationId: 'outbox-operation-1',
+          noteId: 'outbox-draft',
+          baseRevision: 0,
+          ordinal: 0,
+          kind: 'text_delta',
+          payloadJson: '{}',
+          createdAt: now,
+        ),
+      );
 
       final notes = await db.notesDao.watchAllActiveNotes('user-1').first;
-      expect(notes.map((note) => note.note.id), ['attachment-draft']);
+      expect(notes.map((note) => note.note.id), [
+        'outbox-draft',
+        'attachment-draft',
+      ]);
 
       await db.close();
     },

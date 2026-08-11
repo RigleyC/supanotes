@@ -191,13 +191,13 @@ class NoteOperationAdapter {
   void _scheduleDebounceFlush() {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 50), () {
-      unawaited(_flushLocalOps());
+      unawaited(_flushLocalOps(propagateErrors: false));
     });
   }
 
   Future<void> _flushMutex = Future.value();
 
-  Future<void> _flushLocalOps() async {
+  Future<void> _flushLocalOps({required bool propagateErrors}) async {
     if (_pendingOps.isEmpty) return;
     final ops = List<OperationRequest>.from(_pendingOps);
     _pendingOps.clear();
@@ -249,6 +249,16 @@ class NoteOperationAdapter {
       onLocalOperations?.call(ops);
       final pending = await _syncService.getPendingOperations(_noteId);
       _pendingOpsController.add(pending);
+    } catch (error, stackTrace) {
+      _pendingOps.insertAll(0, ops);
+      if (propagateErrors) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      dev.log(
+        'Local operation flush failed for $_noteId; keeping operations in memory',
+        error: error,
+        stackTrace: stackTrace,
+      );
     } finally {
       completer.complete();
     }
@@ -257,7 +267,8 @@ class NoteOperationAdapter {
   Future<void> flushNow() async {
     _debounceTimer?.cancel();
     if (_pendingOps.isNotEmpty) {
-      unawaited(_flushLocalOps());
+      await _flushLocalOps(propagateErrors: true);
+      return;
     }
     await _flushMutex;
   }

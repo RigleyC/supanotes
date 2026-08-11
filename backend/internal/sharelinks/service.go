@@ -153,6 +153,22 @@ func (s *Service) PublicSnapshot(ctx context.Context, token string, options Rend
 	return PublicSnapshot{Note: note, Document: document, Page: page}, nil
 }
 
+func (s *Service) PublicDocument(ctx context.Context, token string) (PublicSnapshot, error) {
+	note, err := s.ResolvePublic(ctx, token)
+	if err != nil {
+		return PublicSnapshot{}, err
+	}
+	document, err := decodePublicDocument(note.Document)
+	if err != nil {
+		return PublicSnapshot{}, fmt.Errorf("decode public note: %w", err)
+	}
+	return PublicSnapshot{
+		Note:     note,
+		Document: document,
+		Page:     RenderedPage{Title: documentTitle(document)},
+	}, nil
+}
+
 func (s *Service) result(link Link) (LinkResult, error) {
 	token, err := s.signer.Sign(link.TokenID)
 	if err != nil {

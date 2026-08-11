@@ -7,6 +7,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:supanotes/core/utils/format_utils.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/attachments/model/attachment_model.dart';
@@ -54,7 +55,7 @@ class DocumentAttachmentWidget extends ConsumerWidget {
         fileName: attachment.fileName,
         subtitle: 'Anexo compartilhado',
         icon: Icons.attach_file,
-        onTap: () => _openAttachment(null, attachment: attachment),
+        onTap: () => unawaited(_openAttachment(null, attachment: attachment)),
       );
     }
 
@@ -90,14 +91,32 @@ class DocumentAttachmentWidget extends ConsumerWidget {
                   fileName: model.fileName,
                   subtitle: 'Imagem',
                   icon: Icons.image_outlined,
-                  onTap: () => _openAttachment(
-                    url,
-                    attachment: model.remoteUrl == null
-                        ? null
-                        : AttachmentReference(
-                            id: attachmentId,
-                            fileName: model.fileName,
-                          ),
+                  onTap: () => unawaited(
+                    _openAttachment(
+                      url,
+                      attachment: model.remoteUrl == null
+                          ? null
+                          : AttachmentReference(
+                              id: attachmentId,
+                              fileName: model.fileName,
+                            ),
+                    ),
+                  ),
+                );
+              }
+              if (attachmentDelivery != null && model.localPath == null) {
+                return AttachmentFilePill(
+                  fileName: model.fileName,
+                  subtitle: 'Imagem',
+                  icon: Icons.image_outlined,
+                  onTap: () => unawaited(
+                    _openAttachment(
+                      url,
+                      attachment: AttachmentReference(
+                        id: attachmentId,
+                        fileName: model.fileName,
+                      ),
+                    ),
                   ),
                 );
               }
@@ -114,14 +133,16 @@ class DocumentAttachmentWidget extends ConsumerWidget {
                   ? Icons.play_circle_outline
                   : Icons.insert_drive_file,
               onTap: url.isNotEmpty
-                  ? () => _openAttachment(
-                      url,
-                      attachment: model.remoteUrl == null
-                          ? null
-                          : AttachmentReference(
-                              id: attachmentId,
-                              fileName: model.fileName,
-                            ),
+                  ? () => unawaited(
+                      _openAttachment(
+                        url,
+                        attachment: model.remoteUrl == null
+                            ? null
+                            : AttachmentReference(
+                                id: attachmentId,
+                                fileName: model.fileName,
+                              ),
+                      ),
                     )
                   : () {},
             );
@@ -144,24 +165,27 @@ class DocumentAttachmentWidget extends ConsumerWidget {
     );
   }
 
-  void _openAttachment(String? url, {AttachmentReference? attachment}) {
-    final delivery = attachmentDelivery;
-    if (delivery == null) {
-      if (url != null) launchUrl(Uri.parse(url));
-      return;
+  Future<void> _openAttachment(
+    String? url, {
+    AttachmentReference? attachment,
+  }) async {
+    try {
+      final delivery = attachmentDelivery;
+      if (delivery == null) {
+        if (url == null || !await launchUrl(Uri.parse(url))) {
+          throw StateError('Could not open attachment');
+        }
+        return;
+      }
+      if (attachment == null) return;
+      await delivery.open(attachment);
+    } catch (error, stackTrace) {
+      dev.log(
+        'Failed to open attachment $attachmentId',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      AppMessenger.showError('Falha ao abrir anexo');
     }
-    if (attachment == null) return;
-    unawaited(
-      delivery.open(attachment).catchError((
-        Object error,
-        StackTrace stackTrace,
-      ) {
-        dev.log(
-          'Failed to open attachment $attachmentId',
-          error: error,
-          stackTrace: stackTrace,
-        );
-      }),
-    );
   }
 }

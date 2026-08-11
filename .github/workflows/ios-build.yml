@@ -195,6 +195,7 @@ jobs:
           USE_SIGNING: ${{ inputs.use_signing || false }}
           CONFIGURATION: ${{ inputs.configuration || 'Release' }}
           API_BASE_URL: ${{ inputs.api_base_url || 'https://backend-winter-waterfall-5807.fly.dev/api/v1' }}
+          SHARE_LINK_DOMAIN: ${{ vars.SHARE_LINK_DOMAIN || 'supanotes.app' }}
         run: |
           set -e
 
@@ -241,6 +242,7 @@ jobs:
               if [ -n "$API_BASE_URL" ]; then
                 FLUTTER_BUILD_ARGS+=(--dart-define=API_BASE_URL="$API_BASE_URL")
               fi
+              FLUTTER_BUILD_ARGS+=(--dart-define=SHARE_LINK_DOMAIN="$SHARE_LINK_DOMAIN")
               if [ "$CONFIGURATION" = "Debug" ]; then
                 echo "Building Flutter iOS Debug (signed)..."
                 flutter build ios --debug "${FLUTTER_BUILD_ARGS[@]}"
@@ -282,6 +284,7 @@ jobs:
               if [ -n "$API_BASE_URL" ]; then
                 BUILD_CMD="$BUILD_CMD FLUTTER_BUILD_EXTRA_FRONT_END_OPTIONS=\"--dart-define=API_BASE_URL=$API_BASE_URL\""
               fi
+              BUILD_CMD="$BUILD_CMD SHARE_LINK_DOMAIN=$SHARE_LINK_DOMAIN"
 
               BUILD_CMD="$BUILD_CMD build"
 

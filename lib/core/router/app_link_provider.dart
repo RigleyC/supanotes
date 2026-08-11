@@ -40,12 +40,19 @@ final class AppLinkStream {
     StreamSubscription<Uri>? subscription;
     Timer? deduplicationWindow;
     String? lastPath;
+    var duplicateSuppressed = false;
     var closed = false;
 
     void emit(Uri uri) {
       if (closed || !isShareLinkUri(uri)) return;
-      if (uri.path == lastPath && deduplicationWindow != null) return;
+      if (uri.path == lastPath && deduplicationWindow != null) {
+        if (!duplicateSuppressed) {
+          duplicateSuppressed = true;
+          return;
+        }
+      }
       lastPath = uri.path;
+      duplicateSuppressed = false;
       deduplicationWindow?.cancel();
       deduplicationWindow = Timer(deduplicationDuration, () {
         deduplicationWindow = null;

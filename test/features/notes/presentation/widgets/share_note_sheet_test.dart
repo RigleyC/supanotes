@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/sharing/data/shares_repository.dart';
+import 'package:supanotes/features/notes/sharing/data/share_link_repository.dart';
+import 'package:supanotes/features/notes/sharing/model/share_link_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/sharing/model/share_model.dart';
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
@@ -47,6 +49,9 @@ Widget _buildTestHarness({
   return ProviderScope(
     overrides: [
       sharesRepositoryProvider.overrideWithValue(repo),
+      shareLinkStatusProvider(
+        'note-1',
+      ).overrideWithValue(const AsyncData(ShareLinkModel(active: false))),
       if (shares != null)
         shareListProvider.overrideWith((ref, _) => Future.value(shares)),
     ],

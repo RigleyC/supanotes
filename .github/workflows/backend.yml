@@ -88,3 +88,15 @@ jobs:
         working-directory: backend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Validate Share Link platform associations
+        if: ${{ vars.SHARE_LINK_DOMAIN != '' && secrets.IOS_TEAM_ID != '' && secrets.ANDROID_SHA256_CERT != '' }}
+        env:
+          SHARE_LINK_DOMAIN: ${{ vars.SHARE_LINK_DOMAIN }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          ANDROID_SHA256_CERT: ${{ secrets.ANDROID_SHA256_CERT }}
+        run: >-
+          pwsh ./scripts/validate-share-link-association.ps1
+          -BaseUrl "https://${SHARE_LINK_DOMAIN}"
+          -AppleTeamId "$IOS_TEAM_ID"
+          -AndroidSha256 "$ANDROID_SHA256_CERT"

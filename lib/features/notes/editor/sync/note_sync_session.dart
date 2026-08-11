@@ -21,6 +21,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   final void Function(Object error)? onProtocolError;
 
   Timer? _pollTimer;
+  bool _isClosing = false;
   bool _isPolling = false;
   bool _disposed = false;
   bool _protocolFailed = false;
@@ -127,30 +128,40 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     }
   }
 
-  Future<void> _enqueueProjection({bool allowWhenDisposed = false}) {
+  Future<void> _enqueueProjection() {
     _projectionTail = _projectionTail.then((_) async {
-      if ((!allowWhenDisposed && _disposed) || taskProjectionEngine == null) {
+      if (_isClosing || _disposed || taskProjectionEngine == null) {
         return;
       }
-      try {
-        await taskProjectionEngine!.projectTasksFromDocument(
-          noteId: noteId,
-          document: document,
-          userId: userId,
-        );
-      } catch (error, stackTrace) {
-        dev.log(
-          'Task projection failed for $noteId',
-          error: error,
-          stackTrace: stackTrace,
-        );
-      }
+      await _projectDocumentCatchingErrors();
     });
     return _projectionTail;
   }
 
+  Future<void> _projectDocument() {
+    final engine = taskProjectionEngine;
+    if (engine == null) return Future.value();
+    return engine.projectTasksFromDocument(
+      noteId: noteId,
+      document: document,
+      userId: userId,
+    );
+  }
+
+  Future<void> _projectDocumentCatchingErrors() async {
+    try {
+      await _projectDocument();
+    } catch (error, stackTrace) {
+      dev.log(
+        'Task projection failed for $noteId',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   Future<void> _onLocalOps() async {
-    if (_disposed) return;
+    if (_isClosing || _disposed) return;
     await _runSyncOperation('syncPending', () async {
       await _syncPending();
     });
@@ -172,7 +183,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   }
 
   Future<void> pollNow() async {
-    if (_disposed || _protocolFailed || _isPolling) return;
+    if (_isClosing || _disposed || _protocolFailed || _isPolling) return;
     _isPolling = true;
     try {
       await _runSyncOperation('pollNow', () async {
@@ -201,7 +212,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     }
     final run = _syncTail.then((_) async {
       try {
-        if (_disposed || _protocolFailed) return;
+        if (_isClosing || _disposed || _protocolFailed) return;
         await operation();
         _lastError = null;
       } catch (error, stackTrace) {
@@ -223,7 +234,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   }
 
   Future<void> _handleSyncResult(SyncResult result) async {
-    if (_disposed) return;
+    if (_isClosing || _disposed) return;
     if (result.isBlocked) {
       _blockedByForeignSession = true;
       _setStatus(NoteSessionStatus.blocked);
@@ -246,17 +257,23 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   @override
   Future<void> dispose() async {
-    _disposed = true;
+    _isClosing = true;
     _setStatus(NoteSessionStatus.closing);
     _pollTimer?.cancel();
+    adapter.onLocalOperations = null;
+    Object? closeError;
+    StackTrace? closeStackTrace;
     try {
       // Persist the editor before waiting for a network request that may be
       // slow or unavailable. Closing must not discard an in-memory edit.
       await adapter.flushNow();
-      await _enqueueProjection(allowWhenDisposed: true);
+      await _projectionTail;
+      await _projectDocument();
       // The outbox is durable now. Do not wait for the network queue during
       // teardown; the next session or catalog sync will retry it.
     } catch (error, stackTrace) {
+      closeError = error;
+      closeStackTrace = stackTrace;
       dev.log(
         'NoteSyncSession flush on dispose failed for $noteId',
         error: error,
@@ -268,6 +285,9 @@ class NoteSyncSession implements NoteEditorSyncHandle {
       _setStatus(NoteSessionStatus.closed);
       unawaited(_statusController.close());
       unawaited(_captureController.close());
+    }
+    if (closeError != null) {
+      Error.throwWithStackTrace(closeError, closeStackTrace!);
     }
   }
 

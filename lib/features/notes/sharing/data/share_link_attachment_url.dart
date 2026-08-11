@@ -30,7 +30,10 @@ final class ShareLinkAttachmentDelivery implements AttachmentDelivery {
   final AttachmentDeliveryPreference preference;
 
   @override
-  @override
   Future<void> open(AttachmentReference attachment) =>
-      launchUrl(shareLinkAttachmentUrl(token, attachment.id));
+      launchUrl(shareLinkAttachmentUrl(token, attachment.id)).then((opened) {
+        if (!opened) {
+          throw StateError('Could not open shared attachment');
+        }
+      });
 }

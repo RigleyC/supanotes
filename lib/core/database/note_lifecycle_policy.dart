@@ -13,4 +13,12 @@ AND NOT EXISTS (
   SELECT 1 FROM attachments a
   WHERE a.note_id = n.id
 )
+AND NOT EXISTS (
+  SELECT 1 FROM pending_note_operations p
+  WHERE p.note_id = n.id
+)
+AND NOT EXISTS (
+  SELECT 1 FROM sync_sessions s
+  WHERE s.note_id = n.id
+)
 """;
