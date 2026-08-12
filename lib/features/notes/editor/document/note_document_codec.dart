@@ -717,36 +717,53 @@ class NoteDocumentCodec {
 
   AttributedText _attributedTextFromDelta(Delta documentDelta) {
     final span = AttributedSpans();
-    final buf = StringBuffer();
+    final buffer = StringBuffer();
     for (final op in documentDelta.operations) {
-      if (!op.isInsert || op.data is! String || (op.data as String).isEmpty) {
-        continue;
-      }
-
-      final insert = op.data as String;
-      final start = buf.length;
-      buf.write(insert);
-      final attrs = op.attributes;
-      if (attrs != null) {
-        for (final entry in attrs.entries) {
-          Attribution? attr;
-          if (entry.key == 'link' && entry.value is String) {
-            final uri = Uri.tryParse(entry.value as String);
-            if (uri != null) attr = LinkAttribution.fromUri(uri);
-          } else if (entry.value == true) {
-            attr = attributionFromId(entry.key);
-          }
-          if (attr != null) {
-            span.addAttribution(
-              newAttribution: attr,
-              start: start,
-              end: buf.length - 1,
-            );
-          }
-        }
-      }
+      _appendOperation(op, buffer, span);
     }
-    return AttributedText(buf.toString(), span);
+    return AttributedText(buffer.toString(), span);
+  }
+
+  void _appendOperation(
+    Operation operation,
+    StringBuffer buffer,
+    AttributedSpans span,
+  ) {
+    final insert = operation.data;
+    if (!operation.isInsert || insert is! String || insert.isEmpty) return;
+
+    final start = buffer.length;
+    buffer.write(insert);
+    _appendAttributions(
+      operation.attributes,
+      span: span,
+      start: start,
+      end: buffer.length - 1,
+    );
+  }
+
+  void _appendAttributions(
+    Map<String, dynamic>? attributes, {
+    required AttributedSpans span,
+    required int start,
+    required int end,
+  }) {
+    if (attributes == null) return;
+
+    for (final entry in attributes.entries) {
+      final attribution = _attributionFromDeltaEntry(entry);
+      if (attribution == null) continue;
+      span.addAttribution(newAttribution: attribution, start: start, end: end);
+    }
+  }
+
+  Attribution? _attributionFromDeltaEntry(MapEntry<String, dynamic> entry) {
+    if (entry.key == 'link' && entry.value is String) {
+      final uri = Uri.tryParse(entry.value as String);
+      return uri == null ? null : LinkAttribution.fromUri(uri);
+    }
+    if (entry.value == true) return attributionFromId(entry.key);
+    return null;
   }
 
   AttributedText? applyDeltaToText(
