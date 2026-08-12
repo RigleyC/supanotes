@@ -370,49 +370,22 @@ class DocumentProjectionApplier {
     DocumentNode node,
     Map<String, dynamic> meta,
   ) {
-    final updatedMeta = Map<String, dynamic>.from(node.metadata);
-    for (final entry in meta.entries) {
-      if (entry.value == null) {
-        updatedMeta.remove(entry.key);
-      } else {
-        updatedMeta[entry.key] = entry.value;
-      }
-    }
-
-    if (updatedMeta.containsKey('blockType')) {
-      final rawBType = updatedMeta['blockType'];
-      if (rawBType is String) {
-        final attr = _codec.attributionFromName(rawBType);
-        if (attr != null) {
-          updatedMeta['blockType'] = attr;
-        } else {
-          updatedMeta.remove('blockType');
-        }
-      } else if (rawBType == null) {
-        updatedMeta.remove('blockType');
-      }
-    }
+    final updatedMeta = _mergeMetadata(node.metadata, meta);
+    _normalizeBlockType(updatedMeta);
 
     if (node is TaskNode) {
-      final isComp = meta.containsKey('isCompleted')
-          ? meta['isCompleted'] as bool
-          : node.isComplete;
       return TaskNode(
         id: node.id,
         text: node.text,
-        isComplete: isComp,
-        indent: meta.containsKey('indent')
-            ? meta['indent'] as int? ?? 0
-            : node.indent,
+        isComplete: _updatedCompletion(node, meta),
+        indent: _updatedIndent(node.indent, meta),
         metadata: updatedMeta,
       );
     } else if (node is ParagraphNode) {
       return ParagraphNode(
         id: node.id,
         text: node.text,
-        indent: meta.containsKey('indent')
-            ? meta['indent'] as int? ?? 0
-            : node.indent,
+        indent: _updatedIndent(node.indent, meta),
         metadata: updatedMeta,
       );
     } else if (node is ListItemNode) {
@@ -420,12 +393,53 @@ class DocumentProjectionApplier {
         id: node.id,
         itemType: node.type,
         text: node.text,
-        indent: meta.containsKey('indent')
-            ? meta['indent'] as int? ?? 0
-            : node.indent,
+        indent: _updatedIndent(node.indent, meta),
         metadata: updatedMeta,
       );
     }
     return node;
+  }
+
+  Map<String, dynamic> _mergeMetadata(
+    Map<String, dynamic> current,
+    Map<String, dynamic> updates,
+  ) {
+    final merged = Map<String, dynamic>.from(current);
+    for (final entry in updates.entries) {
+      if (entry.value == null) {
+        merged.remove(entry.key);
+      } else {
+        merged[entry.key] = entry.value;
+      }
+    }
+    return merged;
+  }
+
+  void _normalizeBlockType(Map<String, dynamic> metadata) {
+    if (!metadata.containsKey('blockType')) return;
+
+    final rawBlockType = metadata['blockType'];
+    if (rawBlockType is String) {
+      final attribution = _codec.attributionFromName(rawBlockType);
+      if (attribution != null) {
+        metadata['blockType'] = attribution;
+      } else {
+        metadata.remove('blockType');
+      }
+    } else if (rawBlockType == null) {
+      metadata.remove('blockType');
+    }
+  }
+
+  bool _updatedCompletion(TaskNode node, Map<String, dynamic> metadata) {
+    return metadata.containsKey('isCompleted')
+        ? metadata['isCompleted'] as bool
+        : node.isComplete;
+  }
+
+  int _updatedIndent(int currentIndent, Map<String, dynamic> metadata) {
+    return metadata.containsKey('indent')
+        ? metadata['indent'] as int? ?? 0
+        : currentIndent;
   }
 }
