@@ -148,4 +148,42 @@ void main() {
     expect(task.metadata['completions'], isA<Map>());
     expect(task.indent, 2);
   });
+
+  test(
+    'keeps capture suppressed when rebuilding a malformed snapshot fails',
+    () async {
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'block-1', text: AttributedText('Initial'))],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: MutableDocumentComposer(),
+      );
+      final applier = DocumentProjectionApplier(
+        document: document,
+        editor: editor,
+        codec: const NoteDocumentCodec(),
+      );
+      var suppressCalls = 0;
+      var resumeCalls = 0;
+      var mirrorCalls = 0;
+
+      await expectLater(
+        applier.rebuildFromSnapshot(
+          snapshot: const {
+            'blocks': [42],
+          },
+          pendingOps: null,
+          suppressCapture: () => suppressCalls++,
+          resumeCapture: () => resumeCalls++,
+          rebuildMirror: () => mirrorCalls++,
+        ),
+        throwsA(isA<TypeError>()),
+      );
+
+      expect(suppressCalls, 1);
+      expect(resumeCalls, 0);
+      expect(mirrorCalls, 0);
+    },
+  );
 }

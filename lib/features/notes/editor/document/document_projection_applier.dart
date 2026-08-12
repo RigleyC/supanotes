@@ -40,6 +40,7 @@ class DocumentProjectionApplier {
         'selection': previousSelection,
       },
     );
+    var rebuildCompleted = false;
     try {
       _editor.startTransaction();
       _editor.execute([
@@ -78,6 +79,7 @@ class DocumentProjectionApplier {
       }
 
       rebuildMirror();
+      rebuildCompleted = true;
     } finally {
       final selection = _selectionAfterRebuild(previousSelection);
       NoteSyncDebug.log(
@@ -92,7 +94,7 @@ class DocumentProjectionApplier {
         ),
       ]);
       _editor.endTransaction();
-      resumeCapture();
+      if (rebuildCompleted) resumeCapture();
     }
   }
 
