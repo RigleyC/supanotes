@@ -189,6 +189,7 @@ class DocumentProjectionApplier {
         final node = _document.getNodeById(moveBlockId);
         if (node == null || _document.nodeCount <= 1) return;
 
+        final sourceIndex = _document.getNodeIndexById(moveBlockId);
         final afterBlockId = payload['afterBlockId'] as String?;
         if (afterBlockId == moveBlockId) return;
         int targetIndex = _document.nodeCount - 1;
@@ -197,7 +198,11 @@ class DocumentProjectionApplier {
         } else {
           final targetNode = _document.getNodeById(afterBlockId);
           if (targetNode != null) {
-            targetIndex = _document.getNodeIndexById(targetNode.id) + 1;
+            final targetNodeIndex = _document.getNodeIndexById(targetNode.id);
+            targetIndex = targetNodeIndex + 1;
+            if (sourceIndex < targetNodeIndex) {
+              targetIndex -= 1;
+            }
           }
         }
         _editor.execute([
