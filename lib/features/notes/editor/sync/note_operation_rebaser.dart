@@ -234,100 +234,33 @@ class NoteOperationRebaser {
     NoteOp appliedOp,
     bool opToTransformHasPriority,
   ) {
-    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
-        appliedOp.blockId != null &&
-        appliedOp.blockId == opToTransform.blockId) {
+    if (_remoteDeleteRemovesOperation(opToTransform, appliedOp)) {
       return null;
     }
 
-    if (opToTransform.kind == NoteOperationKind.textDelta.wireName &&
-        appliedOp.kind == NoteOperationKind.textDelta.wireName) {
-      if (opToTransform.blockId != appliedOp.blockId) return opToTransform;
-
-      final opToTransformOps = opToTransform.payload['ops'];
-      final appliedOps = appliedOp.payload['ops'];
-      if (opToTransformOps == null || appliedOps == null) return opToTransform;
-
-      final opToTransformDelta =
-          opToTransform.cachedDelta ??
-          quill.Delta.fromJson(opToTransformOps as List<dynamic>);
-      final appliedDelta =
-          appliedOp.cachedDelta ??
-          quill.Delta.fromJson(appliedOps as List<dynamic>);
-
-      final transformedDelta = appliedDelta.transform(
-        opToTransformDelta,
-        !opToTransformHasPriority,
-      );
-
-      final newPayload = Map<String, dynamic>.from(opToTransform.payload);
-      newPayload['ops'] = transformedDelta.toJson();
-
-      return NoteOp.fromData(
-        operationId: opToTransform.operationId,
-        actorId: opToTransform.actorId,
-        revision: opToTransform.revision,
-        kind: opToTransform.kind,
-        blockId: opToTransform.blockId,
-        payload: newPayload,
-        cachedDelta: transformedDelta,
+    if (_isTextDeltaPair(opToTransform, appliedOp)) {
+      return _transformTextDelta(
+        opToTransform,
+        appliedOp,
+        opToTransformHasPriority,
       );
     }
 
     final payload = Map<String, dynamic>.from(opToTransform.payload);
-    final kind = opToTransform.kind;
-    final rKind = appliedOp.kind;
-    final rPayload = appliedOp.payload;
-
-    if (kind == NoteOperationKind.createBlock.wireName) {
-      final afterBlockId = payload['afterBlockId'] as String?;
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          afterBlockId == appliedOp.blockId) {
-        payload['afterBlockId'] = null;
-      }
-      if (rKind == NoteOperationKind.createBlock.wireName) {
-        final rAfter = rPayload['afterBlockId'] as String?;
-        if (afterBlockId != null && afterBlockId == rAfter) {
-          if (!opToTransformHasPriority) {
-            payload['afterBlockId'] = appliedOp.blockId;
-          }
+    switch (opToTransform.kind) {
+      case NoteOperationWireNames.createBlock:
+        _transformCreateBlock(payload, appliedOp, opToTransformHasPriority);
+      case NoteOperationWireNames.moveBlock:
+        if (!_transformMoveBlock(
+          payload,
+          appliedOp,
+          opToTransformHasPriority,
+        )) {
+          return null;
         }
-      }
-    }
-
-    if (kind == NoteOperationKind.moveBlock.wireName) {
-      final targetId = payload['blockId'] as String?;
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          targetId == appliedOp.blockId) {
-        return null;
-      }
-      final afterBlockId = payload['afterBlockId'] as String?;
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          afterBlockId == appliedOp.blockId) {
-        payload['afterBlockId'] = null;
-      }
-      if (rKind == NoteOperationKind.moveBlock.wireName) {
-        final rTarget = rPayload['blockId'] as String?;
-        if (targetId == rTarget) {
-          if (!opToTransformHasPriority) {
-            return null;
-          }
-        }
-      }
-    }
-
-    if (kind == NoteOperationKind.deleteBlock.wireName) {
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          opToTransform.blockId == appliedOp.blockId) {
-        return null;
-      }
-    }
-
-    if (kind == NoteOperationKind.setBlockType.wireName) {
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          opToTransform.blockId == appliedOp.blockId) {
-        return null;
-      }
+      case NoteOperationWireNames.deleteBlock:
+      case NoteOperationWireNames.setBlockType:
+        if (_sameBlockWasDeleted(opToTransform, appliedOp)) return null;
     }
 
     return NoteOp(
@@ -338,5 +271,99 @@ class NoteOperationRebaser {
       blockId: opToTransform.blockId,
       payload: payload,
     );
+  }
+
+  bool _remoteDeleteRemovesOperation(NoteOp operation, NoteOp appliedOp) {
+    return appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        appliedOp.blockId != null &&
+        appliedOp.blockId == operation.blockId;
+  }
+
+  bool _isTextDeltaPair(NoteOp operation, NoteOp appliedOp) {
+    return operation.kind == NoteOperationKind.textDelta.wireName &&
+        appliedOp.kind == NoteOperationKind.textDelta.wireName;
+  }
+
+  NoteOp _transformTextDelta(
+    NoteOp operation,
+    NoteOp appliedOp,
+    bool operationHasPriority,
+  ) {
+    if (operation.blockId != appliedOp.blockId) return operation;
+
+    final operationOps = operation.payload['ops'];
+    final appliedOps = appliedOp.payload['ops'];
+    if (operationOps == null || appliedOps == null) return operation;
+
+    final operationDelta =
+        operation.cachedDelta ??
+        quill.Delta.fromJson(operationOps as List<dynamic>);
+    final appliedDelta =
+        appliedOp.cachedDelta ??
+        quill.Delta.fromJson(appliedOps as List<dynamic>);
+    final transformedDelta = appliedDelta.transform(
+      operationDelta,
+      !operationHasPriority,
+    );
+    final payload = Map<String, dynamic>.from(operation.payload);
+    payload['ops'] = transformedDelta.toJson();
+
+    return NoteOp.fromData(
+      operationId: operation.operationId,
+      actorId: operation.actorId,
+      revision: operation.revision,
+      kind: operation.kind,
+      blockId: operation.blockId,
+      payload: payload,
+      cachedDelta: transformedDelta,
+    );
+  }
+
+  void _transformCreateBlock(
+    Map<String, dynamic> payload,
+    NoteOp appliedOp,
+    bool operationHasPriority,
+  ) {
+    final afterBlockId = payload['afterBlockId'] as String?;
+    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        afterBlockId == appliedOp.blockId) {
+      payload['afterBlockId'] = null;
+    }
+    if (appliedOp.kind != NoteOperationKind.createBlock.wireName) return;
+
+    final appliedAfterBlockId = appliedOp.payload['afterBlockId'] as String?;
+    if (afterBlockId != null && afterBlockId == appliedAfterBlockId) {
+      if (!operationHasPriority) {
+        payload['afterBlockId'] = appliedOp.blockId;
+      }
+    }
+  }
+
+  bool _transformMoveBlock(
+    Map<String, dynamic> payload,
+    NoteOp appliedOp,
+    bool operationHasPriority,
+  ) {
+    final targetId = payload['blockId'] as String?;
+    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        targetId == appliedOp.blockId) {
+      return false;
+    }
+
+    final afterBlockId = payload['afterBlockId'] as String?;
+    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        afterBlockId == appliedOp.blockId) {
+      payload['afterBlockId'] = null;
+    }
+    if (appliedOp.kind != NoteOperationKind.moveBlock.wireName) return true;
+
+    final appliedTargetId = appliedOp.payload['blockId'] as String?;
+    if (targetId == appliedTargetId && !operationHasPriority) return false;
+    return true;
+  }
+
+  bool _sameBlockWasDeleted(NoteOp operation, NoteOp appliedOp) {
+    return appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        operation.blockId == appliedOp.blockId;
   }
 }
