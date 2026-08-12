@@ -69,6 +69,19 @@ void main() {
     );
   });
 
+  test('contract rejects text delta entries that are not objects', () {
+    expect(
+      NoteOperationContract.validate(
+        kind: NoteOperationKind.textDelta.wireName,
+        blockId: 'block-1',
+        payload: const {
+          'ops': ['inserted text'],
+        },
+      ),
+      'ops must contain objects',
+    );
+  });
+
   test('contract accepts a create block without metadata', () {
     final error = NoteOperationContract.validate(
       kind: NoteOperationKind.createBlock.wireName,

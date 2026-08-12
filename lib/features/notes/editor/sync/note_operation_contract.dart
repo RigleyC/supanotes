@@ -92,7 +92,9 @@ abstract final class NoteOperationContract {
         if (blockId == null || blockId.isEmpty) {
           return 'blockId is required for text_delta';
         }
-        return payload['ops'] is List ? null : 'ops must be a list';
+        final ops = payload['ops'];
+        if (ops is! List) return 'ops must be a list';
+        return ops.every((op) => op is Map) ? null : 'ops must contain objects';
       case NoteOperationKind.createBlock:
         final id = payload['id'];
         if (id is! String || id.isEmpty) {
