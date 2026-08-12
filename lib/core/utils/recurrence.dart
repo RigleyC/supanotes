@@ -108,19 +108,45 @@ List<DateTime> enumerateOccurrences({
   if (anchor == null || recurrence == null) return [];
   if (to.isBefore(from)) return [];
 
-  final results = <DateTime>[];
-  var current = anchor;
+  final firstOccurrence = _advanceToWindowStart(
+    current: anchor,
+    recurrence: recurrence,
+    from: from,
+    maxCount: maxCount,
+  );
+  return _collectWindowOccurrences(
+    current: firstOccurrence,
+    recurrence: recurrence,
+    from: from,
+    to: to,
+    maxCount: maxCount,
+  );
+}
 
-  // Phase 1: advance from anchor to the first occurrence >= from
-  // (separate counter so far-past anchors don't consume the result budget)
+DateTime _advanceToWindowStart({
+  required DateTime current,
+  required TaskRecurrence recurrence,
+  required DateTime from,
+  required int maxCount,
+}) {
+  // A separate counter keeps far-past anchors from consuming the result budget.
   for (var i = 0; i < maxCount; i++) {
     if (!current.isBefore(from)) break;
     final next = nextDueDate(from: current, recurrence: recurrence);
     if (next == null || next.isAtSameMomentAs(current)) break;
     current = next;
   }
+  return current;
+}
 
-  // Phase 2: collect occurrences within the query window
+List<DateTime> _collectWindowOccurrences({
+  required DateTime current,
+  required TaskRecurrence recurrence,
+  required DateTime from,
+  required DateTime to,
+  required int maxCount,
+}) {
+  final results = <DateTime>[];
   for (var i = 0; i < maxCount; i++) {
     if (current.isBefore(from) || current.isAfter(to)) break;
     results.add(current);
@@ -128,7 +154,6 @@ List<DateTime> enumerateOccurrences({
     if (next == null || next.isAtSameMomentAs(current)) break;
     current = next;
   }
-
   return results;
 }
 
