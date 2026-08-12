@@ -797,15 +797,7 @@ class NoteDocumentCodec {
 
   String? blockTypeName(DocumentNode node) {
     if (node is ParagraphNode) {
-      final raw = node.getMetadataValue('blockType');
-      final blockType = raw is Attribution
-          ? raw
-          : (raw is String ? attributionFromName(raw) : null);
-      if (blockType == header1Attribution || raw == 'header1') return 'header1';
-      if (blockType == header2Attribution || raw == 'header2') return 'header2';
-      if (blockType == header3Attribution || raw == 'header3') return 'header3';
-      if (blockType == blockquoteAttribution || raw == 'quote') return 'quote';
-      return 'paragraph';
+      return _paragraphBlockTypeName(node);
     }
     if (node is ListItemNode) {
       return node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
@@ -815,6 +807,18 @@ class NoteDocumentCodec {
     if (node is DocumentAttachmentNode) return 'attachment';
     if (node is RichLinkNode) return 'rich_link';
     return null;
+  }
+
+  String _paragraphBlockTypeName(ParagraphNode node) {
+    final raw = node.getMetadataValue('blockType');
+    final blockType = raw is Attribution
+        ? raw
+        : (raw is String ? attributionFromName(raw) : null);
+    if (blockType == header1Attribution || raw == 'header1') return 'header1';
+    if (blockType == header2Attribution || raw == 'header2') return 'header2';
+    if (blockType == header3Attribution || raw == 'header3') return 'header3';
+    if (blockType == blockquoteAttribution || raw == 'quote') return 'quote';
+    return 'paragraph';
   }
 
   Attribution? attributionFromId(String id) {
