@@ -252,28 +252,39 @@ class NoteDocumentCodec {
     if (rawAttributes is! Map) return;
 
     for (final entry in rawAttributes.entries) {
-      if (entry.key is! String) {
-        throw const FormatException(
-          'Note document block contains invalid delta attribute names',
-        );
-      }
-      if (entry.key == 'link') {
-        final uri = entry.value is String
-            ? Uri.tryParse(entry.value as String)
-            : null;
-        if (uri == null) {
-          throw const FormatException(
-            'Note document block contains an invalid link attribute',
-          );
-        }
-      } else if (entry.key.toString().startsWith('link:')) {
-        if (entry.value != true ||
-            Uri.tryParse(entry.key.toString().substring(5)) == null) {
-          throw const FormatException(
-            'Note document block contains an invalid link attribution',
-          );
-        }
-      }
+      _validateDeltaAttributeEntry(entry);
+    }
+  }
+
+  void _validateDeltaAttributeEntry(MapEntry<dynamic, dynamic> entry) {
+    if (entry.key is! String) {
+      throw const FormatException(
+        'Note document block contains invalid delta attribute names',
+      );
+    }
+
+    final key = entry.key as String;
+    if (key == 'link') {
+      _validateLinkAttribute(entry.value);
+    } else if (key.startsWith('link:')) {
+      _validateLinkAttribution(key, entry.value);
+    }
+  }
+
+  void _validateLinkAttribute(dynamic value) {
+    final uri = value is String ? Uri.tryParse(value) : null;
+    if (uri == null) {
+      throw const FormatException(
+        'Note document block contains an invalid link attribute',
+      );
+    }
+  }
+
+  void _validateLinkAttribution(String key, dynamic value) {
+    if (value != true || Uri.tryParse(key.substring(5)) == null) {
+      throw const FormatException(
+        'Note document block contains an invalid link attribution',
+      );
     }
   }
 
