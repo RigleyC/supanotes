@@ -174,6 +174,7 @@ void main() {
             'blocks': [42],
           },
           pendingOps: null,
+          repairPersistedSnapshot: false,
           suppressCapture: () => suppressCalls++,
           resumeCapture: () => resumeCalls++,
           rebuildMirror: () => mirrorCalls++,
@@ -186,4 +187,43 @@ void main() {
       expect(mirrorCalls, 0);
     },
   );
+
+  test('rejects mutation operations in a strict remote snapshot', () async {
+    final document = MutableDocument(
+      nodes: [ParagraphNode(id: 'block-1', text: AttributedText('Initial'))],
+    );
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: MutableDocumentComposer(),
+    );
+    final applier = DocumentProjectionApplier(
+      document: document,
+      editor: editor,
+      codec: const NoteDocumentCodec(),
+    );
+
+    await expectLater(
+      applier.rebuildFromSnapshot(
+        snapshot: const {
+          'blocks': [
+            {
+              'id': 'block-1',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'Remote'},
+                {'delete': 6},
+              ],
+              'metadata': {},
+            },
+          ],
+        },
+        pendingOps: null,
+        repairPersistedSnapshot: false,
+        suppressCapture: () {},
+        resumeCapture: () {},
+        rebuildMirror: () {},
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
 }

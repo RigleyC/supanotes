@@ -23,6 +23,7 @@ class DocumentProjectionApplier {
   Future<void> rebuildFromSnapshot({
     required Map<String, dynamic> snapshot,
     required List<PendingNoteOperationData>? pendingOps,
+    required bool repairPersistedSnapshot,
     required void Function() suppressCapture,
     required void Function() resumeCapture,
     required void Function() rebuildMirror,
@@ -56,7 +57,10 @@ class DocumentProjectionApplier {
         _editor.execute([DeleteNodeRequest(nodeId: node.id)]);
       }
 
-      applyFullDocument(snapshot);
+      applyFullDocument(
+        snapshot,
+        repairPersistedSnapshot: repairPersistedSnapshot,
+      );
 
       if (pendingOps != null) {
         for (final op in pendingOps) {
@@ -98,7 +102,10 @@ class DocumentProjectionApplier {
     }
   }
 
-  void applyFullDocument(Map<String, dynamic> snapshot) {
+  void applyFullDocument(
+    Map<String, dynamic> snapshot, {
+    required bool repairPersistedSnapshot,
+  }) {
     final blocks = snapshot['blocks'] as List<dynamic>? ?? [];
     if (blocks.isEmpty) {
       _editor.execute([
@@ -117,7 +124,9 @@ class DocumentProjectionApplier {
     var nodeIndex = 0;
     for (final block in blocks) {
       final b = block as Map<String, dynamic>;
-      final node = _codec.decodePersistedNode(b);
+      final node = repairPersistedSnapshot
+          ? _codec.decodePersistedNode(b)
+          : _codec.decodeNode(b);
       if (!insertedNodeIds.add(node.id)) {
         NoteSyncDebug.log(
           'projection.snapshot.duplicate_node_id',
