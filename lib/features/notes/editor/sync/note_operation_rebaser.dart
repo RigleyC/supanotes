@@ -69,119 +69,162 @@ class NoteOperationRebaser {
     required int finalRevision,
     List<AcceptedOperation>? acceptedOps,
   }) {
-    final acceptedRevisions = <String, int>{};
-    if (acceptedOps != null) {
-      for (final a in acceptedOps) {
-        acceptedRevisions[a.operationId] = a.revision;
-      }
-    }
-
-    var currentRemote = remote
-        .map(
-          (r) => NoteOp.fromData(
-            operationId: r.operationId,
-            actorId: r.actorId,
-            revision: r.revision,
-            kind: r.kind,
-            blockId: r.blockId,
-            payload: r.payload,
-          ),
-        )
-        .toList();
-
-    if (inFlight != null && inFlight.isNotEmpty) {
-      for (final inFlightData in inFlight) {
-        final payload =
-            jsonDecode(inFlightData.payloadJson) as Map<String, dynamic>;
-        final inFlightOp = NoteOp.fromData(
-          operationId: inFlightData.operationId,
-          actorId: localActorId,
-          kind: inFlightData.kind,
-          blockId: inFlightData.blockId,
-          payload: payload,
-        );
-
-        final acceptedRev = acceptedRevisions[inFlightOp.operationId];
-        final newRemote = <NoteOp>[];
-        for (final r in currentRemote) {
-          if (acceptedRev != null &&
-              r.revision != null &&
-              r.revision! < acceptedRev) {
-            final localKey = '$localActorId:${inFlightOp.operationId}';
-            final remoteKey = '${r.actorId}:${r.operationId}';
-            final rHasPriority = remoteKey.compareTo(localKey) > 0;
-
-            final transformed = _transformOp(r, inFlightOp, rHasPriority);
-            if (transformed != null) {
-              newRemote.add(transformed);
-            }
-          } else {
-            newRemote.add(r);
-          }
-        }
-        currentRemote = newRemote;
-      }
-    }
+    final acceptedRevisions = _acceptedRevisions(acceptedOps);
+    var currentRemote = _toNoteOperations(remote);
+    currentRemote = _transformRemoteAgainstInFlight(
+      inFlight: inFlight,
+      remote: currentRemote,
+      acceptedRevisions: acceptedRevisions,
+    );
 
     final result = <PendingNoteOperationData>[];
     var activeRemote = currentRemote;
 
-    for (int i = 0; i < pending.length; i++) {
-      final pendingData = pending[i];
+    for (final pendingData in pending) {
       if (acceptedRevisions.containsKey(pendingData.operationId)) {
         continue;
       }
 
-      var pOp = NoteOp.fromData(
-        operationId: pendingData.operationId,
-        actorId: localActorId,
-        kind: pendingData.kind,
-        blockId: pendingData.blockId,
-        payload: jsonDecode(pendingData.payloadJson) as Map<String, dynamic>,
+      final rebased = _rebasePendingOperation(
+        pendingData: pendingData,
+        activeRemote: activeRemote,
       );
+      if (rebased == null) continue;
 
-      bool dropped = false;
-      final nextRemote = <NoteOp>[];
-
-      for (final r in activeRemote) {
-        final localKey = '$localActorId:${pOp.operationId}';
-        final remoteKey = '${r.actorId}:${r.operationId}';
-        final pHasPriority = localKey.compareTo(remoteKey) > 0;
-
-        final transformedP = _transformOp(pOp, r, pHasPriority);
-        if (transformedP == null) {
-          dropped = true;
-          break;
-        }
-
-        final transformedR = _transformOp(r, pOp, !pHasPriority);
-        if (transformedR != null) {
-          nextRemote.add(transformedR);
-        }
-
-        pOp = transformedP;
-      }
-
-      if (dropped) continue;
-      activeRemote = nextRemote;
-
+      activeRemote = rebased.remote;
       result.add(
-        PendingNoteOperationData(
-          operationId: pOp.operationId,
-          noteId: pendingData.noteId,
-          baseRevision: finalRevision + result.length,
+        _buildRebasedOperation(
+          pendingData: pendingData,
+          operation: rebased.operation,
+          finalRevision: finalRevision,
           ordinal: result.length,
-          kind: pOp.kind,
-          blockId: pOp.blockId,
-          payloadJson: jsonEncode(pOp.payload),
-          createdAt: pendingData.createdAt,
-          lastAttemptAt: pendingData.lastAttemptAt,
-          attemptCount: pendingData.attemptCount,
-          status: pendingData.status,
         ),
       );
     }
     return result;
+  }
+
+  Map<String, int> _acceptedRevisions(List<AcceptedOperation>? acceptedOps) {
+    if (acceptedOps == null) return {};
+    return {
+      for (final accepted in acceptedOps)
+        accepted.operationId: accepted.revision,
+    };
+  }
+
+  List<NoteOp> _toNoteOperations(List<Operation> operations) {
+    return operations
+        .map(
+          (operation) => NoteOp.fromData(
+            operationId: operation.operationId,
+            actorId: operation.actorId,
+            revision: operation.revision,
+            kind: operation.kind,
+            blockId: operation.blockId,
+            payload: operation.payload,
+          ),
+        )
+        .toList();
+  }
+
+  List<NoteOp> _transformRemoteAgainstInFlight({
+    required List<PendingNoteOperationData>? inFlight,
+    required List<NoteOp> remote,
+    required Map<String, int> acceptedRevisions,
+  }) {
+    var currentRemote = remote;
+    if (inFlight == null || inFlight.isEmpty) return currentRemote;
+
+    for (final inFlightData in inFlight) {
+      final payload =
+          jsonDecode(inFlightData.payloadJson) as Map<String, dynamic>;
+      final inFlightOp = NoteOp.fromData(
+        operationId: inFlightData.operationId,
+        actorId: localActorId,
+        kind: inFlightData.kind,
+        blockId: inFlightData.blockId,
+        payload: payload,
+      );
+      final acceptedRevision = acceptedRevisions[inFlightOp.operationId];
+      final transformedRemote = <NoteOp>[];
+
+      for (final remoteOp in currentRemote) {
+        if (acceptedRevision != null &&
+            remoteOp.revision != null &&
+            remoteOp.revision! < acceptedRevision) {
+          final localKey = '$localActorId:${inFlightOp.operationId}';
+          final remoteKey = '${remoteOp.actorId}:${remoteOp.operationId}';
+          final remoteHasPriority = remoteKey.compareTo(localKey) > 0;
+          final transformed = _transformOp(
+            remoteOp,
+            inFlightOp,
+            remoteHasPriority,
+          );
+          if (transformed != null) transformedRemote.add(transformed);
+        } else {
+          transformedRemote.add(remoteOp);
+        }
+      }
+      currentRemote = transformedRemote;
+    }
+    return currentRemote;
+  }
+
+  ({NoteOp operation, List<NoteOp> remote})? _rebasePendingOperation({
+    required PendingNoteOperationData pendingData,
+    required List<NoteOp> activeRemote,
+  }) {
+    var operation = NoteOp.fromData(
+      operationId: pendingData.operationId,
+      actorId: localActorId,
+      kind: pendingData.kind,
+      blockId: pendingData.blockId,
+      payload: jsonDecode(pendingData.payloadJson) as Map<String, dynamic>,
+    );
+    final nextRemote = <NoteOp>[];
+
+    for (final remoteOp in activeRemote) {
+      final localKey = '$localActorId:${operation.operationId}';
+      final remoteKey = '${remoteOp.actorId}:${remoteOp.operationId}';
+      final localHasPriority = localKey.compareTo(remoteKey) > 0;
+      final transformedOperation = _transformOp(
+        operation,
+        remoteOp,
+        localHasPriority,
+      );
+      if (transformedOperation == null) return null;
+
+      final transformedRemote = _transformOp(
+        remoteOp,
+        operation,
+        !localHasPriority,
+      );
+      if (transformedRemote != null) nextRemote.add(transformedRemote);
+      operation = transformedOperation;
+    }
+
+    return (operation: operation, remote: nextRemote);
+  }
+
+  PendingNoteOperationData _buildRebasedOperation({
+    required PendingNoteOperationData pendingData,
+    required NoteOp operation,
+    required int finalRevision,
+    required int ordinal,
+  }) {
+    return PendingNoteOperationData(
+      operationId: operation.operationId,
+      noteId: pendingData.noteId,
+      baseRevision: finalRevision + ordinal,
+      ordinal: ordinal,
+      kind: operation.kind,
+      blockId: operation.blockId,
+      payloadJson: jsonEncode(operation.payload),
+      createdAt: pendingData.createdAt,
+      lastAttemptAt: pendingData.lastAttemptAt,
+      attemptCount: pendingData.attemptCount,
+      status: pendingData.status,
+    );
   }
 
   /// Transforms `opToTransform` against `appliedOp`.
