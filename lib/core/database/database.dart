@@ -136,26 +136,13 @@ class AppDatabase extends _$AppDatabase {
     String userId = '',
   }) {
     return transaction(() async {
-      if (!note.id.present || note.id.value != noteId) {
-        throw ArgumentError('Remote note companion id must match noteId');
-      }
-      if (!document.noteId.present || document.noteId.value != noteId) {
-        throw ArgumentError('Remote document noteId must match noteId');
-      }
-
-      if (mode is InsertRemoteNote) {
-        if (await notesDao.getNoteById(noteId) != null) return false;
-        await notesDao.createNote(note);
-      } else if (mode is UpdateRemoteNote) {
-        if (!await notesDao.updateRemoteNoteIfUnchanged(
-          id: noteId,
-          expectedUpdatedAt: mode.expectedUpdatedAt,
-          note: note,
-        )) {
-          return false;
-        }
-      } else {
-        throw StateError('Unsupported remote note write mode');
+      _validateRemoteNoteWrite(noteId: noteId, note: note, document: document);
+      if (!await _writeRemoteNoteCatalog(
+        noteId: noteId,
+        mode: mode,
+        note: note,
+      )) {
+        return false;
       }
 
       await noteOperationsDao.upsertNoteDocument(document);
@@ -166,6 +153,39 @@ class AppDatabase extends _$AppDatabase {
       );
       return true;
     });
+  }
+
+  void _validateRemoteNoteWrite({
+    required String noteId,
+    required NotesCompanion note,
+    required LocalNoteDocumentsCompanion document,
+  }) {
+    if (!note.id.present || note.id.value != noteId) {
+      throw ArgumentError('Remote note companion id must match noteId');
+    }
+    if (!document.noteId.present || document.noteId.value != noteId) {
+      throw ArgumentError('Remote document noteId must match noteId');
+    }
+  }
+
+  Future<bool> _writeRemoteNoteCatalog({
+    required String noteId,
+    required RemoteNoteWriteMode mode,
+    required NotesCompanion note,
+  }) async {
+    if (mode is InsertRemoteNote) {
+      if (await notesDao.getNoteById(noteId) != null) return false;
+      await notesDao.createNote(note);
+      return true;
+    }
+    if (mode is UpdateRemoteNote) {
+      return notesDao.updateRemoteNoteIfUnchanged(
+        id: noteId,
+        expectedUpdatedAt: mode.expectedUpdatedAt,
+        note: note,
+      );
+    }
+    throw StateError('Unsupported remote note write mode');
   }
 
   @override
