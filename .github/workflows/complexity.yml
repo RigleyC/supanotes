@@ -1,0 +1,37 @@
+name: Cognitive Complexity Audit
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - lib/**
+      - pubspec.yaml
+      - .github/workflows/complexity.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+
+      - name: Run cognitive complexity audit
+        uses: kevmoo/cognitive_complexity.dart@e36813e14019789ec69588e78cbe98acf1dce0d4
+        with:
+          targets: lib
+          threshold: 15
+          fail-threshold: 15
+          fail-on-increase: true
+          format: github
