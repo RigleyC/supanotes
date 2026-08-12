@@ -42,6 +42,8 @@ final class _RemoteNoteWriteResult {
   final int? fetchedRevision;
 }
 
+enum _NoteIconPushOutcome { completed, retry }
+
 class NoteCatalogSync {
   static const _pageSize = 100;
 
@@ -96,52 +98,71 @@ class NoteCatalogSync {
 
   Future<void> _pushDirtyNoteIcon(String noteId) async {
     for (var attempt = 0; attempt < 3; attempt++) {
-      final note = await _database.notesDao.getNoteById(noteId);
-      if (note == null || !note.noteIconDirty) return;
-
-      final remote = _remoteCatalog[noteId];
-      if (remote != null && remote.updatedAt.isAfter(note.updatedAt)) {
-        final resolved = await _database.notesDao.resolveRemoteNoteIcon(
-          id: noteId,
-          noteIconJson: remote.noteIconJson,
-          remoteUpdatedAt: remote.updatedAt,
-          expectedUpdatedAt: note.updatedAt,
-          expectedNoteIconJson: note.noteIconJson,
-        );
-        if (resolved) return;
-        // The local row changed while the catalog was being refreshed. Read it
-        // again and push the newest local icon instead of overwriting it.
-        continue;
-      }
-
-      final icon = _decodeLocalNoteIcon(noteId, note.noteIconJson);
-      try {
-        await _updateNoteIcon(noteId, icon, remote?.updatedAt);
-      } catch (error) {
-        if (!_isVersionConflict(error)) rethrow;
-        await _refreshRemoteCatalog();
-        final latest = _remoteCatalog[noteId];
-        if (latest == null) rethrow;
-        final resolved = await _database.notesDao.resolveRemoteNoteIcon(
-          id: noteId,
-          noteIconJson: latest.noteIconJson,
-          remoteUpdatedAt: latest.updatedAt,
-          expectedUpdatedAt: note.updatedAt,
-          expectedNoteIconJson: note.noteIconJson,
-        );
-        if (resolved) return;
-        // A newer local icon exists. Retry with its current timestamp and the
-        // refreshed server version.
-        continue;
-      }
-      await _database.notesDao.clearNoteIconDirty(
-        noteId,
-        note.updatedAt,
-        expectedNoteIconJson: note.noteIconJson,
-      );
-      return;
+      final outcome = await _tryPushDirtyNoteIcon(noteId);
+      if (outcome == _NoteIconPushOutcome.completed) return;
     }
     throw StateError('Note icon changed while it was being synchronized');
+  }
+
+  Future<_NoteIconPushOutcome> _tryPushDirtyNoteIcon(String noteId) async {
+    final note = await _database.notesDao.getNoteById(noteId);
+    if (note == null || !note.noteIconDirty) {
+      return _NoteIconPushOutcome.completed;
+    }
+
+    final remote = _remoteCatalog[noteId];
+    if (remote != null && remote.updatedAt.isAfter(note.updatedAt)) {
+      return _resolveRemoteNoteIcon(note, remote);
+    }
+    return _pushLocalNoteIcon(noteId, note, remote?.updatedAt);
+  }
+
+  Future<_NoteIconPushOutcome> _resolveRemoteNoteIcon(
+    NoteData note,
+    RemoteNoteMetadata remote,
+  ) async {
+    final resolved = await _database.notesDao.resolveRemoteNoteIcon(
+      id: note.id,
+      noteIconJson: remote.noteIconJson,
+      remoteUpdatedAt: remote.updatedAt,
+      expectedUpdatedAt: note.updatedAt,
+      expectedNoteIconJson: note.noteIconJson,
+    );
+    return resolved
+        ? _NoteIconPushOutcome.completed
+        : _NoteIconPushOutcome.retry;
+  }
+
+  Future<_NoteIconPushOutcome> _pushLocalNoteIcon(
+    String noteId,
+    NoteData note,
+    DateTime? remoteUpdatedAt,
+  ) async {
+    final icon = _decodeLocalNoteIcon(noteId, note.noteIconJson);
+    try {
+      await _updateNoteIcon(noteId, icon, remoteUpdatedAt);
+    } catch (error, stackTrace) {
+      if (!_isVersionConflict(error)) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      final outcome = await _resolveVersionConflict(note);
+      if (outcome != null) return outcome;
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+
+    await _database.notesDao.clearNoteIconDirty(
+      noteId,
+      note.updatedAt,
+      expectedNoteIconJson: note.noteIconJson,
+    );
+    return _NoteIconPushOutcome.completed;
+  }
+
+  Future<_NoteIconPushOutcome?> _resolveVersionConflict(NoteData note) async {
+    await _refreshRemoteCatalog();
+    final latest = _remoteCatalog[note.id];
+    if (latest == null) return null;
+    return _resolveRemoteNoteIcon(note, latest);
   }
 
   bool _isVersionConflict(Object error) {
