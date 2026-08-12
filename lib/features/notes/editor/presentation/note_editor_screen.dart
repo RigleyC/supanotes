@@ -80,38 +80,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  Future<void> _handleMenuValue(
-    BuildContext context,
-    WidgetRef ref,
-    String value,
-    NoteModel note,
-    bool hideCompleted,
-  ) async {
-    final session = _readSession().value;
-    if (session == null || !session.captureLocalOperations) return;
-
-    final mutationController = ref.read(
-      notePreferenceMutationControllerProvider(widget.noteId).notifier,
-    );
-    switch (value) {
-      case 'share':
-        await showAppBottomSheet(
-          context: context,
-          builder: (_) => ShareNoteSheet(noteId: widget.noteId),
-        );
-      case 'hide_completed':
-        await mutationController.setHideCompleted(
-          current: note,
-          value: !hideCompleted,
-        );
-      case 'collapse_images':
-        await mutationController.setCollapseImages(
-          current: note,
-          value: !note.collapseImages,
-        );
-    }
-  }
-
   AsyncValue<NoteEditorSession> _readSession() =>
       ref.read(noteEditorSessionProvider(widget.noteId));
 
@@ -130,121 +98,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       loading: () => note?.isReadOnly ?? true,
       error: (_, _) => true,
     );
-    final preferenceMutation = ref.watch(
-      notePreferenceMutationControllerProvider(widget.noteId),
-    );
-
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.home);
-            }
-          },
-        ),
-              flexibleSpace: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-              title: screenIsReadOnly && note?.sharedByEmail != null
-                  ? Text('${NoteStrings.sharedByPrefix} ${note!.sharedByEmail}')
-                  : null,
-              actions: [
-                if (note != null && !screenIsReadOnly) ...[
-                  AdaptivePopupMenuButton.icon<String>(
-                    icon: PlatformInfo.isIOS26OrHigher()
-                        ? 'ellipsis'
-                        : Icons.more_vert,
-                    items: [
-                      if (note.isOwner)
-                        AdaptivePopupMenuItem<String>(
-                          label: NoteStrings.shareLabel,
-                          icon: PlatformInfo.isIOS26OrHigher()
-                              ? 'square.and.arrow.up'
-                              : Icons.share_outlined,
-                          value: 'share',
-                        ),
-                      AdaptivePopupMenuItem<String>(
-                        label: note.hideCompleted
-                            ? NoteStrings.showCompleted
-                            : NoteStrings.hideCompleted,
-                        icon: PlatformInfo.isIOS26OrHigher()
-                            ? (note.hideCompleted ? 'eye' : 'eye.slash')
-                            : (note.hideCompleted
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined),
-                        value: 'hide_completed',
-                      ),
-                      if (note.isOwner)
-                        AdaptivePopupMenuItem<String>(
-                          label: note.collapseImages
-                              ? 'Expandir imagens'
-                              : 'Colapsar imagens',
-                          icon: PlatformInfo.isIOS26OrHigher()
-                              ? 'photo'
-                              : Icons.image_outlined,
-                          value: 'collapse_images',
-                        ),
-                    ],
-                    onSelected: (index, entry) {
-                      final value = entry.value;
-                      if (value != null) {
-                        _handleMenuValue(
-                          context,
-                          ref,
-                          value,
-                          note,
-                          note.hideCompleted,
-                        );
-                      }
-                    },
-                  ),
-                  if (preferenceMutation.status ==
-                      NotePreferenceMutationStatus.saving)
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: Padding(
-                        padding: EdgeInsets.all(4),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  else if (preferenceMutation.status ==
-                      NotePreferenceMutationStatus.error)
-                    const Icon(Icons.error_outline),
-                  if (!screenIsReadOnly)
-                    sessionAsync.when(
-                      data: (session) => AnimatedBuilder(
-                        animation: session.controller.focusNode,
-                        builder: (context, _) {
-                          if (!session.controller.focusNode.hasFocus) {
-                            return const SizedBox.shrink();
-                          }
-                          return IconButton(
-                            icon: const Icon(Icons.check),
-                            onPressed: () {
-                              session.controller.focusNode.unfocus();
-                              SystemChannels.textInput.invokeMethod(
-                                'TextInput.hide',
-                              );
-                            },
-                          );
-                        },
-                      ),
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, _) => const SizedBox.shrink(),
-                    ),
-                ],
-              ],
-            ),
+      appBar: _NoteEditorAppBar(
+        noteId: widget.noteId,
+        note: note,
+        screenIsReadOnly: screenIsReadOnly,
+        sessionAsync: sessionAsync,
+      ),
       body: _NoteEditorBody(
         noteId: widget.noteId,
         attachmentDelivery: widget.attachmentDelivery,
@@ -253,6 +114,161 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         taskForMetadata: _taskForMetadata,
         readSession: _readSession,
       ),
+    );
+  }
+}
+
+class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
+  const _NoteEditorAppBar({
+    required this.noteId,
+    required this.note,
+    required this.screenIsReadOnly,
+    required this.sessionAsync,
+  });
+
+  final String noteId;
+  final NoteModel? note;
+  final bool screenIsReadOnly;
+  final AsyncValue<NoteEditorSession> sessionAsync;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  Future<void> _handleMenuValue(
+    BuildContext context,
+    WidgetRef ref,
+    String value,
+    NoteModel currentNote,
+  ) async {
+    final session = ref.read(noteEditorSessionProvider(noteId)).value;
+    if (session == null || !session.captureLocalOperations) return;
+
+    final mutationController = ref.read(
+      notePreferenceMutationControllerProvider(noteId).notifier,
+    );
+    switch (value) {
+      case 'share':
+        await showAppBottomSheet(
+          context: context,
+          builder: (_) => ShareNoteSheet(noteId: noteId),
+        );
+      case 'hide_completed':
+        await mutationController.setHideCompleted(
+          current: currentNote,
+          value: !currentNote.hideCompleted,
+        );
+      case 'collapse_images':
+        await mutationController.setCollapseImages(
+          current: currentNote,
+          value: !currentNote.collapseImages,
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentNote = note;
+    final preferenceMutation = ref.watch(
+      notePreferenceMutationControllerProvider(noteId),
+    );
+
+    return AppBar(
+      automaticallyImplyLeading: false,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
+      ),
+      flexibleSpace: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+          child: Container(color: Colors.transparent),
+        ),
+      ),
+      title: screenIsReadOnly && currentNote?.sharedByEmail != null
+          ? Text('${NoteStrings.sharedByPrefix} ${currentNote!.sharedByEmail}')
+          : null,
+      actions: [
+        if (currentNote != null && !screenIsReadOnly) ...[
+          AdaptivePopupMenuButton.icon<String>(
+            icon: PlatformInfo.isIOS26OrHigher() ? 'ellipsis' : Icons.more_vert,
+            items: [
+              if (currentNote.isOwner)
+                AdaptivePopupMenuItem<String>(
+                  label: NoteStrings.shareLabel,
+                  icon: PlatformInfo.isIOS26OrHigher()
+                      ? 'square.and.arrow.up'
+                      : Icons.share_outlined,
+                  value: 'share',
+                ),
+              AdaptivePopupMenuItem<String>(
+                label: currentNote.hideCompleted
+                    ? NoteStrings.showCompleted
+                    : NoteStrings.hideCompleted,
+                icon: PlatformInfo.isIOS26OrHigher()
+                    ? (currentNote.hideCompleted ? 'eye' : 'eye.slash')
+                    : (currentNote.hideCompleted
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                value: 'hide_completed',
+              ),
+              if (currentNote.isOwner)
+                AdaptivePopupMenuItem<String>(
+                  label: currentNote.collapseImages
+                      ? 'Expandir imagens'
+                      : 'Colapsar imagens',
+                  icon: PlatformInfo.isIOS26OrHigher()
+                      ? 'photo'
+                      : Icons.image_outlined,
+                  value: 'collapse_images',
+                ),
+            ],
+            onSelected: (index, entry) {
+              final value = entry.value;
+              if (value != null) {
+                _handleMenuValue(context, ref, value, currentNote);
+              }
+            },
+          ),
+          if (preferenceMutation.status == NotePreferenceMutationStatus.saving)
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: Padding(
+                padding: EdgeInsets.all(4),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (preferenceMutation.status ==
+              NotePreferenceMutationStatus.error)
+            const Icon(Icons.error_outline),
+          if (!screenIsReadOnly)
+            sessionAsync.when(
+              data: (session) => AnimatedBuilder(
+                animation: session.controller.focusNode,
+                builder: (context, _) {
+                  if (!session.controller.focusNode.hasFocus) {
+                    return const SizedBox.shrink();
+                  }
+                  return IconButton(
+                    icon: const Icon(Icons.check),
+                    onPressed: () {
+                      session.controller.focusNode.unfocus();
+                      SystemChannels.textInput.invokeMethod('TextInput.hide');
+                    },
+                  );
+                },
+              ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+            ),
+        ],
+      ],
     );
   }
 }
