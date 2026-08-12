@@ -60,13 +60,30 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     );
   }
 
-  Future<T> open(String noteId, FutureOr<T> Function() create) async {
+  Future<T> open(String noteId, FutureOr<T> Function() create) {
     _assertCoordinatorOpen();
+    final current = _entries[noteId];
+    if (current == null) return _startOpening(noteId, create);
+    if (!current.isClosing) return current.openFuture;
+    return _openAfterClosing(noteId, create);
+  }
 
+  Future<T> _startOpening(String noteId, FutureOr<T> Function() create) {
+    final entry = _registerOpeningEntry(noteId);
+    final openCompleter = Completer<T>();
+    entry.openFuture = openCompleter.future;
+    unawaited(_openEntry(entry, create, openCompleter));
+    return openCompleter.future;
+  }
+
+  Future<T> _openAfterClosing(
+    String noteId,
+    FutureOr<T> Function() create,
+  ) async {
     while (true) {
       final current = _entries[noteId];
       if (current == null) {
-        break;
+        return _startOpening(noteId, create);
       }
       if (current.isClosing) {
         await current.closeFuture;
@@ -74,7 +91,9 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
         return current.openFuture;
       }
     }
+  }
 
+  _SessionEntry<T> _registerOpeningEntry(String noteId) {
     final entry = _SessionEntry<T>(noteId: noteId);
     _entries[noteId] = entry;
     _activityTracker?.markActive(noteId);
@@ -84,52 +103,61 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
       noteId: noteId,
       fields: {'activeCount': snapshot().activeCount},
     );
+    return entry;
+  }
 
-    final openCompleter = Completer<T>();
-    entry.openFuture = openCompleter.future;
-
-    () async {
-      try {
-        final session = await create();
-        entry.session = session;
-        if (entry.isClosing) {
-          await entry.disposeSessionOnce();
-          throw StateError('Session opening was cancelled by close()');
-        }
-        await session.start();
-        if (entry.isClosing) {
-          await entry.disposeSessionOnce();
-          throw StateError('Session opening was cancelled by close()');
-        }
-        openCompleter.complete(session);
-      } catch (error, stack) {
-        Object reportedError = error;
-        StackTrace reportedStack = stack;
-        try {
-          await entry.disposeSessionOnce();
-        } catch (disposeError, disposeStack) {
-          reportedError = disposeError;
-          reportedStack = disposeStack;
-          NoteSyncDebug.log(
-            'session.open.dispose_error',
-            noteId: noteId,
-            fields: {'errorClass': NoteSyncDebug.errorClass(disposeError)},
-          );
-        }
-        if (_entries[noteId] == entry && entry.isDisposed) {
-          _entries.remove(noteId);
-          _activityTracker?.markInactive(noteId);
-        }
-        NoteSyncDebug.log(
-          'session.open.error',
-          noteId: noteId,
-          fields: {'errorClass': NoteSyncDebug.errorClass(reportedError)},
-        );
-        openCompleter.completeError(reportedError, reportedStack);
+  Future<void> _openEntry(
+    _SessionEntry<T> entry,
+    FutureOr<T> Function() create,
+    Completer<T> openCompleter,
+  ) async {
+    try {
+      final session = await create();
+      entry.session = session;
+      if (entry.isClosing) {
+        await entry.disposeSessionOnce();
+        throw StateError('Session opening was cancelled by close()');
       }
-    }();
+      await session.start();
+      if (entry.isClosing) {
+        await entry.disposeSessionOnce();
+        throw StateError('Session opening was cancelled by close()');
+      }
+      openCompleter.complete(session);
+    } catch (error, stack) {
+      await _completeFailedOpen(entry, openCompleter, error, stack);
+    }
+  }
 
-    return openCompleter.future;
+  Future<void> _completeFailedOpen(
+    _SessionEntry<T> entry,
+    Completer<T> openCompleter,
+    Object error,
+    StackTrace stack,
+  ) async {
+    Object reportedError = error;
+    StackTrace reportedStack = stack;
+    try {
+      await entry.disposeSessionOnce();
+    } catch (disposeError, disposeStack) {
+      reportedError = disposeError;
+      reportedStack = disposeStack;
+      NoteSyncDebug.log(
+        'session.open.dispose_error',
+        noteId: entry.noteId,
+        fields: {'errorClass': NoteSyncDebug.errorClass(disposeError)},
+      );
+    }
+    if (_entries[entry.noteId] == entry && entry.isDisposed) {
+      _entries.remove(entry.noteId);
+      _activityTracker?.markInactive(entry.noteId);
+    }
+    NoteSyncDebug.log(
+      'session.open.error',
+      noteId: entry.noteId,
+      fields: {'errorClass': NoteSyncDebug.errorClass(reportedError)},
+    );
+    openCompleter.completeError(reportedError, reportedStack);
   }
 
   Future<void> close(String noteId) async {
