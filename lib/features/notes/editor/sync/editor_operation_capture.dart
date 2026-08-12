@@ -143,7 +143,6 @@ class EditorOperationCapture {
       return;
     }
 
-    final requests = <OperationRequestData>[];
     final currentNodes = _document.toList();
     final currentIds = currentNodes.map((n) => n.id).toList();
     final currentIdSet = currentIds.toSet();
@@ -159,190 +158,21 @@ class EditorOperationCapture {
         ? currentNodes
         : currentNodes.where((node) => changedNodeIds.contains(node.id));
 
-    if (nodesToInspect.any(
-      (node) => node is TextNode && _hasComposingAttribution(node.text),
+    if (_deferComposingChanges(
+      nodesToInspect: nodesToInspect,
+      changedNodeIds: changedNodeIds,
+      structuralChange: structuralChange,
     )) {
-      _deferredChangedNodeIds
-        ..clear()
-        ..addAll(changedNodeIds);
-      _hasDeferredStructuralChange = structuralChange;
-      NoteSyncDebug.log('capture.deferred_composing');
       return;
     }
+
     _deferredChangedNodeIds.clear();
     _hasDeferredStructuralChange = false;
 
-    // 1. Deleted blocks
-    final deletedIds = _orderedNodeIds
-        .where((id) => !currentIdSet.contains(id))
-        .toList();
-    for (final delId in deletedIds) {
-      requests.add(
-        OperationRequestData(
-          operationId: _generateOpId(),
-          kind: NoteOperationKind.deleteBlock.wireName,
-          blockId: delId,
-          payload: NoteOperationPayloads.deleteBlock(delId),
-        ),
-      );
-      _mirrors.remove(delId);
-    }
-
-    // 2. Created & Moved blocks
-    final oldIndexById = <String, int>{
-      for (var i = 0; i < _orderedNodeIds.length; i++) _orderedNodeIds[i]: i,
-    };
-    for (int i = 0; i < currentNodes.length; i++) {
-      final node = currentNodes[i];
-      final afterBlockId = i == 0 ? null : currentNodes[i - 1].id;
-
-      if (!_mirrors.containsKey(node.id)) {
-        // Created block
-        final blockJson = _codec.encodeNode(node);
-        requests.add(
-          OperationRequestData(
-            operationId: _generateOpId(),
-            kind: NoteOperationKind.createBlock.wireName,
-            blockId: node.id,
-            payload: NoteOperationPayloads.createBlock(
-              block: blockJson,
-              afterBlockId: afterBlockId,
-            ),
-          ),
-        );
-        _mirrors[node.id] = _mirrorForNode(node);
-      } else if (structuralChange) {
-        // Moved block
-        final prevIndexInOld = oldIndexById[node.id];
-        final expectedAfterId = i == 0 ? null : currentNodes[i - 1].id;
-        final actualOldAfterId = prevIndexInOld == null || prevIndexInOld <= 0
-            ? null
-            : _orderedNodeIds[prevIndexInOld - 1];
-
-        if (prevIndexInOld != null && expectedAfterId != actualOldAfterId) {
-          requests.add(
-            OperationRequestData(
-              operationId: _generateOpId(),
-              kind: NoteOperationKind.moveBlock.wireName,
-              blockId: node.id,
-              payload: NoteOperationPayloads.moveBlock(
-                blockId: node.id,
-                afterBlockId: expectedAfterId,
-              ),
-            ),
-          );
-        }
-      }
-    }
-
-    // 3. Text & Type & Metadata changes
-    for (final node in nodesToInspect) {
-      final mirror = _mirrors[node.id];
-      if (mirror == null) continue;
-
-      final currentMirror = _mirrorForNode(node);
-      final currentAttrText = currentMirror.attributedText;
-      final currentBType = currentMirror.blockType;
-      final currentMeta = currentMirror.metadata;
-
-      // Check attributed text change
-      if (currentAttrText != mirror.attributedText) {
-        final deltaOps = _computeAttributedTextDelta(
-          mirror.attributedText,
-          currentAttrText,
-        );
-        if (deltaOps.isNotEmpty) {
-          requests.add(
-            OperationRequestData(
-              operationId: _generateOpId(),
-              kind: NoteOperationKind.textDelta.wireName,
-              blockId: node.id,
-              payload: NoteOperationPayloads.textDelta(ops: deltaOps),
-            ),
-          );
-        }
-        mirror.attributedText = currentAttrText;
-      }
-
-      // Check type change
-      if (currentBType != mirror.blockType && currentBType != null) {
-        requests.add(
-          OperationRequestData(
-            operationId: _generateOpId(),
-            kind: NoteOperationKind.setBlockType.wireName,
-            blockId: node.id,
-            payload: NoteOperationPayloads.setBlockType(currentBType),
-          ),
-        );
-        mirror.blockType = currentBType;
-      }
-
-      // Check metadata change
-      if (!mapEquals(currentMeta, mirror.metadata)) {
-        final curCompletions = Map<String, dynamic>.from(
-          currentMeta['completions'] as Map? ?? {},
-        );
-        final oldCompletions = Map<String, dynamic>.from(
-          mirror.metadata['completions'] as Map? ?? {},
-        );
-
-        for (final entry in curCompletions.entries) {
-          if (oldCompletions[entry.key] != entry.value) {
-            requests.add(
-              OperationRequestData(
-                operationId: _generateOpId(),
-                kind: NoteOperationKind.completeTaskOccurrence.wireName,
-                blockId: node.id,
-                payload: NoteOperationPayloads.completeTaskOccurrence(
-                  taskId: node.id,
-                  scheduledAt: entry.key,
-                  completedAt: entry.value as String?,
-                ),
-              ),
-            );
-          }
-        }
-
-        for (final key in oldCompletions.keys) {
-          if (!curCompletions.containsKey(key)) {
-            requests.add(
-              OperationRequestData(
-                operationId: _generateOpId(),
-                kind: NoteOperationKind.completeTaskOccurrence.wireName,
-                blockId: node.id,
-                payload: NoteOperationPayloads.completeTaskOccurrence(
-                  taskId: node.id,
-                  scheduledAt: key,
-                  completedAt: null,
-                ),
-              ),
-            );
-          }
-        }
-
-        final otherCurMeta = Map<String, dynamic>.from(currentMeta)
-          ..remove('completions');
-        final otherOldMeta = Map<String, dynamic>.from(mirror.metadata)
-          ..remove('completions');
-        if (!mapEquals(otherCurMeta, otherOldMeta)) {
-          for (final key in otherOldMeta.keys) {
-            if (!otherCurMeta.containsKey(key)) {
-              otherCurMeta[key] = null;
-            }
-          }
-          requests.add(
-            OperationRequestData(
-              operationId: _generateOpId(),
-              kind: NoteOperationKind.setBlockMetadata.wireName,
-              blockId: node.id,
-              payload: NoteOperationPayloads.setBlockMetadata(otherCurMeta),
-            ),
-          );
-        }
-
-        mirror.metadata = currentMeta;
-      }
-    }
+    final requests = <OperationRequestData>[];
+    _appendDeletedBlockOperations(currentIdSet, requests);
+    _appendStructuralOperations(currentNodes, structuralChange, requests);
+    _appendContentOperations(nodesToInspect, requests);
 
     _orderedNodeIds = currentIds;
 
@@ -361,6 +191,243 @@ class EditorOperationCapture {
       );
       _onOperationsCaptured(requests);
     }
+  }
+
+  bool _deferComposingChanges({
+    required Iterable<DocumentNode> nodesToInspect,
+    required Set<String> changedNodeIds,
+    required bool structuralChange,
+  }) {
+    if (!nodesToInspect.any(
+      (node) => node is TextNode && _hasComposingAttribution(node.text),
+    )) {
+      return false;
+    }
+
+    _deferredChangedNodeIds
+      ..clear()
+      ..addAll(changedNodeIds);
+    _hasDeferredStructuralChange = structuralChange;
+    NoteSyncDebug.log('capture.deferred_composing');
+    return true;
+  }
+
+  void _appendDeletedBlockOperations(
+    Set<String> currentIdSet,
+    List<OperationRequestData> requests,
+  ) {
+    final deletedIds = _orderedNodeIds
+        .where((id) => !currentIdSet.contains(id))
+        .toList();
+    for (final blockId in deletedIds) {
+      requests.add(
+        OperationRequestData(
+          operationId: _generateOpId(),
+          kind: NoteOperationKind.deleteBlock.wireName,
+          blockId: blockId,
+          payload: NoteOperationPayloads.deleteBlock(blockId),
+        ),
+      );
+      _mirrors.remove(blockId);
+    }
+  }
+
+  void _appendStructuralOperations(
+    List<DocumentNode> currentNodes,
+    bool structuralChange,
+    List<OperationRequestData> requests,
+  ) {
+    final oldIndexById = <String, int>{
+      for (var i = 0; i < _orderedNodeIds.length; i++) _orderedNodeIds[i]: i,
+    };
+    for (var i = 0; i < currentNodes.length; i++) {
+      final node = currentNodes[i];
+      final afterBlockId = i == 0 ? null : currentNodes[i - 1].id;
+
+      if (!_mirrors.containsKey(node.id)) {
+        final blockJson = _codec.encodeNode(node);
+        requests.add(
+          OperationRequestData(
+            operationId: _generateOpId(),
+            kind: NoteOperationKind.createBlock.wireName,
+            blockId: node.id,
+            payload: NoteOperationPayloads.createBlock(
+              block: blockJson,
+              afterBlockId: afterBlockId,
+            ),
+          ),
+        );
+        _mirrors[node.id] = _mirrorForNode(node);
+      } else if (structuralChange) {
+        _appendMoveOperation(
+          node: node,
+          currentIndex: i,
+          oldIndexById: oldIndexById,
+          currentNodes: currentNodes,
+          requests: requests,
+        );
+      }
+    }
+  }
+
+  void _appendMoveOperation({
+    required DocumentNode node,
+    required int currentIndex,
+    required Map<String, int> oldIndexById,
+    required List<DocumentNode> currentNodes,
+    required List<OperationRequestData> requests,
+  }) {
+    final previousIndex = oldIndexById[node.id];
+    final expectedAfterId = currentIndex == 0
+        ? null
+        : currentNodes[currentIndex - 1].id;
+    final actualOldAfterId = previousIndex == null || previousIndex <= 0
+        ? null
+        : _orderedNodeIds[previousIndex - 1];
+
+    if (previousIndex == null || expectedAfterId == actualOldAfterId) return;
+    requests.add(
+      OperationRequestData(
+        operationId: _generateOpId(),
+        kind: NoteOperationKind.moveBlock.wireName,
+        blockId: node.id,
+        payload: NoteOperationPayloads.moveBlock(
+          blockId: node.id,
+          afterBlockId: expectedAfterId,
+        ),
+      ),
+    );
+  }
+
+  void _appendContentOperations(
+    Iterable<DocumentNode> nodesToInspect,
+    List<OperationRequestData> requests,
+  ) {
+    for (final node in nodesToInspect) {
+      final mirror = _mirrors[node.id];
+      if (mirror == null) continue;
+
+      final currentMirror = _mirrorForNode(node);
+      _appendTextOperation(node, mirror, currentMirror, requests);
+      _appendBlockTypeOperation(node.id, mirror, currentMirror, requests);
+      _appendMetadataOperations(node.id, mirror, currentMirror, requests);
+    }
+  }
+
+  void _appendTextOperation(
+    DocumentNode node,
+    _BlockMirror mirror,
+    _BlockMirror currentMirror,
+    List<OperationRequestData> requests,
+  ) {
+    if (currentMirror.attributedText == mirror.attributedText) return;
+
+    final deltaOps = _computeAttributedTextDelta(
+      mirror.attributedText,
+      currentMirror.attributedText,
+    );
+    if (deltaOps.isNotEmpty) {
+      requests.add(
+        OperationRequestData(
+          operationId: _generateOpId(),
+          kind: NoteOperationKind.textDelta.wireName,
+          blockId: node.id,
+          payload: NoteOperationPayloads.textDelta(ops: deltaOps),
+        ),
+      );
+    }
+    mirror.attributedText = currentMirror.attributedText;
+  }
+
+  void _appendBlockTypeOperation(
+    String nodeId,
+    _BlockMirror mirror,
+    _BlockMirror currentMirror,
+    List<OperationRequestData> requests,
+  ) {
+    final blockType = currentMirror.blockType;
+    if (blockType == mirror.blockType || blockType == null) return;
+
+    requests.add(
+      OperationRequestData(
+        operationId: _generateOpId(),
+        kind: NoteOperationKind.setBlockType.wireName,
+        blockId: nodeId,
+        payload: NoteOperationPayloads.setBlockType(blockType),
+      ),
+    );
+    mirror.blockType = blockType;
+  }
+
+  void _appendMetadataOperations(
+    String nodeId,
+    _BlockMirror mirror,
+    _BlockMirror currentMirror,
+    List<OperationRequestData> requests,
+  ) {
+    final currentMeta = currentMirror.metadata;
+    if (mapEquals(currentMeta, mirror.metadata)) return;
+
+    final curCompletions = Map<String, dynamic>.from(
+      currentMeta['completions'] as Map? ?? {},
+    );
+    final oldCompletions = Map<String, dynamic>.from(
+      mirror.metadata['completions'] as Map? ?? {},
+    );
+
+    for (final entry in curCompletions.entries) {
+      if (oldCompletions[entry.key] == entry.value) continue;
+      requests.add(
+        OperationRequestData(
+          operationId: _generateOpId(),
+          kind: NoteOperationKind.completeTaskOccurrence.wireName,
+          blockId: nodeId,
+          payload: NoteOperationPayloads.completeTaskOccurrence(
+            taskId: nodeId,
+            scheduledAt: entry.key,
+            completedAt: entry.value as String?,
+          ),
+        ),
+      );
+    }
+
+    for (final key in oldCompletions.keys) {
+      if (curCompletions.containsKey(key)) continue;
+      requests.add(
+        OperationRequestData(
+          operationId: _generateOpId(),
+          kind: NoteOperationKind.completeTaskOccurrence.wireName,
+          blockId: nodeId,
+          payload: NoteOperationPayloads.completeTaskOccurrence(
+            taskId: nodeId,
+            scheduledAt: key,
+            completedAt: null,
+          ),
+        ),
+      );
+    }
+
+    final otherCurMeta = Map<String, dynamic>.from(currentMeta)
+      ..remove('completions');
+    final otherOldMeta = Map<String, dynamic>.from(mirror.metadata)
+      ..remove('completions');
+    if (!mapEquals(otherCurMeta, otherOldMeta)) {
+      for (final key in otherOldMeta.keys) {
+        if (!otherCurMeta.containsKey(key)) {
+          otherCurMeta[key] = null;
+        }
+      }
+      requests.add(
+        OperationRequestData(
+          operationId: _generateOpId(),
+          kind: NoteOperationKind.setBlockMetadata.wireName,
+          blockId: nodeId,
+          payload: NoteOperationPayloads.setBlockMetadata(otherCurMeta),
+        ),
+      );
+    }
+
+    mirror.metadata = currentMeta;
   }
 
   List<Map<String, dynamic>> _computeAttributedTextDelta(
