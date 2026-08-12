@@ -322,7 +322,7 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
   }
 }
 
-class _NoteEditorBody extends ConsumerWidget {
+class _NoteEditorBody extends StatelessWidget {
   const _NoteEditorBody({
     required this.noteId,
     required this.attachmentDelivery,
@@ -345,133 +345,269 @@ class _NoteEditorBody extends ConsumerWidget {
   final AsyncValue<NoteEditorSession> Function() readSession;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Column(
       children: [
         Expanded(
           child: SafeArea(
             top: false,
             bottom: false,
-            child: noteWithTasksAsync.when(
-              data: (noteWithTasks) {
-                final tasksMap = noteWithTasks.taskById;
-                final noteData = noteWithTasks.note;
-                if (noteData == null) {
-                  return Center(child: Text(NoteStrings.errorNotFound));
-                }
-
-                return sessionAsync.when(
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, _) =>
-                      const AppErrorView(title: NoteStrings.editorErrorTitle),
-                  data: (session) {
-                    final isReadOnly = !session.captureLocalOperations;
-                    final editor = NoteEditor(
-                      noteId: noteId,
-                      session: session,
-                      requestInitialFocus: noteData.shouldAutofocus,
-                      taskMetadata: tasksMap,
-                      hideCompleted: noteData.hideCompleted,
-                      collapseImages: noteData.collapseImages,
-                      attachmentDelivery: attachmentDelivery,
-                      delegate: NoteEditorDelegate(
-                        onTaskLongPress: isReadOnly
-                            ? null
-                            : (taskId) async {
-                                final task = taskForMetadata(
-                                  taskId,
-                                  tasksMap,
-                                  noteData,
-                                );
-                                if (!context.mounted || task == null) return;
-                                await showTaskMetadataSheet(
-                                  context: context,
-                                  ref: ref,
-                                  task: task,
-                                  onSave:
-                                      ({
-                                        required dueDate,
-                                        required hasTime,
-                                        required recurrence,
-                                        required reminder,
-                                      }) async {
-                                        final controller =
-                                            readSession().value?.controller;
-                                        controller?.updateTaskMetadataInEditor(
-                                          taskId,
-                                          dueDate: dueDate,
-                                          clearDueDate: dueDate == null,
-                                          hasTime: hasTime,
-                                          recurrence: recurrence?.name,
-                                          clearRecurrence: recurrence == null,
-                                          reminder: reminder,
-                                          clearReminder: reminder == null,
-                                        );
-                                      },
-                                );
-                              },
-                        onTaskComplete: isReadOnly
-                            ? null
-                            : (taskId) {
-                                return TaskSnackBarHelper.completeTaskWithFeedback(
-                                  onComplete: () async {
-                                    final controller =
-                                        readSession().value?.controller;
-                                    if (controller == null) {
-                                      return (
-                                        nextDue: null as DateTime?,
-                                        previousDue: null as DateTime?,
-                                        previousHasTime: false,
-                                        scheduledAt: null as DateTime?,
-                                      );
-                                    }
-                                    final result = controller
-                                        .completeTaskInEditor(taskId);
-                                    return (
-                                      nextDue: result?.nextDue,
-                                      previousDue: result?.previousDue,
-                                      previousHasTime:
-                                          result?.previousHasTime ?? false,
-                                      scheduledAt: result?.scheduledAt,
-                                    );
-                                  },
-                                  onUndo: (previousDue, previousHasTime, scheduledAt) {
-                                    final controller =
-                                        readSession().value?.controller;
-                                    if (controller != null) {
-                                      // For recurring tasks, the template's dueDate is the
-                                      // anchor and never changes — only remove the completion.
-                                      controller.reopenTaskInEditor(
-                                        taskId,
-                                        previousDue: previousDue,
-                                        scheduledAt: scheduledAt,
-                                      );
-                                    }
-                                  },
-                                );
-                              },
-                        onTaskReopen: isReadOnly
-                            ? null
-                            : (taskId) async {
-                                final controller =
-                                    readSession().value?.controller;
-                                if (controller != null) {
-                                  controller.reopenTaskInEditor(taskId);
-                                }
-                              },
-                      ),
-                    );
-                    return editor;
-                  },
-                );
-              },
-              loading: () => const SizedBox.shrink(),
-              error: (_, _) =>
-                  const AppErrorView(title: NoteStrings.editorErrorTitle),
+            child: _NoteEditorDocument(
+              noteId: noteId,
+              attachmentDelivery: attachmentDelivery,
+              noteWithTasksAsync: noteWithTasksAsync,
+              sessionAsync: sessionAsync,
+              taskForMetadata: taskForMetadata,
+              readSession: readSession,
             ),
           ),
         ),
       ],
     );
+  }
+}
+
+class _NoteEditorDocument extends StatelessWidget {
+  const _NoteEditorDocument({
+    required this.noteId,
+    required this.attachmentDelivery,
+    required this.noteWithTasksAsync,
+    required this.sessionAsync,
+    required this.taskForMetadata,
+    required this.readSession,
+  });
+
+  final String noteId;
+  final AttachmentDelivery? attachmentDelivery;
+  final AsyncValue<NoteWithTasks> noteWithTasksAsync;
+  final AsyncValue<NoteEditorSession> sessionAsync;
+  final TaskModel? Function(
+    String taskId,
+    Map<String, TaskModel> tasks,
+    NoteModel note,
+  )
+  taskForMetadata;
+  final AsyncValue<NoteEditorSession> Function() readSession;
+
+  @override
+  Widget build(BuildContext context) {
+    return noteWithTasksAsync.when(
+      data: (noteWithTasks) {
+        final note = noteWithTasks.note;
+        if (note == null) {
+          return Center(child: Text(NoteStrings.errorNotFound));
+        }
+        return _NoteEditorSessionContent(
+          noteId: noteId,
+          note: note,
+          tasks: noteWithTasks.taskById,
+          attachmentDelivery: attachmentDelivery,
+          sessionAsync: sessionAsync,
+          taskForMetadata: taskForMetadata,
+          readSession: readSession,
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const AppErrorView(title: NoteStrings.editorErrorTitle),
+    );
+  }
+}
+
+class _NoteEditorSessionContent extends StatelessWidget {
+  const _NoteEditorSessionContent({
+    required this.noteId,
+    required this.note,
+    required this.tasks,
+    required this.attachmentDelivery,
+    required this.sessionAsync,
+    required this.taskForMetadata,
+    required this.readSession,
+  });
+
+  final String noteId;
+  final NoteModel note;
+  final Map<String, TaskModel> tasks;
+  final AttachmentDelivery? attachmentDelivery;
+  final AsyncValue<NoteEditorSession> sessionAsync;
+  final TaskModel? Function(
+    String taskId,
+    Map<String, TaskModel> tasks,
+    NoteModel note,
+  )
+  taskForMetadata;
+  final AsyncValue<NoteEditorSession> Function() readSession;
+
+  @override
+  Widget build(BuildContext context) {
+    return sessionAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const AppErrorView(title: NoteStrings.editorErrorTitle),
+      data: (session) => _NoteEditorWithSession(
+        noteId: noteId,
+        note: note,
+        tasks: tasks,
+        attachmentDelivery: attachmentDelivery,
+        session: session,
+        taskForMetadata: taskForMetadata,
+        readSession: readSession,
+      ),
+    );
+  }
+}
+
+class _NoteEditorWithSession extends ConsumerWidget {
+  const _NoteEditorWithSession({
+    required this.noteId,
+    required this.note,
+    required this.tasks,
+    required this.attachmentDelivery,
+    required this.session,
+    required this.taskForMetadata,
+    required this.readSession,
+  });
+
+  final String noteId;
+  final NoteModel note;
+  final Map<String, TaskModel> tasks;
+  final AttachmentDelivery? attachmentDelivery;
+  final NoteEditorSession session;
+  final TaskModel? Function(
+    String taskId,
+    Map<String, TaskModel> tasks,
+    NoteModel note,
+  )
+  taskForMetadata;
+  final AsyncValue<NoteEditorSession> Function() readSession;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final taskDelegate = _NoteEditorTaskDelegate(
+      context: context,
+      ref: ref,
+      note: note,
+      tasks: tasks,
+      taskForMetadata: taskForMetadata,
+      readSession: readSession,
+      isReadOnly: !session.captureLocalOperations,
+    );
+    return NoteEditor(
+      noteId: noteId,
+      session: session,
+      requestInitialFocus: note.shouldAutofocus,
+      taskMetadata: tasks,
+      hideCompleted: note.hideCompleted,
+      collapseImages: note.collapseImages,
+      attachmentDelivery: attachmentDelivery,
+      delegate: taskDelegate.create(),
+    );
+  }
+}
+
+class _NoteEditorTaskDelegate {
+  const _NoteEditorTaskDelegate({
+    required this.context,
+    required this.ref,
+    required this.note,
+    required this.tasks,
+    required this.taskForMetadata,
+    required this.readSession,
+    required this.isReadOnly,
+  });
+
+  final BuildContext context;
+  final WidgetRef ref;
+  final NoteModel note;
+  final Map<String, TaskModel> tasks;
+  final TaskModel? Function(
+    String taskId,
+    Map<String, TaskModel> tasks,
+    NoteModel note,
+  )
+  taskForMetadata;
+  final AsyncValue<NoteEditorSession> Function() readSession;
+  final bool isReadOnly;
+
+  NoteEditorDelegate create() {
+    if (isReadOnly) return const NoteEditorDelegate();
+    return NoteEditorDelegate(
+      onTaskLongPress: _onTaskLongPress,
+      onTaskComplete: _onTaskComplete,
+      onTaskReopen: _onTaskReopen,
+    );
+  }
+
+  Future<void> _onTaskLongPress(String taskId) async {
+    final task = taskForMetadata(taskId, tasks, note);
+    if (!context.mounted || task == null) return;
+    await showTaskMetadataSheet(
+      context: context,
+      ref: ref,
+      task: task,
+      onSave:
+          ({
+            required dueDate,
+            required hasTime,
+            required recurrence,
+            required reminder,
+          }) => _saveTaskMetadata(
+            taskId,
+            dueDate: dueDate,
+            hasTime: hasTime,
+            recurrence: recurrence,
+            reminder: reminder,
+          ),
+    );
+  }
+
+  Future<void> _saveTaskMetadata(
+    String taskId, {
+    required DateTime? dueDate,
+    required bool hasTime,
+    required TaskRecurrence? recurrence,
+    required String? reminder,
+  }) async {
+    final controller = readSession().value?.controller;
+    controller?.updateTaskMetadataInEditor(
+      taskId,
+      dueDate: dueDate,
+      clearDueDate: dueDate == null,
+      hasTime: hasTime,
+      recurrence: recurrence?.name,
+      clearRecurrence: recurrence == null,
+      reminder: reminder,
+      clearReminder: reminder == null,
+    );
+  }
+
+  Future<DateTime?> _onTaskComplete(String taskId) {
+    return TaskSnackBarHelper.completeTaskWithFeedback(
+      onComplete: () async {
+        final controller = readSession().value?.controller;
+        final result = controller?.completeTaskInEditor(taskId);
+        return (
+          nextDue: result?.nextDue,
+          previousDue: result?.previousDue,
+          previousHasTime: result?.previousHasTime ?? false,
+          scheduledAt: result?.scheduledAt,
+        );
+      },
+      onUndo: (previousDue, _, scheduledAt) {
+        final controller = readSession().value?.controller;
+        if (controller != null) {
+          // For recurring tasks, the template's dueDate is the anchor and
+          // never changes — only remove the completion.
+          controller.reopenTaskInEditor(
+            taskId,
+            previousDue: previousDue,
+            scheduledAt: scheduledAt,
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _onTaskReopen(String taskId) async {
+    final controller = readSession().value?.controller;
+    controller?.reopenTaskInEditor(taskId);
   }
 }
