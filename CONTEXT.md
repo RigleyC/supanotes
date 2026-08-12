@@ -8,6 +8,22 @@ A personal notes app with offline support, real-time REST/OT synchronization, an
 A rich text document containing paragraphs, headings, lists, images, and tasks. Persisted as a versioned REST/OT JSON document snapshot (`notes.document`).
 _Avoid_: Page, entry, file
 
+**Note Icon**:
+An optional shared visual symbol for a **Note**, represented by either a native-color Unicode emoji or a color-selected icon from the application's fixed catalog.
+_Avoid_: Note image, thumbnail, title prefix
+
+**Display Title**:
+The read-only name derived from the first non-empty textual **Block** of a **Note**.
+_Avoid_: Stored title, title field, separately editable note name
+
+**Share Link**:
+A revocable secret link that grants read-only access to a **Note** and its attachments to any person who possesses it, without requiring a SupaNotes account.
+_Avoid_: Public note, note URL, invitation link
+
+**Direct Share**:
+An access grant that identifies one registered SupaNotes user and assigns `view` or `edit` permission to a **Note**.
+_Avoid_: Share Link, public access, email link
+
 **Document Snapshot**:
 The canonical versioned JSON snapshot for a single note (`schemaVersion: 1`, array of structured blocks). Single source of truth for all note content and task state.
 _Avoid_: YDoc, Yjs state, CRDT, document state
@@ -66,6 +82,32 @@ _Avoid_: Selection menu, document toolbar
 
 ## Relationships
 
+- A **Note** has zero or one **Note Icon**.
+- A **Note** has one derived **Display Title**, including the empty-note fallback.
+- A **Note** has zero or one active **Share Link**.
+- An active **Share Link** grants read-only access to exactly one **Note**.
+- Replacing a **Share Link** invalidates the previous link immediately.
+- A **Share Link** remains valid until the owner disables or replaces it; it has no automatic expiration.
+- A person who possesses an active **Share Link** may read its **Note** without becoming a collaborator.
+- A **Share Link** exposes the current **Document Snapshot**, not a frozen copy from the time the link was created.
+- A loaded **Share Link** page keeps its rendered snapshot until the visitor reloads it; it does not receive live updates.
+- A **Share Link** grants read access to the **Note** attachments but never grants permission to upload, change, or delete them.
+- Invalidating a **Share Link** also ends access to the **Note** attachments through that link.
+- A **Share Link** is an HTTPS URL that has a responsive browser destination and does not require the SupaNotes app.
+- An installed SupaNotes app may claim a **Share Link** through its platform link association; otherwise the same URL opens the browser destination.
+- The app may use a valid **Share Link** for read-only guest access without an authenticated account.
+- When an authenticated account has a stronger permission than the **Share Link**, the stronger account permission applies.
+- A **Share Link** does not disclose the owner identity unless that identity is part of the **Note** content.
+- A **Share Link** may expose only the **Display Title** to an external preview service; it never exposes an excerpt, image, or attachment in preview metadata.
+- External preview metadata uses `Nota compartilhada no SupaNotes` when the **Note** has no **Display Title**.
+- A **Share Link** has no product-level visitor identity, reader history, or view counter.
+- Read-only access through a **Share Link** permits copying, printing, and attachment downloads but never a **Note** mutation.
+- Only the **Note** owner may create, replace, or disable its **Share Link**.
+- A **Share Link** exists only after explicit owner activation; opening sharing controls never creates one.
+- Deleting a **Note** invalidates its **Share Link** permanently; restoring the **Note** does not reactivate that link.
+- A **Note** may have both user-specific **Direct Shares** and one active **Share Link**.
+- A **Direct Share** makes the identified user a collaborator; a **Share Link** does not.
+- A **Share Link** does not grant access to another **Note** referenced by an internal `note://` link.
 - A **Note** contains zero or more **Task** blocks.
 - A **Task** may be the parent of zero or more **Subtasks**.
 - A **Subtask** belongs to exactly one parent **Task**.
@@ -75,9 +117,34 @@ _Avoid_: Selection menu, document toolbar
 
 > **Dev:** "Is `Fazer aulas` only linked to `Tirar carteira`?"
 > **Domain expert:** "No. It is a **Subtask** of the parent **Task** `Tirar carteira`, so its completion contributes to the parent's progress."
+>
+> **Dev:** "Must a person have an account to open a **Share Link**?"
+> **Domain expert:** "No. Possession of an active **Share Link** grants read-only access, but it does not make the person a collaborator."
 
 ## Flagged ambiguities
 
+- "Icon" was used for both an emoji and an application glyph — resolved: **Note Icon** includes both variants but excludes custom images.
+- "Icon color" applies only to catalog icons — resolved: emojis keep their native colors and have no configurable background.
+- A **Note Icon** was considered as a personal preference — resolved: it belongs to the **Note** and is shared by all collaborators.
+- "Title" was considered as separately stored note data — resolved: the **Display Title** is derived from document content and is never edited independently.
+- "A link that gives access" was ambiguous between a locator and an authorization grant — resolved: a **Share Link** is a revocable read-only grant for any person who possesses it.
+- Multiple simultaneous links for one **Note** were considered and rejected: replacing its **Share Link** invalidates the previous link.
+- Automatic expiration was considered and rejected: the owner controls when a **Share Link** becomes invalid.
+- App-only access was considered and rejected: every **Share Link** must work in a browser without an installed app.
+- App and web URLs were considered as separate resources and rejected: one canonical HTTPS **Share Link** supports native app handoff and browser fallback.
+- Opening a **Share Link** in the app was considered as a permission downgrade and rejected: owner or `edit` account access remains stronger than link-based read access.
+- Owner attribution on the public page was considered and rejected: account identity is private unless the owner writes it in the **Note**.
+- A fully generic external preview was considered and rejected: preview metadata may include the **Display Title**, but no other note content.
+- Visitor tracking and view counts were considered and rejected: anonymous access does not create a product-level reader history.
+- Copy and print restrictions were considered and rejected: read-only means no mutation, not digital rights enforcement.
+- An `edit` collaborator was considered for **Share Link** management and rejected: editing content does not include authority to grant anonymous access.
+- "Sharing" was used for both identified collaboration and anonymous access — resolved: use **Direct Share** for a registered collaborator and **Share Link** for possession-based read access; both may coexist on one **Note**.
+- Automatic link creation when opening sharing controls was considered and rejected: anonymous access requires explicit owner activation.
+- Link restoration after note recovery was considered and rejected: a restored **Note** requires a newly activated **Share Link**.
+- A frozen copy was considered and rejected: a **Share Link** always resolves the current **Document Snapshot**.
+- Live updates in an open public page were considered and rejected: changes appear after a browser reload.
+- Internal links were considered as transitive access and rejected: the public reader renders `note://` text without navigation, while external web links remain actionable.
+- Text-only access was considered and rejected: a **Share Link** includes the attachments that belong to its **Note**.
 - "Vincular" was used ambiguously for both a generic reference and a parent-child relationship — resolved: use **Task Hierarchy**, **parent Task**, and **Subtask** for this feature.
 - A hierarchy spanning multiple notes was considered and rejected: a **Task Hierarchy** remains within one note, even when shown in global task views.
 - A future task-only page could be mistaken for independent task ownership — resolved: a global task view may read the projection, but every mutation must resolve the owning **Note** and enter through that note's canonical REST/OT session. A **Task** never exists as an independently mutable root entity.

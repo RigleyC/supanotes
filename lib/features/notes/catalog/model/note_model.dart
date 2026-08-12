@@ -1,5 +1,7 @@
-import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'dart:convert';
+
+import 'package:supanotes/core/database/daos/notes_dao.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 
 import 'note_icon.dart';
 
@@ -7,7 +9,7 @@ class NoteModel {
   const NoteModel({
     required this.id,
     required this.userId,
-    this.content,
+    required this.content,
     required this.title,
     this.excerpt,
     required this.favorite,
@@ -21,11 +23,12 @@ class NoteModel {
     this.sharedByName,
     this.noteIcon,
     required this.hasRemoteCopy,
+    required this.isEmptyDraft,
   });
 
   final String id;
   final String userId;
-  final String? content;
+  final String content;
   final String title;
   final String? excerpt;
   final bool favorite;
@@ -39,9 +42,10 @@ class NoteModel {
   final String? sharedByName;
   final NoteIcon? noteIcon;
   final bool hasRemoteCopy;
+  final bool isEmptyDraft;
 
   /// Opens a newly-created empty local note ready for typing.
-  bool get shouldAutofocus => !hasRemoteCopy && (content ?? '').trim().isEmpty;
+  bool get shouldAutofocus => isEmptyDraft;
 
   bool get isOwner => permission == null;
   bool get isReadOnly => permission == 'view';
@@ -64,6 +68,7 @@ class NoteModel {
     String? sharedByName,
     NoteIcon? noteIcon,
     bool? hasRemoteCopy,
+    bool? isEmptyDraft,
   }) => NoteModel(
     id: id ?? this.id,
     userId: userId ?? this.userId,
@@ -81,6 +86,7 @@ class NoteModel {
     sharedByName: sharedByName ?? this.sharedByName,
     noteIcon: noteIcon ?? this.noteIcon,
     hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
+    isEmptyDraft: isEmptyDraft ?? this.isEmptyDraft,
   );
 
   factory NoteModel.fromQueryResult(NoteQueryResult qr) {
@@ -111,6 +117,7 @@ class NoteModel {
               jsonDecode(qr.note.noteIconJson!) as Map<String, dynamic>,
             ),
       hasRemoteCopy: qr.note.hasRemoteCopy,
+      isEmptyDraft: qr.note.lifecycleState == emptyDraftLifecycleState,
     );
   }
 }

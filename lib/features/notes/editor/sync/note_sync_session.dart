@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:developer' as dev;
+
 import 'package:dio/dio.dart';
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
+
 import 'note_operation_adapter.dart';
 
 class NoteSyncSession implements NoteEditorSyncHandle {
@@ -28,7 +30,10 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   bool _blockedByForeignSession = false;
   int _pendingSyncOperations = 0;
   Object? _lastError;
+  Object? _projectionError;
+  StackTrace? _projectionStackTrace;
   Future<void> _projectionTail = Future<void>.value();
+  Future<void> _reconcileTail = Future<void>.value();
   Future<void> _syncTail = Future<void>.value();
 
   NoteSessionStatus _status = NoteSessionStatus.opening;
@@ -94,7 +99,11 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   @override
   void setCaptureLocalOperations(bool captureLocalOperations) {
-    if (_disposed || _captureLocalOperations == captureLocalOperations) return;
+    if (_isClosing ||
+        _disposed ||
+        _captureLocalOperations == captureLocalOperations) {
+      return;
+    }
     _captureLocalOperations = captureLocalOperations;
     adapter.setCaptureLocalOperations(captureLocalOperations);
     _captureController.add(captureLocalOperations);
@@ -102,14 +111,11 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   @override
   Future<void> start() async {
-    adapter.onLocalOperations = (_) {
-      if (_captureLocalOperations) {
-        unawaited(_enqueueProjection());
-        unawaited(_onLocalOps());
-      }
-    };
+    if (_isClosing || _disposed) return;
+    adapter.onLocalOperations = _handleLocalOperations;
     try {
       await adapter.start();
+      if (_isClosing || _disposed) return;
       _startPolling();
       if (_status == NoteSessionStatus.opening) {
         _setStatus(NoteSessionStatus.ready);
@@ -123,9 +129,16 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         unawaited(_onLocalOps());
       }
     } catch (error, stackTrace) {
+      if (_isClosing || _disposed) return;
       _handleError(error, stackTrace, 'start');
       rethrow;
     }
+  }
+
+  void _handleLocalOperations(List<OperationRequest> _) {
+    if (_isClosing || _disposed || !_captureLocalOperations) return;
+    unawaited(_enqueueProjection());
+    unawaited(_onLocalOps());
   }
 
   Future<void> _enqueueProjection() {
@@ -151,7 +164,11 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   Future<void> _projectDocumentCatchingErrors() async {
     try {
       await _projectDocument();
+      _projectionError = null;
+      _projectionStackTrace = null;
     } catch (error, stackTrace) {
+      _projectionError = error;
+      _projectionStackTrace = stackTrace;
       dev.log(
         'Task projection failed for $noteId',
         error: error,
@@ -216,10 +233,13 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         await operation();
         _lastError = null;
       } catch (error, stackTrace) {
-        _handleError(error, stackTrace, context);
+        if (!_isClosing && !_disposed) {
+          _handleError(error, stackTrace, context);
+        }
       } finally {
         _pendingSyncOperations--;
         if (_pendingSyncOperations == 0 &&
+            !_isClosing &&
             !_disposed &&
             !_protocolFailed &&
             _lastError == null &&
@@ -242,13 +262,29 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     }
     _blockedByForeignSession = false;
     if (result.canonicalDocument != null) {
-      await adapter.reconcile(result);
-      await _enqueueProjection();
+      final reconcile = _reconcileTail.then<void>((_) async {
+        if (_isClosing || _disposed) return;
+        await adapter.reconcile(result);
+        if (_isClosing || _disposed) return;
+        await _enqueueProjection();
+      });
+      _reconcileTail = reconcile.then<void>(
+        (_) {},
+        onError: (Object error, StackTrace stackTrace) {
+          dev.log(
+            'Note reconciliation failed for $noteId',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        },
+      );
+      await reconcile;
     }
   }
 
   @override
   Future<void> flushNow() async {
+    if (_disposed) return;
     await adapter.flushNow();
     if (_captureLocalOperations) {
       await _onLocalOps();
@@ -257,38 +293,60 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   @override
   Future<void> dispose() async {
+    if (_disposed) return;
     _isClosing = true;
     _setStatus(NoteSessionStatus.closing);
+    final restartPollingOnFailure = _pollTimer != null;
     _pollTimer?.cancel();
+    adapter.setCaptureLocalOperations(false);
     adapter.onLocalOperations = null;
-    Object? closeError;
-    StackTrace? closeStackTrace;
     try {
+      // A sync response can already be reconciling locally when close starts.
+      // Finish that local callback before the final flush so it cannot mutate
+      // the editor after the final projection.
+      await _reconcileTail;
       // Persist the editor before waiting for a network request that may be
       // slow or unavailable. Closing must not discard an in-memory edit.
       await adapter.flushNow();
       await _projectionTail;
-      await _projectDocument();
+      if (adapter.hasCapturedLocalOperations) {
+        await _projectDocument();
+        _projectionError = null;
+        _projectionStackTrace = null;
+      }
+      if (_projectionError != null) {
+        Error.throwWithStackTrace(
+          _projectionError!,
+          _projectionStackTrace ?? StackTrace.current,
+        );
+      }
       // The outbox is durable now. Do not wait for the network queue during
       // teardown; the next session or catalog sync will retry it.
     } catch (error, stackTrace) {
-      closeError = error;
-      closeStackTrace = stackTrace;
+      // The adapter still owns any operation that failed to reach the
+      // durable outbox. Keep the session usable so the caller can retry the
+      // close instead of losing that in-memory edit.
+      _isClosing = false;
+      _lastError = error;
+      _setStatus(NoteSessionStatus.syncError);
+      adapter.onLocalOperations = _handleLocalOperations;
+      adapter.setCaptureLocalOperations(_captureLocalOperations);
+      if (restartPollingOnFailure && !_protocolFailed) {
+        _startPolling();
+      }
       dev.log(
         'NoteSyncSession flush on dispose failed for $noteId',
         error: error,
         stackTrace: stackTrace,
       );
-    } finally {
-      _disposed = true;
-      adapter.dispose();
-      _setStatus(NoteSessionStatus.closed);
-      unawaited(_statusController.close());
-      unawaited(_captureController.close());
+      Error.throwWithStackTrace(error, stackTrace);
     }
-    if (closeError != null) {
-      Error.throwWithStackTrace(closeError, closeStackTrace!);
-    }
+
+    _disposed = true;
+    adapter.dispose();
+    _setStatus(NoteSessionStatus.closed);
+    unawaited(_statusController.close());
+    unawaited(_captureController.close());
   }
 
   void _handleError(Object error, StackTrace stackTrace, String context) {

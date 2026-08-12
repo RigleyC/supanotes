@@ -43,7 +43,7 @@ void main() {
       () => mockSyncService.getConfirmedDocument(any()),
     ).thenAnswer((_) async => null);
     when(
-      () => mockSyncService.enqueueOperation(any(), any()),
+      () => mockSyncService.enqueueOperations(any(), any()),
     ).thenAnswer((_) async {});
     when(
       () => mockSyncService.getPendingOperations(any()),
@@ -69,6 +69,41 @@ void main() {
         onReconcile: any(named: 'onReconcile'),
       ),
     ).thenAnswer((_) async => SyncResult.empty());
+  });
+
+  test('does not resume session startup after disposal', () async {
+    const noteId = 'note-dispose-during-start';
+    final confirmedDocument = Completer<LocalNoteDocumentData?>();
+    when(
+      () => mockSyncService.getConfirmedDocument(noteId),
+    ).thenAnswer((_) => confirmedDocument.future);
+
+    final session = NoteSyncSession(
+      noteId: noteId,
+      syncService: mockSyncService,
+      document: document,
+      editor: editor,
+    );
+    final startFuture = session.start();
+    await Future<void>.delayed(Duration.zero);
+
+    final disposeFuture = session.dispose();
+    confirmedDocument.complete(null);
+    await Future.wait([startFuture, disposeFuture]);
+
+    verifyNever(
+      () => mockSyncService.syncPending(
+        noteId,
+        onReconcile: any(named: 'onReconcile'),
+      ),
+    );
+    verifyNever(
+      () => mockSyncService.pollAndReconcile(
+        noteId,
+        onReconcile: any(named: 'onReconcile'),
+      ),
+    );
+    expect(session.status, NoteSessionStatus.closed);
   });
 
   test('opens from local state before a slow network sync completes', () async {
@@ -153,6 +188,44 @@ void main() {
     }
   });
 
+  test('keeps the session open when the final projection fails', () async {
+    const noteId = 'note-projection-failure';
+    final projectionDb = AppDatabase.test();
+    final projection = FailingTaskProjectionEngine(
+      database: projectionDb,
+      failuresRemaining: 2,
+    );
+    final session = NoteSyncSession(
+      noteId: noteId,
+      syncService: mockSyncService,
+      document: document,
+      editor: editor,
+      taskProjectionEngine: projection,
+      userId: 'user-1',
+    );
+
+    await session.start();
+    await pumpEventQueue();
+    editor.execute([
+      InsertTextRequest(
+        documentPosition: const DocumentPosition(
+          nodeId: 'block-1',
+          nodePosition: TextNodePosition(offset: 12),
+        ),
+        textToInsert: ' pending projection',
+        attributions: const {},
+      ),
+    ]);
+
+    await expectLater(session.dispose(), throwsA(isA<StateError>()));
+    expect(session.status, NoteSessionStatus.syncError);
+
+    projection.failuresRemaining = 0;
+    await session.dispose();
+    expect(session.status, NoteSessionStatus.closed);
+    await projectionDb.close();
+  });
+
   test(
     'persists a new edit before waiting for a slow sync during close',
     () async {
@@ -171,7 +244,7 @@ void main() {
         }
         return syncCompleter.future;
       });
-      when(() => mockSyncService.enqueueOperation(noteId, any())).thenAnswer((
+      when(() => mockSyncService.enqueueOperations(noteId, any())).thenAnswer((
         _,
       ) async {
         enqueued = true;
@@ -272,7 +345,7 @@ void main() {
     await session.flushNow();
 
     verify(
-      () => mockSyncService.enqueueOperation(noteId, any()),
+      () => mockSyncService.enqueueOperations(noteId, any()),
     ).called(greaterThanOrEqualTo(1));
 
     await session.dispose();
@@ -308,13 +381,55 @@ void main() {
       await session.dispose();
 
       // Confirm that the debounced edit was flushed to the durable outbox.
-      verify(() => mockSyncService.enqueueOperation(noteId, any())).called(1);
+      verify(() => mockSyncService.enqueueOperations(noteId, any())).called(1);
       verifyNever(
         () => mockSyncService.syncPending(
           noteId,
           onReconcile: any(named: 'onReconcile'),
         ),
       );
+    },
+  );
+
+  test(
+    'a failed close keeps the session and edit available for retry',
+    () async {
+      const noteId = 'note-retry-close';
+      var enqueueAttempts = 0;
+      when(() => mockSyncService.enqueueOperations(noteId, any())).thenAnswer((
+        _,
+      ) async {
+        enqueueAttempts++;
+        if (enqueueAttempts == 1) throw StateError('outbox unavailable');
+      });
+
+      final session = NoteSyncSession(
+        noteId: noteId,
+        syncService: mockSyncService,
+        document: document,
+        editor: editor,
+      );
+      await session.start();
+      clearInteractions(mockSyncService);
+
+      editor.execute([
+        InsertTextRequest(
+          documentPosition: const DocumentPosition(
+            nodeId: 'block-1',
+            nodePosition: TextNodePosition(offset: 12),
+          ),
+          textToInsert: ' retry close',
+          attributions: const {},
+        ),
+      ]);
+
+      await expectLater(session.dispose(), throwsA(isA<StateError>()));
+      expect(session.status, NoteSessionStatus.syncError);
+
+      await session.dispose();
+
+      expect(enqueueAttempts, 2);
+      expect(session.status, NoteSessionStatus.closed);
     },
   );
 
@@ -514,7 +629,7 @@ void main() {
 
       final node = document.getNodeAt(0)! as TextNode;
       expect(node.text.toPlainText(), 'Remote visible');
-      verifyNever(() => mockSyncService.enqueueOperation(noteId, any()));
+      verifyNever(() => mockSyncService.enqueueOperations(noteId, any()));
       verifyNever(
         () => mockSyncService.syncPending(
           noteId,
@@ -744,5 +859,26 @@ class BlockingTaskProjectionEngine extends TaskProjectionEngine {
     if (concurrent > maxConcurrent) maxConcurrent = concurrent;
     if (callCount > 1) await release.future;
     concurrent--;
+  }
+}
+
+class FailingTaskProjectionEngine extends TaskProjectionEngine {
+  FailingTaskProjectionEngine({
+    required super.database,
+    required this.failuresRemaining,
+  });
+
+  int failuresRemaining;
+
+  @override
+  Future<void> projectTasksFromDocument({
+    required String noteId,
+    required MutableDocument document,
+    String userId = '',
+  }) async {
+    if (failuresRemaining > 0) {
+      failuresRemaining--;
+      throw StateError('projection failed');
+    }
   }
 }

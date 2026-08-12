@@ -103,17 +103,29 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
         }
         openCompleter.complete(session);
       } catch (error, stack) {
-        await entry.disposeSessionOnce();
-        if (_entries[noteId] == entry) {
+        Object reportedError = error;
+        StackTrace reportedStack = stack;
+        try {
+          await entry.disposeSessionOnce();
+        } catch (disposeError, disposeStack) {
+          reportedError = disposeError;
+          reportedStack = disposeStack;
+          NoteSyncDebug.log(
+            'session.open.dispose_error',
+            noteId: noteId,
+            fields: {'errorClass': NoteSyncDebug.errorClass(disposeError)},
+          );
+        }
+        if (_entries[noteId] == entry && entry.isDisposed) {
           _entries.remove(noteId);
           _activityTracker?.markInactive(noteId);
         }
         NoteSyncDebug.log(
           'session.open.error',
           noteId: noteId,
-          fields: {'errorClass': NoteSyncDebug.errorClass(error)},
+          fields: {'errorClass': NoteSyncDebug.errorClass(reportedError)},
         );
-        openCompleter.completeError(error, stack);
+        openCompleter.completeError(reportedError, reportedStack);
       }
     }();
 
@@ -128,7 +140,7 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     }
 
     entry.isClosing = true;
-    entry.closeFuture = () async {
+    final closeFuture = () async {
       try {
         try {
           await entry.openFuture;
@@ -136,22 +148,33 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
           // Open future failures handle disposal in their catch block
         }
         await entry.disposeSessionOnce();
-      } finally {
-        if (_entries[noteId] == entry) {
-          _entries.remove(noteId);
-          _activityTracker?.markInactive(noteId);
-        }
+      } catch (_) {
+        // A failed close leaves the session and its durable-retry state in
+        // place. The next close call must be able to retry it.
+        entry.isClosing = false;
+        entry.closeFuture = null;
+        rethrow;
+      }
+      if (_entries[noteId] == entry) {
+        _entries.remove(noteId);
+        _activityTracker?.markInactive(noteId);
       }
     }();
+    entry.closeFuture = closeFuture;
 
-    await entry.closeFuture;
+    await closeFuture;
   }
 
   Future<void> closeAll() async {
     if (_disposed) return;
     _disposed = true;
     final entries = List<_SessionEntry<T>>.from(_entries.values);
-    await Future.wait(entries.map((entry) => close(entry.noteId)));
+    try {
+      await Future.wait(entries.map((entry) => close(entry.noteId)));
+    } catch (_) {
+      _disposed = false;
+      rethrow;
+    }
   }
 
   void _assertCoordinatorOpen() {
@@ -170,10 +193,16 @@ class _SessionEntry<T extends NoteSessionHandle> {
   Future<void>? closeFuture;
   bool isClosing = false;
   bool _disposed = false;
+  bool get isDisposed => _disposed;
 
   Future<void> disposeSessionOnce() async {
-    if (_disposed || session == null) return;
+    if (_disposed) return;
+    final current = session;
+    if (current == null) {
+      _disposed = true;
+      return;
+    }
+    await current.dispose();
     _disposed = true;
-    await session!.dispose();
   }
 }

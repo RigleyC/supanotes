@@ -1,12 +1,23 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 
 void main() {
   group('NoteOperationsDao', () {
     test('upsert and watch note document', () async {
       final db = AppDatabase.test();
       final now = DateTime.utc(2026, 7, 20);
+
+      await db.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'note-1',
+          userId: 'user-1',
+          content: '',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
 
       await db.noteOperationsDao.upsertNoteDocument(
         LocalNoteDocumentsCompanion.insert(
@@ -22,6 +33,10 @@ void main() {
       expect(doc!.noteId, 'note-1');
       expect(doc.revision, 5);
       expect(doc.documentJson, '{"blocks": []}');
+      expect(
+        (await db.notesDao.getNoteById('note-1'))!.lifecycleState,
+        materializedLifecycleState,
+      );
 
       await db.close();
     });

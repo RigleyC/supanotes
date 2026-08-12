@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../database.dart';
+import '../note_lifecycle_policy.dart';
 import '../tables/local_note_documents.dart';
 import '../tables/note_sync_errors.dart';
 import '../tables/notes.dart';
@@ -28,10 +29,17 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.noteId.equals(noteId))).watchSingleOrNull();
   }
 
-  Future<void> upsertNoteDocument(LocalNoteDocumentsCompanion doc) {
-    return into(
-      localNoteDocuments,
-    ).insert(doc, onConflict: DoUpdate((_) => doc));
+  Future<void> upsertNoteDocument(LocalNoteDocumentsCompanion doc) async {
+    await transaction(() async {
+      await into(
+        localNoteDocuments,
+      ).insert(doc, onConflict: DoUpdate((_) => doc));
+      if (doc.noteId.present) {
+        await attachedDatabase.noteLifecycleDao.markMaterialized(
+          doc.noteId.value,
+        );
+      }
+    });
   }
 
   Future<void> deleteNoteDocument(String noteId) async {
@@ -42,14 +50,26 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
 
   Future<void> markNoteHasRemoteCopy(String noteId) async {
     await (update(notes)..where((note) => note.id.equals(noteId))).write(
-      const NotesCompanion(hasRemoteCopy: Value(true)),
+      const NotesCompanion(
+        hasRemoteCopy: Value(true),
+        lifecycleState: Value(materializedLifecycleState),
+      ),
     );
   }
 
   Future<void> insertPendingOperation(PendingNoteOperationsCompanion op) {
-    return into(
+    return transaction(() => _insertPendingOperationAndMarkMaterialized(op));
+  }
+
+  Future<void> _insertPendingOperationAndMarkMaterialized(
+    PendingNoteOperationsCompanion op,
+  ) async {
+    await into(
       pendingNoteOperations,
     ).insert(op, mode: InsertMode.insertOrReplace);
+    if (op.noteId.present) {
+      await attachedDatabase.noteLifecycleDao.markMaterialized(op.noteId.value);
+    }
   }
 
   Stream<List<PendingNoteOperationData>> watchPendingOperations(
@@ -257,6 +277,9 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
           ),
           mode: InsertMode.insertOrReplace,
         );
+      }
+      if (ops.isNotEmpty) {
+        await attachedDatabase.noteLifecycleDao.markMaterialized(noteId);
       }
     });
   }

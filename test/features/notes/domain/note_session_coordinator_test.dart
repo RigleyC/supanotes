@@ -117,21 +117,53 @@ void main() {
       expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
     });
 
-    test('cancels opening and disposes resources if close() is called during async open()', () async {
+    test('keeps a failed close recoverable for a later retry', () async {
       final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
-      final start = Completer<void>();
-      final handle = _FakeSessionHandle(startCompleter: start);
+      final handle = _FakeSessionHandle(disposeFailures: 1);
+      await coordinator.open('note-1', () => handle);
 
-      final openFuture = coordinator.open('note-1', () => handle);
-      final closeFuture = coordinator.close('note-1');
+      await expectLater(
+        coordinator.close('note-1'),
+        throwsA(isA<StateError>()),
+      );
+      expect(coordinator.statusOf('note-1'), NoteSessionStatus.ready);
 
-      start.complete();
+      await coordinator.close('note-1');
 
-      await closeFuture;
-      expect(openFuture, throwsStateError);
-      expect(handle.disposeCalls, 1);
+      expect(handle.disposeCalls, 2);
       expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
     });
+
+    test('retries closeAll after a session close failure', () async {
+      final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
+      final handle = _FakeSessionHandle(disposeFailures: 1);
+      await coordinator.open('note-1', () => handle);
+
+      await expectLater(coordinator.closeAll(), throwsA(isA<StateError>()));
+      await coordinator.closeAll();
+
+      expect(handle.disposeCalls, 2);
+      expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
+    });
+
+    test(
+      'cancels opening and disposes resources if close() is called during async open()',
+      () async {
+        final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
+        final start = Completer<void>();
+        final handle = _FakeSessionHandle(startCompleter: start);
+
+        final openFuture = coordinator.open('note-1', () => handle);
+        final closeFuture = coordinator.close('note-1');
+
+        start.complete();
+
+        await closeFuture;
+        expect(openFuture, throwsStateError);
+        expect(handle.disposeCalls, 1);
+        expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
+      },
+    );
 
     test('rolls back created resources when opening fails', () async {
       final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
@@ -143,6 +175,23 @@ void main() {
       );
 
       expect(handle.disposeCalls, 1);
+      expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
+    });
+
+    test('completes open when cleanup also fails', () async {
+      final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
+      final handle = _FakeSessionHandle(failStart: true, disposeFailures: 1);
+
+      await expectLater(
+        coordinator.open('note-1', () => handle),
+        throwsStateError,
+      );
+
+      expect(handle.disposeCalls, 1);
+      expect(coordinator.statusOf('note-1'), NoteSessionStatus.error);
+
+      await coordinator.close('note-1');
+      expect(handle.disposeCalls, 2);
       expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
     });
 
@@ -170,8 +219,9 @@ void main() {
 
         expect(coordinator.statusOf('note-opening'), NoteSessionStatus.opening);
 
-        final initialStreamStatus =
-            await coordinator.statusChangesOf('note-opening').first;
+        final initialStreamStatus = await coordinator
+            .statusChangesOf('note-opening')
+            .first;
         expect(initialStreamStatus, NoteSessionStatus.opening);
 
         final snap = coordinator.snapshot();
@@ -189,12 +239,14 @@ class _FakeSessionHandle implements NoteSessionHandle {
     this.flushCompleter,
     this.disposeCompleter,
     this.failStart = false,
+    this.disposeFailures = 0,
   });
 
   final Completer<void>? startCompleter;
   final Completer<void>? flushCompleter;
   final Completer<void>? disposeCompleter;
   final bool failStart;
+  int disposeFailures;
 
   int startCalls = 0;
   int flushCalls = 0;
@@ -237,7 +289,11 @@ class _FakeSessionHandle implements NoteSessionHandle {
   @override
   Future<void> dispose() async {
     disposeCalls++;
-    _status = NoteSessionStatus.closed;
     await disposeCompleter?.future;
+    if (disposeFailures > 0) {
+      disposeFailures--;
+      throw StateError('dispose failed');
+    }
+    _status = NoteSessionStatus.closed;
   }
 }

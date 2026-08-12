@@ -38,40 +38,40 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
 
   Future<void> setFavorite(String userId, String noteId, bool favorite) async {
     final now = DateTime.now();
-    await into(userNotePreferences).insert(
-      UserNotePreferencesCompanion.insert(
+    await _writePreference(
+      noteId: noteId,
+      materialized: favorite,
+      insertion: UserNotePreferencesCompanion.insert(
         userId: userId,
         noteId: noteId,
         favorite: Value(favorite),
         updatedAt: Value(now),
         isDirty: const Value(true),
       ),
-      onConflict: DoUpdate(
-        (old) => UserNotePreferencesCompanion(
-          favorite: Value(favorite),
-          updatedAt: Value(now),
-          isDirty: const Value(true),
-        ),
+      update: UserNotePreferencesCompanion(
+        favorite: Value(favorite),
+        updatedAt: Value(now),
+        isDirty: const Value(true),
       ),
     );
   }
 
   Future<void> setArchived(String userId, String noteId, bool archived) async {
     final now = DateTime.now();
-    await into(userNotePreferences).insert(
-      UserNotePreferencesCompanion.insert(
+    await _writePreference(
+      noteId: noteId,
+      materialized: archived,
+      insertion: UserNotePreferencesCompanion.insert(
         userId: userId,
         noteId: noteId,
         archived: Value(archived),
         updatedAt: Value(now),
         isDirty: const Value(true),
       ),
-      onConflict: DoUpdate(
-        (old) => UserNotePreferencesCompanion(
-          archived: Value(archived),
-          updatedAt: Value(now),
-          isDirty: const Value(true),
-        ),
+      update: UserNotePreferencesCompanion(
+        archived: Value(archived),
+        updatedAt: Value(now),
+        isDirty: const Value(true),
       ),
     );
   }
@@ -82,21 +82,37 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
     bool hideCompleted,
   ) async {
     final now = DateTime.now();
-    await into(userNotePreferences).insert(
-      UserNotePreferencesCompanion.insert(
+    await _writePreference(
+      noteId: noteId,
+      materialized: hideCompleted,
+      insertion: UserNotePreferencesCompanion.insert(
         userId: userId,
         noteId: noteId,
         hideCompleted: Value(hideCompleted),
         updatedAt: Value(now),
         isDirty: const Value(true),
       ),
-      onConflict: DoUpdate(
-        (old) => UserNotePreferencesCompanion(
-          hideCompleted: Value(hideCompleted),
-          updatedAt: Value(now),
-          isDirty: const Value(true),
-        ),
+      update: UserNotePreferencesCompanion(
+        hideCompleted: Value(hideCompleted),
+        updatedAt: Value(now),
+        isDirty: const Value(true),
       ),
     );
+  }
+
+  Future<void> _writePreference({
+    required String noteId,
+    required bool materialized,
+    required UserNotePreferencesCompanion insertion,
+    required UserNotePreferencesCompanion update,
+  }) async {
+    await attachedDatabase.transaction(() async {
+      await into(
+        userNotePreferences,
+      ).insert(insertion, onConflict: DoUpdate((_) => update));
+      if (materialized) {
+        await attachedDatabase.noteLifecycleDao.markMaterialized(noteId);
+      }
+    });
   }
 }

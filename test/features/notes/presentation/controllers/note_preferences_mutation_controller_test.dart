@@ -155,6 +155,7 @@ NoteModel _note({bool hideCompleted = false, bool collapseImages = false}) {
     createdAt: DateTime.utc(2026, 7, 26),
     updatedAt: DateTime.utc(2026, 7, 26),
     hasRemoteCopy: true,
+    isEmptyDraft: false,
   );
 }
 

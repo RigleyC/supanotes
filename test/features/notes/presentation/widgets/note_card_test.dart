@@ -20,6 +20,7 @@ void main() {
         createdAt: DateTime(2026),
         updatedAt: DateTime(2026),
         hasRemoteCopy: true,
+        isEmptyDraft: false,
       );
 
       await tester.pumpWidget(

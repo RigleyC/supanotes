@@ -26,6 +26,7 @@ import 'tables/pending_note_operations.dart';
 import 'tables/task_completions.dart';
 import 'tables/tasks.dart';
 import 'tables/user_note_preferences.dart';
+import 'note_lifecycle_policy.dart';
 
 import '../../features/tasks/domain/projected_task.dart';
 import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNameConverter in tasks.dart
@@ -111,6 +112,7 @@ class AppDatabase extends _$AppDatabase {
         id: noteId,
         content: content,
         excerpt: excerpt,
+        materialized: content.trim().isNotEmpty || tasks.isNotEmpty,
       );
       await tasksDao.syncProjectedTasksForNoteTyped(
         noteId,
@@ -167,7 +169,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 27;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -361,18 +363,56 @@ class AppDatabase extends _$AppDatabase {
         );
       }
       if (from < 26) {
-        await addColumnIfMissing(
-          notes,
-          'notes',
-          notes.noteIconJson,
-        );
+        await addColumnIfMissing(notes, 'notes', notes.noteIconJson);
       }
       if (from < 27) {
-        await addColumnIfMissing(
-          notes,
-          'notes',
-          notes.noteIconDirty,
-        );
+        await addColumnIfMissing(notes, 'notes', notes.noteIconDirty);
+      }
+      if (from < 28) {
+        await addColumnIfMissing(notes, 'notes', notes.lifecycleState);
+        await customStatement('''
+          UPDATE notes
+          SET lifecycle_state = '$materializedLifecycleState'
+          WHERE has_remote_copy = 1
+             OR TRIM(content) <> ''
+             OR collapse_images = 1
+             OR note_icon_json IS NOT NULL
+             OR note_icon_dirty = 1
+             OR EXISTS (
+               SELECT 1 FROM tasks t
+               WHERE t.note_id = notes.id AND t.deleted_at IS NULL
+             )
+             OR EXISTS (
+               SELECT 1 FROM attachments a
+               WHERE a.note_id = notes.id
+             )
+             OR EXISTS (
+               SELECT 1 FROM user_note_preferences p
+               WHERE p.note_id = notes.id
+                 AND (
+                   p.favorite = 1
+                   OR p.archived = 1
+                   OR p.hide_completed = 1
+                   OR p.filters <> '{}'
+                 )
+             )
+             OR EXISTS (
+               SELECT 1 FROM local_note_documents d
+               WHERE d.note_id = notes.id
+             )
+             OR EXISTS (
+               SELECT 1 FROM pending_note_operations o
+               WHERE o.note_id = notes.id
+             )
+             OR EXISTS (
+               SELECT 1 FROM note_sync_errors e
+               WHERE e.note_id = notes.id
+             )
+             OR EXISTS (
+               SELECT 1 FROM sync_sessions s
+               WHERE s.note_id = notes.id
+             )
+        ''');
       }
     },
     beforeOpen: (details) async {

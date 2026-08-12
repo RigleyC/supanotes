@@ -183,7 +183,7 @@ void main() {
         'note-1',
         OperationRequest(
           operationId: 'op-2',
-          baseRevision: 1,
+          baseRevision: 99,
           kind: 'text_delta',
           payload: {'ops': []},
         ),
@@ -198,6 +198,70 @@ void main() {
               as PendingNoteOperationsCompanion;
 
       expect(captured.ordinal.value, 1);
+      expect(captured.baseRevision.value, 1);
+    });
+
+    test('uses the confirmed revision when the outbox is empty', () async {
+      when(
+        () => mockDao.getPendingOperations('note-1', ownerUserId: 'test-actor'),
+      ).thenAnswer((_) async => []);
+      when(() => mockDao.watchNoteDocument('note-1')).thenAnswer(
+        (_) => Stream.value(
+          LocalNoteDocumentData(
+            noteId: 'note-1',
+            revision: 7,
+            documentJson: '{"blocks":[]}',
+            updatedAt: DateTime.utc(2026, 7, 20),
+          ),
+        ),
+      );
+      when(
+        () => mockDao.insertPendingOperation(any()),
+      ).thenAnswer((_) async {});
+
+      await service.enqueueOperation(
+        'note-1',
+        OperationRequest(
+          operationId: 'op-1',
+          baseRevision: 0,
+          kind: 'create_block',
+          payload: const {},
+        ),
+      );
+
+      final captured =
+          verify(
+                () => mockDao.insertPendingOperation(
+                  captureAny(that: isA<PendingNoteOperationsCompanion>()),
+                ),
+              ).captured.single
+              as PendingNoteOperationsCompanion;
+
+      expect(captured.baseRevision.value, 7);
+    });
+
+    test('persists an operation batch in one transaction', () async {
+      when(
+        () => mockDao.insertPendingOperation(any()),
+      ).thenAnswer((_) async {});
+
+      await service.enqueueOperations('note-1', [
+        OperationRequest(
+          operationId: 'op-1',
+          baseRevision: 0,
+          kind: 'create_block',
+          payload: const {},
+        ),
+        OperationRequest(
+          operationId: 'op-2',
+          baseRevision: 1,
+          kind: 'text_delta',
+          payload: const {'ops': []},
+        ),
+      ]);
+
+      verify(() => mockDao.runInTransaction(any())).called(1);
+      verify(() => mockDao.insertPendingOperation(any())).called(2);
     });
 
     test('serializes concurrent outbox appends for the same note', () async {

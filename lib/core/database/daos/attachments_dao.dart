@@ -19,8 +19,16 @@ class AttachmentsDao extends DatabaseAccessor<AppDatabase>
   Stream<AttachmentData?> watchById(String id) =>
       (select(attachments)..where((a) => a.id.equals(id))).watchSingleOrNull();
 
-  Future<void> upsert(AttachmentsCompanion companion) =>
-      into(attachments).insertOnConflictUpdate(companion);
+  Future<void> upsert(AttachmentsCompanion companion) async {
+    await attachedDatabase.transaction(() async {
+      await into(attachments).insertOnConflictUpdate(companion);
+      if (companion.noteId.present) {
+        await attachedDatabase.noteLifecycleDao.markMaterialized(
+          companion.noteId.value,
+        );
+      }
+    });
+  }
 
   Future<void> updateStatus(String id, String status) =>
       (update(attachments)..where((a) => a.id.equals(id))).write(

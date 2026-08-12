@@ -155,6 +155,7 @@ void main() {
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 11),
           hasRemoteCopy: true,
+          isEmptyDraft: false,
           hideCompleted: false,
         ),
       );
@@ -175,6 +176,7 @@ void main() {
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 12),
           hasRemoteCopy: true,
+          isEmptyDraft: false,
           hideCompleted: false,
         ),
       );
@@ -227,6 +229,7 @@ void main() {
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
         hasRemoteCopy: true,
+        isEmptyDraft: false,
         hideCompleted: false,
       ),
     );
@@ -369,6 +372,7 @@ void main() {
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
         hasRemoteCopy: false,
+        isEmptyDraft: true,
       ),
     );
     await tester.pumpAndSettle();
@@ -1096,6 +1100,7 @@ void main() {
         createdAt: DateTime(2026, 6, 17),
         updatedAt: DateTime(2026, 6, 17),
         hasRemoteCopy: true,
+        isEmptyDraft: false,
         hideCompleted: false,
       ),
     );
@@ -1175,6 +1180,7 @@ void main() {
         createdAt: DateTime(2026, 6, 11),
         updatedAt: DateTime(2026, 6, 11),
         hasRemoteCopy: true,
+        isEmptyDraft: false,
         hideCompleted: false,
       ),
     );
@@ -1257,6 +1263,7 @@ void main() {
           createdAt: DateTime(2026, 6, 11),
           updatedAt: DateTime(2026, 6, 11),
           hasRemoteCopy: true,
+          isEmptyDraft: false,
           hideCompleted: false,
         ),
       );

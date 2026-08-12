@@ -10,6 +10,7 @@ honor its STOP conditions, and update your row when done.
 |------|-------|----------|--------|------------|--------|
 | 001  | Implement fallback for corrupted Yjs text nodes and await SQLite projection | P1       | S      | —          | DONE   |
 | 002  | Reduce SupaNotes to the note product core | P1       | L      | —          | DONE   |
+| 004  | Make the structured voice dictation plan safe to execute | P1 | M | — | TODO |
 
 ## Dependency notes
 
@@ -17,6 +18,9 @@ honor its STOP conditions, and update your row when done.
 
 - Plan 002 is a staged migration. Its mandatory decision gate must be completed
   before any Yjs, database, agent, or Telegram deletion.
+
+- Plan 004 must finish before execution starts on
+  `docs/superpowers/plans/2026-08-11-dictation-stt-model-evaluation.md`.
 
 ## Findings considered and rejected
 

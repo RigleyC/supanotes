@@ -139,7 +139,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
               ? notes
               : notes.where((n) {
                   final q = trimmedSearchQuery.toLowerCase();
-                  final bodyText = (n.excerpt ?? n.content ?? '').toLowerCase();
+                  final bodyText = (n.excerpt ?? n.content).toLowerCase();
                   return n.title.toLowerCase().contains(q) ||
                       bodyText.contains(q);
                 }).toList();

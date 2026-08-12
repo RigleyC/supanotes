@@ -19,12 +19,14 @@ class _RecordingNotesRepository implements INotesRepository {
     return NoteModel(
       id: id,
       userId: 'test-user',
+      content: '',
       title: '',
       favorite: false,
       archived: false,
       createdAt: now,
       updatedAt: now,
       hasRemoteCopy: false,
+      isEmptyDraft: true,
     );
   }
 

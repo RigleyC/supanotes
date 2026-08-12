@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 
 void main() {
@@ -45,6 +46,7 @@ void main() {
             content: 'My Trip\n\nsome details',
             createdAt: now,
             updatedAt: now,
+            lifecycleState: const Value(materializedLifecycleState),
           ),
         );
 
@@ -69,6 +71,7 @@ void main() {
             createdAt: now,
             updatedAt: now,
             hasRemoteCopy: const Value(true),
+            lifecycleState: const Value(materializedLifecycleState),
           ),
         );
 
@@ -121,19 +124,17 @@ void main() {
               hasRemoteCopy: const Value(false),
             ),
           );
-      await db
-          .into(db.attachments)
-          .insert(
-            AttachmentsCompanion.insert(
-              id: 'attachment-1',
-              noteId: 'attachment-draft',
-              fileName: 'image.png',
-              mimeType: 'image/png',
-              fileSize: 1,
-              createdAt: now,
-              updatedAt: now,
-            ),
-          );
+      await db.attachmentsDao.upsert(
+        AttachmentsCompanion.insert(
+          id: 'attachment-1',
+          noteId: 'attachment-draft',
+          fileName: 'image.png',
+          mimeType: 'image/png',
+          fileSize: 1,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
       await db.noteOperationsDao.insertPendingOperation(
         PendingNoteOperationsCompanion.insert(
           operationId: 'outbox-operation-1',
@@ -155,4 +156,83 @@ void main() {
       await db.close();
     },
   );
+
+  test('keeps local drafts with meaningful note metadata', () async {
+    final db = AppDatabase.test();
+    final now = DateTime(2026, 7, 6);
+
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: 'icon-draft',
+            userId: 'user-1',
+            content: '',
+            createdAt: now,
+            updatedAt: now,
+            noteIconJson: const Value('{"kind":"emoji","value":"🔥"}'),
+            lifecycleState: const Value(materializedLifecycleState),
+          ),
+        );
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: 'favorite-draft',
+            userId: 'user-1',
+            content: '',
+            createdAt: now,
+            updatedAt: now,
+            lifecycleState: const Value(materializedLifecycleState),
+          ),
+        );
+    await db
+        .into(db.userNotePreferences)
+        .insert(
+          UserNotePreferencesCompanion.insert(
+            userId: 'user-1',
+            noteId: 'favorite-draft',
+            favorite: const Value(true),
+          ),
+        );
+
+    final notes = await db.notesDao.watchAllActiveNotes('user-1').first;
+    expect(
+      notes.map((note) => note.note.id),
+      unorderedEquals(['icon-draft', 'favorite-draft']),
+    );
+
+    await db.close();
+  });
+
+  test('does not reset a materialized note on an empty upsert', () async {
+    final db = AppDatabase.test();
+    final now = DateTime(2026, 7, 6);
+    addTearDown(db.close);
+
+    await db.notesDao.createNote(
+      NotesCompanion.insert(
+        id: 'materialized-note',
+        userId: 'user-1',
+        content: 'Saved content',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    await db.notesDao.upsertNote(
+      NotesCompanion.insert(
+        id: 'materialized-note',
+        userId: 'user-1',
+        content: '',
+        createdAt: now,
+        updatedAt: now.add(const Duration(seconds: 1)),
+      ),
+    );
+
+    expect(
+      (await db.notesDao.getNoteById('materialized-note'))!.lifecycleState,
+      materializedLifecycleState,
+    );
+  });
 }

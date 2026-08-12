@@ -42,7 +42,7 @@ void main() {
       () => mockSyncService.getConfirmedDocument(any()),
     ).thenAnswer((_) async => null);
     when(
-      () => mockSyncService.enqueueOperation(any(), any()),
+      () => mockSyncService.enqueueOperations(any(), any()),
     ).thenAnswer((_) async {});
     when(
       () => mockSyncService.getPendingOperations(any()),
@@ -531,23 +531,26 @@ void main() {
           () => mockSyncService.loadPendingProjection('note-1'),
         ).thenAnswer((_) async => persistedOperations);
         when(
-          () => mockSyncService.enqueueOperation('note-1', any()),
+          () => mockSyncService.enqueueOperations('note-1', any()),
         ).thenAnswer((invocation) async {
-          final request = invocation.positionalArguments[1] as OperationRequest;
-          persistedOperations.add(
-            PendingNoteOperationData(
-              operationId: request.operationId,
-              noteId: 'note-1',
-              baseRevision: request.baseRevision,
-              ordinal: persistedOperations.length,
-              kind: request.kind,
-              blockId: request.blockId,
-              payloadJson: jsonEncode(request.payload),
-              createdAt: DateTime.utc(2026, 8, 3),
-              status: 'pending',
-              attemptCount: 0,
-            ),
-          );
+          final requests =
+              invocation.positionalArguments[1] as List<OperationRequest>;
+          for (final request in requests) {
+            persistedOperations.add(
+              PendingNoteOperationData(
+                operationId: request.operationId,
+                noteId: 'note-1',
+                baseRevision: request.baseRevision,
+                ordinal: persistedOperations.length,
+                kind: request.kind,
+                blockId: request.blockId,
+                payloadJson: jsonEncode(request.payload),
+                createdAt: DateTime.utc(2026, 8, 3),
+                status: 'pending',
+                attemptCount: 0,
+              ),
+            );
+          }
         });
 
         final adapter = createAdapter();
@@ -986,7 +989,7 @@ void main() {
 
         final completer = Completer<void>();
         when(
-          () => mockSyncService.enqueueOperation(any(), any()),
+          () => mockSyncService.enqueueOperations(any(), any()),
         ).thenAnswer((_) => completer.future);
 
         editor.execute([
@@ -1017,9 +1020,66 @@ void main() {
         expect(secondFlushResolved, true);
       },
     );
+
+    test('retries operations left by a failed background flush', () async {
+      final adapter = createAdapter();
+      await adapter.start();
+
+      var attempts = 0;
+      when(() => mockSyncService.enqueueOperations(any(), any())).thenAnswer((
+        _,
+      ) async {
+        attempts++;
+        if (attempts == 1) throw StateError('outbox temporarily unavailable');
+      });
+
+      editor.execute([
+        InsertTextRequest(
+          documentPosition: const DocumentPosition(
+            nodeId: 'block-1',
+            nodePosition: TextNodePosition(offset: 5),
+          ),
+          textToInsert: ' retry',
+          attributions: const {},
+        ),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      await adapter.flushNow();
+
+      expect(attempts, 2);
+    });
   });
 
   group('dispose', () {
+    test('does not resume startup after disposal during hydration', () async {
+      final confirmedDocument = Completer<LocalNoteDocumentData?>();
+      when(
+        () => mockSyncService.getConfirmedDocument('note-1'),
+      ).thenAnswer((_) => confirmedDocument.future);
+
+      final adapter = createAdapter();
+      final start = adapter.start();
+      adapter.dispose();
+
+      confirmedDocument.complete(null);
+      await start;
+
+      editor.execute([
+        InsertTextRequest(
+          documentPosition: const DocumentPosition(
+            nodeId: 'block-1',
+            nodePosition: TextNodePosition(offset: 5),
+          ),
+          textToInsert: ' ignored',
+          attributions: const {},
+        ),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+
+      verifyNever(() => mockSyncService.enqueueOperations(any(), any()));
+    });
+
     test('stops listening to document changes', () async {
       final adapter = createAdapter();
       adapter.start();

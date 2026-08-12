@@ -1,45 +1,6 @@
 name: iOS Build
 
-on:
-  push:
-    branches:
-      - master
-  workflow_dispatch:
-    inputs:
-      build_id:
-        description: 'Unique build identifier'
-        required: false
-        type: string
-      ios_path:
-        description: 'Path to iOS project (e.g., "ios" for React Native)'
-        required: false
-        type: string
-        default: 'ios'
-      scheme:
-        description: 'Xcode scheme to build (auto-detected if empty)'
-        required: false
-        type: string
-        default: ''
-      use_signing:
-        description: 'Enable code signing (requires secrets to be configured)'
-        required: false
-        type: boolean
-        default: false
-      configuration:
-        description: 'Build configuration (Release works with unsigned CI builds)'
-        required: false
-        type: string
-        default: 'Release'
-      flutter_version:
-        description: 'Flutter version to use.'
-        required: false
-        type: string
-        default: '3.44.1'
-      api_base_url:
-        description: 'Backend base URL passed to Flutter as --dart-define=API_BASE_URL'
-        required: false
-        type: string
-        default: 'https://backend-winter-waterfall-5807.fly.dev/api/v1'
+on: []
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

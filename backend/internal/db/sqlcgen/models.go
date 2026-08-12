@@ -9,25 +9,27 @@ import (
 )
 
 type AlexaAuthorizationCode struct {
-	CodeHash         string             `json:"code_hash"`
-	UserID           pgtype.UUID        `json:"user_id"`
-	ClientID         string             `json:"client_id"`
-	RedirectUri      string             `json:"redirect_uri"`
-	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
-	RefreshTokenHash pgtype.Text        `json:"refresh_token_hash"`
-	RefreshExpiresAt pgtype.Timestamptz `json:"refresh_expires_at"`
-	UsedAt           pgtype.Timestamptz `json:"used_at"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	CodeHash                 string             `json:"code_hash"`
+	UserID                   pgtype.UUID        `json:"user_id"`
+	ClientID                 string             `json:"client_id"`
+	RedirectUri              string             `json:"redirect_uri"`
+	ExpiresAt                pgtype.Timestamptz `json:"expires_at"`
+	RefreshTokenHash         pgtype.Text        `json:"refresh_token_hash"`
+	RefreshExpiresAt         pgtype.Timestamptz `json:"refresh_expires_at"`
+	UsedAt                   pgtype.Timestamptz `json:"used_at"`
+	CreatedAt                pgtype.Timestamptz `json:"created_at"`
+	PreviousRefreshTokenHash pgtype.Text        `json:"previous_refresh_token_hash"`
+	RefreshRevokedAt         pgtype.Timestamptz `json:"refresh_revoked_at"`
 }
 
 type Attachment struct {
-	ID        pgtype.UUID        `json:"id"`
-	NoteID    pgtype.UUID        `json:"note_id"`
-	Filename  string             `json:"filename"`
-	Url       string             `json:"url"`
-	MimeType  string             `json:"mime_type"`
-	SizeBytes int64              `json:"size_bytes"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID         pgtype.UUID        `json:"id"`
+	NoteID     pgtype.UUID        `json:"note_id"`
+	Filename   string             `json:"filename"`
+	StorageKey string             `json:"storage_key"`
+	MimeType   string             `json:"mime_type"`
+	SizeBytes  int64              `json:"size_bytes"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type McpAuditLog struct {

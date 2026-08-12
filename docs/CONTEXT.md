@@ -4,6 +4,15 @@
 
 A note has no separate user-authored title. The title is derived from the first non-deleted block (by position) in the REST/OT document snapshot whose text is non-empty. The first line is still part of the document, but the display title comes from the first block. `KeepFirstLineAsTitleReaction` enforces H1 styling of the first line in the editor (Apple Notes-style first-line-as-title UX).
 
+## Display Title and Note Icon
+
+The **Display Title** is read-only metadata derived from the document snapshot;
+there is no separate title field or title-editing mode. A **Note Icon** is
+shared note metadata. It is either a native-color Unicode emoji or a color-
+selected icon from the fixed catalog. Owners and editors can change it; the
+picker saves the change immediately. View-only collaborators can see it but
+cannot change it.
+
 ## Empty Note
 
 An empty regular note is determined from block content, tasks, attachments, not `title`.

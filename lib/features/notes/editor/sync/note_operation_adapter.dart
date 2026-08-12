@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as dev;
+
 import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:supanotes/features/notes/editor/document/document_projection_applier.dart';
-import 'editor_operation_capture.dart';
-import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/document/document_projection_applier.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+
+import 'editor_operation_capture.dart';
 
 class _RebuildRequest {
   final Map<String, dynamic> snapshot;
@@ -66,14 +68,21 @@ class NoteOperationAdapter {
 
   int get confirmedRevision => _confirmedRevision;
   bool get captureLocalOperations => _captureLocalOperations;
+  bool get hasCapturedLocalOperations => _hasCapturedLocalOperations;
 
   void Function(List<OperationRequest> ops)? onLocalOperations;
 
   bool _isComposing = false;
+  bool _disposed = false;
+  bool _hasCapturedLocalOperations = false;
   _RebuildRequest? _pendingRebuild;
 
-  void onCompositionStart() => _isComposing = true;
+  void onCompositionStart() {
+    if (!_disposed) _isComposing = true;
+  }
+
   void onCompositionEnd() {
+    if (_disposed) return;
     _isComposing = false;
     if (_pendingRebuild != null) {
       final req = _pendingRebuild!;
@@ -85,19 +94,22 @@ class NoteOperationAdapter {
   }
 
   Future<void> start() async {
+    if (_disposed) return;
     _capture.setSuppress(true);
     _capture.buildMirror();
     await _loadConfirmedState();
+    if (_disposed) return;
     if (_captureLocalOperations) {
       _capture.start();
     }
     await _hydrateFromPersistedState();
+    if (_disposed) return;
     _capture.buildMirror();
     _capture.setSuppress(!_captureLocalOperations);
   }
 
   void setCaptureLocalOperations(bool captureLocalOperations) {
-    if (_captureLocalOperations == captureLocalOperations) return;
+    if (_disposed || _captureLocalOperations == captureLocalOperations) return;
     _captureLocalOperations = captureLocalOperations;
     _capture.setSuppress(!captureLocalOperations);
     if (captureLocalOperations) {
@@ -120,6 +132,7 @@ class NoteOperationAdapter {
     try {
       final doc = _confirmedDocument;
       final pending = await _syncService.loadPendingProjection(_noteId);
+      if (_disposed) return;
       if (doc == null && pending.isEmpty) return;
       if (doc == null && !_codec.isEmptyDocumentPlaceholder(_document)) {
         return;
@@ -135,6 +148,7 @@ class NoteOperationAdapter {
         resumeCapture: () => _capture.setSuppress(!_captureLocalOperations),
         rebuildMirror: _capture.buildMirror,
       );
+      if (_disposed) return;
       if (doc != null) {
         _confirmedRevision = doc.revision;
       }
@@ -149,6 +163,7 @@ class NoteOperationAdapter {
   }
 
   void _onOperationsCaptured(List<OperationRequestData> requests) {
+    if (_disposed) return;
     NoteSyncDebug.log(
       'adapter.captured',
       noteId: _noteId,
@@ -175,6 +190,8 @@ class NoteOperationAdapter {
           '$contractError',
         );
       }
+    }
+    for (final req in requests) {
       _pendingOps.add(
         OperationRequest(
           operationId: req.operationId,
@@ -185,51 +202,51 @@ class NoteOperationAdapter {
         ),
       );
     }
+    if (requests.isNotEmpty) {
+      _hasCapturedLocalOperations = true;
+    }
     _scheduleDebounceFlush();
   }
 
   void _scheduleDebounceFlush() {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 50), () {
-      unawaited(_flushLocalOps(propagateErrors: false));
+      if (_disposed) return;
+      unawaited(_queueFlush(propagateErrors: false));
     });
   }
 
-  Future<void> _flushMutex = Future.value();
+  Future<void> _flushTail = Future<void>.value();
 
-  Future<void> _flushLocalOps({required bool propagateErrors}) async {
+  Future<void> _queueFlush({required bool propagateErrors}) {
+    final flush = _flushTail.then<void>((_) => _flushLocalOps());
+    _flushTail = flush.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {
+        dev.log(
+          'Local operation flush failed for $_noteId; keeping operations in memory',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      },
+    );
+    return propagateErrors ? flush : _flushTail;
+  }
+
+  Future<void> _flushLocalOps() async {
     if (_pendingOps.isEmpty) return;
     final ops = List<OperationRequest>.from(_pendingOps);
     _pendingOps.clear();
-
-    final prevFlush = _flushMutex;
-    final completer = Completer<void>();
-    _flushMutex = completer.future;
-
-    await prevFlush;
+    var persisted = false;
     try {
-      final projectedCount = await _syncService
-          .getProjectedOutboxOperationCount(_noteId);
       NoteSyncDebug.log(
         'adapter.flush.begin',
         noteId: _noteId,
         fields: {
           'confirmedRevision': _confirmedRevision,
-          'projectedOutboxCount': projectedCount,
           'operationCount': ops.length,
         },
       );
-
-      for (int i = 0; i < ops.length; i++) {
-        final old = ops[i];
-        ops[i] = OperationRequest(
-          operationId: old.operationId,
-          baseRevision: _confirmedRevision + projectedCount + i,
-          kind: old.kind,
-          blockId: old.blockId,
-          payload: old.payload,
-        );
-      }
 
       for (final op in ops) {
         NoteSyncDebug.log(
@@ -243,42 +260,39 @@ class NoteOperationAdapter {
             'payload': NoteSyncDebug.payloadSummary(op.payload),
           },
         );
-        await _syncService.enqueueOperation(_noteId, op);
       }
+
+      await _syncService.enqueueOperations(_noteId, ops);
+      persisted = true;
 
       onLocalOperations?.call(ops);
       final pending = await _syncService.getPendingOperations(_noteId);
       _pendingOpsController.add(pending);
     } catch (error, stackTrace) {
-      _pendingOps.insertAll(0, ops);
-      if (propagateErrors) {
-        Error.throwWithStackTrace(error, stackTrace);
+      if (!persisted) {
+        _pendingOps.insertAll(0, ops);
       }
-      dev.log(
-        'Local operation flush failed for $_noteId; keeping operations in memory',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    } finally {
-      completer.complete();
+      Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
   Future<void> flushNow() async {
     _debounceTimer?.cancel();
-    if (_pendingOps.isNotEmpty) {
-      await _flushLocalOps(propagateErrors: true);
-      return;
+    while (true) {
+      await _queueFlush(propagateErrors: true);
+      if (_pendingOps.isEmpty) return;
     }
-    await _flushMutex;
   }
 
   Future<void> reconcile(SyncResult result) async {
+    if (_disposed) return;
     final canonical = result.canonicalDocument;
     if (canonical == null) return;
     _confirmedRevision = result.finalRevision;
     await flushNow();
+    if (_disposed) return;
     final rebasedOps = await _syncService.loadPendingProjection(_noteId);
+    if (_disposed) return;
     NoteSyncDebug.log(
       'adapter.reconcile',
       noteId: _noteId,
@@ -310,6 +324,7 @@ class NoteOperationAdapter {
     required Map<String, dynamic> snapshot,
     required List<PendingNoteOperationData>? rebasedOps,
   }) async {
+    if (_disposed) return;
     if (_isComposing) {
       NoteSyncDebug.log('adapter.rebuild.deferred_composing', noteId: _noteId);
       _pendingRebuild = _RebuildRequest(snapshot: snapshot, ops: rebasedOps);
@@ -335,7 +350,10 @@ class NoteOperationAdapter {
   }
 
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _debounceTimer?.cancel();
+    _pendingRebuild = null;
     _capture.stop();
     _pendingOpsController.close();
   }

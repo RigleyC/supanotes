@@ -7,6 +7,19 @@ import '../note_lifecycle_policy.dart';
 final class NoteLifecycleDao extends DatabaseAccessor<AppDatabase> {
   NoteLifecycleDao(super.db);
 
+  Future<void> markMaterialized(String noteId) async {
+    await (update(attachedDatabase.notes)..where(
+          (note) =>
+              note.id.equals(noteId) &
+              note.lifecycleState.equals(emptyDraftLifecycleState),
+        ))
+        .write(
+          const NotesCompanion(
+            lifecycleState: Value(materializedLifecycleState),
+          ),
+        );
+  }
+
   Future<bool> discardLocalDraftIfUntouched(String noteId) {
     return attachedDatabase.transaction(() async {
       final matchingDraft = await customSelect(

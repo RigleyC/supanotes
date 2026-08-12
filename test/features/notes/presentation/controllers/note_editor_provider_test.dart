@@ -13,6 +13,7 @@ import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
@@ -106,6 +107,42 @@ void main() {
 
     expect(session.captureLocalOperations, isTrue);
   });
+
+  test(
+    'closing immediately after an edit keeps the note out of draft discard',
+    () async {
+      final container = await buildContainer();
+      final db = container.read(appDatabaseProvider);
+      await insertNote(db, id: 'note-close-before-debounce');
+
+      final session = await container.read(
+        noteEditorSessionProvider('note-close-before-debounce').future,
+      );
+      session.controller.editor.execute([
+        InsertTextRequest(
+          documentPosition: const DocumentPosition(
+            nodeId: 'init',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          textToInsert: 'typed before close',
+          attributions: const {},
+        ),
+      ]);
+
+      await container
+          .read(noteSessionCoordinatorProvider)
+          .close('note-close-before-debounce');
+
+      final discarded = await db.noteLifecycleDao.discardLocalDraftIfUntouched(
+        'note-close-before-debounce',
+      );
+      final note = await db.notesDao.getNoteById('note-close-before-debounce');
+
+      expect(discarded, isFalse);
+      expect(note, isNotNull);
+      expect(note!.lifecycleState, materializedLifecycleState);
+    },
+  );
 
   test(
     'opens the hydrated local document through the real editor session',

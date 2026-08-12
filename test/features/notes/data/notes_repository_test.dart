@@ -74,6 +74,23 @@ void main() {
       );
     });
 
+    test('discardLocalDraft keeps a local note with an icon', () async {
+      final database = AppDatabase.test();
+      addTearDown(database.close);
+      final local = NotesLocalRepository(database.notesDao, 'test-user');
+      final repo = NotesRepository(local, database.userNotePreferencesDao);
+
+      await repo.createLocalNote(id: 'draft-with-icon');
+      await repo.updateNoteIcon('draft-with-icon', NoteIcon.emoji('🔥'));
+
+      final discarded = await DatabaseNoteLifecycleStore(
+        database,
+      ).discardLocalDraft('draft-with-icon');
+
+      expect(discarded, isFalse);
+      expect(await database.notesDao.getNoteById('draft-with-icon'), isNotNull);
+    });
+
     test('saveSnapshot writes content and tasks together', () async {
       final prefsDao = FakeUserNotePreferencesDao();
       final local = FakeNotesLocalRepository();
@@ -233,6 +250,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       hasRemoteCopy: false,
       noteIconDirty: false,
       collapseImages: false,
+      lifecycleState: 'empty_draft',
     );
     _store[id] = data;
     return (

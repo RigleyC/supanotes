@@ -19,6 +19,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
+        isEmptyDraft: false,
         sharedByEmail: null,
       );
 
@@ -51,6 +52,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
+        isEmptyDraft: false,
         sharedByEmail: 'owner@example.com',
       );
 
@@ -86,6 +88,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
+        isEmptyDraft: false,
         sharedByEmail: null,
       );
 
@@ -120,6 +123,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
+        isEmptyDraft: false,
         sharedByEmail: null,
       );
 

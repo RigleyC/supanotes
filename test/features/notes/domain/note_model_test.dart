@@ -14,6 +14,7 @@ void main() {
       createdAt: DateTime(2026, 7, 6),
       updatedAt: DateTime(2026, 7, 6),
       hasRemoteCopy: true,
+      isEmptyDraft: false,
     );
 
     expect(model.title, 'From Node');
@@ -31,6 +32,7 @@ void main() {
       createdAt: DateTime(2026, 7, 6),
       updatedAt: DateTime(2026, 7, 6),
       hasRemoteCopy: true,
+      isEmptyDraft: false,
     );
 
     final updated = model.copyWith(content: 'new body');

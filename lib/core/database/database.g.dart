@@ -141,6 +141,18 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _lifecycleStateMeta = const VerificationMeta(
+    'lifecycleState',
+  );
+  @override
+  late final GeneratedColumn<String> lifecycleState = GeneratedColumn<String>(
+    'lifecycle_state',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('empty_draft'),
+  );
   static const VerificationMeta _permissionMeta = const VerificationMeta(
     'permission',
   );
@@ -198,6 +210,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     hasRemoteCopy,
     noteIconDirty,
     collapseImages,
+    lifecycleState,
     permission,
     sharedByEmail,
     sharedByName,
@@ -297,6 +310,15 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         ),
       );
     }
+    if (data.containsKey('lifecycle_state')) {
+      context.handle(
+        _lifecycleStateMeta,
+        lifecycleState.isAcceptableOrUnknown(
+          data['lifecycle_state']!,
+          _lifecycleStateMeta,
+        ),
+      );
+    }
     if (data.containsKey('permission')) {
       context.handle(
         _permissionMeta,
@@ -383,6 +405,10 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         DriftSqlType.bool,
         data['${effectivePrefix}collapse_images'],
       )!,
+      lifecycleState: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lifecycle_state'],
+      )!,
       permission: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}permission'],
@@ -420,6 +446,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
   final bool hasRemoteCopy;
   final bool noteIconDirty;
   final bool collapseImages;
+  final String lifecycleState;
   final String? permission;
   final String? sharedByEmail;
   final String? sharedByName;
@@ -436,6 +463,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     required this.hasRemoteCopy,
     required this.noteIconDirty,
     required this.collapseImages,
+    required this.lifecycleState,
     this.permission,
     this.sharedByEmail,
     this.sharedByName,
@@ -459,6 +487,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     map['has_remote_copy'] = Variable<bool>(hasRemoteCopy);
     map['note_icon_dirty'] = Variable<bool>(noteIconDirty);
     map['collapse_images'] = Variable<bool>(collapseImages);
+    map['lifecycle_state'] = Variable<String>(lifecycleState);
     if (!nullToAbsent || permission != null) {
       map['permission'] = Variable<String>(permission);
     }
@@ -491,6 +520,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       hasRemoteCopy: Value(hasRemoteCopy),
       noteIconDirty: Value(noteIconDirty),
       collapseImages: Value(collapseImages),
+      lifecycleState: Value(lifecycleState),
       permission: permission == null && nullToAbsent
           ? const Value.absent()
           : Value(permission),
@@ -523,6 +553,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       hasRemoteCopy: serializer.fromJson<bool>(json['hasRemoteCopy']),
       noteIconDirty: serializer.fromJson<bool>(json['noteIconDirty']),
       collapseImages: serializer.fromJson<bool>(json['collapseImages']),
+      lifecycleState: serializer.fromJson<String>(json['lifecycleState']),
       permission: serializer.fromJson<String?>(json['permission']),
       sharedByEmail: serializer.fromJson<String?>(json['sharedByEmail']),
       sharedByName: serializer.fromJson<String?>(json['sharedByName']),
@@ -544,6 +575,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       'hasRemoteCopy': serializer.toJson<bool>(hasRemoteCopy),
       'noteIconDirty': serializer.toJson<bool>(noteIconDirty),
       'collapseImages': serializer.toJson<bool>(collapseImages),
+      'lifecycleState': serializer.toJson<String>(lifecycleState),
       'permission': serializer.toJson<String?>(permission),
       'sharedByEmail': serializer.toJson<String?>(sharedByEmail),
       'sharedByName': serializer.toJson<String?>(sharedByName),
@@ -563,6 +595,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     bool? hasRemoteCopy,
     bool? noteIconDirty,
     bool? collapseImages,
+    String? lifecycleState,
     Value<String?> permission = const Value.absent(),
     Value<String?> sharedByEmail = const Value.absent(),
     Value<String?> sharedByName = const Value.absent(),
@@ -579,6 +612,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
     noteIconDirty: noteIconDirty ?? this.noteIconDirty,
     collapseImages: collapseImages ?? this.collapseImages,
+    lifecycleState: lifecycleState ?? this.lifecycleState,
     permission: permission.present ? permission.value : this.permission,
     sharedByEmail: sharedByEmail.present
         ? sharedByEmail.value
@@ -605,6 +639,9 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       collapseImages: data.collapseImages.present
           ? data.collapseImages.value
           : this.collapseImages,
+      lifecycleState: data.lifecycleState.present
+          ? data.lifecycleState.value
+          : this.lifecycleState,
       permission: data.permission.present
           ? data.permission.value
           : this.permission,
@@ -634,6 +671,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ..write('hasRemoteCopy: $hasRemoteCopy, ')
           ..write('noteIconDirty: $noteIconDirty, ')
           ..write('collapseImages: $collapseImages, ')
+          ..write('lifecycleState: $lifecycleState, ')
           ..write('permission: $permission, ')
           ..write('sharedByEmail: $sharedByEmail, ')
           ..write('sharedByName: $sharedByName, ')
@@ -655,6 +693,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     hasRemoteCopy,
     noteIconDirty,
     collapseImages,
+    lifecycleState,
     permission,
     sharedByEmail,
     sharedByName,
@@ -675,6 +714,7 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           other.hasRemoteCopy == this.hasRemoteCopy &&
           other.noteIconDirty == this.noteIconDirty &&
           other.collapseImages == this.collapseImages &&
+          other.lifecycleState == this.lifecycleState &&
           other.permission == this.permission &&
           other.sharedByEmail == this.sharedByEmail &&
           other.sharedByName == this.sharedByName &&
@@ -693,6 +733,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   final Value<bool> hasRemoteCopy;
   final Value<bool> noteIconDirty;
   final Value<bool> collapseImages;
+  final Value<String> lifecycleState;
   final Value<String?> permission;
   final Value<String?> sharedByEmail;
   final Value<String?> sharedByName;
@@ -710,6 +751,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.hasRemoteCopy = const Value.absent(),
     this.noteIconDirty = const Value.absent(),
     this.collapseImages = const Value.absent(),
+    this.lifecycleState = const Value.absent(),
     this.permission = const Value.absent(),
     this.sharedByEmail = const Value.absent(),
     this.sharedByName = const Value.absent(),
@@ -728,6 +770,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.hasRemoteCopy = const Value.absent(),
     this.noteIconDirty = const Value.absent(),
     this.collapseImages = const Value.absent(),
+    this.lifecycleState = const Value.absent(),
     this.permission = const Value.absent(),
     this.sharedByEmail = const Value.absent(),
     this.sharedByName = const Value.absent(),
@@ -750,6 +793,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Expression<bool>? hasRemoteCopy,
     Expression<bool>? noteIconDirty,
     Expression<bool>? collapseImages,
+    Expression<String>? lifecycleState,
     Expression<String>? permission,
     Expression<String>? sharedByEmail,
     Expression<String>? sharedByName,
@@ -768,6 +812,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       if (hasRemoteCopy != null) 'has_remote_copy': hasRemoteCopy,
       if (noteIconDirty != null) 'note_icon_dirty': noteIconDirty,
       if (collapseImages != null) 'collapse_images': collapseImages,
+      if (lifecycleState != null) 'lifecycle_state': lifecycleState,
       if (permission != null) 'permission': permission,
       if (sharedByEmail != null) 'shared_by_email': sharedByEmail,
       if (sharedByName != null) 'shared_by_name': sharedByName,
@@ -788,6 +833,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Value<bool>? hasRemoteCopy,
     Value<bool>? noteIconDirty,
     Value<bool>? collapseImages,
+    Value<String>? lifecycleState,
     Value<String?>? permission,
     Value<String?>? sharedByEmail,
     Value<String?>? sharedByName,
@@ -806,6 +852,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
       noteIconDirty: noteIconDirty ?? this.noteIconDirty,
       collapseImages: collapseImages ?? this.collapseImages,
+      lifecycleState: lifecycleState ?? this.lifecycleState,
       permission: permission ?? this.permission,
       sharedByEmail: sharedByEmail ?? this.sharedByEmail,
       sharedByName: sharedByName ?? this.sharedByName,
@@ -850,6 +897,9 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     if (collapseImages.present) {
       map['collapse_images'] = Variable<bool>(collapseImages.value);
     }
+    if (lifecycleState.present) {
+      map['lifecycle_state'] = Variable<String>(lifecycleState.value);
+    }
     if (permission.present) {
       map['permission'] = Variable<String>(permission.value);
     }
@@ -882,6 +932,7 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
           ..write('hasRemoteCopy: $hasRemoteCopy, ')
           ..write('noteIconDirty: $noteIconDirty, ')
           ..write('collapseImages: $collapseImages, ')
+          ..write('lifecycleState: $lifecycleState, ')
           ..write('permission: $permission, ')
           ..write('sharedByEmail: $sharedByEmail, ')
           ..write('sharedByName: $sharedByName, ')
@@ -5719,6 +5770,7 @@ typedef $$NotesTableCreateCompanionBuilder =
       Value<bool> hasRemoteCopy,
       Value<bool> noteIconDirty,
       Value<bool> collapseImages,
+      Value<String> lifecycleState,
       Value<String?> permission,
       Value<String?> sharedByEmail,
       Value<String?> sharedByName,
@@ -5738,6 +5790,7 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<bool> hasRemoteCopy,
       Value<bool> noteIconDirty,
       Value<bool> collapseImages,
+      Value<String> lifecycleState,
       Value<String?> permission,
       Value<String?> sharedByEmail,
       Value<String?> sharedByName,
@@ -5805,6 +5858,11 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<bool> get collapseImages => $composableBuilder(
     column: $table.collapseImages,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lifecycleState => $composableBuilder(
+    column: $table.lifecycleState,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5893,6 +5951,11 @@ class $$NotesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get lifecycleState => $composableBuilder(
+    column: $table.lifecycleState,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get permission => $composableBuilder(
     column: $table.permission,
     builder: (column) => ColumnOrderings(column),
@@ -5962,6 +6025,11 @@ class $$NotesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get lifecycleState => $composableBuilder(
+    column: $table.lifecycleState,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get permission => $composableBuilder(
     column: $table.permission,
     builder: (column) => column,
@@ -6022,6 +6090,7 @@ class $$NotesTableTableManager
                 Value<bool> hasRemoteCopy = const Value.absent(),
                 Value<bool> noteIconDirty = const Value.absent(),
                 Value<bool> collapseImages = const Value.absent(),
+                Value<String> lifecycleState = const Value.absent(),
                 Value<String?> permission = const Value.absent(),
                 Value<String?> sharedByEmail = const Value.absent(),
                 Value<String?> sharedByName = const Value.absent(),
@@ -6039,6 +6108,7 @@ class $$NotesTableTableManager
                 hasRemoteCopy: hasRemoteCopy,
                 noteIconDirty: noteIconDirty,
                 collapseImages: collapseImages,
+                lifecycleState: lifecycleState,
                 permission: permission,
                 sharedByEmail: sharedByEmail,
                 sharedByName: sharedByName,
@@ -6058,6 +6128,7 @@ class $$NotesTableTableManager
                 Value<bool> hasRemoteCopy = const Value.absent(),
                 Value<bool> noteIconDirty = const Value.absent(),
                 Value<bool> collapseImages = const Value.absent(),
+                Value<String> lifecycleState = const Value.absent(),
                 Value<String?> permission = const Value.absent(),
                 Value<String?> sharedByEmail = const Value.absent(),
                 Value<String?> sharedByName = const Value.absent(),
@@ -6075,6 +6146,7 @@ class $$NotesTableTableManager
                 hasRemoteCopy: hasRemoteCopy,
                 noteIconDirty: noteIconDirty,
                 collapseImages: collapseImages,
+                lifecycleState: lifecycleState,
                 permission: permission,
                 sharedByEmail: sharedByEmail,
                 sharedByName: sharedByName,

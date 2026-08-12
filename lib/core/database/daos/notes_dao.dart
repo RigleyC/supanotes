@@ -63,7 +63,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
-      'AND NOT ($untouchedLocalDraftPredicate) '
+      "AND n.lifecycle_state <> '$emptyDraftLifecycleState' "
       'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC, n.id DESC',
       userId,
     );
@@ -147,7 +147,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
-      'AND NOT ($untouchedLocalDraftPredicate) '
+      "AND n.lifecycle_state <> '$emptyDraftLifecycleState' "
       'ORDER BY n.updated_at DESC, n.id DESC',
       userId,
     );
@@ -168,6 +168,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       hasRemoteCopy: row.read<bool>('has_remote_copy'),
       noteIconDirty: row.read<bool>('note_icon_dirty'),
       collapseImages: row.read<bool>('collapse_images'),
+      lifecycleState: row.read<String>('lifecycle_state'),
       permission: row.read<String?>('permission'),
       sharedByEmail: row.read<String?>('shared_by_email'),
       sharedByName: row.read<String?>('shared_by_name'),
@@ -224,14 +225,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     return customSelect(
       sql,
       variables: [Variable.withString(userId), ...extraVariables],
-      readsFrom: {
-        notes,
-        userNotePreferences,
-        attachedDatabase.tasks,
-        attachedDatabase.attachments,
-        attachedDatabase.pendingNoteOperations,
-        attachedDatabase.syncSessions,
-      },
+      readsFrom: {notes, userNotePreferences},
     ).watch().map((rows) {
       final result = <NoteQueryResult>[];
       for (final row in rows) {
@@ -245,25 +239,31 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   }
 
   Future<void> createNote(NotesCompanion note) {
-    return into(notes).insert(note);
+    return into(notes).insert(_withDerivedLifecycleState(note));
   }
 
   Future<void> upsertNote(NotesCompanion note) {
+    final incoming = _withDerivedLifecycleState(note);
     return into(notes).insert(
-      note,
+      incoming,
       onConflict: DoUpdate.withExcluded(
         (old, excluded) => NotesCompanion.custom(
           content: excluded.content,
           excerpt: excluded.excerpt,
           updatedAt: excluded.updatedAt,
           isDirty: excluded.isDirty,
+          lifecycleState: incoming.lifecycleState.present
+              ? excluded.lifecycleState
+              : old.lifecycleState,
         ),
       ),
     );
   }
 
   Future<void> updateNote(NotesCompanion note) async {
-    await (update(notes)..where((t) => t.id.equals(note.id.value))).write(note);
+    await (update(notes)..where((t) => t.id.equals(note.id.value))).write(
+      _withDerivedLifecycleState(note),
+    );
   }
 
   /// Applies a remote snapshot only when the clean local row still has the
@@ -273,6 +273,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     required DateTime expectedUpdatedAt,
     required NotesCompanion note,
   }) async {
+    final materializedNote = note.copyWith(
+      lifecycleState: const Value(materializedLifecycleState),
+    );
     final updatedRows =
         await (update(notes)..where(
               (t) =>
@@ -281,7 +284,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
                   t.isDirty.equals(false) &
                   t.updatedAt.equals(expectedUpdatedAt),
             ))
-            .write(note);
+            .write(materializedNote);
     return updatedRows == 1;
   }
 
@@ -308,6 +311,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
               ),
             );
         if (updatedRows != 1) return false;
+        await attachedDatabase.noteLifecycleDao.markMaterialized(id);
       }
 
       if (!noteIconJson.present) return hasShareMetadata;
@@ -319,7 +323,11 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
           await (update(notes)
                 ..where((t) => t.id.equals(id) & t.noteIconDirty.equals(false)))
               .write(NotesCompanion(noteIconJson: noteIconJson));
-      if (iconRows == 1 || hasShareMetadata) return true;
+      if (iconRows == 1) {
+        await attachedDatabase.noteLifecycleDao.markMaterialized(id);
+        return true;
+      }
+      if (hasShareMetadata) return true;
 
       // An icon-only update can be skipped because a local icon is pending.
       // Confirm that the row still exists so the caller can distinguish that
@@ -334,6 +342,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     required String id,
     required String content,
     String? excerpt,
+    required bool materialized,
   }) async {
     final now = DateTime.now();
     await (update(notes)..where((t) => t.id.equals(id))).write(
@@ -341,6 +350,9 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         content: Value(content),
         excerpt: Value(excerpt),
         updatedAt: Value(now),
+        lifecycleState: materialized
+            ? const Value(materializedLifecycleState)
+            : const Value.absent(),
       ),
     );
   }
@@ -481,7 +493,25 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// copy in place, and always sets [isDirty] to `false` so the row does
   /// not get pushed back to the server.
   Future<void> upsertFromRemote(NoteData note) async {
-    final incoming = note.copyWith(isDirty: false, hasRemoteCopy: true);
+    final incoming = note.copyWith(
+      isDirty: false,
+      hasRemoteCopy: true,
+      lifecycleState: materializedLifecycleState,
+    );
     await into(notes).insertOnConflictUpdate(incoming);
+  }
+
+  NotesCompanion _withDerivedLifecycleState(NotesCompanion note) {
+    final hasMeaningfulValue =
+        (note.content.present && note.content.value.trim().isNotEmpty) ||
+        (note.hasRemoteCopy.present && note.hasRemoteCopy.value);
+    final hasMeaningfulMetadata =
+        (note.collapseImages.present && note.collapseImages.value) ||
+        (note.noteIconJson.present && note.noteIconJson.value != null) ||
+        (note.noteIconDirty.present && note.noteIconDirty.value);
+    if (!hasMeaningfulValue && !hasMeaningfulMetadata) return note;
+    return note.copyWith(
+      lifecycleState: const Value(materializedLifecycleState),
+    );
   }
 }

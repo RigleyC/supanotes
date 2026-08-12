@@ -28,17 +28,15 @@ void main() {
       addTearDown(subscription.close);
 
       final now = DateTime.utc(2026, 8, 1);
-      await database
-          .into(database.notes)
-          .insert(
-            NotesCompanion.insert(
-              id: 'note-local-1',
-              userId: 'user-1',
-              content: 'Local note',
-              createdAt: now,
-              updatedAt: now,
-            ),
-          );
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'note-local-1',
+          userId: 'user-1',
+          content: 'Local note',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
 
       final notes = await container.read(activeNotesProvider.future);
 
