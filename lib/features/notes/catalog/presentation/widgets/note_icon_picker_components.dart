@@ -24,49 +24,54 @@ class _PickerScrollPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       type: MaterialType.transparency,
-      child: CustomScrollView(
-        slivers: [
-          SliverPadding(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _PickerHeader(title: title, onBack: onBack),
-                  const SizedBox(height: AppSpacing.md),
-                  ...headerChildren,
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PickerHeader(title: title, onBack: onBack),
+                const SizedBox(height: AppSpacing.md),
+                ...headerChildren,
+              ],
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-            sliver: SliverLayoutBuilder(
-              builder: (context, constraints) {
-                final crossAxisCount = math
-                    .max(
-                      1,
-                      ((constraints.crossAxisExtent +
-                                  _pickerGridCrossAxisSpacing) /
-                              (_pickerGridMinTileExtent +
-                                  _pickerGridCrossAxisSpacing))
-                          .floor(),
-                    )
-                    .clamp(1, _pickerGridMaxColumns)
-                    .toInt();
-                return SliverGrid(
-                  delegate: SliverChildBuilderDelegate(
-                    itemBuilder,
-                    childCount: itemCount,
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  sliver: SliverLayoutBuilder(
+                    builder: (context, constraints) {
+                      final crossAxisCount = math
+                          .max(
+                            1,
+                            ((constraints.crossAxisExtent +
+                                        _pickerGridCrossAxisSpacing) /
+                                    (_pickerGridMinTileExtent +
+                                        _pickerGridCrossAxisSpacing))
+                                .floor(),
+                          )
+                          .clamp(1, _pickerGridMaxColumns)
+                          .toInt();
+                      return SliverGrid(
+                        delegate: SliverChildBuilderDelegate(
+                          itemBuilder,
+                          childCount: itemCount,
+                        ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          mainAxisSpacing: _pickerGridSpacing,
+                          crossAxisSpacing: _pickerGridCrossAxisSpacing,
+                          childAspectRatio: 1,
+                        ),
+                      );
+                    },
                   ),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: _pickerGridSpacing,
-                    crossAxisSpacing: _pickerGridCrossAxisSpacing,
-                    childAspectRatio: 1,
-                  ),
-                );
-              },
+                ),
+              ],
             ),
           ),
         ],
