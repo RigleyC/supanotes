@@ -42,42 +42,47 @@ class TaskMetadataDatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    return GlobalSheetScrollablePage(
+    return GlobalSheetPage(
       title: 'Escolher data',
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: QuickDueDate.values.length,
-              itemBuilder: (context, index) {
-                final option = QuickDueDate.values[index];
-                final date = option.compute(now);
-                return AppSelectionTile(
-                  label: option.label,
-                  icon: option.icon,
-                  isSelected: selected != null && selected!.isSameDayAs(date),
-                  onTap: () {
-                    onSelected(date);
-                    FamilyModalSheet.of(context).popPage();
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            CalendarDatePicker(
-              initialDate: selected ?? now.startOfDay,
-              firstDate: DateTime(now.year - 1),
-              lastDate: DateTime(now.year + 5),
-              onDateChanged: (date) {
-                onSelected(date);
-                FamilyModalSheet.of(context).popPage();
-              },
-            ),
-          ],
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: QuickDueDate.values.length,
+                itemBuilder: (context, index) {
+                  final option = QuickDueDate.values[index];
+                  final date = option.compute(now);
+                  return AppSelectionTile(
+                    label: option.label,
+                    icon: option.icon,
+                    isSelected: selected != null && selected!.isSameDayAs(date),
+                    onTap: () {
+                      onSelected(date);
+                      FamilyModalSheet.of(context).popPage();
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              CalendarDatePicker(
+                initialDate: selected ?? now.startOfDay,
+                firstDate: DateTime(now.year - 1),
+                lastDate: DateTime(now.year + 5),
+                onDateChanged: (date) {
+                  onSelected(date);
+                  FamilyModalSheet.of(context).popPage();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -30,28 +30,33 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
       FamilyModalSheet.of(context).popPage();
     }
 
-    return GlobalSheetScrollablePage(
+    return GlobalSheetPage(
       title: title,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppSelectionTile(
-              label: noneLabel,
-              icon: Icons.do_not_disturb_on_outlined,
-              isSelected: selected == null,
-              onTap: () => select(null),
-            ),
-            for (final option in options)
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               AppSelectionTile(
-                label: optionLabel(option),
-                icon: optionIcon(option),
-                isSelected: selected == option,
-                onTap: () => select(option),
+                label: noneLabel,
+                icon: Icons.do_not_disturb_on_outlined,
+                isSelected: selected == null,
+                onTap: () => select(null),
               ),
-            const SizedBox(height: 24),
-          ],
+              for (final option in options)
+                AppSelectionTile(
+                  label: optionLabel(option),
+                  icon: optionIcon(option),
+                  isSelected: selected == option,
+                  onTap: () => select(option),
+                ),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );

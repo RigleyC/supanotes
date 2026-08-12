@@ -19,47 +19,46 @@ class _PushPageButton extends StatelessWidget {
 }
 
 void main() {
-  testWidgets(
-    'root page close button completes the sheet future',
-    (tester) async {
-      var closed = false;
+  testWidgets('root page close button completes the sheet future', (
+    tester,
+  ) async {
+    var closed = false;
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (context) => Scaffold(
-              body: Center(
-                child: TextButton(
-                  onPressed: () async {
-                    await showGlobalSheet<void>(
-                      context: context,
-                      builder: (_) => const GlobalSheetPage(
-                        title: 'Página principal',
-                        child: SizedBox(height: 40),
-                      ),
-                    );
-                    closed = true;
-                  },
-                  child: const Text('Abrir'),
-                ),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () async {
+                  await showGlobalSheet<void>(
+                    context: context,
+                    builder: (_) => const GlobalSheetPage(
+                      title: 'Página principal',
+                      child: SizedBox(height: 40),
+                    ),
+                  );
+                  closed = true;
+                },
+                child: const Text('Abrir'),
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
 
-      await tester.tap(find.text('Abrir'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Abrir'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Página principal'), findsOneWidget);
+    expect(find.text('Página principal'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Fechar'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Fechar'));
+    await tester.pumpAndSettle();
 
-      expect(closed, isTrue);
-      expect(find.text('Página principal'), findsNothing);
-    },
-  );
+    expect(closed, isTrue);
+    expect(find.text('Página principal'), findsNothing);
+  });
 
   testWidgets(
     'internal page close returns to root without resolving the sheet',
@@ -135,7 +134,7 @@ void main() {
               child: TextButton(
                 onPressed: () => showGlobalSheet<void>(
                   context: context,
-                  builder: (_) => GlobalSheetScrollablePage(
+                  builder: (_) => GlobalSheetPage(
                     title: 'Página principal',
                     child: SizedBox(
                       height: 200,

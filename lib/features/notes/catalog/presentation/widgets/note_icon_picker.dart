@@ -45,46 +45,44 @@ class NoteIconPickerRootPage extends StatelessWidget {
     final hasIcon = note.noteIcon != null;
     return GlobalSheetPage(
       title: 'Selecionar ícone',
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            0,
-            AppSpacing.lg,
-            AppSpacing.sm,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _PickerAction(
-                icon: Icons.emoji_emotions_outlined,
-                label: 'Usar emoji',
-                onTap: () => FamilyModalSheet.of(context).pushPage(
-                  NoteEmojiPickerPage(
-                    onSelected: (icon) => _select(context, icon),
-                  ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          0,
+          AppSpacing.lg,
+          AppSpacing.sm,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _PickerAction(
+              icon: Icons.emoji_emotions_outlined,
+              label: 'Usar emoji',
+              onTap: () => FamilyModalSheet.of(context).pushPage(
+                NoteEmojiPickerPage(
+                  onSelected: (icon) => _select(context, icon),
                 ),
               ),
-              const SizedBox(height: 8),
-              _PickerAction(
-                icon: Icons.star_outline_rounded,
-                label: 'Usar ícone',
-                onTap: () => FamilyModalSheet.of(context).pushPage(
-                  NoteCatalogIconPickerPage(
-                    current: note.noteIcon,
-                    onSelected: (icon) => _select(context, icon),
-                  ),
+            ),
+            const SizedBox(height: 8),
+            _PickerAction(
+              icon: Icons.star_outline_rounded,
+              label: 'Usar ícone',
+              onTap: () => FamilyModalSheet.of(context).pushPage(
+                NoteCatalogIconPickerPage(
+                  current: note.noteIcon,
+                  onSelected: (icon) => _select(context, icon),
                 ),
               ),
-              if (hasIcon) const SizedBox(height: 8),
-              if (hasIcon)
-                _PickerAction(
-                  icon: Icons.remove_circle_outline,
-                  label: 'Remover ícone',
-                  onTap: () => _select(context, null),
-                ),
-            ],
-          ),
+            ),
+            if (hasIcon) const SizedBox(height: 8),
+            if (hasIcon)
+              _PickerAction(
+                icon: Icons.remove_circle_outline,
+                label: 'Remover ícone',
+                onTap: () => _select(context, null),
+              ),
+          ],
         ),
       ),
     );
@@ -115,7 +113,7 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
     final emojis = _query.isEmpty
         ? UnicodeEmojis.allEmojis
         : UnicodeEmojis.search(_query, limit: 240);
-    return GlobalSheetScrollablePage(
+    return GlobalSheetPage(
       title: 'Escolher emoji',
       child: _PickerGridContent(
         headerChildren: [
@@ -181,7 +179,7 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
       );
     }).toList();
     final scheme = Theme.of(context).colorScheme;
-    return GlobalSheetScrollablePage(
+    return GlobalSheetPage(
       title: 'Escolher ícone',
       child: _PickerGridContent(
         headerChildren: [

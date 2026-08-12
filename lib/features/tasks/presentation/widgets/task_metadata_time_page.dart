@@ -42,42 +42,47 @@ class _TaskMetadataTimePageState extends State<TaskMetadataTimePage> {
 
   @override
   Widget build(BuildContext context) {
-    return GlobalSheetScrollablePage(
+    return GlobalSheetPage(
       title: 'Escolher horário',
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: 200,
-              child: CupertinoDatePicker(
-                mode: CupertinoDatePickerMode.time,
-                use24hFormat: false,
-                initialDateTime: _selectedTime,
-                onDateTimeChanged: (d) => setState(() => _selectedTime = d),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 200,
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  use24hFormat: false,
+                  initialDateTime: _selectedTime,
+                  onDateTimeChanged: (d) => setState(() => _selectedTime = d),
+                ),
               ),
-            ),
 
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: AppButton(
-                text: 'Confirmar',
-                onPressed: () {
-                  final d = widget.currentDueDate;
-                  final newDate = DateTime(
-                    d.year,
-                    d.month,
-                    d.day,
-                    _selectedTime.hour,
-                    _selectedTime.minute,
-                  );
-                  widget.onSelected(newDate, hasTime: true);
-                  FamilyModalSheet.of(context).popPage();
-                },
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: AppButton(
+                  text: 'Confirmar',
+                  onPressed: () {
+                    final d = widget.currentDueDate;
+                    final newDate = DateTime(
+                      d.year,
+                      d.month,
+                      d.day,
+                      _selectedTime.hour,
+                      _selectedTime.minute,
+                    );
+                    widget.onSelected(newDate, hasTime: true);
+                    FamilyModalSheet.of(context).popPage();
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
