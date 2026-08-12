@@ -31,90 +31,116 @@ final class AppLinkStream {
 
   final AppLinkSource source;
 
-  Stream<Uri> stream() {
-    final controller = StreamController<Uri>();
-    StreamSubscription<Uri>? subscription;
-    final bufferedRuntimeLinks = <Uri>[];
-    String? initialPath;
-    var initialResolved = false;
-    var initialEchoPending = false;
-    var closed = false;
+  Stream<Uri> stream() => _AppLinkStreamController(source).build();
+}
 
-    void emit(Uri uri) {
-      if (closed || !isShareLinkUri(uri)) return;
-      controller.add(uri);
-    }
+final class _AppLinkStreamController {
+  _AppLinkStreamController(this.source);
 
-    void emitError(Object error, StackTrace stack) {
-      if (!closed) controller.addError(error, stack);
-    }
+  final AppLinkSource source;
+  final _controller = StreamController<Uri>();
+  final _bufferedRuntimeLinks = <Uri>[];
+  StreamSubscription<Uri>? _subscription;
+  String? _initialPath;
+  var _initialResolved = false;
+  var _initialEchoPending = false;
+  var _closed = false;
 
-    void emitRuntime(Uri uri) {
-      if (closed || !isShareLinkUri(uri)) return;
-      // app_links can emit the initial URI again through the runtime stream.
-      // Suppress only that one known echo. Every later event is a deliberate
-      // open, including opening the same path again after an error or login.
-      if (initialEchoPending && uri.path == initialPath) {
-        initialEchoPending = false;
-        return;
-      }
-      emit(uri);
-    }
+  Stream<Uri> build() {
+    _listenToRuntimeLinks();
+    _resolveInitialLink();
+    _controller.onCancel = _cancel;
+    return _controller.stream;
+  }
 
-    void flushBufferedRuntimeLinks() {
-      final pending = List<Uri>.of(bufferedRuntimeLinks);
-      bufferedRuntimeLinks.clear();
-      for (final uri in pending) {
-        emitRuntime(uri);
-      }
-    }
-
+  void _listenToRuntimeLinks() {
     try {
-      subscription = source.uriLinkStream.listen(
-        (uri) {
-          if (!initialResolved) {
-            bufferedRuntimeLinks.add(uri);
-            return;
-          }
-          emitRuntime(uri);
-        },
-        onError: (Object error, StackTrace stack) => emitError(error, stack),
-        onDone: () {
-          if (!closed) {
-            closed = true;
-            controller.close();
-          }
-        },
+      _subscription = source.uriLinkStream.listen(
+        _handleRuntimeLink,
+        onError: _handleRuntimeError,
+        onDone: _handleRuntimeDone,
       );
     } catch (error, stack) {
-      emitError(error, stack);
+      _emitError(error, stack);
     }
+  }
 
+  void _handleRuntimeLink(Uri uri) {
+    if (!_initialResolved) {
+      _bufferedRuntimeLinks.add(uri);
+      return;
+    }
+    _emitRuntime(uri);
+  }
+
+  void _handleRuntimeError(Object error, StackTrace stack) {
+    _emitError(error, stack);
+  }
+
+  void _handleRuntimeDone() {
+    if (_closed) return;
+    _closed = true;
+    _controller.close();
+  }
+
+  void _resolveInitialLink() {
     source.getInitialLink().then(
-      (uri) {
-        if (closed) return;
-        initialResolved = true;
-        if (uri != null && isShareLinkUri(uri)) {
-          initialPath = uri.path;
-          initialEchoPending = true;
-          emit(uri);
-        }
-        flushBufferedRuntimeLinks();
-      },
-      onError: (Object error, StackTrace stack) {
-        if (closed) return;
-        initialResolved = true;
-        flushBufferedRuntimeLinks();
-        emitError(error, stack);
-      },
+      _handleInitialLink,
+      onError: _handleInitialLinkError,
     );
+  }
 
-    controller.onCancel = () async {
-      closed = true;
-      await subscription?.cancel();
-      await controller.close();
-    };
-    return controller.stream;
+  void _handleInitialLink(Uri? uri) {
+    if (_closed) return;
+    _initialResolved = true;
+    if (uri != null && isShareLinkUri(uri)) {
+      _initialPath = uri.path;
+      _initialEchoPending = true;
+      _emit(uri);
+    }
+    _flushBufferedRuntimeLinks();
+  }
+
+  void _handleInitialLinkError(Object error, StackTrace stack) {
+    if (_closed) return;
+    _initialResolved = true;
+    _flushBufferedRuntimeLinks();
+    _emitError(error, stack);
+  }
+
+  void _emitRuntime(Uri uri) {
+    if (_closed || !isShareLinkUri(uri)) return;
+    // app_links can emit the initial URI again through the runtime stream.
+    // Suppress only that one known echo. Every later event is a deliberate
+    // open, including opening the same path again after an error or login.
+    if (_initialEchoPending && uri.path == _initialPath) {
+      _initialEchoPending = false;
+      return;
+    }
+    _emit(uri);
+  }
+
+  void _flushBufferedRuntimeLinks() {
+    final pending = List<Uri>.of(_bufferedRuntimeLinks);
+    _bufferedRuntimeLinks.clear();
+    for (final uri in pending) {
+      _emitRuntime(uri);
+    }
+  }
+
+  void _emit(Uri uri) {
+    if (_closed || !isShareLinkUri(uri)) return;
+    _controller.add(uri);
+  }
+
+  void _emitError(Object error, StackTrace stack) {
+    if (!_closed) _controller.addError(error, stack);
+  }
+
+  Future<void> _cancel() async {
+    _closed = true;
+    await _subscription?.cancel();
+    await _controller.close();
   }
 }
 
