@@ -1,6 +1,6 @@
 # Global Family Sheet Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add a shared Family-based sheet API and migrate `TaskMetadataSheet` and the note icon picker to a fixed-header, page-aware layout with consistent closing behavior.
 
@@ -51,7 +51,7 @@
 - Produces `GlobalSheetHeader({Key? key, required String title})`.
 - `GlobalSheetHeader` depends on `FamilyModalSheet.of(context).popPage()` and does not accept an `onClose` callback.
 
-- [ ] **Step 1: Write failing tests for the shared contract.**
+- [x] **Step 1: Write failing tests for the shared contract.**
 
   Build a `MaterialApp` test harness that opens `showGlobalSheet` from a button. The root builder returns `GlobalSheetPage(title: 'Página principal', child: const SizedBox(height: 40))`. Add a test that taps the header close button, pumps until settled, and verifies the future completed and a caller-side `closed` flag became true.
 
@@ -70,7 +70,7 @@
 
   Add a scroll test with a long `ListView` inside `GlobalSheetPage`; after scrolling the list, verify the page title and close button remain visible.
 
-- [ ] **Step 2: Run the new tests and confirm they fail for missing shared widgets.**
+- [x] **Step 2: Run the new tests and confirm they fail for missing shared widgets.**
 
   Run:
 
@@ -80,7 +80,7 @@
 
   Expected result: compile failure because the shared API and widgets do not exist yet.
 
-- [ ] **Step 3: Implement `showGlobalSheet` with one Family configuration.**
+- [x] **Step 3: Implement `showGlobalSheet` with one Family configuration.**
 
   Implement the exact public signature:
 
@@ -104,7 +104,7 @@
 
   Do not add `onClose`, `maxHeightFactor`, `isDismissible`, or other options in this first API. The approved design has one boring default configuration.
 
-- [ ] **Step 4: Implement `GlobalSheetHeader` as a standalone widget.**
+- [x] **Step 4: Implement `GlobalSheetHeader` as a standalone widget.**
 
   Use a `Padding` and `Row`, with the title in `Expanded` using `titleMedium`. Put an `IconButton` on the right with `Icons.close_rounded`, tooltip `Fechar`, and this exact close behavior:
 
@@ -114,11 +114,11 @@
 
   Do not inspect page count or call `Navigator.pop` directly. `FamilyModalSheet.popPage()` already handles root dismissal and internal navigation.
 
-- [ ] **Step 5: Implement `GlobalSheetPage` with a fixed header and bounded child.**
+- [x] **Step 5: Implement `GlobalSheetPage` with a fixed header and bounded child.**
 
   Use a transparent `Material` and a `Column` with the header outside the content slot. The content slot must be `Expanded(child: child)` so a feature-owned `ListView` or `CustomScrollView` receives a bounded viewport. Apply the approved 24 px horizontal/top spacing in the page/header boundary. Do not wrap the entire page in a scroll view.
 
-- [ ] **Step 6: Run the shared tests and analyzer.**
+- [x] **Step 6: Run the shared tests and analyzer.**
 
   Run:
 
@@ -129,7 +129,7 @@
 
   Expected result: all shared widget tests pass and the analyzer reports no issues.
 
-- [ ] **Step 7: Commit the shared component.**
+- [x] **Step 7: Commit the shared component.**
 
   ```text
   git add lib/shared/widgets/global_sheet.dart lib/shared/widgets/global_sheet_page.dart lib/shared/widgets/global_sheet_header.dart test/shared/widgets/global_sheet_test.dart
@@ -151,11 +151,11 @@
 - Keeps `showTaskMetadataSheet` signature and `onSave` signature unchanged.
 - Keeps `TaskMetadataSheetBody` as the provider-backed content widget.
 
-- [ ] **Step 1: Add regression assertions before changing the task sheet.**
+- [x] **Step 1: Add regression assertions before changing the task sheet.**
 
   Extend the existing task sheet widget tests to verify the root page renders the title `Editar horário e frequência` and a close button with tooltip `Fechar` when opened through `showTaskMetadataSheet`. Keep the existing test that selects date, time, and recurrence, then dismisses the root sheet and asserts `onSave` receives the final values.
 
-- [ ] **Step 2: Run the task sheet tests to establish the current baseline.**
+- [x] **Step 2: Run the task sheet tests to establish the current baseline.**
 
   Run:
 
@@ -165,7 +165,7 @@
 
   Expected result: the existing suite passes; the new tooltip assertion may fail until migration because the root page has no shared close button.
 
-- [ ] **Step 3: Migrate the root opening path.**
+- [x] **Step 3: Migrate the root opening path.**
 
   In `showTaskMetadataSheet`, replace only the `FamilyModalSheet.show<void>` call with `showGlobalSheet<void>`. Preserve the surrounding `try/finally`, `controller.releaseSheet()`, provider invalidation, logging, reminder permission handling, and post-await `onSave` call exactly.
 
@@ -180,7 +180,7 @@
 
   Remove the root title and its title spacing from `TaskMetadataSheetBody`; keep the provider watch and all metadata tiles unchanged.
 
-- [ ] **Step 4: Migrate task internal pages to the shared page wrapper.**
+- [x] **Step 4: Migrate task internal pages to the shared page wrapper.**
 
   Replace each `TaskMetadataPageHeader` with `GlobalSheetPage` at the page root and delete the old header file after all imports are removed:
 
@@ -190,11 +190,11 @@
 
   Remove the feature-specific close header once no task page uses it. Do not change selection callbacks or controller mutations.
 
-- [ ] **Step 5: Verify root and internal close behavior.**
+- [x] **Step 5: Verify root and internal close behavior.**
 
   Update the task test flow so it opens a metadata subpage, taps the shared `Fechar` button, verifies the root title returns, and only then dismisses the root sheet. Assert that the save callback runs once after root dismissal, not when the internal page closes.
 
-- [ ] **Step 6: Run focused task checks.**
+- [x] **Step 6: Run focused task checks.**
 
   Run:
 
@@ -206,7 +206,7 @@
 
   Expected result: task metadata tests pass, including save-after-root-dismissal, and analyzer reports no issues in the checked paths.
 
-- [ ] **Step 7: Commit the task migration.**
+- [x] **Step 7: Commit the task migration.**
 
   ```text
   git add lib/features/tasks/presentation/widgets/task_metadata_sheet.dart lib/features/tasks/presentation/widgets/task_metadata_date_page.dart lib/features/tasks/presentation/widgets/task_metadata_time_page.dart lib/features/tasks/presentation/widgets/task_metadata_selection_page.dart lib/features/tasks/presentation/widgets/task_metadata_page_header.dart test/features/tasks/presentation/widgets/task_metadata_sheet_test.dart
@@ -225,11 +225,11 @@
 - Keeps `showNoteIconPicker` signature and immediate-save `onSelected` behavior unchanged.
 - Keeps emoji/catalog selection callbacks and the current icon catalog model unchanged.
 
-- [ ] **Step 1: Add picker layout regression tests.**
+- [x] **Step 1: Add picker layout regression tests.**
 
   Keep the existing 48 px color and icon hit-target assertions. Add a test that pumps `NoteEmojiPickerPage` on a 360×800 surface, finds the title and search field, scrolls the grid using the `CustomScrollView`/grid finder, and verifies the title and search field remain visible. Add the equivalent catalog assertion for the search field and `Cor red` color target.
 
-- [ ] **Step 2: Run the picker tests before migration.**
+- [x] **Step 2: Run the picker tests before migration.**
 
   ```text
   flutter test test/features/notes/catalog/presentation/widgets/note_icon_picker_test.dart
@@ -237,13 +237,13 @@
 
   Expected result: the existing hit-target test passes; the new fixed-control assertions describe the required layout and must be retained during migration.
 
-- [ ] **Step 3: Migrate the root picker page.**
+- [x] **Step 3: Migrate the root picker page.**
 
   Replace `FamilyModalSheet.show<void>` with `showGlobalSheet<void>` in `showNoteIconPicker`. Preserve the read-only early return, immediate `onSelected` await, and root dismissal after selection.
 
   Make `NoteIconPickerRootPage` return `GlobalSheetPage(title: 'Selecionar ícone', child: ...)`. Keep the three action rows and their internal page pushes unchanged.
 
-- [ ] **Step 4: Migrate emoji and catalog pages to fixed shared headers.**
+- [x] **Step 4: Migrate emoji and catalog pages to fixed shared headers.**
 
   Wrap each page in `GlobalSheetPage` with its existing title:
 
@@ -252,11 +252,11 @@
 
   Remove `_PickerHeader` and the `onBack` parameter from `_PickerScrollPage`. The shared `GlobalSheetHeader` supplies the close button. Keep the existing `Expanded(CustomScrollView(...))` structure so only the grid scrolls; do not put the search field or color selector inside the vertical scroll view. Keep horizontal color scrolling unchanged.
 
-- [ ] **Step 5: Remove duplicated picker page wrappers only after migration.**
+- [x] **Step 5: Remove duplicated picker page wrappers only after migration.**
 
   Replace `_PickerScrollPage` with one standalone `_PickerGridContent` widget. It receives `headerChildren`, `itemCount`, and `itemBuilder`; it renders the fixed `headerChildren` in a `Column` followed by `Expanded(child: CustomScrollView(...))`. Keep `_PickerAction` as a standalone widget. Do not create builder methods inside the state classes. Preserve `TextEditingController` disposal and query filtering.
 
-- [ ] **Step 6: Run focused picker checks.**
+- [x] **Step 6: Run focused picker checks.**
 
   ```text
   dart format lib/features/notes/catalog/presentation/widgets/note_icon_picker.dart lib/features/notes/catalog/presentation/widgets/note_icon_picker_components.dart
@@ -266,7 +266,7 @@
 
   Expected result: hit targets, fixed header/search/color controls, selection callbacks, and analyzer checks pass.
 
-- [ ] **Step 7: Commit the picker migration.**
+- [x] **Step 7: Commit the picker migration.**
 
   ```text
   git add lib/features/notes/catalog/presentation/widgets/note_icon_picker.dart lib/features/notes/catalog/presentation/widgets/note_icon_picker_components.dart test/features/notes/catalog/presentation/widgets/note_icon_picker_test.dart
@@ -283,7 +283,7 @@
 - Consumes the completed shared sheet, task migration, and icon picker migration.
 - Produces verified tests and a clean, scope-limited diff for this feature.
 
-- [ ] **Step 1: Inspect the final scope.**
+- [x] **Step 1: Inspect the final scope.**
 
   Before implementation, record the current commit with `git rev-parse HEAD`; use that SHA to inspect the feature diff in this task. Run:
 
@@ -296,7 +296,7 @@
 
   Confirm the commits created from the recorded base SHA contain only the shared sheet files, the two migrated feature areas, and their tests. Confirm the pre-existing `note_document_codec.dart` change remains unstaged and uncommitted by this work.
 
-- [ ] **Step 2: Run the combined focused test set.**
+- [x] **Step 2: Run the combined focused test set.**
 
   Run sequentially:
 
@@ -308,7 +308,7 @@
 
   Expected result: all three commands exit successfully.
 
-- [ ] **Step 3: Run analyzer on all migrated Dart paths.**
+- [x] **Step 3: Run analyzer on all migrated Dart paths.**
 
   ```text
   flutter analyze lib/shared/widgets/global_sheet.dart lib/shared/widgets/global_sheet_page.dart lib/shared/widgets/global_sheet_header.dart lib/features/tasks/presentation/widgets/task_metadata_sheet.dart lib/features/tasks/presentation/widgets/task_metadata_date_page.dart lib/features/tasks/presentation/widgets/task_metadata_time_page.dart lib/features/tasks/presentation/widgets/task_metadata_selection_page.dart lib/features/notes/catalog/presentation/widgets/note_icon_picker.dart lib/features/notes/catalog/presentation/widgets/note_icon_picker_components.dart
@@ -316,7 +316,7 @@
 
   Expected result: `No issues found`.
 
-- [ ] **Step 4: Run the full Flutter suite once.**
+- [x] **Step 4: Run the full Flutter suite once.**
 
   ```text
   flutter test
@@ -324,7 +324,7 @@
 
   Record the completed result. If the suite times out, report the timeout and the focused checks separately; do not claim a full-suite pass.
 
-- [ ] **Step 5: Perform a final code-quality review.**
+- [x] **Step 5: Perform a final code-quality review.**
 
   Check that:
 
@@ -336,6 +336,6 @@
   - no new configurable parameters or compatibility fallbacks were added;
   - all modified widgets are standalone classes with one responsibility.
 
-- [ ] **Step 6: Commit verification-only fixes, if needed.**
+- [x] **Step 6: Commit verification-only fixes, if needed.**
 
   If the review finds a real issue, fix it in a focused commit with the affected test. If no issue is found, do not create an empty commit.
