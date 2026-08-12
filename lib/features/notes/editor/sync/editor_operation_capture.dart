@@ -437,36 +437,106 @@ class EditorOperationCapture {
     final oldStr = oldText.toPlainText();
     final newStr = newText.toPlainText();
 
-    // 1. Identical plain text: compare attributions per character
     if (oldStr == newStr) {
-      final ops = <Map<String, dynamic>>[];
-      int pos = 0;
-      while (pos < oldStr.length) {
-        final oldAttrs = _getAttributionsAt(oldText, pos);
-        final newAttrs = _getAttributionsAt(newText, pos);
-        final attrDiff = _diffAttributes(oldAttrs, newAttrs);
-
-        int runEnd = pos + 1;
-        while (runEnd < oldStr.length) {
-          final nextOld = _getAttributionsAt(oldText, runEnd);
-          final nextNew = _getAttributionsAt(newText, runEnd);
-          final nextDiff = _diffAttributes(nextOld, nextNew);
-          if (!mapEquals(attrDiff, nextDiff)) break;
-          runEnd++;
-        }
-
-        final retainLength = runEnd - pos;
-        final op = <String, dynamic>{'retain': retainLength};
-        if (attrDiff.isNotEmpty) {
-          op['attributes'] = attrDiff;
-        }
-        ops.add(op);
-        pos = runEnd;
-      }
-      return ops;
+      return _computeAttributeDelta(oldText, newText, oldStr.length);
     }
 
-    // 2. Text changed: compute prefix, delete, insert with attributes, suffix
+    return _computeTextDelta(oldText, newText, oldStr, newStr);
+  }
+
+  List<Map<String, dynamic>> _computeAttributeDelta(
+    AttributedText oldText,
+    AttributedText newText,
+    int textLength,
+  ) {
+    final ops = <Map<String, dynamic>>[];
+    var position = 0;
+    while (position < textLength) {
+      final attrDiff = _diffAttributes(
+        _getAttributionsAt(oldText, position),
+        _getAttributionsAt(newText, position),
+      );
+      final runEnd = _findAttributeRunEnd(
+        oldText,
+        newText,
+        position,
+        textLength,
+        attrDiff,
+      );
+      ops.add(_retainOperation(runEnd - position, attrDiff));
+      position = runEnd;
+    }
+    return ops;
+  }
+
+  int _findAttributeRunEnd(
+    AttributedText oldText,
+    AttributedText newText,
+    int start,
+    int textLength,
+    Map<String, dynamic> attrDiff,
+  ) {
+    var runEnd = start + 1;
+    while (runEnd < textLength) {
+      final nextDiff = _diffAttributes(
+        _getAttributionsAt(oldText, runEnd),
+        _getAttributionsAt(newText, runEnd),
+      );
+      if (!mapEquals(attrDiff, nextDiff)) break;
+      runEnd++;
+    }
+    return runEnd;
+  }
+
+  Map<String, dynamic> _retainOperation(
+    int length,
+    Map<String, dynamic> attributes,
+  ) {
+    final operation = <String, dynamic>{'retain': length};
+    if (attributes.isNotEmpty) {
+      operation['attributes'] = attributes;
+    }
+    return operation;
+  }
+
+  List<Map<String, dynamic>> _computeTextDelta(
+    AttributedText oldText,
+    AttributedText newText,
+    String oldStr,
+    String newStr,
+  ) {
+    final range = _findTextChangeRange(oldStr, newStr);
+    final deletedCount =
+        oldStr.length - range.prefixLength - range.suffixLength;
+    final insertedStr = newStr.substring(
+      range.prefixLength,
+      newStr.length - range.suffixLength,
+    );
+    final ops = <Map<String, dynamic>>[];
+
+    if (range.prefixLength > 0) {
+      ops.add({'retain': range.prefixLength});
+    }
+    if (deletedCount > 0) {
+      ops.add({'delete': deletedCount});
+    }
+    if (insertedStr.isNotEmpty) {
+      ops.addAll(
+        _buildInsertOperations(
+          oldText: oldText,
+          newText: newText,
+          prefixLength: range.prefixLength,
+          insertedLength: insertedStr.length,
+        ),
+      );
+    }
+    return ops;
+  }
+
+  ({int prefixLength, int suffixLength}) _findTextChangeRange(
+    String oldStr,
+    String newStr,
+  ) {
     int prefixLen = 0;
     while (prefixLen < oldStr.length &&
         prefixLen < newStr.length &&
@@ -481,51 +551,40 @@ class EditorOperationCapture {
             newStr[newStr.length - 1 - suffixLen]) {
       suffixLen++;
     }
+    return (prefixLength: prefixLen, suffixLength: suffixLen);
+  }
 
-    final deletedCount = oldStr.length - prefixLen - suffixLen;
-    final insertedStr = newStr.substring(prefixLen, newStr.length - suffixLen);
-
-    final ops = <Map<String, dynamic>>[];
-
-    // A text edit must not also rewrite attributes in unchanged text. IMEs
-    // can transiently change those attributes while they compose input.
-    if (prefixLen > 0) {
-      ops.add({'retain': prefixLen});
+  List<Map<String, dynamic>> _buildInsertOperations({
+    required AttributedText oldText,
+    required AttributedText newText,
+    required int prefixLength,
+    required int insertedLength,
+  }) {
+    final insertSub = newText.copyText(
+      prefixLength,
+      prefixLength + insertedLength,
+    );
+    final insertOps = _codec.encodeAttributedTextToDelta(insertSub);
+    final insertionWasBold =
+        prefixLength > 0 &&
+        _getAttributionsAt(oldText, prefixLength - 1).contains('bold');
+    if (!insertionWasBold) {
+      _removeInheritedBold(insertOps);
     }
+    return insertOps;
+  }
 
-    // Delete
-    if (deletedCount > 0) {
-      ops.add({'delete': deletedCount});
-    }
-
-    // Insert
-    if (insertedStr.isNotEmpty) {
-      final insertSub = newText.copyText(
-        prefixLen,
-        prefixLen + insertedStr.length,
-      );
-      final insertOps = _codec.encodeAttributedTextToDelta(insertSub);
-      final insertionWasBold =
-          prefixLen > 0 &&
-          _getAttributionsAt(oldText, prefixLen - 1).contains('bold');
-      if (!insertionWasBold) {
-        for (final op in insertOps) {
-          final attributes = op['attributes'];
-          if (attributes is Map && attributes.containsKey('bold')) {
-            final cleaned = Map<String, dynamic>.from(attributes)
-              ..remove('bold');
-            if (cleaned.isEmpty) {
-              op.remove('attributes');
-            } else {
-              op['attributes'] = cleaned;
-            }
-          }
-        }
+  void _removeInheritedBold(List<Map<String, dynamic>> operations) {
+    for (final operation in operations) {
+      final attributes = operation['attributes'];
+      if (attributes is! Map || !attributes.containsKey('bold')) continue;
+      final cleaned = Map<String, dynamic>.from(attributes)..remove('bold');
+      if (cleaned.isEmpty) {
+        operation.remove('attributes');
+      } else {
+        operation['attributes'] = cleaned;
       }
-      ops.addAll(insertOps);
     }
-
-    return ops;
   }
 
   Set<String> _getAttributionsAt(AttributedText text, int offset) {
