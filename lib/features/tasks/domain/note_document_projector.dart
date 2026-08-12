@@ -37,45 +37,17 @@ class NoteDocumentProjector {
       final plain = attributedText.toPlainText();
       if (plain.isNotEmpty) textBuffer.writeln(plain);
 
-      if (type != 'task') continue;
-
-      final metadata = Map<String, dynamic>.from(
-        blockData['metadata'] as Map? ?? {},
-      );
-      final isCompleted = metadata['isCompleted'] as bool? ?? false;
-      final hasTime = metadata['hasTime'] as bool? ?? false;
-      final recurrenceRule =
-          metadata['recurrenceRule'] as String? ??
-          metadata['recurrence'] as String?;
-      final recurrence = TaskRecurrence.parse(recurrenceRule);
-      final rawDueDate = DateTime.tryParse(
-        metadata['dueDate'] as String? ?? '',
-      );
-      final currentDueDate =
-          !isCompleted && rawDueDate != null && recurrence != null
-          ? occurrencePolicy.currentScheduledAt(
-              anchor: rawDueDate,
-              recurrence: recurrence,
-              hasTime: hasTime,
-            )
-          : rawDueDate;
-      final rawDueDateString = metadata['dueDate'] as String?;
-      final projectedDueDate = currentDueDate == rawDueDate
-          ? rawDueDateString
-          : currentDueDate?.toIso8601String();
-      projectedTasks.add(
-        ProjectedTask(
-          id: blockData['id'] as String? ?? '',
-          noteId: noteId,
-          title: plain,
-          isCompleted: isCompleted,
-          dueDate: projectedDueDate,
-          recurrenceRule: recurrenceRule,
-          hasTime: hasTime,
-          reminder: metadata['reminder'] as String?,
-          position: i.toString(),
-        ),
-      );
+      if (type == 'task') {
+        projectedTasks.add(
+          _projectTask(
+            noteId: noteId,
+            blockData: blockData,
+            title: plain,
+            position: i,
+            occurrencePolicy: occurrencePolicy,
+          ),
+        );
+      }
     }
 
     final content = textBuffer.toString().trimRight();
@@ -85,6 +57,48 @@ class NoteDocumentProjector {
           ? null
           : (content.length > 200 ? content.substring(0, 200) : content),
       tasks: projectedTasks,
+    );
+  }
+
+  ProjectedTask _projectTask({
+    required String noteId,
+    required Map<String, dynamic> blockData,
+    required String title,
+    required int position,
+    required TaskOccurrencePolicy occurrencePolicy,
+  }) {
+    final metadata = Map<String, dynamic>.from(
+      blockData['metadata'] as Map? ?? {},
+    );
+    final isCompleted = metadata['isCompleted'] as bool? ?? false;
+    final hasTime = metadata['hasTime'] as bool? ?? false;
+    final recurrenceRule =
+        metadata['recurrenceRule'] as String? ??
+        metadata['recurrence'] as String?;
+    final recurrence = TaskRecurrence.parse(recurrenceRule);
+    final rawDueDate = DateTime.tryParse(metadata['dueDate'] as String? ?? '');
+    final currentDueDate =
+        !isCompleted && rawDueDate != null && recurrence != null
+        ? occurrencePolicy.currentScheduledAt(
+            anchor: rawDueDate,
+            recurrence: recurrence,
+            hasTime: hasTime,
+          )
+        : rawDueDate;
+    final rawDueDateString = metadata['dueDate'] as String?;
+    final projectedDueDate = currentDueDate == rawDueDate
+        ? rawDueDateString
+        : currentDueDate?.toIso8601String();
+    return ProjectedTask(
+      id: blockData['id'] as String? ?? '',
+      noteId: noteId,
+      title: title,
+      isCompleted: isCompleted,
+      dueDate: projectedDueDate,
+      recurrenceRule: recurrenceRule,
+      hasTime: hasTime,
+      reminder: metadata['reminder'] as String?,
+      position: position.toString(),
     );
   }
 
