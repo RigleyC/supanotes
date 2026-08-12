@@ -30,10 +30,22 @@ void main() {
       updatedAt: now,
     );
 
-    await tester.pumpWidget(_buildSheetForTask(task));
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: _MetadataSheetLauncher(
+            task: task,
+            onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Abrir metadados'));
     await tester.pumpAndSettle();
 
     expect(find.text('Editar horário e frequência'), findsOneWidget);
+    expect(find.byTooltip('Fechar'), findsOneWidget);
     expect(find.text('Diariamente'), findsOneWidget);
   });
 
@@ -147,6 +159,7 @@ void main() {
     DateTime? savedDueDate;
     TaskRecurrence? savedRecurrence;
     var savedHasTime = false;
+    var saveCalls = 0;
 
     await tester.pumpWidget(
       ProviderScope(
@@ -154,6 +167,7 @@ void main() {
           home: _MetadataSheetLauncher(
             task: task,
             onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {
+              saveCalls++;
               savedDueDate = dueDate;
               savedRecurrence = recurrence;
               savedHasTime = hasTime;
@@ -172,6 +186,8 @@ void main() {
 
     await tester.tap(find.text('Adicionar horário'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Confirmar'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Confirmar'));
     await tester.pumpAndSettle();
 
@@ -185,7 +201,53 @@ void main() {
     expect(savedDueDate, isNotNull);
     expect(savedHasTime, isTrue);
     expect(savedRecurrence, TaskRecurrence.daily);
+    expect(saveCalls, 1);
   });
+
+  testWidgets(
+    'internal page close returns to root and resolves save only on root dismissal',
+    (tester) async {
+      final task = _taskWithoutMetadata(id: 'task-internal-close');
+      DateTime? savedDueDate;
+      var saveCalls = 0;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: _MetadataSheetLauncher(
+              task: task,
+              onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {
+                saveCalls++;
+                savedDueDate = dueDate;
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Abrir metadados'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Adicionar data'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Escolher data'), findsOneWidget);
+      expect(find.text('Editar horário e frequência'), findsNothing);
+
+      await tester.tap(find.byTooltip('Fechar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Editar horário e frequência'), findsOneWidget);
+      expect(find.text('Escolher data'), findsNothing);
+      expect(saveCalls, 0);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(saveCalls, 1);
+      expect(savedDueDate, isNull);
+    },
+  );
 }
 
 Widget _buildSheetForTask(TaskModel task) {

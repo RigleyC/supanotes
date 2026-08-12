@@ -1,8 +1,7 @@
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:supanotes/shared/widgets/app_selection_tile.dart';
-
-import 'task_metadata_page_header.dart';
+import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 class TaskMetadataSelectionPage<T> extends StatelessWidget {
   const TaskMetadataSelectionPage({
@@ -31,28 +30,29 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
       FamilyModalSheet.of(context).popPage();
     }
 
-    return Material(
-      type: MaterialType.transparency,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TaskMetadataPageHeader(title: title),
-          AppSelectionTile(
-            label: noneLabel,
-            icon: Icons.do_not_disturb_on_outlined,
-            isSelected: selected == null,
-            onTap: () => select(null),
-          ),
-          for (final option in options)
+    return GlobalSheetPage(
+      title: title,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             AppSelectionTile(
-              label: optionLabel(option),
-              icon: optionIcon(option),
-              isSelected: selected == option,
-              onTap: () => select(option),
+              label: noneLabel,
+              icon: Icons.do_not_disturb_on_outlined,
+              isSelected: selected == null,
+              onTap: () => select(null),
             ),
-          const SizedBox(height: 24),
-        ],
+            for (final option in options)
+              AppSelectionTile(
+                label: optionLabel(option),
+                icon: optionIcon(option),
+                isSelected: selected == option,
+                onTap: () => select(option),
+              ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
