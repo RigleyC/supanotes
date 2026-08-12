@@ -132,6 +132,37 @@ void main() {
       expect(node.text.toPlainText(), isEmpty);
     });
 
+    test(
+      'repairs mutation operations leaked into persisted document Deltas',
+      () {
+        final node =
+            codec.decodePersistedNode({
+                  'id': 'paragraph-1',
+                  'type': 'paragraph',
+                  'delta': [
+                    {'insert': 'kept'},
+                    {'delete': 4},
+                  ],
+                })
+                as ParagraphNode;
+
+        expect(node.text.toPlainText(), 'kept');
+        expect(codec.encodeNode(node)['delta'], [
+          {'insert': 'kept'},
+        ]);
+        expect(
+          () => codec.decodeNode({
+            'id': 'paragraph-1',
+            'type': 'paragraph',
+            'delta': [
+              {'delete': 4},
+            ],
+          }),
+          throwsA(isA<FormatException>()),
+        );
+      },
+    );
+
     test('rejects a non-empty malformed persisted Delta operation', () {
       expect(
         () => codec.attributedFromDelta([

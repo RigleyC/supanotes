@@ -17,3 +17,5 @@
 - [x] Move draft validation and aggregate deletion into one database transaction.
 - [x] Remove optional lifecycle dependencies and make note state explicit.
 - [x] Add coverage for immediate close and attachment-only drafts.
+- [x] Repair the invalid canonical Delta snapshot that blocked Windows debug
+  note hydration.

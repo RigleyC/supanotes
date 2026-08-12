@@ -153,6 +153,7 @@ class NoteDocumentCodec {
   NoteDocumentBlock _parseBlock(
     Map<String, dynamic> json, {
     bool allowEmptyDeltaOperations = false,
+    bool allowMutationDeltaOperations = false,
   }) {
     final rawId = json['id'];
     final rawType = json['type'];
@@ -171,7 +172,7 @@ class NoteDocumentCodec {
       throw const FormatException('Note document block has no delta');
     }
     final delta = rawDelta
-        .map((rawOperation) {
+        .map<Map<String, dynamic>?>((rawOperation) {
           if (rawOperation is! Map) {
             throw const FormatException(
               'Note document block contains an invalid delta',
@@ -182,6 +183,12 @@ class NoteDocumentCodec {
             return <String, dynamic>{'insert': ''};
           }
           if (operation['insert'] is! String) {
+            final isMutationOperation =
+                !operation.containsKey('insert') &&
+                (operation['delete'] is int || operation['retain'] is int);
+            if (allowMutationDeltaOperations && isMutationOperation) {
+              return null;
+            }
             throw const FormatException(
               'Note document block contains a non-text delta operation',
             );
@@ -220,6 +227,7 @@ class NoteDocumentCodec {
           }
           return operation;
         })
+        .whereType<Map<String, dynamic>>()
         .toList(growable: false);
 
     final rawMetadata = json['metadata'];
@@ -491,13 +499,31 @@ class NoteDocumentCodec {
   }
 
   DocumentNode decodeNode(Map<String, dynamic> blockData) {
+    return _decodeNode(blockData, allowMutationDeltaOperations: false);
+  }
+
+  /// Decodes a local persisted block and removes OT mutation operations that
+  /// can be present in a malformed cached snapshot. They are not document
+  /// content; the strict transport decoder remains unchanged.
+  DocumentNode decodePersistedNode(Map<String, dynamic> blockData) {
+    return _decodeNode(blockData, allowMutationDeltaOperations: true);
+  }
+
+  DocumentNode _decodeNode(
+    Map<String, dynamic> blockData, {
+    required bool allowMutationDeltaOperations,
+  }) {
     final normalized = Map<String, dynamic>.from(blockData);
     normalized['id'] ??= Editor.createNodeId();
     if (normalized['delta'] == null && normalized['content'] is List) {
       normalized['delta'] = normalized['content'];
     }
     return _decodeSnapshotBlock(
-      _parseBlock(normalized, allowEmptyDeltaOperations: true),
+      _parseBlock(
+        normalized,
+        allowEmptyDeltaOperations: true,
+        allowMutationDeltaOperations: allowMutationDeltaOperations,
+      ),
     );
   }
 

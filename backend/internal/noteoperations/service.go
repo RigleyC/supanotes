@@ -277,11 +277,15 @@ func (s *Service) GetDocument(ctx context.Context, noteID pgtype.UUID, userID pg
 		}
 		return DocumentResponse{}, fmt.Errorf("get document: %w", err)
 	}
+	document, err := canonicalDocumentJSON(result.Document)
+	if err != nil {
+		return DocumentResponse{}, fmt.Errorf("normalize document: %w", err)
+	}
 
 	return DocumentResponse{
 		NoteID:     pgtypeUUIDToString(noteID),
 		Revision:   result.Revision,
-		Document:   result.Document,
+		Document:   document,
 		ServerTime: time.Now().UTC(),
 	}, nil
 }
@@ -327,12 +331,24 @@ func (s *Service) GetOperationsSince(ctx context.Context, noteID pgtype.UUID, us
 	if err := tx.Commit(ctx); err != nil {
 		return OperationsListResponse{}, fmt.Errorf("commit tx: %w", err)
 	}
+	document, err := canonicalDocumentJSON(doc.Document)
+	if err != nil {
+		return OperationsListResponse{}, fmt.Errorf("normalize document: %w", err)
+	}
 
 	return OperationsListResponse{
 		Operations: ops,
-		Document:   doc.Document,
+		Document:   document,
 		Revision:   doc.Revision,
 	}, nil
+}
+
+func canonicalDocumentJSON(data []byte) ([]byte, error) {
+	document, err := UnmarshalDocument(data)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(document)
 }
 
 func mustParseUUID(s string) pgtype.UUID {

@@ -119,6 +119,42 @@ func TestApplyTextDelta(t *testing.T) {
 	assert.Equal(t, "hello world", text)
 }
 
+func TestUnmarshalDocumentRemovesMutationOperationsFromSnapshotDeltas(t *testing.T) {
+	doc, err := UnmarshalDocument([]byte(`{
+		"schemaVersion":1,
+		"blocks":[{
+			"id":"b1",
+			"type":"paragraph",
+			"delta":[{"insert":"kept"},{"delete":4}],
+			"metadata":{}
+		}]
+	}`))
+	require.NoError(t, err)
+
+	require.Len(t, doc.Blocks[0].Delta, 1)
+	assert.Equal(t, "kept", string(doc.Blocks[0].Delta[0].Insert))
+	assert.Nil(t, doc.Blocks[0].Delta[0].Delete)
+}
+
+func TestApplyTextDeltaDoesNotPersistMutationOperations(t *testing.T) {
+	doc := Document{
+		SchemaVersion: 1,
+		Blocks: []Block{{
+			ID:       "b1",
+			Type:     string(BlockParagraph),
+			Delta:    []delta.Op{{Delete: intPtr(3)}},
+			Metadata: map[string]any{},
+		}},
+	}
+
+	payload := json.RawMessage(`{"ops":[{"insert":"new"}]}`)
+	require.NoError(t, doc.ApplyOperation(KindTextDelta, "b1", payload))
+
+	require.Len(t, doc.Blocks[0].Delta, 1)
+	assert.Equal(t, "new", string(doc.Blocks[0].Delta[0].Insert))
+	assert.Nil(t, doc.Blocks[0].Delta[0].Delete)
+}
+
 func TestApplyTextDeltaUsesFlutterUTF16Offsets(t *testing.T) {
 	doc := Document{
 		SchemaVersion: 1,

@@ -115,7 +115,7 @@ class DocumentProjectionApplier {
     var nodeIndex = 0;
     for (final block in blocks) {
       final b = block as Map<String, dynamic>;
-      final node = _codec.decodeNode(b);
+      final node = _codec.decodePersistedNode(b);
       if (!insertedNodeIds.add(node.id)) {
         NoteSyncDebug.log(
           'projection.snapshot.duplicate_node_id',

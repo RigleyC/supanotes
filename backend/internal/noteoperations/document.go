@@ -122,17 +122,34 @@ func (d *Document) applyTextDelta(blockID string, payload json.RawMessage) error
 
 	for i := range d.Blocks {
 		if d.Blocks[i].ID == blockID {
-			current := delta.New(opsToUTF16(d.Blocks[i].Delta))
+			currentOps, err := normalizeDocumentDelta(d.Blocks[i].Delta, d.Blocks[i].ID)
+			if err != nil {
+				return err
+			}
+			current := delta.New(opsToUTF16(currentOps))
 			result := current.Compose(*incoming)
-			d.Blocks[i].Delta = opsFromUTF16(result.Ops)
+			normalized, err := normalizeDocumentDelta(result.Ops, d.Blocks[i].ID)
+			if err != nil {
+				return err
+			}
+			d.Blocks[i].Delta = opsFromUTF16(normalized)
 			return nil
 		}
 	}
 
 	if d.ensureMissingBlock(blockID) {
-		current := delta.New(opsToUTF16(d.Blocks[len(d.Blocks)-1].Delta))
+		block := &d.Blocks[len(d.Blocks)-1]
+		currentOps, err := normalizeDocumentDelta(block.Delta, block.ID)
+		if err != nil {
+			return err
+		}
+		current := delta.New(opsToUTF16(currentOps))
 		result := current.Compose(*incoming)
-		d.Blocks[len(d.Blocks)-1].Delta = opsFromUTF16(result.Ops)
+		normalized, err := normalizeDocumentDelta(result.Ops, block.ID)
+		if err != nil {
+			return err
+		}
+		block.Delta = opsFromUTF16(normalized)
 		return nil
 	}
 
@@ -370,7 +387,9 @@ func UnmarshalDocument(data []byte) (Document, error) {
 	if doc.SchemaVersion == 0 {
 		doc.SchemaVersion = 1
 	}
-	doc.normalizeEmptyDeltaOperations()
+	if err := doc.normalizeDocumentDeltas(); err != nil {
+		return Document{}, err
+	}
 	doc.removeDuplicateBlockIDs()
 	if len(doc.Blocks) == 0 {
 		doc = NewEmptyDocument()
@@ -378,16 +397,47 @@ func UnmarshalDocument(data []byte) (Document, error) {
 	return doc, nil
 }
 
-func (d *Document) normalizeEmptyDeltaOperations() {
+func (d *Document) normalizeDocumentDeltas() error {
 	for blockIndex := range d.Blocks {
-		operations := make([]delta.Op, 0, len(d.Blocks[blockIndex].Delta))
-		for _, operation := range d.Blocks[blockIndex].Delta {
-			if !operation.IsNil() {
-				operations = append(operations, operation)
-			}
+		block := &d.Blocks[blockIndex]
+		operations, err := normalizeDocumentDelta(block.Delta, block.ID)
+		if err != nil {
+			return err
 		}
-		d.Blocks[blockIndex].Delta = operations
+		block.Delta = operations
 	}
+	return nil
+}
+
+// normalizeDocumentDelta keeps only content operations. A document snapshot
+// is not an OT change: delete and retain operations must never be persisted in
+// it. They are discarded here because the faulty compose path could publish
+// those mutation operations in a snapshot.
+func normalizeDocumentDelta(operations []delta.Op, blockID string) ([]delta.Op, error) {
+	normalized := make([]delta.Op, 0, len(operations))
+	for _, operation := range operations {
+		if operation.IsNil() {
+			continue
+		}
+		if operation.InsertEmbed != nil {
+			return nil, fmt.Errorf(
+				"document block %q contains an unsupported embedded delta operation",
+				blockID,
+			)
+		}
+		if operation.Insert != nil {
+			normalized = append(normalized, operation)
+			continue
+		}
+		if operation.Delete != nil || operation.Retain != nil {
+			continue
+		}
+		return nil, fmt.Errorf(
+			"document block %q contains an invalid delta operation",
+			blockID,
+		)
+	}
+	return normalized, nil
 }
 
 func (d *Document) removeDuplicateBlockIDs() {

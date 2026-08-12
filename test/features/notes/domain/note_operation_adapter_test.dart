@@ -946,6 +946,24 @@ void main() {
       expect((document.first as TextNode).text.toPlainText(), 'Legacy');
     });
 
+    test('hydrates a cached document containing a leaked mutation operation', () async {
+      when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
+        (_) async => LocalNoteDocumentData(
+          noteId: 'note-1',
+          revision: 507,
+          documentJson:
+              '{"blocks":[{"id":"block-1","type":"paragraph","delta":[{"insert":"Cached"},{"delete":6}],"metadata":{}}]}',
+          updatedAt: DateTime.utc(2026, 7, 20),
+        ),
+      );
+
+      final adapter = createAdapter();
+      await adapter.start();
+
+      expect(document.nodeCount, 1);
+      expect((document.first as TextNode).text.toPlainText(), 'Cached');
+    });
+
     test('propagates hydration failures', () async {
       when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
         (_) async => LocalNoteDocumentData(

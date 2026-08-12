@@ -113,6 +113,35 @@ func TestGetDocument(t *testing.T) {
 	assert.Equal(t, int64(0), docResp.Revision)
 }
 
+func TestGetDocumentReturnsCanonicalDeltaOperations(t *testing.T) {
+	svc := NewService(&mockRepository{
+		getNoteDocumentFn: func(context.Context, pgtype.UUID) (GetNoteDocumentResult, error) {
+			return GetNoteDocumentResult{
+				Revision: 7,
+				Document: []byte(`{
+					"schemaVersion":1,
+					"blocks":[{
+						"id":"b1",
+						"type":"paragraph",
+						"delta":[{"insert":"kept"},{"delete":4}],
+						"metadata":{}
+					}]
+				}`),
+			}, nil
+		},
+	}, nil)
+
+	docResp, err := svc.GetDocument(context.Background(), pgtype.UUID{}, pgtype.UUID{})
+	assert.NoError(t, err)
+	assert.Equal(t, int64(7), docResp.Revision)
+
+	var document Document
+	assert.NoError(t, json.Unmarshal(docResp.Document, &document))
+	assert.Len(t, document.Blocks[0].Delta, 1)
+	assert.Equal(t, "kept", string(document.Blocks[0].Delta[0].Insert))
+	assert.Nil(t, document.Blocks[0].Delta[0].Delete)
+}
+
 func TestGetDocumentNoteNotFound(t *testing.T) {
 	svc := NewService(&mockRepository{
 		getNoteDocumentFn: func(ctx context.Context, noteID pgtype.UUID) (GetNoteDocumentResult, error) {

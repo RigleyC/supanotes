@@ -10,9 +10,9 @@ import (
 // DecodeCanonicalDocument validates and decodes the schema-v1 snapshot shared
 // by REST/OT, the public HTML reader, and native clients.
 //
-// UnmarshalDocument is intentionally permissive because it also repairs old
-// operation streams. Public delivery must not perform those repairs: a
-// malformed snapshot must fail consistently at the transport boundary.
+// UnmarshalDocument repairs malformed persisted snapshots for internal
+// processing. Public delivery must not perform those repairs: a malformed
+// snapshot must fail consistently at the transport boundary.
 func DecodeCanonicalDocument(data []byte) (Document, error) {
 	var envelope struct {
 		SchemaVersion *int              `json:"schemaVersion"`

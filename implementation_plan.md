@@ -1,5 +1,14 @@
 # Implementation plan — local-first note persistence
 
+## Windows debug launch: invalid canonical Delta snapshot
+
+Status: complete.
+
+- [x] Add a regression test for the backend writing mutation operations into a document snapshot.
+- [x] Normalize the REST/OT document at the backend boundary so snapshots contain insert operations only.
+- [x] Keep local editor hydration able to repair the existing cached mutation operation without weakening the public snapshot contract.
+- [x] Reproduce the Windows launch and run focused, analyzer, backend, and full checks.
+
 Status: complete for ticket 01.
 
 Review-fix pass: complete.

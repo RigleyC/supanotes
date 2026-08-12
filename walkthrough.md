@@ -118,3 +118,25 @@ Verification:
 - Full Flutter test suite: 630 passed, 1 skipped (1 unrelated failure in the
   other agent's draft-lifecycle test).
 - `git diff --check`: passed.
+
+## Windows debug launch: canonical Delta snapshot
+
+The Windows debug launch failed during note hydration because the REST/OT
+backend persisted a text mutation Delta as part of the document snapshot.
+The editor correctly rejected the `delete` operation because snapshots contain
+text inserts only.
+
+The backend now keeps mutation operations out of canonical snapshots. Local
+hydration repairs the malformed cached snapshot at the projection boundary,
+while transport decoding remains strict. This lets the existing local note
+open without weakening the shared REST/OT contract.
+
+Verification:
+
+- Backend suite: 337 tests passed in 27 packages.
+- `go vet ./...`: passed.
+- Flutter suite: 651 tests passed, 1 skipped.
+- Flutter analyze: no issues found.
+- Windows debug build: passed.
+- Controlled `flutter run -d windows --debug`: reached VM service attachment
+  with no `FormatException` or note-session startup error.
