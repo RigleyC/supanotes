@@ -163,6 +163,24 @@ class NoteDocumentCodec {
   }) {
     final rawId = json['id'];
     final rawType = json['type'];
+    _validateBlockIdentity(rawId, rawType);
+
+    final delta = _parseDelta(
+      json['delta'],
+      allowEmptyDeltaOperations: allowEmptyDeltaOperations,
+      allowMutationDeltaOperations: allowMutationDeltaOperations,
+    );
+    final metadata = _parseMetadata(json['metadata']);
+    _validateMetadata(rawType as String, metadata);
+    return NoteDocumentBlock(
+      id: rawId as String,
+      type: rawType,
+      delta: delta,
+      metadata: metadata,
+    );
+  }
+
+  void _validateBlockIdentity(dynamic rawId, dynamic rawType) {
     if (rawId is! String || rawId.isEmpty) {
       throw const FormatException('Note document block has no id');
     }
@@ -172,84 +190,100 @@ class NoteDocumentCodec {
     if (!supportedBlockTypes.contains(rawType)) {
       throw FormatException('Unsupported note document block type: $rawType');
     }
+  }
 
-    final rawDelta = json['delta'];
+  List<Map<String, dynamic>> _parseDelta(
+    dynamic rawDelta, {
+    required bool allowEmptyDeltaOperations,
+    required bool allowMutationDeltaOperations,
+  }) {
     if (rawDelta is! List) {
       throw const FormatException('Note document block has no delta');
     }
-    final delta = rawDelta
+    return rawDelta
         .map<Map<String, dynamic>?>((rawOperation) {
-          if (rawOperation is! Map) {
-            throw const FormatException(
-              'Note document block contains an invalid delta',
-            );
-          }
-          final operation = Map<String, dynamic>.from(rawOperation);
-          if (allowEmptyDeltaOperations && operation.isEmpty) {
-            return <String, dynamic>{'insert': ''};
-          }
-          if (operation['insert'] is! String) {
-            final isMutationOperation =
-                !operation.containsKey('insert') &&
-                (operation['delete'] is int || operation['retain'] is int);
-            if (allowMutationDeltaOperations && isMutationOperation) {
-              return null;
-            }
-            throw const FormatException(
-              'Note document block contains a non-text delta operation',
-            );
-          }
-          final rawAttributes = operation['attributes'];
-          if (rawAttributes != null && rawAttributes is! Map) {
-            throw const FormatException(
-              'Note document block contains invalid delta attributes',
-            );
-          }
-          if (rawAttributes is Map) {
-            for (final entry in rawAttributes.entries) {
-              if (entry.key is! String) {
-                throw const FormatException(
-                  'Note document block contains invalid delta attribute names',
-                );
-              }
-              if (entry.key == 'link') {
-                final uri = entry.value is String
-                    ? Uri.tryParse(entry.value as String)
-                    : null;
-                if (uri == null) {
-                  throw const FormatException(
-                    'Note document block contains an invalid link attribute',
-                  );
-                }
-              } else if (entry.key.toString().startsWith('link:')) {
-                if (entry.value != true ||
-                    Uri.tryParse(entry.key.toString().substring(5)) == null) {
-                  throw const FormatException(
-                    'Note document block contains an invalid link attribution',
-                  );
-                }
-              }
-            }
-          }
-          return operation;
+          return _parseDeltaOperation(
+            rawOperation,
+            allowEmptyDeltaOperations: allowEmptyDeltaOperations,
+            allowMutationDeltaOperations: allowMutationDeltaOperations,
+          );
         })
         .whereType<Map<String, dynamic>>()
         .toList(growable: false);
+  }
 
-    final rawMetadata = json['metadata'];
+  Map<String, dynamic>? _parseDeltaOperation(
+    dynamic rawOperation, {
+    required bool allowEmptyDeltaOperations,
+    required bool allowMutationDeltaOperations,
+  }) {
+    if (rawOperation is! Map) {
+      throw const FormatException(
+        'Note document block contains an invalid delta',
+      );
+    }
+    final operation = Map<String, dynamic>.from(rawOperation);
+    if (allowEmptyDeltaOperations && operation.isEmpty) {
+      return <String, dynamic>{'insert': ''};
+    }
+    if (operation['insert'] is! String) {
+      if (allowMutationDeltaOperations && _isMutationOperation(operation)) {
+        return null;
+      }
+      throw const FormatException(
+        'Note document block contains a non-text delta operation',
+      );
+    }
+    _validateDeltaAttributes(operation['attributes']);
+    return operation;
+  }
+
+  bool _isMutationOperation(Map<String, dynamic> operation) {
+    return !operation.containsKey('insert') &&
+        (operation['delete'] is int || operation['retain'] is int);
+  }
+
+  void _validateDeltaAttributes(dynamic rawAttributes) {
+    if (rawAttributes != null && rawAttributes is! Map) {
+      throw const FormatException(
+        'Note document block contains invalid delta attributes',
+      );
+    }
+    if (rawAttributes is! Map) return;
+
+    for (final entry in rawAttributes.entries) {
+      if (entry.key is! String) {
+        throw const FormatException(
+          'Note document block contains invalid delta attribute names',
+        );
+      }
+      if (entry.key == 'link') {
+        final uri = entry.value is String
+            ? Uri.tryParse(entry.value as String)
+            : null;
+        if (uri == null) {
+          throw const FormatException(
+            'Note document block contains an invalid link attribute',
+          );
+        }
+      } else if (entry.key.toString().startsWith('link:')) {
+        if (entry.value != true ||
+            Uri.tryParse(entry.key.toString().substring(5)) == null) {
+          throw const FormatException(
+            'Note document block contains an invalid link attribution',
+          );
+        }
+      }
+    }
+  }
+
+  Map<String, dynamic> _parseMetadata(dynamic rawMetadata) {
     if (rawMetadata != null && rawMetadata is! Map) {
       throw const FormatException('Note document block has invalid metadata');
     }
-    final metadata = rawMetadata == null
+    return rawMetadata == null
         ? const <String, dynamic>{}
         : Map<String, dynamic>.from(rawMetadata);
-    _validateMetadata(rawType, metadata);
-    return NoteDocumentBlock(
-      id: rawId,
-      type: rawType,
-      delta: delta,
-      metadata: metadata,
-    );
   }
 
   static void _validateMetadata(String type, Map<String, dynamic> metadata) {
