@@ -23,96 +23,48 @@ class HiddenTaskEditingGuard {
     final selection = composer.selection;
 
     if (request is ChangeSelectionRequest) {
-      final requestedSelection = request.newSelection;
-      if (requestedSelection == null ||
-          !selectionTouchesHiddenTask(document, requestedSelection)) {
-        return null;
-      }
-
-      return ChangeSelectionCommand(
-        null,
-        SelectionChangeType.clearSelection,
-        request.reason,
-        notifyListeners: request.notifyListeners,
-      );
+      return _handleSelectionChange(document, request);
     }
 
     if (request is DeleteUpstreamRequest) {
-      if (selectionTouchesHiddenTask(document, selection)) {
-        return _clearSelectionCommand();
-      }
-      if (_deleteWouldCrossHiddenTask(document, selection, upstream: true)) {
-        return const _NoOpEditCommand();
-      }
-      return null;
+      return _handleDirectionalDeletion(document, selection, upstream: true);
     }
 
     if (request is DeleteDownstreamRequest) {
-      if (selectionTouchesHiddenTask(document, selection)) {
-        return _clearSelectionCommand();
-      }
-      if (_deleteWouldCrossHiddenTask(document, selection, upstream: false)) {
-        return const _NoOpEditCommand();
-      }
-      return null;
+      return _handleDirectionalDeletion(document, selection, upstream: false);
     }
 
     if (request is DeleteUpstreamAtBeginningOfNodeRequest) {
-      if (_isHiddenTask(request.node) ||
-          _isHiddenTask(document.getNodeBeforeById(request.node.id))) {
-        return const _NoOpEditCommand();
-      }
-      return null;
+      return _handleNodeStartDeletion(document, request);
     }
 
     if (request is DeleteUpstreamCharacterRequest ||
         request is DeleteDownstreamCharacterRequest ||
         request is DeleteSelectionRequest) {
-      if (selectionTouchesHiddenTask(document, selection)) {
-        return _clearSelectionCommand();
-      }
-      return null;
+      return _handleCharacterDeletion(document, selection);
     }
 
     if (request is DeleteContentRequest) {
-      if (_rangeTouchesHiddenTask(document, request.documentRange)) {
-        return selectionTouchesHiddenTask(document, selection)
-            ? _clearSelectionCommand()
-            : const _NoOpEditCommand();
-      }
-      return null;
+      return _handleDeleteContent(document, selection, request);
     }
 
     if (request is AddTextAttributionsRequest ||
         request is RemoveTextAttributionsRequest ||
         request is ToggleTextAttributionsRequest) {
-      final range = switch (request) {
-        AddTextAttributionsRequest request => request.documentRange,
-        RemoveTextAttributionsRequest request => request.documentRange,
-        ToggleTextAttributionsRequest request => request.documentRange,
-        _ => throw StateError('Unsupported attribution request'),
-      };
-      if (_rangeTouchesHiddenTask(document, range)) {
-        return selectionTouchesHiddenTask(document, selection)
-            ? _clearSelectionCommand()
-            : const _NoOpEditCommand();
-      }
-      return null;
+      return _handleAttributionChange(
+        document,
+        selection,
+        _attributionRange(request),
+      );
     }
 
     if (request is InsertTextRequest ||
         request is InsertAttributedTextRequest) {
-      final position = switch (request) {
-        InsertTextRequest request => request.documentPosition,
-        InsertAttributedTextRequest request => request.documentPosition,
-        _ => throw StateError('Unsupported text insertion request'),
-      };
-      if (_isHiddenTask(document.getNodeById(position.nodeId))) {
-        return selectionTouchesHiddenTask(document, selection)
-            ? _clearSelectionCommand()
-            : const _NoOpEditCommand();
-      }
-      return null;
+      return _handleTextInsertion(
+        document,
+        selection,
+        _insertionPosition(request),
+      );
     }
 
     if (_requestUsesCurrentSelection(request) &&
@@ -125,6 +77,108 @@ class HiddenTaskEditingGuard {
     }
 
     return null;
+  }
+
+  EditCommand? _handleSelectionChange(
+    Document document,
+    ChangeSelectionRequest request,
+  ) {
+    final requestedSelection = request.newSelection;
+    if (requestedSelection == null ||
+        !selectionTouchesHiddenTask(document, requestedSelection)) {
+      return null;
+    }
+
+    return ChangeSelectionCommand(
+      null,
+      SelectionChangeType.clearSelection,
+      request.reason,
+      notifyListeners: request.notifyListeners,
+    );
+  }
+
+  EditCommand? _handleDirectionalDeletion(
+    Document document,
+    DocumentSelection? selection, {
+    required bool upstream,
+  }) {
+    if (selectionTouchesHiddenTask(document, selection)) {
+      return _clearSelectionCommand();
+    }
+    if (_deleteWouldCrossHiddenTask(document, selection, upstream: upstream)) {
+      return const _NoOpEditCommand();
+    }
+    return null;
+  }
+
+  EditCommand? _handleNodeStartDeletion(
+    Document document,
+    DeleteUpstreamAtBeginningOfNodeRequest request,
+  ) {
+    if (_isHiddenTask(request.node) ||
+        _isHiddenTask(document.getNodeBeforeById(request.node.id))) {
+      return const _NoOpEditCommand();
+    }
+    return null;
+  }
+
+  EditCommand? _handleCharacterDeletion(
+    Document document,
+    DocumentSelection? selection,
+  ) {
+    return selectionTouchesHiddenTask(document, selection)
+        ? _clearSelectionCommand()
+        : null;
+  }
+
+  EditCommand? _handleDeleteContent(
+    Document document,
+    DocumentSelection? selection,
+    DeleteContentRequest request,
+  ) {
+    if (!_rangeTouchesHiddenTask(document, request.documentRange)) return null;
+    return selectionTouchesHiddenTask(document, selection)
+        ? _clearSelectionCommand()
+        : const _NoOpEditCommand();
+  }
+
+  EditCommand? _handleAttributionChange(
+    Document document,
+    DocumentSelection? selection,
+    DocumentRange range,
+  ) {
+    if (!_rangeTouchesHiddenTask(document, range)) return null;
+    return selectionTouchesHiddenTask(document, selection)
+        ? _clearSelectionCommand()
+        : const _NoOpEditCommand();
+  }
+
+  DocumentRange _attributionRange(EditRequest request) {
+    return switch (request) {
+      AddTextAttributionsRequest request => request.documentRange,
+      RemoveTextAttributionsRequest request => request.documentRange,
+      ToggleTextAttributionsRequest request => request.documentRange,
+      _ => throw StateError('Unsupported attribution request'),
+    };
+  }
+
+  EditCommand? _handleTextInsertion(
+    Document document,
+    DocumentSelection? selection,
+    DocumentPosition position,
+  ) {
+    if (!_isHiddenTask(document.getNodeById(position.nodeId))) return null;
+    return selectionTouchesHiddenTask(document, selection)
+        ? _clearSelectionCommand()
+        : const _NoOpEditCommand();
+  }
+
+  DocumentPosition _insertionPosition(EditRequest request) {
+    return switch (request) {
+      InsertTextRequest request => request.documentPosition,
+      InsertAttributedTextRequest request => request.documentPosition,
+      _ => throw StateError('Unsupported text insertion request'),
+    };
   }
 
   EditCommand _clearSelectionCommand() {
