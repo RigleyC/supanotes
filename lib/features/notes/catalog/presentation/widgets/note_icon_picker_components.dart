@@ -27,20 +27,20 @@ class _PickerScrollPage extends StatelessWidget {
       child: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
             sliver: SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _PickerHeader(title: title, onBack: onBack),
-                  const Divider(),
+                  const SizedBox(height: AppSpacing.md),
                   ...headerChildren,
                 ],
               ),
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
             sliver: SliverLayoutBuilder(
               builder: (context, constraints) {
                 final crossAxisCount = math
@@ -87,12 +87,12 @@ class _PickerPage extends StatelessWidget {
       type: MaterialType.transparency,
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _PickerHeader(title: title),
-              const Divider(),
+              const SizedBox(height: AppSpacing.md),
               ...children,
             ],
           ),
@@ -119,7 +119,7 @@ class _PickerHeader extends StatelessWidget {
             icon: const Icon(Icons.arrow_back),
           ),
         Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
         ),
       ],
     );
@@ -142,23 +142,17 @@ class _PickerAction extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
-      child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Icon(icon),
-                const SizedBox(width: 12),
-                Text(label, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-          ),
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: Icon(icon, size: 20),
+        title: Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
         ),
+        onTap: onTap,
       ),
     );
   }

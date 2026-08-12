@@ -7,6 +7,7 @@ import 'package:unicode_emojis/unicode_emojis.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_catalog.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
 
@@ -22,6 +23,9 @@ Future<void> showNoteIconPicker({
     context: context,
     isDismissible: true,
     enableDrag: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+    ),
     contentBackgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
     builder: (_) => NoteIconPickerRootPage(note: note, onSelected: onSelected),
   );
