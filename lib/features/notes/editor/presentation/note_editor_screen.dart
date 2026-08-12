@@ -134,43 +134,9 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
-  Future<void> _handleMenuValue(
-    BuildContext context,
-    WidgetRef ref,
-    String value,
-    NoteModel currentNote,
-  ) async {
-    final session = ref.read(noteEditorSessionProvider(noteId)).value;
-    if (session == null || !session.captureLocalOperations) return;
-
-    final mutationController = ref.read(
-      notePreferenceMutationControllerProvider(noteId).notifier,
-    );
-    switch (value) {
-      case 'share':
-        await showAppBottomSheet(
-          context: context,
-          builder: (_) => ShareNoteSheet(noteId: noteId),
-        );
-      case 'hide_completed':
-        await mutationController.setHideCompleted(
-          current: currentNote,
-          value: !currentNote.hideCompleted,
-        );
-      case 'collapse_images':
-        await mutationController.setCollapseImages(
-          current: currentNote,
-          value: !currentNote.collapseImages,
-        );
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentNote = note;
-    final preferenceMutation = ref.watch(
-      notePreferenceMutationControllerProvider(noteId),
-    );
 
     return AppBar(
       automaticallyImplyLeading: false,
@@ -193,82 +159,165 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
       title: screenIsReadOnly && currentNote?.sharedByEmail != null
           ? Text('${NoteStrings.sharedByPrefix} ${currentNote!.sharedByEmail}')
           : null,
-      actions: [
-        if (currentNote != null && !screenIsReadOnly) ...[
-          AdaptivePopupMenuButton.icon<String>(
-            icon: PlatformInfo.isIOS26OrHigher() ? 'ellipsis' : Icons.more_vert,
-            items: [
-              if (currentNote.isOwner)
-                AdaptivePopupMenuItem<String>(
-                  label: NoteStrings.shareLabel,
-                  icon: PlatformInfo.isIOS26OrHigher()
-                      ? 'square.and.arrow.up'
-                      : Icons.share_outlined,
-                  value: 'share',
-                ),
-              AdaptivePopupMenuItem<String>(
-                label: currentNote.hideCompleted
-                    ? NoteStrings.showCompleted
-                    : NoteStrings.hideCompleted,
-                icon: PlatformInfo.isIOS26OrHigher()
-                    ? (currentNote.hideCompleted ? 'eye' : 'eye.slash')
-                    : (currentNote.hideCompleted
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
-                value: 'hide_completed',
-              ),
-              if (currentNote.isOwner)
-                AdaptivePopupMenuItem<String>(
-                  label: currentNote.collapseImages
-                      ? 'Expandir imagens'
-                      : 'Colapsar imagens',
-                  icon: PlatformInfo.isIOS26OrHigher()
-                      ? 'photo'
-                      : Icons.image_outlined,
-                  value: 'collapse_images',
-                ),
+      actions: currentNote == null || screenIsReadOnly
+          ? const []
+          : [
+              _NoteEditorMenuButton(noteId: noteId, note: currentNote),
+              _NoteEditorPreferenceStatus(noteId: noteId),
+              _NoteEditorKeyboardButton(sessionAsync: sessionAsync),
             ],
-            onSelected: (index, entry) {
-              final value = entry.value;
-              if (value != null) {
-                _handleMenuValue(context, ref, value, currentNote);
-              }
+    );
+  }
+}
+
+class _NoteEditorMenuButton extends ConsumerWidget {
+  const _NoteEditorMenuButton({required this.noteId, required this.note});
+
+  final String noteId;
+  final NoteModel note;
+
+  Future<void> _handleSelection(
+    BuildContext context,
+    WidgetRef ref,
+    String value,
+  ) async {
+    final session = ref.read(noteEditorSessionProvider(noteId)).value;
+    if (session == null || !session.captureLocalOperations) return;
+
+    final mutationController = ref.read(
+      notePreferenceMutationControllerProvider(noteId).notifier,
+    );
+    switch (value) {
+      case 'share':
+        await showAppBottomSheet(
+          context: context,
+          builder: (_) => ShareNoteSheet(noteId: noteId),
+        );
+      case 'hide_completed':
+        await mutationController.setHideCompleted(
+          current: note,
+          value: !note.hideCompleted,
+        );
+      case 'collapse_images':
+        await mutationController.setCollapseImages(
+          current: note,
+          value: !note.collapseImages,
+        );
+    }
+  }
+
+  List<AdaptivePopupMenuItem<String>> _buildItems(bool isIos) {
+    return [
+      if (note.isOwner) _shareItem(isIos),
+      _completedTasksItem(isIos),
+      if (note.isOwner) _collapseImagesItem(isIos),
+    ];
+  }
+
+  AdaptivePopupMenuItem<String> _shareItem(bool isIos) {
+    return AdaptivePopupMenuItem<String>(
+      label: NoteStrings.shareLabel,
+      icon: isIos ? 'square.and.arrow.up' : Icons.share_outlined,
+      value: 'share',
+    );
+  }
+
+  AdaptivePopupMenuItem<String> _completedTasksItem(bool isIos) {
+    return AdaptivePopupMenuItem<String>(
+      label: note.hideCompleted
+          ? NoteStrings.showCompleted
+          : NoteStrings.hideCompleted,
+      icon: isIos
+          ? (note.hideCompleted ? 'eye' : 'eye.slash')
+          : (note.hideCompleted
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined),
+      value: 'hide_completed',
+    );
+  }
+
+  AdaptivePopupMenuItem<String> _collapseImagesItem(bool isIos) {
+    return AdaptivePopupMenuItem<String>(
+      label: note.collapseImages ? 'Expandir imagens' : 'Colapsar imagens',
+      icon: isIos ? 'photo' : Icons.image_outlined,
+      value: 'collapse_images',
+    );
+  }
+
+  void _onSelected(
+    BuildContext context,
+    WidgetRef ref,
+    AdaptivePopupMenuItem<String> entry,
+  ) {
+    final value = entry.value;
+    if (value != null) {
+      _handleSelection(context, ref, value);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isIos = PlatformInfo.isIOS26OrHigher();
+    return AdaptivePopupMenuButton.icon<String>(
+      icon: isIos ? 'ellipsis' : Icons.more_vert,
+      items: _buildItems(isIos),
+      onSelected: (_, entry) => _onSelected(context, ref, entry),
+    );
+  }
+}
+
+class _NoteEditorPreferenceStatus extends ConsumerWidget {
+  const _NoteEditorPreferenceStatus({required this.noteId});
+
+  final String noteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref
+        .watch(notePreferenceMutationControllerProvider(noteId))
+        .status;
+    if (status == NotePreferenceMutationStatus.saving) {
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: Padding(
+          padding: EdgeInsets.all(4),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    if (status == NotePreferenceMutationStatus.error) {
+      return const Icon(Icons.error_outline);
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+class _NoteEditorKeyboardButton extends StatelessWidget {
+  const _NoteEditorKeyboardButton({required this.sessionAsync});
+
+  final AsyncValue<NoteEditorSession> sessionAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    return sessionAsync.when(
+      data: (session) => AnimatedBuilder(
+        animation: session.controller.focusNode,
+        builder: (context, _) {
+          if (!session.controller.focusNode.hasFocus) {
+            return const SizedBox.shrink();
+          }
+          return IconButton(
+            icon: const Icon(Icons.check),
+            onPressed: () {
+              session.controller.focusNode.unfocus();
+              SystemChannels.textInput.invokeMethod('TextInput.hide');
             },
-          ),
-          if (preferenceMutation.status == NotePreferenceMutationStatus.saving)
-            const SizedBox(
-              width: 24,
-              height: 24,
-              child: Padding(
-                padding: EdgeInsets.all(4),
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else if (preferenceMutation.status ==
-              NotePreferenceMutationStatus.error)
-            const Icon(Icons.error_outline),
-          if (!screenIsReadOnly)
-            sessionAsync.when(
-              data: (session) => AnimatedBuilder(
-                animation: session.controller.focusNode,
-                builder: (context, _) {
-                  if (!session.controller.focusNode.hasFocus) {
-                    return const SizedBox.shrink();
-                  }
-                  return IconButton(
-                    icon: const Icon(Icons.check),
-                    onPressed: () {
-                      session.controller.focusNode.unfocus();
-                      SystemChannels.textInput.invokeMethod('TextInput.hide');
-                    },
-                  );
-                },
-              ),
-              loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
-            ),
-        ],
-      ],
+          );
+        },
+      ),
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }
