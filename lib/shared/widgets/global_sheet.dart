@@ -17,9 +17,6 @@ Future<T?> showGlobalSheet<T>({
     context: context,
     isDismissible: true,
     enableDrag: true,
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.5,
-    ),
     contentBackgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
     builder: builder,
   );

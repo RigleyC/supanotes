@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'global_sheet_header.dart';
 
-/// Layout for a Family sheet page: a fixed [GlobalSheetHeader] above a bounded
-/// content slot. The child receives a bounded viewport, so a feature-owned
-/// `ListView` or `CustomScrollView` scrolls below the fixed header.
+/// Layout for a Family sheet page: a fixed [GlobalSheetHeader] above the
+/// feature-owned content.
 class GlobalSheetPage extends StatelessWidget {
   const GlobalSheetPage({super.key, required this.title, required this.child});
 
@@ -13,23 +12,17 @@ class GlobalSheetPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SizedBox(
-          height: constraints.maxHeight,
-          child: Material(
-            type: MaterialType.transparency,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                GlobalSheetHeader(title: title),
-                Expanded(child: child),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
+    return Material(
+      type: MaterialType.transparency,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GlobalSheetHeader(title: title),
+          child,
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 }

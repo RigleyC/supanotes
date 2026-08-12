@@ -137,11 +137,14 @@ void main() {
                   context: context,
                   builder: (_) => GlobalSheetPage(
                     title: 'Página principal',
-                    child: ListView(
-                      children: [
-                        for (var i = 0; i < 100; i++)
-                          SizedBox(height: 60, child: Text('Item $i')),
-                      ],
+                    child: SizedBox(
+                      height: 200,
+                      child: ListView(
+                        children: [
+                          for (var i = 0; i < 100; i++)
+                            SizedBox(height: 60, child: Text('Item $i')),
+                        ],
+                      ),
                     ),
                   ),
                 ),

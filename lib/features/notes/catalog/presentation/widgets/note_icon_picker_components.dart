@@ -34,8 +34,12 @@ class _PickerGridContent extends StatelessWidget {
             children: headerChildren,
           ),
         ),
-        Expanded(
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+          ),
           child: CustomScrollView(
+            shrinkWrap: true,
             slivers: [
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
