@@ -42,7 +42,7 @@ class _TaskMetadataTimePageState extends State<TaskMetadataTimePage> {
 
   @override
   Widget build(BuildContext context) {
-    return GlobalSheetPage(
+    return GlobalSheetScrollablePage(
       title: 'Escolher horário',
       child: SingleChildScrollView(
         child: Column(

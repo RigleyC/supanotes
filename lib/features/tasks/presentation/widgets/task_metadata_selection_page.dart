@@ -30,7 +30,7 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
       FamilyModalSheet.of(context).popPage();
     }
 
-    return GlobalSheetPage(
+    return GlobalSheetScrollablePage(
       title: title,
       child: SingleChildScrollView(
         child: Column(

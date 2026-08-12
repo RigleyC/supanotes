@@ -135,7 +135,7 @@ void main() {
               child: TextButton(
                 onPressed: () => showGlobalSheet<void>(
                   context: context,
-                  builder: (_) => GlobalSheetPage(
+                  builder: (_) => GlobalSheetScrollablePage(
                     title: 'Página principal',
                     child: SizedBox(
                       height: 200,

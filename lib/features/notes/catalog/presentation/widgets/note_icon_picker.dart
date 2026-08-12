@@ -115,7 +115,7 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
     final emojis = _query.isEmpty
         ? UnicodeEmojis.allEmojis
         : UnicodeEmojis.search(_query, limit: 240);
-    return GlobalSheetPage(
+    return GlobalSheetScrollablePage(
       title: 'Escolher emoji',
       child: _PickerGridContent(
         headerChildren: [
@@ -181,7 +181,7 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
       );
     }).toList();
     final scheme = Theme.of(context).colorScheme;
-    return GlobalSheetPage(
+    return GlobalSheetScrollablePage(
       title: 'Escolher ícone',
       child: _PickerGridContent(
         headerChildren: [

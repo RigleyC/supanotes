@@ -42,7 +42,7 @@ class TaskMetadataDatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    return GlobalSheetPage(
+    return GlobalSheetScrollablePage(
       title: 'Escolher data',
       child: SingleChildScrollView(
         child: Column(
