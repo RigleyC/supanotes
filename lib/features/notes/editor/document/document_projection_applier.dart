@@ -146,9 +146,7 @@ class DocumentProjectionApplier {
             final newText = _codec.applyDeltaToText(node.text, ops);
             if (newText != null) {
               final newNode = _createNodeWithUpdatedText(node, newText);
-              _editor.execute([
-                ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
-              ]);
+              _replaceNode(blockId, newNode);
             }
           }
         }
@@ -233,9 +231,7 @@ class DocumentProjectionApplier {
         final meta = payload['metadata'] as Map<String, dynamic>?;
         if (node != null && meta != null) {
           final newNode = _createNodeWithUpdatedMetadata(node, meta);
-          _editor.execute([
-            ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
-          ]);
+          _replaceNode(blockId, newNode);
         }
         break;
       case NoteOperationWireNames.completeTaskOccurrence:
@@ -256,9 +252,7 @@ class DocumentProjectionApplier {
           final newNode = _createNodeWithUpdatedMetadata(node, {
             'completions': currentCompletions,
           });
-          _editor.execute([
-            ReplaceNodeRequest(existingNodeId: targetId, newNode: newNode),
-          ]);
+          _replaceNode(targetId, newNode);
         }
         break;
     }
@@ -298,6 +292,7 @@ class DocumentProjectionApplier {
         id: node.id,
         text: newText,
         isComplete: node.isComplete,
+        indent: node.indent,
         metadata: Map.from(node.metadata),
       );
     } else if (node is ListItemNode) {
@@ -305,16 +300,29 @@ class DocumentProjectionApplier {
         id: node.id,
         itemType: node.type,
         text: newText,
+        indent: node.indent,
         metadata: Map.from(node.metadata),
       );
     } else if (node is ParagraphNode) {
       return ParagraphNode(
         id: node.id,
         text: newText,
+        indent: node.indent,
         metadata: Map.from(node.metadata),
       );
     }
     return ParagraphNode(id: node.id, text: newText);
+  }
+
+  void _replaceNode(String nodeId, DocumentNode newNode) {
+    _editor.execute([
+      ReplaceNodeRequest(existingNodeId: nodeId, newNode: newNode),
+    ]);
+    if (newNode is TaskNode && newNode.indent > 0) {
+      // Super Editor treats a task replacement as a deletion while normalizing
+      // task indentation. Restore the existing level after that reaction.
+      _editor.execute([SetTaskIndentRequest(newNode.id, newNode.indent)]);
+    }
   }
 
   DocumentNode _createNodeWithUpdatedMetadata(
@@ -352,15 +360,28 @@ class DocumentProjectionApplier {
         id: node.id,
         text: node.text,
         isComplete: isComp,
+        indent: meta.containsKey('indent')
+            ? meta['indent'] as int? ?? 0
+            : node.indent,
         metadata: updatedMeta,
       );
     } else if (node is ParagraphNode) {
-      return ParagraphNode(id: node.id, text: node.text, metadata: updatedMeta);
+      return ParagraphNode(
+        id: node.id,
+        text: node.text,
+        indent: meta.containsKey('indent')
+            ? meta['indent'] as int? ?? 0
+            : node.indent,
+        metadata: updatedMeta,
+      );
     } else if (node is ListItemNode) {
       return ListItemNode(
         id: node.id,
         itemType: node.type,
         text: node.text,
+        indent: meta.containsKey('indent')
+            ? meta['indent'] as int? ?? 0
+            : node.indent,
         metadata: updatedMeta,
       );
     }

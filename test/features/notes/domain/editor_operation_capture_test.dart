@@ -571,6 +571,39 @@ void main() {
       expect(operation.payload['afterBlockId'], null);
     });
 
+    test('captures task indentation as metadata', () {
+      final doc = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'task-1',
+            text: AttributedText('Nested task'),
+            isComplete: false,
+          ),
+        ],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: MutableDocumentComposer(),
+      );
+      final capturedOps = <OperationRequestData>[];
+      EditorOperationCapture(
+        document: doc,
+        generateOpId: () => 'op-indent',
+        codec: codec,
+        onOperationsCaptured: capturedOps.addAll,
+      ).start();
+
+      editor.execute([const SetTaskIndentRequest('task-1', 2)]);
+
+      final operation = capturedOps.singleWhere(
+        (op) => op.kind == 'set_block_metadata',
+      );
+      expect(
+        (operation.payload['metadata'] as Map<String, dynamic>)['indent'],
+        2,
+      );
+    });
+
     test('captures a move deferred while text is composing', () {
       const composingAttribution = NamedAttribution('composing');
       final composingSpans = AttributedSpans()

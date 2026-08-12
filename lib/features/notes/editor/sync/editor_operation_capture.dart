@@ -100,6 +100,11 @@ class EditorOperationCapture {
     if (node is TaskNode) {
       metadata['isCompleted'] = node.isComplete;
     }
+    if (node is TaskNode && node.indent != 0) {
+      metadata['indent'] = node.indent;
+    } else if (node is ListItemNode && node.indent != 0) {
+      metadata['indent'] = node.indent;
+    }
 
     return _BlockMirror(
       attributedText: node is TextNode ? node.text : AttributedText(),
