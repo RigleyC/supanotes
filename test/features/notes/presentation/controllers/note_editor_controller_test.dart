@@ -95,10 +95,47 @@ void main() {
       expect(result?.scheduledAt, expectedScheduledAt);
       expect(result?.nextDue, expectedNextDue);
       final task = controller.document.getNodeById('task-1')! as TaskNode;
-      expect(task.metadata['dueDate'], expectedNextDue.toIso8601String());
+      expect(task.metadata['dueDate'], '2026-07-01T09:00:00.000');
       expect(
         (task.metadata['completions'] as Map).keys,
         contains(expectedScheduledAt.toUtc().toIso8601String()),
+      );
+      await controller.dispose();
+    },
+  );
+
+  test(
+    'early recurring completion keeps the anchor and advances by history',
+    () async {
+      final controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+        nodes: [
+          TaskNode(
+            id: 'task-1',
+            text: AttributedText('Weekly task'),
+            isComplete: false,
+            metadata: {
+              'dueDate': '2026-08-12T09:00:00.000',
+              'hasTime': true,
+              'recurrenceRule': 'weekly',
+            },
+          ),
+        ],
+      );
+
+      final result = controller.completeTaskInEditor(
+        'task-1',
+        now: DateTime(2026, 8, 10, 14),
+      );
+
+      expect(result?.scheduledAt, DateTime(2026, 8, 12, 9));
+      expect(result?.nextDue, DateTime(2026, 8, 19, 9));
+      final task = controller.document.getNodeById('task-1')! as TaskNode;
+      expect(task.metadata['dueDate'], '2026-08-12T09:00:00.000');
+      expect(
+        (task.metadata['completions'] as Map).values,
+        contains(DateTime(2026, 8, 10, 14).toUtc().toIso8601String()),
       );
       await controller.dispose();
     },

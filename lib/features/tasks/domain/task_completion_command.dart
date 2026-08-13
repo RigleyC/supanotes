@@ -5,8 +5,14 @@ class TaskSnapshot {
   final DateTime? dueDate;
   final bool hasTime;
   final TaskRecurrence? recurrence;
+  final Map<DateTime, DateTime> completions;
 
-  const TaskSnapshot({this.dueDate, this.hasTime = false, this.recurrence});
+  const TaskSnapshot({
+    this.dueDate,
+    this.hasTime = false,
+    this.recurrence,
+    this.completions = const {},
+  });
 }
 
 class TaskCompletionResult {
@@ -36,6 +42,7 @@ class TaskCompletionCommand {
       dueDate: task.dueDate,
       hasTime: task.hasTime,
       recurrence: task.recurrence,
+      completedAtByScheduledAt: task.completions,
       scheduledAt: scheduledAt,
     );
     return TaskCompletionResult(

@@ -61,13 +61,12 @@ class TaskOccurrencePolicy {
     required TaskRecurrence? recurrence,
     required bool hasTime,
   }) {
-    if (anchor == null || recurrence == null) return anchor;
-    return _currentScheduledAt(
+    return resolveCurrent(
+      taskId: '',
       anchor: anchor,
       recurrence: recurrence,
       hasTime: hasTime,
-      now: _now(),
-    );
+    )?.scheduledAt;
   }
 
   /// Builds the current occurrence with its derived status.
@@ -76,26 +75,38 @@ class TaskOccurrencePolicy {
     required DateTime? anchor,
     required TaskRecurrence? recurrence,
     required bool hasTime,
-    required Set<DateTime> completedScheduledAts,
+    Map<DateTime, DateTime> completedAtByScheduledAt = const {},
   }) {
     if (anchor == null) return null;
     final effectiveNow = _now();
-    final currentDate = recurrence == null
-        ? anchor
-        : _currentScheduledAt(
-            anchor: anchor,
-            recurrence: recurrence,
-            hasTime: hasTime,
-            now: effectiveNow,
-          );
+    if (recurrence == null) {
+      final completedAt = _findCompletion(anchor, completedAtByScheduledAt);
+      return TaskOccurrence(
+        taskId: taskId,
+        scheduledAt: anchor,
+        status: completedAt != null
+            ? OccurrenceStatus.completed
+            : _isOverdue(anchor, effectiveNow, hasTime)
+            ? OccurrenceStatus.overdue
+            : OccurrenceStatus.pending,
+        completedAt: completedAt,
+      );
+    }
 
-    final completedAt = _findCompletion(currentDate, completedScheduledAts);
+    final occurrence = _resolveRecurringOccurrence(
+      anchor: anchor,
+      recurrence: recurrence,
+      hasTime: hasTime,
+      now: effectiveNow,
+      completedAtByScheduledAt: completedAtByScheduledAt,
+    );
+    final completedAt = occurrence.completedAt;
     return TaskOccurrence(
       taskId: taskId,
-      scheduledAt: currentDate,
+      scheduledAt: occurrence.scheduledAt,
       status: completedAt != null
           ? OccurrenceStatus.completed
-          : _isOverdue(currentDate, effectiveNow, hasTime)
+          : _isOverdue(occurrence.scheduledAt, effectiveNow, hasTime)
           ? OccurrenceStatus.overdue
           : OccurrenceStatus.pending,
       completedAt: completedAt,
@@ -107,6 +118,7 @@ class TaskOccurrencePolicy {
     required DateTime? dueDate,
     required bool hasTime,
     required TaskRecurrence? recurrence,
+    Map<DateTime, DateTime> completedAtByScheduledAt = const {},
     DateTime? scheduledAt,
   }) {
     final now = _now();
@@ -126,12 +138,13 @@ class TaskOccurrencePolicy {
         scheduledAt ??
         (dueDate == null
             ? DateTime(now.year, now.month, now.day)
-            : _currentScheduledAt(
+            : resolveCurrent(
+                taskId: '',
                 anchor: dueDate,
                 recurrence: recurrence,
                 hasTime: hasTime,
-                now: now,
-              ));
+                completedAtByScheduledAt: completedAtByScheduledAt,
+              )!.scheduledAt);
     return TaskOccurrenceTransition(
       completed: false,
       nextDue: nextDueDate(from: occurrenceDate, recurrence: recurrence),
@@ -144,18 +157,60 @@ class TaskOccurrencePolicy {
 
   DateTime _now() => clock?.call() ?? DateTime.now();
 
-  DateTime _currentScheduledAt({
+  TaskOccurrence _resolveRecurringOccurrence({
     required DateTime anchor,
     required TaskRecurrence recurrence,
     required bool hasTime,
     required DateTime now,
+    required Map<DateTime, DateTime> completedAtByScheduledAt,
   }) {
-    return advanceRecurringDueDate(
-      from: anchor,
-      recurrence: recurrence,
-      hasTime: hasTime,
-      now: now,
+    var scheduledAt = anchor;
+    DateTime? latestStartedUncompleted;
+
+    for (var i = 0; i < 10000; i++) {
+      final completedAt = _findCompletion(
+        scheduledAt,
+        completedAtByScheduledAt,
+      );
+      final hasStarted = _hasStarted(scheduledAt, now, hasTime);
+
+      if (completedAt == null && !hasStarted) {
+        return TaskOccurrence(
+          taskId: '',
+          scheduledAt: latestStartedUncompleted ?? scheduledAt,
+          status: OccurrenceStatus.pending,
+        );
+      }
+
+      if (hasStarted) {
+        // Only the latest occurrence that has started can be active. Earlier
+        // uncompleted occurrences remain history once a newer occurrence
+        // starts.
+        latestStartedUncompleted = completedAt == null ? scheduledAt : null;
+      }
+
+      final next = nextDueDate(from: scheduledAt, recurrence: recurrence);
+      if (next == null || next.isAtSameMomentAs(scheduledAt)) break;
+      scheduledAt = next;
+    }
+
+    final result = latestStartedUncompleted ?? scheduledAt;
+    return TaskOccurrence(
+      taskId: '',
+      scheduledAt: result,
+      status: OccurrenceStatus.pending,
     );
+  }
+
+  bool _hasStarted(DateTime scheduledAt, DateTime now, bool hasTime) {
+    if (hasTime) return !scheduledAt.isAfter(now);
+    final scheduledDay = DateTime(
+      scheduledAt.year,
+      scheduledAt.month,
+      scheduledAt.day,
+    );
+    final today = DateTime(now.year, now.month, now.day);
+    return !scheduledDay.isAfter(today);
   }
 }
 
@@ -175,7 +230,9 @@ List<TaskOccurrence> buildOccurrences({
     anchor: anchor,
     recurrence: recurrence,
     hasTime: hasTime,
-    completedScheduledAts: completedScheduledAts,
+    completedAtByScheduledAt: {
+      for (final scheduledAt in completedScheduledAts) scheduledAt: scheduledAt,
+    },
   );
   return occurrence == null ? [] : [occurrence];
 }
@@ -187,14 +244,18 @@ DateTime nextOccurrenceDate({
   return nextDueDate(from: from, recurrence: recurrence)!;
 }
 
-DateTime? _findCompletion(DateTime date, Set<DateTime> completedDates) {
-  for (final d in completedDates) {
+DateTime? _findCompletion(
+  DateTime date,
+  Map<DateTime, DateTime> completedAtByScheduledAt,
+) {
+  for (final entry in completedAtByScheduledAt.entries) {
+    final d = entry.key;
     if (d.year == date.year &&
         d.month == date.month &&
         d.day == date.day &&
         d.hour == date.hour &&
         d.minute == date.minute) {
-      return d;
+      return entry.value;
     }
   }
   return null;

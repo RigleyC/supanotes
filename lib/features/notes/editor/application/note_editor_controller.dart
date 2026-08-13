@@ -75,13 +75,12 @@ class NoteEditorController extends ChangeNotifier {
     if (node is TaskNode) {
       final dueDateStr = node.metadata['dueDate'] as String?;
       final hasTime = node.metadata['hasTime'] as bool? ?? false;
-      final recurrenceStr =
-          node.metadata['recurrenceRule'] as String? ??
-          node.metadata['recurrence'] as String?;
+      final recurrenceStr = node.metadata['recurrenceRule'] as String?;
       final snapshot = TaskSnapshot(
         dueDate: dueDateStr != null ? DateTime.tryParse(dueDateStr) : null,
         hasTime: hasTime,
         recurrence: TaskRecurrence.parse(recurrenceStr),
+        completions: _readCompletions(node.metadata['completions']),
       );
       final effectiveNow = now ?? DateTime.now();
       final result = TaskCompletionCommand(
@@ -96,9 +95,6 @@ class NoteEditorController extends ChangeNotifier {
         updatedMeta.remove('dueDate');
       } else {
         isCompleted = false;
-        if (result.nextDue != null) {
-          updatedMeta['dueDate'] = result.nextDue!.toIso8601String();
-        }
         if (result.scheduledAt != null) {
           final completions = Map<String, dynamic>.from(
             updatedMeta['completions'] as Map? ?? {},
@@ -132,7 +128,7 @@ class NoteEditorController extends ChangeNotifier {
     final node = document.getNodeById(nodeId);
     if (node is TaskNode) {
       final updatedMeta = Map<String, dynamic>.from(node.metadata);
-      if (previousDue != null) {
+      if (scheduledAt == null && previousDue != null) {
         updatedMeta['dueDate'] = previousDue.toIso8601String();
       }
       if (scheduledAt != null) {
@@ -167,6 +163,20 @@ class NoteEditorController extends ChangeNotifier {
     final node = document.getNodeById(nodeId);
     if (node is TaskNode) {
       final updatedMeta = Map<String, dynamic>.from(node.metadata);
+      final previousDueDate = DateTime.tryParse(
+        node.metadata['dueDate'] as String? ?? '',
+      );
+      final previousRecurrence = node.metadata['recurrenceRule'] as String?;
+      final previousHasTime = node.metadata['hasTime'] as bool? ?? false;
+      final nextDueDate = clearDueDate ? null : dueDate ?? previousDueDate;
+      final nextRecurrence = clearRecurrence
+          ? null
+          : recurrence ?? previousRecurrence;
+      final nextHasTime = hasTime ?? previousHasTime;
+      final scheduleChanged =
+          nextDueDate != previousDueDate ||
+          nextRecurrence != previousRecurrence ||
+          nextHasTime != previousHasTime;
       if (clearDueDate) {
         updatedMeta.remove('dueDate');
         updatedMeta.remove('hasTime');
@@ -175,10 +185,8 @@ class NoteEditorController extends ChangeNotifier {
       }
       if (clearRecurrence) {
         updatedMeta.remove('recurrenceRule');
-        updatedMeta.remove('recurrence');
       } else if (recurrence != null) {
         updatedMeta['recurrenceRule'] = recurrence;
-        updatedMeta['recurrence'] = recurrence;
       }
       if (hasTime != null) {
         updatedMeta['hasTime'] = hasTime;
@@ -188,12 +196,27 @@ class NoteEditorController extends ChangeNotifier {
       } else if (reminder != null) {
         updatedMeta['reminder'] = reminder;
       }
+      if (scheduleChanged) updatedMeta.remove('completions');
 
       final updatedNode = node.copyTaskWith(metadata: updatedMeta);
       editor.execute([
         ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
       ]);
     }
+  }
+
+  Map<DateTime, DateTime> _readCompletions(Object? value) {
+    if (value is! Map) return const {};
+    final result = <DateTime, DateTime>{};
+    for (final entry in value.entries) {
+      if (entry.key is! String || entry.value is! String) continue;
+      final scheduledAt = DateTime.tryParse(entry.key as String);
+      final completedAt = DateTime.tryParse(entry.value as String);
+      if (scheduledAt != null && completedAt != null) {
+        result[scheduledAt] = completedAt;
+      }
+    }
+    return result;
   }
 
   void _setupEditor() {
