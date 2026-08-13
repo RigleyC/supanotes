@@ -149,6 +149,44 @@ void main() {
     expect(task.indent, 2);
   });
 
+  test('preserves task metadata when changing a block type to task', () {
+    final document = MutableDocument(
+      nodes: [
+        ParagraphNode(
+          id: 'task-1',
+          text: AttributedText('Review task'),
+          metadata: const {
+            'dueDate': '2099-01-02T10:00:00.000Z',
+            'hasTime': true,
+            'recurrenceRule': 'weekly',
+            'reminder': 'at_time',
+          },
+        ),
+      ],
+    );
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: MutableDocumentComposer(),
+    );
+    final applier = DocumentProjectionApplier(
+      document: document,
+      editor: editor,
+      codec: const NoteDocumentCodec(),
+    );
+
+    applier.applyOperationPayload(
+      kind: NoteOperationWireNames.setBlockType,
+      blockId: 'task-1',
+      payload: const {'type': 'task'},
+    );
+
+    final task = document.getNodeById('task-1')! as TaskNode;
+    expect(task.metadata['dueDate'], '2099-01-02T10:00:00.000Z');
+    expect(task.metadata['hasTime'], true);
+    expect(task.metadata['recurrenceRule'], 'weekly');
+    expect(task.metadata['reminder'], 'at_time');
+  });
+
   test(
     'keeps capture suppressed when rebuilding a malformed snapshot fails',
     () async {

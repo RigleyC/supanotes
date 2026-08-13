@@ -313,6 +313,40 @@ void main() {
   });
 
   group('convertToTask', () {
+    test('preserves paragraph metadata when converting to task', () {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(
+            id: 'node-1',
+            text: AttributedText('Task'),
+            metadata: const {
+              'dueDate': '2099-01-02T10:00:00.000Z',
+              'hasTime': true,
+              'recurrenceRule': 'weekly',
+              'reminder': 'at_time',
+            },
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: caretSelection('node-1'),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      NoteEditorCommands.convertToTask(editor, composer);
+
+      final task = document.first as TaskNode;
+      expect(task.metadata['dueDate'], '2099-01-02T10:00:00.000Z');
+      expect(task.metadata['hasTime'], true);
+      expect(task.metadata['recurrenceRule'], 'weekly');
+      expect(task.metadata['reminder'], 'at_time');
+    });
+  });
+
+  group('convertToTask', () {
     test('converts paragraph to task', () {
       final document = MutableDocument(
         nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Buy milk'))],
@@ -453,5 +487,4 @@ void main() {
       expect(item.indent, 1);
     });
   });
-
 }

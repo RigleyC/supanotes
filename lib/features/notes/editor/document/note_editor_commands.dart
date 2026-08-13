@@ -172,10 +172,31 @@ class NoteEditorCommands {
     final requests = <EditRequest>[];
     for (final node in nodes) {
       if (node is ParagraphNode) {
-        requests.add(ConvertParagraphToTaskRequest(nodeId: node.id));
+        requests.add(
+          ReplaceNodeRequest(
+            existingNodeId: node.id,
+            newNode: TaskNode(
+              id: node.id,
+              text: node.text,
+              isComplete: false,
+              indent: node.indent,
+              metadata: Map<String, dynamic>.from(node.metadata),
+            ),
+          ),
+        );
       } else if (node is ListItemNode) {
-        requests.add(ConvertListItemToParagraphRequest(nodeId: node.id));
-        requests.add(ConvertParagraphToTaskRequest(nodeId: node.id));
+        requests.add(
+          ReplaceNodeRequest(
+            existingNodeId: node.id,
+            newNode: TaskNode(
+              id: node.id,
+              text: node.text,
+              isComplete: false,
+              indent: node.indent,
+              metadata: Map<String, dynamic>.from(node.metadata),
+            ),
+          ),
+        );
       } else if (node is TaskNode) {
         if (shouldClear) {
           requests.add(ConvertTaskToParagraphRequest(nodeId: node.id));
