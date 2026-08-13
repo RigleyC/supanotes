@@ -56,4 +56,57 @@ void main() {
 
     expect(const NoteTaskReader().read(document), hasLength(1));
   });
+
+  test('reads tasks from a persisted snapshot with leaked text mutations', () {
+    final document = jsonEncode({
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': 'task-1',
+          'type': 'task',
+          'delta': [
+            {'insert': 'Persisted task'},
+            {'delete': 14},
+          ],
+          'metadata': {
+            'dueDate': '2099-01-02T10:00:00.000Z',
+            'hasTime': true,
+            'isCompleted': false,
+          },
+        },
+      ],
+    });
+
+    final entries = const NoteTaskReader().read(document);
+
+    expect(entries, hasLength(1));
+    expect(entries.single.title, 'Persisted task');
+  });
+
+  test('reads tasks from a persisted snapshot with empty delta operations', () {
+    final document = jsonEncode({
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': 'heading-1',
+          'type': 'header1',
+          'delta': [{}],
+        },
+        {
+          'id': 'task-1',
+          'type': 'task',
+          'delta': [
+            {'insert': 'Persisted task'},
+          ],
+          'metadata': {
+            'dueDate': '2099-01-02T10:00:00.000Z',
+            'hasTime': true,
+            'isCompleted': false,
+          },
+        },
+      ],
+    });
+
+    expect(const NoteTaskReader().read(document), hasLength(1));
+  });
 }

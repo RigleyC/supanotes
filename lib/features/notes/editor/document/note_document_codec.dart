@@ -92,7 +92,11 @@ class NoteDocumentCodec {
     'rich_link',
   };
 
-  NoteDocumentSnapshot parseSnapshot(Map<String, dynamic> json) {
+  NoteDocumentSnapshot parseSnapshot(
+    Map<String, dynamic> json, {
+    bool allowEmptyDeltaOperations = false,
+    bool allowMutationDeltaOperations = false,
+  }) {
     if (json['schemaVersion'] != 1) {
       throw const FormatException(
         'Note document has an unsupported schema version',
@@ -111,7 +115,11 @@ class NoteDocumentCodec {
               'Note document contains an invalid block',
             );
           }
-          final block = _parseBlock(Map<String, dynamic>.from(rawBlock));
+          final block = _parseBlock(
+            Map<String, dynamic>.from(rawBlock),
+            allowEmptyDeltaOperations: allowEmptyDeltaOperations,
+            allowMutationDeltaOperations: allowMutationDeltaOperations,
+          );
           if (!ids.add(block.id)) {
             throw const FormatException(
               'Note document contains duplicate block ids',
