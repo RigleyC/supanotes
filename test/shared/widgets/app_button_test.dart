@@ -2,7 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 
+import '../../helpers/haptic_test_helper.dart';
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late HapticTestRecorder recorder;
+
+  setUp(() {
+    recorder = HapticTestRecorder();
+    recorder.install();
+  });
+
+  tearDown(() {
+    recorder.dispose();
+  });
+
   group('AppButton Widget Tests', () {
     testWidgets('renders AppButtonVariant.fab with icon and no text required', (
       tester,
@@ -70,6 +85,38 @@ void main() {
       final scheme = ThemeData.dark().colorScheme;
       expect(fab.backgroundColor, scheme.primary);
       expect(fab.foregroundColor, scheme.onPrimary);
+    });
+
+    testWidgets('emits light impact when an enabled primary button is tapped', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(text: 'Salvar', onPressed: () {}),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Salvar'));
+      await tester.pump();
+
+      expect(recorder.saw('HapticFeedbackType.lightImpact'), isTrue);
+    });
+
+    testWidgets('emits no haptic when isLoading is true', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(text: 'Salvar', isLoading: true, onPressed: () {}),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(AppButton));
+      await tester.pump();
+
+      expect(recorder.saw('HapticFeedbackType.lightImpact'), isFalse);
     });
   });
 }

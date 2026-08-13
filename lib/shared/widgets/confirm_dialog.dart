@@ -9,7 +9,7 @@ library;
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
-
+import 'package:supanotes/core/utils/app_haptics.dart';
 
 /// Strings displayed inside the confirm dialog.
 ///
@@ -43,12 +43,20 @@ Future<bool> showConfirmDialog({
       AlertAction(
         title: cancelLabel,
         style: AlertActionStyle.cancel,
-        onPressed: () => confirmed = false,
+        onPressed: () {
+          AppHaptics.controlTap();
+          confirmed = false;
+        },
       ),
       AlertAction(
         title: confirmLabel,
-        style: destructive ? AlertActionStyle.destructive : AlertActionStyle.primary,
-        onPressed: () => confirmed = true,
+        style: destructive
+            ? AlertActionStyle.destructive
+            : AlertActionStyle.primary,
+        onPressed: () {
+          AppHaptics.controlTap();
+          confirmed = true;
+        },
       ),
     ],
   );

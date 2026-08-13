@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 
 /// A full-width, tappable tile for list-based single-selection UIs.
 ///
@@ -27,11 +28,19 @@ class AppSelectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final callback = onTap == null
+        ? null
+        : () {
+            if (!isSelected) {
+              AppHaptics.selectionChange();
+            }
+            onTap!();
+          };
 
     return ListTile(
       dense: true,
       selected: isSelected,
-      onTap: onTap,
+      onTap: callback,
       leading:
           leading ??
           (icon != null

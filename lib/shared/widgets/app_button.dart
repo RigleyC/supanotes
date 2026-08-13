@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 
 enum AppButtonVariant { primary, secondary, tonal, danger, text, fab }
 
@@ -121,7 +122,12 @@ class _AppButtonControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const size = Size(0, 48);
-    final callback = isLoading ? null : onPressed;
+    final callback = isLoading || onPressed == null
+        ? null
+        : () {
+            AppHaptics.controlTap();
+            onPressed!();
+          };
     return switch (variant) {
       AppButtonVariant.primary => FilledButton(
         onPressed: callback,
