@@ -131,6 +131,7 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     required super.nodeId,
     required super.createdAt,
     required super.padding,
+    super.opacity = 1.0,
     required super.indent,
     required super.isComplete,
     required super.setComplete,
@@ -147,6 +148,30 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
   final TaskMetadataDraft taskMetadata;
+
+  @override
+  CustomTaskComponentViewModel copy() {
+    return super.internalCopy(
+          CustomTaskComponentViewModel(
+            nodeId: nodeId,
+            createdAt: createdAt,
+            padding: padding,
+            text: text.copy(),
+            textStyleBuilder: textStyleBuilder,
+            opacity: opacity,
+            selectionColor: selectionColor,
+            indent: indent,
+            isComplete: isComplete,
+            setComplete: setComplete,
+            textDirection: textDirection,
+            textAlignment: textAlignment,
+            dueDate: dueDate,
+            recurrence: recurrence,
+            taskMetadata: taskMetadata,
+          ),
+        )
+        as CustomTaskComponentViewModel;
+  }
 
   @override
   bool operator ==(Object other) {
