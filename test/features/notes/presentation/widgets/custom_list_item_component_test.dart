@@ -117,4 +117,40 @@ void main() {
     final secondX = tester.getTopLeft(checkboxes.at(1)).dx;
     expect(secondX - firstX, closeTo(43.2, 0.001));
   });
+
+  testWidgets(
+    'starts the root checkbox at the block edge with an 8px text gap',
+    (tester) async {
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'task-1',
+            text: AttributedText('Task'),
+            isComplete: false,
+          ),
+        ],
+      );
+      final editor = createDefaultDocumentEditor(document: document);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SuperEditor(
+              editor: editor,
+              componentBuilders: [CustomTaskComponentBuilder()],
+            ),
+          ),
+        ),
+      );
+
+      final componentX = tester.getTopLeft(find.byType(CustomTaskComponent)).dx;
+      final checkbox = find.byType(AppTaskCheckbox);
+      final checkboxBox = tester.getTopLeft(checkbox);
+      final textBox = tester.getTopLeft(find.byType(TextComponent));
+
+      expect(checkboxBox.dx, closeTo(componentX, 0.001));
+      expect(tester.getSize(checkbox).width, 20);
+      expect(textBox.dx - checkboxBox.dx, 28);
+    },
+  );
 }

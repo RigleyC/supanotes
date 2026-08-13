@@ -12,8 +12,9 @@ import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
-const double _taskCheckboxSize = 22.0;
+const double _taskCheckboxSize = 20.0;
 const double _taskCheckboxFallbackTopInset = 2.0;
+const double _taskCheckboxTextGap = 8.0;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
@@ -334,6 +335,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final checkboxTopInset = textStyle.height == null
         ? _taskCheckboxFallbackTopInset
         : (textLineHeight - _taskCheckboxSize) / 2;
+    const checkboxMarkerWidth = _taskCheckboxSize + _taskCheckboxTextGap;
     final indentUnit = noteEditorIndentUnit(textStyle);
     final levelOffset = indentUnit * widget.viewModel.indent;
 
@@ -347,7 +349,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
           children: [
             SizedBox(width: levelOffset),
             SizedBox(
-              width: indentUnit,
+              width: checkboxMarkerWidth,
               child: Semantics(
                 button: true,
                 checked: _isComplete,
@@ -366,8 +368,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
-                      padding: EdgeInsets.only(left: 11, top: checkboxTopInset),
+                      padding: EdgeInsets.only(top: checkboxTopInset),
                       child: AppTaskCheckbox(
+                        size: 20,
                         value: _isComplete,
                         accentColor: taskColor,
                         inactiveColor: colorScheme.outline,
