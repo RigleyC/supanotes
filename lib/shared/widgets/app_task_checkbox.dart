@@ -93,7 +93,7 @@ class _AppTaskCheckboxState extends State<AppTaskCheckbox>
                     ? BoxShape.circle
                     : BoxShape.rectangle,
                 borderRadius: widget.shape == AppTaskCheckboxShape.rounded
-                    ? BorderRadius.circular(8)
+                    ? BorderRadius.circular(6)
                     : null,
                 border: Border.all(color: border, width: 2),
               ),

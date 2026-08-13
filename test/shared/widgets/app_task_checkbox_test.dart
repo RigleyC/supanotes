@@ -6,11 +6,7 @@ void main() {
   group('AppTaskCheckbox', () {
     testWidgets('renders outlined circle when value=false', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: AppTaskCheckbox(value: false),
-          ),
-        ),
+        MaterialApp(home: Scaffold(body: AppTaskCheckbox(value: false))),
       );
 
       final container = tester.widget<Container>(
@@ -70,26 +66,24 @@ void main() {
         ),
       );
       final decoration = container.decoration as BoxDecoration;
-      expect(decoration.borderRadius, BorderRadius.circular(8));
+      expect(decoration.borderRadius, BorderRadius.circular(6));
     });
 
-    testWidgets('is purely visual: tapping it does nothing (no gesture detector)',
-        (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: AppTaskCheckbox(value: false),
+    testWidgets(
+      'is purely visual: tapping it does nothing (no gesture detector)',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: AppTaskCheckbox(value: false))),
+        );
+
+        expect(
+          find.ancestor(
+            of: find.byType(AppTaskCheckbox),
+            matching: find.byType(GestureDetector),
           ),
-        ),
-      );
-
-      expect(
-        find.ancestor(
-          of: find.byType(AppTaskCheckbox),
-          matching: find.byType(GestureDetector),
-        ),
-        findsNothing,
-      );
-    });
+          findsNothing,
+        );
+      },
+    );
   });
 }
