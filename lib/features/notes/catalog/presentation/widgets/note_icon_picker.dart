@@ -61,6 +61,7 @@ class NoteIconPickerRootPage extends StatelessWidget {
               label: 'Usar emoji',
               onTap: () => FamilyModalSheet.of(context).pushPage(
                 NoteEmojiPickerPage(
+                  current: note.noteIcon,
                   onSelected: (icon) => _select(context, icon),
                 ),
               ),
@@ -91,8 +92,13 @@ class NoteIconPickerRootPage extends StatelessWidget {
 }
 
 class NoteEmojiPickerPage extends StatefulWidget {
-  const NoteEmojiPickerPage({super.key, required this.onSelected});
+  const NoteEmojiPickerPage({
+    super.key,
+    this.current,
+    required this.onSelected,
+  });
 
+  final NoteIcon? current;
   final Future<void> Function(NoteIcon icon) onSelected;
 
   @override
@@ -134,6 +140,10 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () {
+                final selected =
+                    widget.current?.isEmoji == true &&
+                    widget.current!.value == emoji.emoji;
+                if (selected) return;
                 AppHaptics.selectionChange();
                 widget.onSelected(NoteIcon.emoji(emoji.emoji));
               },
@@ -247,6 +257,11 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () {
+                final selected =
+                    widget.current?.isEmoji == false &&
+                    widget.current!.value == entry.key &&
+                    widget.current!.colorKey == _colorKey;
+                if (selected) return;
                 AppHaptics.selectionChange();
                 widget.onSelected(
                   NoteIcon.catalog(id: entry.key, colorKey: _colorKey),

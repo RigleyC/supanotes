@@ -21,12 +21,12 @@ void main() {
   test('sends light impact for a control tap', () async {
     await AppHaptics.controlTap();
 
-    expect(recorder.saw('HapticFeedbackType.lightImpact'), isTrue);
+    expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
   });
 
   test('sends a selection click for a changed selection', () async {
     await AppHaptics.selectionChange();
 
-    expect(recorder.saw('HapticFeedbackType.selectionClick'), isTrue);
+    expect(recorder.count('HapticFeedbackType.selectionClick'), 1);
   });
 }

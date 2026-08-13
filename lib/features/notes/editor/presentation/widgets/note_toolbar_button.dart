@@ -3,6 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:motor/motor.dart';
 
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
+
+enum ToolbarHaptic { none, controlTap, selectionChange }
 
 class ToolbarButton extends StatefulWidget {
   const ToolbarButton({
@@ -11,6 +14,7 @@ class ToolbarButton extends StatefulWidget {
     this.svgAsset,
     this.semanticLabel,
     this.spacious = false,
+    this.haptic = ToolbarHaptic.none,
     required this.isActive,
     this.onPressed,
   }) : assert(
@@ -22,6 +26,7 @@ class ToolbarButton extends StatefulWidget {
   final String? svgAsset;
   final String? semanticLabel;
   final bool spacious;
+  final ToolbarHaptic haptic;
   final bool isActive;
   final VoidCallback? onPressed;
 
@@ -95,11 +100,26 @@ class _ToolbarButtonState extends State<ToolbarButton>
         svgAsset: widget.svgAsset,
         semanticLabel: widget.semanticLabel,
         spacious: widget.spacious,
-        onPressed: widget.onPressed,
+        onPressed: _onPressed,
         activeProgress: _activeMotion.value.clamp(0.0, 1.0),
         iconProgress: _iconMotion.value.clamp(0.0, 1.0),
       ),
     );
+  }
+
+  VoidCallback? get _onPressed {
+    if (widget.onPressed == null) return null;
+    return () {
+      switch (widget.haptic) {
+        case ToolbarHaptic.none:
+          break;
+        case ToolbarHaptic.controlTap:
+          AppHaptics.controlTap();
+        case ToolbarHaptic.selectionChange:
+          AppHaptics.selectionChange();
+      }
+      widget.onPressed!();
+    };
   }
 }
 

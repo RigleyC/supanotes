@@ -263,7 +263,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: NoteCatalogIconPickerPage(
-              current: NoteIcon.catalog(id: 'wallet', colorKey: 'blue'),
+              current: null,
               onSelected: (icon) async {
                 selectedIcon = icon;
               },
@@ -273,6 +273,8 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.bySemanticsLabel('Cor blue'));
+      await tester.pumpAndSettle();
       recorder.calls.clear();
       await tester.tap(find.bySemanticsLabel('Carteira'));
       await tester.pumpAndSettle();
@@ -289,6 +291,36 @@ void main() {
       );
     },
   );
+
+  testWidgets('tapping the current catalog icon emits no selection haptic', (
+    tester,
+  ) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NoteCatalogIconPickerPage(
+            current: NoteIcon.catalog(id: 'wallet', colorKey: 'blue'),
+            onSelected: (_) async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    recorder.calls.clear();
+    await tester.tap(find.bySemanticsLabel('Carteira'));
+    await tester.pumpAndSettle();
+
+    expect(
+      recorder.calls.where(
+        (call) => call.arguments == 'HapticFeedbackType.selectionClick',
+      ),
+      isEmpty,
+    );
+  });
 }
 
 NoteModel _buildNote() {

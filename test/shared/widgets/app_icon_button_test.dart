@@ -38,7 +38,7 @@ void main() {
     await tester.pump();
 
     expect(pressedCount, 1);
-    expect(recorder.saw('HapticFeedbackType.lightImpact'), isTrue);
+    expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
   });
 
   testWidgets('emits no haptic when its callback is disabled', (tester) async {
@@ -53,6 +53,6 @@ void main() {
     await tester.tap(find.byType(AppIconButton));
     await tester.pump();
 
-    expect(recorder.saw('HapticFeedbackType.lightImpact'), isFalse);
+    expect(recorder.count('HapticFeedbackType.lightImpact'), 0);
   });
 }

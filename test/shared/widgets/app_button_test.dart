@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motor/motor.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 
 import '../../helpers/haptic_test_helper.dart';
@@ -101,10 +102,10 @@ void main() {
       );
 
       await tester.tap(find.text('Salvar'));
-      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(pressedCount, 1);
-      expect(recorder.saw('HapticFeedbackType.lightImpact'), isTrue);
+      expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
     });
 
     testWidgets('emits no haptic when isLoading is true', (tester) async {
@@ -119,7 +120,30 @@ void main() {
       await tester.tap(find.byType(AppButton));
       await tester.pump();
 
-      expect(recorder.saw('HapticFeedbackType.lightImpact'), isFalse);
+      expect(recorder.count('HapticFeedbackType.lightImpact'), 0);
+    });
+
+    testWidgets('animates the button while it is pressed', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(text: 'Salvar', onPressed: () {}),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('Salvar')),
+      );
+      await tester.pump(const Duration(seconds: 1));
+
+      final motion = tester.widget<SingleMotionBuilder>(
+        find.byType(SingleMotionBuilder),
+      );
+      expect(motion.value, lessThan(1));
+
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
     });
   });
 }

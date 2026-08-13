@@ -65,6 +65,7 @@ class _FormattingToolbarPanel extends StatelessWidget {
                       icon: Icons.close,
                       spacious: true,
                       isActive: false,
+                      haptic: ToolbarHaptic.controlTap,
                       onPressed: onClose,
                     ),
                   ),
@@ -96,12 +97,14 @@ class _FormattingToolbarPanel extends StatelessWidget {
                     ToolbarButton(
                       icon: Icons.format_indent_increase,
                       isActive: false,
+                      haptic: ToolbarHaptic.selectionChange,
                       onPressed: onIndent,
                       semanticLabel: 'Aumentar recuo',
                     ),
                     ToolbarButton(
                       icon: Icons.format_indent_decrease,
                       isActive: false,
+                      haptic: ToolbarHaptic.selectionChange,
                       onPressed: onUnindent,
                       semanticLabel: 'Diminuir recuo',
                     ),
@@ -146,28 +149,40 @@ class _FormattingMenu extends StatelessWidget {
             svgAsset: 'assets/icons/h1_icon.svg',
             spacious: true,
             isActive: blockType == header1Attribution,
-            onPressed: () => onBlockType(header1Attribution),
+            haptic: ToolbarHaptic.selectionChange,
+            onPressed: blockType == header1Attribution
+                ? null
+                : () => onBlockType(header1Attribution),
             semanticLabel: 'Título 1',
           ),
           ToolbarButton(
             svgAsset: 'assets/icons/h2_icon.svg',
             spacious: true,
             isActive: blockType == header2Attribution,
-            onPressed: () => onBlockType(header2Attribution),
+            haptic: ToolbarHaptic.selectionChange,
+            onPressed: blockType == header2Attribution
+                ? null
+                : () => onBlockType(header2Attribution),
             semanticLabel: 'Título 2',
           ),
           ToolbarButton(
             svgAsset: 'assets/icons/h3_icon.svg',
             spacious: true,
             isActive: blockType == header3Attribution,
-            onPressed: () => onBlockType(header3Attribution),
+            haptic: ToolbarHaptic.selectionChange,
+            onPressed: blockType == header3Attribution
+                ? null
+                : () => onBlockType(header3Attribution),
             semanticLabel: 'Título 3',
           ),
           ToolbarButton(
             icon: Icons.format_quote,
             spacious: true,
             isActive: blockType == blockquoteAttribution,
-            onPressed: () => onBlockType(blockquoteAttribution),
+            haptic: ToolbarHaptic.selectionChange,
+            onPressed: blockType == blockquoteAttribution
+                ? null
+                : () => onBlockType(blockquoteAttribution),
             semanticLabel: 'Citação',
           ),
           const ToolbarDivider(),
@@ -175,6 +190,7 @@ class _FormattingMenu extends StatelessWidget {
             icon: Icons.format_bold,
             spacious: true,
             isActive: isBold,
+            haptic: ToolbarHaptic.selectionChange,
             onPressed: hasSelection
                 ? () => onToggleInline(boldAttribution)
                 : null,
@@ -184,6 +200,7 @@ class _FormattingMenu extends StatelessWidget {
             icon: Icons.format_italic,
             spacious: true,
             isActive: isItalic,
+            haptic: ToolbarHaptic.selectionChange,
             onPressed: hasSelection
                 ? () => onToggleInline(italicsAttribution)
                 : null,
@@ -193,6 +210,7 @@ class _FormattingMenu extends StatelessWidget {
             icon: Icons.format_strikethrough,
             spacious: true,
             isActive: isStrikethrough,
+            haptic: ToolbarHaptic.selectionChange,
             onPressed: hasSelection
                 ? () => onToggleInline(strikethroughAttribution)
                 : null,
@@ -237,6 +255,7 @@ class _ListFormatMenu extends StatelessWidget {
             icon: Icons.format_list_bulleted,
             spacious: true,
             isActive: activeOption == _ListFormatOption.bulleted,
+            haptic: ToolbarHaptic.selectionChange,
             onPressed: () => onSelected(_ListFormatOption.bulleted),
             semanticLabel: 'Lista com marcadores',
           ),
@@ -244,6 +263,7 @@ class _ListFormatMenu extends StatelessWidget {
             icon: Icons.format_list_numbered,
             spacious: true,
             isActive: activeOption == _ListFormatOption.numbered,
+            haptic: ToolbarHaptic.selectionChange,
             onPressed: () => onSelected(_ListFormatOption.numbered),
             semanticLabel: 'Lista numerada',
           ),
@@ -251,6 +271,7 @@ class _ListFormatMenu extends StatelessWidget {
             svgAsset: 'assets/icons/checkbox.svg',
             spacious: true,
             isActive: activeOption == _ListFormatOption.checklist,
+            haptic: ToolbarHaptic.selectionChange,
             onPressed: () => onSelected(_ListFormatOption.checklist),
             semanticLabel: 'Checklist',
           ),

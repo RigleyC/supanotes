@@ -21,13 +21,15 @@ void main() {
   testWidgets(
     'showConfirmDialog emits a control tap for Cancelar and Confirmar',
     (tester) async {
+      late Future<bool> result;
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: Builder(
               builder: (context) => TextButton(
                 onPressed: () {
-                  showConfirmDialog(
+                  result = showConfirmDialog(
                     context: context,
                     title: 'Excluir nota',
                     message: 'Esta acao nao pode ser desfeita.',
@@ -46,7 +48,8 @@ void main() {
       await tester.tap(find.text(ConfirmDialogStrings.cancel));
       await tester.pumpAndSettle();
 
-      expect(recorder.saw('HapticFeedbackType.lightImpact'), isTrue);
+      expect(await result, isFalse);
+      expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
 
       recorder.calls.clear();
 
@@ -56,7 +59,8 @@ void main() {
       await tester.tap(find.text(ConfirmDialogStrings.confirm));
       await tester.pumpAndSettle();
 
-      expect(recorder.saw('HapticFeedbackType.lightImpact'), isTrue);
+      expect(await result, isTrue);
+      expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
     },
   );
 }

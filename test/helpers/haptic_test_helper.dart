@@ -17,10 +17,15 @@ class HapticTestRecorder {
         .setMockMethodCallHandler(SystemChannels.platform, null);
   }
 
-  bool saw(String argument) {
-    return calls.any(
-      (call) =>
-          call.method == 'HapticFeedback.vibrate' && call.arguments == argument,
-    );
+  int count(String argument) {
+    return calls
+        .where(
+          (call) =>
+              call.method == 'HapticFeedback.vibrate' &&
+              call.arguments == argument,
+        )
+        .length;
   }
+
+  bool saw(String argument) => count(argument) > 0;
 }

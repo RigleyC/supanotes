@@ -1759,7 +1759,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Título 1'));
       await tester.pumpAndSettle();
 
-      expect(recorder.saw('HapticFeedbackType.selectionClick'), isTrue);
+      expect(recorder.count('HapticFeedbackType.selectionClick'), 1);
     });
   });
 }
