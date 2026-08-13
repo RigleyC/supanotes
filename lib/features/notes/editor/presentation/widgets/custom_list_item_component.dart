@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
+const double noteEditorMarkerTextGap = 8.0;
+
 double noteEditorIndentUnit(TextStyle textStyle) {
   return (textStyle.fontSize ?? 16) * 0.60 * 4;
 }
 
-double noteEditorListIndentCalculator(TextStyle textStyle, int indent) {
-  return noteEditorIndentUnit(textStyle) * (indent + 1);
+double noteEditorListIndentCalculator(
+  TextStyle textStyle,
+  int indent,
+  double markerWidth,
+) {
+  return noteEditorIndentUnit(textStyle) * indent +
+      markerWidth +
+      noteEditorMarkerTextGap;
 }
 
 class CustomListItemComponentBuilder extends ListItemComponentBuilder {
@@ -18,6 +26,7 @@ class CustomListItemComponentBuilder extends ListItemComponentBuilder {
     SingleColumnLayoutComponentViewModel componentViewModel,
   ) {
     if (componentViewModel is UnorderedListItemComponentViewModel) {
+      final markerWidth = componentViewModel.dotStyle.size.width;
       return UnorderedListItemComponent(
         componentKey: componentContext.componentKey,
         text: componentViewModel.text,
@@ -25,7 +34,8 @@ class CustomListItemComponentBuilder extends ListItemComponentBuilder {
         indent: componentViewModel.indent,
         dotStyle: componentViewModel.dotStyle,
         dotBuilder: _leftAlignedDotBuilder,
-        indentCalculator: noteEditorListIndentCalculator,
+        indentCalculator: (textStyle, indent) =>
+            noteEditorListIndentCalculator(textStyle, indent, markerWidth),
         textSelection: componentViewModel.selection,
         textDirection: componentViewModel.textDirection,
         textAlignment: componentViewModel.textAlignment,
@@ -39,10 +49,12 @@ class CustomListItemComponentBuilder extends ListItemComponentBuilder {
     }
 
     if (componentViewModel is OrderedListItemComponentViewModel) {
+      final listIndex = componentViewModel.ordinalValue!;
+      final numeralStyle = componentViewModel.numeralStyle;
       return OrderedListItemComponent(
         componentKey: componentContext.componentKey,
         indent: componentViewModel.indent,
-        listIndex: componentViewModel.ordinalValue!,
+        listIndex: listIndex,
         text: componentViewModel.text,
         textDirection: componentViewModel.textDirection,
         textAlignment: componentViewModel.textAlignment,
@@ -50,8 +62,12 @@ class CustomListItemComponentBuilder extends ListItemComponentBuilder {
         overflow: componentViewModel.overflow,
         styleBuilder: componentViewModel.textStyleBuilder,
         numeralBuilder: _leftAlignedNumeralBuilder,
-        numeralStyle: componentViewModel.numeralStyle,
-        indentCalculator: noteEditorListIndentCalculator,
+        numeralStyle: numeralStyle,
+        indentCalculator: (textStyle, indent) => noteEditorListIndentCalculator(
+          textStyle,
+          indent,
+          _orderedListMarkerWidth(textStyle, listIndex, numeralStyle),
+        ),
         textSelection: componentViewModel.selection,
         selectionColor: componentViewModel.selectionColor,
         highlightWhenEmpty: componentViewModel.highlightWhenEmpty,
@@ -71,30 +87,33 @@ Widget _leftAlignedDotBuilder(
   final attributions = component.text.getAllAttributionsAt(0).toSet();
   final textStyle = component.styleBuilder(attributions);
   final dotSize = component.dotStyle?.size ?? const Size(4, 4);
+  final levelOffset = noteEditorIndentUnit(textStyle) * component.indent;
 
   return Align(
     key: const ValueKey('unordered-list-marker'),
     alignment: Alignment.centerLeft,
-    child: Text.rich(
-      TextSpan(
-        text: '\u200C',
-        style: textStyle,
-        children: [
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Container(
-              width: dotSize.width,
-              height: dotSize.height,
-              margin: const EdgeInsets.only(right: 10),
-              decoration: BoxDecoration(
-                shape: component.dotStyle?.shape ?? BoxShape.circle,
-                color: component.dotStyle?.color ?? textStyle.color,
+    child: Padding(
+      padding: EdgeInsets.only(left: levelOffset),
+      child: Text.rich(
+        TextSpan(
+          text: '\u200C',
+          style: textStyle,
+          children: [
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Container(
+                width: dotSize.width,
+                height: dotSize.height,
+                decoration: BoxDecoration(
+                  shape: component.dotStyle?.shape ?? BoxShape.circle,
+                  color: component.dotStyle?.color ?? textStyle.color,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+        textScaler: const TextScaler.linear(1.0),
       ),
-      textScaler: const TextScaler.linear(1.0),
     ),
   );
 }
@@ -107,6 +126,7 @@ Widget _leftAlignedNumeralBuilder(
   final textStyle = component
       .styleBuilder(attributions)
       .copyWith(inherit: false);
+  final levelOffset = noteEditorIndentUnit(textStyle) * component.indent;
 
   return OverflowBox(
     maxWidth: double.infinity,
@@ -115,7 +135,7 @@ Widget _leftAlignedNumeralBuilder(
       key: const ValueKey('ordered-list-marker'),
       alignment: Alignment.centerLeft,
       child: Padding(
-        padding: const EdgeInsets.only(right: 5),
+        padding: EdgeInsets.only(left: levelOffset),
         child: Text(
           '${_numeralForIndex(component.listIndex, component.numeralStyle)}.',
           textAlign: TextAlign.left,
@@ -124,6 +144,20 @@ Widget _leftAlignedNumeralBuilder(
       ),
     ),
   );
+}
+
+double _orderedListMarkerWidth(
+  TextStyle textStyle,
+  int listIndex,
+  OrderedListNumeralStyle numeralStyle,
+) {
+  final marker = '${_numeralForIndex(listIndex, numeralStyle)}.';
+  final painter = TextPainter(
+    text: TextSpan(text: marker, style: textStyle.copyWith(inherit: false)),
+    textDirection: TextDirection.ltr,
+    textScaler: const TextScaler.linear(1.0),
+  )..layout();
+  return painter.width;
 }
 
 String _numeralForIndex(int numeral, OrderedListNumeralStyle style) {

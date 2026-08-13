@@ -13,11 +13,14 @@ void main() {
     );
   });
 
-  test('keeps one marker slot and advances one unit per list level', () {
+  test('keeps the marker gap and advances one unit per list level', () {
     const textStyle = TextStyle(fontSize: 16);
 
-    expect(noteEditorListIndentCalculator(textStyle, 0), closeTo(38.4, 0.001));
-    expect(noteEditorListIndentCalculator(textStyle, 1), closeTo(76.8, 0.001));
+    expect(noteEditorListIndentCalculator(textStyle, 0, 4), closeTo(12, 0.001));
+    expect(
+      noteEditorListIndentCalculator(textStyle, 1, 4),
+      closeTo(50.4, 0.001),
+    );
   });
 
   test('uses the default text size when style has no font size', () {
@@ -79,6 +82,106 @@ void main() {
         tester.getTopLeft(find.byType(OrderedListItemComponent)).dx,
         0.001,
       ),
+    );
+  });
+
+  testWidgets('keeps list markers 8px from their text', (tester) async {
+    final document = MutableDocument(
+      nodes: [
+        ListItemNode.unordered(id: 'bullet', text: AttributedText('Bullet')),
+        ListItemNode.ordered(id: 'number', text: AttributedText('Number')),
+      ],
+    );
+    final editor = createDefaultDocumentEditor(document: document);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SuperEditor(
+          editor: editor,
+          componentBuilders: const [CustomListItemComponentBuilder()],
+        ),
+      ),
+    );
+
+    final bulletGlyph = find.descendant(
+      of: find.byType(UnorderedListItemComponent),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.constraints?.minWidth == 4 &&
+            widget.constraints?.maxWidth == 4 &&
+            widget.constraints?.minHeight == 4 &&
+            widget.constraints?.maxHeight == 4,
+      ),
+    );
+    final bulletText = tester.getTopLeft(
+      find.descendant(
+        of: find.byType(UnorderedListItemComponent),
+        matching: find.byType(TextComponent),
+      ),
+    );
+    final numberGlyph = find.descendant(
+      of: find.byType(OrderedListItemComponent),
+      matching: find.text('1.'),
+    );
+    final numberText = tester.getTopLeft(
+      find.descendant(
+        of: find.byType(OrderedListItemComponent),
+        matching: find.byType(TextComponent),
+      ),
+    );
+
+    final bulletGlyphTopLeft = tester.getTopLeft(bulletGlyph);
+    final numberGlyphTopLeft = tester.getTopLeft(numberGlyph);
+    expect(
+      bulletText.dx - bulletGlyphTopLeft.dx - tester.getSize(bulletGlyph).width,
+      closeTo(8, 0.001),
+    );
+    expect(
+      numberText.dx - numberGlyphTopLeft.dx - tester.getSize(numberGlyph).width,
+      closeTo(8, 0.001),
+    );
+  });
+
+  testWidgets('moves nested list markers by one indentation unit', (
+    tester,
+  ) async {
+    final document = MutableDocument(
+      nodes: [
+        ListItemNode.unordered(id: 'root', text: AttributedText('Root')),
+        ListItemNode.unordered(
+          id: 'nested',
+          text: AttributedText('Nested'),
+          indent: 1,
+        ),
+      ],
+    );
+    final editor = createDefaultDocumentEditor(document: document);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SuperEditor(
+          editor: editor,
+          componentBuilders: const [CustomListItemComponentBuilder()],
+        ),
+      ),
+    );
+
+    final markers = find.descendant(
+      of: find.byType(UnorderedListItemComponent),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.constraints?.minWidth == 4 &&
+            widget.constraints?.maxWidth == 4 &&
+            widget.constraints?.minHeight == 4 &&
+            widget.constraints?.maxHeight == 4,
+      ),
+    );
+    expect(markers, findsNWidgets(2));
+    expect(
+      tester.getTopLeft(markers.at(1)).dx - tester.getTopLeft(markers.at(0)).dx,
+      closeTo(noteEditorIndentUnit(const TextStyle(fontSize: 18)), 0.001),
     );
   });
 
