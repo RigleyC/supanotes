@@ -110,7 +110,10 @@ class _PickerAction extends StatelessWidget {
             context,
           ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
         ),
-        onTap: onTap,
+        onTap: () {
+          AppHaptics.controlTap();
+          onTap();
+        },
       ),
     );
   }

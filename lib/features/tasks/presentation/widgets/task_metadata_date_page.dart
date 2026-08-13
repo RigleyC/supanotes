@@ -1,7 +1,8 @@
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
-import 'package:supanotes/shared/widgets/app_selection_tile.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 enum QuickDueDate {
@@ -60,11 +61,14 @@ class TaskMetadataDatePage extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final option = QuickDueDate.values[index];
                   final date = option.compute(now);
-                  return AppSelectionTile(
-                    label: option.label,
-                    icon: option.icon,
-                    isSelected: selected != null && selected!.isSameDayAs(date),
+                  return AppTile(
+                    title: option.label,
+                    leading: Icon(option.icon),
+                    selected: selected != null && selected!.isSameDayAs(date),
                     onTap: () {
+                      if (selected == null || !selected!.isSameDayAs(date)) {
+                        AppHaptics.selectionChange();
+                      }
                       onSelected(date);
                       FamilyModalSheet.of(context).popPage();
                     },

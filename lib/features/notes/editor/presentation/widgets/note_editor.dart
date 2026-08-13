@@ -14,6 +14,7 @@ import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/hidden_task_trailing_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_config.dart';
@@ -147,6 +148,7 @@ class _NoteEditorState extends State<NoteEditor> {
     _componentBuilders = [
       const CustomDividerComponentBuilder(),
       _taskComponentBuilder!,
+      const CustomListItemComponentBuilder(),
       AttachmentComponentBuilder(
         editor: controller.editor,
         collapseImages: widget.collapseImages,

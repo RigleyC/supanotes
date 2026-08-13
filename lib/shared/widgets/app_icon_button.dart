@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 
 /// Shared icon-only action control.
 ///
@@ -24,9 +25,16 @@ class AppIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final callback = onPressed == null
+        ? null
+        : () {
+            AppHaptics.controlTap();
+            onPressed!();
+          };
+
     return IconButton(
       icon: icon,
-      onPressed: onPressed,
+      onPressed: callback,
       tooltip: tooltip,
       constraints: constraints,
       padding: padding,

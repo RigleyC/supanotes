@@ -313,6 +313,40 @@ void main() {
   });
 
   group('convertToTask', () {
+    test('preserves paragraph metadata when converting to task', () {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(
+            id: 'node-1',
+            text: AttributedText('Task'),
+            metadata: const {
+              'dueDate': '2099-01-02T10:00:00.000Z',
+              'hasTime': true,
+              'recurrenceRule': 'weekly',
+              'reminder': 'at_time',
+            },
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: caretSelection('node-1'),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      NoteEditorCommands.convertToTask(editor, composer);
+
+      final task = document.first as TaskNode;
+      expect(task.metadata['dueDate'], '2099-01-02T10:00:00.000Z');
+      expect(task.metadata['hasTime'], true);
+      expect(task.metadata['recurrenceRule'], 'weekly');
+      expect(task.metadata['reminder'], 'at_time');
+    });
+  });
+
+  group('convertToTask', () {
     test('converts paragraph to task', () {
       final document = MutableDocument(
         nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Buy milk'))],
@@ -406,7 +440,7 @@ void main() {
     );
   });
 
-  group('indentListItems', () {
+  group('indentSelectedBlocks', () {
     test('indents a list item', () {
       final document = MutableDocument(
         nodes: [
@@ -421,14 +455,42 @@ void main() {
         composer: composer,
       );
 
-      NoteEditorCommands.indentListItems(editor, composer);
+      NoteEditorCommands.indentSelectedBlocks(editor, composer);
 
       final item = document.first as ListItemNode;
       expect(item.indent, 1);
     });
+
+    test('indents the selected task', () {
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Parent'),
+            isComplete: false,
+          ),
+          TaskNode(
+            id: 'node-2',
+            text: AttributedText('Child'),
+            isComplete: false,
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: caretSelection('node-2'),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      NoteEditorCommands.indentSelectedBlocks(editor, composer);
+
+      expect((document.getNodeById('node-2') as TaskNode).indent, 1);
+    });
   });
 
-  group('unindentListItems', () {
+  group('unindentSelectedBlocks', () {
     test('unindents a list item', () {
       final document = MutableDocument(
         nodes: [
@@ -447,11 +509,39 @@ void main() {
         composer: composer,
       );
 
-      NoteEditorCommands.unindentListItems(editor, composer);
+      NoteEditorCommands.unindentSelectedBlocks(editor, composer);
 
       final item = document.first as ListItemNode;
       expect(item.indent, 1);
     });
-  });
 
+    test('unindents the selected task', () {
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Parent'),
+            isComplete: false,
+          ),
+          TaskNode(
+            id: 'node-2',
+            text: AttributedText('Child'),
+            isComplete: false,
+            indent: 1,
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: caretSelection('node-2'),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      NoteEditorCommands.unindentSelectedBlocks(editor, composer);
+
+      expect((document.getNodeById('node-2') as TaskNode).indent, 0);
+    });
+  });
 }

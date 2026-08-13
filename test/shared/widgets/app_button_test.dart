@@ -1,8 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motor/motor.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 
+import '../../helpers/haptic_test_helper.dart';
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late HapticTestRecorder recorder;
+
+  setUp(() {
+    recorder = HapticTestRecorder();
+    recorder.install();
+  });
+
+  tearDown(() {
+    recorder.dispose();
+  });
+
   group('AppButton Widget Tests', () {
     testWidgets('renders AppButtonVariant.fab with icon and no text required', (
       tester,
@@ -70,6 +86,64 @@ void main() {
       final scheme = ThemeData.dark().colorScheme;
       expect(fab.backgroundColor, scheme.primary);
       expect(fab.foregroundColor, scheme.onPrimary);
+    });
+
+    testWidgets('emits light impact when an enabled primary button is tapped', (
+      tester,
+    ) async {
+      var pressedCount = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(text: 'Salvar', onPressed: () => pressedCount += 1),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Salvar'));
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(pressedCount, 1);
+      expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
+    });
+
+    testWidgets('emits no haptic when isLoading is true', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(text: 'Salvar', isLoading: true, onPressed: () {}),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(AppButton));
+      await tester.pump();
+
+      expect(recorder.count('HapticFeedbackType.lightImpact'), 0);
+    });
+
+    testWidgets('animates the button while it is pressed', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(text: 'Salvar', onPressed: () {}),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('Salvar')),
+      );
+      await tester.pump(const Duration(seconds: 1));
+
+      final motion = tester.widget<SingleMotionBuilder>(
+        find.byType(SingleMotionBuilder),
+      );
+      expect(motion.value, lessThan(1));
+
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
     });
   });
 }

@@ -259,6 +259,7 @@ class DocumentProjectionApplier {
       type: newType,
       text: text,
       isTaskComplete: isComplete,
+      metadata: Map<String, dynamic>.from(node.metadata),
     );
     _editor.execute([
       ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),

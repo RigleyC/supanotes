@@ -69,7 +69,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       error: (_, _) => true,
     );
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      extendBodyBehindAppBar: false,
       appBar: _NoteEditorAppBar(
         noteId: widget.noteId,
         note: note,

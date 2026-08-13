@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:motor/motor.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 
 enum AppButtonVariant { primary, secondary, tonal, danger, text, fab }
 
-class AppButton extends StatelessWidget {
+class AppButton extends StatefulWidget {
   const AppButton({
     super.key,
     this.text,
@@ -21,28 +23,67 @@ class AppButton extends StatelessWidget {
   final Widget? icon;
 
   @override
+  State<AppButton> createState() => _AppButtonState();
+}
+
+class _AppButtonState extends State<AppButton> {
+  double _scale = 1;
+
+  @override
+  void didUpdateWidget(covariant AppButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLoading || widget.onPressed == null) _scale = 1;
+  }
+
+  void _setPressed(bool pressed) {
+    if (widget.isLoading || widget.onPressed == null) {
+      if (_scale != 1) setState(() => _scale = 1);
+      return;
+    }
+    setState(() => _scale = pressed ? 0.96 : 1);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final child = _AppButtonContent(
-      text: text,
-      icon: icon,
-      variant: variant,
-      isLoading: isLoading,
+      text: widget.text,
+      icon: widget.icon,
+      variant: widget.variant,
+      isLoading: widget.isLoading,
       foregroundColor: _foregroundColor(scheme),
       fabForegroundColor: scheme.onPrimary,
     );
     final button = _AppButtonControl(
-      variant: variant,
-      isLoading: isLoading,
-      onPressed: onPressed,
+      variant: widget.variant,
+      isLoading: widget.isLoading,
+      onPressed: widget.onPressed,
       scheme: scheme,
       child: child,
     );
-    return _AppButtonLayout(variant: variant, width: width, child: button);
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => _setPressed(true),
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: SingleMotionBuilder(
+        motion: CupertinoMotion.smooth(),
+        value: _scale,
+        builder: (context, scale, child) => Transform.scale(
+          scale: scale,
+          child: child,
+        ),
+        child: _AppButtonLayout(
+          variant: widget.variant,
+          width: widget.width,
+          child: button,
+        ),
+      ),
+    );
   }
 
   Color _foregroundColor(ColorScheme scheme) {
-    switch (variant) {
+    switch (widget.variant) {
       case AppButtonVariant.primary:
         return scheme.onPrimary;
       case AppButtonVariant.secondary:
@@ -121,7 +162,12 @@ class _AppButtonControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const size = Size(0, 48);
-    final callback = isLoading ? null : onPressed;
+    final callback = isLoading || onPressed == null
+        ? null
+        : () {
+            AppHaptics.controlTap();
+            onPressed!();
+          };
     return switch (variant) {
       AppButtonVariant.primary => FilledButton(
         onPressed: callback,

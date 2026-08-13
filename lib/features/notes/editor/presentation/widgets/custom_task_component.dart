@@ -1,10 +1,11 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
@@ -54,7 +55,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     Future<void> updateCompletion(bool isComplete) async {
       if (readOnly) return;
-      HapticFeedback.lightImpact();
+      AppHaptics.selectionChange();
       if (isComplete) {
         if (hideCompleted && !isRecurring) {
           FocusManager.instance.primaryFocus?.unfocus();
@@ -110,7 +111,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       onLongPress: readOnly || onTaskLongPress == null
           ? null
           : () {
-              HapticFeedback.mediumImpact();
               onTaskLongPress!(nodeId);
             },
     );
@@ -130,6 +130,7 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     required super.nodeId,
     required super.createdAt,
     required super.padding,
+    super.opacity = 1.0,
     required super.indent,
     required super.isComplete,
     required super.setComplete,
@@ -146,6 +147,30 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
   final TaskMetadataDraft taskMetadata;
+
+  @override
+  CustomTaskComponentViewModel copy() {
+    return super.internalCopy(
+          CustomTaskComponentViewModel(
+            nodeId: nodeId,
+            createdAt: createdAt,
+            padding: padding,
+            text: text.copy(),
+            textStyleBuilder: textStyleBuilder,
+            opacity: opacity,
+            selectionColor: selectionColor,
+            indent: indent,
+            isComplete: isComplete,
+            setComplete: setComplete,
+            textDirection: textDirection,
+            textAlignment: textAlignment,
+            dueDate: dueDate,
+            recurrence: recurrence,
+            taskMetadata: taskMetadata,
+          ),
+        )
+        as CustomTaskComponentViewModel;
+  }
 
   @override
   bool operator ==(Object other) {
@@ -253,6 +278,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     }
   }
 
+  void _onTouchLongPress() {
+    AppHaptics.longPress(context);
+    widget.onLongPress?.call();
+  }
+
   void _onCheckAnimationCompleted() {
     if (!_isRecurring || !_isComplete || !mounted) return;
     setState(() => _isComplete = false);
@@ -304,12 +334,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final checkboxTopInset = textStyle.height == null
         ? _taskCheckboxFallbackTopInset
         : (textLineHeight - _taskCheckboxSize) / 2;
-    // Keep task text on the same column as Super Editor's bullet and number
-    // markers. The marker itself remains inside the shared indentation slot.
-    final markerIndent = defaultListItemIndentCalculator(
-      textStyle,
-      widget.viewModel.indent,
-    );
+    final indentUnit = noteEditorIndentUnit(textStyle);
+    final levelOffset = indentUnit * widget.viewModel.indent;
 
     final content = Directionality(
       textDirection: widget.viewModel.textDirection,
@@ -319,8 +345,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            SizedBox(width: levelOffset),
             SizedBox(
-              width: markerIndent,
+              width: indentUnit,
               child: Semantics(
                 button: true,
                 checked: _isComplete,
@@ -333,7 +360,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   onTap: widget.isReadOnly || _isUpdatingCompletion
                       ? null
                       : _onCheckboxTap,
-                  onLongPress: widget.isReadOnly ? null : widget.onLongPress,
+                  onLongPress: widget.isReadOnly || widget.onLongPress == null
+                      ? null
+                      : _onTouchLongPress,
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(

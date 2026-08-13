@@ -7,6 +7,7 @@ import 'package:unicode_emojis/unicode_emojis.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_catalog.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
@@ -60,6 +61,7 @@ class NoteIconPickerRootPage extends StatelessWidget {
               label: 'Usar emoji',
               onTap: () => FamilyModalSheet.of(context).pushPage(
                 NoteEmojiPickerPage(
+                  current: note.noteIcon,
                   onSelected: (icon) => _select(context, icon),
                 ),
               ),
@@ -90,8 +92,13 @@ class NoteIconPickerRootPage extends StatelessWidget {
 }
 
 class NoteEmojiPickerPage extends StatefulWidget {
-  const NoteEmojiPickerPage({super.key, required this.onSelected});
+  const NoteEmojiPickerPage({
+    super.key,
+    this.current,
+    required this.onSelected,
+  });
 
+  final NoteIcon? current;
   final Future<void> Function(NoteIcon icon) onSelected;
 
   @override
@@ -132,7 +139,14 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
             label: emoji.name,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => widget.onSelected(NoteIcon.emoji(emoji.emoji)),
+              onTap: () {
+                final selected =
+                    widget.current?.isEmoji == true &&
+                    widget.current!.value == emoji.emoji;
+                if (selected) return;
+                AppHaptics.selectionChange();
+                widget.onSelected(NoteIcon.emoji(emoji.emoji));
+              },
               child: Center(
                 child: Text(emoji.emoji, style: const TextStyle(fontSize: 28)),
               ),
@@ -206,7 +220,11 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
                   child: SizedBox.square(
                     dimension: 48,
                     child: InkWell(
-                      onTap: () => setState(() => _colorKey = key),
+                      onTap: () {
+                        if (key == _colorKey) return;
+                        AppHaptics.selectionChange();
+                        setState(() => _colorKey = key);
+                      },
                       borderRadius: BorderRadius.circular(24),
                       child: Center(
                         child: Container(
@@ -238,9 +256,17 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
             label: catalogIconLabels[entry.key] ?? entry.key,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => widget.onSelected(
-                NoteIcon.catalog(id: entry.key, colorKey: _colorKey),
-              ),
+              onTap: () {
+                final selected =
+                    widget.current?.isEmoji == false &&
+                    widget.current!.value == entry.key &&
+                    widget.current!.colorKey == _colorKey;
+                if (selected) return;
+                AppHaptics.selectionChange();
+                widget.onSelected(
+                  NoteIcon.catalog(id: entry.key, colorKey: _colorKey),
+                );
+              },
               child: Icon(
                 entry.value,
                 size: 28,

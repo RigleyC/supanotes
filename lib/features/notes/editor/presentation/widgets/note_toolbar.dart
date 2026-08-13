@@ -206,8 +206,8 @@ class _NoteToolbarState extends State<NoteToolbar> {
                           blockType: formattingBlockType,
                           selection: formattingSelection,
                           activeListOption: _activeListOption(formattingNodes),
-                          isListItem: formattingNodes.any(
-                            (node) => node is ListItemNode,
+                          isIndentableBlock: formattingNodes.any(
+                            (node) => node is ListItemNode || node is TaskNode,
                           ),
                           isBold: _selectionHasAttribution(
                             formattingSelection,
@@ -234,9 +234,10 @@ class _NoteToolbarState extends State<NoteToolbar> {
                             option,
                             formattingSelection,
                           ),
-                          onIndent: () => _indentListItem(formattingSelection),
+                          onIndent: () =>
+                              _indentSelectedBlocks(formattingSelection),
                           onUnindent: () =>
-                              _unindentListItem(formattingSelection),
+                              _unindentSelectedBlocks(formattingSelection),
                         )
                       : SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -246,6 +247,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
                               ToolbarButton(
                                 icon: Icons.text_format,
                                 isActive: false,
+                                haptic: ToolbarHaptic.controlTap,
                                 onPressed: _openFormatting,
                                 semanticLabel: 'Abrir formatação',
                               ),
@@ -253,17 +255,20 @@ class _NoteToolbarState extends State<NoteToolbar> {
                               ToolbarButton(
                                 icon: Icons.horizontal_rule,
                                 isActive: false,
+                                haptic: ToolbarHaptic.selectionChange,
                                 onPressed: _insertDivider,
                               ),
                               const ToolbarDivider(),
                               ToolbarButton(
                                 icon: Icons.image,
                                 isActive: false,
+                                haptic: ToolbarHaptic.controlTap,
                                 onPressed: onAttachImage,
                               ),
                               ToolbarButton(
                                 icon: Icons.attach_file,
                                 isActive: false,
+                                haptic: ToolbarHaptic.controlTap,
                                 onPressed: onAttachFile,
                               ),
                             ],
@@ -337,7 +342,6 @@ class _NoteToolbarState extends State<NoteToolbar> {
       _insertParagraphAtEnd(attribution);
       return;
     }
-    HapticFeedback.selectionClick();
     NoteEditorCommands.setBlockType(editor, composer, attribution);
   }
 
@@ -347,7 +351,6 @@ class _NoteToolbarState extends State<NoteToolbar> {
   ) {
     if (selection == null || selection.isCollapsed) return;
     if (_prepareEditorAction(selection) == null) return;
-    HapticFeedback.selectionClick();
     NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
   }
 
@@ -365,12 +368,10 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   void _convertToListItem(ListItemType type) {
-    HapticFeedback.selectionClick();
     NoteEditorCommands.convertToListItem(editor, composer, type);
   }
 
   void _convertToTask() {
-    HapticFeedback.selectionClick();
     NoteEditorCommands.convertToTask(editor, composer);
   }
 
@@ -392,16 +393,14 @@ class _NoteToolbarState extends State<NoteToolbar> {
     }
   }
 
-  void _indentListItem(DocumentSelection? selection) {
+  void _indentSelectedBlocks(DocumentSelection? selection) {
     if (_prepareEditorAction(selection) == null) return;
-    HapticFeedback.selectionClick();
-    NoteEditorCommands.indentListItems(editor, composer);
+    NoteEditorCommands.indentSelectedBlocks(editor, composer);
   }
 
-  void _unindentListItem(DocumentSelection? selection) {
+  void _unindentSelectedBlocks(DocumentSelection? selection) {
     if (_prepareEditorAction(selection) == null) return;
-    HapticFeedback.selectionClick();
-    NoteEditorCommands.unindentListItems(editor, composer);
+    NoteEditorCommands.unindentSelectedBlocks(editor, composer);
   }
 
   void _insertDivider() {
@@ -409,14 +408,12 @@ class _NoteToolbarState extends State<NoteToolbar> {
       _insertDividerAtEnd();
       return;
     }
-    HapticFeedback.selectionClick();
     NoteEditorCommands.insertDivider(editor, dividerCount: 35);
   }
 
   void _insertParagraphAtEnd(Attribution blockType) {
     focusNode?.requestFocus();
     NoteEditorCommands.insertParagraphAtEnd(editor, blockType: blockType);
-    HapticFeedback.selectionClick();
   }
 
   void _insertListBlockAtEnd(_ListFormatOption option) {
@@ -435,12 +432,10 @@ class _NoteToolbarState extends State<NoteToolbar> {
       case _ListFormatOption.checklist:
         NoteEditorCommands.insertTaskAtEnd(editor);
     }
-    HapticFeedback.selectionClick();
   }
 
   void _insertDividerAtEnd() {
     focusNode?.requestFocus();
     NoteEditorCommands.insertDividerAtEnd(editor, dividerCount: 35);
-    HapticFeedback.selectionClick();
   }
 }

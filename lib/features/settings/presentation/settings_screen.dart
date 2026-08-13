@@ -9,7 +9,8 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:supanotes/features/settings/presentation/widgets/settings_tile.dart';
+import 'package:supanotes/shared/widgets/app_tile.dart';
+import 'package:supanotes/features/settings/presentation/widgets/settings_section_header.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
@@ -34,29 +35,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
         children: [
           const SettingsSectionHeader(title: 'Conta'),
-          SettingsTile.action(
-            icon: Icons.alternate_email,
+          AppTile(
+            leading: const Icon(Icons.alternate_email),
             title: 'Email',
             subtitle: account?.email ?? '—',
           ),
-          SettingsTile.action(
-            icon: Icons.person_outline,
+          AppTile(
+            leading: const Icon(Icons.person_outline),
             title: 'Nome',
             subtitle: account?.name ?? '—',
           ),
-          SettingsTile.action(
-            icon: Icons.logout,
+          AppTile(
+            leading: const Icon(Icons.logout),
             title: 'Sair da conta',
             onTap: () => _confirmLogout(context, ref),
             enabled: account != null,
           ),
 
           const SettingsSectionHeader(title: 'Avançado'),
-          SettingsTile.navigation(
-            icon: Icons.developer_mode_outlined,
+          AppTile(
+            leading: const Icon(Icons.developer_mode_outlined),
             title: 'Protocolo de Contexto (MCP)',
             subtitle: 'Token de acesso e configuração.',
             onTap: () => context.push(AppRoutes.mcp),
+            trailing: const Icon(Icons.chevron_right),
           ),
         ],
       ),
