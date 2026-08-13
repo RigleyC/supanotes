@@ -131,31 +131,6 @@ type RefreshToken struct {
 	ReuseDetectedAt pgtype.Timestamptz `json:"reuse_detected_at"`
 }
 
-type Task struct {
-	ID          pgtype.UUID        `json:"id"`
-	NoteID      pgtype.UUID        `json:"note_id"`
-	UserID      pgtype.UUID        `json:"user_id"`
-	Title       string             `json:"title"`
-	Status      string             `json:"status"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
-	Recurrence  pgtype.Text        `json:"recurrence"`
-	Position    string             `json:"position"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
-	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	HasTime     bool               `json:"has_time"`
-	Reminder    pgtype.Text        `json:"reminder"`
-}
-
-type TaskCompletion struct {
-	ID          pgtype.UUID        `json:"id"`
-	TaskID      pgtype.UUID        `json:"task_id"`
-	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	DueDate     pgtype.Date        `json:"due_date"`
-	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
-}
-
 type User struct {
 	ID           pgtype.UUID        `json:"id"`
 	Email        string             `json:"email"`

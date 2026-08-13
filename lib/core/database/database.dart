@@ -166,14 +166,6 @@ class AppDatabase extends _$AppDatabase {
     await _migrateSyncStorage(m, from);
     await _migrateNoteMetadata(m, from);
     await _migrateEffectiveDocuments(m, from);
-    await _removeRelationalTaskStorage(m, from);
-  }
-
-  Future<void> _removeRelationalTaskStorage(Migrator m, int from) async {
-    if (from < 30) {
-      await customStatement('DROP TABLE IF EXISTS local_task_completions');
-      await customStatement('DROP TABLE IF EXISTS tasks');
-    }
   }
 
   Future<void> _migrateEffectiveDocuments(Migrator m, int from) async {
