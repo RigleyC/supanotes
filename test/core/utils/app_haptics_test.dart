@@ -8,10 +8,15 @@ import '../../helpers/haptic_test_helper.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  final recorder = HapticTestRecorder();
+  late HapticTestRecorder recorder;
 
-  setUp(recorder.install);
-  tearDown(recorder.dispose);
+  setUp(() {
+    recorder = HapticTestRecorder();
+    recorder.install();
+  });
+  tearDown(() {
+    recorder.dispose();
+  });
 
   test('sends light impact for a control tap', () async {
     await AppHaptics.controlTap();
