@@ -1,6 +1,7 @@
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
-import 'package:supanotes/shared/widgets/app_selection_tile.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 class TaskMetadataSelectionPage<T> extends StatelessWidget {
@@ -41,18 +42,24 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppSelectionTile(
-                label: noneLabel,
-                icon: Icons.do_not_disturb_on_outlined,
-                isSelected: selected == null,
-                onTap: () => select(null),
+              AppTile(
+                title: noneLabel,
+                leading: const Icon(Icons.do_not_disturb_on_outlined),
+                selected: selected == null,
+                onTap: () {
+                  if (selected != null) AppHaptics.selectionChange();
+                  select(null);
+                },
               ),
               for (final option in options)
-                AppSelectionTile(
-                  label: optionLabel(option),
-                  icon: optionIcon(option),
-                  isSelected: selected == option,
-                  onTap: () => select(option),
+                AppTile(
+                  title: optionLabel(option),
+                  leading: Icon(optionIcon(option)),
+                  selected: selected == option,
+                  onTap: () {
+                    if (selected != option) AppHaptics.selectionChange();
+                    select(option);
+                  },
                 ),
               const SizedBox(height: 24),
             ],

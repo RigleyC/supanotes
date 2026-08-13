@@ -233,3 +233,15 @@ be executed independently.
   document path is confirmed in production.
 - Do not add an automatic `DROP TABLE` migration. Physical cleanup is a
   separate, approved operation after the retention period.
+
+## Haptic feedback defaults
+
+Status: plan written; awaiting implementation approval.
+
+The detailed plan is in
+`docs/superpowers/plans/2026-08-13-haptic-feedback.md`.
+
+Scope includes the shared control defaults, the `GlobalSheetHeader`, all
+controls inside the task metadata sheet, all controls inside the emoji/icon
+picker sheets, and normalization of the existing editor haptic calls. The
+plan keeps native picker feedback and feature-owned scrolling unchanged.

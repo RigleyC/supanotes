@@ -80,4 +80,38 @@ void main() {
       );
     },
   );
+
+  testWidgets('reselecting the active quick date emits no haptic', (
+    tester,
+  ) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => showGlobalSheet<void>(
+                context: context,
+                builder: (_) => TaskMetadataDatePage(
+                  selected: DateTime.now(),
+                  onSelected: (_) {},
+                ),
+              ),
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Abrir'));
+    await tester.pumpAndSettle();
+    recorder.calls.clear();
+    await tester.tap(find.text('Hoje'));
+
+    expect(recorder.count('HapticFeedbackType.selectionClick'), 0);
+  });
 }

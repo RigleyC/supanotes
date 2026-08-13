@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_controller.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
+import 'package:supanotes/shared/widgets/app_tile.dart';
 import '../../../../helpers/haptic_test_helper.dart';
 
 void main() {
@@ -265,7 +267,12 @@ void main() {
     expect(find.text('Adicionar data'), findsNothing);
 
     recorder.calls.clear();
-    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AppTile).first,
+        matching: find.byIcon(Icons.close_rounded),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Adicionar data'), findsOneWidget);
@@ -275,6 +282,43 @@ void main() {
       ),
       hasLength(1),
     );
+  });
+
+  testWidgets('clearing time recurrence and reminder emits control haptics', (
+    tester,
+  ) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+    final task = _SheetTask(
+      id: 'task-clear-all-haptics',
+      draft: TaskMetadataDraft(
+        scheduleAnchor: DateTime.utc(2026, 6, 11, 9, 30),
+        hasTime: true,
+        recurrence: TaskRecurrence.daily,
+        reminder: TaskReminderOption.atTime,
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Abrir metadados'));
+    await tester.pumpAndSettle();
+
+    for (final tooltip in [
+      'Remover lembrete',
+      'Remover recorrência',
+      'Remover horário',
+    ]) {
+      recorder.calls.clear();
+      await tester.tap(find.byTooltip(tooltip));
+      await tester.pumpAndSettle();
+      expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
+    }
   });
 }
 

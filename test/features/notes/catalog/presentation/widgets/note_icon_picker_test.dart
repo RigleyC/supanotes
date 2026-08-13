@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
@@ -211,8 +210,8 @@ void main() {
       final blueSemantics = tester.getSemantics(
         find.bySemanticsLabel('Cor blue'),
       );
-      expect(blueSemantics.hasFlag(SemanticsFlag.isButton), isTrue);
-      expect(blueSemantics.hasFlag(SemanticsFlag.isSelected), isTrue);
+      expect(blueSemantics.flagsCollection.isButton, isTrue);
+      expect(blueSemantics.flagsCollection.isSelected.name, 'isTrue');
       expect(
         recorder.calls.where(
           (call) => call.arguments == 'HapticFeedbackType.selectionClick',
@@ -221,6 +220,31 @@ void main() {
       );
     },
   );
+
+  testWidgets('tapping the selected emoji emits no selection haptic', (
+    tester,
+  ) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NoteEmojiPickerPage(
+            current: NoteIcon.emoji('😀'),
+            onSelected: (_) async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    recorder.calls.clear();
+    await tester.tap(find.text('😀'));
+    await tester.pumpAndSettle();
+
+    expect(recorder.count('HapticFeedbackType.selectionClick'), 0);
+  });
 
   testWidgets('tapping the selected color emits no extra selection haptic', (
     tester,
