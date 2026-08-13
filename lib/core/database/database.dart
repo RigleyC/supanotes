@@ -104,7 +104,7 @@ class AppDatabase extends _$AppDatabase {
     required String noteId,
     required String content,
     String? excerpt,
-    required List<ProjectedTask> tasks,
+    List<ProjectedTask> tasks = const [],
     String userId = '',
   }) {
     return transaction(() async {
@@ -113,11 +113,6 @@ class AppDatabase extends _$AppDatabase {
         content: content,
         excerpt: excerpt,
         materialized: content.trim().isNotEmpty || tasks.isNotEmpty,
-      );
-      await tasksDao.syncProjectedTasksForNoteTyped(
-        noteId,
-        tasks,
-        userId: userId,
       );
     });
   }
@@ -132,7 +127,7 @@ class AppDatabase extends _$AppDatabase {
     required RemoteNoteWriteMode mode,
     required NotesCompanion note,
     required LocalNoteDocumentsCompanion document,
-    required List<ProjectedTask> tasks,
+    List<ProjectedTask> tasks = const [],
     String userId = '',
   }) {
     return transaction(() async {
@@ -146,11 +141,6 @@ class AppDatabase extends _$AppDatabase {
       }
 
       await noteOperationsDao.upsertNoteDocument(document);
-      await tasksDao.syncProjectedTasksForNoteTyped(
-        noteId,
-        tasks,
-        userId: userId,
-      );
       return true;
     });
   }

@@ -10,7 +10,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
-import 'package:supanotes/features/tasks/domain/note_document_projector.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
 
@@ -55,14 +55,12 @@ class NoteCatalogSync {
   }) : _syncClient = syncClient,
        _database = database,
        _activityTracker = activityTracker,
-       _updateNoteIcon = updateNoteIcon,
-       _documentProjector = const NoteDocumentProjector();
+       _updateNoteIcon = updateNoteIcon;
 
   final NoteSyncClient _syncClient;
   final AppDatabase _database;
   final NoteSessionActivityTracker _activityTracker;
   final NoteIconUpdater _updateNoteIcon;
-  final NoteDocumentProjector _documentProjector;
   Map<String, RemoteNoteMetadata> _remoteCatalog = const {};
   final _remoteNoteQueue = KeyedAsyncQueue();
 
@@ -433,9 +431,8 @@ class NoteCatalogSync {
       return const _RemoteNoteWriteResult(_RemoteNoteWriteOutcome.becameActive);
     }
 
-    final projection = _documentProjector.projectBlocks(
-      noteId: id,
-      blocks: documentResponse.document['blocks'] as List<dynamic>? ?? [],
+    final projection = _projectContent(
+      documentResponse.document['blocks'] as List<dynamic>? ?? [],
     );
     final document = LocalNoteDocumentsCompanion.insert(
       noteId: documentResponse.noteId,
@@ -450,7 +447,6 @@ class NoteCatalogSync {
           ? const InsertRemoteNote()
           : UpdateRemoteNote(expectedUpdatedAt: local.existing!.updatedAt),
       document: document,
-      tasks: projection.tasks,
       userId: userId,
       note: NotesCompanion(
         id: Value(catalog.id),
@@ -502,6 +498,25 @@ class NoteCatalogSync {
       shouldReadRemoteIcon: local.shouldReadRemoteIcon,
     );
   }
+}
+
+({String content, String? excerpt}) _projectContent(List<dynamic> blocks) {
+  final codec = const NoteDocumentCodec();
+  final text = StringBuffer();
+  for (final block in blocks) {
+    if (block is! Map) continue;
+    final rawDelta = block['delta'] ?? block['content'];
+    if (rawDelta is! List) continue;
+    final plain = codec.attributedFromDelta(rawDelta).toPlainText();
+    if (plain.isNotEmpty) text.writeln(plain);
+  }
+  final content = text.toString().trimRight();
+  return (
+    content: content,
+    excerpt: content.isEmpty
+        ? null
+        : content.substring(0, content.length > 200 ? 200 : content.length),
+  );
 }
 
 /// App-scoped catalog synchronization.

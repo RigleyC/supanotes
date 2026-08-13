@@ -3,13 +3,11 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
-import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 import 'note_editor_controller.dart';
 import 'note_editor_session.dart';
 
@@ -56,8 +54,6 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
       ),
     );
 
-    final database = ref.read(appDatabaseProvider);
-    final taskProjectionEngine = TaskProjectionEngine(database: database);
     final syncService = ref.read(noteOperationsSyncServiceProvider);
 
     final syncSession = NoteSyncSession(
@@ -65,7 +61,6 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
       syncService: syncService,
       document: controller.document,
       editor: controller.editor,
-      taskProjectionEngine: taskProjectionEngine,
       userId: userId,
       captureLocalOperations: _canCaptureLocalOperations(note),
     );
