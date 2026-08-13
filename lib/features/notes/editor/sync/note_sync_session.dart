@@ -7,7 +7,6 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 
 import 'note_operation_adapter.dart';
 
@@ -15,7 +14,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   final String noteId;
   final NoteOperationsSyncService syncService;
   final NoteOperationAdapter adapter;
-  final TaskProjectionEngine? taskProjectionEngine;
   final MutableDocument document;
   final String userId;
   bool _captureLocalOperations;
@@ -30,9 +28,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   bool _blockedByForeignSession = false;
   int _pendingSyncOperations = 0;
   Object? _lastError;
-  Object? _projectionError;
-  StackTrace? _projectionStackTrace;
-  Future<void> _projectionTail = Future<void>.value();
   Future<void> _reconcileTail = Future<void>.value();
   Future<void> _syncTail = Future<void>.value();
 
@@ -83,7 +78,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     required this.syncService,
     required this.document,
     required Editor editor,
-    this.taskProjectionEngine,
     this.userId = '',
     bool captureLocalOperations = true,
     this.onTransientError,
@@ -121,10 +115,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         _setStatus(NoteSessionStatus.ready);
       }
 
-      // The local document is ready now. Keep projection and network work in
-      // the background so a large note or a slow connection cannot block the
-      // first frame of the editor.
-      unawaited(_enqueueProjection());
       if (_captureLocalOperations) {
         unawaited(_onLocalOps());
       }
@@ -137,44 +127,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   void _handleLocalOperations(List<OperationRequest> _) {
     if (_isClosing || _disposed || !_captureLocalOperations) return;
-    unawaited(_enqueueProjection());
     unawaited(_onLocalOps());
-  }
-
-  Future<void> _enqueueProjection() {
-    _projectionTail = _projectionTail.then((_) async {
-      if (_isClosing || _disposed || taskProjectionEngine == null) {
-        return;
-      }
-      await _projectDocumentCatchingErrors();
-    });
-    return _projectionTail;
-  }
-
-  Future<void> _projectDocument() {
-    final engine = taskProjectionEngine;
-    if (engine == null) return Future.value();
-    return engine.projectTasksFromDocument(
-      noteId: noteId,
-      document: document,
-      userId: userId,
-    );
-  }
-
-  Future<void> _projectDocumentCatchingErrors() async {
-    try {
-      await _projectDocument();
-      _projectionError = null;
-      _projectionStackTrace = null;
-    } catch (error, stackTrace) {
-      _projectionError = error;
-      _projectionStackTrace = stackTrace;
-      dev.log(
-        'Task projection failed for $noteId',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
   }
 
   Future<void> _onLocalOps() async {
@@ -266,7 +219,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         if (_isClosing || _disposed) return;
         await adapter.reconcile(result);
         if (_isClosing || _disposed) return;
-        await _enqueueProjection();
       });
       _reconcileTail = reconcile.then<void>(
         (_) {},
@@ -302,24 +254,11 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     adapter.onLocalOperations = null;
     try {
       // A sync response can already be reconciling locally when close starts.
-      // Finish that local callback before the final flush so it cannot mutate
-      // the editor after the final projection.
+      // Finish that local callback before the final flush.
       await _reconcileTail;
       // Persist the editor before waiting for a network request that may be
       // slow or unavailable. Closing must not discard an in-memory edit.
       await adapter.flushNow();
-      await _projectionTail;
-      if (adapter.hasCapturedLocalOperations) {
-        await _projectDocument();
-        _projectionError = null;
-        _projectionStackTrace = null;
-      }
-      if (_projectionError != null) {
-        Error.throwWithStackTrace(
-          _projectionError!,
-          _projectionStackTrace ?? StackTrace.current,
-        );
-      }
       // The outbox is durable now. Do not wait for the network queue during
       // teardown; the next session or catalog sync will retry it.
     } catch (error, stackTrace) {

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
@@ -14,6 +13,7 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 import '../controllers/task_metadata_controller.dart';
+import '../controllers/task_metadata_draft.dart';
 import 'task_metadata_date_page.dart';
 import 'task_metadata_selection_page.dart';
 import 'task_metadata_time_page.dart';
@@ -21,18 +21,12 @@ import 'task_metadata_time_page.dart';
 Future<void> showTaskMetadataSheet({
   required BuildContext context,
   required WidgetRef ref,
-  required TaskModel task,
-  required Future<void> Function({
-    required DateTime? dueDate,
-    required bool hasTime,
-    required TaskRecurrence? recurrence,
-    required String? reminder,
-  })
-  onSave,
+  required String taskId,
+  required TaskMetadataDraft draft,
+  required Future<void> Function(TaskMetadataDraft draft) onSave,
 }) async {
-  final taskId = task.id;
   final controller = ref.read(taskMetadataProvider(taskId).notifier)
-    ..initialize(task);
+    ..initialize(draft);
 
   try {
     await showGlobalSheet<void>(
@@ -49,10 +43,12 @@ Future<void> showTaskMetadataSheet({
       name: 'TaskMetadataSheet',
     );
     await onSave(
-      dueDate: state.dueDate,
-      hasTime: state.hasTime,
-      recurrence: state.recurrence,
-      reminder: state.reminder?.value,
+      TaskMetadataDraft(
+        scheduleAnchor: state.dueDate,
+        hasTime: state.hasTime,
+        recurrence: state.recurrence,
+        reminder: state.reminder,
+      ),
     );
 
     if (state.reminder != null) {

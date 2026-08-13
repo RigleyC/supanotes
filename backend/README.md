@@ -27,8 +27,9 @@ autorização. Repositories escondem SQL e transações.
 ## Endpoints que merecem atenção
 
 - `/notes/:id/operations:sync` e `/notes/:id/operations`: REST/OT do editor.
-- `/notes`, `/tasks`, `/settings`, `/attachments` e `/notes/:id/shares`: APIs
-  convencionais para recursos que não são mutações de bloco.
+- `/notes`, `/settings`, `/attachments` e `/notes/:id/shares`: APIs
+  convencionais para recursos que não são mutações de bloco. Tarefas são
+  blocos do documento e usam as operações REST/OT da nota.
 
 O servidor é a autoridade final para identidade, acesso à nota e validade da
 operação. O cliente pode otimizar a experiência, mas não pode substituir essa

@@ -211,7 +211,6 @@ func TestCurrentToolNames_areRetainedProductContract(t *testing.T) {
 		"list_note_operations",
 		"list_note_shares",
 		"list_notes",
-		"list_tasks",
 		"move_block",
 		"remove_note_share",
 		"reopen_task_occurrence",

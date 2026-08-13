@@ -13,25 +13,17 @@ import (
 type Querier interface {
 	CheckNotePermission(ctx context.Context, arg CheckNotePermissionParams) (interface{}, error)
 	ConsumeRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
-	CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
-	CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
-	CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error)
 	CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) error
 	CreateNoteShare(ctx context.Context, arg CreateNoteShareParams) (NoteShare, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRotatedRefreshToken(ctx context.Context, arg CreateRotatedRefreshTokenParams) (RefreshToken, error)
-	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
-	CreateTaskCompletion(ctx context.Context, arg CreateTaskCompletionParams) (TaskCompletion, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserSettings(ctx context.Context, arg CreateUserSettingsParams) (UserSetting, error)
 	DeleteAttachment(ctx context.Context, id pgtype.UUID) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
-	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
-	DeleteTaskByNodeID(ctx context.Context, arg DeleteTaskByNodeIDParams) error
-	DeleteTasksByNoteID(ctx context.Context, arg DeleteTasksByNoteIDParams) error
 	DisableNoteShareLink(ctx context.Context, noteID pgtype.UUID) error
 	GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesForMigrationRow, error)
 	GetAttachmentByID(ctx context.Context, id pgtype.UUID) (Attachment, error)
@@ -49,14 +41,8 @@ type Querier interface {
 	GetPublicNoteByShareToken(ctx context.Context, tokenID pgtype.UUID) (GetPublicNoteByShareTokenRow, error)
 	GetPublicNoteIDByShareToken(ctx context.Context, tokenID pgtype.UUID) (pgtype.UUID, error)
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]GetRecentNotesRow, error)
-	GetRecentlyCompletedTasks(ctx context.Context, arg GetRecentlyCompletedTasksParams) ([]Task, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRefreshTokenRecord(ctx context.Context, tokenHash string) (RefreshToken, error)
-	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
-	GetTasks(ctx context.Context, arg GetTasksParams) ([]Task, error)
-	GetTasksByNodeID(ctx context.Context, id pgtype.UUID) ([]Task, error)
-	GetTasksByNoteID(ctx context.Context, arg GetTasksByNoteIDParams) ([]Task, error)
-	GetTodayTasks(ctx context.Context, arg GetTodayTasksParams) ([]Task, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserSettings(ctx context.Context, userID pgtype.UUID) (UserSetting, error)
@@ -68,15 +54,12 @@ type Querier interface {
 	RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error
 	RevokeRefreshTokenFamily(ctx context.Context, familyID pgtype.UUID) error
-	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Task, error)
 	TryAcquireGCLock(ctx context.Context) (bool, error)
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteContent(ctx context.Context, arg UpdateNoteContentParams) error
 	UpdateNoteDocument(ctx context.Context, arg UpdateNoteDocumentParams) error
-	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error)
 	UpsertNoteShareLink(ctx context.Context, arg UpsertNoteShareLinkParams) (NoteShareLink, error)
-	UpsertTasksBatch(ctx context.Context, arg UpsertTasksBatchParams) error
 }
 
 var _ Querier = (*Queries)(nil)

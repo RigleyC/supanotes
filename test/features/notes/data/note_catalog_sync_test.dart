@@ -749,9 +749,6 @@ void main() {
     );
     expect(query!.title, 'Shared');
     expect(query.note.collapseImages, isTrue);
-    final tasks = await database.tasksDao.getNoteTasks('shared-view-note');
-    expect(tasks, hasLength(1));
-    expect(tasks.single.title, 'Review offline behavior');
     final document =
         await (database.select(database.localNoteDocuments)
               ..where((document) => document.noteId.equals('shared-view-note')))

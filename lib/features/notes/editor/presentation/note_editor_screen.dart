@@ -15,7 +15,6 @@ import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
-import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
@@ -26,8 +25,7 @@ import 'package:supanotes/features/notes/catalog/application/notes_providers.dar
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
-import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -45,39 +43,11 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
-  TaskModel? _taskForMetadata(
-    String taskId,
-    Map<String, TaskModel> tasks,
-    NoteModel note,
-  ) {
-    final projected = tasks[taskId];
-    if (projected != null) return projected;
-
+  TaskMetadataDraft? _taskForMetadata(String taskId) {
     final controller = _readSession().value?.controller;
     final node = controller?.document.getNodeById(taskId);
     if (node is! TaskNode) return null;
-
-    final dueDate = DateTime.tryParse(
-      node.metadata['dueDate'] as String? ?? '',
-    );
-    return TaskModel(
-      id: node.id,
-      userId: note.userId,
-      noteId: note.id,
-      title: node.text.toPlainText(),
-      status: node.isComplete ? 'done' : 'open',
-      position: '',
-      dueDate: dueDate,
-      hasTime: node.metadata['hasTime'] as bool? ?? false,
-      completedAt: null,
-      recurrence: TaskRecurrence.parse(
-        node.metadata['recurrenceRule'] as String? ??
-            node.metadata['recurrence'] as String?,
-      ),
-      reminder: node.metadata['reminder'] as String?,
-      createdAt: DateTime.now().toUtc(),
-      updatedAt: DateTime.now().toUtc(),
-    );
+    return TaskMetadataDraft.fromTaskNode(node);
   }
 
   AsyncValue<NoteEditorSession> _readSession() =>
@@ -85,9 +55,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
-    final note = noteWithTasksAsync.when(
-      data: (noteWithTasks) => noteWithTasks.note,
+    final noteAsync = ref.watch(noteProvider(widget.noteId));
+    final note = noteAsync.when(
+      data: (note) => note,
       loading: () => null,
       error: (_, _) => null,
     );
@@ -109,7 +79,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       body: _NoteEditorBody(
         noteId: widget.noteId,
         attachmentDelivery: widget.attachmentDelivery,
-        noteWithTasksAsync: noteWithTasksAsync,
+        noteAsync: noteAsync,
         sessionAsync: sessionAsync,
         taskForMetadata: _taskForMetadata,
         readSession: _readSession,
@@ -326,7 +296,7 @@ class _NoteEditorBody extends StatelessWidget {
   const _NoteEditorBody({
     required this.noteId,
     required this.attachmentDelivery,
-    required this.noteWithTasksAsync,
+    required this.noteAsync,
     required this.sessionAsync,
     required this.taskForMetadata,
     required this.readSession,
@@ -334,14 +304,9 @@ class _NoteEditorBody extends StatelessWidget {
 
   final String noteId;
   final AttachmentDelivery? attachmentDelivery;
-  final AsyncValue<NoteWithTasks> noteWithTasksAsync;
+  final AsyncValue<NoteModel?> noteAsync;
   final AsyncValue<NoteEditorSession> sessionAsync;
-  final TaskModel? Function(
-    String taskId,
-    Map<String, TaskModel> tasks,
-    NoteModel note,
-  )
-  taskForMetadata;
+  final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
 
   @override
@@ -355,7 +320,7 @@ class _NoteEditorBody extends StatelessWidget {
             child: _NoteEditorDocument(
               noteId: noteId,
               attachmentDelivery: attachmentDelivery,
-              noteWithTasksAsync: noteWithTasksAsync,
+              noteAsync: noteAsync,
               sessionAsync: sessionAsync,
               taskForMetadata: taskForMetadata,
               readSession: readSession,
@@ -371,7 +336,7 @@ class _NoteEditorDocument extends StatelessWidget {
   const _NoteEditorDocument({
     required this.noteId,
     required this.attachmentDelivery,
-    required this.noteWithTasksAsync,
+    required this.noteAsync,
     required this.sessionAsync,
     required this.taskForMetadata,
     required this.readSession,
@@ -379,28 +344,21 @@ class _NoteEditorDocument extends StatelessWidget {
 
   final String noteId;
   final AttachmentDelivery? attachmentDelivery;
-  final AsyncValue<NoteWithTasks> noteWithTasksAsync;
+  final AsyncValue<NoteModel?> noteAsync;
   final AsyncValue<NoteEditorSession> sessionAsync;
-  final TaskModel? Function(
-    String taskId,
-    Map<String, TaskModel> tasks,
-    NoteModel note,
-  )
-  taskForMetadata;
+  final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
 
   @override
   Widget build(BuildContext context) {
-    return noteWithTasksAsync.when(
-      data: (noteWithTasks) {
-        final note = noteWithTasks.note;
+    return noteAsync.when(
+      data: (note) {
         if (note == null) {
           return Center(child: Text(NoteStrings.errorNotFound));
         }
         return _NoteEditorSessionContent(
           noteId: noteId,
           note: note,
-          tasks: noteWithTasks.taskById,
           attachmentDelivery: attachmentDelivery,
           sessionAsync: sessionAsync,
           taskForMetadata: taskForMetadata,
@@ -417,7 +375,6 @@ class _NoteEditorSessionContent extends StatelessWidget {
   const _NoteEditorSessionContent({
     required this.noteId,
     required this.note,
-    required this.tasks,
     required this.attachmentDelivery,
     required this.sessionAsync,
     required this.taskForMetadata,
@@ -426,15 +383,9 @@ class _NoteEditorSessionContent extends StatelessWidget {
 
   final String noteId;
   final NoteModel note;
-  final Map<String, TaskModel> tasks;
   final AttachmentDelivery? attachmentDelivery;
   final AsyncValue<NoteEditorSession> sessionAsync;
-  final TaskModel? Function(
-    String taskId,
-    Map<String, TaskModel> tasks,
-    NoteModel note,
-  )
-  taskForMetadata;
+  final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
 
   @override
@@ -445,7 +396,6 @@ class _NoteEditorSessionContent extends StatelessWidget {
       data: (session) => _NoteEditorWithSession(
         noteId: noteId,
         note: note,
-        tasks: tasks,
         attachmentDelivery: attachmentDelivery,
         session: session,
         taskForMetadata: taskForMetadata,
@@ -459,7 +409,6 @@ class _NoteEditorWithSession extends ConsumerWidget {
   const _NoteEditorWithSession({
     required this.noteId,
     required this.note,
-    required this.tasks,
     required this.attachmentDelivery,
     required this.session,
     required this.taskForMetadata,
@@ -468,15 +417,9 @@ class _NoteEditorWithSession extends ConsumerWidget {
 
   final String noteId;
   final NoteModel note;
-  final Map<String, TaskModel> tasks;
   final AttachmentDelivery? attachmentDelivery;
   final NoteEditorSession session;
-  final TaskModel? Function(
-    String taskId,
-    Map<String, TaskModel> tasks,
-    NoteModel note,
-  )
-  taskForMetadata;
+  final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
 
   @override
@@ -485,7 +428,6 @@ class _NoteEditorWithSession extends ConsumerWidget {
       context: context,
       ref: ref,
       note: note,
-      tasks: tasks,
       taskForMetadata: taskForMetadata,
       readSession: readSession,
       isReadOnly: !session.captureLocalOperations,
@@ -494,7 +436,6 @@ class _NoteEditorWithSession extends ConsumerWidget {
       noteId: noteId,
       session: session,
       requestInitialFocus: note.shouldAutofocus,
-      taskMetadata: tasks,
       hideCompleted: note.hideCompleted,
       collapseImages: note.collapseImages,
       attachmentDelivery: attachmentDelivery,
@@ -508,7 +449,6 @@ class _NoteEditorTaskDelegate {
     required this.context,
     required this.ref,
     required this.note,
-    required this.tasks,
     required this.taskForMetadata,
     required this.readSession,
     required this.isReadOnly,
@@ -517,13 +457,7 @@ class _NoteEditorTaskDelegate {
   final BuildContext context;
   final WidgetRef ref;
   final NoteModel note;
-  final Map<String, TaskModel> tasks;
-  final TaskModel? Function(
-    String taskId,
-    Map<String, TaskModel> tasks,
-    NoteModel note,
-  )
-  taskForMetadata;
+  final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
   final bool isReadOnly;
 
@@ -537,45 +471,28 @@ class _NoteEditorTaskDelegate {
   }
 
   Future<void> _onTaskLongPress(String taskId) async {
-    final task = taskForMetadata(taskId, tasks, note);
+    final task = taskForMetadata(taskId);
     if (!context.mounted || task == null) return;
     await showTaskMetadataSheet(
       context: context,
       ref: ref,
-      task: task,
-      onSave:
-          ({
-            required dueDate,
-            required hasTime,
-            required recurrence,
-            required reminder,
-          }) => _saveTaskMetadata(
-            taskId,
-            dueDate: dueDate,
-            hasTime: hasTime,
-            recurrence: recurrence,
-            reminder: reminder,
-          ),
+      taskId: taskId,
+      draft: task,
+      onSave: (draft) => _saveTaskMetadata(taskId, draft),
     );
   }
 
-  Future<void> _saveTaskMetadata(
-    String taskId, {
-    required DateTime? dueDate,
-    required bool hasTime,
-    required TaskRecurrence? recurrence,
-    required String? reminder,
-  }) async {
+  Future<void> _saveTaskMetadata(String taskId, TaskMetadataDraft draft) async {
     final controller = readSession().value?.controller;
     controller?.updateTaskMetadataInEditor(
       taskId,
-      dueDate: dueDate,
-      clearDueDate: dueDate == null,
-      hasTime: hasTime,
-      recurrence: recurrence?.name,
-      clearRecurrence: recurrence == null,
-      reminder: reminder,
-      clearReminder: reminder == null,
+      dueDate: draft.scheduleAnchor,
+      clearDueDate: draft.scheduleAnchor == null,
+      hasTime: draft.hasTime,
+      recurrence: draft.recurrence?.name,
+      clearRecurrence: draft.recurrence == null,
+      reminder: draft.reminder?.value,
+      clearReminder: draft.reminder == null,
     );
   }
 

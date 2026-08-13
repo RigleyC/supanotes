@@ -29,6 +29,19 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.noteId.equals(noteId))).watchSingleOrNull();
   }
 
+  Stream<List<LocalNoteDocumentData>> watchMaterializedDocuments() {
+    final query =
+        select(localNoteDocuments).join([
+          innerJoin(notes, notes.id.equalsExp(localNoteDocuments.noteId)),
+        ])..where(
+          localNoteDocuments.materializedDocumentJson.isNotNull() &
+              notes.deletedAt.isNull(),
+        );
+    return query.watch().map(
+      (rows) => rows.map((row) => row.readTable(localNoteDocuments)).toList(),
+    );
+  }
+
   Future<void> upsertNoteDocument(LocalNoteDocumentsCompanion doc) async {
     await transaction(() async {
       await into(
@@ -40,6 +53,34 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
         );
       }
     });
+  }
+
+  Future<void> updateMaterializedDocument({
+    required String noteId,
+    required String documentJson,
+    required DateTime updatedAt,
+  }) async {
+    final changed =
+        await (update(
+          localNoteDocuments,
+        )..where((t) => t.noteId.equals(noteId))).write(
+          LocalNoteDocumentsCompanion(
+            materializedDocumentJson: Value(documentJson),
+            materializedUpdatedAt: Value(updatedAt),
+          ),
+        );
+    if (changed != 0) return;
+    await into(localNoteDocuments).insert(
+      LocalNoteDocumentsCompanion.insert(
+        noteId: noteId,
+        revision: 0,
+        documentJson: '{"schemaVersion":1,"blocks":[]}',
+        updatedAt: updatedAt,
+        materializedDocumentJson: Value(documentJson),
+        materializedUpdatedAt: Value(updatedAt),
+      ),
+      mode: InsertMode.insertOrReplace,
+    );
   }
 
   Future<void> deleteNoteDocument(String noteId) async {

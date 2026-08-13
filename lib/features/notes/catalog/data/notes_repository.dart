@@ -10,8 +10,6 @@ import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
-import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'local/notes_local_repository.dart';
 
 /// Presentation-facing facade over the local notes database.
@@ -24,7 +22,6 @@ import 'local/notes_local_repository.dart';
 abstract class INotesRepository {
   Stream<List<NoteModel>> watchNotes({bool favoritesOnly = false});
   Stream<NoteModel?> watchNoteById(String id);
-  Stream<NoteWithTasks> watchNoteWithTasks(String noteId);
   Future<NoteModel?> getNoteById(String id);
   Future<NoteModel> upsertNote({required String id, String content = ''});
   Future<void> updateNote(String id, {String? content, bool? collapseImages});
@@ -67,17 +64,6 @@ class NotesRepository implements INotesRepository {
     return _local
         .watchNoteById(id)
         .map((qr) => qr == null ? null : NoteModel.fromQueryResult(qr));
-  }
-
-  @override
-  Stream<NoteWithTasks> watchNoteWithTasks(String noteId) {
-    return _local.watchNoteWithTasks(noteId).map((result) {
-      if (result == null) return const NoteWithTasks(note: null, tasks: []);
-      return NoteWithTasks(
-        note: NoteModel.fromQueryResult(result.note),
-        tasks: result.tasks.map(TaskModel.fromData).toList(),
-      );
-    });
   }
 
   @override

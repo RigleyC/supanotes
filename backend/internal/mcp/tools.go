@@ -27,5 +27,4 @@ func RegisterTools(
 	addTaskOccurrenceTool(server, security, toolCompleteTaskOccurrence, deps.DocumentCommands, false)
 	addTaskOccurrenceTool(server, security, toolReopenTaskOccurrence, deps.DocumentCommands, true)
 	addNoteTools(server, security, deps.Notes, deps.DocumentReader, deps.DocumentCommands)
-	addTaskTools(server, security, deps.Tasks)
 }

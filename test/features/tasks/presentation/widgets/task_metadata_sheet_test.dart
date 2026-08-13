@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_controller.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 
 void main() {
@@ -14,29 +14,20 @@ void main() {
 
   testWidgets('renders metadata pickers for existing task', (tester) async {
     final now = DateTime.utc(2026, 6, 11);
-    final task = TaskModel(
+    final task = _SheetTask(
       id: 'task-1',
-      userId: 'user-1',
-      noteId: 'note-1',
-      title: 'Comprar cafe',
-      status: 'open',
-      position: '0',
-      dueDate: now,
-      completedAt: null,
-      recurrence: TaskRecurrence.daily,
-      hasTime: false,
-      reminder: null,
-      createdAt: now,
-      updatedAt: now,
+      draft: TaskMetadataDraft(
+        scheduleAnchor: now,
+        recurrence: TaskRecurrence.daily,
+        hasTime: false,
+        reminder: null,
+      ),
     );
 
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          home: _MetadataSheetLauncher(
-            task: task,
-            onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {},
-          ),
+          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
         ),
       ),
     );
@@ -51,20 +42,14 @@ void main() {
 
   testWidgets('does not show title input', (tester) async {
     final now = DateTime.utc(2026, 6, 11);
-    final task = TaskModel(
+    final task = _SheetTask(
       id: 'task-1',
-      userId: 'user-1',
-      noteId: 'note-1',
-      title: 'Comprar cafe',
-      status: 'open',
-      position: '0',
-      dueDate: now,
-      completedAt: null,
-      recurrence: TaskRecurrence.daily,
-      hasTime: false,
-      reminder: null,
-      createdAt: now,
-      updatedAt: now,
+      draft: TaskMetadataDraft(
+        scheduleAnchor: now,
+        recurrence: TaskRecurrence.daily,
+        hasTime: false,
+        reminder: null,
+      ),
     );
 
     await tester.pumpWidget(_buildSheetForTask(task));
@@ -74,20 +59,14 @@ void main() {
 
   testWidgets('does not show delete button', (tester) async {
     final now = DateTime.utc(2026, 6, 11);
-    final task = TaskModel(
+    final task = _SheetTask(
       id: 'task-1',
-      userId: 'user-1',
-      noteId: 'note-1',
-      title: 'Comprar cafe',
-      status: 'open',
-      position: '0',
-      dueDate: now,
-      completedAt: null,
-      recurrence: TaskRecurrence.daily,
-      hasTime: false,
-      reminder: null,
-      createdAt: now,
-      updatedAt: now,
+      draft: TaskMetadataDraft(
+        scheduleAnchor: now,
+        recurrence: TaskRecurrence.daily,
+        hasTime: false,
+        reminder: null,
+      ),
     );
 
     await tester.pumpWidget(_buildSheetForTask(task));
@@ -97,20 +76,14 @@ void main() {
 
   testWidgets('shows dynamic weekly label with day of week', (tester) async {
     final thursday = DateTime.utc(2026, 6, 11);
-    final t = TaskModel(
+    final t = _SheetTask(
       id: 'task-2',
-      userId: 'user-1',
-      noteId: 'note-1',
-      title: 'Tarefa semanal',
-      status: 'open',
-      position: '0',
-      dueDate: thursday,
-      completedAt: null,
-      recurrence: TaskRecurrence.weekly,
-      hasTime: false,
-      reminder: null,
-      createdAt: thursday,
-      updatedAt: thursday,
+      draft: TaskMetadataDraft(
+        scheduleAnchor: thursday,
+        recurrence: TaskRecurrence.weekly,
+        hasTime: false,
+        reminder: null,
+      ),
     );
 
     await tester.pumpWidget(_buildSheetForTask(t));
@@ -121,20 +94,14 @@ void main() {
 
   testWidgets('shows dynamic monthly label with day of month', (tester) async {
     final fifteenth = DateTime.utc(2026, 7, 15);
-    final t = TaskModel(
+    final t = _SheetTask(
       id: 'task-3',
-      userId: 'user-1',
-      noteId: 'note-1',
-      title: 'Tarefa mensal',
-      status: 'open',
-      position: '0',
-      dueDate: fifteenth,
-      completedAt: null,
-      recurrence: TaskRecurrence.monthly,
-      hasTime: false,
-      reminder: null,
-      createdAt: fifteenth,
-      updatedAt: fifteenth,
+      draft: TaskMetadataDraft(
+        scheduleAnchor: fifteenth,
+        recurrence: TaskRecurrence.monthly,
+        hasTime: false,
+        reminder: null,
+      ),
     );
 
     await tester.pumpWidget(_buildSheetForTask(t));
@@ -152,9 +119,7 @@ void main() {
     expect(find.text('Cancelar'), findsNothing);
   });
 
-  testWidgets('modal selections persist date and recurrence', (
-    tester,
-  ) async {
+  testWidgets('modal selections persist date and recurrence', (tester) async {
     final task = _taskWithoutMetadata(id: 'task-modal-selection');
     DateTime? savedDueDate;
     TaskRecurrence? savedRecurrence;
@@ -166,11 +131,11 @@ void main() {
         child: MaterialApp(
           home: _MetadataSheetLauncher(
             task: task,
-            onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {
+            onSave: (draft) async {
               saveCalls++;
-              savedDueDate = dueDate;
-              savedRecurrence = recurrence;
-              savedHasTime = hasTime;
+              savedDueDate = draft.scheduleAnchor;
+              savedRecurrence = draft.recurrence;
+              savedHasTime = draft.hasTime;
             },
           ),
         ),
@@ -216,9 +181,9 @@ void main() {
           child: MaterialApp(
             home: _MetadataSheetLauncher(
               task: task,
-              onSave: ({dueDate, hasTime = false, recurrence, reminder}) async {
+              onSave: (draft) async {
                 saveCalls++;
-                savedDueDate = dueDate;
+                savedDueDate = draft.scheduleAnchor;
               },
             ),
           ),
@@ -250,7 +215,7 @@ void main() {
   );
 }
 
-Widget _buildSheetForTask(TaskModel task) {
+Widget _buildSheetForTask(_SheetTask task) {
   return ProviderScope(
     child: _ProviderInitializer(
       task: task,
@@ -261,53 +226,40 @@ Widget _buildSheetForTask(TaskModel task) {
   );
 }
 
-TaskModel _task({String id = 'task-1'}) {
+_SheetTask _task({String id = 'task-1'}) {
   final now = DateTime.utc(2026, 6, 11);
-  return TaskModel(
+  return _SheetTask(
     id: id,
-    userId: 'user-1',
-    noteId: 'note-1',
-    title: 'Comprar cafe',
-    status: 'open',
-    position: '0',
-    dueDate: now,
-    completedAt: null,
-    recurrence: TaskRecurrence.daily,
-    hasTime: false,
-    reminder: null,
-    createdAt: now,
-    updatedAt: now,
+    draft: TaskMetadataDraft(
+      scheduleAnchor: now,
+      recurrence: TaskRecurrence.daily,
+      hasTime: false,
+      reminder: null,
+    ),
   );
 }
 
-TaskModel _taskWithoutMetadata({required String id}) {
-  final now = DateTime.utc(2026, 6, 11);
-  return TaskModel(
+_SheetTask _taskWithoutMetadata({required String id}) {
+  return _SheetTask(
     id: id,
-    userId: 'user-1',
-    noteId: 'note-1',
-    title: 'Comprar cafe',
-    status: 'open',
-    position: '0',
-    dueDate: null,
-    completedAt: null,
-    recurrence: null,
-    hasTime: false,
-    reminder: null,
-    createdAt: now,
-    updatedAt: now,
+    draft: const TaskMetadataDraft(
+      scheduleAnchor: null,
+      hasTime: false,
+      recurrence: null,
+      reminder: null,
+    ),
   );
 }
 
 class _ProviderInitializer extends ConsumerWidget {
   const _ProviderInitializer({required this.task, required this.child});
-  final TaskModel task;
+  final _SheetTask task;
   final Widget child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(taskMetadataProvider(task.id).notifier).initialize(task);
+      ref.read(taskMetadataProvider(task.id).notifier).initialize(task.draft);
     });
     return child;
   }
@@ -316,14 +268,8 @@ class _ProviderInitializer extends ConsumerWidget {
 class _MetadataSheetLauncher extends ConsumerWidget {
   const _MetadataSheetLauncher({required this.task, required this.onSave});
 
-  final TaskModel task;
-  final Future<void> Function({
-    required DateTime? dueDate,
-    required bool hasTime,
-    required TaskRecurrence? recurrence,
-    required String? reminder,
-  })
-  onSave;
+  final _SheetTask task;
+  final Future<void> Function(TaskMetadataDraft draft) onSave;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -332,11 +278,19 @@ class _MetadataSheetLauncher extends ConsumerWidget {
         onPressed: () => showTaskMetadataSheet(
           context: context,
           ref: ref,
-          task: task,
+          taskId: task.id,
+          draft: task.draft,
           onSave: onSave,
         ),
         child: const Text('Abrir metadados'),
       ),
     );
   }
+}
+
+class _SheetTask {
+  const _SheetTask({required this.id, required this.draft});
+
+  final String id;
+  final TaskMetadataDraft draft;
 }

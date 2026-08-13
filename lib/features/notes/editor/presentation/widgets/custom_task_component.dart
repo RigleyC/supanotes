@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
@@ -18,7 +18,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
     this.editor,
     this.composer,
-    this.taskMetadataById = const {},
     this.hideCompleted = false,
     this.readOnly = false,
     this.onTaskLongPress,
@@ -29,7 +28,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   Editor? editor;
 
   final MutableDocumentComposer? composer;
-  Map<String, TaskModel> taskMetadataById;
   bool hideCompleted;
   final bool readOnly;
   ValueChanged<String>? onTaskLongPress;
@@ -46,8 +44,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ) {
     if (node is! TaskNode) return null;
 
-    final metadata = taskMetadataById[node.id];
-    final isRecurring = isRecurringTaskNode(node, metadata);
+    final metadata = TaskMetadataDraft.fromTaskNode(node);
+    final isRecurring = isRecurringTaskNode(node);
     if (isRecurring) {
       _recurringTaskIds.add(node.id);
     } else {
@@ -83,8 +81,9 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       textAlignment: TextAlign.left,
       textStyleBuilder: noStyleBuilder,
       selectionColor: const Color(0x00000000),
-      dueDate: metadata?.dueDate,
-      recurrence: metadata?.recurrence,
+      dueDate: metadata.scheduleAnchor,
+      recurrence: metadata.recurrence,
+      taskMetadata: metadata,
     );
   }
 
@@ -96,11 +95,14 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     if (componentViewModel is! TaskComponentViewModel) return null;
 
     final nodeId = componentViewModel.nodeId;
+    final customViewModel = componentViewModel is CustomTaskComponentViewModel
+        ? componentViewModel
+        : null;
 
     return CustomTaskComponent(
       key: componentContext.componentKey,
       viewModel: componentViewModel,
-      taskMetadata: taskMetadataById[nodeId],
+      taskMetadata: customViewModel?.taskMetadata,
       isRecurring: _recurringTaskIds.contains(nodeId),
       isReadOnly: readOnly,
       onCompletionChange: _completionHandlers[nodeId],
@@ -115,16 +117,12 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   }
 }
 
-bool isRecurringTaskNode(TaskNode node, TaskModel? metadata) {
+bool isRecurringTaskNode(TaskNode node) {
   final recurrenceRule = node.metadata['recurrenceRule'];
-  final recurrence = node.metadata['recurrence'];
-  final recurrenceValue = recurrenceRule is String
-      ? recurrenceRule
-      : recurrence is String
-      ? recurrence
-      : null;
-  return TaskRecurrence.parse(recurrenceValue) != null ||
-      metadata?.recurrence != null;
+  return TaskRecurrence.parse(
+        recurrenceRule is String ? recurrenceRule : null,
+      ) !=
+      null;
 }
 
 class CustomTaskComponentViewModel extends TaskComponentViewModel {
@@ -142,21 +140,26 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     required super.selectionColor,
     this.dueDate,
     this.recurrence,
+    required this.taskMetadata,
   });
 
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
+  final TaskMetadataDraft taskMetadata;
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! CustomTaskComponentViewModel) return false;
     if (super != other) return false;
-    return dueDate == other.dueDate && recurrence == other.recurrence;
+    return dueDate == other.dueDate &&
+        recurrence == other.recurrence &&
+        taskMetadata == other.taskMetadata;
   }
 
   @override
-  int get hashCode => Object.hash(super.hashCode, dueDate, recurrence);
+  int get hashCode =>
+      Object.hash(super.hashCode, dueDate, recurrence, taskMetadata);
 }
 
 class CustomTaskComponent extends StatefulWidget {
@@ -174,7 +177,7 @@ class CustomTaskComponent extends StatefulWidget {
   final TaskComponentViewModel viewModel;
   final bool isReadOnly;
   final bool isRecurring;
-  final TaskModel? taskMetadata;
+  final TaskMetadataDraft? taskMetadata;
   final bool hideCompleted;
   final VoidCallback? onLongPress;
   final Future<void> Function(bool isComplete)? onCompletionChange;
@@ -373,12 +376,12 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                     highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
                     underlines: widget.viewModel.createUnderlines(),
                   ),
-                  if (widget.taskMetadata?.dueDate != null ||
+                  if (widget.taskMetadata?.scheduleAnchor != null ||
                       widget.taskMetadata?.recurrence != null ||
                       widget.taskMetadata?.reminder != null) ...[
                     const SizedBox(height: 4),
                     TaskMetadataBadges(
-                      dueDate: widget.taskMetadata?.dueDate,
+                      dueDate: widget.taskMetadata?.scheduleAnchor,
                       recurrence: widget.taskMetadata?.recurrence,
                       hasReminder: widget.taskMetadata?.reminder != null,
                       hasTime: widget.taskMetadata?.hasTime ?? false,

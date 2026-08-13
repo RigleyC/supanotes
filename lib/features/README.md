@@ -8,7 +8,7 @@ sem um contrato claro.
 | --- | --- | --- |
 | `auth` | sessão, login, cadastro e renovação de token | [auth](auth/README.md) |
 | `notes` | catálogo, documento, editor, compartilhamento e anexos | [notes](notes/README.md) |
-| `tasks` | projeções, recorrência, metadados e lembretes | [tasks](tasks/README.md) |
+| `tasks` | recorrência, metadados e lembretes derivados do documento | [tasks](tasks/README.md) |
 | `settings` | preferências da conta e configuração MCP | [settings](settings/README.md) |
 
 Uma feature normalmente separa `data` (adapta banco/API), `domain` (modelo e

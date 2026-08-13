@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
+
+import 'task_metadata_draft.dart';
 
 class TaskMetadataState {
   const TaskMetadataState({
@@ -55,13 +56,13 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
     return const TaskMetadataState();
   }
 
-  void initialize(TaskModel task) {
+  void initialize(TaskMetadataDraft draft) {
     _releaseSheetKeepAlive ??= ref.keepAlive().close;
     state = TaskMetadataState(
-      dueDate: task.dueDate,
-      hasTime: task.hasTime,
-      recurrence: task.recurrence,
-      reminder: TaskReminderOption.fromValue(task.reminder),
+      dueDate: draft.scheduleAnchor,
+      hasTime: draft.hasTime,
+      recurrence: draft.recurrence,
+      reminder: draft.reminder,
       isSaving: false,
     );
   }

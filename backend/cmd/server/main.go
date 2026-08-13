@@ -34,7 +34,6 @@ import (
 	"github.com/RigleyC/supanotes/internal/sharelinks"
 	"github.com/RigleyC/supanotes/internal/shares"
 	"github.com/RigleyC/supanotes/internal/shoppinglist"
-	"github.com/RigleyC/supanotes/internal/tasks"
 	authpkg "github.com/RigleyC/supanotes/pkg/auth"
 	"github.com/RigleyC/supanotes/pkg/config"
 	"github.com/RigleyC/supanotes/pkg/db"
@@ -194,19 +193,6 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.PATCH("/notes/:id", notesH.Update)
 	protected.DELETE("/notes/:id", notesH.Delete)
 
-	// Tasks
-	tasksRepo := tasks.NewRepository(queries)
-	tasksSvc := tasks.NewService(tasksRepo)
-	tasksH := tasks.NewHandler(tasksSvc)
-	protected.POST("/tasks", tasksH.Create)
-	protected.GET("/tasks", tasksH.List)
-	protected.PATCH("/tasks/:id", tasksH.Update)
-	protected.DELETE("/tasks/:id", tasksH.Delete)
-	protected.POST("/tasks/:id/complete", tasksH.Complete)
-	protected.POST("/tasks/:id/reopen", tasksH.Reopen)
-	protected.GET("/tasks/today", tasksH.Today)
-	protected.GET("/notes/:id/tasks", tasksH.GetByNoteID)
-
 	// Shares
 	sharesRepo := shares.NewRepository(queries)
 	sharesSvc := shares.NewService(sharesRepo)
@@ -324,7 +310,6 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	mcpServer := mcpapp.NewServer(mcpapp.ServerDependencies{
 		Security:         mcpapp.NewSecurityStore(pool),
 		Notes:            notesSvc,
-		Tasks:            tasksSvc,
 		DocumentReader:   noteOpsSvc,
 		DocumentCommands: noteOpsSvc,
 		Attachments:      attachmentsSvc,

@@ -13,8 +13,6 @@ import 'daos/note_links_dao.dart';
 import 'daos/note_lifecycle_dao.dart';
 import 'daos/note_operations_dao.dart';
 import 'daos/notes_dao.dart';
-import 'daos/task_completions_dao.dart';
-import 'daos/tasks_dao.dart';
 import 'daos/user_note_preferences_dao.dart';
 import 'tables/attachments.dart';
 import 'tables/local_note_documents.dart';
@@ -23,13 +21,8 @@ import 'tables/note_sync_errors.dart';
 import 'tables/sync_sessions.dart';
 import 'tables/notes.dart';
 import 'tables/pending_note_operations.dart';
-import 'tables/task_completions.dart';
-import 'tables/tasks.dart';
 import 'tables/user_note_preferences.dart';
 import 'note_lifecycle_policy.dart';
-
-import '../../features/tasks/domain/projected_task.dart';
-import '../../features/tasks/domain/task_recurrence.dart'; // Needed for EnumNameConverter in tasks.dart
 
 part 'database.g.dart';
 
@@ -50,8 +43,6 @@ final class UpdateRemoteNote extends RemoteNoteWriteMode {
 @DriftDatabase(
   tables: [
     Notes,
-    Tasks,
-    LocalTaskCompletions,
     NoteLinks,
     Attachments,
     UserNotePreferences,
@@ -62,8 +53,6 @@ final class UpdateRemoteNote extends RemoteNoteWriteMode {
   ],
   daos: [
     NotesDao,
-    TasksDao,
-    TaskCompletionsDao,
     NoteLinksDao,
     AttachmentsDao,
     UserNotePreferencesDao,
@@ -91,38 +80,14 @@ class AppDatabase extends _$AppDatabase {
   /// Removes all local projections and sync state for a deleted note.
   ///
   /// The note row is only the catalog entry. Its document, operations,
-  /// projected tasks, task completions, links, preferences and attachments
+  /// links, preferences and attachments
   /// must be removed together so a deleted note cannot keep producing local
   /// results or notifications.
   Future<void> deleteNoteData(String noteId) async {
     await noteLifecycleDao.deleteNoteData(noteId);
   }
 
-  /// Saves note content/excerpt projection and synced tasks in a single atomic transaction.
-  /// [saveProjectedDocument] is the sole owner opening the transaction.
-  Future<void> saveProjectedDocument({
-    required String noteId,
-    required String content,
-    String? excerpt,
-    required List<ProjectedTask> tasks,
-    String userId = '',
-  }) {
-    return transaction(() async {
-      await notesDao.updateNoteProjection(
-        id: noteId,
-        content: content,
-        excerpt: excerpt,
-        materialized: content.trim().isNotEmpty || tasks.isNotEmpty,
-      );
-      await tasksDao.syncProjectedTasksForNoteTyped(
-        noteId,
-        tasks,
-        userId: userId,
-      );
-    });
-  }
-
-  /// Saves a remote note's canonical snapshot and every local projection atomically.
+  /// Saves a remote note's canonical snapshot and local catalog projection atomically.
   /// [mode] describes whether the catalog observed a new note or a clean
   /// existing row. Returns `false` when a local edit or a concurrent deletion
   /// changed the row after the catalog read. In that case no part of the
@@ -132,7 +97,6 @@ class AppDatabase extends _$AppDatabase {
     required RemoteNoteWriteMode mode,
     required NotesCompanion note,
     required LocalNoteDocumentsCompanion document,
-    required List<ProjectedTask> tasks,
     String userId = '',
   }) {
     return transaction(() async {
@@ -146,11 +110,6 @@ class AppDatabase extends _$AppDatabase {
       }
 
       await noteOperationsDao.upsertNoteDocument(document);
-      await tasksDao.syncProjectedTasksForNoteTyped(
-        noteId,
-        tasks,
-        userId: userId,
-      );
       return true;
     });
   }
@@ -189,7 +148,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => 29;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -203,9 +162,33 @@ class AppDatabase extends _$AppDatabase {
   Future<void> _onUpgrade(Migrator m, int from, int to) async {
     await _migrateInitialSchema(m, from);
     await _migrateNoteFeatures(m, from);
-    await _migrateTaskStorage(m, from);
+    await _migrateLegacyStorage(m, from);
     await _migrateSyncStorage(m, from);
     await _migrateNoteMetadata(m, from);
+    await _migrateEffectiveDocuments(m, from);
+  }
+
+  Future<void> _migrateEffectiveDocuments(Migrator m, int from) async {
+    if (from < 29) {
+      await _addColumnIfMissing(
+        m,
+        localNoteDocuments,
+        'local_note_documents',
+        localNoteDocuments.materializedDocumentJson,
+      );
+      await _addColumnIfMissing(
+        m,
+        localNoteDocuments,
+        'local_note_documents',
+        localNoteDocuments.materializedUpdatedAt,
+      );
+      await customStatement('''
+        UPDATE local_note_documents
+        SET materialized_document_json = document_json,
+            materialized_updated_at = updated_at
+        WHERE materialized_document_json IS NULL
+      ''');
+    }
   }
 
   Future<bool> _hasColumn(String tableName, String columnName) async {
@@ -226,8 +209,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _migrateInitialSchema(Migrator m, int from) async {
     if (from < 2) {
-      await m.createTable(localTaskCompletions);
-      await m.addColumn(tasks, tasks.completedAt);
+      await customStatement(
+        'ALTER TABLE tasks ADD COLUMN completed_at INTEGER',
+      );
     }
     if (from < 3) {
       await m.addColumn(notes, notes.hasRemoteCopy);
@@ -287,7 +271,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  Future<void> _migrateTaskStorage(Migrator m, int from) async {
+  Future<void> _migrateLegacyStorage(Migrator m, int from) async {
     if (from < 14) {
       await customStatement('PRAGMA foreign_keys=ON;');
     }
@@ -296,10 +280,12 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('ALTER TABLE notes DROP COLUMN is_inbox;');
     }
     if (from < 17) {
-      await m.addColumn(tasks, tasks.hasTime);
+      await customStatement(
+        'ALTER TABLE tasks ADD COLUMN has_time INTEGER NOT NULL DEFAULT 0',
+      );
     }
     if (from < 18) {
-      await m.addColumn(tasks, tasks.reminder);
+      await customStatement('ALTER TABLE tasks ADD COLUMN reminder TEXT');
     }
     if (from < 19) {
       await customStatement('DROP TABLE IF EXISTS local_yjs_states;');
@@ -431,10 +417,6 @@ class AppDatabase extends _$AppDatabase {
          OR collapse_images = 1
          OR note_icon_json IS NOT NULL
          OR note_icon_dirty = 1
-         OR EXISTS (
-           SELECT 1 FROM tasks t
-           WHERE t.note_id = notes.id AND t.deleted_at IS NULL
-         )
          OR EXISTS (
            SELECT 1 FROM attachments a
            WHERE a.note_id = notes.id

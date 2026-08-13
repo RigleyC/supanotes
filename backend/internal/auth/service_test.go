@@ -284,55 +284,6 @@ func (m *mockQuerier) GetNoteShareForUser(ctx context.Context, arg sqlcgen.GetNo
 func (m *mockQuerier) GetNoteShares(ctx context.Context, noteID pgtype.UUID) ([]sqlcgen.GetNoteSharesRow, error) {
 	return nil, nil
 }
-func (m *mockQuerier) CreateTask(ctx context.Context, arg sqlcgen.CreateTaskParams) (sqlcgen.Task, error) {
-	return sqlcgen.Task{}, nil
-}
-func (m *mockQuerier) CreateTaskCompletion(ctx context.Context, arg sqlcgen.CreateTaskCompletionParams) (sqlcgen.TaskCompletion, error) {
-	return sqlcgen.TaskCompletion{}, nil
-}
-func (m *mockQuerier) DeleteTask(ctx context.Context, arg sqlcgen.DeleteTaskParams) error { return nil }
-func (m *mockQuerier) DeleteTaskByNodeID(ctx context.Context, arg sqlcgen.DeleteTaskByNodeIDParams) error {
-	return nil
-}
-func (m *mockQuerier) DeleteTasksByNoteID(ctx context.Context, arg sqlcgen.DeleteTasksByNoteIDParams) error {
-	return nil
-}
-func (m *mockQuerier) GetTaskByID(ctx context.Context, arg sqlcgen.GetTaskByIDParams) (sqlcgen.Task, error) {
-	return sqlcgen.Task{}, nil
-}
-func (m *mockQuerier) GetTasks(ctx context.Context, arg sqlcgen.GetTasksParams) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
-func (m *mockQuerier) GetTasksByNodeID(ctx context.Context, id pgtype.UUID) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
-func (m *mockQuerier) GetTasksByNoteID(ctx context.Context, arg sqlcgen.GetTasksByNoteIDParams) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
-func (m *mockQuerier) GetTodayTasks(ctx context.Context, arg sqlcgen.GetTodayTasksParams) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
-func (m *mockQuerier) UpdateTask(ctx context.Context, arg sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
-	return sqlcgen.Task{}, nil
-}
-func (m *mockQuerier) UpsertTasksBatch(ctx context.Context, arg sqlcgen.UpsertTasksBatchParams) error {
-	return nil
-}
-func (m *mockQuerier) GetRecentlyCompletedTasks(ctx context.Context, arg sqlcgen.GetRecentlyCompletedTasksParams) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
-func (m *mockQuerier) SearchTasks(ctx context.Context, arg sqlcgen.SearchTasksParams) ([]sqlcgen.Task, error) {
-	return nil, nil
-}
-func (m *mockQuerier) CountTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	return 0, nil
-}
-func (m *mockQuerier) CountOpenTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	return 0, nil
-}
-func (m *mockQuerier) CountCompletedTasks(ctx context.Context, userID pgtype.UUID) (int64, error) {
-	return 0, nil
-}
 func (m *mockQuerier) InsertAttachment(ctx context.Context, arg sqlcgen.InsertAttachmentParams) (sqlcgen.Attachment, error) {
 	return sqlcgen.Attachment{}, nil
 }

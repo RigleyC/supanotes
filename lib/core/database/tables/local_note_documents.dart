@@ -6,6 +6,8 @@ class LocalNoteDocuments extends Table {
   IntColumn get revision => integer()();
   TextColumn get documentJson => text()();
   DateTimeColumn get updatedAt => dateTime()();
+  TextColumn get materializedDocumentJson => text().nullable()();
+  DateTimeColumn get materializedUpdatedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {noteId};

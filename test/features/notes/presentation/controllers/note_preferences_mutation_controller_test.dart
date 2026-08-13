@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/preferences/data/user_note_preferences_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
-import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
 
 void main() {
@@ -222,11 +221,6 @@ class _FakeNotesRepository implements INotesRepository {
   @override
   Stream<NoteModel?> watchNoteById(String id) {
     return Stream.value(note.id == id ? note : null);
-  }
-
-  @override
-  Stream<NoteWithTasks> watchNoteWithTasks(String noteId) {
-    return Stream.value(NoteWithTasks(note: note, tasks: const []));
   }
 
   @override

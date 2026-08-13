@@ -42,7 +42,17 @@ void main() {
       () => mockSyncService.getConfirmedDocument(any()),
     ).thenAnswer((_) async => null);
     when(
-      () => mockSyncService.enqueueOperations(any(), any()),
+      () => mockSyncService.enqueueOperations(
+        any(),
+        any(),
+        materializedDocumentJson: any(named: 'materializedDocumentJson'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockSyncService.storeMaterializedDocument(
+        noteId: any(named: 'noteId'),
+        documentJson: any(named: 'documentJson'),
+      ),
     ).thenAnswer((_) async {});
     when(
       () => mockSyncService.getPendingOperations(any()),
@@ -531,7 +541,11 @@ void main() {
           () => mockSyncService.loadPendingProjection('note-1'),
         ).thenAnswer((_) async => persistedOperations);
         when(
-          () => mockSyncService.enqueueOperations('note-1', any()),
+          () => mockSyncService.enqueueOperations(
+            'note-1',
+            any(),
+            materializedDocumentJson: any(named: 'materializedDocumentJson'),
+          ),
         ).thenAnswer((invocation) async {
           final requests =
               invocation.positionalArguments[1] as List<OperationRequest>;
@@ -946,23 +960,26 @@ void main() {
       expect((document.first as TextNode).text.toPlainText(), 'Legacy');
     });
 
-    test('hydrates a cached document containing a leaked mutation operation', () async {
-      when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
-        (_) async => LocalNoteDocumentData(
-          noteId: 'note-1',
-          revision: 507,
-          documentJson:
-              '{"blocks":[{"id":"block-1","type":"paragraph","delta":[{"insert":"Cached"},{"delete":6}],"metadata":{}}]}',
-          updatedAt: DateTime.utc(2026, 7, 20),
-        ),
-      );
+    test(
+      'hydrates a cached document containing a leaked mutation operation',
+      () async {
+        when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
+          (_) async => LocalNoteDocumentData(
+            noteId: 'note-1',
+            revision: 507,
+            documentJson:
+                '{"blocks":[{"id":"block-1","type":"paragraph","delta":[{"insert":"Cached"},{"delete":6}],"metadata":{}}]}',
+            updatedAt: DateTime.utc(2026, 7, 20),
+          ),
+        );
 
-      final adapter = createAdapter();
-      await adapter.start();
+        final adapter = createAdapter();
+        await adapter.start();
 
-      expect(document.nodeCount, 1);
-      expect((document.first as TextNode).text.toPlainText(), 'Cached');
-    });
+        expect(document.nodeCount, 1);
+        expect((document.first as TextNode).text.toPlainText(), 'Cached');
+      },
+    );
 
     test('propagates hydration failures', () async {
       when(() => mockSyncService.getConfirmedDocument('note-1')).thenAnswer(
@@ -1007,7 +1024,11 @@ void main() {
 
         final completer = Completer<void>();
         when(
-          () => mockSyncService.enqueueOperations(any(), any()),
+          () => mockSyncService.enqueueOperations(
+            any(),
+            any(),
+            materializedDocumentJson: any(named: 'materializedDocumentJson'),
+          ),
         ).thenAnswer((_) => completer.future);
 
         editor.execute([
@@ -1044,9 +1065,13 @@ void main() {
       await adapter.start();
 
       var attempts = 0;
-      when(() => mockSyncService.enqueueOperations(any(), any())).thenAnswer((
-        _,
-      ) async {
+      when(
+        () => mockSyncService.enqueueOperations(
+          any(),
+          any(),
+          materializedDocumentJson: any(named: 'materializedDocumentJson'),
+        ),
+      ).thenAnswer((_) async {
         attempts++;
         if (attempts == 1) throw StateError('outbox temporarily unavailable');
       });
@@ -1095,7 +1120,13 @@ void main() {
       ]);
       await Future<void>.delayed(Duration.zero);
 
-      verifyNever(() => mockSyncService.enqueueOperations(any(), any()));
+      verifyNever(
+        () => mockSyncService.enqueueOperations(
+          any(),
+          any(),
+          materializedDocumentJson: any(named: 'materializedDocumentJson'),
+        ),
+      );
     });
 
     test('stops listening to document changes', () async {

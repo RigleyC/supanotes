@@ -19,7 +19,8 @@ migração dos importadores. Novos arquivos devem ficar no submódulo correto.
 
 1. [catalog](catalog/README.md): como uma nota passa a existir localmente.
 2. [editor](editor/README.md): como a edição vira operação REST/OT.
-3. [tasks](../tasks/README.md): por que tarefas são projeções do documento.
+3. [tasks](../tasks/README.md): como tarefas vivem no documento e alimentam
+   notificações locais.
 4. [backend noteoperations](../../../backend/internal/noteoperations/README.md): como o servidor confirma uma operação.
 
 Para a referência arquivo por arquivo, consulte [Notes: file reference](../../../docs/architecture/notes-file-reference.md).
@@ -27,4 +28,4 @@ Para a referência arquivo por arquivo, consulte [Notes: file reference](../../.
 ## Regra de ouro
 
 Para mudar texto ou metadados de uma tarefa, altere o documento através da
-sessão do editor. Não escreva diretamente no DAO de tarefas.
+sessão do editor. Não existe DAO relacional de tarefas.
