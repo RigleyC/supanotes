@@ -10,13 +10,11 @@ import (
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/settings"
 	"github.com/RigleyC/supanotes/internal/shares"
-	"github.com/RigleyC/supanotes/internal/tasks"
 )
 
 type ServerDependencies struct {
 	Security         SecurityStore
 	Notes            *notes.Service
-	Tasks            *tasks.Service
 	DocumentReader   noteoperations.DocumentReader
 	DocumentCommands noteoperations.DocumentCommandService
 	Attachments      attachments.Service
@@ -30,8 +28,6 @@ func (d ServerDependencies) Validate() error {
 		missing = "security"
 	} else if d.Notes == nil {
 		missing = "notes"
-	} else if d.Tasks == nil {
-		missing = "tasks"
 	} else if d.DocumentReader == nil {
 		missing = "document reader"
 	} else if d.DocumentCommands == nil {

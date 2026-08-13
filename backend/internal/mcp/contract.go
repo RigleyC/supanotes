@@ -6,7 +6,6 @@ const (
 	toolCreateNote             = "create_note"
 	toolUpdateNote             = "update_note"
 	toolDeleteNote             = "delete_note"
-	toolListTasks              = "list_tasks"
 	toolGetNoteDocument        = "get_note_document"
 	toolListNoteOperations     = "list_note_operations"
 	toolCreateBlock            = "create_block"
@@ -33,7 +32,7 @@ const (
 // Keep this list limited to capabilities that exist in the retained app.
 var CurrentToolNames = []string{
 	toolListNotes, toolGetNote, toolCreateNote, toolUpdateNote, toolDeleteNote,
-	toolListTasks, toolGetNoteDocument, toolListNoteOperations,
+	toolGetNoteDocument, toolListNoteOperations,
 	toolCreateBlock, toolUpdateBlockText, toolMoveBlock, toolDeleteBlock,
 	toolSetBlockType, toolSetBlockMetadata, toolCreateTaskBlock, toolUpdateTaskMetadata,
 	toolCompleteTaskOccurrence, toolReopenTaskOccurrence,

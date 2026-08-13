@@ -11,7 +11,6 @@ import (
 
 	"github.com/RigleyC/supanotes/internal/noteoperations"
 	"github.com/RigleyC/supanotes/internal/notes"
-	"github.com/RigleyC/supanotes/internal/tasks"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
@@ -245,23 +244,4 @@ func syncNoteContent(
 		Operations:    operations,
 		ClientID:      "mcp",
 	})
-}
-
-func addTaskTools(server *mcp.Server, security SecurityStore, tasksSvc *tasks.Service) {
-	addTool(server, security, &mcp.Tool{Name: toolListTasks, Description: "List tasks", InputSchema: noParamSchema},
-		func(ctx context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if err := requireReadScope(ctx); err != nil {
-				return asError(err)
-			}
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			res, err := tasksSvc.GetTasks(ctx, userID, nil, nil, nil, nil, 50, 0)
-			if err != nil {
-				return asError(err)
-			}
-			return asTextResult(res)
-		},
-	)
 }
