@@ -9,7 +9,9 @@ import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 import '../controllers/task_metadata_controller.dart';
@@ -89,66 +91,78 @@ class TaskMetadataSheetBody extends ConsumerWidget {
           _DateTile(
             dueDate: state.dueDate,
             hasTime: state.hasTime,
-            onTap: () => FamilyModalSheet.of(context).pushPage(
-              TaskMetadataDatePage(
-                selected: state.dueDate,
-                onSelected: (date) {
-                  controller.setDueDate(date);
-                },
-              ),
-            ),
+            onTap: () {
+              AppHaptics.controlTap();
+              FamilyModalSheet.of(context).pushPage(
+                TaskMetadataDatePage(
+                  selected: state.dueDate,
+                  onSelected: (date) {
+                    controller.setDueDate(date);
+                  },
+                ),
+              );
+            },
             onClear: controller.clearDueDate,
           ),
           _TimeTile(
             dueDate: state.dueDate,
             hasTime: state.hasTime,
-            onTap: () => FamilyModalSheet.of(context).pushPage(
-              TaskMetadataTimePage(
-                currentDueDate: state.dueDate ?? DateTime.now(),
-                hasTime: state.hasTime,
-                onSelected: (date, {required bool hasTime}) {
-                  controller.setTime(date, hasTime: hasTime);
-                },
-              ),
-            ),
+            onTap: () {
+              AppHaptics.controlTap();
+              FamilyModalSheet.of(context).pushPage(
+                TaskMetadataTimePage(
+                  currentDueDate: state.dueDate ?? DateTime.now(),
+                  hasTime: state.hasTime,
+                  onSelected: (date, {required bool hasTime}) {
+                    controller.setTime(date, hasTime: hasTime);
+                  },
+                ),
+              );
+            },
             onClear: controller.clearTime,
           ),
           _RecurrenceTile(
             recurrence: state.recurrence,
             dueDate: state.dueDate,
-            onTap: () => FamilyModalSheet.of(context).pushPage(
-              TaskMetadataSelectionPage<TaskRecurrence>(
-                title: 'Repetição',
-                selected: state.recurrence,
-                options: TaskRecurrence.values,
-                noneLabel: 'Nenhuma',
-                optionLabel: (recurrence) =>
-                    recurrence.getLocalizedLabel(state.dueDate),
-                optionIcon: (recurrence) => recurrence.icon,
-                onSelected: (r) {
-                  controller.setRecurrence(r);
-                },
-              ),
-            ),
+            onTap: () {
+              AppHaptics.controlTap();
+              FamilyModalSheet.of(context).pushPage(
+                TaskMetadataSelectionPage<TaskRecurrence>(
+                  title: 'Repetição',
+                  selected: state.recurrence,
+                  options: TaskRecurrence.values,
+                  noneLabel: 'Nenhuma',
+                  optionLabel: (recurrence) =>
+                      recurrence.getLocalizedLabel(state.dueDate),
+                  optionIcon: (recurrence) => recurrence.icon,
+                  onSelected: (r) {
+                    controller.setRecurrence(r);
+                  },
+                ),
+              );
+            },
             onClear: () => controller.setRecurrence(null),
           ),
           _ReminderTile(
             reminder: state.reminder,
-            onTap: () => FamilyModalSheet.of(context).pushPage(
-              TaskMetadataSelectionPage<TaskReminderOption>(
-                title: 'Lembrete',
-                selected: state.reminder,
-                options: TaskReminderOption.values.where(
-                  (option) => option.isRelative == state.hasTime,
+            onTap: () {
+              AppHaptics.controlTap();
+              FamilyModalSheet.of(context).pushPage(
+                TaskMetadataSelectionPage<TaskReminderOption>(
+                  title: 'Lembrete',
+                  selected: state.reminder,
+                  options: TaskReminderOption.values.where(
+                    (option) => option.isRelative == state.hasTime,
+                  ),
+                  noneLabel: 'Nenhum',
+                  optionLabel: (reminder) => reminder.label,
+                  optionIcon: (_) => Icons.notifications_outlined,
+                  onSelected: (reminder) {
+                    controller.setReminder(reminder);
+                  },
                 ),
-                noneLabel: 'Nenhum',
-                optionLabel: (reminder) => reminder.label,
-                optionIcon: (_) => Icons.notifications_outlined,
-                onSelected: (reminder) {
-                  controller.setReminder(reminder);
-                },
-              ),
-            ),
+              );
+            },
             onClear: () => controller.setReminder(null),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -193,8 +207,9 @@ class _DateTile extends StatelessWidget {
         ),
       ),
       trailing: hasDueDate
-          ? IconButton(
+          ? AppIconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
+              tooltip: 'Remover data',
               onPressed: onClear,
             )
           : null,
@@ -236,8 +251,9 @@ class _TimeTile extends StatelessWidget {
         ),
       ),
       trailing: hasTime
-          ? IconButton(
+          ? AppIconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
+              tooltip: 'Remover horário',
               onPressed: onClear,
             )
           : null,
@@ -281,8 +297,9 @@ class _RecurrenceTile extends StatelessWidget {
         ),
       ),
       trailing: hasValue
-          ? IconButton(
+          ? AppIconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
+              tooltip: 'Remover recorrência',
               onPressed: onClear,
             )
           : null,
@@ -322,8 +339,9 @@ class _ReminderTile extends StatelessWidget {
         ),
       ),
       trailing: hasValue
-          ? IconButton(
+          ? AppIconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
+              tooltip: 'Remover lembrete',
               onPressed: onClear,
             )
           : null,

@@ -6,6 +6,7 @@ import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_controller.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
+import '../../../../helpers/haptic_test_helper.dart';
 
 void main() {
   setUpAll(() async {
@@ -119,6 +120,35 @@ void main() {
     expect(find.text('Cancelar'), findsNothing);
   });
 
+  testWidgets('opening the date page emits one control haptic', (tester) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+    final task = _taskWithoutMetadata(id: 'task-date-open-haptic');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Abrir metadados'));
+    await tester.pumpAndSettle();
+
+    recorder.calls.clear();
+    await tester.tap(find.text('Adicionar data'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Escolher data'), findsOneWidget);
+    expect(
+      recorder.calls.where(
+        (call) => call.arguments == 'HapticFeedbackType.lightImpact',
+      ),
+      hasLength(1),
+    );
+  });
+
   testWidgets('modal selections persist date and recurrence', (tester) async {
     final task = _taskWithoutMetadata(id: 'task-modal-selection');
     DateTime? savedDueDate;
@@ -213,6 +243,39 @@ void main() {
       expect(savedDueDate, isNull);
     },
   );
+
+  testWidgets('clearing an existing date emits one control haptic', (
+    tester,
+  ) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+    final task = _task(id: 'task-date-clear-haptic');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Abrir metadados'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Adicionar data'), findsNothing);
+
+    recorder.calls.clear();
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Adicionar data'), findsOneWidget);
+    expect(
+      recorder.calls.where(
+        (call) => call.arguments == 'HapticFeedbackType.lightImpact',
+      ),
+      hasLength(1),
+    );
+  });
 }
 
 Widget _buildSheetForTask(_SheetTask task) {

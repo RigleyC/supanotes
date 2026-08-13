@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:supanotes/shared/widgets/global_sheet.dart';
+import '../../helpers/haptic_test_helper.dart';
 
 class _PushPageButton extends StatelessWidget {
   const _PushPageButton({required this.child});
@@ -23,6 +24,8 @@ void main() {
     tester,
   ) async {
     var closed = false;
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -53,9 +56,16 @@ void main() {
 
     expect(find.text('Página principal'), findsOneWidget);
 
+    recorder.calls.clear();
     await tester.tap(find.byTooltip('Fechar'));
     await tester.pumpAndSettle();
 
+    expect(
+      recorder.calls.where(
+        (call) => call.arguments == 'HapticFeedbackType.lightImpact',
+      ),
+      hasLength(1),
+    );
     expect(closed, isTrue);
     expect(find.text('Página principal'), findsNothing);
   });
