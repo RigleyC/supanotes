@@ -13,7 +13,11 @@ class NoteTaskReader {
 
   List<TaskNotificationEntry> read(String documentJson) {
     final json = jsonDecode(documentJson) as Map<String, dynamic>;
-    final snapshot = const NoteDocumentCodec().parseSnapshot(json);
+    final snapshot = const NoteDocumentCodec().parseSnapshot(
+      json,
+      allowEmptyDeltaOperations: true,
+      allowMutationDeltaOperations: true,
+    );
     final policy = TaskOccurrencePolicy(clock: clock);
     final entries = <TaskNotificationEntry>[];
     for (final block in snapshot.blocks) {
