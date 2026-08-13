@@ -30,9 +30,16 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
   }
 
   Stream<List<LocalNoteDocumentData>> watchMaterializedDocuments() {
-    return (select(
-      localNoteDocuments,
-    )..where((t) => t.materializedDocumentJson.isNotNull())).watch();
+    final query =
+        select(localNoteDocuments).join([
+          innerJoin(notes, notes.id.equalsExp(localNoteDocuments.noteId)),
+        ])..where(
+          localNoteDocuments.materializedDocumentJson.isNotNull() &
+              notes.deletedAt.isNull(),
+        );
+    return query.watch().map(
+      (rows) => rows.map((row) => row.readTable(localNoteDocuments)).toList(),
+    );
   }
 
   Future<void> upsertNoteDocument(LocalNoteDocumentsCompanion doc) async {

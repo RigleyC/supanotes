@@ -87,24 +87,6 @@ class AppDatabase extends _$AppDatabase {
     await noteLifecycleDao.deleteNoteData(noteId);
   }
 
-  /// Saves note content/excerpt projection.
-  /// [saveProjectedDocument] is the sole owner opening the transaction.
-  Future<void> saveProjectedDocument({
-    required String noteId,
-    required String content,
-    String? excerpt,
-    String userId = '',
-  }) {
-    return transaction(() async {
-      await notesDao.updateNoteProjection(
-        id: noteId,
-        content: content,
-        excerpt: excerpt,
-        materialized: content.trim().isNotEmpty,
-      );
-    });
-  }
-
   /// Saves a remote note's canonical snapshot and local catalog projection atomically.
   /// [mode] describes whether the catalog observed a new note or a clean
   /// existing row. Returns `false` when a local edit or a concurrent deletion
