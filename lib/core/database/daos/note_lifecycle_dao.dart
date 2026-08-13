@@ -41,15 +41,6 @@ final class NoteLifecycleDao extends DatabaseAccessor<AppDatabase> {
   }
 
   Future<void> _deleteNoteDataInTransaction(String noteId) async {
-    final noteTasks = await (select(
-      attachedDatabase.tasks,
-    )..where((task) => task.noteId.equals(noteId))).get();
-    for (final task in noteTasks) {
-      await (delete(
-        attachedDatabase.localTaskCompletions,
-      )..where((completion) => completion.taskId.equals(task.id))).go();
-    }
-
     await (delete(
       attachedDatabase.attachments,
     )..where((attachment) => attachment.noteId.equals(noteId))).go();
@@ -60,9 +51,6 @@ final class NoteLifecycleDao extends DatabaseAccessor<AppDatabase> {
     await (delete(
       attachedDatabase.userNotePreferences,
     )..where((preference) => preference.noteId.equals(noteId))).go();
-    await (delete(
-      attachedDatabase.tasks,
-    )..where((task) => task.noteId.equals(noteId))).go();
     await (delete(
       attachedDatabase.localNoteDocuments,
     )..where((document) => document.noteId.equals(noteId))).go();

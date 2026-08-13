@@ -53,14 +53,15 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     required String documentJson,
     required DateTime updatedAt,
   }) async {
-    final changed = await (update(
-      localNoteDocuments,
-    )..where((t) => t.noteId.equals(noteId))).write(
-      LocalNoteDocumentsCompanion(
-        materializedDocumentJson: Value(documentJson),
-        materializedUpdatedAt: Value(updatedAt),
-      ),
-    );
+    final changed =
+        await (update(
+          localNoteDocuments,
+        )..where((t) => t.noteId.equals(noteId))).write(
+          LocalNoteDocumentsCompanion(
+            materializedDocumentJson: Value(documentJson),
+            materializedUpdatedAt: Value(updatedAt),
+          ),
+        );
     if (changed != 0) return;
     await into(localNoteDocuments).insert(
       LocalNoteDocumentsCompanion.insert(

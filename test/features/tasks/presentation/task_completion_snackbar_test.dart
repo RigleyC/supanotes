@@ -3,7 +3,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
@@ -114,24 +113,6 @@ void main() {
   testWidgets(
     'creates a daily recurring task, clicks to complete, and snackbar disappears after default time',
     (tester) async {
-      // Create a daily recurring task
-      final now = DateTime.now();
-      final task = TaskModel(
-        id: 'task-1',
-        userId: 'user-1',
-        noteId: 'note-1',
-        title: 'Daily Task',
-        status: 'open',
-        position: '0',
-        dueDate: now,
-        completedAt: null,
-        recurrence: TaskRecurrence.daily,
-        hasTime: false,
-        reminder: null,
-        createdAt: now,
-        updatedAt: now,
-      );
-
       await tester.pumpWidget(
         ProviderScope(
           overrides: [

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart';
 import 'package:mocktail/mocktail.dart';
@@ -8,7 +10,6 @@ import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
-import 'package:supanotes/features/tasks/domain/task_projection_engine.dart';
 
 class _OfflineNoteSyncClient extends Mock implements NoteSyncClient {}
 
@@ -58,7 +59,6 @@ void main() {
         syncService: syncService,
         document: document,
         editor: editor,
-        taskProjectionEngine: TaskProjectionEngine(database: database),
         userId: 'user-1',
         captureLocalOperations: false,
       );
@@ -79,8 +79,13 @@ void main() {
 
       verifyNever(() => client.syncOperations(any(), any()));
 
+      final localDocument = await database.noteOperationsDao
+          .watchNoteDocument('close-note')
+          .first;
       expect(
-        (await database.notesDao.getNoteById('close-note'))!.content,
+        jsonDecode(
+          localDocument!.materializedDocumentJson!,
+        )['blocks'][0]['delta'][0]['insert'],
         'Última edição',
       );
       editor.dispose();
