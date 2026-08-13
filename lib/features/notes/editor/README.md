@@ -38,7 +38,8 @@ mas somente a sessão converte mudanças em operações e sincroniza dados.
   hidrata e reconcilia o documento.
 - `sync/note_operation_rebaser.dart`: ajusta operações locais restantes após
   operações remotas ou confirmação de servidor.
-- `sync/note_sync_session.dart`: serializa sync/polling/projeção e expõe os
+- `sync/note_sync_session.dart`: serializa sync/polling e materialização local,
+  e expõe os
   estados `opening`, `ready`, `syncing`, `syncError`, `error` e `closed`.
 
 ## Por que não sincronizar no widget?
