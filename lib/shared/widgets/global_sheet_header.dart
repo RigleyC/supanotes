@@ -1,9 +1,12 @@
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
+
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
-class TaskMetadataPageHeader extends StatelessWidget {
-  const TaskMetadataPageHeader({super.key, required this.title});
+/// Fixed page header for a Family sheet page: title plus a close button that
+/// delegates to [FamilyModalSheet.popPage].
+class GlobalSheetHeader extends StatelessWidget {
+  const GlobalSheetHeader({super.key, required this.title});
 
   final String title;
 
@@ -22,7 +25,7 @@ class TaskMetadataPageHeader extends StatelessWidget {
             child: Text(title, style: Theme.of(context).textTheme.titleMedium),
           ),
           IconButton(
-            tooltip: 'Voltar',
+            tooltip: 'Fechar',
             icon: const Icon(Icons.close_rounded),
             onPressed: () => FamilyModalSheet.of(context).popPage(),
           ),

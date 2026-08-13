@@ -90,67 +90,91 @@ class _ToolbarButtonState extends State<ToolbarButton>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _motion,
-      builder: (context, child) {
-        final colorScheme = Theme.of(context).colorScheme;
-        final activeProgress = _activeMotion.value.clamp(0.0, 1.0);
-        final iconProgress = _iconMotion.value.clamp(0.0, 1.0);
-        final inactiveColor = widget.onPressed == null
-            ? colorScheme.onSurface.withValues(alpha: 0.38)
-            : colorScheme.onSurface;
-        final foreground = Color.lerp(
-          inactiveColor,
-          colorScheme.primary,
-          activeProgress,
-        )!;
-        final background = colorScheme.primary.withValues(
-          alpha: 0.12 * activeProgress,
-        );
+      builder: (_, _) => _ToolbarButtonVisual(
+        icon: widget.icon,
+        svgAsset: widget.svgAsset,
+        semanticLabel: widget.semanticLabel,
+        spacious: widget.spacious,
+        onPressed: widget.onPressed,
+        activeProgress: _activeMotion.value.clamp(0.0, 1.0),
+        iconProgress: _iconMotion.value.clamp(0.0, 1.0),
+      ),
+    );
+  }
+}
 
-        final icon = widget.icon != null
-            ? Icon(
-                widget.icon,
-                size: widget.spacious ? 28 : 26,
-                color: foreground,
-              )
-            : SvgPicture.asset(
-                widget.svgAsset!,
-                width: widget.spacious ? 26 : 24,
-                height: widget.spacious ? 26 : 24,
-                colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
-              );
+class _ToolbarButtonVisual extends StatelessWidget {
+  const _ToolbarButtonVisual({
+    required this.icon,
+    required this.svgAsset,
+    required this.semanticLabel,
+    required this.spacious,
+    required this.onPressed,
+    required this.activeProgress,
+    required this.iconProgress,
+  });
 
-        return Semantics(
-          button: true,
-          enabled: widget.onPressed != null,
-          label: widget.semanticLabel,
-          child: InkWell(
+  final IconData? icon;
+  final String? svgAsset;
+  final String? semanticLabel;
+  final bool spacious;
+  final VoidCallback? onPressed;
+  final double activeProgress;
+  final double iconProgress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final inactiveColor = onPressed == null
+        ? colorScheme.onSurface.withValues(alpha: 0.38)
+        : colorScheme.onSurface;
+    final foreground = Color.lerp(
+      inactiveColor,
+      colorScheme.primary,
+      activeProgress,
+    )!;
+    final background = colorScheme.primary.withValues(
+      alpha: 0.12 * activeProgress,
+    );
+    final buttonIcon = icon != null
+        ? Icon(icon, size: spacious ? 28 : 26, color: foreground)
+        : SvgPicture.asset(
+            svgAsset!,
+            width: spacious ? 26 : 24,
+            height: spacious ? 26 : 24,
+            colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
+          );
+
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      label: semanticLabel,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        onTap: onPressed,
+        child: Container(
+          constraints: BoxConstraints(
+            minWidth: spacious ? 44 : 36,
+            minHeight: spacious ? 44 : 36,
+          ),
+          alignment: Alignment.center,
+          padding: EdgeInsets.all(AppSpacing.xs),
+          decoration: BoxDecoration(
+            color: background,
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            onTap: widget.onPressed,
-            child: Container(
-              constraints: BoxConstraints(
-                minWidth: widget.spacious ? 44 : 36,
-                minHeight: widget.spacious ? 44 : 36,
-              ),
-              alignment: Alignment.center,
-              padding: EdgeInsets.all(AppSpacing.xs),
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-              ),
+          ),
+          child: Transform.scale(
+            scale: 0.96 + (0.04 * activeProgress),
+            child: Opacity(
+              opacity: 0.7 + (0.3 * iconProgress),
               child: Transform.scale(
-                scale: 0.96 + (0.04 * activeProgress),
-                child: Opacity(
-                  opacity: 0.7 + (0.3 * iconProgress),
-                  child: Transform.scale(
-                    scale: 0.9 + (0.1 * iconProgress),
-                    child: icon,
-                  ),
-                ),
+                scale: 0.9 + (0.1 * iconProgress),
+                child: buttonIcon,
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

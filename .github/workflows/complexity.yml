@@ -30,7 +30,33 @@ jobs:
       - name: Run cognitive complexity audit
         uses: kevmoo/cognitive_complexity.dart@e36813e14019789ec69588e78cbe98acf1dce0d4
         with:
-          targets: lib
+          # Keep generated Drift bindings out of the source audit.
+          targets: >-
+            lib/main.dart
+            lib/shared
+            lib/core/api
+            lib/core/auth
+            lib/core/async
+            lib/core/constants
+            lib/core/database/database.dart
+            lib/core/database/note_lifecycle_policy.dart
+            lib/core/database/tables
+            lib/core/database/daos/attachments_dao.dart
+            lib/core/database/daos/note_lifecycle_dao.dart
+            lib/core/database/daos/note_links_dao.dart
+            lib/core/database/daos/note_operations_dao.dart
+            lib/core/database/daos/notes_dao.dart
+            lib/core/database/daos/task_completions_dao.dart
+            lib/core/database/daos/tasks_dao.dart
+            lib/core/database/daos/user_note_preferences_dao.dart
+            lib/core/debug
+            lib/core/di
+            lib/core/notifications
+            lib/core/router
+            lib/core/sync
+            lib/core/utils
+            lib/core/validators
+            lib/features
           threshold: 15
           fail-threshold: 15
           fail-on-increase: true

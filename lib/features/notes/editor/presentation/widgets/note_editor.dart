@@ -178,39 +178,61 @@ class _NoteEditorState extends State<NoteEditor> {
   void didUpdateWidget(NoteEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (widget.session != oldWidget.session) {
-      _controls?.dispose();
-      _controls = null;
-      _componentBuilders = null;
-      _contentTapDelegateFactories = null;
-      _taskComponentBuilder = null;
-      _attachSession(widget.session);
-    }
+    _handleSessionUpdate(oldWidget);
+    _handleHiddenTaskUpdate(oldWidget);
+    _handleBuilderUpdate(oldWidget);
+  }
 
+  void _handleSessionUpdate(NoteEditor oldWidget) {
+    if (widget.session == oldWidget.session) return;
+
+    _controls?.dispose();
+    _controls = null;
+    _resetStableBuilders();
+    _attachSession(widget.session);
+  }
+
+  void _handleHiddenTaskUpdate(NoteEditor oldWidget) {
     if (widget.hideCompleted != oldWidget.hideCompleted ||
         widget.taskMetadata != oldWidget.taskMetadata) {
       _configureHiddenTaskEditing();
     }
+  }
 
-    if (widget.hideCompleted != oldWidget.hideCompleted ||
+  void _handleBuilderUpdate(NoteEditor oldWidget) {
+    final builderInputsChanged =
+        widget.hideCompleted != oldWidget.hideCompleted ||
         widget.collapseImages != oldWidget.collapseImages ||
-        widget.attachmentDelivery != oldWidget.attachmentDelivery) {
-      if (widget.hideCompleted && !oldWidget.hideCompleted) {
-        final selection = _controller?.composer.selection;
-        final selectedNode = selection == null
-            ? null
-            : _controller?.editor.document.getNodeById(selection.extent.nodeId);
-        if (selectedNode is TaskNode && selectedNode.isComplete) {
-          _controller?.composer.clearSelection();
-          _controller?.focusNode.unfocus();
-        }
+        widget.attachmentDelivery != oldWidget.attachmentDelivery;
+
+    if (!builderInputsChanged) {
+      if (widget.taskMetadata != oldWidget.taskMetadata) {
+        _taskComponentBuilder?.taskMetadataById = widget.taskMetadata;
       }
-      _componentBuilders = null;
-      _contentTapDelegateFactories = null;
-      _taskComponentBuilder = null;
-    } else if (widget.taskMetadata != oldWidget.taskMetadata) {
-      _taskComponentBuilder?.taskMetadataById = widget.taskMetadata;
+      return;
     }
+
+    if (widget.hideCompleted && !oldWidget.hideCompleted) {
+      _clearSelectionFromCompletedTask();
+    }
+    _resetStableBuilders();
+  }
+
+  void _clearSelectionFromCompletedTask() {
+    final selection = _controller?.composer.selection;
+    final selectedNode = selection == null
+        ? null
+        : _controller?.editor.document.getNodeById(selection.extent.nodeId);
+    if (selectedNode is TaskNode && selectedNode.isComplete) {
+      _controller?.composer.clearSelection();
+      _controller?.focusNode.unfocus();
+    }
+  }
+
+  void _resetStableBuilders() {
+    _componentBuilders = null;
+    _contentTapDelegateFactories = null;
+    _taskComponentBuilder = null;
   }
 
   void _onControllerReady() {
@@ -293,46 +315,44 @@ class _NoteEditorState extends State<NoteEditor> {
                       groupId: noteEditorToolbarTapRegionGroup,
                       child: ValueListenableBuilder<bool>(
                         valueListenable: _formattingToolbarOpen,
-                        builder:
-                            (context, formattingToolbarOpen, child) =>
-                                SuperEditor(
-                                  key: ValueKey<bool>(_isReadOnly),
-                                  editor: controller.editor,
-                                  focusNode: controller.focusNode,
-                                  autofocus: widget.requestInitialFocus,
-                                  inputSource: TextInputSource.ime,
-                                  softwareKeyboardController:
-                                      _softwareKeyboardController,
-                                  imePolicies: SuperEditorImePolicies(
-                                    openKeyboardOnSelectionChange:
-                                        !formattingToolbarOpen,
-                                  ),
-                                  documentLayoutKey: _docLayoutKey,
-                                  selectionLayerLinks: _selectionLayerLinks,
-                                  stylesheet: _cachedStylesheet!,
-                                  selectionStyle: editorSelectionStyle(
-                                    theme.colorScheme,
-                                  ),
-                                  documentOverlayBuilders: [
-                                    ...defaultSuperEditorDocumentOverlayBuilders
-                                        .where(
-                                          (builder) =>
-                                              builder
-                                                  is! DefaultCaretOverlayBuilder,
-                                        ),
-                                    DefaultCaretOverlayBuilder(
-                                      caretStyle: CaretStyle(
-                                        color: theme.colorScheme.primary,
-                                        width: 1.5,
-                                      ),
+                        builder: (context, formattingToolbarOpen, child) =>
+                            SuperEditor(
+                              key: ValueKey<bool>(_isReadOnly),
+                              editor: controller.editor,
+                              focusNode: controller.focusNode,
+                              autofocus: widget.requestInitialFocus,
+                              inputSource: TextInputSource.ime,
+                              softwareKeyboardController:
+                                  _softwareKeyboardController,
+                              imePolicies: SuperEditorImePolicies(
+                                openKeyboardOnSelectionChange:
+                                    !formattingToolbarOpen,
+                              ),
+                              documentLayoutKey: _docLayoutKey,
+                              selectionLayerLinks: _selectionLayerLinks,
+                              stylesheet: _cachedStylesheet!,
+                              selectionStyle: editorSelectionStyle(
+                                theme.colorScheme,
+                              ),
+                              documentOverlayBuilders: [
+                                ...defaultSuperEditorDocumentOverlayBuilders
+                                    .where(
+                                      (builder) =>
+                                          builder
+                                              is! DefaultCaretOverlayBuilder,
                                     ),
-                                  ],
-                                  contentTapDelegateFactories:
-                                      _contentTapDelegateFactories,
-                                  keyboardActions:
-                                      editorKeyboardActions(),
-                                  componentBuilders: _componentBuilders!,
+                                DefaultCaretOverlayBuilder(
+                                  caretStyle: CaretStyle(
+                                    color: theme.colorScheme.primary,
+                                    width: 1.5,
+                                  ),
                                 ),
+                              ],
+                              contentTapDelegateFactories:
+                                  _contentTapDelegateFactories,
+                              keyboardActions: editorKeyboardActions(),
+                              componentBuilders: _componentBuilders!,
+                            ),
                       ),
                     ),
                   ),

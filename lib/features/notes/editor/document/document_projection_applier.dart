@@ -23,6 +23,7 @@ class DocumentProjectionApplier {
   Future<void> rebuildFromSnapshot({
     required Map<String, dynamic> snapshot,
     required List<PendingNoteOperationData>? pendingOps,
+    required bool repairPersistedSnapshot,
     required void Function() suppressCapture,
     required void Function() resumeCapture,
     required void Function() rebuildMirror,
@@ -40,6 +41,7 @@ class DocumentProjectionApplier {
         'selection': previousSelection,
       },
     );
+    var rebuildCompleted = false;
     try {
       _editor.startTransaction();
       _editor.execute([
@@ -55,7 +57,10 @@ class DocumentProjectionApplier {
         _editor.execute([DeleteNodeRequest(nodeId: node.id)]);
       }
 
-      applyFullDocument(snapshot);
+      applyFullDocument(
+        snapshot,
+        repairPersistedSnapshot: repairPersistedSnapshot,
+      );
 
       if (pendingOps != null) {
         for (final op in pendingOps) {
@@ -78,6 +83,7 @@ class DocumentProjectionApplier {
       }
 
       rebuildMirror();
+      rebuildCompleted = true;
     } finally {
       final selection = _selectionAfterRebuild(previousSelection);
       NoteSyncDebug.log(
@@ -92,11 +98,14 @@ class DocumentProjectionApplier {
         ),
       ]);
       _editor.endTransaction();
-      resumeCapture();
+      if (rebuildCompleted) resumeCapture();
     }
   }
 
-  void applyFullDocument(Map<String, dynamic> snapshot) {
+  void applyFullDocument(
+    Map<String, dynamic> snapshot, {
+    required bool repairPersistedSnapshot,
+  }) {
     final blocks = snapshot['blocks'] as List<dynamic>? ?? [];
     if (blocks.isEmpty) {
       _editor.execute([
@@ -115,7 +124,9 @@ class DocumentProjectionApplier {
     var nodeIndex = 0;
     for (final block in blocks) {
       final b = block as Map<String, dynamic>;
-      final node = _codec.decodePersistedNode(b);
+      final node = repairPersistedSnapshot
+          ? _codec.decodePersistedNode(b)
+          : _codec.decodeNode(b);
       if (!insertedNodeIds.add(node.id)) {
         NoteSyncDebug.log(
           'projection.snapshot.duplicate_node_id',
@@ -137,126 +148,155 @@ class DocumentProjectionApplier {
   }) {
     switch (kind) {
       case NoteOperationWireNames.textDelta:
-        if (blockId == null) return;
-        final node = _document.getNodeById(blockId);
-        if (node is TextNode) {
-          final rawOps = payload['ops'] as List<dynamic>?;
-          if (rawOps != null) {
-            final ops = rawOps.cast<Map<String, dynamic>>();
-            final newText = _codec.applyDeltaToText(node.text, ops);
-            if (newText != null) {
-              final newNode = _createNodeWithUpdatedText(node, newText);
-              _editor.execute([
-                ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
-              ]);
-            }
-          }
-        }
+        _applyTextDelta(blockId, payload);
         break;
       case NoteOperationWireNames.createBlock:
-        final node = _codec.decodeNode(payload);
-        if (_document.getNodeById(node.id) != null) {
-          NoteSyncDebug.log(
-            'projection.create.skip_duplicate',
-            fields: {'nodeId': node.id},
-          );
-          return;
-        }
-        final afterBlockId = payload['afterBlockId'] as String?;
-        int insertIndex = _document.nodeCount;
-        if (afterBlockId != null) {
-          final targetNode = _document.getNodeById(afterBlockId);
-          if (targetNode != null) {
-            insertIndex = _document.getNodeIndexById(targetNode.id) + 1;
-          }
-        } else {
-          insertIndex = 0;
-        }
-        _editor.execute([
-          InsertNodeAtIndexRequest(newNode: node, nodeIndex: insertIndex),
-        ]);
+        _applyCreateBlock(payload);
         break;
       case NoteOperationWireNames.deleteBlock:
-        if (blockId == null) return;
-        final node = _document.getNodeById(blockId);
-        if (node != null && _document.nodeCount > 1) {
-          _editor.execute([DeleteNodeRequest(nodeId: blockId)]);
-        }
+        _applyDeleteBlock(blockId);
         break;
       case NoteOperationWireNames.moveBlock:
-        final moveBlockId = payload['blockId'] as String? ?? blockId;
-        if (moveBlockId == null) return;
-        final node = _document.getNodeById(moveBlockId);
-        if (node == null || _document.nodeCount <= 1) return;
-
-        final afterBlockId = payload['afterBlockId'] as String?;
-        if (afterBlockId == moveBlockId) return;
-        int targetIndex = _document.nodeCount - 1;
-        if (afterBlockId == null) {
-          targetIndex = 0;
-        } else {
-          final targetNode = _document.getNodeById(afterBlockId);
-          if (targetNode != null) {
-            targetIndex = _document.getNodeIndexById(targetNode.id) + 1;
-          }
-        }
-        _editor.execute([
-          MoveNodeRequest(nodeId: moveBlockId, newIndex: targetIndex),
-        ]);
+        _applyMoveBlock(blockId, payload);
         break;
       case NoteOperationWireNames.setBlockType:
-        if (blockId == null) return;
-        final newType = payload['type'] as String? ?? 'paragraph';
-        final node = _document.getNodeById(blockId);
-        if (node != null) {
-          final text = (node is TextNode) ? node.text : AttributedText();
-          final isComplete = (node is TaskNode) ? node.isComplete : false;
-          final newNode = _codec.createNodeFromBlockType(
-            nodeId: blockId,
-            type: newType,
-            text: text,
-            isTaskComplete: isComplete,
-          );
-          _editor.execute([
-            ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
-          ]);
-        }
+        _applySetBlockType(blockId, payload);
         break;
       case NoteOperationWireNames.setBlockMetadata:
-        if (blockId == null) return;
-        final node = _document.getNodeById(blockId);
-        final meta = payload['metadata'] as Map<String, dynamic>?;
-        if (node != null && meta != null) {
-          final newNode = _createNodeWithUpdatedMetadata(node, meta);
-          _editor.execute([
-            ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
-          ]);
-        }
+        _applySetBlockMetadata(blockId, payload);
         break;
       case NoteOperationWireNames.completeTaskOccurrence:
-        final targetId = blockId ?? payload['taskId'] as String?;
-        if (targetId == null) return;
-        final node = _document.getNodeById(targetId);
-        final scheduledAt = payload['scheduledAt'] as String?;
-        final completedAt = payload['completedAt'] as String?;
-        if (node is TaskNode && scheduledAt != null) {
-          final currentCompletions = Map<String, dynamic>.from(
-            node.metadata['completions'] as Map? ?? {},
-          );
-          if (completedAt != null && completedAt.isNotEmpty) {
-            currentCompletions[scheduledAt] = completedAt;
-          } else {
-            currentCompletions.remove(scheduledAt);
-          }
-          final newNode = _createNodeWithUpdatedMetadata(node, {
-            'completions': currentCompletions,
-          });
-          _editor.execute([
-            ReplaceNodeRequest(existingNodeId: targetId, newNode: newNode),
-          ]);
-        }
+        _applyCompleteTaskOccurrence(blockId, payload);
         break;
     }
+  }
+
+  void _applyTextDelta(String? blockId, Map<String, dynamic> payload) {
+    if (blockId == null) return;
+    final node = _document.getNodeById(blockId);
+    if (node is! TextNode) return;
+
+    final rawOps = payload['ops'] as List<dynamic>?;
+    if (rawOps == null) return;
+
+    final ops = rawOps.cast<Map<String, dynamic>>();
+    final newText = _codec.applyDeltaToText(node.text, ops);
+    if (newText == null) return;
+
+    _replaceNode(blockId, _createNodeWithUpdatedText(node, newText));
+  }
+
+  void _applyCreateBlock(Map<String, dynamic> payload) {
+    final node = _codec.decodeNode(payload);
+    if (_document.getNodeById(node.id) != null) {
+      NoteSyncDebug.log(
+        'projection.create.skip_duplicate',
+        fields: {'nodeId': node.id},
+      );
+      return;
+    }
+
+    final afterBlockId = payload['afterBlockId'] as String?;
+    int insertIndex = _document.nodeCount;
+    if (afterBlockId != null) {
+      final targetNode = _document.getNodeById(afterBlockId);
+      if (targetNode != null) {
+        insertIndex = _document.getNodeIndexById(targetNode.id) + 1;
+      }
+    } else {
+      insertIndex = 0;
+    }
+    _editor.execute([
+      InsertNodeAtIndexRequest(newNode: node, nodeIndex: insertIndex),
+    ]);
+  }
+
+  void _applyDeleteBlock(String? blockId) {
+    if (blockId == null) return;
+    final node = _document.getNodeById(blockId);
+    if (node != null && _document.nodeCount > 1) {
+      _editor.execute([DeleteNodeRequest(nodeId: blockId)]);
+    }
+  }
+
+  void _applyMoveBlock(String? blockId, Map<String, dynamic> payload) {
+    final moveBlockId = payload['blockId'] as String? ?? blockId;
+    if (moveBlockId == null) return;
+    final node = _document.getNodeById(moveBlockId);
+    if (node == null || _document.nodeCount <= 1) return;
+
+    final sourceIndex = _document.getNodeIndexById(moveBlockId);
+    final afterBlockId = payload['afterBlockId'] as String?;
+    if (afterBlockId == moveBlockId) return;
+    int targetIndex = _document.nodeCount - 1;
+    if (afterBlockId == null) {
+      targetIndex = 0;
+    } else {
+      final targetNode = _document.getNodeById(afterBlockId);
+      if (targetNode != null) {
+        final targetNodeIndex = _document.getNodeIndexById(targetNode.id);
+        targetIndex = targetNodeIndex + 1;
+        if (sourceIndex < targetNodeIndex) {
+          targetIndex -= 1;
+        }
+      }
+    }
+    _editor.execute([
+      MoveNodeRequest(nodeId: moveBlockId, newIndex: targetIndex),
+    ]);
+  }
+
+  void _applySetBlockType(String? blockId, Map<String, dynamic> payload) {
+    if (blockId == null) return;
+    final newType = payload['type'] as String? ?? 'paragraph';
+    final node = _document.getNodeById(blockId);
+    if (node == null) return;
+
+    final text = (node is TextNode) ? node.text : AttributedText();
+    final isComplete = (node is TaskNode) ? node.isComplete : false;
+    final newNode = _codec.createNodeFromBlockType(
+      nodeId: blockId,
+      type: newType,
+      text: text,
+      isTaskComplete: isComplete,
+    );
+    _editor.execute([
+      ReplaceNodeRequest(existingNodeId: blockId, newNode: newNode),
+    ]);
+  }
+
+  void _applySetBlockMetadata(String? blockId, Map<String, dynamic> payload) {
+    if (blockId == null) return;
+    final node = _document.getNodeById(blockId);
+    final meta = payload['metadata'] as Map<String, dynamic>?;
+    if (node == null || meta == null) return;
+
+    _replaceNode(blockId, _createNodeWithUpdatedMetadata(node, meta));
+  }
+
+  void _applyCompleteTaskOccurrence(
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    final targetId = blockId ?? payload['taskId'] as String?;
+    if (targetId == null) return;
+    final node = _document.getNodeById(targetId);
+    final scheduledAt = payload['scheduledAt'] as String?;
+    final completedAt = payload['completedAt'] as String?;
+    if (node is! TaskNode || scheduledAt == null) return;
+
+    final currentCompletions = Map<String, dynamic>.from(
+      node.metadata['completions'] as Map? ?? {},
+    );
+    if (completedAt != null && completedAt.isNotEmpty) {
+      currentCompletions[scheduledAt] = completedAt;
+    } else {
+      currentCompletions.remove(scheduledAt);
+    }
+    final newNode = _createNodeWithUpdatedMetadata(node, {
+      'completions': currentCompletions,
+    });
+    _replaceNode(targetId, newNode);
   }
 
   DocumentSelection? _selectionAfterRebuild(DocumentSelection? previous) {
@@ -293,6 +333,7 @@ class DocumentProjectionApplier {
         id: node.id,
         text: newText,
         isComplete: node.isComplete,
+        indent: node.indent,
         metadata: Map.from(node.metadata),
       );
     } else if (node is ListItemNode) {
@@ -300,65 +341,105 @@ class DocumentProjectionApplier {
         id: node.id,
         itemType: node.type,
         text: newText,
+        indent: node.indent,
         metadata: Map.from(node.metadata),
       );
     } else if (node is ParagraphNode) {
       return ParagraphNode(
         id: node.id,
         text: newText,
+        indent: node.indent,
         metadata: Map.from(node.metadata),
       );
     }
     return ParagraphNode(id: node.id, text: newText);
   }
 
+  void _replaceNode(String nodeId, DocumentNode newNode) {
+    _editor.execute([
+      ReplaceNodeRequest(existingNodeId: nodeId, newNode: newNode),
+    ]);
+    if (newNode is TaskNode && newNode.indent > 0) {
+      // Super Editor treats a task replacement as a deletion while normalizing
+      // task indentation. Restore the existing level after that reaction.
+      _editor.execute([SetTaskIndentRequest(newNode.id, newNode.indent)]);
+    }
+  }
+
   DocumentNode _createNodeWithUpdatedMetadata(
     DocumentNode node,
     Map<String, dynamic> meta,
   ) {
-    final updatedMeta = Map<String, dynamic>.from(node.metadata);
-    for (final entry in meta.entries) {
-      if (entry.value == null) {
-        updatedMeta.remove(entry.key);
-      } else {
-        updatedMeta[entry.key] = entry.value;
-      }
-    }
-
-    if (updatedMeta.containsKey('blockType')) {
-      final rawBType = updatedMeta['blockType'];
-      if (rawBType is String) {
-        final attr = _codec.attributionFromName(rawBType);
-        if (attr != null) {
-          updatedMeta['blockType'] = attr;
-        } else {
-          updatedMeta.remove('blockType');
-        }
-      } else if (rawBType == null) {
-        updatedMeta.remove('blockType');
-      }
-    }
+    final updatedMeta = _mergeMetadata(node.metadata, meta);
+    _normalizeBlockType(updatedMeta);
 
     if (node is TaskNode) {
-      final isComp = meta.containsKey('isCompleted')
-          ? meta['isCompleted'] as bool
-          : node.isComplete;
       return TaskNode(
         id: node.id,
         text: node.text,
-        isComplete: isComp,
+        isComplete: _updatedCompletion(node, meta),
+        indent: _updatedIndent(node.indent, meta),
         metadata: updatedMeta,
       );
     } else if (node is ParagraphNode) {
-      return ParagraphNode(id: node.id, text: node.text, metadata: updatedMeta);
+      return ParagraphNode(
+        id: node.id,
+        text: node.text,
+        indent: _updatedIndent(node.indent, meta),
+        metadata: updatedMeta,
+      );
     } else if (node is ListItemNode) {
       return ListItemNode(
         id: node.id,
         itemType: node.type,
         text: node.text,
+        indent: _updatedIndent(node.indent, meta),
         metadata: updatedMeta,
       );
     }
     return node;
+  }
+
+  Map<String, dynamic> _mergeMetadata(
+    Map<String, dynamic> current,
+    Map<String, dynamic> updates,
+  ) {
+    final merged = Map<String, dynamic>.from(current);
+    for (final entry in updates.entries) {
+      if (entry.value == null) {
+        merged.remove(entry.key);
+      } else {
+        merged[entry.key] = entry.value;
+      }
+    }
+    return merged;
+  }
+
+  void _normalizeBlockType(Map<String, dynamic> metadata) {
+    if (!metadata.containsKey('blockType')) return;
+
+    final rawBlockType = metadata['blockType'];
+    if (rawBlockType is String) {
+      final attribution = _codec.attributionFromName(rawBlockType);
+      if (attribution != null) {
+        metadata['blockType'] = attribution;
+      } else {
+        metadata.remove('blockType');
+      }
+    } else if (rawBlockType == null) {
+      metadata.remove('blockType');
+    }
+  }
+
+  bool _updatedCompletion(TaskNode node, Map<String, dynamic> metadata) {
+    return metadata.containsKey('isCompleted')
+        ? metadata['isCompleted'] as bool
+        : node.isComplete;
+  }
+
+  int _updatedIndent(int currentIndent, Map<String, dynamic> metadata) {
+    return metadata.containsKey('indent')
+        ? metadata['indent'] as int? ?? 0
+        : currentIndent;
   }
 }

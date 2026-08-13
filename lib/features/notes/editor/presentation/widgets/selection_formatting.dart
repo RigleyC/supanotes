@@ -31,24 +31,51 @@ bool hasAttributionInEditorSelection(
     document,
     selection,
   ).whereType<TextNode>()) {
-    final startPosition = selection.start.nodeId == node.id
-        ? selection.start.nodePosition
-        : null;
-    final endPosition = selection.end.nodeId == node.id
-        ? selection.end.nodePosition
-        : null;
-    final start = startPosition is TextNodePosition ? startPosition.offset : 0;
-    final end = endPosition is TextNodePosition
-        ? endPosition.offset
-        : node.text.length;
-    final safeStart = start.clamp(0, node.text.length);
-    final safeEnd = end.clamp(safeStart, node.text.length);
-    for (var index = safeStart; index < safeEnd; index++) {
-      containsText = true;
-      if (!node.text.hasAttributionAt(index, attribution: attribution)) {
-        return false;
-      }
-    }
+    final range = _selectedTextRange(node, selection);
+    containsText = containsText || range.start < range.end;
+    if (!_hasAttributionInRange(node, range, attribution)) return false;
   }
   return containsText;
+}
+
+({int start, int end}) _selectedTextRange(
+  TextNode node,
+  DocumentSelection selection,
+) {
+  final start = _selectionOffset(
+    position: selection.start,
+    nodeId: node.id,
+    fallback: 0,
+  );
+  final end = _selectionOffset(
+    position: selection.end,
+    nodeId: node.id,
+    fallback: node.text.length,
+  );
+  final safeStart = start.clamp(0, node.text.length);
+  final safeEnd = end.clamp(safeStart, node.text.length);
+  return (start: safeStart, end: safeEnd);
+}
+
+int _selectionOffset({
+  required DocumentPosition position,
+  required String nodeId,
+  required int fallback,
+}) {
+  if (position.nodeId != nodeId) return fallback;
+  final nodePosition = position.nodePosition;
+  return nodePosition is TextNodePosition ? nodePosition.offset : fallback;
+}
+
+bool _hasAttributionInRange(
+  TextNode node,
+  ({int start, int end}) range,
+  Attribution attribution,
+) {
+  for (var index = range.start; index < range.end; index++) {
+    if (!node.text.hasAttributionAt(index, attribution: attribution)) {
+      return false;
+    }
+  }
+  return true;
 }

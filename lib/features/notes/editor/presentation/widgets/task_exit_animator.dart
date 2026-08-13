@@ -58,26 +58,44 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
   void didUpdateWidget(covariant TaskExitAnimator oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    final becameComplete = widget.isComplete && !oldWidget.isComplete;
-    final becameIncomplete = !widget.isComplete && oldWidget.isComplete;
-    final hideToggledOn = widget.hideCompleted && !oldWidget.hideCompleted;
-    final hideToggledOff = !widget.hideCompleted && oldWidget.hideCompleted;
-
-    if (hideToggledOn && widget.isComplete && !becameComplete) {
-      Future.delayed(_exitAnimationDelay, () {
-        if (mounted && widget.isComplete && widget.hideCompleted) {
-          _controller.forward();
-        }
-      });
-    } else if (hideToggledOff) {
+    if (_shouldAnimateWhenHidingCompleted(oldWidget)) {
+      _scheduleForwardWhenHidden();
+    } else if (_shouldReverseForVisibilityChange(oldWidget)) {
       _controller.reverse();
-    } else if (becameComplete && widget.hideCompleted) {
-      Future.delayed(_exitAnimationDelay, () {
-        if (mounted && widget.isComplete) _controller.forward();
-      });
-    } else if (becameIncomplete) {
-      _controller.reverse();
+    } else if (_shouldAnimateCompletedTask(oldWidget)) {
+      _scheduleForwardAfterCompletion();
     }
+  }
+
+  bool _shouldAnimateWhenHidingCompleted(TaskExitAnimator oldWidget) {
+    return widget.hideCompleted &&
+        !oldWidget.hideCompleted &&
+        widget.isComplete &&
+        oldWidget.isComplete;
+  }
+
+  bool _shouldReverseForVisibilityChange(TaskExitAnimator oldWidget) {
+    final hideToggledOff = !widget.hideCompleted && oldWidget.hideCompleted;
+    final becameIncomplete = !widget.isComplete && oldWidget.isComplete;
+    return hideToggledOff || becameIncomplete;
+  }
+
+  bool _shouldAnimateCompletedTask(TaskExitAnimator oldWidget) {
+    return widget.isComplete && !oldWidget.isComplete && widget.hideCompleted;
+  }
+
+  void _scheduleForwardWhenHidden() {
+    Future.delayed(_exitAnimationDelay, () {
+      if (mounted && widget.isComplete && widget.hideCompleted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  void _scheduleForwardAfterCompletion() {
+    Future.delayed(_exitAnimationDelay, () {
+      if (mounted && widget.isComplete) _controller.forward();
+    });
   }
 
   @override

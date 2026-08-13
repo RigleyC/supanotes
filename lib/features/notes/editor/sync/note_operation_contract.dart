@@ -89,71 +89,123 @@ abstract final class NoteOperationContract {
 
     switch (parsedKind) {
       case NoteOperationKind.textDelta:
-        if (blockId == null || blockId.isEmpty) {
-          return 'blockId is required for text_delta';
-        }
-        return payload['ops'] is List ? null : 'ops must be a list';
+        return _validateTextDelta(blockId, payload);
       case NoteOperationKind.createBlock:
-        final id = payload['id'];
-        if (id is! String || id.isEmpty) {
-          return 'id is required for create_block';
-        }
-        if (blockId != null && blockId != id) {
-          return 'blockId must match id for create_block';
-        }
-        if (payload['type'] is! String || (payload['type'] as String).isEmpty) {
-          return 'type is required for create_block';
-        }
-        if (payload['delta'] is! List) return 'delta must be a list';
-        if (payload.containsKey('metadata') &&
-            payload['metadata'] != null &&
-            payload['metadata'] is! Map) {
-          return 'metadata must be an object';
-        }
-        return _optionalString(payload, 'afterBlockId');
+        return _validateCreateBlock(blockId, payload);
       case NoteOperationKind.deleteBlock:
-        return _matchesBlockId(
-          blockId,
-          payload['blockId'],
-          NoteOperationKind.deleteBlock.wireName,
-        );
+        return _validateDeleteBlock(blockId, payload);
       case NoteOperationKind.moveBlock:
-        final blockError = _matchesBlockId(
-          blockId,
-          payload['blockId'],
-          NoteOperationKind.moveBlock.wireName,
-        );
-        return blockError ?? _optionalString(payload, 'afterBlockId');
+        return _validateMoveBlock(blockId, payload);
       case NoteOperationKind.setBlockType:
-        if (blockId == null || blockId.isEmpty) {
-          return 'blockId is required for set_block_type';
-        }
-        final type = payload['type'];
-        return type is String && type.isNotEmpty
-            ? null
-            : 'type is required for set_block_type';
+        return _validateSetBlockType(blockId, payload);
       case NoteOperationKind.setBlockMetadata:
-        if (blockId == null || blockId.isEmpty) {
-          return 'blockId is required for set_block_metadata';
-        }
-        return payload['metadata'] is Map ? null : 'metadata must be an object';
+        return _validateSetBlockMetadata(blockId, payload);
       case NoteOperationKind.completeTaskOccurrence:
-        if (blockId == null || blockId.isEmpty) {
-          return 'blockId is required for complete_task_occurrence';
-        }
-        final taskId = payload['taskId'];
-        if (taskId != blockId) return 'taskId must match blockId';
-        final scheduledAt = payload['scheduledAt'];
-        if (scheduledAt is! String || scheduledAt.isEmpty) {
-          return 'scheduledAt is required';
-        }
-        final completedAt = payload['completedAt'];
-        if (completedAt != null &&
-            (completedAt is! String || completedAt.isEmpty)) {
-          return 'completedAt must be null or a non-empty string';
-        }
-        return null;
+        return _validateCompleteTaskOccurrence(blockId, payload);
     }
+  }
+
+  static String? _validateTextDelta(
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    if (blockId == null || blockId.isEmpty) {
+      return 'blockId is required for text_delta';
+    }
+    final ops = payload['ops'];
+    if (ops is! List) return 'ops must be a list';
+    return ops.every((op) => op is Map) ? null : 'ops must contain objects';
+  }
+
+  static String? _validateCreateBlock(
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    final id = payload['id'];
+    if (id is! String || id.isEmpty) {
+      return 'id is required for create_block';
+    }
+    if (blockId != null && blockId != id) {
+      return 'blockId must match id for create_block';
+    }
+    final type = payload['type'];
+    if (type is! String || type.isEmpty) {
+      return 'type is required for create_block';
+    }
+    if (payload['delta'] is! List) return 'delta must be a list';
+    if (payload.containsKey('metadata') &&
+        payload['metadata'] != null &&
+        payload['metadata'] is! Map) {
+      return 'metadata must be an object';
+    }
+    return _optionalString(payload, 'afterBlockId');
+  }
+
+  static String? _validateDeleteBlock(
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    return _matchesBlockId(
+      blockId,
+      payload['blockId'],
+      NoteOperationKind.deleteBlock.wireName,
+    );
+  }
+
+  static String? _validateMoveBlock(
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    final blockError = _matchesBlockId(
+      blockId,
+      payload['blockId'],
+      NoteOperationKind.moveBlock.wireName,
+    );
+    return blockError ?? _optionalString(payload, 'afterBlockId');
+  }
+
+  static String? _validateSetBlockType(
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    if (blockId == null || blockId.isEmpty) {
+      return 'blockId is required for set_block_type';
+    }
+    final type = payload['type'];
+    return type is String && type.isNotEmpty
+        ? null
+        : 'type is required for set_block_type';
+  }
+
+  static String? _validateSetBlockMetadata(
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    if (blockId == null || blockId.isEmpty) {
+      return 'blockId is required for set_block_metadata';
+    }
+    return payload['metadata'] is Map ? null : 'metadata must be an object';
+  }
+
+  static String? _validateCompleteTaskOccurrence(
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    if (blockId == null || blockId.isEmpty) {
+      return 'blockId is required for complete_task_occurrence';
+    }
+    final taskId = payload['taskId'];
+    if (taskId != blockId) return 'taskId must match blockId';
+    final scheduledAt = payload['scheduledAt'];
+    if (scheduledAt is! String || scheduledAt.isEmpty) {
+      return 'scheduledAt is required';
+    }
+    final completedAt = payload['completedAt'];
+    if (completedAt != null &&
+        (completedAt is! String || completedAt.isEmpty)) {
+      return 'completedAt must be null or a non-empty string';
+    }
+    return null;
   }
 
   static String? _matchesBlockId(

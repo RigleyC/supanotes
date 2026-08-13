@@ -6,6 +6,12 @@ import 'package:super_editor/super_editor.dart';
 import 'attachment_nodes.dart';
 import 'note_document_constants.dart';
 
+typedef _EncodedNode = ({
+  String type,
+  AttributedText text,
+  Map<String, dynamic> metadata,
+});
+
 /// Strict, transport-independent representation of a canonical note
 /// snapshot. Sharing and sync envelopes may carry this value, but only this
 /// document layer validates and decodes its block contract.
@@ -157,6 +163,24 @@ class NoteDocumentCodec {
   }) {
     final rawId = json['id'];
     final rawType = json['type'];
+    _validateBlockIdentity(rawId, rawType);
+
+    final delta = _parseDelta(
+      json['delta'],
+      allowEmptyDeltaOperations: allowEmptyDeltaOperations,
+      allowMutationDeltaOperations: allowMutationDeltaOperations,
+    );
+    final metadata = _parseMetadata(json['metadata']);
+    _validateMetadata(rawType as String, metadata);
+    return NoteDocumentBlock(
+      id: rawId as String,
+      type: rawType,
+      delta: delta,
+      metadata: metadata,
+    );
+  }
+
+  void _validateBlockIdentity(dynamic rawId, dynamic rawType) {
     if (rawId is! String || rawId.isEmpty) {
       throw const FormatException('Note document block has no id');
     }
@@ -166,84 +190,111 @@ class NoteDocumentCodec {
     if (!supportedBlockTypes.contains(rawType)) {
       throw FormatException('Unsupported note document block type: $rawType');
     }
+  }
 
-    final rawDelta = json['delta'];
+  List<Map<String, dynamic>> _parseDelta(
+    dynamic rawDelta, {
+    required bool allowEmptyDeltaOperations,
+    required bool allowMutationDeltaOperations,
+  }) {
     if (rawDelta is! List) {
       throw const FormatException('Note document block has no delta');
     }
-    final delta = rawDelta
+    return rawDelta
         .map<Map<String, dynamic>?>((rawOperation) {
-          if (rawOperation is! Map) {
-            throw const FormatException(
-              'Note document block contains an invalid delta',
-            );
-          }
-          final operation = Map<String, dynamic>.from(rawOperation);
-          if (allowEmptyDeltaOperations && operation.isEmpty) {
-            return <String, dynamic>{'insert': ''};
-          }
-          if (operation['insert'] is! String) {
-            final isMutationOperation =
-                !operation.containsKey('insert') &&
-                (operation['delete'] is int || operation['retain'] is int);
-            if (allowMutationDeltaOperations && isMutationOperation) {
-              return null;
-            }
-            throw const FormatException(
-              'Note document block contains a non-text delta operation',
-            );
-          }
-          final rawAttributes = operation['attributes'];
-          if (rawAttributes != null && rawAttributes is! Map) {
-            throw const FormatException(
-              'Note document block contains invalid delta attributes',
-            );
-          }
-          if (rawAttributes is Map) {
-            for (final entry in rawAttributes.entries) {
-              if (entry.key is! String) {
-                throw const FormatException(
-                  'Note document block contains invalid delta attribute names',
-                );
-              }
-              if (entry.key == 'link') {
-                final uri = entry.value is String
-                    ? Uri.tryParse(entry.value as String)
-                    : null;
-                if (uri == null) {
-                  throw const FormatException(
-                    'Note document block contains an invalid link attribute',
-                  );
-                }
-              } else if (entry.key.toString().startsWith('link:')) {
-                if (entry.value != true ||
-                    Uri.tryParse(entry.key.toString().substring(5)) == null) {
-                  throw const FormatException(
-                    'Note document block contains an invalid link attribution',
-                  );
-                }
-              }
-            }
-          }
-          return operation;
+          return _parseDeltaOperation(
+            rawOperation,
+            allowEmptyDeltaOperations: allowEmptyDeltaOperations,
+            allowMutationDeltaOperations: allowMutationDeltaOperations,
+          );
         })
         .whereType<Map<String, dynamic>>()
         .toList(growable: false);
+  }
 
-    final rawMetadata = json['metadata'];
+  Map<String, dynamic>? _parseDeltaOperation(
+    dynamic rawOperation, {
+    required bool allowEmptyDeltaOperations,
+    required bool allowMutationDeltaOperations,
+  }) {
+    if (rawOperation is! Map) {
+      throw const FormatException(
+        'Note document block contains an invalid delta',
+      );
+    }
+    final operation = Map<String, dynamic>.from(rawOperation);
+    if (allowEmptyDeltaOperations && operation.isEmpty) {
+      return <String, dynamic>{'insert': ''};
+    }
+    if (operation['insert'] is! String) {
+      if (allowMutationDeltaOperations && _isMutationOperation(operation)) {
+        return null;
+      }
+      throw const FormatException(
+        'Note document block contains a non-text delta operation',
+      );
+    }
+    _validateDeltaAttributes(operation['attributes']);
+    return operation;
+  }
+
+  bool _isMutationOperation(Map<String, dynamic> operation) {
+    return !operation.containsKey('insert') &&
+        (operation['delete'] is int || operation['retain'] is int);
+  }
+
+  void _validateDeltaAttributes(dynamic rawAttributes) {
+    if (rawAttributes != null && rawAttributes is! Map) {
+      throw const FormatException(
+        'Note document block contains invalid delta attributes',
+      );
+    }
+    if (rawAttributes is! Map) return;
+
+    for (final entry in rawAttributes.entries) {
+      _validateDeltaAttributeEntry(entry);
+    }
+  }
+
+  void _validateDeltaAttributeEntry(MapEntry<dynamic, dynamic> entry) {
+    if (entry.key is! String) {
+      throw const FormatException(
+        'Note document block contains invalid delta attribute names',
+      );
+    }
+
+    final key = entry.key as String;
+    if (key == 'link') {
+      _validateLinkAttribute(entry.value);
+    } else if (key.startsWith('link:')) {
+      _validateLinkAttribution(key, entry.value);
+    }
+  }
+
+  void _validateLinkAttribute(dynamic value) {
+    final uri = value is String ? Uri.tryParse(value) : null;
+    if (uri == null) {
+      throw const FormatException(
+        'Note document block contains an invalid link attribute',
+      );
+    }
+  }
+
+  void _validateLinkAttribution(String key, dynamic value) {
+    if (value != true || Uri.tryParse(key.substring(5)) == null) {
+      throw const FormatException(
+        'Note document block contains an invalid link attribution',
+      );
+    }
+  }
+
+  Map<String, dynamic> _parseMetadata(dynamic rawMetadata) {
     if (rawMetadata != null && rawMetadata is! Map) {
       throw const FormatException('Note document block has invalid metadata');
     }
-    final metadata = rawMetadata == null
+    return rawMetadata == null
         ? const <String, dynamic>{}
         : Map<String, dynamic>.from(rawMetadata);
-    _validateMetadata(rawType, metadata);
-    return NoteDocumentBlock(
-      id: rawId,
-      type: rawType,
-      delta: delta,
-      metadata: metadata,
-    );
   }
 
   static void _validateMetadata(String type, Map<String, dynamic> metadata) {
@@ -379,91 +430,118 @@ class NoteDocumentCodec {
   }
 
   Map<String, dynamic> encodeNode(DocumentNode node) {
-    final String blockId = node.id;
-    String type = 'paragraph';
-    final Map<String, dynamic> metadata = {};
-    AttributedText text = AttributedText();
+    final encoded = _encodeNode(node);
 
-    if (node is TaskNode) {
-      type = 'task';
-      text = node.text;
-      metadata['isCompleted'] = node.isComplete;
-      if (node.indent != 0) {
-        metadata['indent'] = node.indent;
-      }
-      for (final entry in node.metadata.entries) {
-        if (entry.key != 'isCompleted') {
-          metadata[entry.key] = entry.value;
-        }
-      }
-    } else if (node is HorizontalRuleNode) {
-      type = 'divider';
-      for (final entry in node.metadata.entries) {
-        metadata[entry.key] = entry.value;
-      }
-    } else if (node is ListItemNode) {
-      type = node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
-      text = node.text;
-      if (node.indent != 0) {
-        metadata['indent'] = node.indent;
-      }
-      for (final entry in node.metadata.entries) {
-        if (entry.key != 'blockType') {
-          metadata[entry.key] = entry.value;
-        }
-      }
-    } else if (node is ParagraphNode) {
-      text = node.text;
-      final blockType = node.metadata['blockType'];
-      if (blockType == header1Attribution) {
-        type = 'header1';
-      } else if (blockType == header2Attribution) {
-        type = 'header2';
-      } else if (blockType == header3Attribution) {
-        type = 'header3';
-      } else if (blockType == blockquoteAttribution) {
-        type = 'quote';
-      }
-      for (final entry in node.metadata.entries) {
-        if (entry.key != 'blockType') {
-          metadata[entry.key] = entry.value;
-        }
-      }
-    } else if (node is DocumentAttachmentNode) {
-      type = 'attachment';
-      metadata['attachmentId'] = node.metadata['attachmentId'] ?? node.id;
-      metadata['filename'] = node.metadata['filename'] ?? 'attachment';
-      metadata['fileSize'] = node.metadata['fileSize'] ?? 0;
-      metadata['mimeType'] =
-          node.metadata['mimeType'] ?? 'application/octet-stream';
-      if (node.metadata['url'] != null) metadata['url'] = node.metadata['url'];
-    } else if (node is RichLinkNode) {
-      type = 'rich_link';
-      if (node.url != null) metadata['url'] = node.url;
-      if (node.title != null) metadata['title'] = node.title;
-      if (node.description != null) metadata['description'] = node.description;
-      if (node.imageUrl != null) metadata['imageUrl'] = node.imageUrl;
-      if (node.domain != null) metadata['domain'] = node.domain;
-    } else if (node is ImageNode) {
-      type = 'attachment';
-      metadata['url'] = node.imageUrl;
-      if (node.altText.isNotEmpty) metadata['filename'] = node.altText;
-    } else if (node is TextNode) {
-      text = node.text;
-    }
-
-    final deltaOps = encodeAttributedTextToDelta(text);
+    final deltaOps = encodeAttributedTextToDelta(encoded.text);
 
     final result = <String, dynamic>{
-      'id': blockId,
-      'type': type,
+      'id': node.id,
+      'type': encoded.type,
       'delta': deltaOps,
     };
-    if (metadata.isNotEmpty) {
-      result['metadata'] = _toJsonValue(metadata);
+    if (encoded.metadata.isNotEmpty) {
+      result['metadata'] = _toJsonValue(encoded.metadata);
     }
     return result;
   }
+
+  _EncodedNode _encodeNode(DocumentNode node) => switch (node) {
+    TaskNode node => _encodeTaskNode(node),
+    HorizontalRuleNode node => _encodeHorizontalRuleNode(node),
+    ListItemNode node => _encodeListItemNode(node),
+    ParagraphNode node => _encodeParagraphNode(node),
+    DocumentAttachmentNode node => _encodeAttachmentNode(node),
+    RichLinkNode node => _encodeRichLinkNode(node),
+    ImageNode node => _encodeImageNode(node),
+    _ => _encodeTextNode(node),
+  };
+
+  _EncodedNode _encodeTaskNode(TaskNode node) {
+    final metadata = <String, dynamic>{'isCompleted': node.isComplete};
+    if (node.indent != 0) {
+      metadata['indent'] = node.indent;
+    }
+    for (final entry in node.metadata.entries) {
+      if (entry.key != 'isCompleted') {
+        metadata[entry.key] = entry.value;
+      }
+    }
+    return (type: 'task', text: node.text, metadata: metadata);
+  }
+
+  _EncodedNode _encodeHorizontalRuleNode(HorizontalRuleNode node) => (
+    type: 'divider',
+    text: AttributedText(),
+    metadata: Map<String, dynamic>.from(node.metadata),
+  );
+
+  _EncodedNode _encodeListItemNode(ListItemNode node) {
+    final metadata = <String, dynamic>{};
+    if (node.indent != 0) {
+      metadata['indent'] = node.indent;
+    }
+    for (final entry in node.metadata.entries) {
+      if (entry.key != 'blockType') {
+        metadata[entry.key] = entry.value;
+      }
+    }
+    return (
+      type: node.type == ListItemType.ordered ? 'orderedList' : 'bulletList',
+      text: node.text,
+      metadata: metadata,
+    );
+  }
+
+  _EncodedNode _encodeParagraphNode(ParagraphNode node) {
+    final blockType = node.metadata['blockType'];
+    final type = switch (blockType) {
+      header1Attribution => 'header1',
+      header2Attribution => 'header2',
+      header3Attribution => 'header3',
+      blockquoteAttribution => 'quote',
+      _ => 'paragraph',
+    };
+    final metadata = <String, dynamic>{};
+    for (final entry in node.metadata.entries) {
+      if (entry.key != 'blockType') {
+        metadata[entry.key] = entry.value;
+      }
+    }
+    return (type: type, text: node.text, metadata: metadata);
+  }
+
+  _EncodedNode _encodeAttachmentNode(DocumentAttachmentNode node) {
+    final metadata = <String, dynamic>{
+      'attachmentId': node.metadata['attachmentId'] ?? node.id,
+      'filename': node.metadata['filename'] ?? 'attachment',
+      'fileSize': node.metadata['fileSize'] ?? 0,
+      'mimeType': node.metadata['mimeType'] ?? 'application/octet-stream',
+    };
+    if (node.metadata['url'] != null) metadata['url'] = node.metadata['url'];
+    return (type: 'attachment', text: AttributedText(), metadata: metadata);
+  }
+
+  _EncodedNode _encodeRichLinkNode(RichLinkNode node) {
+    final metadata = <String, dynamic>{};
+    if (node.url != null) metadata['url'] = node.url;
+    if (node.title != null) metadata['title'] = node.title;
+    if (node.description != null) metadata['description'] = node.description;
+    if (node.imageUrl != null) metadata['imageUrl'] = node.imageUrl;
+    if (node.domain != null) metadata['domain'] = node.domain;
+    return (type: 'rich_link', text: AttributedText(), metadata: metadata);
+  }
+
+  _EncodedNode _encodeImageNode(ImageNode node) {
+    final metadata = <String, dynamic>{'url': node.imageUrl};
+    if (node.altText.isNotEmpty) metadata['filename'] = node.altText;
+    return (type: 'attachment', text: AttributedText(), metadata: metadata);
+  }
+
+  _EncodedNode _encodeTextNode(DocumentNode node) => (
+    type: 'paragraph',
+    text: node is TextNode ? node.text : AttributedText(),
+    metadata: <String, dynamic>{},
+  );
 
   List<Map<String, dynamic>> encodeAttributedTextToDelta(AttributedText text) {
     return _deltaFromAttributedText(text).toJson();
@@ -650,36 +728,53 @@ class NoteDocumentCodec {
 
   AttributedText _attributedTextFromDelta(Delta documentDelta) {
     final span = AttributedSpans();
-    final buf = StringBuffer();
+    final buffer = StringBuffer();
     for (final op in documentDelta.operations) {
-      if (!op.isInsert || op.data is! String || (op.data as String).isEmpty) {
-        continue;
-      }
-
-      final insert = op.data as String;
-      final start = buf.length;
-      buf.write(insert);
-      final attrs = op.attributes;
-      if (attrs != null) {
-        for (final entry in attrs.entries) {
-          Attribution? attr;
-          if (entry.key == 'link' && entry.value is String) {
-            final uri = Uri.tryParse(entry.value as String);
-            if (uri != null) attr = LinkAttribution.fromUri(uri);
-          } else if (entry.value == true) {
-            attr = attributionFromId(entry.key);
-          }
-          if (attr != null) {
-            span.addAttribution(
-              newAttribution: attr,
-              start: start,
-              end: buf.length - 1,
-            );
-          }
-        }
-      }
+      _appendOperation(op, buffer, span);
     }
-    return AttributedText(buf.toString(), span);
+    return AttributedText(buffer.toString(), span);
+  }
+
+  void _appendOperation(
+    Operation operation,
+    StringBuffer buffer,
+    AttributedSpans span,
+  ) {
+    final insert = operation.data;
+    if (!operation.isInsert || insert is! String || insert.isEmpty) return;
+
+    final start = buffer.length;
+    buffer.write(insert);
+    _appendAttributions(
+      operation.attributes,
+      span: span,
+      start: start,
+      end: buffer.length - 1,
+    );
+  }
+
+  void _appendAttributions(
+    Map<String, dynamic>? attributes, {
+    required AttributedSpans span,
+    required int start,
+    required int end,
+  }) {
+    if (attributes == null) return;
+
+    for (final entry in attributes.entries) {
+      final attribution = _attributionFromDeltaEntry(entry);
+      if (attribution == null) continue;
+      span.addAttribution(newAttribution: attribution, start: start, end: end);
+    }
+  }
+
+  Attribution? _attributionFromDeltaEntry(MapEntry<String, dynamic> entry) {
+    if (entry.key == 'link' && entry.value is String) {
+      final uri = Uri.tryParse(entry.value as String);
+      return uri == null ? null : LinkAttribution.fromUri(uri);
+    }
+    if (entry.value == true) return attributionFromId(entry.key);
+    return null;
   }
 
   AttributedText? applyDeltaToText(
@@ -730,15 +825,7 @@ class NoteDocumentCodec {
 
   String? blockTypeName(DocumentNode node) {
     if (node is ParagraphNode) {
-      final raw = node.getMetadataValue('blockType');
-      final blockType = raw is Attribution
-          ? raw
-          : (raw is String ? attributionFromName(raw) : null);
-      if (blockType == header1Attribution || raw == 'header1') return 'header1';
-      if (blockType == header2Attribution || raw == 'header2') return 'header2';
-      if (blockType == header3Attribution || raw == 'header3') return 'header3';
-      if (blockType == blockquoteAttribution || raw == 'quote') return 'quote';
-      return 'paragraph';
+      return _paragraphBlockTypeName(node);
     }
     if (node is ListItemNode) {
       return node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
@@ -748,6 +835,18 @@ class NoteDocumentCodec {
     if (node is DocumentAttachmentNode) return 'attachment';
     if (node is RichLinkNode) return 'rich_link';
     return null;
+  }
+
+  String _paragraphBlockTypeName(ParagraphNode node) {
+    final raw = node.getMetadataValue('blockType');
+    final blockType = raw is Attribution
+        ? raw
+        : (raw is String ? attributionFromName(raw) : null);
+    if (blockType == header1Attribution || raw == 'header1') return 'header1';
+    if (blockType == header2Attribution || raw == 'header2') return 'header2';
+    if (blockType == header3Attribution || raw == 'header3') return 'header3';
+    if (blockType == blockquoteAttribution || raw == 'quote') return 'quote';
+    return 'paragraph';
   }
 
   Attribution? attributionFromId(String id) {

@@ -171,10 +171,48 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     // Load the persisted cached schedule for cancellation and reuse.
     final currentState = state.asData?.value ?? <String, DateTime>{};
 
-    // 1. Cancel notifications for tasks that were removed entirely.
-    // Check both the in-memory previous snapshot and the persisted cached
-    // state (to catch removals that happened between sessions).
-    final previousMap = _previousTaskMap;
+    await _cancelRemovedNotifications(
+      service: service,
+      currentUserId: currentUserId,
+      newTaskMap: newTaskMap,
+      currentState: currentState,
+      previousMap: _previousTaskMap,
+    );
+
+    final newSchedule = await _scheduleTasks(
+      tasks: tasks,
+      now: now,
+      service: service,
+      currentUserId: currentUserId,
+      previousMap: _previousTaskMap,
+      currentState: currentState,
+    );
+
+    // Store this task snapshot for the next diff
+    _previousTaskMap = newTaskMap;
+
+    // Sort and limit to 30 to avoid overwhelming the OS
+    final limitedSchedule = _limitSchedule(newSchedule);
+
+    // Reconcile against platform: list pending notifications from the OS
+    // and cancel those that no longer belong.
+    await _reconcilePlatform(service, currentUserId, limitedSchedule);
+
+    dev.log(
+      '[Scheduler] Done. Scheduled: ${limitedSchedule.length} notifications',
+    );
+    state = AsyncValue.data(limitedSchedule);
+
+    await _cacheSchedule(currentUserId, limitedSchedule);
+  }
+
+  Future<void> _cancelRemovedNotifications({
+    required LocalNotificationService service,
+    required String currentUserId,
+    required Map<String, TaskData> newTaskMap,
+    required Map<String, DateTime> currentState,
+    required Map<String, TaskData>? previousMap,
+  }) async {
     final removedIds = <String>{};
     if (previousMap != null) {
       for (final id in previousMap.keys) {
@@ -183,13 +221,15 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
         }
       }
     }
+
     // On first run (_previousTaskMap is null) or as a safety net, also
     // cancel tasks that were in the persisted cache but are no longer open.
     for (final id in currentState.keys) {
-      if (!newTaskMap.containsKey(id) && !removedIds.contains(id)) {
+      if (!newTaskMap.containsKey(id)) {
         removedIds.add(id);
       }
     }
+
     for (final id in removedIds) {
       final nid = notificationIdForTask(currentUserId, id);
       dev.log(
@@ -197,101 +237,106 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
       );
       await service.cancel(nid);
     }
+  }
 
-    // Build new schedule — reuse cached notification times for unchanged tasks
-    final newSchedule = <String, DateTime>{};
-
+  Future<Map<String, DateTime>> _scheduleTasks({
+    required List<TaskData> tasks,
+    required DateTime now,
+    required LocalNotificationService service,
+    required String currentUserId,
+    required Map<String, TaskData>? previousMap,
+    required Map<String, DateTime> currentState,
+  }) async {
+    final schedule = <String, DateTime>{};
     for (final task in tasks) {
-      final due = task.dueDate;
-      if (due == null) continue;
-
-      // Check if this task is unchanged from the previous snapshot.
-      // Drift-generated TaskData overrides == for structural equality,
-      // so unchanged tasks skip the platform notification call.
-      final previous = previousMap?[task.id];
-      final bool isUnchanged = previous != null && previous == task;
-
-      if (isUnchanged && currentState.containsKey(task.id)) {
-        // Reuse cached notification time if it's still in the future
-        final cachedTime = currentState[task.id]!;
-        if (cachedTime.isAfter(now)) {
-          newSchedule[task.id] = cachedTime;
-          continue;
-        }
-      }
-
-      final shouldReplaceExisting =
-          !isUnchanged &&
-          (previous != null || currentState.containsKey(task.id));
-      if (shouldReplaceExisting) {
-        final nid = notificationIdForTask(currentUserId, task.id);
-        await service.cancel(nid);
-        dev.log(
-          '[Scheduler] Cancelled previous notification before rescheduling '
-          'task id=${task.id} nid=$nid',
-        );
-      }
-
-      // Compute notification time for new or changed tasks
-      final notificationTime = _computeNotificationTime(
-        due,
-        task.hasTime,
-        task.reminder,
+      final notificationTime = await _scheduleTask(
+        task: task,
+        now: now,
+        service: service,
+        currentUserId: currentUserId,
+        previous: previousMap?[task.id],
+        currentState: currentState,
       );
-
-      if (notificationTime != null && notificationTime.isAfter(now)) {
-        newSchedule[task.id] = notificationTime;
-        dev.log(
-          '[Scheduler] Scheduling notification id=${task.id} at $notificationTime',
-        );
-        final body = formatDueDate(due, hasTime: task.hasTime);
-        final nid = notificationIdForTask(currentUserId, task.id);
-        await service.scheduleTaskNotification(
-          nid,
-          task.title,
-          body,
-          notificationTime,
-        );
-      } else {
-        if (notificationTime == null) {
-          dev.log(
-            '[Scheduler] Task id=${task.id} skipped: no notification time',
-          );
-        } else {
-          dev.log(
-            '[Scheduler] Task id=${task.id} skipped: notification time '
-            '$notificationTime is in the past (now=$now)',
-          );
-        }
+      if (notificationTime != null) {
+        schedule[task.id] = notificationTime;
       }
     }
+    return schedule;
+  }
 
-    // Store this task snapshot for the next diff
-    _previousTaskMap = newTaskMap;
+  Future<DateTime?> _scheduleTask({
+    required TaskData task,
+    required DateTime now,
+    required LocalNotificationService service,
+    required String currentUserId,
+    required TaskData? previous,
+    required Map<String, DateTime> currentState,
+  }) async {
+    final due = task.dueDate;
+    if (due == null) return null;
 
-    // Sort and limit to 30 to avoid overwhelming the OS
-    final sortedEntries = newSchedule.entries.toList()
-      ..sort((a, b) => a.value.compareTo(b.value));
-    final limitedSchedule = Map.fromEntries(sortedEntries.take(30));
+    // Drift-generated TaskData overrides == for structural equality,
+    // so unchanged tasks skip the platform notification call.
+    final isUnchanged = previous != null && previous == task;
+    final cachedTime = currentState[task.id];
+    if (isUnchanged && cachedTime != null && cachedTime.isAfter(now)) {
+      return cachedTime;
+    }
 
-    // Reconcile against platform: list pending notifications from the OS
-    // and cancel those that no longer belong.
-    await _reconcilePlatform(
-      service,
-      currentUserId,
-      limitedSchedule,
-      currentState,
+    if (!isUnchanged && (previous != null || cachedTime != null)) {
+      final nid = notificationIdForTask(currentUserId, task.id);
+      await service.cancel(nid);
+      dev.log(
+        '[Scheduler] Cancelled previous notification before rescheduling '
+        'task id=${task.id} nid=$nid',
+      );
+    }
+
+    final notificationTime = _computeNotificationTime(
+      due,
+      task.hasTime,
+      task.reminder,
     );
+    if (notificationTime == null) {
+      dev.log('[Scheduler] Task id=${task.id} skipped: no notification time');
+      return null;
+    }
+    if (!notificationTime.isAfter(now)) {
+      dev.log(
+        '[Scheduler] Task id=${task.id} skipped: notification time '
+        '$notificationTime is in the past (now=$now)',
+      );
+      return null;
+    }
 
     dev.log(
-      '[Scheduler] Done. Scheduled: ${limitedSchedule.length} notifications',
+      '[Scheduler] Scheduling notification id=${task.id} at $notificationTime',
     );
-    state = AsyncValue.data(limitedSchedule);
+    final body = formatDueDate(due, hasTime: task.hasTime);
+    final nid = notificationIdForTask(currentUserId, task.id);
+    await service.scheduleTaskNotification(
+      nid,
+      task.title,
+      body,
+      notificationTime,
+    );
+    return notificationTime;
+  }
 
+  Map<String, DateTime> _limitSchedule(Map<String, DateTime> schedule) {
+    final sortedEntries = schedule.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    return Map.fromEntries(sortedEntries.take(30));
+  }
+
+  Future<void> _cacheSchedule(
+    String currentUserId,
+    Map<String, DateTime> schedule,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final toSave = <String, String>{};
-      for (final entry in limitedSchedule.entries) {
+      for (final entry in schedule.entries) {
         toSave[entry.key] = entry.value.toIso8601String();
       }
       await prefs.setString(_kPrefKey(currentUserId), jsonEncode(toSave));
@@ -315,7 +360,6 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     LocalNotificationService service,
     String currentUserId,
     Map<String, DateTime> desiredSchedule,
-    Map<String, DateTime> currentCached,
   ) async {
     try {
       final pending = await service.getPendingNotificationRequests();

@@ -2,8 +2,7 @@ import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/shared/widgets/app_selection_tile.dart';
-
-import 'task_metadata_page_header.dart';
+import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 enum QuickDueDate {
   today,
@@ -43,41 +42,48 @@ class TaskMetadataDatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    return Material(
-      type: MaterialType.transparency,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const TaskMetadataPageHeader(title: 'Escolher data'),
-          ListView.builder(
-            shrinkWrap: true,
-            itemCount: QuickDueDate.values.length,
-            itemBuilder: (context, index) {
-              final option = QuickDueDate.values[index];
-              final date = option.compute(now);
-              return AppSelectionTile(
-                label: option.label,
-                icon: option.icon,
-                isSelected: selected != null && selected!.isSameDayAs(date),
-                onTap: () {
+    return GlobalSheetPage(
+      title: 'Escolher data',
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: QuickDueDate.values.length,
+                itemBuilder: (context, index) {
+                  final option = QuickDueDate.values[index];
+                  final date = option.compute(now);
+                  return AppSelectionTile(
+                    label: option.label,
+                    icon: option.icon,
+                    isSelected: selected != null && selected!.isSameDayAs(date),
+                    onTap: () {
+                      onSelected(date);
+                      FamilyModalSheet.of(context).popPage();
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              CalendarDatePicker(
+                initialDate: selected ?? now.startOfDay,
+                firstDate: DateTime(now.year - 1),
+                lastDate: DateTime(now.year + 5),
+                onDateChanged: (date) {
                   onSelected(date);
                   FamilyModalSheet.of(context).popPage();
                 },
-              );
-            },
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          CalendarDatePicker(
-            initialDate: selected ?? now.startOfDay,
-            firstDate: DateTime(now.year - 1),
-            lastDate: DateTime(now.year + 5),
-            onDateChanged: (date) {
-              onSelected(date);
-              FamilyModalSheet.of(context).popPage();
-            },
-          ),
-        ],
+        ),
       ),
     );
   }

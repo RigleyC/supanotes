@@ -50,48 +50,69 @@ class NoteEditorCommands {
       composer.selection,
     );
     if (nodes.isEmpty) return;
-    final shouldClear =
-        blockType != null &&
-        nodes.every(
-          (node) =>
-              node is ParagraphNode &&
-              node.getMetadataValue('blockType') == blockType,
-        );
-    final targetBlockType = shouldClear ? null : blockType;
+    final targetBlockType = _targetBlockType(nodes, blockType);
+    final requests = _buildBlockTypeRequests(nodes, targetBlockType);
+    if (requests.isNotEmpty) editor.execute(requests);
+  }
+
+  static Attribution? _targetBlockType(
+    List<DocumentNode> nodes,
+    Attribution? blockType,
+  ) {
+    if (blockType == null) return null;
+    final shouldClear = nodes.every(
+      (node) =>
+          node is ParagraphNode &&
+          node.getMetadataValue('blockType') == blockType,
+    );
+    return shouldClear ? null : blockType;
+  }
+
+  static List<EditRequest> _buildBlockTypeRequests(
+    List<DocumentNode> nodes,
+    Attribution? blockType,
+  ) {
     final requests = <EditRequest>[];
     for (final node in nodes) {
-      if (node is ParagraphNode) {
-        requests.add(
-          ChangeParagraphBlockTypeRequest(
-            nodeId: node.id,
-            blockType: targetBlockType,
-          ),
-        );
-      } else if (node is ListItemNode) {
-        requests.add(
-          ConvertListItemToParagraphRequest(
-            nodeId: node.id,
-            paragraphMetadata: targetBlockType != null
-                ? {'blockType': targetBlockType}
-                : <String, dynamic>{},
-          ),
-        );
-      } else if (node is TaskNode) {
-        requests.add(
-          ReplaceNodeRequest(
-            existingNodeId: node.id,
-            newNode: ParagraphNode(
-              id: node.id,
-              text: node.text,
-              metadata: targetBlockType != null
-                  ? {'blockType': targetBlockType}
-                  : <String, dynamic>{},
-            ),
-          ),
-        );
-      }
+      requests.addAll(_requestsForBlockType(node, blockType));
     }
-    if (requests.isNotEmpty) editor.execute(requests);
+    return requests;
+  }
+
+  static List<EditRequest> _requestsForBlockType(
+    DocumentNode node,
+    Attribution? blockType,
+  ) {
+    if (node is ParagraphNode) {
+      return [
+        ChangeParagraphBlockTypeRequest(nodeId: node.id, blockType: blockType),
+      ];
+    }
+    if (node is ListItemNode) {
+      return [
+        ConvertListItemToParagraphRequest(
+          nodeId: node.id,
+          paragraphMetadata: _blockTypeMetadata(blockType),
+        ),
+      ];
+    }
+    if (node is TaskNode) {
+      return [
+        ReplaceNodeRequest(
+          existingNodeId: node.id,
+          newNode: ParagraphNode(
+            id: node.id,
+            text: node.text,
+            metadata: _blockTypeMetadata(blockType),
+          ),
+        ),
+      ];
+    }
+    return const [];
+  }
+
+  static Map<String, dynamic> _blockTypeMetadata(Attribution? blockType) {
+    return blockType == null ? const {} : {'blockType': blockType};
   }
 
   /// Converts selected nodes to the given list type. Toggles off (back to

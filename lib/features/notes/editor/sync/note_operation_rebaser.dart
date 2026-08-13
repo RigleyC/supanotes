@@ -69,119 +69,162 @@ class NoteOperationRebaser {
     required int finalRevision,
     List<AcceptedOperation>? acceptedOps,
   }) {
-    final acceptedRevisions = <String, int>{};
-    if (acceptedOps != null) {
-      for (final a in acceptedOps) {
-        acceptedRevisions[a.operationId] = a.revision;
-      }
-    }
-
-    var currentRemote = remote
-        .map(
-          (r) => NoteOp.fromData(
-            operationId: r.operationId,
-            actorId: r.actorId,
-            revision: r.revision,
-            kind: r.kind,
-            blockId: r.blockId,
-            payload: r.payload,
-          ),
-        )
-        .toList();
-
-    if (inFlight != null && inFlight.isNotEmpty) {
-      for (final inFlightData in inFlight) {
-        final payload =
-            jsonDecode(inFlightData.payloadJson) as Map<String, dynamic>;
-        final inFlightOp = NoteOp.fromData(
-          operationId: inFlightData.operationId,
-          actorId: localActorId,
-          kind: inFlightData.kind,
-          blockId: inFlightData.blockId,
-          payload: payload,
-        );
-
-        final acceptedRev = acceptedRevisions[inFlightOp.operationId];
-        final newRemote = <NoteOp>[];
-        for (final r in currentRemote) {
-          if (acceptedRev != null &&
-              r.revision != null &&
-              r.revision! < acceptedRev) {
-            final localKey = '$localActorId:${inFlightOp.operationId}';
-            final remoteKey = '${r.actorId}:${r.operationId}';
-            final rHasPriority = remoteKey.compareTo(localKey) > 0;
-
-            final transformed = _transformOp(r, inFlightOp, rHasPriority);
-            if (transformed != null) {
-              newRemote.add(transformed);
-            }
-          } else {
-            newRemote.add(r);
-          }
-        }
-        currentRemote = newRemote;
-      }
-    }
+    final acceptedRevisions = _acceptedRevisions(acceptedOps);
+    var currentRemote = _toNoteOperations(remote);
+    currentRemote = _transformRemoteAgainstInFlight(
+      inFlight: inFlight,
+      remote: currentRemote,
+      acceptedRevisions: acceptedRevisions,
+    );
 
     final result = <PendingNoteOperationData>[];
     var activeRemote = currentRemote;
 
-    for (int i = 0; i < pending.length; i++) {
-      final pendingData = pending[i];
+    for (final pendingData in pending) {
       if (acceptedRevisions.containsKey(pendingData.operationId)) {
         continue;
       }
 
-      var pOp = NoteOp.fromData(
-        operationId: pendingData.operationId,
-        actorId: localActorId,
-        kind: pendingData.kind,
-        blockId: pendingData.blockId,
-        payload: jsonDecode(pendingData.payloadJson) as Map<String, dynamic>,
+      final rebased = _rebasePendingOperation(
+        pendingData: pendingData,
+        activeRemote: activeRemote,
       );
+      if (rebased == null) continue;
 
-      bool dropped = false;
-      final nextRemote = <NoteOp>[];
-
-      for (final r in activeRemote) {
-        final localKey = '$localActorId:${pOp.operationId}';
-        final remoteKey = '${r.actorId}:${r.operationId}';
-        final pHasPriority = localKey.compareTo(remoteKey) > 0;
-
-        final transformedP = _transformOp(pOp, r, pHasPriority);
-        if (transformedP == null) {
-          dropped = true;
-          break;
-        }
-
-        final transformedR = _transformOp(r, pOp, !pHasPriority);
-        if (transformedR != null) {
-          nextRemote.add(transformedR);
-        }
-
-        pOp = transformedP;
-      }
-
-      if (dropped) continue;
-      activeRemote = nextRemote;
-
+      activeRemote = rebased.remote;
       result.add(
-        PendingNoteOperationData(
-          operationId: pOp.operationId,
-          noteId: pendingData.noteId,
-          baseRevision: finalRevision + result.length,
+        _buildRebasedOperation(
+          pendingData: pendingData,
+          operation: rebased.operation,
+          finalRevision: finalRevision,
           ordinal: result.length,
-          kind: pOp.kind,
-          blockId: pOp.blockId,
-          payloadJson: jsonEncode(pOp.payload),
-          createdAt: pendingData.createdAt,
-          lastAttemptAt: pendingData.lastAttemptAt,
-          attemptCount: pendingData.attemptCount,
-          status: pendingData.status,
         ),
       );
     }
     return result;
+  }
+
+  Map<String, int> _acceptedRevisions(List<AcceptedOperation>? acceptedOps) {
+    if (acceptedOps == null) return {};
+    return {
+      for (final accepted in acceptedOps)
+        accepted.operationId: accepted.revision,
+    };
+  }
+
+  List<NoteOp> _toNoteOperations(List<Operation> operations) {
+    return operations
+        .map(
+          (operation) => NoteOp.fromData(
+            operationId: operation.operationId,
+            actorId: operation.actorId,
+            revision: operation.revision,
+            kind: operation.kind,
+            blockId: operation.blockId,
+            payload: operation.payload,
+          ),
+        )
+        .toList();
+  }
+
+  List<NoteOp> _transformRemoteAgainstInFlight({
+    required List<PendingNoteOperationData>? inFlight,
+    required List<NoteOp> remote,
+    required Map<String, int> acceptedRevisions,
+  }) {
+    var currentRemote = remote;
+    if (inFlight == null || inFlight.isEmpty) return currentRemote;
+
+    for (final inFlightData in inFlight) {
+      final payload =
+          jsonDecode(inFlightData.payloadJson) as Map<String, dynamic>;
+      final inFlightOp = NoteOp.fromData(
+        operationId: inFlightData.operationId,
+        actorId: localActorId,
+        kind: inFlightData.kind,
+        blockId: inFlightData.blockId,
+        payload: payload,
+      );
+      final acceptedRevision = acceptedRevisions[inFlightOp.operationId];
+      final transformedRemote = <NoteOp>[];
+
+      for (final remoteOp in currentRemote) {
+        if (acceptedRevision != null &&
+            remoteOp.revision != null &&
+            remoteOp.revision! < acceptedRevision) {
+          final localKey = '$localActorId:${inFlightOp.operationId}';
+          final remoteKey = '${remoteOp.actorId}:${remoteOp.operationId}';
+          final remoteHasPriority = remoteKey.compareTo(localKey) > 0;
+          final transformed = _transformOp(
+            remoteOp,
+            inFlightOp,
+            remoteHasPriority,
+          );
+          if (transformed != null) transformedRemote.add(transformed);
+        } else {
+          transformedRemote.add(remoteOp);
+        }
+      }
+      currentRemote = transformedRemote;
+    }
+    return currentRemote;
+  }
+
+  ({NoteOp operation, List<NoteOp> remote})? _rebasePendingOperation({
+    required PendingNoteOperationData pendingData,
+    required List<NoteOp> activeRemote,
+  }) {
+    var operation = NoteOp.fromData(
+      operationId: pendingData.operationId,
+      actorId: localActorId,
+      kind: pendingData.kind,
+      blockId: pendingData.blockId,
+      payload: jsonDecode(pendingData.payloadJson) as Map<String, dynamic>,
+    );
+    final nextRemote = <NoteOp>[];
+
+    for (final remoteOp in activeRemote) {
+      final localKey = '$localActorId:${operation.operationId}';
+      final remoteKey = '${remoteOp.actorId}:${remoteOp.operationId}';
+      final localHasPriority = localKey.compareTo(remoteKey) > 0;
+      final transformedOperation = _transformOp(
+        operation,
+        remoteOp,
+        localHasPriority,
+      );
+      if (transformedOperation == null) return null;
+
+      final transformedRemote = _transformOp(
+        remoteOp,
+        operation,
+        !localHasPriority,
+      );
+      if (transformedRemote != null) nextRemote.add(transformedRemote);
+      operation = transformedOperation;
+    }
+
+    return (operation: operation, remote: nextRemote);
+  }
+
+  PendingNoteOperationData _buildRebasedOperation({
+    required PendingNoteOperationData pendingData,
+    required NoteOp operation,
+    required int finalRevision,
+    required int ordinal,
+  }) {
+    return PendingNoteOperationData(
+      operationId: operation.operationId,
+      noteId: pendingData.noteId,
+      baseRevision: finalRevision + ordinal,
+      ordinal: ordinal,
+      kind: operation.kind,
+      blockId: operation.blockId,
+      payloadJson: jsonEncode(operation.payload),
+      createdAt: pendingData.createdAt,
+      lastAttemptAt: pendingData.lastAttemptAt,
+      attemptCount: pendingData.attemptCount,
+      status: pendingData.status,
+    );
   }
 
   /// Transforms `opToTransform` against `appliedOp`.
@@ -191,100 +234,33 @@ class NoteOperationRebaser {
     NoteOp appliedOp,
     bool opToTransformHasPriority,
   ) {
-    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
-        appliedOp.blockId != null &&
-        appliedOp.blockId == opToTransform.blockId) {
+    if (_remoteDeleteRemovesOperation(opToTransform, appliedOp)) {
       return null;
     }
 
-    if (opToTransform.kind == NoteOperationKind.textDelta.wireName &&
-        appliedOp.kind == NoteOperationKind.textDelta.wireName) {
-      if (opToTransform.blockId != appliedOp.blockId) return opToTransform;
-
-      final opToTransformOps = opToTransform.payload['ops'];
-      final appliedOps = appliedOp.payload['ops'];
-      if (opToTransformOps == null || appliedOps == null) return opToTransform;
-
-      final opToTransformDelta =
-          opToTransform.cachedDelta ??
-          quill.Delta.fromJson(opToTransformOps as List<dynamic>);
-      final appliedDelta =
-          appliedOp.cachedDelta ??
-          quill.Delta.fromJson(appliedOps as List<dynamic>);
-
-      final transformedDelta = appliedDelta.transform(
-        opToTransformDelta,
-        !opToTransformHasPriority,
-      );
-
-      final newPayload = Map<String, dynamic>.from(opToTransform.payload);
-      newPayload['ops'] = transformedDelta.toJson();
-
-      return NoteOp.fromData(
-        operationId: opToTransform.operationId,
-        actorId: opToTransform.actorId,
-        revision: opToTransform.revision,
-        kind: opToTransform.kind,
-        blockId: opToTransform.blockId,
-        payload: newPayload,
-        cachedDelta: transformedDelta,
+    if (_isTextDeltaPair(opToTransform, appliedOp)) {
+      return _transformTextDelta(
+        opToTransform,
+        appliedOp,
+        opToTransformHasPriority,
       );
     }
 
     final payload = Map<String, dynamic>.from(opToTransform.payload);
-    final kind = opToTransform.kind;
-    final rKind = appliedOp.kind;
-    final rPayload = appliedOp.payload;
-
-    if (kind == NoteOperationKind.createBlock.wireName) {
-      final afterBlockId = payload['afterBlockId'] as String?;
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          afterBlockId == appliedOp.blockId) {
-        payload['afterBlockId'] = null;
-      }
-      if (rKind == NoteOperationKind.createBlock.wireName) {
-        final rAfter = rPayload['afterBlockId'] as String?;
-        if (afterBlockId != null && afterBlockId == rAfter) {
-          if (!opToTransformHasPriority) {
-            payload['afterBlockId'] = appliedOp.blockId;
-          }
+    switch (opToTransform.kind) {
+      case NoteOperationWireNames.createBlock:
+        _transformCreateBlock(payload, appliedOp, opToTransformHasPriority);
+      case NoteOperationWireNames.moveBlock:
+        if (!_transformMoveBlock(
+          payload,
+          appliedOp,
+          opToTransformHasPriority,
+        )) {
+          return null;
         }
-      }
-    }
-
-    if (kind == NoteOperationKind.moveBlock.wireName) {
-      final targetId = payload['blockId'] as String?;
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          targetId == appliedOp.blockId) {
-        return null;
-      }
-      final afterBlockId = payload['afterBlockId'] as String?;
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          afterBlockId == appliedOp.blockId) {
-        payload['afterBlockId'] = null;
-      }
-      if (rKind == NoteOperationKind.moveBlock.wireName) {
-        final rTarget = rPayload['blockId'] as String?;
-        if (targetId == rTarget) {
-          if (!opToTransformHasPriority) {
-            return null;
-          }
-        }
-      }
-    }
-
-    if (kind == NoteOperationKind.deleteBlock.wireName) {
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          opToTransform.blockId == appliedOp.blockId) {
-        return null;
-      }
-    }
-
-    if (kind == NoteOperationKind.setBlockType.wireName) {
-      if (rKind == NoteOperationKind.deleteBlock.wireName &&
-          opToTransform.blockId == appliedOp.blockId) {
-        return null;
-      }
+      case NoteOperationWireNames.deleteBlock:
+      case NoteOperationWireNames.setBlockType:
+        if (_sameBlockWasDeleted(opToTransform, appliedOp)) return null;
     }
 
     return NoteOp(
@@ -295,5 +271,99 @@ class NoteOperationRebaser {
       blockId: opToTransform.blockId,
       payload: payload,
     );
+  }
+
+  bool _remoteDeleteRemovesOperation(NoteOp operation, NoteOp appliedOp) {
+    return appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        appliedOp.blockId != null &&
+        appliedOp.blockId == operation.blockId;
+  }
+
+  bool _isTextDeltaPair(NoteOp operation, NoteOp appliedOp) {
+    return operation.kind == NoteOperationKind.textDelta.wireName &&
+        appliedOp.kind == NoteOperationKind.textDelta.wireName;
+  }
+
+  NoteOp _transformTextDelta(
+    NoteOp operation,
+    NoteOp appliedOp,
+    bool operationHasPriority,
+  ) {
+    if (operation.blockId != appliedOp.blockId) return operation;
+
+    final operationOps = operation.payload['ops'];
+    final appliedOps = appliedOp.payload['ops'];
+    if (operationOps == null || appliedOps == null) return operation;
+
+    final operationDelta =
+        operation.cachedDelta ??
+        quill.Delta.fromJson(operationOps as List<dynamic>);
+    final appliedDelta =
+        appliedOp.cachedDelta ??
+        quill.Delta.fromJson(appliedOps as List<dynamic>);
+    final transformedDelta = appliedDelta.transform(
+      operationDelta,
+      !operationHasPriority,
+    );
+    final payload = Map<String, dynamic>.from(operation.payload);
+    payload['ops'] = transformedDelta.toJson();
+
+    return NoteOp.fromData(
+      operationId: operation.operationId,
+      actorId: operation.actorId,
+      revision: operation.revision,
+      kind: operation.kind,
+      blockId: operation.blockId,
+      payload: payload,
+      cachedDelta: transformedDelta,
+    );
+  }
+
+  void _transformCreateBlock(
+    Map<String, dynamic> payload,
+    NoteOp appliedOp,
+    bool operationHasPriority,
+  ) {
+    final afterBlockId = payload['afterBlockId'] as String?;
+    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        afterBlockId == appliedOp.blockId) {
+      payload['afterBlockId'] = null;
+    }
+    if (appliedOp.kind != NoteOperationKind.createBlock.wireName) return;
+
+    final appliedAfterBlockId = appliedOp.payload['afterBlockId'] as String?;
+    if (afterBlockId != null && afterBlockId == appliedAfterBlockId) {
+      if (!operationHasPriority) {
+        payload['afterBlockId'] = appliedOp.blockId;
+      }
+    }
+  }
+
+  bool _transformMoveBlock(
+    Map<String, dynamic> payload,
+    NoteOp appliedOp,
+    bool operationHasPriority,
+  ) {
+    final targetId = payload['blockId'] as String?;
+    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        targetId == appliedOp.blockId) {
+      return false;
+    }
+
+    final afterBlockId = payload['afterBlockId'] as String?;
+    if (appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        afterBlockId == appliedOp.blockId) {
+      payload['afterBlockId'] = null;
+    }
+    if (appliedOp.kind != NoteOperationKind.moveBlock.wireName) return true;
+
+    final appliedTargetId = appliedOp.payload['blockId'] as String?;
+    if (targetId == appliedTargetId && !operationHasPriority) return false;
+    return true;
+  }
+
+  bool _sameBlockWasDeleted(NoteOp operation, NoteOp appliedOp) {
+    return appliedOp.kind == NoteOperationKind.deleteBlock.wireName &&
+        operation.blockId == appliedOp.blockId;
   }
 }

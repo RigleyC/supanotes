@@ -144,6 +144,7 @@ class NoteOperationAdapter {
       await _applier.rebuildFromSnapshot(
         snapshot: snapshot,
         pendingOps: pending,
+        repairPersistedSnapshot: true,
         suppressCapture: () => _capture.setSuppress(true),
         resumeCapture: () => _capture.setSuppress(!_captureLocalOperations),
         rebuildMirror: _capture.buildMirror,
@@ -343,6 +344,7 @@ class NoteOperationAdapter {
     await _applier.rebuildFromSnapshot(
       snapshot: snapshot,
       pendingOps: rebasedOps,
+      repairPersistedSnapshot: false,
       suppressCapture: () => _capture.setSuppress(true),
       resumeCapture: () => _capture.setSuppress(false),
       rebuildMirror: () => _capture.buildMirror(),

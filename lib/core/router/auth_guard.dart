@@ -9,39 +9,61 @@ String? authGuardRedirect({
   required String currentLocation,
   required AsyncValue<User?> authState,
 }) {
-  final isAuthPage =
-      currentLocation == AppRoutes.login ||
-      currentLocation == AppRoutes.register;
+  final isAuthPage = _isAuthPage(currentLocation);
   final isPublicShareLink = currentLocation.startsWith('/s/');
 
   return authState.when(
-    data: (user) {
-      if (currentLocation == AppRoutes.splash) {
-        if (user == null) return AppRoutes.login;
-        return AppRoutes.home;
-      }
-
-      if (user != null) {
-        if (isAuthPage) return AppRoutes.home;
-        return null;
-      }
-
-      if (isPublicShareLink) return null;
-
-      if (isAuthPage) return null;
-      return AppRoutes.login;
-    },
-    loading: () {
-      if (isAuthPage ||
-          isPublicShareLink ||
-          currentLocation == AppRoutes.splash) {
-        return null;
-      }
-      return AppRoutes.splash;
-    },
-    error: (_, _) {
-      if (isAuthPage || isPublicShareLink) return null;
-      return AppRoutes.login;
-    },
+    data: (user) => _redirectForData(
+      currentLocation: currentLocation,
+      user: user,
+      isAuthPage: isAuthPage,
+      isPublicShareLink: isPublicShareLink,
+    ),
+    loading: () => _redirectWhileLoading(
+      currentLocation: currentLocation,
+      isAuthPage: isAuthPage,
+      isPublicShareLink: isPublicShareLink,
+    ),
+    error: (_, _) => _redirectForError(
+      isAuthPage: isAuthPage,
+      isPublicShareLink: isPublicShareLink,
+    ),
   );
+}
+
+bool _isAuthPage(String location) {
+  return location == AppRoutes.login || location == AppRoutes.register;
+}
+
+String? _redirectForData({
+  required String currentLocation,
+  required User? user,
+  required bool isAuthPage,
+  required bool isPublicShareLink,
+}) {
+  if (currentLocation == AppRoutes.splash) {
+    return user == null ? AppRoutes.login : AppRoutes.home;
+  }
+  if (user != null) return isAuthPage ? AppRoutes.home : null;
+  if (isPublicShareLink || isAuthPage) return null;
+  return AppRoutes.login;
+}
+
+String? _redirectWhileLoading({
+  required String currentLocation,
+  required bool isAuthPage,
+  required bool isPublicShareLink,
+}) {
+  if (isAuthPage || isPublicShareLink || currentLocation == AppRoutes.splash) {
+    return null;
+  }
+  return AppRoutes.splash;
+}
+
+String? _redirectForError({
+  required bool isAuthPage,
+  required bool isPublicShareLink,
+}) {
+  if (isAuthPage || isPublicShareLink) return null;
+  return AppRoutes.login;
 }
