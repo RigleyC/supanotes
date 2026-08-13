@@ -440,7 +440,7 @@ void main() {
     );
   });
 
-  group('indentListItems', () {
+  group('indentSelectedBlocks', () {
     test('indents a list item', () {
       final document = MutableDocument(
         nodes: [
@@ -455,14 +455,42 @@ void main() {
         composer: composer,
       );
 
-      NoteEditorCommands.indentListItems(editor, composer);
+      NoteEditorCommands.indentSelectedBlocks(editor, composer);
 
       final item = document.first as ListItemNode;
       expect(item.indent, 1);
     });
+
+    test('indents the selected task', () {
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Parent'),
+            isComplete: false,
+          ),
+          TaskNode(
+            id: 'node-2',
+            text: AttributedText('Child'),
+            isComplete: false,
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: caretSelection('node-2'),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      NoteEditorCommands.indentSelectedBlocks(editor, composer);
+
+      expect((document.getNodeById('node-2') as TaskNode).indent, 1);
+    });
   });
 
-  group('unindentListItems', () {
+  group('unindentSelectedBlocks', () {
     test('unindents a list item', () {
       final document = MutableDocument(
         nodes: [
@@ -481,10 +509,39 @@ void main() {
         composer: composer,
       );
 
-      NoteEditorCommands.unindentListItems(editor, composer);
+      NoteEditorCommands.unindentSelectedBlocks(editor, composer);
 
       final item = document.first as ListItemNode;
       expect(item.indent, 1);
+    });
+
+    test('unindents the selected task', () {
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Parent'),
+            isComplete: false,
+          ),
+          TaskNode(
+            id: 'node-2',
+            text: AttributedText('Child'),
+            isComplete: false,
+            indent: 1,
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: caretSelection('node-2'),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      NoteEditorCommands.unindentSelectedBlocks(editor, composer);
+
+      expect((document.getNodeById('node-2') as TaskNode).indent, 0);
     });
   });
 }

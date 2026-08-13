@@ -7,7 +7,7 @@ class _FormattingToolbarPanel extends StatelessWidget {
     required this.blockType,
     required this.selection,
     required this.activeListOption,
-    required this.isListItem,
+    required this.isIndentableBlock,
     required this.isBold,
     required this.isItalic,
     required this.isStrikethrough,
@@ -22,7 +22,7 @@ class _FormattingToolbarPanel extends StatelessWidget {
   final Attribution? blockType;
   final DocumentSelection? selection;
   final _ListFormatOption? activeListOption;
-  final bool isListItem;
+  final bool isIndentableBlock;
   final bool isBold;
   final bool isItalic;
   final bool isStrikethrough;
@@ -91,7 +91,7 @@ class _FormattingToolbarPanel extends StatelessWidget {
                     activeOption: activeListOption,
                     onSelected: onListSelected,
                   ),
-                  if (isListItem) ...[
+                  if (isIndentableBlock) ...[
                     const ToolbarDivider(),
                     ToolbarButton(
                       icon: Icons.format_indent_increase,

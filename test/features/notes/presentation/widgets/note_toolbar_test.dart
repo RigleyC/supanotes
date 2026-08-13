@@ -111,9 +111,7 @@ Widget buildConversionHarness({
   );
 }
 
-
 void main() {
-
   group('List menu trigger state', () {
     testWidgets('shows list controls only inside formatting mode', (
       tester,
@@ -917,6 +915,76 @@ void main() {
       final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
       expect(indentBtn, findsOneWidget);
       expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
+    });
+
+    testWidgets('indent button is enabled on a task', (tester) async {
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [
+            TaskNode(
+              id: 'node-1',
+              text: AttributedText('Task'),
+              isComplete: false,
+            ),
+          ],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openListMenu(tester);
+      final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
+      expect(indentBtn, findsOneWidget);
+      expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
+    });
+
+    testWidgets('toolbar indent changes the selected task', (tester) async {
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'node-1',
+            text: AttributedText('Parent'),
+            isComplete: false,
+          ),
+          TaskNode(
+            id: 'node-2',
+            text: AttributedText('Child'),
+            isComplete: false,
+          ),
+        ],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-2',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NoteToolbar(editor: editor, composer: composer),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openListMenu(tester);
+      await tester.tap(iconButtonWithIcon(Icons.format_indent_increase));
+      await tester.pumpAndSettle();
+
+      expect((document.getNodeById('node-2') as TaskNode).indent, 1);
     });
 
     testWidgets('indent button is not present on a non-list item', (

@@ -206,8 +206,8 @@ class _NoteToolbarState extends State<NoteToolbar> {
                           blockType: formattingBlockType,
                           selection: formattingSelection,
                           activeListOption: _activeListOption(formattingNodes),
-                          isListItem: formattingNodes.any(
-                            (node) => node is ListItemNode,
+                          isIndentableBlock: formattingNodes.any(
+                            (node) => node is ListItemNode || node is TaskNode,
                           ),
                           isBold: _selectionHasAttribution(
                             formattingSelection,
@@ -234,9 +234,10 @@ class _NoteToolbarState extends State<NoteToolbar> {
                             option,
                             formattingSelection,
                           ),
-                          onIndent: () => _indentListItem(formattingSelection),
+                          onIndent: () =>
+                              _indentSelectedBlocks(formattingSelection),
                           onUnindent: () =>
-                              _unindentListItem(formattingSelection),
+                              _unindentSelectedBlocks(formattingSelection),
                         )
                       : SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -392,16 +393,16 @@ class _NoteToolbarState extends State<NoteToolbar> {
     }
   }
 
-  void _indentListItem(DocumentSelection? selection) {
+  void _indentSelectedBlocks(DocumentSelection? selection) {
     if (_prepareEditorAction(selection) == null) return;
     HapticFeedback.selectionClick();
-    NoteEditorCommands.indentListItems(editor, composer);
+    NoteEditorCommands.indentSelectedBlocks(editor, composer);
   }
 
-  void _unindentListItem(DocumentSelection? selection) {
+  void _unindentSelectedBlocks(DocumentSelection? selection) {
     if (_prepareEditorAction(selection) == null) return;
     HapticFeedback.selectionClick();
-    NoteEditorCommands.unindentListItems(editor, composer);
+    NoteEditorCommands.unindentSelectedBlocks(editor, composer);
   }
 
   void _insertDivider() {

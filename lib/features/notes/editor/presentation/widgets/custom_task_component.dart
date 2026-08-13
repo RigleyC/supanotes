@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
@@ -304,12 +305,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final checkboxTopInset = textStyle.height == null
         ? _taskCheckboxFallbackTopInset
         : (textLineHeight - _taskCheckboxSize) / 2;
-    // Keep task text on the same column as Super Editor's bullet and number
-    // markers. The marker itself remains inside the shared indentation slot.
-    final markerIndent = defaultListItemIndentCalculator(
-      textStyle,
-      widget.viewModel.indent,
-    );
+    final indentUnit = noteEditorIndentUnit(textStyle);
+    final levelOffset = indentUnit * widget.viewModel.indent;
 
     final content = Directionality(
       textDirection: widget.viewModel.textDirection,
@@ -319,8 +316,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            SizedBox(width: levelOffset),
             SizedBox(
-              width: markerIndent,
+              width: indentUnit,
               child: Semantics(
                 button: true,
                 checked: _isComplete,

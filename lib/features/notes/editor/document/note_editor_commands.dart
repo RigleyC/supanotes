@@ -206,24 +206,42 @@ class NoteEditorCommands {
     if (requests.isNotEmpty) editor.execute(requests);
   }
 
-  /// Indents all selected list items.
-  static void indentListItems(Editor editor, DocumentComposer composer) {
-    final requests =
-        _selectedEditableNodes(editor.context.document, composer.selection)
-            .whereType<ListItemNode>()
-            .map((node) => IndentListItemRequest(nodeId: node.id));
-    final requestList = requests.toList();
-    if (requestList.isNotEmpty) editor.execute(requestList);
+  /// Indents all selected list items and tasks.
+  static void indentSelectedBlocks(Editor editor, DocumentComposer composer) {
+    final requests = _selectedEditableNodes(
+      editor.context.document,
+      composer.selection,
+    ).map(_indentRequestFor).whereType<EditRequest>().toList();
+    if (requests.isNotEmpty) editor.execute(requests);
   }
 
-  /// Unindents all selected list items.
-  static void unindentListItems(Editor editor, DocumentComposer composer) {
-    final requests =
-        _selectedEditableNodes(editor.context.document, composer.selection)
-            .whereType<ListItemNode>()
-            .map((node) => UnIndentListItemRequest(nodeId: node.id));
-    final requestList = requests.toList();
-    if (requestList.isNotEmpty) editor.execute(requestList);
+  /// Unindents all selected list items and tasks.
+  static void unindentSelectedBlocks(Editor editor, DocumentComposer composer) {
+    final requests = _selectedEditableNodes(
+      editor.context.document,
+      composer.selection,
+    ).map(_unindentRequestFor).whereType<EditRequest>().toList();
+    if (requests.isNotEmpty) editor.execute(requests);
+  }
+
+  static EditRequest? _indentRequestFor(DocumentNode node) {
+    if (node is ListItemNode) {
+      return IndentListItemRequest(nodeId: node.id);
+    }
+    if (node is TaskNode) {
+      return IndentTaskRequest(node.id);
+    }
+    return null;
+  }
+
+  static EditRequest? _unindentRequestFor(DocumentNode node) {
+    if (node is ListItemNode) {
+      return UnIndentListItemRequest(nodeId: node.id);
+    }
+    if (node is TaskNode) {
+      return UnIndentTaskRequest(node.id);
+    }
+    return null;
   }
 
   /// Inserts an empty paragraph with [blockType] after the existing document.
