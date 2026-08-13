@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_controller.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 
 void main() {
   late ProviderContainer container;
@@ -86,21 +86,12 @@ void main() {
   });
 }
 
-TaskModel _task({String? reminder}) {
+TaskMetadataDraft _task({String? reminder}) {
   final now = DateTime.utc(2026, 7, 20, 10);
-  return TaskModel(
-    id: 'task-1',
-    userId: 'user-1',
-    noteId: 'note-1',
-    title: 'Tarefa',
-    status: 'open',
-    position: 'a0',
-    dueDate: now,
-    completedAt: null,
+  return TaskMetadataDraft(
+    scheduleAnchor: now,
     recurrence: TaskRecurrence.weekly,
     hasTime: true,
-    reminder: reminder,
-    createdAt: now,
-    updatedAt: now,
+    reminder: TaskReminderOption.fromValue(reminder),
   );
 }

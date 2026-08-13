@@ -20,12 +20,10 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
-import 'package:supanotes/features/tasks/domain/task_model.dart';
 
 class NoteEditor extends StatefulWidget {
   final String noteId;
   final NoteEditorSession session;
-  final Map<String, TaskModel> taskMetadata;
   final bool hideCompleted;
   final bool collapseImages;
   final AttachmentDelivery? attachmentDelivery;
@@ -36,7 +34,6 @@ class NoteEditor extends StatefulWidget {
     super.key,
     required this.noteId,
     required this.session,
-    required this.taskMetadata,
     this.hideCompleted = false,
     this.collapseImages = false,
     this.attachmentDelivery,
@@ -140,7 +137,6 @@ class _NoteEditorState extends State<NoteEditor> {
     _taskComponentBuilder = CustomTaskComponentBuilder(
       editor: controller.editor,
       composer: controller.composer,
-      taskMetadataById: widget.taskMetadata,
       hideCompleted: widget.hideCompleted,
       readOnly: _isReadOnly,
       onTaskLongPress: _isReadOnly ? null : widget.delegate.onTaskLongPress,
@@ -170,9 +166,7 @@ class _NoteEditorState extends State<NoteEditor> {
   }
 
   bool _isHiddenTask(TaskNode node) =>
-      widget.hideCompleted &&
-      node.isComplete &&
-      !isRecurringTaskNode(node, widget.taskMetadata[node.id]);
+      widget.hideCompleted && node.isComplete && !isRecurringTaskNode(node);
 
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
@@ -194,7 +188,7 @@ class _NoteEditorState extends State<NoteEditor> {
 
   void _handleHiddenTaskUpdate(NoteEditor oldWidget) {
     if (widget.hideCompleted != oldWidget.hideCompleted ||
-        widget.taskMetadata != oldWidget.taskMetadata) {
+        widget.hideCompleted != oldWidget.hideCompleted) {
       _configureHiddenTaskEditing();
     }
   }
@@ -205,12 +199,7 @@ class _NoteEditorState extends State<NoteEditor> {
         widget.collapseImages != oldWidget.collapseImages ||
         widget.attachmentDelivery != oldWidget.attachmentDelivery;
 
-    if (!builderInputsChanged) {
-      if (widget.taskMetadata != oldWidget.taskMetadata) {
-        _taskComponentBuilder?.taskMetadataById = widget.taskMetadata;
-      }
-      return;
-    }
+    if (!builderInputsChanged) return;
 
     if (widget.hideCompleted && !oldWidget.hideCompleted) {
       _clearSelectionFromCompletedTask();

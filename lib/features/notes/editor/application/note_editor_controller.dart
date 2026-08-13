@@ -168,15 +168,18 @@ class NoteEditorController extends ChangeNotifier {
       );
       final previousRecurrence = node.metadata['recurrenceRule'] as String?;
       final previousHasTime = node.metadata['hasTime'] as bool? ?? false;
+      final previousReminder = node.metadata['reminder'] as String?;
       final nextDueDate = clearDueDate ? null : dueDate ?? previousDueDate;
       final nextRecurrence = clearRecurrence
           ? null
           : recurrence ?? previousRecurrence;
       final nextHasTime = hasTime ?? previousHasTime;
+      final nextReminder = clearReminder ? null : reminder ?? previousReminder;
       final scheduleChanged =
           nextDueDate != previousDueDate ||
           nextRecurrence != previousRecurrence ||
           nextHasTime != previousHasTime;
+      if (nextReminder == previousReminder && !scheduleChanged) return;
       if (clearDueDate) {
         updatedMeta.remove('dueDate');
         updatedMeta.remove('hasTime');
