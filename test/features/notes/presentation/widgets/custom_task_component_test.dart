@@ -6,6 +6,8 @@ import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../helpers/haptic_test_helper.dart';
+
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('pt_BR', null);
@@ -81,4 +83,103 @@ void main() {
     expect(find.byIcon(Icons.refresh), findsOneWidget);
     expect(find.byIcon(Icons.notifications_active_outlined), findsOneWidget);
   });
+
+  testWidgets('task completion emits one selection haptic', (tester) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+    var completionCalls = 0;
+    final document = MutableDocument(
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Review task'),
+          isComplete: false,
+        ),
+      ],
+    );
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: MutableDocumentComposer(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SuperEditor(
+            editor: editor,
+            componentBuilders: [
+              CustomTaskComponentBuilder(
+                onTaskComplete: (_) async {
+                  completionCalls++;
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    recorder.calls.clear();
+    await tester.tap(find.bySemanticsLabel('Concluir tarefa'));
+    await tester.pumpAndSettle();
+
+    expect(completionCalls, 1);
+    expect(
+      recorder.calls.where(
+        (call) => call.arguments == 'HapticFeedbackType.selectionClick',
+      ),
+      hasLength(1),
+    );
+  });
+
+  testWidgets(
+    'task long press emits one long-press haptic only with callback',
+    (tester) async {
+      final recorder = HapticTestRecorder()..install();
+      addTearDown(recorder.dispose);
+      var longPressCalls = 0;
+      final document = MutableDocument(
+        nodes: [
+          TaskNode(
+            id: 'task-1',
+            text: AttributedText('Review task'),
+            isComplete: false,
+          ),
+        ],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: MutableDocumentComposer(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SuperEditor(
+              editor: editor,
+              componentBuilders: [
+                CustomTaskComponentBuilder(
+                  onTaskLongPress: (_) => longPressCalls++,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      recorder.calls.clear();
+    final taskTopLeft = tester.getTopLeft(find.byType(CustomTaskComponent));
+    await tester.longPressAt(taskTopLeft + const Offset(16, 20));
+      await tester.pumpAndSettle();
+
+      expect(longPressCalls, 1);
+      expect(
+        recorder.calls.where((call) => call.method == 'HapticFeedback.vibrate'),
+        hasLength(1),
+      );
+    },
+  );
 }

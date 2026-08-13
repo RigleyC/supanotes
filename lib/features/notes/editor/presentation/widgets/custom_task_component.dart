@@ -360,7 +360,9 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   onTap: widget.isReadOnly || _isUpdatingCompletion
                       ? null
                       : _onCheckboxTap,
-                  onLongPress: widget.isReadOnly ? null : _onTouchLongPress,
+                  onLongPress: widget.isReadOnly || widget.onLongPress == null
+                      ? null
+                      : _onTouchLongPress,
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
