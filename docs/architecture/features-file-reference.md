@@ -15,21 +15,15 @@
 
 | Arquivo | Classe/provider | Métodos-chave e motivo |
 | --- | --- | --- |
-| `tasks/domain/task_model.dart` | `TaskModel` | Modelo de leitura da projeção; não é o bloco canônico. |
-| `tasks/domain/projected_task.dart` | `ProjectedTask` | Resultado intermediário do parser de blocos antes da escrita transacional. |
-| `tasks/domain/note_document_projector.dart` | `NoteDocumentProjector` | Calcula `content`, `excerpt` e tarefas de blocos/snapshot REST/OT sem banco ou ciclo de vida do editor; deriva a ocorrência atual de recorrências abertas. |
-| `tasks/domain/task_projection_engine.dart` | `TaskProjectionEngine` | `projectTasksFromDocument`/`projectTasksFromSnapshot` delegam o cálculo ao projector e persistem tarefas/projeções; `saveProjectedDocument` mantém snapshot + projeção do editor atômicos. A hidratação remota usa `AppDatabase.saveRemoteNote`. |
 | `tasks/domain/task_occurrence.dart` | `TaskOccurrence` | `buildOccurrences` expõe a ocorrência atual em estado pending/overdue/completed; não cria uma fila de ocorrências perdidas. |
 | `tasks/domain/task_recurrence.dart` | `TaskRecurrence` | Faz parse e cálculo de próxima ocorrência; concentra bordas de calendário. |
 | `tasks/domain/task_completion_command.dart` | `TaskCompletionCommand` | Resultado e snapshot para completar/reabrir; mantém undo com a ocorrência correta. |
 | `tasks/domain/task_date_filter.dart`, `task_date_format.dart` | filtros/formatadores | Regras puras para listas e apresentação, testáveis sem banco. |
 | `tasks/domain/task_notification_scheduler.dart` | `TaskNotificationScheduler` | Observa tarefas abertas e agenda notificações locais; não altera documento. |
-| `tasks/data/tasks_repository.dart` | `TasksRepository` | Streams e ações de leitura da projeção; endpoints convencionais não substituem edição do documento. |
-| `tasks/data/local/tasks_local_repository.dart` | adapter local | Encapsula `TasksDao` e mantém escopo do usuário. |
 | `tasks/presentation/controllers/task_metadata_controller.dart` | controller de sheet | Controla seleção de data/hora/recorrência com estado local da UI. |
 | `tasks/presentation/controllers/task_snackbar_helper.dart` | `TaskSnackBarHelper` | Coordena feedback/undo e chama callback que altera o editor. |
 | `tasks/presentation/widgets/task_metadata_sheet.dart` e páginas | widgets | Coletam metadata; ao salvar, delegam ao controller do editor. |
-| `tasks/presentation/widgets/task_tile.dart`, badges | widgets | Renderizam projeção; não persistem checkbox diretamente. |
+| `tasks/presentation/widgets/task_metadata_badges.dart` | widget | Renderiza o estado da ocorrência; não persiste checkbox diretamente. |
 
 ## Settings
 

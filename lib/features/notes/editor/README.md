@@ -18,9 +18,9 @@ mas somente a sessão converte mudanças em operações e sincroniza dados.
 2. `NoteEditorSession` cria e possui o `NoteEditorController` e
    `NoteSyncSession`.
 3. `NoteSyncSession.start()` hidrata o documento confirmado e as operações
-   pendentes locais, marca a sessão como pronta e inicia a projeção de tarefas,
-   o sync e o polling em segundo plano. Assim, latência de rede ou uma projeção
-   grande não bloqueia o primeiro frame do editor.
+   pendentes locais, marca a sessão como pronta e inicia a materialização do
+   documento efetivo, o sync e o polling em segundo plano. Assim, latência de
+   rede não bloqueia o primeiro frame do editor.
 4. O adapter captura operações do editor, grava a outbox e pede sync.
 5. Ao fechar, a sessão aguarda filas, tenta flush, para polling e descarta os
    recursos. Uma finalização atrasada não pode remover uma nova sessão do mesmo
@@ -50,5 +50,5 @@ documento e garantir que somente um owner faça polling e flush.
 ## Ligações
 
 - Outbox e HTTP: [core sync](../../../core/sync/README.md).
-- Projeção de tarefas: [tasks](../../tasks/README.md).
+- Tasks e notificações: [tasks](../../tasks/README.md).
 - Aplicação no servidor: [backend noteoperations](../../../../backend/internal/noteoperations/README.md).

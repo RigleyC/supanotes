@@ -177,7 +177,7 @@ Status: complete.
 
 ## Task document-native migration
 
-Status: design approved; implementation plan ready for user approval.
+Status: implementation in progress; design and migration plan approved.
 
 The approved design is in
 `docs/superpowers/specs/2026-08-12-task-document-native-design.md`.
@@ -186,10 +186,50 @@ The migration plan is in
 The older incremental relational projection design is superseded and must not
 be executed independently.
 
-- [ ] Complete the production backup and read-only inventory gate.
-- [ ] Normalize the canonical task metadata and occurrence contract.
-- [ ] Persist the effective local note document for offline notifications.
-- [ ] Move the scheduler and editor sheet off `TaskModel` and relational tasks.
-- [ ] Remove projection writers, legacy routes, providers, and tables only
-      after the production data and traffic gates pass.
-- [ ] Update living architecture and lifecycle documentation.
+### Decisions
+
+- `TaskNode` in the canonical note document is the only task model.
+- REST/OT owns task content and metadata. SQLite stores the local effective
+  document for offline reads and notifications.
+- `dueDate` is the recurrence anchor. A completion is stored as
+  `completions[scheduledAt] = completedAt`.
+- Early and late completion preserve the scheduled occurrence key. The next
+  occurrence is calculated from the original schedule.
+- An overdue occurrence remains historical. The next reached occurrence is
+  the active one. Reopening removes only the exact scheduled occurrence.
+- Changing schedule metadata clears the completion history for that task.
+- The metadata sheet receives `TaskMetadataDraft`; it does not receive a
+  relational `TaskModel`.
+- Notification scheduling uses the effective local document. Shared-link
+  visitors do not run a local notification scheduler.
+
+### Execution order
+
+1. [x] Define the document-native task and recurring-occurrence contract.
+2. [x] Remove `TaskModel` from the editor, task metadata sheet, and editor
+   callbacks.
+3. [x] Persist the effective local note document after local operations and
+   remote rebase/hydration.
+4. [x] Move notification reads to `TaskNode` and remove relational task
+   providers and projection writers.
+5. [x] Remove relational task REST/MCP runtime paths and unused backend task
+   services and queries.
+6. [ ] Add the production read-only preflight and retention runbook. No
+   production data is deleted by this change.
+7. [ ] Review scheduler boundary changes, schema versioning, generated SQL,
+   and test coverage for regressions.
+8. [ ] Run the complete Flutter and Go verification suites.
+9. [ ] Run the thermo-nuclear maintainability review and resolve every finding.
+
+### Data safety gates
+
+- Take a PostgreSQL backup before production rollout.
+- Export `tasks` and `task_completions` before any physical cleanup.
+- Run a read-only comparison between relational rows and task blocks in
+  `notes.document`.
+- Classify rows as corresponding, orphaned, or conflicting. Stop rollout on
+  conflicts until they are resolved.
+- Keep the legacy export under controlled retention until the canonical
+  document path is confirmed in production.
+- Do not add an automatic `DROP TABLE` migration. Physical cleanup is a
+  separate, approved operation after the retention period.

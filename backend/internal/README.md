@@ -10,7 +10,6 @@ ter `handler.go`, `service.go` e `repository.go`.
 | `auth` | registro, login, refresh e middleware JWT |
 | `notes` | CRUD, busca e ciclo de vida da nota |
 | `noteoperations` | contrato REST/OT, transformação, validação e persistência do snapshot |
-| `tasks` | leitura/ações de tarefas convencionais e recorrência |
 | `shares` | concessão e revogação de acesso à nota |
 | `attachments` | validação, storage S3 e metadados de upload |
 | `linkpreview` | busca e sanitização de metadados de links |

@@ -16,11 +16,10 @@ esse estado é documentada no controller, provider ou repositório indicado.
 | Arquivo | Classe/provider | Métodos-chave e motivo |
 | --- | --- | --- |
 | `catalog/model/note_model.dart` | `NoteModel` | `copyWith` cria uma versão de apresentação sem mutar a linha; o modelo representa nota + permissões + preferências já combinadas. |
-| `catalog/model/note_with_tasks.dart` | `NoteWithTasks` | Agrupa uma nota e `taskById` para uma emissão reativa única; evita que a tela coordene dois streams. |
 | `catalog/model/note_strings.dart` | `NoteStrings` | Mantém mensagens longas e compartilhadas fora dos widgets. |
-| `catalog/data/local/notes_local_repository.dart` | `NotesLocalRepository` | `watchActiveNotes`, `watchNoteById`, `watchNoteWithTasks` leem Drift reativamente; `createNoteWithId`, `updateNoteRaw`, `softDeleteNote`, `hardDeleteNote` preservam o ciclo local-first. |
-| `catalog/data/notes_repository.dart` | `INotesRepository`, `NotesRepository` | Interface usada por UI; `watchNotes`, `watchNoteById`, `watchNoteWithTasks` expõem leitura; `createLocalNote` cria antes da navegação; `saveSnapshot` mantém conteúdo, links e projeção juntos; `deleteIfEmptyOrTombstone` diferencia nota local vazia de nota remota. |
-| `catalog/data/note_catalog_sync.dart` | `NoteCatalogSync`, `noteCatalogSyncProvider` | `pullRemoteNotes` hidrata o catálogo; `_pullRemoteNote` ignora notas ativas, calcula a projeção com `tasks/domain/note_document_projector.dart` e usa `AppDatabase.saveRemoteNote` para gravar snapshot e projeções atomicamente. A atualização remota usa comparação de versão e recusa linhas sujas, excluídas, ausentes ou alteradas durante a requisição. |
+| `catalog/data/local/notes_local_repository.dart` | `NotesLocalRepository` | `watchActiveNotes` e `watchNoteById` leem o catálogo reativamente; `createNoteWithId`, `updateNoteRaw`, `softDeleteNote`, `hardDeleteNote` preservam o ciclo local-first. |
+| `catalog/data/notes_repository.dart` | `INotesRepository`, `NotesRepository` | Interface usada por UI; `watchNotes` e `watchNoteById` expõem leitura; `createLocalNote` cria antes da navegação; `saveSnapshot` mantém conteúdo e links juntos; `deleteIfEmptyOrTombstone` diferencia nota local vazia de nota remota. |
+| `catalog/data/note_catalog_sync.dart` | `NoteCatalogSync`, `noteCatalogSyncProvider` | `pullRemoteNotes` hidrata o catálogo; `_pullRemoteNote` ignora notas ativas e usa `AppDatabase.saveRemoteNote` para gravar o snapshot confirmado e os metadados da nota atomicamente. A atualização remota usa comparação de versão e recusa linhas sujas, excluídas, ausentes ou alteradas durante a requisição. |
 | `catalog/application/notes_providers.dart` | `activeNotesProvider`, `noteWithTasksProvider` | Convertem os streams do repositório em `AsyncValue`; a tela não decide como consultar Drift. |
 | `catalog/presentation/notes_list_screen.dart` | `NotesListScreen` | `_openSearch`/`_closeSearch` controlam somente UI; `_onSearchQueryChanged` aplica debounce; `_openNewNote`, `_deleteNote`, `_toggleFavorite` delegam ao repositório; `build` combina `AsyncValue` com grid/lista. |
 | `catalog/presentation/widgets/notes_grid_view.dart` | `NotesGridView` | `build` apenas distribui `NoteCard` em grid; callbacks continuam pertencendo à tela. |
@@ -58,7 +57,7 @@ esse estado é documentada no controller, provider ou repositório indicado.
 | `editor/sync/note_operation_contract.dart` | `NoteOperationKind`, `NoteOperationPayloads`, `NoteOperationContract` | Centraliza nomes wire, builders e validação local dos sete tipos de operação; o adapter rejeita payload inválido antes da outbox e o servidor continua sendo o owner autoritativo. |
 | `editor/sync/note_operation_adapter.dart` | `NoteOperationAdapter` | `start` carrega revisão e hidrata; `setCaptureLocalOperations` alterna edição/read-only; `flushNow` esvazia debounce; `reconcile` aplica confirmação/remoto; `rebuildFromSnapshot` coordena applier + capture. É o adaptador entre editor mutável e outbox. |
 | `editor/sync/note_operation_rebaser.dart` | `NoteOp`, `NoteOperationRebaser` | `rebase` mantém operações pendentes após remoto; `transformOp` resolve conflitos por bloco/posição; uma operação não aplicável retorna nula para não corromper o documento. |
-| `editor/sync/note_sync_session.dart` | `NoteSyncSession` | `start` inicia adapter, projeção e polling; `pollNow` busca remoto; `flushNow` garante envio imediato; `_runSyncOperation` serializa concorrência; `dispose` espera filas e fecha recursos; `isProtocolError` separa erro definitivo de falha transitória. |
+| `editor/sync/note_sync_session.dart` | `NoteSyncSession` | `start` inicia adapter, materialização local do documento efetivo e polling; `pollNow` busca remoto; `flushNow` garante envio imediato; `_runSyncOperation` serializa concorrência; `dispose` espera filas e fecha recursos; `isProtocolError` separa erro definitivo de falha transitória. |
 | `editor/sync/note_session_coordinator.dart` | `NoteSessionCoordinator<T>`, `NoteSessionSnapshot` | `open` reutiliza sessão pendente/pronta; `close` aguarda fechamento; `statusOf`, `statusChangesOf` e `snapshot` expõem uma visão consistente; `closeAll` encerra logout. O mapa usa identidade para impedir cleanup obsoleto. |
 | `editor/sync/note_session_handle.dart` | `NoteSessionHandle`, `NoteEditorSyncHandle`, `NoteSessionStatus` | Interface mínima do ciclo de vida; permite testar coordinator com fake e evita que ele conheça `NoteSyncSession`. |
 | `editor/sync/note_session_activity_tracker.dart` | `NoteSessionActivityTracker` | `markActive`/`markInactive` e `isActive` impedem catalog sync de sobrescrever nota aberta. |
@@ -80,7 +79,8 @@ esse estado é documentada no controller, provider ou repositório indicado.
 
 ## O que não deve ser feito
 
-- Não mover `TaskProjectionEngine` para `notes`: tasks é dona da projeção.
+- Tarefas não têm uma projeção relacional: o bloco no documento canônico é a
+  fonte de leitura e escrita.
 - Não criar `NoteSyncSession` dentro de um widget ou provider secundário.
 - Não escrever `tasks` para editar conteúdo; produza uma operação do documento.
 - Não tratar `NoteSyncClient` como regra de negócio; ele só transporta DTOs.
