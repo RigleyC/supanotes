@@ -1,7 +1,11 @@
 # Design: projeção incremental de tarefas no fluxo REST/OT
 
 Data: 2026-08-12  
-Status: draft para revisão do usuário
+Status: superseded by `2026-08-12-task-document-native-design.md`
+
+Este documento fica preservado como histórico da alternativa de projeção
+incremental. Ele não deve ser executado: o design atual remove a dependência
+runtime da projeção relacional de tasks.
 
 ## Contexto
 
