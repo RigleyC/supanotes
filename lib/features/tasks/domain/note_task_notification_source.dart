@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/database/database.dart';
 
@@ -8,11 +10,28 @@ final noteTaskNotificationSourceProvider =
     StreamProvider.autoDispose<List<TaskNotificationEntry>>((ref) {
       final dao = ref.watch(appDatabaseProvider).noteOperationsDao;
       const reader = NoteTaskReader();
-      return dao.watchMaterializedDocuments().map((documents) {
-        return [
-          for (final document in documents)
-            if (document.materializedDocumentJson != null)
-              ...reader.read(document.materializedDocumentJson!),
-        ];
+      return Stream.multi((controller) {
+        List<LocalNoteDocumentData> latestDocuments = const [];
+
+        void emit() {
+          controller.add([
+            for (final document in latestDocuments)
+              if (document.materializedDocumentJson != null)
+                ...reader.read(document.materializedDocumentJson!),
+          ]);
+        }
+
+        final subscription = dao.watchMaterializedDocuments().listen((
+          documents,
+        ) {
+          latestDocuments = documents;
+          emit();
+        }, onError: controller.addError);
+        final timer = Timer.periodic(const Duration(minutes: 1), (_) => emit());
+
+        ref.onDispose(() {
+          timer.cancel();
+          subscription.cancel();
+        });
       });
     });
