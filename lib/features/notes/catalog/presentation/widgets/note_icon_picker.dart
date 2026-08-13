@@ -7,6 +7,7 @@ import 'package:unicode_emojis/unicode_emojis.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_catalog.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
@@ -132,7 +133,10 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
             label: emoji.name,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => widget.onSelected(NoteIcon.emoji(emoji.emoji)),
+              onTap: () {
+                AppHaptics.selectionChange();
+                widget.onSelected(NoteIcon.emoji(emoji.emoji));
+              },
               child: Center(
                 child: Text(emoji.emoji, style: const TextStyle(fontSize: 28)),
               ),
@@ -206,7 +210,11 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
                   child: SizedBox.square(
                     dimension: 48,
                     child: InkWell(
-                      onTap: () => setState(() => _colorKey = key),
+                      onTap: () {
+                        if (key == _colorKey) return;
+                        AppHaptics.selectionChange();
+                        setState(() => _colorKey = key);
+                      },
                       borderRadius: BorderRadius.circular(24),
                       child: Center(
                         child: Container(
@@ -238,9 +246,12 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
             label: catalogIconLabels[entry.key] ?? entry.key,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => widget.onSelected(
-                NoteIcon.catalog(id: entry.key, colorKey: _colorKey),
-              ),
+              onTap: () {
+                AppHaptics.selectionChange();
+                widget.onSelected(
+                  NoteIcon.catalog(id: entry.key, colorKey: _colorKey),
+                );
+              },
               child: Icon(
                 entry.value,
                 size: 28,
