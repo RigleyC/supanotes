@@ -151,7 +151,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('empty_draft'),
+    defaultValue: const Constant(emptyDraftLifecycleState),
   );
   static const VerificationMeta _permissionMeta = const VerificationMeta(
     'permission',
@@ -3811,12 +3811,36 @@ class $LocalNoteDocumentsTable extends LocalNoteDocuments
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _materializedDocumentJsonMeta =
+      const VerificationMeta('materializedDocumentJson');
+  @override
+  late final GeneratedColumn<String> materializedDocumentJson =
+      GeneratedColumn<String>(
+        'materialized_document_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _materializedUpdatedAtMeta =
+      const VerificationMeta('materializedUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> materializedUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'materialized_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     noteId,
     revision,
     documentJson,
     updatedAt,
+    materializedDocumentJson,
+    materializedUpdatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3865,6 +3889,24 @@ class $LocalNoteDocumentsTable extends LocalNoteDocuments
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('materialized_document_json')) {
+      context.handle(
+        _materializedDocumentJsonMeta,
+        materializedDocumentJson.isAcceptableOrUnknown(
+          data['materialized_document_json']!,
+          _materializedDocumentJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('materialized_updated_at')) {
+      context.handle(
+        _materializedUpdatedAtMeta,
+        materializedUpdatedAt.isAcceptableOrUnknown(
+          data['materialized_updated_at']!,
+          _materializedUpdatedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3890,6 +3932,14 @@ class $LocalNoteDocumentsTable extends LocalNoteDocuments
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      materializedDocumentJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}materialized_document_json'],
+      ),
+      materializedUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}materialized_updated_at'],
+      ),
     );
   }
 
@@ -3905,11 +3955,15 @@ class LocalNoteDocumentData extends DataClass
   final int revision;
   final String documentJson;
   final DateTime updatedAt;
+  final String? materializedDocumentJson;
+  final DateTime? materializedUpdatedAt;
   const LocalNoteDocumentData({
     required this.noteId,
     required this.revision,
     required this.documentJson,
     required this.updatedAt,
+    this.materializedDocumentJson,
+    this.materializedUpdatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3918,6 +3972,16 @@ class LocalNoteDocumentData extends DataClass
     map['revision'] = Variable<int>(revision);
     map['document_json'] = Variable<String>(documentJson);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || materializedDocumentJson != null) {
+      map['materialized_document_json'] = Variable<String>(
+        materializedDocumentJson,
+      );
+    }
+    if (!nullToAbsent || materializedUpdatedAt != null) {
+      map['materialized_updated_at'] = Variable<DateTime>(
+        materializedUpdatedAt,
+      );
+    }
     return map;
   }
 
@@ -3927,6 +3991,12 @@ class LocalNoteDocumentData extends DataClass
       revision: Value(revision),
       documentJson: Value(documentJson),
       updatedAt: Value(updatedAt),
+      materializedDocumentJson: materializedDocumentJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(materializedDocumentJson),
+      materializedUpdatedAt: materializedUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(materializedUpdatedAt),
     );
   }
 
@@ -3940,6 +4010,12 @@ class LocalNoteDocumentData extends DataClass
       revision: serializer.fromJson<int>(json['revision']),
       documentJson: serializer.fromJson<String>(json['documentJson']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      materializedDocumentJson: serializer.fromJson<String?>(
+        json['materializedDocumentJson'],
+      ),
+      materializedUpdatedAt: serializer.fromJson<DateTime?>(
+        json['materializedUpdatedAt'],
+      ),
     );
   }
   @override
@@ -3950,6 +4026,12 @@ class LocalNoteDocumentData extends DataClass
       'revision': serializer.toJson<int>(revision),
       'documentJson': serializer.toJson<String>(documentJson),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'materializedDocumentJson': serializer.toJson<String?>(
+        materializedDocumentJson,
+      ),
+      'materializedUpdatedAt': serializer.toJson<DateTime?>(
+        materializedUpdatedAt,
+      ),
     };
   }
 
@@ -3958,11 +4040,19 @@ class LocalNoteDocumentData extends DataClass
     int? revision,
     String? documentJson,
     DateTime? updatedAt,
+    Value<String?> materializedDocumentJson = const Value.absent(),
+    Value<DateTime?> materializedUpdatedAt = const Value.absent(),
   }) => LocalNoteDocumentData(
     noteId: noteId ?? this.noteId,
     revision: revision ?? this.revision,
     documentJson: documentJson ?? this.documentJson,
     updatedAt: updatedAt ?? this.updatedAt,
+    materializedDocumentJson: materializedDocumentJson.present
+        ? materializedDocumentJson.value
+        : this.materializedDocumentJson,
+    materializedUpdatedAt: materializedUpdatedAt.present
+        ? materializedUpdatedAt.value
+        : this.materializedUpdatedAt,
   );
   LocalNoteDocumentData copyWithCompanion(LocalNoteDocumentsCompanion data) {
     return LocalNoteDocumentData(
@@ -3972,6 +4062,12 @@ class LocalNoteDocumentData extends DataClass
           ? data.documentJson.value
           : this.documentJson,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      materializedDocumentJson: data.materializedDocumentJson.present
+          ? data.materializedDocumentJson.value
+          : this.materializedDocumentJson,
+      materializedUpdatedAt: data.materializedUpdatedAt.present
+          ? data.materializedUpdatedAt.value
+          : this.materializedUpdatedAt,
     );
   }
 
@@ -3981,13 +4077,22 @@ class LocalNoteDocumentData extends DataClass
           ..write('noteId: $noteId, ')
           ..write('revision: $revision, ')
           ..write('documentJson: $documentJson, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('materializedDocumentJson: $materializedDocumentJson, ')
+          ..write('materializedUpdatedAt: $materializedUpdatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(noteId, revision, documentJson, updatedAt);
+  int get hashCode => Object.hash(
+    noteId,
+    revision,
+    documentJson,
+    updatedAt,
+    materializedDocumentJson,
+    materializedUpdatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3995,7 +4100,9 @@ class LocalNoteDocumentData extends DataClass
           other.noteId == this.noteId &&
           other.revision == this.revision &&
           other.documentJson == this.documentJson &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.materializedDocumentJson == this.materializedDocumentJson &&
+          other.materializedUpdatedAt == this.materializedUpdatedAt);
 }
 
 class LocalNoteDocumentsCompanion
@@ -4004,12 +4111,16 @@ class LocalNoteDocumentsCompanion
   final Value<int> revision;
   final Value<String> documentJson;
   final Value<DateTime> updatedAt;
+  final Value<String?> materializedDocumentJson;
+  final Value<DateTime?> materializedUpdatedAt;
   final Value<int> rowid;
   const LocalNoteDocumentsCompanion({
     this.noteId = const Value.absent(),
     this.revision = const Value.absent(),
     this.documentJson = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.materializedDocumentJson = const Value.absent(),
+    this.materializedUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalNoteDocumentsCompanion.insert({
@@ -4017,6 +4128,8 @@ class LocalNoteDocumentsCompanion
     required int revision,
     required String documentJson,
     required DateTime updatedAt,
+    this.materializedDocumentJson = const Value.absent(),
+    this.materializedUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : noteId = Value(noteId),
        revision = Value(revision),
@@ -4027,6 +4140,8 @@ class LocalNoteDocumentsCompanion
     Expression<int>? revision,
     Expression<String>? documentJson,
     Expression<DateTime>? updatedAt,
+    Expression<String>? materializedDocumentJson,
+    Expression<DateTime>? materializedUpdatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4034,6 +4149,10 @@ class LocalNoteDocumentsCompanion
       if (revision != null) 'revision': revision,
       if (documentJson != null) 'document_json': documentJson,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (materializedDocumentJson != null)
+        'materialized_document_json': materializedDocumentJson,
+      if (materializedUpdatedAt != null)
+        'materialized_updated_at': materializedUpdatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4043,6 +4162,8 @@ class LocalNoteDocumentsCompanion
     Value<int>? revision,
     Value<String>? documentJson,
     Value<DateTime>? updatedAt,
+    Value<String?>? materializedDocumentJson,
+    Value<DateTime?>? materializedUpdatedAt,
     Value<int>? rowid,
   }) {
     return LocalNoteDocumentsCompanion(
@@ -4050,6 +4171,10 @@ class LocalNoteDocumentsCompanion
       revision: revision ?? this.revision,
       documentJson: documentJson ?? this.documentJson,
       updatedAt: updatedAt ?? this.updatedAt,
+      materializedDocumentJson:
+          materializedDocumentJson ?? this.materializedDocumentJson,
+      materializedUpdatedAt:
+          materializedUpdatedAt ?? this.materializedUpdatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4069,6 +4194,16 @@ class LocalNoteDocumentsCompanion
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (materializedDocumentJson.present) {
+      map['materialized_document_json'] = Variable<String>(
+        materializedDocumentJson.value,
+      );
+    }
+    if (materializedUpdatedAt.present) {
+      map['materialized_updated_at'] = Variable<DateTime>(
+        materializedUpdatedAt.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4082,6 +4217,8 @@ class LocalNoteDocumentsCompanion
           ..write('revision: $revision, ')
           ..write('documentJson: $documentJson, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('materializedDocumentJson: $materializedDocumentJson, ')
+          ..write('materializedUpdatedAt: $materializedUpdatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7801,6 +7938,8 @@ typedef $$LocalNoteDocumentsTableCreateCompanionBuilder =
       required int revision,
       required String documentJson,
       required DateTime updatedAt,
+      Value<String?> materializedDocumentJson,
+      Value<DateTime?> materializedUpdatedAt,
       Value<int> rowid,
     });
 typedef $$LocalNoteDocumentsTableUpdateCompanionBuilder =
@@ -7809,6 +7948,8 @@ typedef $$LocalNoteDocumentsTableUpdateCompanionBuilder =
       Value<int> revision,
       Value<String> documentJson,
       Value<DateTime> updatedAt,
+      Value<String?> materializedDocumentJson,
+      Value<DateTime?> materializedUpdatedAt,
       Value<int> rowid,
     });
 
@@ -7838,6 +7979,16 @@ class $$LocalNoteDocumentsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get materializedDocumentJson => $composableBuilder(
+    column: $table.materializedDocumentJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get materializedUpdatedAt => $composableBuilder(
+    column: $table.materializedUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7870,6 +8021,16 @@ class $$LocalNoteDocumentsTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get materializedDocumentJson => $composableBuilder(
+    column: $table.materializedDocumentJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get materializedUpdatedAt => $composableBuilder(
+    column: $table.materializedUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalNoteDocumentsTableAnnotationComposer
@@ -7894,6 +8055,16 @@ class $$LocalNoteDocumentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get materializedDocumentJson => $composableBuilder(
+    column: $table.materializedDocumentJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get materializedUpdatedAt => $composableBuilder(
+    column: $table.materializedUpdatedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$LocalNoteDocumentsTableTableManager
@@ -7940,12 +8111,16 @@ class $$LocalNoteDocumentsTableTableManager
                 Value<int> revision = const Value.absent(),
                 Value<String> documentJson = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> materializedDocumentJson = const Value.absent(),
+                Value<DateTime?> materializedUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalNoteDocumentsCompanion(
                 noteId: noteId,
                 revision: revision,
                 documentJson: documentJson,
                 updatedAt: updatedAt,
+                materializedDocumentJson: materializedDocumentJson,
+                materializedUpdatedAt: materializedUpdatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -7954,12 +8129,16 @@ class $$LocalNoteDocumentsTableTableManager
                 required int revision,
                 required String documentJson,
                 required DateTime updatedAt,
+                Value<String?> materializedDocumentJson = const Value.absent(),
+                Value<DateTime?> materializedUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalNoteDocumentsCompanion.insert(
                 noteId: noteId,
                 revision: revision,
                 documentJson: documentJson,
                 updatedAt: updatedAt,
+                materializedDocumentJson: materializedDocumentJson,
+                materializedUpdatedAt: materializedUpdatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

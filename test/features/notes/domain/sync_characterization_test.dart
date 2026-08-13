@@ -43,7 +43,17 @@ void main() {
       () => mockSyncService.getConfirmedDocument(any()),
     ).thenAnswer((_) async => null);
     when(
-      () => mockSyncService.enqueueOperations(any(), any()),
+      () => mockSyncService.enqueueOperations(
+        any(),
+        any(),
+        materializedDocumentJson: any(named: 'materializedDocumentJson'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockSyncService.storeMaterializedDocument(
+        noteId: any(named: 'noteId'),
+        documentJson: any(named: 'documentJson'),
+      ),
     ).thenAnswer((_) async {});
     when(
       () => mockSyncService.getPendingOperations(any()),
@@ -244,9 +254,13 @@ void main() {
         }
         return syncCompleter.future;
       });
-      when(() => mockSyncService.enqueueOperations(noteId, any())).thenAnswer((
-        _,
-      ) async {
+      when(
+        () => mockSyncService.enqueueOperations(
+          noteId,
+          any(),
+          materializedDocumentJson: any(named: 'materializedDocumentJson'),
+        ),
+      ).thenAnswer((_) async {
         enqueued = true;
       });
 
@@ -345,7 +359,11 @@ void main() {
     await session.flushNow();
 
     verify(
-      () => mockSyncService.enqueueOperations(noteId, any()),
+      () => mockSyncService.enqueueOperations(
+        noteId,
+        any(),
+        materializedDocumentJson: any(named: 'materializedDocumentJson'),
+      ),
     ).called(greaterThanOrEqualTo(1));
 
     await session.dispose();
@@ -381,7 +399,13 @@ void main() {
       await session.dispose();
 
       // Confirm that the debounced edit was flushed to the durable outbox.
-      verify(() => mockSyncService.enqueueOperations(noteId, any())).called(1);
+      verify(
+        () => mockSyncService.enqueueOperations(
+          noteId,
+          any(),
+          materializedDocumentJson: any(named: 'materializedDocumentJson'),
+        ),
+      ).called(1);
       verifyNever(
         () => mockSyncService.syncPending(
           noteId,
@@ -396,9 +420,13 @@ void main() {
     () async {
       const noteId = 'note-retry-close';
       var enqueueAttempts = 0;
-      when(() => mockSyncService.enqueueOperations(noteId, any())).thenAnswer((
-        _,
-      ) async {
+      when(
+        () => mockSyncService.enqueueOperations(
+          noteId,
+          any(),
+          materializedDocumentJson: any(named: 'materializedDocumentJson'),
+        ),
+      ).thenAnswer((_) async {
         enqueueAttempts++;
         if (enqueueAttempts == 1) throw StateError('outbox unavailable');
       });

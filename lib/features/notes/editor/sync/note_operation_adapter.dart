@@ -104,6 +104,10 @@ class NoteOperationAdapter {
     }
     await _hydrateFromPersistedState();
     if (_disposed) return;
+    await _syncService.storeMaterializedDocument(
+      noteId: _noteId,
+      documentJson: _encodeCurrentDocument(),
+    );
     _capture.buildMirror();
     _capture.setSuppress(!_captureLocalOperations);
   }
@@ -263,7 +267,11 @@ class NoteOperationAdapter {
         );
       }
 
-      await _syncService.enqueueOperations(_noteId, ops);
+      await _syncService.enqueueOperations(
+        _noteId,
+        ops,
+        materializedDocumentJson: _encodeCurrentDocument(),
+      );
       persisted = true;
 
       onLocalOperations?.call(ops);
@@ -275,6 +283,13 @@ class NoteOperationAdapter {
       }
       Error.throwWithStackTrace(error, stackTrace);
     }
+  }
+
+  String _encodeCurrentDocument() {
+    return jsonEncode({
+      'schemaVersion': 1,
+      'blocks': _codec.encodeDocument(_document),
+    });
   }
 
   Future<void> flushNow() async {
@@ -348,6 +363,10 @@ class NoteOperationAdapter {
       suppressCapture: () => _capture.setSuppress(true),
       resumeCapture: () => _capture.setSuppress(false),
       rebuildMirror: () => _capture.buildMirror(),
+    );
+    await _syncService.storeMaterializedDocument(
+      noteId: _noteId,
+      documentJson: _encodeCurrentDocument(),
     );
   }
 

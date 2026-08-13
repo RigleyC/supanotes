@@ -15,7 +15,6 @@ import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
-import 'package:supanotes/features/notes/catalog/model/note_with_tasks.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
@@ -56,9 +55,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final noteWithTasksAsync = ref.watch(noteWithTasksProvider(widget.noteId));
-    final note = noteWithTasksAsync.when(
-      data: (noteWithTasks) => noteWithTasks.note,
+    final noteAsync = ref.watch(noteProvider(widget.noteId));
+    final note = noteAsync.when(
+      data: (note) => note,
       loading: () => null,
       error: (_, _) => null,
     );
@@ -80,7 +79,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       body: _NoteEditorBody(
         noteId: widget.noteId,
         attachmentDelivery: widget.attachmentDelivery,
-        noteWithTasksAsync: noteWithTasksAsync,
+        noteAsync: noteAsync,
         sessionAsync: sessionAsync,
         taskForMetadata: _taskForMetadata,
         readSession: _readSession,
@@ -297,7 +296,7 @@ class _NoteEditorBody extends StatelessWidget {
   const _NoteEditorBody({
     required this.noteId,
     required this.attachmentDelivery,
-    required this.noteWithTasksAsync,
+    required this.noteAsync,
     required this.sessionAsync,
     required this.taskForMetadata,
     required this.readSession,
@@ -305,7 +304,7 @@ class _NoteEditorBody extends StatelessWidget {
 
   final String noteId;
   final AttachmentDelivery? attachmentDelivery;
-  final AsyncValue<NoteWithTasks> noteWithTasksAsync;
+  final AsyncValue<NoteModel?> noteAsync;
   final AsyncValue<NoteEditorSession> sessionAsync;
   final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
@@ -321,7 +320,7 @@ class _NoteEditorBody extends StatelessWidget {
             child: _NoteEditorDocument(
               noteId: noteId,
               attachmentDelivery: attachmentDelivery,
-              noteWithTasksAsync: noteWithTasksAsync,
+              noteAsync: noteAsync,
               sessionAsync: sessionAsync,
               taskForMetadata: taskForMetadata,
               readSession: readSession,
@@ -337,7 +336,7 @@ class _NoteEditorDocument extends StatelessWidget {
   const _NoteEditorDocument({
     required this.noteId,
     required this.attachmentDelivery,
-    required this.noteWithTasksAsync,
+    required this.noteAsync,
     required this.sessionAsync,
     required this.taskForMetadata,
     required this.readSession,
@@ -345,16 +344,15 @@ class _NoteEditorDocument extends StatelessWidget {
 
   final String noteId;
   final AttachmentDelivery? attachmentDelivery;
-  final AsyncValue<NoteWithTasks> noteWithTasksAsync;
+  final AsyncValue<NoteModel?> noteAsync;
   final AsyncValue<NoteEditorSession> sessionAsync;
   final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
 
   @override
   Widget build(BuildContext context) {
-    return noteWithTasksAsync.when(
-      data: (noteWithTasks) {
-        final note = noteWithTasks.note;
+    return noteAsync.when(
+      data: (note) {
         if (note == null) {
           return Center(child: Text(NoteStrings.errorNotFound));
         }

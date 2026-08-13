@@ -189,7 +189,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => 29;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -206,6 +206,30 @@ class AppDatabase extends _$AppDatabase {
     await _migrateTaskStorage(m, from);
     await _migrateSyncStorage(m, from);
     await _migrateNoteMetadata(m, from);
+    await _migrateEffectiveDocuments(m, from);
+  }
+
+  Future<void> _migrateEffectiveDocuments(Migrator m, int from) async {
+    if (from < 29) {
+      await _addColumnIfMissing(
+        m,
+        localNoteDocuments,
+        'local_note_documents',
+        localNoteDocuments.materializedDocumentJson,
+      );
+      await _addColumnIfMissing(
+        m,
+        localNoteDocuments,
+        'local_note_documents',
+        localNoteDocuments.materializedUpdatedAt,
+      );
+      await customStatement('''
+        UPDATE local_note_documents
+        SET materialized_document_json = document_json,
+            materialized_updated_at = updated_at
+        WHERE materialized_document_json IS NULL
+      ''');
+    }
   }
 
   Future<bool> _hasColumn(String tableName, String columnName) async {

@@ -5,26 +5,12 @@ import 'dart:developer' as dev;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
-import 'package:supanotes/features/tasks/data/local/tasks_local_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
-
-final openTasksStreamProvider = StreamProvider.autoDispose<List<TaskData>>((
-  ref,
-) {
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null || userId.isEmpty) {
-    return const Stream.empty();
-  }
-
-  final repo = ref.watch(tasksLocalRepositoryProvider);
-  dev.log('[Scheduler] watchOpenTasks stream started for $userId');
-  return repo.watchOpenTasks();
-});
+import 'task_notification_entry.dart';
+import 'note_task_notification_source.dart';
 
 final taskNotificationSchedulerProvider =
     AsyncNotifierProvider.autoDispose<
@@ -42,12 +28,12 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
   String? _previousUserId;
 
   /// Tracks the latest pending tasks for superseding coalescing.
-  List<TaskData>? _pendingTasks;
+  List<TaskNotificationEntry>? _pendingTasks;
 
   /// Previous task snapshot keyed by ID for diff-based rescheduling.
   /// Only tasks whose notification-relevant fields (dueDate, hasTime, reminder)
   /// actually changed will trigger platform notification calls.
-  Map<String, TaskData>? _previousTaskMap;
+  Map<String, TaskNotificationEntry>? _previousTaskMap;
 
   /// Serialization chain: only one reconcile runs at a time per provider.
   Future<void> _reconcileChain = Future.value();
@@ -114,7 +100,7 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     );
 
     // ref.listen keeps the stream provider alive and reacts to data changes
-    ref.listen(openTasksStreamProvider, (_, next) {
+    ref.listen(noteTaskNotificationSourceProvider, (_, next) {
       next.when(
         data: _onTasksChanged,
         loading: () => dev.log('[Scheduler] Stream loading...'),
@@ -131,12 +117,12 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
   /// Only the latest [tasks] set is processed if calls are queued.
   /// The [userId] for notification IDs is read from the current auth state
   /// via [_currentUserId], so this method does not accept it as a parameter.
-  Future<void> reconcile({required List<TaskData> tasks}) {
+  Future<void> reconcile({required List<TaskNotificationEntry> tasks}) {
     _onTasksChanged(tasks);
     return _reconcileChain;
   }
 
-  void _onTasksChanged(List<TaskData> tasks) {
+  void _onTasksChanged(List<TaskNotificationEntry> tasks) {
     _pendingTasks = tasks;
     _reconcileChain = _reconcileChain.then((_) async {
       try {
@@ -152,7 +138,7 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     });
   }
 
-  Future<void> _reschedule(List<TaskData> tasks) async {
+  Future<void> _reschedule(List<TaskNotificationEntry> tasks) async {
     final now = DateTime.now();
     dev.log(
       '[Scheduler] _reschedule called. Total open tasks: ${tasks.length}. now=$now',
@@ -163,7 +149,7 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
 
     // Build new task map to diff against previous snapshot and cached state.
     // Indexed by ID for O(1) lookups.
-    final newTaskMap = <String, TaskData>{};
+    final newTaskMap = <String, TaskNotificationEntry>{};
     for (final task in tasks) {
       newTaskMap[task.id] = task;
     }
@@ -209,9 +195,9 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
   Future<void> _cancelRemovedNotifications({
     required LocalNotificationService service,
     required String currentUserId,
-    required Map<String, TaskData> newTaskMap,
+    required Map<String, TaskNotificationEntry> newTaskMap,
     required Map<String, DateTime> currentState,
-    required Map<String, TaskData>? previousMap,
+    required Map<String, TaskNotificationEntry>? previousMap,
   }) async {
     final removedIds = <String>{};
     if (previousMap != null) {
@@ -240,11 +226,11 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
   }
 
   Future<Map<String, DateTime>> _scheduleTasks({
-    required List<TaskData> tasks,
+    required List<TaskNotificationEntry> tasks,
     required DateTime now,
     required LocalNotificationService service,
     required String currentUserId,
-    required Map<String, TaskData>? previousMap,
+    required Map<String, TaskNotificationEntry>? previousMap,
     required Map<String, DateTime> currentState,
   }) async {
     final schedule = <String, DateTime>{};
@@ -265,18 +251,16 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
   }
 
   Future<DateTime?> _scheduleTask({
-    required TaskData task,
+    required TaskNotificationEntry task,
     required DateTime now,
     required LocalNotificationService service,
     required String currentUserId,
-    required TaskData? previous,
+    required TaskNotificationEntry? previous,
     required Map<String, DateTime> currentState,
   }) async {
     final due = task.dueDate;
-    if (due == null) return null;
 
-    // Drift-generated TaskData overrides == for structural equality,
-    // so unchanged tasks skip the platform notification call.
+    // Unchanged entries skip the platform notification call.
     final isUnchanged = previous != null && previous == task;
     final cachedTime = currentState[task.id];
     if (isUnchanged && cachedTime != null && cachedTime.isAfter(now)) {

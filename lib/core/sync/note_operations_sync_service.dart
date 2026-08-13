@@ -142,19 +142,25 @@ class NoteOperationsSyncService {
   /// retain a stale revision hint from the editor.
   Future<void> enqueueOperations(
     String noteId,
-    List<OperationRequest> requests,
-  ) {
+    List<OperationRequest> requests, {
+    String? materializedDocumentJson,
+  }) {
     if (requests.isEmpty) return Future.value();
     return _outboxQueue.run(
       noteId,
-      () => _enqueueOperationsInner(noteId, requests),
+      () => _enqueueOperationsInner(
+        noteId,
+        requests,
+        materializedDocumentJson: materializedDocumentJson,
+      ),
     );
   }
 
   Future<void> _enqueueOperationsInner(
     String noteId,
-    List<OperationRequest> requests,
-  ) async {
+    List<OperationRequest> requests, {
+    String? materializedDocumentJson,
+  }) async {
     await _prepareAccountScope(noteId);
     final pending = await _dao.getPendingOperations(
       noteId,
@@ -198,7 +204,25 @@ class NoteOperationsSyncService {
         ordinal++;
         baseRevision++;
       }
+      if (materializedDocumentJson != null) {
+        await _dao.updateMaterializedDocument(
+          noteId: noteId,
+          documentJson: materializedDocumentJson,
+          updatedAt: DateTime.now().toUtc(),
+        );
+      }
     });
+  }
+
+  Future<void> storeMaterializedDocument({
+    required String noteId,
+    required String documentJson,
+  }) {
+    return _dao.updateMaterializedDocument(
+      noteId: noteId,
+      documentJson: documentJson,
+      updatedAt: DateTime.now().toUtc(),
+    );
   }
 
   Future<void> storeDocument(String noteId, NoteDocumentResponse doc) async {
@@ -208,6 +232,8 @@ class NoteOperationsSyncService {
         revision: doc.revision,
         documentJson: encodeDocument(doc.document),
         updatedAt: doc.serverTime,
+        materializedDocumentJson: Value(encodeDocument(doc.document)),
+        materializedUpdatedAt: Value(doc.serverTime),
       ),
     );
   }
@@ -484,6 +510,8 @@ class NoteOperationsSyncService {
             revision: response.finalRevision,
             documentJson: encodeDocument(canonical),
             updatedAt: response.serverTime,
+            materializedDocumentJson: Value(encodeDocument(canonical)),
+            materializedUpdatedAt: Value(response.serverTime),
           ),
         );
         await _dao.markNoteHasRemoteCopy(noteId);
@@ -595,6 +623,8 @@ class NoteOperationsSyncService {
             revision: revision,
             documentJson: encodeDocument(document),
             updatedAt: DateTime.now().toUtc(),
+            materializedDocumentJson: Value(encodeDocument(document)),
+            materializedUpdatedAt: Value(DateTime.now().toUtc()),
           ),
         );
         await _dao.replacePendingOps(noteId, rebased, ownerUserId: _actorId);
