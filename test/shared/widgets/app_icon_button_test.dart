@@ -21,10 +21,15 @@ void main() {
   testWidgets('emits light impact when its callback is enabled', (
     tester,
   ) async {
+    var pressedCount = 0;
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AppIconButton(icon: const Icon(Icons.close), onPressed: () {}),
+          body: AppIconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => pressedCount += 1,
+          ),
         ),
       ),
     );
@@ -32,6 +37,22 @@ void main() {
     await tester.tap(find.byType(AppIconButton));
     await tester.pump();
 
+    expect(pressedCount, 1);
     expect(recorder.saw('HapticFeedbackType.lightImpact'), isTrue);
+  });
+
+  testWidgets('emits no haptic when its callback is disabled', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppIconButton(icon: const Icon(Icons.close), onPressed: null),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(AppIconButton));
+    await tester.pump();
+
+    expect(recorder.saw('HapticFeedbackType.lightImpact'), isFalse);
   });
 }

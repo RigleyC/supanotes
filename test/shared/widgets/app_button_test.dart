@@ -90,10 +90,12 @@ void main() {
     testWidgets('emits light impact when an enabled primary button is tapped', (
       tester,
     ) async {
+      var pressedCount = 0;
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: AppButton(text: 'Salvar', onPressed: () {}),
+            body: AppButton(text: 'Salvar', onPressed: () => pressedCount += 1),
           ),
         ),
       );
@@ -101,6 +103,7 @@ void main() {
       await tester.tap(find.text('Salvar'));
       await tester.pump();
 
+      expect(pressedCount, 1);
       expect(recorder.saw('HapticFeedbackType.lightImpact'), isTrue);
     });
 
