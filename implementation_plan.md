@@ -174,3 +174,22 @@ Status: complete.
 - [x] Fix App Link reopen behavior and canonical mobile host wiring.
 - [x] Avoid unnecessary native endpoint rendering work.
 - [x] Add focused regression tests and run the full verification suite.
+
+## Task document-native migration
+
+Status: design approved; implementation plan ready for user approval.
+
+The approved design is in
+`docs/superpowers/specs/2026-08-12-task-document-native-design.md`.
+The migration plan is in
+`plans/005-task-document-native-migration.md`.
+The older incremental relational projection design is superseded and must not
+be executed independently.
+
+- [ ] Complete the production backup and read-only inventory gate.
+- [ ] Normalize the canonical task metadata and occurrence contract.
+- [ ] Persist the effective local note document for offline notifications.
+- [ ] Move the scheduler and editor sheet off `TaskModel` and relational tasks.
+- [ ] Remove projection writers, legacy routes, providers, and tables only
+      after the production data and traffic gates pass.
+- [ ] Update living architecture and lifecycle documentation.
