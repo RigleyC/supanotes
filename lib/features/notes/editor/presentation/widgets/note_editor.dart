@@ -252,13 +252,10 @@ class _NoteEditorState extends State<NoteEditor> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final topPadding =
-            Scaffold.maybeOf(context)?.appBarMaxHeight ??
-            (MediaQuery.paddingOf(context).top + kToolbarHeight);
         final docPadding = EdgeInsets.only(
           left: 24,
           right: 24,
-          top: topPadding,
+          top: 0,
           bottom: _isReadOnly ? 24 : 140,
         );
 
@@ -272,8 +269,6 @@ class _NoteEditorState extends State<NoteEditor> {
             documentPadding: docPadding,
           );
         }
-
-        final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
         return Stack(
           children: [
@@ -353,7 +348,7 @@ class _NoteEditorState extends State<NoteEditor> {
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: bottomInset,
+                bottom: 0,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

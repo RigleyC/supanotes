@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
@@ -43,19 +42,26 @@ Future<void> showTaskMetadataSheet({
       '[TaskMetadataSheet] Persisting on close: taskId=$taskId dueDate=${state.dueDate} hasTime=${state.hasTime} recurrence=${state.recurrence?.name} reminder=${state.reminder?.value}',
       name: 'TaskMetadataSheet',
     );
-    await onSave(TaskMetadataDraft(
-      scheduleAnchor: state.dueDate,
-      hasTime: state.hasTime,
-      recurrence: state.recurrence,
-      reminder: state.reminder,
-    ));
+    await onSave(
+      TaskMetadataDraft(
+        scheduleAnchor: state.dueDate,
+        hasTime: state.hasTime,
+        recurrence: state.recurrence,
+        reminder: state.reminder,
+      ),
+    );
     if (state.reminder != null) {
       try {
-        await ref.read(taskNotificationSchedulerProvider.notifier)
+        await ref
+            .read(taskNotificationSchedulerProvider.notifier)
             .requestPermissionForReminder();
       } catch (error, stackTrace) {
-        dev.log('[TaskMetadataSheet] Notification permission failed',
-            name: 'TaskMetadataSheet', error: error, stackTrace: stackTrace);
+        dev.log(
+          '[TaskMetadataSheet] Notification permission failed',
+          name: 'TaskMetadataSheet',
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     }
   } finally {
@@ -82,20 +88,24 @@ class TaskMetadataSheetBody extends ConsumerWidget {
         children: [
           AppTile(
             contentPadding: EdgeInsets.zero,
-            title: state.dueDate == null ? 'Adicionar data' :
-                formatDueDate(state.dueDate!, hasTime: state.hasTime),
+            title: state.dueDate == null
+                ? 'Adicionar data'
+                : formatDueDate(state.dueDate!, hasTime: state.hasTime),
             leading: const Icon(Icons.calendar_today_rounded, size: 20),
-            trailing: state.dueDate == null ? null : AppIconButton(
-              icon: const Icon(Icons.close_rounded, size: 20),
-              tooltip: 'Remover data',
-              onPressed: controller.clearDueDate,
-            ),
+            trailing: state.dueDate == null
+                ? null
+                : AppIconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    tooltip: 'Remover data',
+                    onPressed: controller.clearDueDate,
+                  ),
             onTap: () {
-              AppHaptics.controlTap();
-              FamilyModalSheet.of(context).pushPage(TaskMetadataDatePage(
-                selected: state.dueDate,
-                onSelected: controller.setDueDate,
-              ));
+              FamilyModalSheet.of(context).pushPage(
+                TaskMetadataDatePage(
+                  selected: state.dueDate,
+                  onSelected: controller.setDueDate,
+                ),
+              );
             },
           ),
           AppTile(
@@ -104,37 +114,45 @@ class TaskMetadataSheetBody extends ConsumerWidget {
                 ? DateFormat('h:mm a').format(state.dueDate!)
                 : 'Adicionar horário',
             leading: const Icon(Icons.access_time_rounded, size: 20),
-            trailing: state.hasTime ? AppIconButton(
-              icon: const Icon(Icons.close_rounded, size: 20),
-              tooltip: 'Remover horário',
-              onPressed: controller.clearTime,
-            ) : null,
+            trailing: state.hasTime
+                ? AppIconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    tooltip: 'Remover horário',
+                    onPressed: controller.clearTime,
+                  )
+                : null,
             onTap: () {
-              AppHaptics.controlTap();
-              FamilyModalSheet.of(context).pushPage(TaskMetadataTimePage(
-                currentDueDate: state.dueDate ?? DateTime.now(),
-                hasTime: state.hasTime,
-                onSelected: controller.setTime,
-              ));
+              FamilyModalSheet.of(context).pushPage(
+                TaskMetadataTimePage(
+                  currentDueDate: state.dueDate ?? DateTime.now(),
+                  hasTime: state.hasTime,
+                  onSelected: controller.setTime,
+                ),
+              );
             },
           ),
           AppTile(
             contentPadding: EdgeInsets.zero,
-            title: state.recurrence?.getLocalizedLabel(state.dueDate) ??
+            title:
+                state.recurrence?.getLocalizedLabel(state.dueDate) ??
                 'Adicionar recorrência',
             leading: const Icon(Icons.refresh_rounded, size: 20),
-            trailing: state.recurrence == null ? null : AppIconButton(
-              icon: const Icon(Icons.close_rounded, size: 20),
-              tooltip: 'Remover recorrência',
-              onPressed: () => controller.setRecurrence(null),
-            ),
+            trailing: state.recurrence == null
+                ? null
+                : AppIconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    tooltip: 'Remover recorrência',
+                    onPressed: () => controller.setRecurrence(null),
+                  ),
             onTap: () {
-              AppHaptics.controlTap();
               FamilyModalSheet.of(context).pushPage(
                 TaskMetadataSelectionPage<TaskRecurrence>(
-                  title: 'Repetição', selected: state.recurrence,
-                  options: TaskRecurrence.values, noneLabel: 'Nenhuma',
-                  optionLabel: (value) => value.getLocalizedLabel(state.dueDate),
+                  title: 'Repetição',
+                  selected: state.recurrence,
+                  options: TaskRecurrence.values,
+                  noneLabel: 'Nenhuma',
+                  optionLabel: (value) =>
+                      value.getLocalizedLabel(state.dueDate),
                   optionIcon: (value) => value.icon,
                   onSelected: controller.setRecurrence,
                 ),
@@ -145,19 +163,22 @@ class TaskMetadataSheetBody extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             title: state.reminder?.label ?? 'Adicionar lembrete',
             leading: const Icon(Icons.notifications_outlined, size: 20),
-            trailing: state.reminder == null ? null : AppIconButton(
-              icon: const Icon(Icons.close_rounded, size: 20),
-              tooltip: 'Remover lembrete',
-              onPressed: () => controller.setReminder(null),
-            ),
+            trailing: state.reminder == null
+                ? null
+                : AppIconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    tooltip: 'Remover lembrete',
+                    onPressed: () => controller.setReminder(null),
+                  ),
             onTap: () {
-              AppHaptics.controlTap();
               FamilyModalSheet.of(context).pushPage(
                 TaskMetadataSelectionPage<TaskReminderOption>(
-                  title: 'Lembrete', selected: state.reminder,
+                  title: 'Lembrete',
+                  selected: state.reminder,
                   options: TaskReminderOption.values.where(
                     (option) => option.isRelative == state.hasTime,
-                  ), noneLabel: 'Nenhum',
+                  ),
+                  noneLabel: 'Nenhum',
                   optionLabel: (value) => value.label,
                   optionIcon: (_) => Icons.notifications_outlined,
                   onSelected: controller.setReminder,

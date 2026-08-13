@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:motor/motor.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
 
+import '../../helpers/haptic_test_helper.dart';
+
 void main() {
   testWidgets('renders a one-line tile with leading and trailing widgets', (
     tester,
@@ -30,6 +32,8 @@ void main() {
   });
 
   testWidgets('renders subtitle and calls onTap when enabled', (tester) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
     var taps = 0;
     await tester.pumpWidget(
       MaterialApp(
@@ -46,6 +50,7 @@ void main() {
     expect(find.text('user@example.com'), findsOneWidget);
     await tester.tap(find.text('Conta'));
     expect(taps, 1);
+    expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
   });
 
   testWidgets('does not call onTap when disabled', (tester) async {
@@ -70,6 +75,68 @@ void main() {
     );
 
     expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+  });
+
+  testWidgets('can suppress its default haptic for selection-owned feedback', (
+    tester,
+  ) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppTile(title: 'Hoje', enableHaptics: false, onTap: () {}),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Hoje'));
+
+    expect(recorder.count('HapticFeedbackType.lightImpact'), 0);
+  });
+
+  testWidgets('uses the selected foreground color for the title', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppTile(
+            title: 'Hoje',
+            leading: const Icon(Icons.calendar_today),
+            selected: true,
+          ),
+        ),
+      ),
+    );
+
+    final context = tester.element(find.byType(AppTile));
+    final primary = Theme.of(context).colorScheme.primary;
+    final title = tester.widget<Text>(find.text('Hoje'));
+
+    expect(title.style?.color, primary);
+  });
+
+  testWidgets('matches the compact picker row size and icon scale', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppTile(
+            title: 'Hoje',
+            leading: const Icon(Icons.calendar_today),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.getSize(find.byType(AppTile)).height, 48);
+    expect(
+      tester.getSize(find.byIcon(Icons.calendar_today)),
+      const Size(20, 20),
+    );
   });
 
   testWidgets('does not trigger the tile when trailing action is pressed', (

@@ -46,6 +46,7 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
                 title: noneLabel,
                 leading: const Icon(Icons.do_not_disturb_on_outlined),
                 selected: selected == null,
+                enableHaptics: false,
                 onTap: () {
                   if (selected != null) AppHaptics.selectionChange();
                   select(null);
@@ -56,6 +57,7 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
                   title: optionLabel(option),
                   leading: Icon(optionIcon(option)),
                   selected: selected == option,
+                  enableHaptics: false,
                   onTap: () {
                     if (selected != option) AppHaptics.selectionChange();
                     select(option);

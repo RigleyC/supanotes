@@ -84,7 +84,7 @@ void main() {
     expect(find.byIcon(Icons.notifications_active_outlined), findsOneWidget);
   });
 
-  testWidgets('task completion emits one selection haptic', (tester) async {
+  testWidgets('task completion emits one medium impact haptic', (tester) async {
     final recorder = HapticTestRecorder()..install();
     addTearDown(recorder.dispose);
     var completionCalls = 0;
@@ -128,7 +128,7 @@ void main() {
     expect(completionCalls, 1);
     expect(
       recorder.calls.where(
-        (call) => call.arguments == 'HapticFeedbackType.selectionClick',
+        (call) => call.arguments == 'HapticFeedbackType.mediumImpact',
       ),
       hasLength(1),
     );
@@ -171,8 +171,8 @@ void main() {
       await tester.pumpAndSettle();
 
       recorder.calls.clear();
-    final taskTopLeft = tester.getTopLeft(find.byType(CustomTaskComponent));
-    await tester.longPressAt(taskTopLeft + const Offset(16, 20));
+      final taskTopLeft = tester.getTopLeft(find.byType(CustomTaskComponent));
+      await tester.longPressAt(taskTopLeft + const Offset(16, 20));
       await tester.pumpAndSettle();
 
       expect(longPressCalls, 1);

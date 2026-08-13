@@ -14,7 +14,7 @@ import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 
 const double _taskCheckboxSize = 20.0;
 const double _taskCheckboxFallbackTopInset = 2.0;
-const double _taskCheckboxTextGap = 8.0;
+const double _taskCheckboxTextGap = noteEditorMarkerTextGap;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
@@ -56,7 +56,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     Future<void> updateCompletion(bool isComplete) async {
       if (readOnly) return;
-      AppHaptics.selectionChange();
+      AppHaptics.taskCompletion();
       if (isComplete) {
         if (hideCompleted && !isRecurring) {
           FocusManager.instance.primaryFocus?.unfocus();

@@ -28,4 +28,10 @@ void main() {
 
     expect(recorder.count('HapticFeedbackType.selectionClick'), 1);
   });
+
+  test('sends a medium impact when a task is completed', () async {
+    await AppHaptics.taskCompletion();
+
+    expect(recorder.count('HapticFeedbackType.mediumImpact'), 1);
+  });
 }

@@ -1,5 +1,6 @@
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 
 export 'global_sheet_header.dart';
 export 'global_sheet_page.dart';
@@ -13,6 +14,7 @@ Future<T?> showGlobalSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
 }) {
+  AppHaptics.controlTap();
   return FamilyModalSheet.show<T>(
     context: context,
     isDismissible: true,

@@ -65,6 +65,7 @@ class TaskMetadataDatePage extends StatelessWidget {
                     title: option.label,
                     leading: Icon(option.icon),
                     selected: selected != null && selected!.isSameDayAs(date),
+                    enableHaptics: false,
                     onTap: () {
                       if (selected == null || !selected!.isSameDayAs(date)) {
                         AppHaptics.selectionChange();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:motor/motor.dart';
 
+import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 
 /// Shared row for settings and task metadata flows.
@@ -12,6 +13,7 @@ class AppTile extends StatefulWidget {
     this.leading,
     this.trailing,
     this.onTap,
+    this.enableHaptics = true,
     this.enabled = true,
     this.selected = false,
     this.contentPadding = const EdgeInsets.symmetric(
@@ -25,6 +27,7 @@ class AppTile extends StatefulWidget {
   final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final bool enableHaptics;
   final bool enabled;
   final bool selected;
   final EdgeInsetsGeometry contentPadding;
@@ -58,10 +61,11 @@ class _AppTileState extends State<AppTile> {
         : widget.selected
         ? scheme.primary
         : scheme.onSurfaceVariant;
-    final titleStyle = theme.textTheme.titleSmall?.copyWith(
-      color: foreground,
-      fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
-    );
+    final titleStyle = (theme.textTheme.titleSmall ?? const TextStyle())
+        .copyWith(
+          color: foreground,
+          fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
+        );
     final subtitleStyle = theme.textTheme.bodyMedium?.copyWith(
       color: widget.enabled
           ? scheme.onSurfaceVariant
@@ -70,11 +74,18 @@ class _AppTileState extends State<AppTile> {
     final leading = widget.leading == null
         ? null
         : IconTheme.merge(
-            data: IconThemeData(color: leadingColor),
+            data: IconThemeData(
+              color: leadingColor,
+              size: AppSpacing.tileIconSize,
+            ),
             child: widget.leading!,
           );
     final trailing = widget.selected && widget.trailing == null
-        ? Icon(Icons.check_rounded, size: AppSpacing.iconMd, color: foreground)
+        ? Icon(
+            Icons.check_rounded,
+            size: AppSpacing.tileIconSize,
+            color: foreground,
+          )
         : widget.trailing;
     final interactive = _interactive;
 
@@ -83,7 +94,12 @@ class _AppTileState extends State<AppTile> {
       enabled: widget.enabled,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: interactive ? widget.onTap : null,
+        onTap: interactive
+            ? () {
+                if (widget.enableHaptics) AppHaptics.controlTap();
+                widget.onTap!();
+              }
+            : null,
         onTapDown: interactive ? (_) => _setPressed(true) : null,
         onTapUp: interactive ? (_) => _setPressed(false) : null,
         onTapCancel: interactive ? () => _setPressed(false) : null,

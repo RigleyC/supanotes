@@ -10,6 +10,7 @@ import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_
 import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
+import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 part 'note_icon_picker_components.dart';

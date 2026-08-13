@@ -100,16 +100,11 @@ class _PickerAction extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
-      child: ListTile(
+      child: AppTile(
         contentPadding: EdgeInsets.zero,
-        dense: true,
-        leading: Icon(icon, size: 20),
-        title: Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
-        ),
+        enableHaptics: false,
+        leading: Icon(icon, size: AppSpacing.tileIconSize),
+        title: label,
         onTap: () {
           AppHaptics.controlTap();
           onTap();

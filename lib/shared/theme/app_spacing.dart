@@ -13,7 +13,8 @@ class AppSpacing {
   static const double xxl = 48.0;
 
   static const double buttonHeight = 48.0;
-  static const double tileHeight = 44.0;
+  static const double tileHeight = 48.0;
+  static const double tileIconSize = 20.0;
   static const double iconSm = 16.0;
   static const double iconMd = 24.0;
   static const double iconLg = 48.0;

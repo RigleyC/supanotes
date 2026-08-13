@@ -56,6 +56,7 @@ void main() {
 
     expect(find.text('Página principal'), findsOneWidget);
 
+    expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
     recorder.calls.clear();
     await tester.tap(find.byTooltip('Fechar'));
     await tester.pumpAndSettle();
@@ -74,6 +75,8 @@ void main() {
     'internal page close returns to root without resolving the sheet',
     (tester) async {
       var closed = false;
+      final recorder = HapticTestRecorder()..install();
+      addTearDown(recorder.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -122,6 +125,7 @@ void main() {
 
       expect(find.text('Página principal'), findsOneWidget);
       expect(find.text('Página interna'), findsNothing);
+      expect(recorder.count('HapticFeedbackType.lightImpact'), 2);
       expect(closed, isFalse);
 
       await tester.tap(find.byTooltip('Fechar'));
