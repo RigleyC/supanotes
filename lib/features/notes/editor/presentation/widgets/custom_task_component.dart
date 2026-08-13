@@ -92,15 +92,14 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     SingleColumnDocumentComponentContext componentContext,
     SingleColumnLayoutComponentViewModel componentViewModel,
   ) {
-    if (componentViewModel is! TaskComponentViewModel) return null;
+    if (componentViewModel is! CustomTaskComponentViewModel) return null;
 
     final nodeId = componentViewModel.nodeId;
 
     return CustomTaskComponent(
       key: componentContext.componentKey,
       viewModel: componentViewModel,
-      taskMetadata:
-          (componentViewModel as CustomTaskComponentViewModel).taskMetadata,
+      taskMetadata: componentViewModel.taskMetadata,
       isRecurring: _recurringTaskIds.contains(nodeId),
       isReadOnly: readOnly,
       onCompletionChange: _completionHandlers[nodeId],

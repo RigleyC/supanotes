@@ -24,8 +24,8 @@ class TaskOccurrence {
 
 /// The domain result of completing one task occurrence.
 ///
-/// This result contains no document or persistence details. Adapters decide
-/// how to encode it in task metadata or a relational projection.
+/// This result contains no document or persistence details. The editor
+/// encodes it in task metadata through a document operation.
 class TaskOccurrenceTransition {
   const TaskOccurrenceTransition({
     required this.completed,

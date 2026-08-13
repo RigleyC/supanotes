@@ -162,7 +162,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> _onUpgrade(Migrator m, int from, int to) async {
     await _migrateInitialSchema(m, from);
     await _migrateNoteFeatures(m, from);
-    await _migrateTaskStorage(m, from);
+    await _migrateLegacyStorage(m, from);
     await _migrateSyncStorage(m, from);
     await _migrateNoteMetadata(m, from);
     await _migrateEffectiveDocuments(m, from);
@@ -271,7 +271,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  Future<void> _migrateTaskStorage(Migrator m, int from) async {
+  Future<void> _migrateLegacyStorage(Migrator m, int from) async {
     if (from < 14) {
       await customStatement('PRAGMA foreign_keys=ON;');
     }
