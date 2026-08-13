@@ -1,8 +1,8 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
@@ -55,7 +55,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     Future<void> updateCompletion(bool isComplete) async {
       if (readOnly) return;
-      HapticFeedback.lightImpact();
+      AppHaptics.selectionChange();
       if (isComplete) {
         if (hideCompleted && !isRecurring) {
           FocusManager.instance.primaryFocus?.unfocus();
@@ -111,7 +111,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       onLongPress: readOnly || onTaskLongPress == null
           ? null
           : () {
-              HapticFeedback.mediumImpact();
               onTaskLongPress!(nodeId);
             },
     );
@@ -279,6 +278,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     }
   }
 
+  void _onTouchLongPress() {
+    AppHaptics.longPress(context);
+    widget.onLongPress?.call();
+  }
+
   void _onCheckAnimationCompleted() {
     if (!_isRecurring || !_isComplete || !mounted) return;
     setState(() => _isComplete = false);
@@ -356,7 +360,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   onTap: widget.isReadOnly || _isUpdatingCompletion
                       ? null
                       : _onCheckboxTap,
-                  onLongPress: widget.isReadOnly ? null : widget.onLongPress,
+                  onLongPress: widget.isReadOnly ? null : _onTouchLongPress,
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(

@@ -10,6 +10,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 
 import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -338,7 +339,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
       _insertParagraphAtEnd(attribution);
       return;
     }
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
     NoteEditorCommands.setBlockType(editor, composer, attribution);
   }
 
@@ -348,7 +349,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
   ) {
     if (selection == null || selection.isCollapsed) return;
     if (_prepareEditorAction(selection) == null) return;
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
     NoteEditorCommands.toggleInlineAttribution(editor, composer, attribution);
   }
 
@@ -366,12 +367,12 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   void _convertToListItem(ListItemType type) {
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
     NoteEditorCommands.convertToListItem(editor, composer, type);
   }
 
   void _convertToTask() {
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
     NoteEditorCommands.convertToTask(editor, composer);
   }
 
@@ -395,13 +396,13 @@ class _NoteToolbarState extends State<NoteToolbar> {
 
   void _indentSelectedBlocks(DocumentSelection? selection) {
     if (_prepareEditorAction(selection) == null) return;
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
     NoteEditorCommands.indentSelectedBlocks(editor, composer);
   }
 
   void _unindentSelectedBlocks(DocumentSelection? selection) {
     if (_prepareEditorAction(selection) == null) return;
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
     NoteEditorCommands.unindentSelectedBlocks(editor, composer);
   }
 
@@ -410,14 +411,14 @@ class _NoteToolbarState extends State<NoteToolbar> {
       _insertDividerAtEnd();
       return;
     }
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
     NoteEditorCommands.insertDivider(editor, dividerCount: 35);
   }
 
   void _insertParagraphAtEnd(Attribution blockType) {
     focusNode?.requestFocus();
     NoteEditorCommands.insertParagraphAtEnd(editor, blockType: blockType);
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
   }
 
   void _insertListBlockAtEnd(_ListFormatOption option) {
@@ -436,12 +437,12 @@ class _NoteToolbarState extends State<NoteToolbar> {
       case _ListFormatOption.checklist:
         NoteEditorCommands.insertTaskAtEnd(editor);
     }
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
   }
 
   void _insertDividerAtEnd() {
     focusNode?.requestFocus();
     NoteEditorCommands.insertDividerAtEnd(editor, dividerCount: 35);
-    HapticFeedback.selectionClick();
+    AppHaptics.selectionChange();
   }
 }

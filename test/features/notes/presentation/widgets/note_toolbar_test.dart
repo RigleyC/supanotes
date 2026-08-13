@@ -5,6 +5,7 @@ import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
+import '../../../../helpers/haptic_test_helper.dart';
 
 Widget buildEditorHarness({
   required List<DocumentNode> nodes,
@@ -1733,6 +1734,32 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
+    });
+
+    testWidgets('format command emits one selection haptic', (tester) async {
+      final recorder = HapticTestRecorder()..install();
+      addTearDown(recorder.dispose);
+
+      await tester.pumpWidget(
+        buildEditorHarness(
+          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+          selection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
+      recorder.calls.clear();
+      await tester.tap(find.bySemanticsLabel('Título 1'));
+      await tester.pumpAndSettle();
+
+      expect(recorder.saw('HapticFeedbackType.selectionClick'), isTrue);
     });
   });
 }
