@@ -136,6 +136,58 @@ WHERE jsonb_typeof(operation) IS DISTINCT FROM 'object'
        AND jsonb_typeof(operation->'attributes') NOT IN ('object', 'null'))
 ORDER BY note_id, block_index, operation_index;
 
+WITH document_blocks AS (
+    SELECT
+        n.id AS note_id,
+        block->>'id' AS block_id,
+        block
+    FROM notes AS n
+    CROSS JOIN LATERAL jsonb_array_elements(
+        CASE
+            WHEN jsonb_typeof(n.document->'blocks') = 'array'
+                THEN n.document->'blocks'
+            ELSE '[]'::jsonb
+        END
+    ) AS item(block)
+    WHERE n.deleted_at IS NULL
+), delta_attributes AS (
+    SELECT
+        note_id,
+        block_id,
+        operation_index,
+        attribute_key,
+        attribute_value
+    FROM document_blocks
+    CROSS JOIN LATERAL jsonb_array_elements(
+        CASE
+            WHEN jsonb_typeof(block->'delta') = 'array'
+                THEN block->'delta'
+            ELSE '[]'::jsonb
+        END
+    ) WITH ORDINALITY AS operations(operation, operation_index)
+    CROSS JOIN LATERAL jsonb_each(
+        CASE
+            WHEN jsonb_typeof(operation->'attributes') = 'object'
+                THEN operation->'attributes'
+            ELSE '{}'::jsonb
+        END
+    ) AS attributes(attribute_key, attribute_value)
+)
+SELECT
+    note_id,
+    block_id,
+    operation_index,
+    attribute_key,
+    attribute_value
+FROM delta_attributes
+WHERE (attribute_key = 'link'
+       AND jsonb_typeof(attribute_value) IS DISTINCT FROM 'string')
+   OR (attribute_key LIKE 'link:%'
+       AND attribute_value IS DISTINCT FROM 'true'::jsonb)
+   OR attribute_key LIKE 'link:https://%60%'
+   OR attribute_key LIKE 'link:https://(%60%'
+ORDER BY note_id, block_id, operation_index, attribute_key;
+
 -- 2. Relational inventory.
 SELECT
     COUNT(*) AS task_rows,

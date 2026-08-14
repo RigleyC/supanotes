@@ -198,24 +198,32 @@ task metadata.
 ### 5a. Convert legacy Delta shapes exposed by the strict reader
 
 The strict reader does not contain a compatibility fallback. If a persisted
-snapshot contains a missing Delta, a null Delta, or an empty non-content Delta
-operation, run the versioned operational conversion in
-`backend/db/operations/task_document_canonical_delta_repair.sql`.
+snapshot contains a missing Delta, a null Delta, an empty non-content Delta
+operation, or a malformed link attribution, run the versioned operational
+conversions in
+`backend/db/operations/task_document_canonical_delta_repair.sql` and
+`backend/db/operations/task_document_canonical_link_repair.sql`.
 
 The conversion is deliberately narrow:
 
 - a missing or null `delta` becomes an empty array;
 - an empty or non-content operation is removed;
+- the known malformed Markdown `link:` attribution is removed while its text
+  insert stays unchanged;
 - text insert operations and their attributes stay unchanged;
-- an embed, unknown insert type, invalid block, or unsupported Delta shape
+- an embed, unknown insert type, invalid block, unsupported Delta shape, or
+  unknown link shape
   aborts the transaction for manual review.
 
 For the 2026-08-14 production repair, three notes and five blocks were
-converted. Two missing/null Deltas became empty arrays and three empty
-operations were removed. The protected audit file records the affected note
-and block IDs. The five repaired blocks returned `delta` arrays with zero
-invalid operations after the conversion. No `note_operations` history was
-rewritten, and no relational task value was used to build the snapshot.
+converted in the first pass. Two missing/null Deltas became empty arrays and
+three empty operations were removed. A second pass found one note with four
+blocks containing eight malformed Markdown link attributions; those
+attributions were removed while all text inserts stayed unchanged. The
+protected audit file records every affected block. The targeted repaired
+blocks returned `delta` arrays with zero invalid operations and the API health
+check returned HTTP 200. No `note_operations` history was rewritten, and no
+relational task value was used to build the snapshot.
 
 ## 6. Deploy and observe
 
