@@ -152,6 +152,35 @@ void main() {
     },
   );
 
+  testWidgets('returns to typing with editor focus and an IME connection', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    await pumpEditor(
+      tester,
+      nodes: [ParagraphNode(id: 'paragraph-1', text: AttributedText('Text'))],
+    );
+    controller.composer.setSelectionWithReason(
+      const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'paragraph-1',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+      ),
+    );
+    await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NoteFormattingPanel), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Voltar a digitar'));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pumpAndSettle();
+
+    expect(controller.focusNode.hasFocus, isTrue);
+    expect(tester.testTextInput.hasAnyClients, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets(
       'keeps the caret above the toolbar while typing on ${platform.name}',

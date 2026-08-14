@@ -29,14 +29,11 @@ Widget buildEditorHarness({
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: ToolbarAndFormattingPanel(
-                    editor: editor,
-                    composer: composer,
-                  ),
+                  child: buildFormattingPanel(editor, composer),
                 ),
               ],
             )
-          : ToolbarAndFormattingPanel(editor: editor, composer: composer),
+          : buildFormattingPanel(editor, composer),
     ),
   );
 }
@@ -64,55 +61,17 @@ Finder toolbarButtonWithSvgAsset(String asset) {
   );
 }
 
-class ToolbarAndFormattingPanel extends StatefulWidget {
-  const ToolbarAndFormattingPanel({
-    super.key,
-    required this.editor,
-    required this.composer,
-  });
-
-  final Editor editor;
-  final MutableDocumentComposer composer;
-
-  @override
-  State<ToolbarAndFormattingPanel> createState() =>
-      _ToolbarAndFormattingPanelState();
-}
-
-class _ToolbarAndFormattingPanelState extends State<ToolbarAndFormattingPanel> {
-  bool _isFormatting = false;
-  DocumentSelection? _selection;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        NoteToolbar(
-          editor: widget.editor,
-          composer: widget.composer,
-          onOpenFormatting: () {
-            setState(() {
-              _selection = widget.composer.selection;
-              _isFormatting = true;
-            });
-          },
-        ),
-        if (_isFormatting)
-          NoteFormattingPanel(
-            editor: widget.editor,
-            composer: widget.composer,
-            selection: _selection,
-            onClose: () => setState(() => _isFormatting = false),
-            onReturnToTyping: () => setState(() => _isFormatting = false),
-          ),
-      ],
-    );
-  }
+Widget buildFormattingPanel(Editor editor, MutableDocumentComposer composer) {
+  return NoteFormattingPanel(
+    editor: editor,
+    composer: composer,
+    selection: composer.selection,
+    onClose: () {},
+    onReturnToTyping: () {},
+  );
 }
 
 Future<void> openListMenu(WidgetTester tester) async {
-  await tester.tap(find.bySemanticsLabel('Abrir formatação'));
   await tester.pumpAndSettle();
   expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
   expect(find.bySemanticsLabel('Lista com marcadores'), findsOneWidget);
@@ -156,7 +115,7 @@ Widget buildConversionHarness({
               ],
             ),
           ),
-          ToolbarAndFormattingPanel(editor: editor, composer: composer),
+          buildFormattingPanel(editor, composer),
         ],
       ),
     ),
@@ -198,9 +157,7 @@ void main() {
   });
 
   group('List menu trigger state', () {
-    testWidgets('shows list controls only inside formatting mode', (
-      tester,
-    ) async {
+    testWidgets('shows list controls in the formatting panel', (tester) async {
       await tester.pumpWidget(
         buildEditorHarness(
           nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
@@ -213,10 +170,6 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('Lista com marcadores'), findsNothing);
-      expect(find.bySemanticsLabel('Lista numerada'), findsNothing);
-      expect(find.bySemanticsLabel('Checklist'), findsNothing);
 
       await openListMenu(tester);
 
@@ -241,8 +194,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-      await tester.pumpAndSettle();
       expect(
         (tester.widget(iconButtonWithIcon(Icons.format_list_bulleted))
                 as dynamic)
@@ -271,8 +222,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-      await tester.pumpAndSettle();
       expect(
         (tester.widget(toolbarButtonWithSvgAsset('assets/icons/checkbox.svg'))
                 as dynamic)
@@ -411,7 +360,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -462,7 +411,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -512,7 +461,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -574,7 +523,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -635,7 +584,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -688,7 +637,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -741,7 +690,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -760,7 +709,6 @@ void main() {
 
   group('_setBlockType', () {
     Future<void> openFormatPopup(WidgetTester tester) async {
-      await tester.tap(iconButtonWithIcon(Icons.text_format));
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Opções de formatação'), findsOneWidget);
     }
@@ -814,10 +762,7 @@ void main() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: ToolbarAndFormattingPanel(
-                    editor: editor,
-                    composer: composer,
-                  ),
+                  child: buildFormattingPanel(editor, composer),
                 ),
               ],
             ),
@@ -873,7 +818,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -928,7 +873,7 @@ void main() {
                     ],
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -1077,9 +1022,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: ToolbarAndFormattingPanel(editor: editor, composer: composer),
-          ),
+          home: Scaffold(body: buildFormattingPanel(editor, composer)),
         ),
       );
       await tester.pumpAndSettle();
@@ -1192,7 +1135,7 @@ void main() {
                     componentBuilders: defaultComponentBuilders,
                   ),
                 ),
-                ToolbarAndFormattingPanel(editor: editor, composer: composer),
+                buildFormattingPanel(editor, composer),
               ],
             ),
           ),
@@ -1237,12 +1180,7 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(
-              body: ToolbarAndFormattingPanel(
-                editor: editor,
-                composer: composer,
-              ),
-            ),
+            home: Scaffold(body: buildFormattingPanel(editor, composer)),
           ),
         );
         await tester.pumpAndSettle();
@@ -1261,7 +1199,9 @@ void main() {
       },
     );
 
-    testWidgets('shows inline actions in the format overlay', (tester) async {
+    testWidgets('disables inline actions without a text selection', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         buildEditorHarness(
           nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
@@ -1275,13 +1215,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.format_bold), findsNothing);
-      expect(find.byIcon(Icons.format_italic), findsNothing);
-      expect(find.byIcon(Icons.format_strikethrough), findsNothing);
-
-      await tester.tap(iconButtonWithIcon(Icons.text_format));
-      await tester.pumpAndSettle();
       expect(find.byIcon(Icons.format_bold), findsOneWidget);
+      expect(find.byIcon(Icons.format_italic), findsOneWidget);
+      expect(find.byIcon(Icons.format_strikethrough), findsOneWidget);
       expect(
         (tester.widget(iconButtonWithIcon(Icons.format_bold)) as dynamic)
             .onPressed,
@@ -1307,9 +1243,6 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
-
-      await tester.tap(iconButtonWithIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.format_bold), findsOneWidget);
@@ -1345,12 +1278,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        await tester.tap(iconButtonWithIcon(Icons.text_format));
-        await tester.pumpAndSettle();
-
         final before = tester.widget<Icon>(find.byIcon(Icons.format_bold));
         final colorScheme = Theme.of(
-          tester.element(find.byType(NoteToolbar)),
+          tester.element(find.byType(NoteFormattingPanel)),
         ).colorScheme;
         expect(before.color, colorScheme.onSurface);
 
@@ -1390,9 +1320,6 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        await tester.tap(iconButtonWithIcon(Icons.text_format));
-        await tester.pumpAndSettle();
-
         final boldButton = iconButtonWithIcon(Icons.format_bold);
         expect((tester.widget(boldButton) as dynamic).isActive, isFalse);
       },
@@ -1425,9 +1352,6 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(iconButtonWithIcon(Icons.text_format));
-      await tester.pumpAndSettle();
-
       await tester.tap(iconButtonWithIcon(Icons.format_bold));
       await tester.pumpAndSettle();
 
@@ -1480,19 +1404,13 @@ void main() {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: ToolbarAndFormattingPanel(
-                      editor: editor,
-                      composer: composer,
-                    ),
+                    child: buildFormattingPanel(editor, composer),
                   ),
                 ],
               ),
             ),
           ),
         );
-        await tester.pumpAndSettle();
-
-        await tester.tap(iconButtonWithIcon(Icons.text_format));
         await tester.pumpAndSettle();
 
         composer.clearSelection();
@@ -1517,8 +1435,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(iconButtonWithIcon(Icons.text_format));
-      await tester.pumpAndSettle();
       final formatSize = tester.getSize(
         find.byWidgetPredicate(
           (widget) => widget.runtimeType.toString() == '_FormattingMenu',
@@ -1567,9 +1483,12 @@ void main() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: ToolbarAndFormattingPanel(
+                  child: NoteFormattingPanel(
                     editor: editor,
                     composer: composer,
+                    selection: null,
+                    onClose: () {},
+                    onReturnToTyping: () {},
                   ),
                 ),
               ],
@@ -1579,8 +1498,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(iconButtonWithIcon(Icons.text_format));
-      await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Título 1'));
       await tester.pumpAndSettle();
 
@@ -1596,122 +1513,104 @@ void main() {
       );
     });
 
-    testWidgets('does not reuse a cleared selection for a new block', (
+    testWidgets(
+      'creates a new block when the formatting panel has no selection',
+      (tester) async {
+        final document = MutableDocument(
+          nodes: [
+            ParagraphNode(id: 'node-1', text: AttributedText('Existing text')),
+            TaskNode(
+              id: 'node-2',
+              text: AttributedText('Final task'),
+              isComplete: false,
+            ),
+          ],
+        );
+        final composer = MutableDocumentComposer(
+          initialSelection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'node-1',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        );
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: NoteFormattingPanel(
+                      editor: editor,
+                      composer: composer,
+                      selection: null,
+                      onClose: () {},
+                      onReturnToTyping: () {},
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.bySemanticsLabel('Título 1'));
+        await tester.pumpAndSettle();
+
+        expect(
+          (document.getNodeById('node-1') as ParagraphNode).getMetadataValue(
+            'blockType',
+          ),
+          isNot(header1Attribution),
+        );
+        expect(document.last.id, isNot('node-2'));
+        expect(document.last, isA<ParagraphNode>());
+        expect(
+          (document.last as ParagraphNode).getMetadataValue('blockType'),
+          header1Attribution,
+        );
+      },
+    );
+
+    testWidgets('requests closure from the formatting panel close button', (
       tester,
     ) async {
       final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('Existing text')),
-          TaskNode(
-            id: 'node-2',
-            text: AttributedText('Final task'),
-            isComplete: false,
-          ),
-        ],
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
       );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
+      final composer = MutableDocumentComposer();
       final editor = createDefaultDocumentEditor(
         document: document,
         composer: composer,
       );
-
+      var closeRequests = 0;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: ToolbarAndFormattingPanel(
-                    editor: editor,
-                    composer: composer,
-                  ),
-                ),
-              ],
+            body: NoteFormattingPanel(
+              editor: editor,
+              composer: composer,
+              selection: composer.selection,
+              onClose: () => closeRequests++,
+              onReturnToTyping: () {},
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      composer.clearSelection();
-      await tester.pump();
-      await tester.tap(iconButtonWithIcon(Icons.text_format));
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Título 1'));
-      await tester.pumpAndSettle();
-
-      expect(
-        (document.getNodeById('node-1') as ParagraphNode).getMetadataValue(
-          'blockType',
-        ),
-        isNot(header1Attribution),
-      );
-      expect(document.last.id, isNot('node-2'));
-      expect(document.last, isA<ParagraphNode>());
-      expect(
-        (document.last as ParagraphNode).getMetadataValue('blockType'),
-        header1Attribution,
-      );
-    });
-
-    testWidgets('keeps compact actions with the formatting panel', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('Abrir formatação'), findsOneWidget);
-      expect(find.bySemanticsLabel('Fechar formatação'), findsNothing);
-
-      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-      await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
-      expect(find.bySemanticsLabel('Fechar formatação'), findsOneWidget);
-      expect(find.bySemanticsLabel('Abrir formatação'), findsOneWidget);
-    });
-
-    testWidgets('closes the formatting panel from its close button', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-      await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Fechar formatação'));
       await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
+      expect(closeRequests, 1);
     });
 
     testWidgets('keeps the formatting panel open after a tap outside', (
@@ -1730,8 +1629,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-      await tester.pumpAndSettle();
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
@@ -1771,71 +1668,6 @@ void main() {
       expect(requests, 1);
     });
 
-    testWidgets('keeps formatting mode open while navigating the editor', (
-      tester,
-    ) async {
-      final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('First line')),
-          ParagraphNode(id: 'node-2', text: AttributedText('Second line')),
-        ],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Stack(
-              children: [
-                Positioned.fill(
-                  child: TapRegion(
-                    groupId: noteEditorToolbarTapRegionGroup,
-                    child: SuperEditor(editor: editor),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: ToolbarAndFormattingPanel(
-                    editor: editor,
-                    composer: composer,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-      await tester.pumpAndSettle();
-      await tester.tapAt(const Offset(100, 100));
-      composer.setSelectionWithReason(
-        const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-2',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
-    });
-
     testWidgets('format command emits one selection haptic', (tester) async {
       final recorder = HapticTestRecorder()..install();
       addTearDown(recorder.dispose);
@@ -1853,8 +1685,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-      await tester.pumpAndSettle();
       recorder.calls.clear();
       await tester.tap(find.bySemanticsLabel('Título 1'));
       await tester.pumpAndSettle();

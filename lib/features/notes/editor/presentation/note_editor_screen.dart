@@ -26,7 +26,6 @@ import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.d
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
-import 'package:supanotes/shared/widgets/progressive_fade.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
@@ -68,21 +67,23 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       loading: () => note?.isReadOnly ?? true,
       error: (_, _) => true,
     );
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: _NoteEditorAppBar(
-        noteId: widget.noteId,
-        note: note,
-        screenIsReadOnly: screenIsReadOnly,
-        sessionAsync: sessionAsync,
-      ),
-      body: _NoteEditorBody(
-        noteId: widget.noteId,
-        attachmentDelivery: widget.attachmentDelivery,
-        noteAsync: noteAsync,
-        sessionAsync: sessionAsync,
-        taskForMetadata: _taskForMetadata,
-        readSession: _readSession,
+    return KeyboardScaffoldSafeArea(
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        appBar: _NoteEditorAppBar(
+          noteId: widget.noteId,
+          note: note,
+          screenIsReadOnly: screenIsReadOnly,
+          sessionAsync: sessionAsync,
+        ),
+        body: _NoteEditorBody(
+          noteId: widget.noteId,
+          attachmentDelivery: widget.attachmentDelivery,
+          noteAsync: noteAsync,
+          sessionAsync: sessionAsync,
+          taskForMetadata: _taskForMetadata,
+          readSession: _readSession,
+        ),
       ),
     );
   }
@@ -307,25 +308,13 @@ class _NoteEditorBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: SafeArea(
-            top: true,
-            bottom: false,
-            child: ProgressiveFade(
-              child: _NoteEditorDocument(
-                noteId: noteId,
-                attachmentDelivery: attachmentDelivery,
-                noteAsync: noteAsync,
-                sessionAsync: sessionAsync,
-                taskForMetadata: taskForMetadata,
-                readSession: readSession,
-              ),
-            ),
-          ),
-        ),
-      ],
+    return _NoteEditorDocument(
+      noteId: noteId,
+      attachmentDelivery: attachmentDelivery,
+      noteAsync: noteAsync,
+      sessionAsync: sessionAsync,
+      taskForMetadata: taskForMetadata,
+      readSession: readSession,
     );
   }
 }
