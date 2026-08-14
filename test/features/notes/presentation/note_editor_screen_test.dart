@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
@@ -93,6 +94,8 @@ void main() {
   ) async {
     addTearDown(tester.view.reset);
     await pumpScreen(tester);
+
+    expect(find.byType(KeyboardScaffoldSafeArea), findsOneWidget);
 
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffold.resizeToAvoidBottomInset, isFalse);
