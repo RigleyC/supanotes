@@ -38,6 +38,8 @@ workflows:
           git fetch --tags --force
           eval "$(dart run scripts/app_version.dart --build-number \"$BUILD_NUMBER\")"
           echo "Building SupaNotes $APP_VERSION+$APP_BUILD_NUMBER"
+          echo "APP_VERSION=$APP_VERSION" >> "$CM_ENV"
+          echo "APP_BUILD_NUMBER=$APP_BUILD_NUMBER" >> "$CM_ENV"
       - name: Install pods
         script: |
           cd ios && pod install && cd ..
@@ -119,6 +121,8 @@ workflows:
           git fetch --tags --force
           eval "$(dart run scripts/app_version.dart --build-number \"$BUILD_NUMBER\")"
           echo "Building SupaNotes $APP_VERSION+$APP_BUILD_NUMBER"
+          echo "APP_VERSION=$APP_VERSION" >> "$CM_ENV"
+          echo "APP_BUILD_NUMBER=$APP_BUILD_NUMBER" >> "$CM_ENV"
       - name: Install pods
         script: |
           cd ios && pod install && cd ..
