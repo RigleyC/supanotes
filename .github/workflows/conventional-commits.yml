@@ -1,0 +1,56 @@
+name: Conventional Commits
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: conventional-commits-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.1
+          channel: stable
+          cache: true
+
+      - name: Get Flutter packages
+        run: flutter pub get
+
+      - name: Validate commit messages
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            range="$BASE_SHA..$HEAD_SHA"
+          elif [[ "$BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            range="$CURRENT_SHA"
+          else
+            range="$BEFORE_SHA..$CURRENT_SHA"
+          fi
+
+          mapfile -t commits < <(git rev-list --reverse "$range")
+          for commit in "${commits[@]}"; do
+            git show --format=%B --no-patch "$commit" > "$RUNNER_TEMP/commit-message.txt"
+            echo "Validating $commit"
+            dart run scripts/commit_message_validator.dart "$RUNNER_TEMP/commit-message.txt"
+          done
