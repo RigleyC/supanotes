@@ -147,6 +147,11 @@ Scaffold(
 ### Git
 - Branch naming: `feat/<name>`, `fix/<name>`, `chore/<name>`
 - Commit format: `type(scope): description` (Conventional Commits)
+- Activate the repository hook once per checkout: `git config core.hooksPath .githooks`
+- Allowed commit types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, `ci`, `perf`, `revert`, and `style`.
+- Breaking changes use `!` in the header or a `BREAKING CHANGE:` footer.
+- Examples: `feat(editor): add task block`, `fix(sync): preserve pending operations`.
+- CI validates commits even when the local hook is not installed.
 - Never commit `.env` files — only `.env.example`.
 
 ### API Design

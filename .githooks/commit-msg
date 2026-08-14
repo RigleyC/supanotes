@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+repository_root=$(git rev-parse --show-toplevel)
+cd "$repository_root"
+exec dart run scripts/commit_message_validator.dart "$1"
