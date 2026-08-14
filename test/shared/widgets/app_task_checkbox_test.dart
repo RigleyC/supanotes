@@ -66,7 +66,7 @@ void main() {
         ),
       );
       final decoration = container.decoration as BoxDecoration;
-      expect(decoration.borderRadius, BorderRadius.circular(6));
+      expect(decoration.borderRadius, BorderRadius.circular(7));
     });
 
     testWidgets(
