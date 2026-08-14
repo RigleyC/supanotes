@@ -129,13 +129,21 @@ func validateCanonicalBlockMetadata(blockType string, metadata map[string]any) e
 			stringFields[key] = true
 		}
 	case BlockTask:
-		for _, key := range []string{"isCompleted", "checked", "hasTime"} {
+		for _, key := range []string{"isCompleted", "hasTime"} {
 			boolFields[key] = true
 		}
-		for _, key := range []string{"dueDate", "recurrenceRule", "recurrence", "reminder"} {
+		for _, key := range []string{"dueDate", "recurrenceRule", "reminder", "lastCompletedAt"} {
 			stringFields[key] = true
 		}
+		for _, key := range []string{"checked", "recurrence"} {
+			if _, exists := metadata[key]; exists {
+				return fmt.Errorf("legacy %s metadata is not allowed; run the task document backfill", key)
+			}
+		}
 		intFields["indent"] = true
+		if err := validateCanonicalTaskMetadata(metadata); err != nil {
+			return err
+		}
 	case BlockBulletList, BlockOrderedList:
 		intFields["indent"] = true
 	case BlockAttachment:
@@ -167,4 +175,67 @@ func validateCanonicalBlockMetadata(blockType string, metadata map[string]any) e
 		}
 	}
 	return nil
+}
+
+func validateCanonicalTaskMetadata(metadata map[string]any) error {
+	if value, exists := metadata["dueDate"]; exists && value != nil {
+		dueDate, ok := value.(string)
+		if !ok || !isCanonicalScheduledAt(dueDate) {
+			return fmt.Errorf("invalid dueDate metadata")
+		}
+	}
+
+	if value, exists := metadata["recurrenceRule"]; exists && value != nil {
+		recurrenceRule, ok := value.(string)
+		if !ok || !canonicalRecurrenceRules[recurrenceRule] {
+			return fmt.Errorf("invalid recurrenceRule metadata")
+		}
+	}
+
+	if value, exists := metadata["reminder"]; exists && value != nil {
+		reminder, ok := value.(string)
+		if !ok || !canonicalReminders[reminder] {
+			return fmt.Errorf("invalid reminder metadata")
+		}
+	}
+
+	if value, exists := metadata["lastCompletedAt"]; exists && value != nil {
+		lastCompletedAt, ok := value.(string)
+		if !ok || !isCanonicalCompletedAt(lastCompletedAt) {
+			return fmt.Errorf("invalid lastCompletedAt metadata")
+		}
+	}
+
+	if value, exists := metadata["completions"]; exists && value != nil {
+		completions, ok := value.(map[string]any)
+		if !ok {
+			return fmt.Errorf("invalid completions metadata")
+		}
+		for scheduledAt, rawCompletedAt := range completions {
+			completedAt, ok := rawCompletedAt.(string)
+			if !ok || !isCanonicalScheduledAt(scheduledAt) || !isCanonicalCompletedAt(completedAt) {
+				return fmt.Errorf("invalid completions metadata")
+			}
+		}
+	}
+
+	return nil
+}
+
+var canonicalRecurrenceRules = map[string]bool{
+	"daily":    true,
+	"weekdays": true,
+	"weekly":   true,
+	"monthly":  true,
+}
+
+var canonicalReminders = map[string]bool{
+	"at_time":       true,
+	"5m_before":     true,
+	"1h_before":     true,
+	"1d_before":     true,
+	"9am":           true,
+	"12pm":          true,
+	"6pm":           true,
+	"1d_before_9am": true,
 }

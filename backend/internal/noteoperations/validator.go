@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
+	"time"
 )
 
 var (
@@ -149,6 +151,9 @@ func validateCreateBlockPayload(payload json.RawMessage, blockID *string) *Valid
 			Message: fmt.Sprintf("invalid block type: %s", p.Type),
 		}
 	}
+	if err := rejectLegacyTaskMetadata(p.Metadata); err != nil {
+		return err
+	}
 	if p.Delta == nil {
 		return &ValidationError{
 			Code:    "INVALID_PAYLOAD",
@@ -242,6 +247,21 @@ func validateSetBlockMetadataPayload(payload json.RawMessage, blockID *string) *
 			Err:     err,
 		}
 	}
+	if err := rejectLegacyTaskMetadata(metadata); err != nil {
+		return err
+	}
+	return nil
+}
+
+func rejectLegacyTaskMetadata(metadata map[string]any) *ValidationError {
+	for _, key := range []string{"checked", "recurrence"} {
+		if _, exists := metadata[key]; exists {
+			return &ValidationError{
+				Code:    "INVALID_PAYLOAD",
+				Message: fmt.Sprintf("legacy %s metadata is not allowed; run the task document backfill", key),
+			}
+		}
+	}
 	return nil
 }
 
@@ -273,14 +293,54 @@ func validateCompleteTaskOccurrencePayload(payload json.RawMessage, blockID *str
 			Message: "scheduledAt is required for complete_task_occurrence",
 		}
 	}
+	if !isCanonicalScheduledAt(p.ScheduledAt) {
+		return &ValidationError{
+			Code:    "INVALID_PAYLOAD",
+			Message: "scheduledAt must be a canonical calendar timestamp without an offset",
+		}
+	}
 	if p.CompletedAt != nil && strings.TrimSpace(*p.CompletedAt) == "" {
 		return &ValidationError{
 			Code:    "INVALID_PAYLOAD",
 			Message: "completedAt must be null or non-empty",
 		}
 	}
+	if p.CompletedAt != nil && !isCanonicalCompletedAt(*p.CompletedAt) {
+		return &ValidationError{
+			Code:    "INVALID_PAYLOAD",
+			Message: "completedAt must be a UTC timestamp",
+		}
+	}
 	return nil
 }
+
+var canonicalScheduledAtPattern = regexp.MustCompile(
+	`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}([0-9]{3})?$`,
+)
+
+func isCanonicalScheduledAt(value string) bool {
+	if !canonicalScheduledAtPattern.MatchString(value) {
+		return false
+	}
+	layout := "2006-01-02T15:04:05.000"
+	if len(value) == len("2006-01-02T15:04:05.000000") {
+		layout = "2006-01-02T15:04:05.000000"
+	}
+	_, err := time.Parse(layout, value)
+	return err == nil
+}
+
+func isCanonicalCompletedAt(value string) bool {
+	if !canonicalCompletedAtPattern.MatchString(value) {
+		return false
+	}
+	_, err := time.Parse(time.RFC3339Nano, value)
+	return err == nil
+}
+
+var canonicalCompletedAtPattern = regexp.MustCompile(
+	`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}([0-9]{3})?Z$`,
+)
 
 func validateAgainstDocument(kind string, blockID *string, doc Document) *ValidationError {
 	switch Kind(kind) {

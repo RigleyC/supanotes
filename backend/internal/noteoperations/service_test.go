@@ -94,7 +94,11 @@ func (m *mockRepository) GetNoteDocument(ctx context.Context, noteID pgtype.UUID
 	if m.getNoteDocumentFn != nil {
 		return m.getNoteDocumentFn(ctx, noteID)
 	}
-	return GetNoteDocumentResult{Revision: 0, Document: []byte(`{"schemaVersion":1,"blocks":[]}`)}, nil
+	document, err := json.Marshal(NewEmptyDocument())
+	if err != nil {
+		return GetNoteDocumentResult{}, err
+	}
+	return GetNoteDocumentResult{Revision: 0, Document: document}, nil
 }
 
 func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {
@@ -113,7 +117,7 @@ func TestGetDocument(t *testing.T) {
 	assert.Equal(t, int64(0), docResp.Revision)
 }
 
-func TestGetDocumentReturnsCanonicalDeltaOperations(t *testing.T) {
+func TestGetDocumentRejectsNonCanonicalDeltaOperations(t *testing.T) {
 	svc := NewService(&mockRepository{
 		getNoteDocumentFn: func(context.Context, pgtype.UUID) (GetNoteDocumentResult, error) {
 			return GetNoteDocumentResult{
@@ -131,15 +135,8 @@ func TestGetDocumentReturnsCanonicalDeltaOperations(t *testing.T) {
 		},
 	}, nil)
 
-	docResp, err := svc.GetDocument(context.Background(), pgtype.UUID{}, pgtype.UUID{})
-	assert.NoError(t, err)
-	assert.Equal(t, int64(7), docResp.Revision)
-
-	var document Document
-	assert.NoError(t, json.Unmarshal(docResp.Document, &document))
-	assert.Len(t, document.Blocks[0].Delta, 1)
-	assert.Equal(t, "kept", string(document.Blocks[0].Delta[0].Insert))
-	assert.Nil(t, document.Blocks[0].Delta[0].Delete)
+	_, err := svc.GetDocument(context.Background(), pgtype.UUID{}, pgtype.UUID{})
+	assert.Error(t, err)
 }
 
 func TestGetDocumentNoteNotFound(t *testing.T) {

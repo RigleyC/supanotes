@@ -636,7 +636,7 @@ void main() {
             kind: 'complete_task_occurrence',
             payload: const {
               'taskId': 'task-1',
-              'scheduledAt': '2026-07-26T09:00:00.000Z',
+              'scheduledAt': '2026-07-26T09:00:00.000',
               'completedAt': null,
             },
           ),
@@ -649,7 +649,7 @@ void main() {
             kind: 'complete_task_occurrence',
             payload: const {
               'taskId': 'task-1',
-              'scheduledAt': '2026-07-27T09:00:00.000Z',
+              'scheduledAt': '2026-07-27T09:00:00.000',
               'completedAt': '2026-07-27T10:00:00.000Z',
             },
           ),
@@ -665,9 +665,9 @@ void main() {
         final docB = await dbB.noteOperationsDao
             .watchNoteDocument(noteId)
             .first;
-        expect(docA!.documentJson, contains('2026-07-26T09:00:00.000Z'));
+        expect(docA!.documentJson, contains('2026-07-26T09:00:00.000'));
         expect(docA.documentJson, contains('reopened'));
-        expect(docA.documentJson, contains('2026-07-27T09:00:00.000Z'));
+        expect(docA.documentJson, contains('2026-07-27T09:00:00.000'));
         expect(docA.documentJson, contains('2026-07-27T10:00:00.000Z'));
         expect(docB!.documentJson, docA.documentJson);
       },

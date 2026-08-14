@@ -98,12 +98,16 @@ Depois da normalização, o runtime usa somente estas chaves:
 
 ```json
 {
-  "2026-08-12T09:00:00Z": "2026-08-10T14:30:00Z"
+  "2026-08-12T09:00:00.000": "2026-08-10T14:30:00.000Z"
 }
 ```
 
-A chave é `scheduledAt`: a ocorrência do calendário que foi concluída. O
-valor é `completedAt`: o momento real em que o usuário concluiu a task.
+A chave é `scheduledAt`: a identidade da ocorrência no calendário. Ela usa os
+componentes de data e hora da agenda, sem offset de fuso. Para uma task de dia
+inteiro, somente a data é relevante e a hora é `00:00`. O valor é
+`completedAt`: o instante real em que o usuário concluiu a task, sempre em
+UTC. Assim, concluir a ocorrência do dia 12 no dia 10 grava `12 -> 10`, e não
+substitui a âncora da série.
 
 `isCompleted` não decide o estado de uma task recorrente. Para uma task
 recorrente, o estado visível é derivado da ocorrência ativa e de
@@ -130,6 +134,9 @@ O resolver recebe `dueDate`, `recurrenceRule`, `hasTime`, `completions` e
    permanecem não concluídas e não formam backlog.
 5. Uma ocorrência concluída antecipadamente ainda é identificada pela sua
    data agendada, não pela data da conclusão.
+6. Conclusões antecipadas consecutivas são permitidas. Depois de concluir 12
+   no dia 10, a ocorrência ativa é 19; se 19 também for concluída no dia 10,
+   a próxima é 26.
 
 Exemplos para uma regra semanal:
 
@@ -150,6 +157,10 @@ completions[activeOccurrence.scheduledAt] = now
 
 O código não grava uma nova `dueDate` para avançar a recorrência. O avanço é
 derivado pelo resolver, sem mutação causada apenas pela passagem do tempo.
+
+Para recorrência mensal, a série preserva o dia da âncora. Uma task ancorada
+no dia 31 ocorre em 31 de janeiro, 28 de fevereiro e 31 de março. O mês curto
+é apenas uma ocorrência limitada; ele não muda a âncora para o dia 28.
 
 ## Reabrir e desfazer
 
@@ -226,24 +237,28 @@ um DTO de borda, por exemplo:
 ```dart
 class TaskNotificationEntry {
   const TaskNotificationEntry({
-    required this.noteId,
-    required this.taskId,
+    required this.id,
     required this.title,
-    required this.occurrence,
+    required this.dueDate,
     required this.hasTime,
     required this.reminder,
   });
 
-  final String noteId;
-  final String taskId;
+  final String id;
   final String title;
-  final TaskOccurrence occurrence;
+  final DateTime dueDate;
   final bool hasTime;
   final String? reminder;
 }
 ```
 
 O DTO não é o modelo da task. Ele existe somente para a borda do scheduler.
+
+O resolver usado para badges e editor mantém a ocorrência atrasada visível até
+o próximo horário de ocorrência. O leitor do scheduler usa uma resolução
+separada: quando a ocorrência recorrente visível está atrasada, ele escolhe a
+primeira ocorrência futura ainda não concluída. Dessa forma, a notificação não
+é agendada para um horário passado e a UI não perde a informação de atraso.
 
 Quando uma task, reminder, data, recorrência ou nota muda, o scheduler cancela
 ou agenda novamente as notificações locais correspondentes. Quando uma nota é
@@ -289,6 +304,12 @@ Casos que exigem parada manual:
 
 Dados órfãos são preservados no export para auditoria, mas não são inseridos
 de volta no documento sem uma decisão de reconciliação.
+
+Chaves de conclusão antigas com offset de fuso exigem uma disposição de
+migração. Para uma task com hora, não é seguro adivinhar o fuso do dispositivo
+que gravou a chave usando o fuso do operador atual. O preflight deve separar
+esses casos e o backfill só pode convertê-los quando a correspondência for
+determinística.
 
 ## Remoção do runtime antigo
 

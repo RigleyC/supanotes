@@ -9,6 +9,7 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_time.dart';
 import 'task_notification_entry.dart';
 import 'note_task_notification_source.dart';
 
@@ -377,30 +378,10 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     bool hasTime,
     String? reminder,
   ) {
-    if (reminder == null) return null;
-
-    final base = hasTime ? due : DateTime(due.year, due.month, due.day, 9, 0);
-
-    if (reminder == 'at_time') return base;
-
-    switch (reminder) {
-      case '5m_before':
-        return base.subtract(const Duration(minutes: 5));
-      case '1h_before':
-        return base.subtract(const Duration(hours: 1));
-      case '1d_before':
-        return base.subtract(const Duration(days: 1));
-      case '9am':
-        return DateTime(due.year, due.month, due.day, 9, 0);
-      case '12pm':
-        return DateTime(due.year, due.month, due.day, 12, 0);
-      case '6pm':
-        return DateTime(due.year, due.month, due.day, 18, 0);
-      case '1d_before_9am':
-        final dayBefore = due.subtract(const Duration(days: 1));
-        return DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 9, 0);
-      default:
-        return base;
-    }
+    return computeTaskNotificationTime(
+      due: due,
+      hasTime: hasTime,
+      reminder: reminder,
+    );
   }
 }

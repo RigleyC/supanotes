@@ -1,3 +1,5 @@
+import 'task_schedule_identity.dart';
+
 class TaskNotificationEntry {
   const TaskNotificationEntry({
     required this.id,
@@ -18,10 +20,16 @@ class TaskNotificationEntry {
       other is TaskNotificationEntry &&
       id == other.id &&
       title == other.title &&
-      dueDate == other.dueDate &&
+      sameScheduledAt(dueDate, other.dueDate, hasTime: hasTime) &&
       hasTime == other.hasTime &&
       reminder == other.reminder;
 
   @override
-  int get hashCode => Object.hash(id, title, dueDate, hasTime, reminder);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    scheduledAtKey(dueDate, hasTime: hasTime),
+    hasTime,
+    reminder,
+  );
 }

@@ -52,6 +52,26 @@ void main() {
     expect(find.textContaining('Atrasada'), findsNothing);
   });
 
+  testWidgets('shows the next occurrence after an early completion', (
+    tester,
+  ) async {
+    final now = DateTime(2026, 8, 10, 12);
+    final anchor = DateTime(2026, 8, 12);
+
+    await tester.pumpWidget(
+      wrap(
+        TaskMetadataBadges(
+          dueDate: anchor,
+          recurrence: TaskRecurrence.weekly,
+          completions: {anchor: DateTime(2026, 8, 10, 10)},
+          now: now,
+        ),
+      ),
+    );
+
+    expect(find.textContaining('19 ago'), findsOneWidget);
+  });
+
   testWidgets('shows recurrence label', (tester) async {
     await tester.pumpWidget(
       wrap(const TaskMetadataBadges(recurrence: TaskRecurrence.weekly)),

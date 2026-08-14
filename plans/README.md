@@ -8,7 +8,7 @@ honor its STOP conditions, and update your row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 005  | Migrate tasks to the canonical note document | P1 | L | — | TODO |
+| 005  | Migrate tasks to the canonical note document | P1 | L | — | PROD CUTOVER DONE / CLEANUP PENDING |
 | 001  | Implement fallback for corrupted Yjs text nodes and await SQLite projection | P1       | S      | —          | DONE   |
 | 002  | Reduce SupaNotes to the note product core | P1       | L      | —          | DONE   |
 | 004  | Make the structured voice dictation plan safe to execute | P1 | M | — | TODO |

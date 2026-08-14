@@ -177,7 +177,9 @@ Status: complete.
 
 ## Task document-native migration
 
-Status: implementation in progress; design and migration plan approved.
+Status: implementation, local verification, production backfill, and backend
+deployment are complete. Physical cleanup remains a separately approved
+operation after retention.
 
 The approved design is in
 `docs/superpowers/specs/2026-08-12-task-document-native-design.md`.
@@ -193,8 +195,15 @@ be executed independently.
   document for offline reads and notifications.
 - `dueDate` is the recurrence anchor. A completion is stored as
   `completions[scheduledAt] = completedAt`.
+- Consecutive early completions are allowed. A series can move from 12 to 19
+  and then 26 even when both completions happen on day 10.
+- Monthly recurrence preserves the original anchor day across short months.
+- `scheduledAt` is a wall-clock calendar identity without an offset;
+  `completedAt` is the actual UTC instant.
 - Early and late completion preserve the scheduled occurrence key. The next
   occurrence is calculated from the original schedule.
+- Notifications use a future-target resolver when the visible recurring
+  occurrence is overdue.
 - An overdue occurrence remains historical. The next reached occurrence is
   the active one. Reopening removes only the exact scheduled occurrence.
 - Changing schedule metadata clears the completion history for that task.
@@ -214,25 +223,27 @@ be executed independently.
    providers and projection writers.
 5. [x] Remove relational task REST/MCP runtime paths and unused backend task
    services and queries.
-6. [ ] Add the production read-only preflight and retention runbook. No
+6. [x] Add and execute the production backup, export, isolated restore,
+   read-only preflight, canonical backfill, and retention runbook. No
    production data is deleted by this change.
-7. [ ] Review scheduler boundary changes, schema versioning, generated SQL,
+7. [x] Review scheduler boundary changes, schema versioning, generated SQL,
    and test coverage for regressions.
-8. [ ] Run the complete Flutter and Go verification suites.
-9. [ ] Run the thermo-nuclear maintainability review and resolve every finding.
+8. [x] Run the complete Flutter and Go verification suites.
+9. [x] Run the thermo-nuclear maintainability review and resolve every finding.
 
 ### Data safety gates
 
-- Take a PostgreSQL backup before production rollout.
-- Export `tasks` and `task_completions` before any physical cleanup.
-- Run a read-only comparison between relational rows and task blocks in
-  `notes.document`.
-- Classify rows as corresponding, orphaned, or conflicting. Stop rollout on
-  conflicts until they are resolved.
-- Keep the legacy export under controlled retention until the canonical
-  document path is confirmed in production.
-- Do not add an automatic `DROP TABLE` migration. Physical cleanup is a
-  separate, approved operation after the retention period.
+- [x] Take a restorable PostgreSQL backup before production rollout.
+- [x] Export `tasks` and `task_completions` before any physical cleanup.
+- [x] Run a read-only comparison between relational rows and task blocks in
+      `notes.document`.
+- [x] Classify rows as corresponding, orphaned, or conflicting. Production
+      had zero relational task rows; document-only blocks were classified as
+      canonical data, not as missing legacy rows.
+- [x] Keep the legacy export under controlled retention until the canonical
+      document path is confirmed in production.
+- [x] No automatic `DROP TABLE` migration was added. Physical cleanup is a
+      separate, approved operation after the retention period.
 
 ## Haptic feedback defaults
 

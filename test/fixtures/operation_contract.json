@@ -49,7 +49,7 @@
       "blockId": "task-1",
       "payload": {
         "taskId": "task-1",
-        "scheduledAt": "2026-07-27T09:00:00.000Z",
+        "scheduledAt": "2026-07-27T09:00:00.000",
         "completedAt": "2026-07-27T10:00:00.000Z"
       }
     }

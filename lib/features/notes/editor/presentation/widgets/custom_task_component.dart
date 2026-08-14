@@ -416,7 +416,11 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                       recurrence: widget.taskMetadata?.recurrence,
                       hasReminder: widget.taskMetadata?.reminder != null,
                       hasTime: widget.taskMetadata?.hasTime ?? false,
-                      isCompleted: _isComplete,
+                      completions: widget.taskMetadata?.completions ?? const {},
+                      // A recurring checkbox is only an occurrence animation.
+                      // Its metadata badge must keep resolving the next
+                      // occurrence from the document completion map.
+                      isCompleted: _isComplete && !_isRecurring,
                     ),
                     const SizedBox(height: 4),
                   ],

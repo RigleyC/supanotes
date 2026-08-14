@@ -1,7 +1,6 @@
 library;
 
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
@@ -69,7 +68,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       error: (_, _) => true,
     );
     return Scaffold(
-      extendBodyBehindAppBar: false,
+      extendBodyBehindAppBar: true,
       appBar: _NoteEditorAppBar(
         noteId: widget.noteId,
         note: note,
@@ -110,6 +109,8 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
     return AppBar(
       automaticallyImplyLeading: false,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
@@ -120,10 +121,16 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
           }
         },
       ),
-      flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-          child: Container(color: Colors.transparent),
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0),
+              Theme.of(context).scaffoldBackgroundColor,
+            ],
+          ),
         ),
       ),
       title: screenIsReadOnly && currentNote?.sharedByEmail != null
@@ -315,7 +322,7 @@ class _NoteEditorBody extends StatelessWidget {
       children: [
         Expanded(
           child: SafeArea(
-            top: false,
+            top: true,
             bottom: false,
             child: _NoteEditorDocument(
               noteId: noteId,

@@ -19,3 +19,11 @@
 - [x] Add coverage for immediate close and attachment-only drafts.
 - [x] Repair the invalid canonical Delta snapshot that blocked Windows debug
   note hydration.
+- [x] Harden document-native task occurrences: stable calendar identity,
+  anchor-aware monthly recurrence, repeated early completion, overdue reminder
+  targeting, and effective-document materialization.
+- [x] Add the read-only production migration preflight and retention runbook.
+- [x] Run Flutter analyze, the full Flutter suite, and the full Go suite.
+- [x] Execute the production backup, export, isolated restore rehearsal,
+  preflight, canonical backfill, retention gate, and backend health check with
+  operator-owned artifacts. Physical cleanup remains a separate approval.

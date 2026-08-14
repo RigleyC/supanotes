@@ -33,6 +33,31 @@
     }
   },
   {
+    "name": "valid canonical task occurrence metadata",
+    "valid": true,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "task-2",
+          "type": "task",
+          "delta": [{ "insert": "Review the release" }],
+          "metadata": {
+            "isCompleted": false,
+            "dueDate": "2026-08-12T09:00:00.000",
+            "hasTime": true,
+            "recurrenceRule": "weekly",
+            "reminder": "at_time",
+            "completions": {
+              "2026-08-12T09:00:00.000": "2026-08-10T14:00:00.000Z"
+            },
+            "lastCompletedAt": "2026-08-10T14:00:00.000Z"
+          }
+        }
+      ]
+    }
+  },
+  {
     "name": "rejects link attribution with false value",
     "valid": false,
     "document": {
@@ -75,6 +100,74 @@
           "type": "task",
           "delta": [{ "insert": "bad" }],
           "metadata": { "isCompleted": "false" }
+        }
+      ]
+    }
+  },
+  {
+    "name": "rejects legacy checked task metadata",
+    "valid": false,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "task-legacy-checked",
+          "type": "task",
+          "delta": [{ "insert": "legacy" }],
+          "metadata": { "isCompleted": false, "checked": false }
+        }
+      ]
+    }
+  },
+  {
+    "name": "rejects legacy recurrence task metadata",
+    "valid": false,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "task-legacy-recurrence",
+          "type": "task",
+          "delta": [{ "insert": "legacy" }],
+          "metadata": { "isCompleted": false, "recurrence": "weekly" }
+        }
+      ]
+    }
+  },
+  {
+    "name": "rejects non-canonical task completion metadata",
+    "valid": false,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "task-invalid-completion",
+          "type": "task",
+          "delta": [{ "insert": "legacy" }],
+          "metadata": {
+            "isCompleted": false,
+            "completions": {
+              "2026-08-12T09:00:00.000Z": "2026-08-10T14:00:00.000Z"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "rejects unknown task recurrence metadata",
+    "valid": false,
+    "document": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "task-invalid-recurrence",
+          "type": "task",
+          "delta": [{ "insert": "legacy" }],
+          "metadata": {
+            "isCompleted": false,
+            "recurrenceRule": "FREQ=DAILY"
+          }
         }
       ]
     }

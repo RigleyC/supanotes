@@ -44,6 +44,37 @@ Review fixes complete:
   integration suite passed with 4 tests, and the backend suite passed with 254
   tests in 25 packages.
 
+## Document-native task occurrence hardening
+
+The task flow now keeps the note document as the only source of truth. The
+editor records `scheduledAt -> completedAt`, where `scheduledAt` is a calendar
+wall-clock identity and `completedAt` is UTC. The recurrence anchor does not
+move after completion, monthly series preserve the original anchor day, and
+consecutive early completions are allowed.
+
+The visible editor occurrence remains overdue until the next occurrence starts.
+The notification reader uses a separate future target so an overdue reminder
+is never scheduled in the past. The effective local document includes pending
+operations, so offline task metadata is available to the scheduler.
+
+Verification for this change:
+
+- Focused task, editor, notification, sync, and contract tests: passed.
+- Full Flutter suite: 680 passed.
+- Flutter analyze: no issues found.
+- Full Go suite: 347 passed in 26 packages.
+- `git diff --check`: passed.
+
+Production cutover is complete for release `task-document-native-2026-08-14`.
+The protected artifacts contain a valid custom-format backup, full legacy table
+exports, isolated restore results, read-only preflight and metadata inventory,
+the per-value backfill audit, and SHA-256 hashes. Production ended with 190
+task blocks, 53 completion entries, zero legacy metadata aliases, and zero
+relational task rows. The strict backend was deployed and
+`GET /api/v1/health` returned HTTP 200. Historical OT payloads retain their old
+wire values by design; they are immutable rebase records, not canonical task
+state. No table cleanup is performed by application code.
+
 ## Editor empty viewport focus
 
 Tapping the blank editor area below visible text now places the caret at the

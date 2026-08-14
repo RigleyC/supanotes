@@ -10,9 +10,3 @@ final activeNotesProvider = StreamProvider.autoDispose<List<NoteModel>>((ref) {
 final noteProvider = StreamProvider.autoDispose.family<NoteModel?, String>(
   (ref, noteId) => ref.watch(notesRepositoryProvider).watchNoteById(noteId),
 );
-
-/// Streams a note together with its tasks in a single reactive emission.
-///
-/// Delegates to a Drift JOIN query that watches both `notes` and `tasks`
-/// tables, so the UI rebuilds whenever *either* changes without manual
-/// stream merging.

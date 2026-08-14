@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,12 +16,10 @@ import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_grid
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_list_view.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
 
-import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_more_menu.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
@@ -67,51 +64,48 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final notesAsync = ref.watch(activeNotesProvider);
     final trimmedSearchQuery = _searchQuery.trim();
 
-    final headerSlivers = [
-      SliverToBoxAdapter(
-        child: SizedBox(
-          height:
-              kToolbarHeight +
-              AppSpacing.lg +
-              (PlatformInfo.isIOS26OrHigher()
-                  ? AppSpacing.ios26ToolbarHeight
-                  : 8),
-        ),
-      ),
-      if (_isSearching)
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              0,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            child: TextField(
-              key: const ValueKey('notes-inline-search-field'),
-              decoration: const InputDecoration(
-                hintText: 'Buscar notas',
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: _onSearchQueryChanged,
-            ),
-          ),
-        ),
-    ];
-
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        flexibleSpace: ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-            child: Container(color: Colors.transparent),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0),
+                Theme.of(context).scaffoldBackgroundColor,
+              ],
+            ),
           ),
         ),
         actions: [
+          if (_isSearching)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 220),
+              child: TextField(
+                key: const ValueKey('notes-inline-search-field'),
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Buscar notas',
+                  prefixIcon: const Icon(Icons.search),
+                  border: InputBorder.none,
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surface,
+                ),
+                onChanged: _onSearchQueryChanged,
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: _openSearch,
+            ),
           IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
-            onPressed: _isSearching ? _closeSearch : _openSearch,
+            icon: const Icon(Icons.close),
+            onPressed: _closeSearch,
           ),
           NotesMoreMenu(
             isListView: !isGridView,
@@ -121,15 +115,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ),
         ],
       ),
-      body: notesAsync.when(
-        loading: () => CustomScrollView(
-          slivers: [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          ],
-        ),
+      body: SafeArea(
+        top: true,
+        child: notesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => AppErrorView(
           title: 'Erro ao carregar as notas',
           subtitle: e.toString(),
@@ -143,13 +132,32 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                   return n.title.toLowerCase().contains(q) ||
                       bodyText.contains(q);
                 }).toList();
-          return CustomScrollView(
-            slivers: [
-              ...headerSlivers,
-              _buildNotesBody(filteredNotes, isGridView),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: isGridView
+                    ? NotesGridView(
+                        key: const ValueKey('grid'),
+                        notes: filteredNotes,
+                        onTap: _openNote,
+                        onDelete: _deleteNote,
+                        onToggleFavorite: _toggleFavorite,
+                        onEditIcon: _editNoteIcon,
+                      )
+                    : NotesListView(
+                        key: const ValueKey('list'),
+                        notes: filteredNotes,
+                        onTap: _openNote,
+                        onDelete: _deleteNote,
+                        onToggleFavorite: _toggleFavorite,
+                        onEditIcon: _editNoteIcon,
+                      ),
+              ),
             ],
           );
         },
+      ),
       ),
 
       floatingActionButton: AppButton(
@@ -197,25 +205,5 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       if (!context.mounted) return;
       AppMessenger.showError('Erro ao salvar preferência de visualização');
     }
-  }
-
-  Widget _buildNotesBody(List<NoteModel> notes, bool isGridView) {
-    return isGridView
-        ? NotesGridView(
-            key: const ValueKey('grid'),
-            notes: notes.toList(),
-            onTap: _openNote,
-            onDelete: _deleteNote,
-            onToggleFavorite: _toggleFavorite,
-            onEditIcon: _editNoteIcon,
-          )
-        : NotesListView(
-            key: const ValueKey('list'),
-            notes: notes.toList(),
-            onTap: _openNote,
-            onDelete: _deleteNote,
-            onToggleFavorite: _toggleFavorite,
-            onEditIcon: _editNoteIcon,
-          );
   }
 }

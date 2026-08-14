@@ -18,7 +18,10 @@
 - **Category:** migration | tech-debt | correctness
 - **Planned at:** commit `0656c720`, 2026-08-12
 - **Design:** [tasks nativas do documento](../docs/superpowers/specs/2026-08-12-task-document-native-design.md)
-- **Plan status:** pronto para revisão e aprovação; não executar antes desse gate
+- **Plan status:** design aprovado; implementação local concluída; gates de
+  produção e limpeza física ainda pendentes
+- **Operational runbook:**
+  [task-document-migration-runbook](../docs/operations/task-document-migration-runbook.md)
 
 Este plano executa o design aprovado. Ele substitui a alternativa de projeção
 incremental descrita em `docs/superpowers/specs/2026-08-12-incremental-task-projection-design.md`.
@@ -52,18 +55,16 @@ de leitura, por exemplo:
 ```dart
 class TaskNotificationEntry {
   const TaskNotificationEntry({
-    required this.noteId,
-    required this.taskId,
+    required this.id,
     required this.title,
-    required this.occurrence,
+    required this.dueDate,
     required this.hasTime,
     required this.reminder,
   });
 
-  final String noteId;
-  final String taskId;
+  final String id;
   final String title;
-  final TaskOccurrence occurrence;
+  final DateTime dueDate;
   final bool hasTime;
   final String? reminder;
 }
@@ -93,7 +94,12 @@ Antes de remover qualquer fallback, registrar e aplicar este contrato:
 - `reminder` continua sendo metadado do bloco e mantém os valores aceitos pelo
   `TaskNotificationScheduler`.
 - `completions` continua no documento para ocorrências recorrentes. Cada chave
-  é o horário agendado e cada valor é o horário de conclusão.
+  é a identidade de calendário de `scheduledAt`, sem offset de fuso, e cada
+  valor é `completedAt`, o instante real de conclusão em UTC.
+- Conclusões antecipadas consecutivas são permitidas: concluir 12 no dia 10,
+  depois 19 no dia 10, avança a série para 26.
+- A recorrência mensal preserva o dia da âncora: 31 de janeiro, 28 de
+  fevereiro e 31 de março pertencem à mesma série.
 - `lastCompletedAt`, se continuar sendo usado para tasks não recorrentes, deve
   ser incluído explicitamente no contrato Dart, Go e de compartilhamento. Não
   depender de metadado desconhecido para preservar uma informação importante.
@@ -567,6 +573,11 @@ O executor deve cobrir, no mínimo:
 - concluir e reabrir task não recorrente;
 - concluir e reabrir cada tipo de recorrência;
 - task recorrente atrasada com ocorrência já concluída;
+- task recorrente atrasada deve manter a ocorrência visível até a próxima data,
+  enquanto o scheduler usa a próxima ocorrência futura;
+- duas conclusões antecipadas seguidas no mesmo dia;
+- task mensal ancorada no dia 31 atravessando fevereiro;
+- chave antiga de conclusão com offset sem conversão determinística;
 - operação `complete_task_occurrence` recebida por sync/MCP;
 - alteração local offline antes de fechar a nota;
 - alteração remota durante uma sessão aberta;
@@ -590,21 +601,30 @@ Os testes devem seguir os padrões existentes em:
 
 ## Critérios de conclusão
 
-- [ ] O editor não importa nem recebe `TaskModel`.
-- [ ] O scheduler não lê `TaskData` nem a tabela `tasks`.
-- [ ] Alterações offline de task sobrevivem ao fechamento e à reabertura do
+- [x] O editor não importa nem recebe `TaskModel`.
+- [x] O scheduler não lê `TaskData` nem a tabela `tasks`.
+- [x] Alterações offline de task sobrevivem ao fechamento e à reabertura do
       aplicativo.
-- [ ] O snapshot confirmado continua separado do documento efetivo local.
-- [ ] Data, hora, lembrete, recorrência, conclusão e reabertura continuam
+- [x] O snapshot confirmado continua separado do documento efetivo local.
+- [x] Data, hora, lembrete, recorrência, conclusão e reabertura continuam
       representados no documento.
-- [ ] O mesmo resolver de ocorrência é usado para editor e notificações.
-- [ ] IDs de notificação permanecem estáveis para tasks existentes.
-- [ ] Rotas backend e MCP `list_tasks` antigos foram removidos.
-- [ ] Cada row de produção antiga tem correspondência, importação aprovada ou
-      export/arquivo verificável.
-- [ ] Tabelas locais e PostgreSQL só foram removidas depois do gate de dados.
-- [ ] Não há escrita direta em `tasks` no runtime.
-- [ ] As verificações definidas para a execução foram concluídas e registradas
+- [x] O mesmo domínio de ocorrência é usado para editor e notificações; o
+      scheduler usa um alvo futuro separado quando a ocorrência visível está
+      atrasada.
+- [x] O codec Dart e o decoder Go rejeitam aliases legados, datas de agenda
+      com offset, regras desconhecidas, reminders desconhecidos e valores
+      inválidos de `completions`/`lastCompletedAt`.
+- [x] IDs de notificação permanecem estáveis para tasks existentes.
+- [x] Rotas backend e MCP `list_tasks` antigos foram removidos.
+- [x] Cada row de produção antiga tem correspondência, importação aprovada ou
+      export/arquivo verificável. A produção tinha zero rows nas tabelas
+      relacionais; os 181 blocos document-only foram classificados como dados
+      canônicos já existentes, e os exports permanecem no artefato protegido.
+- [x] Nenhuma tabela local ou PostgreSQL foi removida nesta migração. A remoção
+      física continua sendo uma mudança separada, após retenção e aprovação
+      explícita.
+- [x] Não há escrita direta em `tasks` no runtime.
+- [x] As verificações locais definidas para a execução foram concluídas e registradas
       pelo executor; este documento não executa testes por si só.
 
 ## STOP conditions
@@ -619,6 +639,8 @@ Os testes devem seguir os padrões existentes em:
 - Há tráfego real nas rotas `/tasks` após a data de corte.
 - Um cliente externo depende de `list_tasks` sem uma decisão explícita de remoção.
 - A nova versão precisa ler um alias antigo em runtime para abrir uma nota.
+- Um dispositivo offline ainda possui snapshot local com alias ou timestamp
+  não canônico quando o cliente estrito é liberado.
 - O backup de produção não foi restaurado com sucesso em staging.
 - A alteração exige editar uma migration já aplicada.
 

@@ -85,6 +85,7 @@ class TaskMetadataSheetBody extends ConsumerWidget {
       children: [
         AppTile(
           contentPadding: EdgeInsets.zero,
+          selected: state.dueDate != null,
           title: state.dueDate == null
               ? 'Adicionar data'
               : formatDueDate(state.dueDate!, hasTime: state.hasTime),
@@ -107,6 +108,7 @@ class TaskMetadataSheetBody extends ConsumerWidget {
         ),
         AppTile(
           contentPadding: EdgeInsets.zero,
+          selected: state.hasTime,
           title: state.hasTime && state.dueDate != null
               ? DateFormat('h:mm a').format(state.dueDate!)
               : 'Adicionar horário',
@@ -130,6 +132,7 @@ class TaskMetadataSheetBody extends ConsumerWidget {
         ),
         AppTile(
           contentPadding: EdgeInsets.zero,
+          selected: state.recurrence != null,
           title:
               state.recurrence?.getLocalizedLabel(state.dueDate) ??
               'Adicionar recorrência',
@@ -157,6 +160,7 @@ class TaskMetadataSheetBody extends ConsumerWidget {
         ),
         AppTile(
           contentPadding: EdgeInsets.zero,
+          selected: state.reminder != null,
           title: state.reminder?.label ?? 'Adicionar lembrete',
           leading: const Icon(Icons.notifications_outlined, size: 20),
           trailing: state.reminder == null

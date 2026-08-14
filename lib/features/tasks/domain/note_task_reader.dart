@@ -4,7 +4,9 @@ import 'package:supanotes/features/notes/editor/document/note_document_codec.dar
 
 import 'task_occurrence.dart';
 import 'task_recurrence.dart';
+import 'task_schedule_identity.dart';
 import 'task_notification_entry.dart';
+import 'task_notification_time.dart';
 
 class NoteTaskReader {
   const NoteTaskReader({this.clock});
@@ -23,17 +25,32 @@ class NoteTaskReader {
     for (final block in snapshot.blocks) {
       if (block.type != 'task') continue;
       final metadata = block.metadata;
-      final dueDate = DateTime.tryParse(metadata['dueDate'] as String? ?? '');
+      final hasTime = metadata['hasTime'] as bool? ?? false;
+      final dueDate = parseScheduledAt(
+        metadata['dueDate'] as String?,
+        hasTime: hasTime,
+      );
       final recurrence = TaskRecurrence.parse(
         metadata['recurrenceRule'] as String?,
       );
-      final completions = _readCompletions(metadata['completions']);
-      final occurrence = policy.resolveCurrent(
+      final reminder = metadata['reminder'] as String?;
+      final completions = readScheduledCompletions(
+        metadata['completions'],
+        hasTime: hasTime,
+      );
+      final occurrence = policy.resolveNotificationOccurrence(
         taskId: block.id,
         anchor: dueDate,
         recurrence: recurrence,
-        hasTime: metadata['hasTime'] as bool? ?? false,
+        hasTime: hasTime,
         completedAtByScheduledAt: completions,
+        notificationAt: reminder == null
+            ? null
+            : (scheduledAt) => computeTaskNotificationTime(
+                due: scheduledAt,
+                hasTime: hasTime,
+                reminder: reminder,
+              ),
       );
       if (occurrence == null || occurrence.isCompleted) continue;
       if (metadata['isCompleted'] == true && recurrence == null) continue;
@@ -42,25 +59,11 @@ class NoteTaskReader {
           id: block.id,
           title: block.text,
           dueDate: occurrence.scheduledAt,
-          hasTime: metadata['hasTime'] as bool? ?? false,
-          reminder: metadata['reminder'] as String?,
+          hasTime: hasTime,
+          reminder: reminder,
         ),
       );
     }
     return entries;
-  }
-
-  Map<DateTime, DateTime> _readCompletions(Object? value) {
-    if (value is! Map) return const {};
-    final result = <DateTime, DateTime>{};
-    for (final entry in value.entries) {
-      if (entry.key is! String || entry.value is! String) continue;
-      final scheduledAt = DateTime.tryParse(entry.key as String);
-      final completedAt = DateTime.tryParse(entry.value as String);
-      if (scheduledAt != null && completedAt != null) {
-        result[scheduledAt] = completedAt;
-      }
-    }
-    return result;
   }
 }

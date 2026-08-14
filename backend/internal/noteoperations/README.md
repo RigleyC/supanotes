@@ -30,7 +30,7 @@ autoritativo da validação e da aplicação:
 | `move_block` | Exige `blockId` no envelope e no payload, com o mesmo valor. |
 | `set_block_type` | Exige um tipo de bloco permitido. |
 | `set_block_metadata` | `metadata` deve ser objeto; valores `null` representam remoções explícitas. |
-| `complete_task_occurrence` | `taskId` deve coincidir com `blockId`, `scheduledAt` não pode ser vazio e o alvo deve ser um bloco `task`. |
+| `complete_task_occurrence` | `taskId` deve coincidir com `blockId`; `scheduledAt` usa timestamp de calendário sem offset; `completedAt`, quando presente, é UTC; o alvo deve ser um bloco `task`. |
 
 `test/fixtures/operation_contract.json` é consumido pelos testes Dart e Go.
 Ele cobre um exemplo válido de cada operação e evita que os dois adapters

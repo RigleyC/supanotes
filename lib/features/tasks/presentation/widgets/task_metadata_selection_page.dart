@@ -43,6 +43,7 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppTile(
+                contentPadding: EdgeInsets.zero,
                 title: noneLabel,
                 leading: const Icon(Icons.do_not_disturb_on_outlined),
                 selected: selected == null,
@@ -54,6 +55,7 @@ class TaskMetadataSelectionPage<T> extends StatelessWidget {
               ),
               for (final option in options)
                 AppTile(
+                  contentPadding: EdgeInsets.zero,
                   title: optionLabel(option),
                   leading: Icon(optionIcon(option)),
                   selected: selected == option,

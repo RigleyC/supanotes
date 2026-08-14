@@ -321,7 +321,7 @@ class NoteOperationAdapter {
       },
     );
 
-    if (result.remoteOperations.isEmpty) {
+    if (result.remoteOperations.isEmpty && rebasedOps.isEmpty) {
       NoteSyncDebug.log(
         'adapter.reconcile.skip_local_ack',
         noteId: _noteId,

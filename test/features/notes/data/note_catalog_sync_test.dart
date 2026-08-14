@@ -22,6 +22,63 @@ Future<void> _noopNoteIconUpdate(
 ) async {}
 
 void main() {
+  test('materializes a clean remote document for offline task reads', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+
+    when(() => client.listNotes()).thenAnswer(
+      (_) async => [
+        {
+          'id': 'task-note',
+          'user_id': 'owner-user',
+          'created_at': '2026-08-10T11:00:00.000Z',
+          'updated_at': '2026-08-10T12:00:00.000Z',
+        },
+      ],
+    );
+    const document = {
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': 'task-1',
+          'type': 'task',
+          'delta': [
+            {'insert': 'Review task'},
+          ],
+          'metadata': {
+            'dueDate': '2026-08-12T09:00:00.000',
+            'hasTime': true,
+            'reminder': 'at_time',
+          },
+        },
+      ],
+    };
+    when(() => client.getDocument('task-note')).thenAnswer(
+      (_) async => NoteDocumentResponse(
+        noteId: 'task-note',
+        revision: 4,
+        document: document,
+        serverTime: DateTime.utc(2026, 8, 10, 12),
+      ),
+    );
+
+    await sync.pullRemoteNotes('owner-user');
+
+    final saved = await (database.select(
+      database.localNoteDocuments,
+    )..where((row) => row.noteId.equals('task-note'))).getSingle();
+    expect(jsonDecode(saved.documentJson), document);
+    expect(jsonDecode(saved.materializedDocumentJson!), document);
+    expect(saved.materializedUpdatedAt?.toUtc(), DateTime.utc(2026, 8, 10, 12));
+  });
+
   test(
     'pushes an active dirty note icon without changing document dirtiness',
     () async {

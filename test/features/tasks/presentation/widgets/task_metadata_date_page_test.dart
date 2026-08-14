@@ -31,6 +31,21 @@ void main() {
     expect(find.byType(SingleChildScrollView), findsNothing);
   });
 
+  testWidgets('aligns task tiles with the sheet title', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TaskMetadataDatePage(selected: null, onSelected: (_) {}),
+      ),
+    );
+
+    final titleLeft = tester.getTopLeft(find.text('Escolher data')).dx;
+    final tileLeadingLeft = tester
+        .getTopLeft(find.byIcon(Icons.calendar_month_rounded).first)
+        .dx;
+
+    expect(tileLeadingLeft, titleLeft);
+  });
+
   testWidgets(
     'quick date selection emits one selection haptic and returns to the root page',
     (tester) async {

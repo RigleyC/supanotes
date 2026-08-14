@@ -48,6 +48,40 @@ void main() {
       expect(result.nextDue, DateTime(2026, 8, 26, 9));
     });
 
+    test('allows a second early completion on the next occurrence', () {
+      final result = TaskCompletionCommand(() => DateTime(2026, 8, 10, 15))
+          .complete(
+            TaskSnapshot(
+              dueDate: DateTime(2026, 8, 12, 9),
+              hasTime: true,
+              recurrence: TaskRecurrence.weekly,
+              completions: {
+                DateTime(2026, 8, 12, 9): DateTime(2026, 8, 10, 14),
+              },
+            ),
+          );
+
+      expect(result.scheduledAt, DateTime(2026, 8, 19, 9));
+      expect(result.nextDue, DateTime(2026, 8, 26, 9));
+    });
+
+    test('preserves the anchor day after a monthly short month', () {
+      final result = TaskCompletionCommand(() => DateTime(2026, 3, 1, 10))
+          .complete(
+            TaskSnapshot(
+              dueDate: DateTime(2026, 1, 31),
+              recurrence: TaskRecurrence.monthly,
+              completions: {
+                DateTime(2026, 1, 31): DateTime(2026, 1, 31, 10),
+                DateTime(2026, 2, 28): DateTime(2026, 2, 27, 10),
+              },
+            ),
+          );
+
+      expect(result.scheduledAt, DateTime(2026, 3, 31));
+      expect(result.nextDue, DateTime(2026, 4, 30));
+    });
+
     test(
       'uses the latest reached occurrence when the stored date is stale',
       () {

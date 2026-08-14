@@ -434,11 +434,14 @@ class NoteCatalogSync {
     final projection = _projectContent(
       documentResponse.document['blocks'] as List<dynamic>? ?? [],
     );
+    final documentJson = jsonEncode(documentResponse.document);
     final document = LocalNoteDocumentsCompanion.insert(
       noteId: documentResponse.noteId,
       revision: documentResponse.revision,
-      documentJson: jsonEncode(documentResponse.document),
+      documentJson: documentJson,
       updatedAt: documentResponse.serverTime,
+      materializedDocumentJson: Value(documentJson),
+      materializedUpdatedAt: Value(documentResponse.serverTime),
     );
     final ownerUserId = local.existing?.userId ?? userId;
     final applied = await _database.saveRemoteNote(

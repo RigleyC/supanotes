@@ -7,9 +7,8 @@ import 'note_card.dart';
 
 /// Grid representation of the notes list.
 ///
-/// Returns a [SliverPadding] wrapping a [SliverMasonryGrid] — no
-/// [CustomScrollView] of its own. The parent owns the scroll view and
-/// any leading slivers.
+/// Returns a [MasonryGridView] — no slivers of its own. The parent owns the
+/// layout (e.g. a [Column]) and provides scroll constraints via [Expanded].
 class NotesGridView extends StatelessWidget {
   const NotesGridView({
     super.key,
@@ -28,30 +27,28 @@ class NotesGridView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverPadding(
+    return MasonryGridView.count(
+      crossAxisCount: 2,
+      mainAxisSpacing: AppSpacing.sm,
+      crossAxisSpacing: AppSpacing.sm,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.sm,
         AppSpacing.sm,
         AppSpacing.sm,
         80 + AppSpacing.sm,
       ),
-      sliver: SliverMasonryGrid.count(
-        crossAxisCount: 2,
-        mainAxisSpacing: AppSpacing.sm,
-        crossAxisSpacing: AppSpacing.sm,
-        childCount: notes.length,
-        itemBuilder: (context, index) {
-          final note = notes[index];
-          return NoteCard(
-            key: ValueKey(note.id),
-            note: note,
-            onTap: () => onTap(note),
-            onDelete: () => onDelete(note),
-            onToggleFavorite: () => onToggleFavorite(note),
-            onEditIcon: () => onEditIcon(note),
-          );
-        },
-      ),
+      itemCount: notes.length,
+      itemBuilder: (context, index) {
+        final note = notes[index];
+        return NoteCard(
+          key: ValueKey(note.id),
+          note: note,
+          onTap: () => onTap(note),
+          onDelete: () => onDelete(note),
+          onToggleFavorite: () => onToggleFavorite(note),
+          onEditIcon: () => onEditIcon(note),
+        );
+      },
     );
   }
 }

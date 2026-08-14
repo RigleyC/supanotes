@@ -35,12 +35,12 @@ func TestApplyCompleteTaskOccurrence_updatesAndReopensOccurrence(t *testing.T) {
 			Metadata: map[string]any{"completions": map[string]any{}},
 		}},
 	}
-	complete := json.RawMessage(`{"taskId":"task-1","scheduledAt":"2026-07-27T09:00:00Z","completedAt":"2026-07-27T10:00:00Z"}`)
-	reopen := json.RawMessage(`{"taskId":"task-1","scheduledAt":"2026-07-27T09:00:00Z","completedAt":null}`)
+	complete := json.RawMessage(`{"taskId":"task-1","scheduledAt":"2026-07-27T09:00:00.000","completedAt":"2026-07-27T10:00:00.000Z"}`)
+	reopen := json.RawMessage(`{"taskId":"task-1","scheduledAt":"2026-07-27T09:00:00.000","completedAt":null}`)
 
 	require.NoError(t, doc.ApplyOperation(KindCompleteTaskOccurrence, "task-1", complete))
 	completions := doc.Blocks[0].Metadata["completions"].(map[string]any)
-	assert.Equal(t, "2026-07-27T10:00:00Z", completions["2026-07-27T09:00:00Z"])
+	assert.Equal(t, "2026-07-27T10:00:00.000Z", completions["2026-07-27T09:00:00.000"])
 
 	require.NoError(t, doc.ApplyOperation(KindCompleteTaskOccurrence, "task-1", reopen))
 	assert.Empty(t, completions)

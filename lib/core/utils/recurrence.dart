@@ -5,6 +5,7 @@ import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 DateTime? nextDueDate({
   required DateTime from,
   required TaskRecurrence recurrence,
+  int? anchorDay,
 }) {
   DateTime? raw;
   switch (recurrence) {
@@ -25,7 +26,8 @@ DateTime? nextDueDate({
       final year = from.year + (overflow ? 1 : 0);
       final month = overflow ? 1 : desiredMonth;
       final lastDayOfTarget = DateTime(year, month + 1, 0).day;
-      final day = from.day <= lastDayOfTarget ? from.day : lastDayOfTarget;
+      final desiredDay = anchorDay ?? from.day;
+      final day = desiredDay <= lastDayOfTarget ? desiredDay : lastDayOfTarget;
       raw = _copyWith(from, year: year, month: month, day: day);
   }
   return raw;
@@ -41,6 +43,7 @@ DateTime advanceRecurringDueDate({
   required TaskRecurrence recurrence,
   required bool hasTime,
   DateTime? now,
+  DateTime? anchor,
 }) {
   final effectiveNow = now ?? DateTime.now();
   final today = DateTime(
@@ -49,9 +52,14 @@ DateTime advanceRecurringDueDate({
     effectiveNow.day,
   );
   var current = from;
+  final anchorDay = anchor?.day ?? from.day;
 
   for (var i = 0; i < 10000; i++) {
-    final next = nextDueDate(from: current, recurrence: recurrence);
+    final next = nextDueDate(
+      from: current,
+      recurrence: recurrence,
+      anchorDay: anchorDay,
+    );
     if (next == null || next.isAtSameMomentAs(current)) break;
 
     final hasStarted = hasTime
@@ -113,6 +121,7 @@ List<DateTime> enumerateOccurrences({
     recurrence: recurrence,
     from: from,
     maxCount: maxCount,
+    anchorDay: anchor.day,
   );
   return _collectWindowOccurrences(
     current: firstOccurrence,
@@ -120,6 +129,7 @@ List<DateTime> enumerateOccurrences({
     from: from,
     to: to,
     maxCount: maxCount,
+    anchorDay: anchor.day,
   );
 }
 
@@ -128,11 +138,16 @@ DateTime _advanceToWindowStart({
   required TaskRecurrence recurrence,
   required DateTime from,
   required int maxCount,
+  required int anchorDay,
 }) {
   // A separate counter keeps far-past anchors from consuming the result budget.
   for (var i = 0; i < maxCount; i++) {
     if (!current.isBefore(from)) break;
-    final next = nextDueDate(from: current, recurrence: recurrence);
+    final next = nextDueDate(
+      from: current,
+      recurrence: recurrence,
+      anchorDay: anchorDay,
+    );
     if (next == null || next.isAtSameMomentAs(current)) break;
     current = next;
   }
@@ -145,12 +160,17 @@ List<DateTime> _collectWindowOccurrences({
   required DateTime from,
   required DateTime to,
   required int maxCount,
+  required int anchorDay,
 }) {
   final results = <DateTime>[];
   for (var i = 0; i < maxCount; i++) {
     if (current.isBefore(from) || current.isAfter(to)) break;
     results.add(current);
-    final next = nextDueDate(from: current, recurrence: recurrence);
+    final next = nextDueDate(
+      from: current,
+      recurrence: recurrence,
+      anchorDay: anchorDay,
+    );
     if (next == null || next.isAtSameMomentAs(current)) break;
     current = next;
   }
@@ -163,11 +183,13 @@ DateTime catchUpDueDate({
   required DateTime from,
   required TaskRecurrence recurrence,
   required DateTime today,
+  DateTime? anchor,
 }) {
   return advanceRecurringDueDate(
     from: from,
     recurrence: recurrence,
     hasTime: false,
     now: today,
+    anchor: anchor,
   );
 }

@@ -98,11 +98,11 @@ void main() {
           from: DateTime(2026, 1, 31),
           to: DateTime(2026, 3, 31),
         );
-        // Jan 31, Feb 28 (clamped), Mar 28 (nextDueDate from Feb 28)
+        // Jan 31, Feb 28 (clamped), Mar 31 (original anchor day restored)
         expect(result, hasLength(3));
         expect(result[0], DateTime(2026, 1, 31));
         expect(result[1], DateTime(2026, 2, 28));
-        expect(result[2], DateTime(2026, 3, 28));
+        expect(result[2], DateTime(2026, 3, 31));
       },
     );
 
@@ -181,6 +181,27 @@ void main() {
       );
 
       expect(result, DateTime(2026, 2, 28));
+    });
+
+    test('monthly recurrence returns to the anchor day after February', () {
+      final result = advanceRecurringDueDate(
+        from: DateTime(2026, 1, 31),
+        recurrence: TaskRecurrence.monthly,
+        hasTime: false,
+        now: DateTime(2026, 3, 1),
+      );
+
+      expect(result, DateTime(2026, 2, 28));
+
+      final nextMonth = advanceRecurringDueDate(
+        from: result,
+        recurrence: TaskRecurrence.monthly,
+        hasTime: false,
+        now: DateTime(2026, 4, 1),
+        anchor: DateTime(2026, 1, 31),
+      );
+
+      expect(nextMonth, DateTime(2026, 3, 31));
     });
 
     test('a timed occurrence stays current until the next time starts', () {

@@ -23,6 +23,7 @@ void main() {
         'hasTime': true,
         'recurrenceRule': 'weekly',
         'reminder': 'at_time',
+        'completions': {'2099-01-02T10:00:00.000': '2098-12-30T12:00:00.000Z'},
       },
     );
     final document = MutableDocument(nodes: [node]);
@@ -39,11 +40,12 @@ void main() {
     final customCopy = copied as CustomTaskComponentViewModel;
     expect(
       customCopy.taskMetadata.scheduleAnchor,
-      DateTime.utc(2099, 1, 2, 10),
+      DateTime(2099, 1, 2, 10),
     );
     expect(customCopy.taskMetadata.hasTime, isTrue);
     expect(customCopy.taskMetadata.recurrence, TaskRecurrence.weekly);
     expect(customCopy.taskMetadata.reminder, TaskReminderOption.atTime);
+    expect(customCopy.taskMetadata.completions, hasLength(1));
   });
 
   testWidgets('renders task metadata inside SuperEditor', (tester) async {

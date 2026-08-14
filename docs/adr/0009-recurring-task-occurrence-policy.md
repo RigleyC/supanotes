@@ -21,6 +21,15 @@ therefore make the editor, task projection, and task views disagree.
 - The current occurrence is the latest scheduled occurrence that has started
   at the evaluation time.
 - Missed occurrences are not kept as a permanent backlog.
+- An overdue occurrence remains the visible occurrence until the next
+  scheduled date starts. Notification readers may resolve a separate future
+  occurrence so they never schedule a reminder in the past.
+- The recurrence anchor day is stable. A monthly series anchored on day 31
+  clamps February to day 28 and returns to day 31 in March.
+- A completion records the scheduled calendar identity and the actual UTC
+  completion instant separately. Consecutive early completions are allowed.
+- All-day schedule identity uses the calendar date. Timed schedule identity
+  uses wall-clock components without a timezone offset.
 - Date arithmetic remains pure and receives an explicit evaluation time where
   the rule depends on the clock.
 - A small domain seam may own current-occurrence resolution and completion

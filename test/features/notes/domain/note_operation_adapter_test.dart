@@ -483,55 +483,58 @@ void main() {
       expect(adapter.confirmedRevision, 1);
     });
 
-    test('does not rebuild while local operations remain pending', () async {
-      when(() => mockSyncService.loadPendingProjection('note-1')).thenAnswer(
-        (_) async => [
-          PendingNoteOperationData(
-            operationId: 'pending-1',
-            noteId: 'note-1',
-            baseRevision: 1,
-            ordinal: 0,
-            kind: 'text_delta',
-            blockId: 'block-1',
-            payloadJson: '{"ops":[{"retain":5},{"insert":" pending"}]}',
-            createdAt: DateTime.utc(2026, 7, 22),
-            status: 'pending',
-            attemptCount: 0,
-          ),
-        ],
-      );
-      final adapter = createAdapter();
-      await adapter.start();
+    test(
+      'rebuilds the effective document when local operations remain pending',
+      () async {
+        when(() => mockSyncService.loadPendingProjection('note-1')).thenAnswer(
+          (_) async => [
+            PendingNoteOperationData(
+              operationId: 'pending-1',
+              noteId: 'note-1',
+              baseRevision: 1,
+              ordinal: 0,
+              kind: 'text_delta',
+              blockId: 'block-1',
+            payloadJson: '{"ops":[{"retain":11},{"insert":" pending"}]}',
+              createdAt: DateTime.utc(2026, 7, 22),
+              status: 'pending',
+              attemptCount: 0,
+            ),
+          ],
+        );
+        final adapter = createAdapter();
+        await adapter.start();
 
-      await adapter.reconcile(
-        SyncResult(
-          acceptedCount: 1,
-          acceptedOperationIds: ['local-1'],
-          finalRevision: 1,
-          remoteOperations: [],
-          canonicalDocument: NoteDocumentResponse(
-            noteId: 'note-1',
-            revision: 1,
-            document: {
-              'blocks': [
-                {
-                  'id': 'block-1',
-                  'type': 'paragraph',
-                  'delta': [
-                    {'insert': 'Server copy'},
-                  ],
-                },
-              ],
-            },
-            serverTime: DateTime.utc(2026, 7, 22),
+        await adapter.reconcile(
+          SyncResult(
+            acceptedCount: 1,
+            acceptedOperationIds: ['local-1'],
+            finalRevision: 1,
+            remoteOperations: [],
+            canonicalDocument: NoteDocumentResponse(
+              noteId: 'note-1',
+              revision: 1,
+              document: {
+                'blocks': [
+                  {
+                    'id': 'block-1',
+                    'type': 'paragraph',
+                    'delta': [
+                      {'insert': 'Server copy'},
+                    ],
+                  },
+                ],
+              },
+              serverTime: DateTime.utc(2026, 7, 22),
+            ),
           ),
-        ),
-      );
+        );
 
-      final node = document.getNodeById('block-1') as TextNode?;
-      expect(node?.text.toPlainText(), 'Hello');
-      expect(adapter.confirmedRevision, 1);
-    });
+        final node = document.getNodeById('block-1') as TextNode?;
+        expect(node?.text.toPlainText(), 'Server copy pending');
+        expect(adapter.confirmedRevision, 1);
+      },
+    );
 
     test(
       'persists an edit before applying a remote update during debounce',

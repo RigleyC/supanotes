@@ -43,6 +43,21 @@ void main() {
     expect(find.text('Diariamente'), findsOneWidget);
   });
 
+  testWidgets('highlights metadata tiles when values are set', (tester) async {
+    await tester.pumpWidget(_buildSheetForTask(_task()));
+    await tester.pumpAndSettle();
+
+    final tiles = tester.widgetList<AppTile>(find.byType(AppTile)).toList();
+    expect(tiles, hasLength(4));
+    expect(tiles.map((tile) => tile.selected), [true, false, true, false]);
+
+    final primary = Theme.of(
+      tester.element(find.byType(TaskMetadataSheetBody)),
+    ).colorScheme.primary;
+    final recurrenceTitle = tester.widget<Text>(find.text('Diariamente'));
+    expect(recurrenceTitle.style?.color, primary);
+  });
+
   testWidgets('does not show title input', (tester) async {
     final now = DateTime.utc(2026, 6, 11);
     final task = _SheetTask(

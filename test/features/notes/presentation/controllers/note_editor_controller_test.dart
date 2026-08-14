@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 void main() {
   test('default document starts with the canonical init paragraph', () async {
@@ -98,7 +99,7 @@ void main() {
       expect(task.metadata['dueDate'], '2026-07-01T09:00:00.000');
       expect(
         (task.metadata['completions'] as Map).keys,
-        contains(expectedScheduledAt.toUtc().toIso8601String()),
+        contains(scheduledAtKey(expectedScheduledAt, hasTime: true)),
       );
       await controller.dispose();
     },
@@ -137,6 +138,105 @@ void main() {
         (task.metadata['completions'] as Map).values,
         contains(DateTime(2026, 8, 10, 14).toUtc().toIso8601String()),
       );
+      await controller.dispose();
+    },
+  );
+
+  test('stores a non-recurring completion instant in UTC', () async {
+    final controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('One-time task'),
+          isComplete: false,
+          metadata: {'dueDate': '2026-08-12T09:00:00.000', 'hasTime': true},
+        ),
+      ],
+    );
+
+    final now = DateTime(2026, 8, 10, 14);
+    controller.completeTaskInEditor('task-1', now: now);
+
+    final task = controller.document.getNodeById('task-1')! as TaskNode;
+    expect(task.isComplete, true);
+    expect(task.metadata['dueDate'], isNull);
+    expect(task.metadata['lastCompletedAt'], now.toUtc().toIso8601String());
+    await controller.dispose();
+  });
+
+  test(
+    'allows consecutive early completions without moving the anchor',
+    () async {
+      final controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+        nodes: [
+          TaskNode(
+            id: 'task-1',
+            text: AttributedText('Weekly task'),
+            isComplete: false,
+            metadata: {
+              'dueDate': '2026-08-12T09:00:00.000',
+              'hasTime': true,
+              'recurrenceRule': 'weekly',
+            },
+          ),
+        ],
+      );
+
+      final first = controller.completeTaskInEditor(
+        'task-1',
+        now: DateTime(2026, 8, 10, 14),
+      );
+      final second = controller.completeTaskInEditor(
+        'task-1',
+        now: DateTime(2026, 8, 10, 15),
+      );
+
+      expect(first?.scheduledAt, DateTime(2026, 8, 12, 9));
+      expect(second?.scheduledAt, DateTime(2026, 8, 19, 9));
+      final task = controller.document.getNodeById('task-1')! as TaskNode;
+      expect(task.metadata['dueDate'], '2026-08-12T09:00:00.000');
+      expect(
+        (task.metadata['completions'] as Map).keys,
+        containsAll(['2026-08-12T09:00:00.000', '2026-08-19T09:00:00.000']),
+      );
+      await controller.dispose();
+    },
+  );
+
+  test(
+    'reopens an occurrence regardless of its old UTC key representation',
+    () async {
+      final controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+        nodes: [
+          TaskNode(
+            id: 'task-1',
+            text: AttributedText('All-day task'),
+            isComplete: false,
+            metadata: {
+              'dueDate': '2026-08-12T00:00:00.000',
+              'hasTime': false,
+              'recurrenceRule': 'weekly',
+              'completions': {
+                '2026-08-12T03:00:00.000Z': '2026-08-10T14:00:00.000Z',
+              },
+            },
+          ),
+        ],
+      );
+
+      controller.reopenTaskInEditor(
+        'task-1',
+        scheduledAt: DateTime(2026, 8, 12),
+      );
+
+      final task = controller.document.getNodeById('task-1')! as TaskNode;
+      expect(task.metadata['completions'], isEmpty);
       await controller.dispose();
     },
   );

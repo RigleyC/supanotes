@@ -170,6 +170,9 @@ func syncOperationsInRepository(
 	if err != nil {
 		return SyncResponse{}, fmt.Errorf("marshal document: %w", err)
 	}
+	if _, err := DecodeCanonicalDocument(docJSON); err != nil {
+		return SyncResponse{}, fmt.Errorf("validate canonical document: %w", err)
+	}
 
 	content, excerpt := DeriveContentFromDocument(doc)
 	if err := repo.UpdateNoteDocument(ctx, UpdateNoteDocumentParams{
@@ -344,7 +347,7 @@ func (s *Service) GetOperationsSince(ctx context.Context, noteID pgtype.UUID, us
 }
 
 func canonicalDocumentJSON(data []byte) ([]byte, error) {
-	document, err := UnmarshalDocument(data)
+	document, err := DecodeCanonicalDocument(data)
 	if err != nil {
 		return nil, err
 	}

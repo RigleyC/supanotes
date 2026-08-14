@@ -43,12 +43,12 @@ void main() {
     expect(
       NoteOperationPayloads.completeTaskOccurrence(
         taskId: 'task-1',
-        scheduledAt: '2026-07-27T09:00:00Z',
+        scheduledAt: '2026-07-27T09:00:00.000',
         completedAt: null,
       ),
       {
         'taskId': 'task-1',
-        'scheduledAt': '2026-07-27T09:00:00Z',
+        'scheduledAt': '2026-07-27T09:00:00.000',
         'completedAt': null,
       },
     );
@@ -61,11 +61,72 @@ void main() {
         blockId: 'task-1',
         payload: const {
           'taskId': 'other-task',
-          'scheduledAt': '2026-07-27T09:00:00Z',
+          'scheduledAt': '2026-07-27T09:00:00.000',
           'completedAt': null,
         },
       ),
       isNotNull,
+    );
+  });
+
+  test('contract rejects legacy task metadata', () {
+    for (final metadata in const [
+      {'checked': false},
+      {'recurrence': 'weekly'},
+    ]) {
+      expect(
+        NoteOperationContract.validate(
+          kind: NoteOperationKind.setBlockMetadata.wireName,
+          blockId: 'task-1',
+          payload: {'metadata': metadata},
+        ),
+        isNotNull,
+      );
+    }
+  });
+
+  test('contract rejects offset schedule identities', () {
+    expect(
+      NoteOperationContract.validate(
+        kind: NoteOperationKind.completeTaskOccurrence.wireName,
+        blockId: 'task-1',
+        payload: const {
+          'taskId': 'task-1',
+          'scheduledAt': '2026-07-27T09:00:00.000Z',
+          'completedAt': null,
+        },
+      ),
+      'scheduledAt must be a canonical calendar timestamp without an offset',
+    );
+  });
+
+  test('contract requires completedAt to be UTC', () {
+    expect(
+      NoteOperationContract.validate(
+        kind: NoteOperationKind.completeTaskOccurrence.wireName,
+        blockId: 'task-1',
+        payload: const {
+          'taskId': 'task-1',
+          'scheduledAt': '2026-07-27T09:00:00.000',
+          'completedAt': '2026-07-27T10:00:00.000-03:00',
+        },
+      ),
+      'completedAt must be a UTC timestamp',
+    );
+  });
+
+  test('contract requires canonical completedAt precision', () {
+    expect(
+      NoteOperationContract.validate(
+        kind: NoteOperationKind.completeTaskOccurrence.wireName,
+        blockId: 'task-1',
+        payload: const {
+          'taskId': 'task-1',
+          'scheduledAt': '2026-07-27T09:00:00.000',
+          'completedAt': '2026-07-27T10:00:00Z',
+        },
+      ),
+      'completedAt must be a UTC timestamp',
     );
   });
 

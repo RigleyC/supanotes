@@ -15,6 +15,7 @@ class TaskMetadataBadges extends StatelessWidget {
     this.hasReminder = false,
     this.isCompleted = false,
     this.hasTime = false,
+    this.completions = const {},
     this.now,
   });
 
@@ -23,6 +24,7 @@ class TaskMetadataBadges extends StatelessWidget {
   final bool hasReminder;
   final bool isCompleted;
   final bool hasTime;
+  final Map<DateTime, DateTime> completions;
   final DateTime? now;
 
   bool get _hasRecurrence => recurrence != null;
@@ -34,6 +36,7 @@ class TaskMetadataBadges extends StatelessWidget {
       anchor: dueDate,
       recurrence: recurrence!,
       hasTime: hasTime,
+      completedAtByScheduledAt: completions,
     );
   }
 

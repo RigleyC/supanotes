@@ -28,7 +28,7 @@ void main() {
             "delta": [{"insert": "Buy milk"}],
             "metadata": {
               "isCompleted": true,
-              "dueDate": "2026-07-25T10:00:00Z"
+              "dueDate": "2026-07-25T10:00:00.000"
             }
           },
           {
@@ -66,7 +66,7 @@ void main() {
       final task = taskNode as TaskNode;
       expect(task.text.toPlainText(), 'Buy milk');
       expect(task.isComplete, true);
-      expect(task.metadata['dueDate'], '2026-07-25T10:00:00Z');
+      expect(task.metadata['dueDate'], '2026-07-25T10:00:00.000');
 
       final dividerNode = codec.decodeNode(blocks[2] as Map<String, dynamic>);
       expect(dividerNode, isA<HorizontalRuleNode>());

@@ -210,6 +210,57 @@ void main() {
       expect(result, hasLength(1));
       expect(result.single.scheduledAt, DateTime(2026, 2, 28));
     });
+
+    test('returns to the anchor day after a short month', () {
+      final result = buildOccurrences(
+        taskId: 't1',
+        anchor: DateTime(2026, 1, 31),
+        recurrence: TaskRecurrence.monthly,
+        hasTime: false,
+        now: DateTime(2026, 3, 1),
+        completedScheduledAts: {DateTime(2026, 2, 28)},
+      );
+
+      expect(result.single.scheduledAt, DateTime(2026, 3, 31));
+    });
+
+    test('allows multiple consecutive early completions', () {
+      final result = buildOccurrences(
+        taskId: 't1',
+        anchor: DateTime(2026, 8, 12),
+        recurrence: TaskRecurrence.weekly,
+        hasTime: false,
+        now: DateTime(2026, 8, 10, 10),
+        completedScheduledAts: {DateTime(2026, 8, 12), DateTime(2026, 8, 19)},
+      );
+
+      expect(result.single.scheduledAt, DateTime(2026, 8, 26));
+      expect(result.single.status, OccurrenceStatus.pending);
+    });
+
+    test('keeps an overdue occurrence until the next date starts', () {
+      final beforeNext = buildOccurrences(
+        taskId: 't1',
+        anchor: DateTime(2026, 8, 12),
+        recurrence: TaskRecurrence.weekly,
+        hasTime: false,
+        now: DateTime(2026, 8, 18),
+        completedScheduledAts: {},
+      );
+      final atNext = buildOccurrences(
+        taskId: 't1',
+        anchor: DateTime(2026, 8, 12),
+        recurrence: TaskRecurrence.weekly,
+        hasTime: false,
+        now: DateTime(2026, 8, 19),
+        completedScheduledAts: {},
+      );
+
+      expect(beforeNext.single.scheduledAt, DateTime(2026, 8, 12));
+      expect(beforeNext.single.status, OccurrenceStatus.overdue);
+      expect(atNext.single.scheduledAt, DateTime(2026, 8, 19));
+      expect(atNext.single.status, OccurrenceStatus.pending);
+    });
   });
 
   group('buildOccurrences - weekdays recurrence', () {

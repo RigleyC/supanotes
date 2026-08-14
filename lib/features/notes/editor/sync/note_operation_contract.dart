@@ -138,6 +138,10 @@ abstract final class NoteOperationContract {
         payload['metadata'] is! Map) {
       return 'metadata must be an object';
     }
+    if (type == 'task') {
+      final legacyError = _rejectLegacyTaskMetadata(payload['metadata']);
+      if (legacyError != null) return legacyError;
+    }
     return _optionalString(payload, 'afterBlockId');
   }
 
@@ -184,7 +188,18 @@ abstract final class NoteOperationContract {
     if (blockId == null || blockId.isEmpty) {
       return 'blockId is required for set_block_metadata';
     }
-    return payload['metadata'] is Map ? null : 'metadata must be an object';
+    if (payload['metadata'] is! Map) return 'metadata must be an object';
+    return _rejectLegacyTaskMetadata(payload['metadata']);
+  }
+
+  static String? _rejectLegacyTaskMetadata(Object? rawMetadata) {
+    if (rawMetadata is! Map) return null;
+    for (final key in const ['checked', 'recurrence']) {
+      if (rawMetadata.containsKey(key)) {
+        return 'legacy $key metadata is not allowed; run the task document backfill';
+      }
+    }
+    return null;
   }
 
   static String? _validateCompleteTaskOccurrence(
@@ -200,12 +215,59 @@ abstract final class NoteOperationContract {
     if (scheduledAt is! String || scheduledAt.isEmpty) {
       return 'scheduledAt is required';
     }
+    if (!_isCanonicalTimestamp(scheduledAt, _canonicalScheduledAtPattern)) {
+      return 'scheduledAt must be a canonical calendar timestamp without an offset';
+    }
     final completedAt = payload['completedAt'];
     if (completedAt != null &&
         (completedAt is! String || completedAt.isEmpty)) {
       return 'completedAt must be null or a non-empty string';
     }
+    if (completedAt is String &&
+        !_isCanonicalTimestamp(completedAt, _canonicalCompletedAtPattern)) {
+      return 'completedAt must be a UTC timestamp';
+    }
     return null;
+  }
+
+  static final _canonicalScheduledAtPattern = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{3})(\d{3})?$',
+  );
+
+  static final _canonicalCompletedAtPattern = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{3})(\d{3})?Z$',
+  );
+
+  static bool _isCanonicalTimestamp(String value, RegExp pattern) {
+    final match = pattern.firstMatch(value);
+    if (match == null) return false;
+
+    final year = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final day = int.parse(match.group(3)!);
+    final hour = int.parse(match.group(4)!);
+    final minute = int.parse(match.group(5)!);
+    final second = int.parse(match.group(6)!);
+    final millisecond = int.parse(match.group(7)!);
+    final microsecond = int.parse(match.group(8) ?? '0');
+    final parsed = DateTime.utc(
+      year,
+      month,
+      day,
+      hour,
+      minute,
+      second,
+      millisecond,
+      microsecond,
+    );
+    return parsed.year == year &&
+        parsed.month == month &&
+        parsed.day == day &&
+        parsed.hour == hour &&
+        parsed.minute == minute &&
+        parsed.second == second &&
+        parsed.millisecond == millisecond &&
+        parsed.microsecond == microsecond;
   }
 
   static String? _matchesBlockId(

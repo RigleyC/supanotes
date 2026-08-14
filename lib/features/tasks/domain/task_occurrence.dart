@@ -1,6 +1,7 @@
 import 'package:supanotes/core/utils/recurrence.dart';
 
 import 'task_recurrence.dart';
+import 'task_schedule_identity.dart';
 
 enum OccurrenceStatus { pending, overdue, completed }
 
@@ -60,12 +61,14 @@ class TaskOccurrencePolicy {
     required DateTime? anchor,
     required TaskRecurrence? recurrence,
     required bool hasTime,
+    Map<DateTime, DateTime> completedAtByScheduledAt = const {},
   }) {
     return resolveCurrent(
       taskId: '',
       anchor: anchor,
       recurrence: recurrence,
       hasTime: hasTime,
+      completedAtByScheduledAt: completedAtByScheduledAt,
     )?.scheduledAt;
   }
 
@@ -80,7 +83,11 @@ class TaskOccurrencePolicy {
     if (anchor == null) return null;
     final effectiveNow = _now();
     if (recurrence == null) {
-      final completedAt = _findCompletion(anchor, completedAtByScheduledAt);
+      final completedAt = _findCompletion(
+        anchor,
+        hasTime: hasTime,
+        completedAtByScheduledAt: completedAtByScheduledAt,
+      );
       return TaskOccurrence(
         taskId: taskId,
         scheduledAt: anchor,
@@ -111,6 +118,65 @@ class TaskOccurrencePolicy {
           : OccurrenceStatus.pending,
       completedAt: completedAt,
     );
+  }
+
+  /// Returns the occurrence that should be used for a future reminder.
+  ///
+  /// The editor still uses [resolveCurrent], so an overdue occurrence remains
+  /// visible until the next scheduled date starts. A reminder cannot be
+  /// scheduled in the past, therefore an overdue recurring task points at its
+  /// first future, uncompleted occurrence instead.
+  TaskOccurrence? resolveNotificationOccurrence({
+    required String taskId,
+    required DateTime? anchor,
+    required TaskRecurrence? recurrence,
+    required bool hasTime,
+    Map<DateTime, DateTime> completedAtByScheduledAt = const {},
+    DateTime? Function(DateTime scheduledAt)? notificationAt,
+  }) {
+    final current = resolveCurrent(
+      taskId: taskId,
+      anchor: anchor,
+      recurrence: recurrence,
+      hasTime: hasTime,
+      completedAtByScheduledAt: completedAtByScheduledAt,
+    );
+    if (current == null || recurrence == null || !current.isOverdue) {
+      return current;
+    }
+
+    var scheduledAt = nextDueDate(
+      from: current.scheduledAt,
+      recurrence: recurrence,
+      anchorDay: anchor!.day,
+    );
+    final effectiveNow = _now();
+    for (var i = 0; i < 10000 && scheduledAt != null; i++) {
+      final completedAt = _findCompletion(
+        scheduledAt,
+        hasTime: hasTime,
+        completedAtByScheduledAt: completedAtByScheduledAt,
+      );
+      final isNotificationInFuture = notificationAt == null
+          ? !_hasStarted(scheduledAt, effectiveNow, hasTime)
+          : notificationAt(scheduledAt)?.isAfter(effectiveNow) ?? false;
+      if (completedAt == null && isNotificationInFuture) {
+        return TaskOccurrence(
+          taskId: taskId,
+          scheduledAt: scheduledAt,
+          status: OccurrenceStatus.pending,
+        );
+      }
+
+      final next = nextDueDate(
+        from: scheduledAt,
+        recurrence: recurrence,
+        anchorDay: anchor.day,
+      );
+      if (next == null || next.isAtSameMomentAs(scheduledAt)) break;
+      scheduledAt = next;
+    }
+    return current;
   }
 
   /// Calculates the document-independent result of completing an occurrence.
@@ -147,7 +213,11 @@ class TaskOccurrencePolicy {
               )!.scheduledAt);
     return TaskOccurrenceTransition(
       completed: false,
-      nextDue: nextDueDate(from: occurrenceDate, recurrence: recurrence),
+      nextDue: nextDueDate(
+        from: occurrenceDate,
+        recurrence: recurrence,
+        anchorDay: dueDate?.day ?? occurrenceDate.day,
+      ),
       completedAt: completedAt,
       previousDue: dueDate,
       previousHasTime: hasTime,
@@ -170,7 +240,8 @@ class TaskOccurrencePolicy {
     for (var i = 0; i < 10000; i++) {
       final completedAt = _findCompletion(
         scheduledAt,
-        completedAtByScheduledAt,
+        hasTime: hasTime,
+        completedAtByScheduledAt: completedAtByScheduledAt,
       );
       final hasStarted = _hasStarted(scheduledAt, now, hasTime);
 
@@ -189,7 +260,11 @@ class TaskOccurrencePolicy {
         latestStartedUncompleted = completedAt == null ? scheduledAt : null;
       }
 
-      final next = nextDueDate(from: scheduledAt, recurrence: recurrence);
+      final next = nextDueDate(
+        from: scheduledAt,
+        recurrence: recurrence,
+        anchorDay: anchor.day,
+      );
       if (next == null || next.isAtSameMomentAs(scheduledAt)) break;
       scheduledAt = next;
     }
@@ -203,14 +278,9 @@ class TaskOccurrencePolicy {
   }
 
   bool _hasStarted(DateTime scheduledAt, DateTime now, bool hasTime) {
-    if (hasTime) return !scheduledAt.isAfter(now);
-    final scheduledDay = DateTime(
-      scheduledAt.year,
-      scheduledAt.month,
-      scheduledAt.day,
-    );
-    final today = DateTime(now.year, now.month, now.day);
-    return !scheduledDay.isAfter(today);
+    final scheduled = canonicalScheduledAt(scheduledAt, hasTime: hasTime);
+    final current = canonicalScheduledAt(now.toLocal(), hasTime: hasTime);
+    return !scheduled.isAfter(current);
   }
 }
 
@@ -240,32 +310,34 @@ List<TaskOccurrence> buildOccurrences({
 DateTime nextOccurrenceDate({
   required DateTime from,
   required TaskRecurrence recurrence,
+  DateTime? anchor,
 }) {
-  return nextDueDate(from: from, recurrence: recurrence)!;
+  return nextDueDate(
+    from: from,
+    recurrence: recurrence,
+    anchorDay: anchor?.day ?? from.day,
+  )!;
 }
 
 DateTime? _findCompletion(
-  DateTime date,
-  Map<DateTime, DateTime> completedAtByScheduledAt,
-) {
+  DateTime date, {
+  required bool hasTime,
+  required Map<DateTime, DateTime> completedAtByScheduledAt,
+}) {
+  DateTime? latestCompletion;
   for (final entry in completedAtByScheduledAt.entries) {
-    final d = entry.key;
-    if (d.year == date.year &&
-        d.month == date.month &&
-        d.day == date.day &&
-        d.hour == date.hour &&
-        d.minute == date.minute) {
-      return entry.value;
+    final previousCompletion = latestCompletion;
+    if (sameScheduledAt(entry.key, date, hasTime: hasTime) &&
+        (previousCompletion == null ||
+            entry.value.isAfter(previousCompletion))) {
+      latestCompletion = entry.value;
     }
   }
-  return null;
+  return latestCompletion;
 }
 
 bool _isOverdue(DateTime date, DateTime now, bool hasTime) {
-  if (hasTime) {
-    return date.isBefore(now);
-  }
-  final dateOnly = DateTime(date.year, date.month, date.day);
-  final todayOnly = DateTime(now.year, now.month, now.day);
-  return dateOnly.isBefore(todayOnly);
+  final scheduled = canonicalScheduledAt(date, hasTime: hasTime);
+  final current = canonicalScheduledAt(now.toLocal(), hasTime: hasTime);
+  return scheduled.isBefore(current);
 }

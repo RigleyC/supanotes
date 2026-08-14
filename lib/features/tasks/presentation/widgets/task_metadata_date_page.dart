@@ -57,6 +57,7 @@ class TaskMetadataDatePage extends StatelessWidget {
               final option = QuickDueDate.values[index];
               final date = option.compute(now);
               return AppTile(
+                contentPadding: EdgeInsets.zero,
                 title: option.label,
                 leading: Icon(option.icon),
                 selected: selected != null && selected!.isSameDayAs(date),

@@ -20,14 +20,20 @@ An empty regular note is determined from block content, tasks, attachments, not 
 ## Document Model
 
 - One REST/OT document snapshot per note, stored in `notes.document` (JSONB) with a `revision` counter.
-- Blocks are stored in `blocks` array, each with an immutable UUID `id`, `type`, `text`, and optional metadata (`checked`, `dueDate`, `dueTime`, `recurrence`, `spans`).
-- Tasks are blocks with type `task`. They are projected to the relational `tasks` table.
-- Task completion events populate `task_completions` derived by document projection.
+- Blocks are stored in the `blocks` array, each with an immutable UUID `id`,
+  `type`, delta text, and optional metadata.
+- Tasks are blocks with type `task`. Their canonical metadata lives in the
+  document: `isCompleted`, `dueDate`, `hasTime`, `recurrenceRule`, `reminder`,
+  and recurring `completions`.
+- `dueDate` is the recurrence anchor. Each completion stores the scheduled
+  calendar identity separately from the UTC completion instant.
+- The relational `tasks` and `task_completions` tables are legacy projections
+  retained only for the controlled migration and retention window.
 - Tasks may form a hierarchy within a note: a subtask belongs to one parent task and can be completed independently.
 - A parent task with subtasks reports partial progress, remains open while any subtask is open, and toggling its checkbox completes or reopens its subtasks.
 
 ## Projections
 
-- `tasks` — relational table projected from document snapshot blocks of type `task`.
-- `task_completions` — relational table projected from task completion state transitions in document task blocks.
+The application editor, task metadata UI, and notification scheduler read the
+canonical note document. They do not read or write the legacy task tables.
 
