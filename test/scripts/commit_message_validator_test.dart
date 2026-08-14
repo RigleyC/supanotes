@@ -24,6 +24,7 @@ void main() {
     for (final message in [
       'add task block',
       'feat(editor) add task block',
+      'feat(): add task block',
       'feat(editor): ',
       'unknown(editor): add task block',
     ]) {

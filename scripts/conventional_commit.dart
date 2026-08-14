@@ -10,7 +10,7 @@ class ConventionalCommit {
     final subject = lines.first;
 
     final header = RegExp(
-      r'^([a-z]+)(?:\([^)]*\))?(!)?: .+$',
+      r'^([a-z]+)(?:\([^()]+\))?(!)?: .+$',
     ).firstMatch(subject);
     if (header == null) return null;
 
