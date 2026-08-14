@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'conventional_commit.dart';
+
 enum VersionBump { none, patch, minor, major }
 
 class AppVersion {
@@ -61,22 +63,15 @@ class VersionCalculator {
   }
 
   static VersionBump _bumpForCommit(String message) {
-    final lines = message.trim().split(RegExp(r'\r?\n'));
-    if (lines.isEmpty || lines.first.startsWith('Merge ')) {
+    if (message.trim().startsWith('Merge ')) {
       return VersionBump.none;
     }
 
-    final subject = lines.first;
-    if (lines.any((line) => line.startsWith('BREAKING CHANGE:'))) {
-      return VersionBump.major;
-    }
+    final commit = ConventionalCommit.tryParse(message);
+    if (commit == null) return VersionBump.none;
+    if (commit.isBreaking) return VersionBump.major;
 
-    final header = RegExp(
-      r'^([a-z]+)(?:\([^)]*\))?(!)?: .+$',
-    ).firstMatch(subject);
-    if (header?.group(2) == '!') return VersionBump.major;
-
-    return switch (header?.group(1)) {
+    return switch (commit.type) {
       'feat' => VersionBump.minor,
       'fix' => VersionBump.patch,
       _ => VersionBump.none,

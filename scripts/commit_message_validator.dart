@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'conventional_commit.dart';
+
 class CommitValidationResult {
   const CommitValidationResult({required this.isValid, this.message = ''});
 
@@ -42,10 +44,8 @@ class CommitMessageValidator {
       return const CommitValidationResult(isValid: true);
     }
 
-    final match = RegExp(
-      r'^([a-z]+)(?:\([^)]*\))?(!)?: (.+)$',
-    ).firstMatch(subject);
-    if (match == null || !_allowedTypes.contains(match.group(1))) {
+    final commit = ConventionalCommit.tryParse(subject);
+    if (commit == null || !_allowedTypes.contains(commit.type)) {
       return const CommitValidationResult(
         isValid: false,
         message:
