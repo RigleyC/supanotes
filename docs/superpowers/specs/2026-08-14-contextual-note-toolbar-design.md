@@ -4,9 +4,9 @@
 
 Replace the formatting panel with one floating note toolbar.
 
-The toolbar stays docked above the software keyboard. It changes its actions
-from the current document selection and block type. The editor keeps the caret
-visible above the toolbar and keyboard.
+The toolbar stays docked above the software keyboard while the editor has
+focus. It changes its actions from the current document selection and block
+type. The editor keeps the caret visible above the toolbar and keyboard.
 
 ## Layout
 
@@ -28,6 +28,10 @@ switching behavior.
 ## Toolbar states
 
 The toolbar has one stable container, position, and height.
+
+It is hidden while the editor has no focus. It becomes visible when the editor
+receives focus from a text tap, a selection, or typing. There is no compact
+button state and no extra action required to show the toolbar.
 
 ### Normal state
 
