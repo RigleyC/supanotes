@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:supanotes/core/app_version/app_version_provider.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
@@ -39,7 +41,17 @@ Widget _settingsApp(_StubAuthController controller) {
   );
 
   return ProviderScope(
-    overrides: [authControllerProvider.overrideWith(() => controller)],
+    overrides: [
+      authControllerProvider.overrideWith(() => controller),
+      appPackageInfoProvider.overrideWith(
+        (ref) async => PackageInfo(
+          appName: 'SupaNotes',
+          packageName: 'com.example.supanotes',
+          version: '1.3.0',
+          buildNumber: '248',
+        ),
+      ),
+    ],
     child: MaterialApp.router(routerConfig: router),
   );
 }
@@ -62,11 +74,16 @@ void main() {
     expect(find.text('Email'), findsNothing);
     expect(find.text('Conta'), findsNothing);
     expect(find.text('Avançado'), findsNothing);
-    expect(find.text('Versão'), findsNothing);
+    expect(find.text('Versão'), findsOneWidget);
+    expect(find.text('1.3.0+248'), findsOneWidget);
 
     final tiles = tester.widgetList<AppTile>(find.byType(AppTile));
-    expect(tiles, hasLength(4));
-    expect(tiles.where((tile) => tile.subtitle != null), isEmpty);
+    expect(tiles, hasLength(5));
+    expect(tiles.where((tile) => tile.subtitle != null), hasLength(1));
+    final versionTile = tester.widget<AppTile>(
+      find.widgetWithText(AppTile, 'Versão'),
+    );
+    expect(versionTile.onTap, isNull);
   });
 
   testWidgets('opens MCP from the settings list', (tester) async {

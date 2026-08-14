@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:supanotes/core/app_version/app_version_provider.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 
@@ -18,6 +19,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(authControllerProvider).value;
+    final packageInfo = ref.watch(appPackageInfoProvider);
     return Scaffold(
       appBar: AppBar(centerTitle: true, title: const Text('Configurações')),
       body: ListView(
@@ -41,6 +43,23 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Protocolo de Contexto (MCP)',
             onTap: () => context.push(AppRoutes.mcp),
             trailing: const Icon(Icons.chevron_right),
+          ),
+          packageInfo.when(
+            data: (info) => AppTile(
+              leading: const Icon(Icons.info_outline),
+              title: 'Versão',
+              subtitle: '${info.version}+${info.buildNumber}',
+            ),
+            loading: () => const AppTile(
+              leading: Icon(Icons.info_outline),
+              title: 'Versão',
+              subtitle: 'Carregando…',
+            ),
+            error: (error, _) => AppTile(
+              leading: const Icon(Icons.info_outline),
+              title: 'Versão',
+              subtitle: 'Indisponível: $error',
+            ),
           ),
           AppTile(
             leading: const Icon(Icons.logout),
