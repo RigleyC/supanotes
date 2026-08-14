@@ -10,7 +10,8 @@ class AppVersion {
   final int patch;
 
   factory AppVersion.parse(String value) {
-    final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)$').firstMatch(value);
+    final match = RegExp(r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$')
+        .firstMatch(value);
     if (match == null) {
       throw FormatException('Invalid app version: $value');
     }

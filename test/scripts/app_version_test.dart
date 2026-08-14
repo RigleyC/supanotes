@@ -17,6 +17,7 @@ void main() {
       expect(() => AppVersion.parse('1.2'), throwsFormatException);
       expect(() => AppVersion.parse('v1.2.3'), throwsFormatException);
       expect(() => AppVersion.parse('1.2.3+4'), throwsFormatException);
+      expect(() => AppVersion.parse('01.2.3'), throwsFormatException);
     });
 
     test('bumps each semantic version component', () {
