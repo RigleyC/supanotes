@@ -19,9 +19,9 @@ SELECT
 FROM notes AS n
 WHERE n.deleted_at IS NULL
   AND (
-      jsonb_typeof(n.document) <> 'object'
+      jsonb_typeof(n.document) IS DISTINCT FROM 'object'
       OR n.document->>'schemaVersion' <> '1'
-      OR jsonb_typeof(n.document->'blocks') <> 'array'
+      OR jsonb_typeof(n.document->'blocks') IS DISTINCT FROM 'array'
       OR jsonb_array_length(
           CASE
               WHEN jsonb_typeof(n.document->'blocks') = 'array'
@@ -55,7 +55,7 @@ SELECT
     jsonb_typeof(block->'delta') AS delta_type,
     jsonb_typeof(block->'metadata') AS metadata_type
 FROM document_blocks
-WHERE jsonb_typeof(block) <> 'object'
+WHERE jsonb_typeof(block) IS DISTINCT FROM 'object'
    OR jsonb_typeof(block->'id') <> 'string'
    OR COALESCE(block->>'id', '') = ''
    OR block->>'type' NOT IN (
@@ -63,7 +63,7 @@ WHERE jsonb_typeof(block) <> 'object'
        'bulletList', 'orderedList', 'task', 'divider', 'attachment',
        'rich_link'
    )
-   OR jsonb_typeof(block->'delta') <> 'array'
+   OR jsonb_typeof(block->'delta') IS DISTINCT FROM 'array'
    OR (block ? 'metadata'
        AND jsonb_typeof(block->'metadata') NOT IN ('object', 'null'))
 ORDER BY note_id, block_index;
@@ -130,8 +130,8 @@ SELECT
     operation_index,
     operation
 FROM delta_operations
-WHERE jsonb_typeof(operation) <> 'object'
-   OR jsonb_typeof(operation->'insert') <> 'string'
+WHERE jsonb_typeof(operation) IS DISTINCT FROM 'object'
+   OR jsonb_typeof(operation->'insert') IS DISTINCT FROM 'string'
    OR (operation ? 'attributes'
        AND jsonb_typeof(operation->'attributes') NOT IN ('object', 'null'))
 ORDER BY note_id, block_index, operation_index;

@@ -195,6 +195,28 @@ server and client use the canonical document snapshot for current state;
 historical operations are returned only for OT rebase and are not replayed as
 task metadata.
 
+### 5a. Convert legacy Delta shapes exposed by the strict reader
+
+The strict reader does not contain a compatibility fallback. If a persisted
+snapshot contains a missing Delta, a null Delta, or an empty non-content Delta
+operation, run the versioned operational conversion in
+`backend/db/operations/task_document_canonical_delta_repair.sql`.
+
+The conversion is deliberately narrow:
+
+- a missing or null `delta` becomes an empty array;
+- an empty or non-content operation is removed;
+- text insert operations and their attributes stay unchanged;
+- an embed, unknown insert type, invalid block, or unsupported Delta shape
+  aborts the transaction for manual review.
+
+For the 2026-08-14 production repair, three notes and five blocks were
+converted. Two missing/null Deltas became empty arrays and three empty
+operations were removed. The protected audit file records the affected note
+and block IDs. The five repaired blocks returned `delta` arrays with zero
+invalid operations after the conversion. No `note_operations` history was
+rewritten, and no relational task value was used to build the snapshot.
+
 ## 6. Deploy and observe
 
 Deploy the application version only after the backup, restore, export, and
