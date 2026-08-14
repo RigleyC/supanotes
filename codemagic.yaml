@@ -33,12 +33,20 @@ workflows:
       - name: Flutter pub get
         script: |
           flutter pub get
+      - name: Calculate app version
+        script: |
+          git fetch --tags --force
+          eval "$(dart run scripts/app_version.dart --build-number \"$BUILD_NUMBER\")"
+          echo "Building SupaNotes $APP_VERSION+$APP_BUILD_NUMBER"
       - name: Install pods
         script: |
           cd ios && pod install && cd ..
       - name: Flutter build config-only
         script: |
-          flutter build ios --config-only --no-codesign --dart-define=API_BASE_URL="$API_BASE_URL"
+          flutter build ios --config-only --no-codesign \
+            --build-name="$APP_VERSION" \
+            --build-number="$APP_BUILD_NUMBER" \
+            --dart-define=API_BASE_URL="$API_BASE_URL"
       - name: Clean Swift Package Manager artifacts
         script: |
           rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
@@ -106,6 +114,11 @@ workflows:
       - name: Flutter pub get
         script: |
           flutter pub get
+      - name: Calculate app version
+        script: |
+          git fetch --tags --force
+          eval "$(dart run scripts/app_version.dart --build-number \"$BUILD_NUMBER\")"
+          echo "Building SupaNotes $APP_VERSION+$APP_BUILD_NUMBER"
       - name: Install pods
         script: |
           cd ios && pod install && cd ..
@@ -126,6 +139,8 @@ workflows:
       - name: Build signed IPA
         script: |
           flutter build ipa --release \
+            --build-name="$APP_VERSION" \
+            --build-number="$APP_BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --export-options-plist=/Users/builder/export_options.plist
     artifacts:
