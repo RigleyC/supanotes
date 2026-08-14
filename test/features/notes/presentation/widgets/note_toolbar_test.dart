@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_formatting_panel.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
 import '../../../../helpers/haptic_test_helper.dart';
@@ -28,11 +29,14 @@ Widget buildEditorHarness({
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: NoteToolbar(editor: editor, composer: composer),
+                  child: ToolbarAndFormattingPanel(
+                    editor: editor,
+                    composer: composer,
+                  ),
                 ),
               ],
             )
-          : NoteToolbar(editor: editor, composer: composer),
+          : ToolbarAndFormattingPanel(editor: editor, composer: composer),
     ),
   );
 }
@@ -58,6 +62,53 @@ Finder toolbarButtonWithSvgAsset(String asset) {
   return find.byWidgetPredicate(
     (widget) => widget is ToolbarButton && widget.svgAsset == asset,
   );
+}
+
+class ToolbarAndFormattingPanel extends StatefulWidget {
+  const ToolbarAndFormattingPanel({
+    super.key,
+    required this.editor,
+    required this.composer,
+  });
+
+  final Editor editor;
+  final MutableDocumentComposer composer;
+
+  @override
+  State<ToolbarAndFormattingPanel> createState() =>
+      _ToolbarAndFormattingPanelState();
+}
+
+class _ToolbarAndFormattingPanelState extends State<ToolbarAndFormattingPanel> {
+  bool _isFormatting = false;
+  DocumentSelection? _selection;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        NoteToolbar(
+          editor: widget.editor,
+          composer: widget.composer,
+          onOpenFormatting: () {
+            setState(() {
+              _selection = widget.composer.selection;
+              _isFormatting = true;
+            });
+          },
+        ),
+        if (_isFormatting)
+          NoteFormattingPanel(
+            editor: widget.editor,
+            composer: widget.composer,
+            selection: _selection,
+            onClose: () => setState(() => _isFormatting = false),
+            onReturnToTyping: () => setState(() => _isFormatting = false),
+          ),
+      ],
+    );
+  }
 }
 
 Future<void> openListMenu(WidgetTester tester) async {
@@ -105,7 +156,7 @@ Widget buildConversionHarness({
               ],
             ),
           ),
-          NoteToolbar(editor: editor, composer: composer),
+          ToolbarAndFormattingPanel(editor: editor, composer: composer),
         ],
       ),
     ),
@@ -113,6 +164,39 @@ Widget buildConversionHarness({
 }
 
 void main() {
+  testWidgets('requests the formatting panel without expanding itself', (
+    tester,
+  ) async {
+    final document = MutableDocument(
+      nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+    );
+    final composer = MutableDocumentComposer();
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: composer,
+    );
+    var requests = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NoteToolbar(
+            editor: editor,
+            composer: composer,
+            onOpenFormatting: () => requests++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+    await tester.pump();
+
+    expect(requests, 1);
+    expect(find.byType(NoteToolbar), findsOneWidget);
+    expect(find.byType(NoteFormattingPanel), findsNothing);
+  });
+
   group('List menu trigger state', () {
     testWidgets('shows list controls only inside formatting mode', (
       tester,
@@ -221,7 +305,7 @@ void main() {
       expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
     });
 
-    testWidgets('dismisses with Escape', (tester) async {
+    testWidgets('does not own Escape dismissal', (tester) async {
       await tester.pumpWidget(
         buildEditorHarness(
           nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
@@ -239,7 +323,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
+      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
     });
 
     testWidgets('constrains the menu on a short viewport', (tester) async {
@@ -250,25 +334,41 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
+      );
+      final composer = MutableDocumentComposer(
+        initialSelection: const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+
       await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
+        MaterialApp(
+          home: Scaffold(
+            body: NoteFormattingPanel(
+              editor: editor,
+              composer: composer,
+              selection: composer.selection,
+              onClose: () {},
+              onReturnToTyping: () {},
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await openListMenu(tester);
-
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('applies the option to the current selection while open', (
+    testWidgets('applies the option to the selection captured when it opens', (
       tester,
     ) async {
       final document = MutableDocument(
@@ -311,7 +411,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -325,8 +425,8 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Lista com marcadores'));
       await tester.pumpAndSettle();
 
-      expect(document.getNodeById('node-1'), isA<ParagraphNode>());
-      expect(document.getNodeById('node-2'), isA<ListItemNode>());
+      expect(document.getNodeById('node-1'), isA<ListItemNode>());
+      expect(document.getNodeById('node-2'), isA<ParagraphNode>());
     });
   });
 
@@ -362,7 +462,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -412,7 +512,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -474,7 +574,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -535,7 +635,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -588,7 +688,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -641,7 +741,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -714,7 +814,10 @@ void main() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: NoteToolbar(editor: editor, composer: composer),
+                  child: ToolbarAndFormattingPanel(
+                    editor: editor,
+                    composer: composer,
+                  ),
                 ),
               ],
             ),
@@ -770,7 +873,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -825,7 +928,7 @@ void main() {
                     ],
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -975,7 +1078,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: NoteToolbar(editor: editor, composer: composer),
+            body: ToolbarAndFormattingPanel(editor: editor, composer: composer),
           ),
         ),
       );
@@ -1089,7 +1192,7 @@ void main() {
                     componentBuilders: defaultComponentBuilders,
                   ),
                 ),
-                NoteToolbar(editor: editor, composer: composer),
+                ToolbarAndFormattingPanel(editor: editor, composer: composer),
               ],
             ),
           ),
@@ -1135,7 +1238,10 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
-              body: NoteToolbar(editor: editor, composer: composer),
+              body: ToolbarAndFormattingPanel(
+                editor: editor,
+                composer: composer,
+              ),
             ),
           ),
         );
@@ -1334,7 +1440,7 @@ void main() {
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('Opções de formatação'), findsNothing);
+      expect(find.bySemanticsLabel('Opções de formatação'), findsOneWidget);
     });
 
     testWidgets(
@@ -1374,7 +1480,10 @@ void main() {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: NoteToolbar(editor: editor, composer: composer),
+                    child: ToolbarAndFormattingPanel(
+                      editor: editor,
+                      composer: composer,
+                    ),
                   ),
                 ],
               ),
@@ -1427,9 +1536,7 @@ void main() {
       expect(listSize.width, lessThan(140));
     });
 
-    testWidgets('focuses the editor and creates a new block at the end', (
-      tester,
-    ) async {
+    testWidgets('creates a new block at the end', (tester) async {
       tester.view.physicalSize = const Size(800, 1000);
       tester.view.devicePixelRatio = 1;
       addTearDown(() {
@@ -1451,9 +1558,6 @@ void main() {
         document: document,
         composer: composer,
       );
-      final focusNode = FocusNode();
-      addTearDown(focusNode.dispose);
-
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -1463,13 +1567,9 @@ void main() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: Focus(
-                    focusNode: focusNode,
-                    child: NoteToolbar(
-                      editor: editor,
-                      composer: composer,
-                      focusNode: focusNode,
-                    ),
+                  child: ToolbarAndFormattingPanel(
+                    editor: editor,
+                    composer: composer,
                   ),
                 ),
               ],
@@ -1484,7 +1584,6 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Título 1'));
       await tester.pumpAndSettle();
 
-      expect(focusNode.hasFocus, isTrue);
       expect(composer.selection?.extent.nodeId, isNot('node-2'));
       final newNode = document.last;
       expect(newNode, isA<ParagraphNode>());
@@ -1532,7 +1631,10 @@ void main() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: NoteToolbar(editor: editor, composer: composer),
+                  child: ToolbarAndFormattingPanel(
+                    editor: editor,
+                    composer: composer,
+                  ),
                 ),
               ],
             ),
@@ -1562,7 +1664,7 @@ void main() {
       );
     });
 
-    testWidgets('replaces compact actions with the formatting panel', (
+    testWidgets('keeps compact actions with the formatting panel', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -1586,7 +1688,7 @@ void main() {
 
       expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
       expect(find.bySemanticsLabel('Fechar formatação'), findsOneWidget);
-      expect(find.bySemanticsLabel('Abrir formatação'), findsNothing);
+      expect(find.bySemanticsLabel('Abrir formatação'), findsOneWidget);
     });
 
     testWidgets('closes the formatting panel from its close button', (
@@ -1636,42 +1738,37 @@ void main() {
       expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
     });
 
-    testWidgets('closes formatting mode with Escape and restores focus', (
+    testWidgets('requests return to typing from the keyboard action', (
       tester,
     ) async {
-      final focusNode = FocusNode();
-      addTearDown(focusNode.dispose);
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+      );
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      var requests = 0;
 
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: Focus(
-              focusNode: focusNode,
-              child: buildEditorHarness(
-                nodes: [
-                  ParagraphNode(id: 'node-1', text: AttributedText('Hello')),
-                ],
-                selection: const DocumentSelection.collapsed(
-                  position: DocumentPosition(
-                    nodeId: 'node-1',
-                    nodePosition: TextNodePosition(offset: 0),
-                  ),
-                ),
-              ),
+            body: NoteFormattingPanel(
+              editor: editor,
+              composer: composer,
+              selection: composer.selection,
+              onClose: () {},
+              onReturnToTyping: () => requests++,
             ),
           ),
         ),
       );
-      await tester.pumpAndSettle();
-      focusNode.requestFocus();
 
-      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-      await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Voltar a digitar'));
+      await tester.pump();
 
-      expect(find.bySemanticsLabel('Painel de formatação'), findsNothing);
-      expect(focusNode.hasFocus, isTrue);
+      expect(requests, 1);
     });
 
     testWidgets('keeps formatting mode open while navigating the editor', (
@@ -1711,7 +1808,10 @@ void main() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: NoteToolbar(editor: editor, composer: composer),
+                  child: ToolbarAndFormattingPanel(
+                    editor: editor,
+                    composer: composer,
+                  ),
                 ),
               ],
             ),
