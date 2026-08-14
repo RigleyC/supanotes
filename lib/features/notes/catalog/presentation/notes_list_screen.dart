@@ -17,6 +17,7 @@ import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_list
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
 
 import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:supanotes/shared/widgets/progressive_fade.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_more_menu.dart';
@@ -69,18 +70,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0),
-                Theme.of(context).scaffoldBackgroundColor,
-              ],
-            ),
-          ),
-        ),
         actions: [
           if (_isSearching)
             ConstrainedBox(
@@ -99,14 +88,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
               ),
             )
           else
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: _openSearch,
-            ),
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: _closeSearch,
-          ),
+            IconButton(icon: const Icon(Icons.search), onPressed: _openSearch),
+          IconButton(icon: const Icon(Icons.close), onPressed: _closeSearch),
           NotesMoreMenu(
             isListView: !isGridView,
             onToggleViewMode: _toggleViewMode,
@@ -116,48 +99,50 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         ],
       ),
       body: SafeArea(
-        top: true,
+        minimum: const EdgeInsets.only(bottom: 32),
         child: notesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorView(
-          title: 'Erro ao carregar as notas',
-          subtitle: e.toString(),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => AppErrorView(
+            title: 'Erro ao carregar as notas',
+            subtitle: e.toString(),
+          ),
+          data: (notes) {
+            final filteredNotes = trimmedSearchQuery.isEmpty
+                ? notes
+                : notes.where((n) {
+                    final q = trimmedSearchQuery.toLowerCase();
+                    final bodyText = (n.excerpt ?? n.content).toLowerCase();
+                    return n.title.toLowerCase().contains(q) ||
+                        bodyText.contains(q);
+                  }).toList();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: ProgressiveFade(
+                    child: isGridView
+                        ? NotesGridView(
+                            key: const ValueKey('grid'),
+                            notes: filteredNotes,
+                            onTap: _openNote,
+                            onDelete: _deleteNote,
+                            onToggleFavorite: _toggleFavorite,
+                            onEditIcon: _editNoteIcon,
+                          )
+                        : NotesListView(
+                            key: const ValueKey('list'),
+                            notes: filteredNotes,
+                            onTap: _openNote,
+                            onDelete: _deleteNote,
+                            onToggleFavorite: _toggleFavorite,
+                            onEditIcon: _editNoteIcon,
+                          ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
-        data: (notes) {
-          final filteredNotes = trimmedSearchQuery.isEmpty
-              ? notes
-              : notes.where((n) {
-                  final q = trimmedSearchQuery.toLowerCase();
-                  final bodyText = (n.excerpt ?? n.content).toLowerCase();
-                  return n.title.toLowerCase().contains(q) ||
-                      bodyText.contains(q);
-                }).toList();
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: isGridView
-                    ? NotesGridView(
-                        key: const ValueKey('grid'),
-                        notes: filteredNotes,
-                        onTap: _openNote,
-                        onDelete: _deleteNote,
-                        onToggleFavorite: _toggleFavorite,
-                        onEditIcon: _editNoteIcon,
-                      )
-                    : NotesListView(
-                        key: const ValueKey('list'),
-                        notes: filteredNotes,
-                        onTap: _openNote,
-                        onDelete: _deleteNote,
-                        onToggleFavorite: _toggleFavorite,
-                        onEditIcon: _editNoteIcon,
-                      ),
-              ),
-            ],
-          );
-        },
-      ),
       ),
 
       floatingActionButton: AppButton(

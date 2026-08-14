@@ -35,7 +35,7 @@ class NotesListView extends StatelessWidget {
         AppSpacing.sm,
         AppSpacing.sm,
         AppSpacing.sm,
-        80 + AppSpacing.sm,
+        0,
       ),
       itemCount: notes.length,
       itemBuilder: (context, index) {

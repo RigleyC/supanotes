@@ -27,3 +27,7 @@
 - [x] Execute the production backup, export, isolated restore rehearsal,
   preflight, canonical backfill, retention gate, and backend health check with
   operator-owned artifacts. Physical cleanup remains a separate approval.
+- [x] Replace the ineffective AppBar gradient with a real content shader mask.
+- [x] Calculate the fade from the rendered viewport instead of screen height.
+- [x] Apply the shared fade to the notes list and note editor.
+- [x] Validate fade geometry and existing editor layout behavior.

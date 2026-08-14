@@ -26,6 +26,7 @@ import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.d
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:supanotes/shared/widgets/progressive_fade.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
@@ -120,18 +121,6 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
             context.go(AppRoutes.home);
           }
         },
-      ),
-      flexibleSpace: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
-          ),
-        ),
       ),
       title: screenIsReadOnly && currentNote?.sharedByEmail != null
           ? Text('${NoteStrings.sharedByPrefix} ${currentNote!.sharedByEmail}')
@@ -324,13 +313,15 @@ class _NoteEditorBody extends StatelessWidget {
           child: SafeArea(
             top: true,
             bottom: false,
-            child: _NoteEditorDocument(
-              noteId: noteId,
-              attachmentDelivery: attachmentDelivery,
-              noteAsync: noteAsync,
-              sessionAsync: sessionAsync,
-              taskForMetadata: taskForMetadata,
-              readSession: readSession,
+            child: ProgressiveFade(
+              child: _NoteEditorDocument(
+                noteId: noteId,
+                attachmentDelivery: attachmentDelivery,
+                noteAsync: noteAsync,
+                sessionAsync: sessionAsync,
+                taskForMetadata: taskForMetadata,
+                readSession: readSession,
+              ),
             ),
           ),
         ),
