@@ -1,6 +1,6 @@
 # Contextual Note Toolbar Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the note formatting panel with a focus-aware, contextual toolbar that keeps the caret in the Super Editor viewport.
 
@@ -32,7 +32,7 @@
 - Consumes: `KeyboardPanelController<Object>`, `KeyboardToolbarVisibility`, and `NoteEditorController.focusNode`.
 - Produces: `NoteEditor` with no formatting-panel state and a toolbar visible only while `focusNode.hasFocus`.
 
-- [ ] **Step 1: Write failing focus-visibility tests**
+- [x] **Step 1: Write failing focus-visibility tests**
 
 Delete tests that search for `NoteFormattingPanel`, `Abrir formatação`, `Fechar formatação`, and `Voltar a digitar`. Add:
 
@@ -60,7 +60,7 @@ testWidgets('hides the toolbar after editor focus is lost', (tester) async {
 
 Keep the Android and iOS caret geometry test. Focus the editor and assert the toolbar appears before comparing `DocumentKeys.caret` to the toolbar top.
 
-- [ ] **Step 2: Run the focused test and verify failure**
+- [x] **Step 2: Run the focused test and verify failure**
 
 Run:
 
@@ -70,7 +70,7 @@ flutter test test/features/notes/presentation/widgets/note_editor_layout_test.da
 
 Expected: FAIL because the toolbar is forced visible and old panel behavior remains.
 
-- [ ] **Step 3: Simplify `NoteEditor`**
+- [x] **Step 3: Simplify `NoteEditor`**
 
 Replace the panel type and panel methods with:
 
@@ -109,11 +109,11 @@ KeyboardPanelScaffold<Object>(
 )
 ```
 
-- [ ] **Step 4: Delete the obsolete panel**
+- [x] **Step 4: Delete the obsolete panel**
 
 Delete `note_formatting_panel.dart`. Remove its imports from production and test files. Do not copy panel callbacks or panel widgets.
 
-- [ ] **Step 5: Verify the lifecycle change**
+- [x] **Step 5: Verify the lifecycle change**
 
 Run:
 
@@ -124,7 +124,7 @@ flutter analyze lib/features/notes/editor/presentation/widgets/note_editor.dart 
 
 Expected: PASS. No layout test references the deleted panel and caret geometry passes on Android and iOS configurations.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add lib/features/notes/editor/presentation/widgets/note_editor.dart test/features/notes/presentation/widgets/note_editor_layout_test.dart
@@ -143,7 +143,7 @@ git commit -m "refactor(editor): remove formatting panel"
 - Consumes: `Editor`, `MutableDocumentComposer`, `editorSelectionNodes`, `NoteEditorCommands`, and `ToolbarButton`.
 - Produces: `NoteToolbar` that derives `_ToolbarMode.normal` or `_ToolbarMode.contextual` from selection and active nodes.
 
-- [ ] **Step 1: Write failing action-set and command tests**
+- [x] **Step 1: Write failing action-set and command tests**
 
 Replace panel harnesses with a `NoteToolbar` harness. Test normal and contextual content:
 
@@ -163,7 +163,7 @@ expect(find.bySemanticsLabel('Task'), findsOneWidget);
 
 Add cases for a collapsed caret in `ListItemNode` and `TaskNode`. Assert indent and outdent are disabled for a paragraph and enabled for list/task. Tap and assert the command result for bold, italic, strikethrough, bulleted list, numbered list, task, indent, and outdent.
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 ```powershell
 flutter test test/features/notes/presentation/widgets/note_toolbar_test.dart
@@ -171,7 +171,7 @@ flutter test test/features/notes/presentation/widgets/note_toolbar_test.dart
 
 Expected: FAIL because `NoteToolbar` still exposes `Abrir formatação`.
 
-- [ ] **Step 3: Derive toolbar mode and reuse command paths**
+- [x] **Step 3: Derive toolbar mode and reuse command paths**
 
 Convert `NoteToolbar` to `StatefulWidget`. Listen to `composer.selectionNotifier` and `editor.context.document`; detach the exact listeners in `didUpdateWidget` and `dispose`.
 
@@ -203,11 +203,11 @@ NoteEditorCommands.unindentSelectedBlocks(editor, composer);
 
 Inline controls are disabled for collapsed selection. Indent controls are enabled only when the selected nodes contain a list item or task.
 
-- [ ] **Step 4: Remove panel-only menu code**
+- [x] **Step 4: Remove panel-only menu code**
 
 Move any required list option enum and list controls into `note_toolbar.dart`. Delete the `part 'note_toolbar_menus.dart'` relation and delete `note_toolbar_menus.dart`. Do not leave panel-only classes.
 
-- [ ] **Step 5: Verify actions**
+- [x] **Step 5: Verify actions**
 
 ```powershell
 flutter test test/features/notes/presentation/widgets/note_toolbar_test.dart
@@ -215,7 +215,7 @@ flutter test test/features/notes/presentation/widgets/note_toolbar_test.dart
 
 Expected: PASS. Paragraph, selected-text, list, and task states expose exactly their defined action sets and all command tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add lib/features/notes/editor/presentation/widgets/note_toolbar.dart test/features/notes/presentation/widgets/note_toolbar_test.dart
@@ -233,7 +233,7 @@ git commit -m "feat(editor): add contextual toolbar actions"
 - Consumes: `_ToolbarMode` from Task 2 and current `ToolbarButton` Motor primitives.
 - Produces: one toolbar shell whose active action set changes with a Motor effects spring.
 
-- [ ] **Step 1: Write failing transition and semantics tests**
+- [x] **Step 1: Write failing transition and semantics tests**
 
 Change a paragraph selection from collapsed to expanded and assert:
 
@@ -254,7 +254,7 @@ expect(find.bySemanticsLabel('Título 1'), findsNothing);
 
 Add a `MediaQuery(disableAnimations: true, ...)` case that exposes only the contextual semantic set after one pump.
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 ```powershell
 flutter test test/features/notes/presentation/widgets/note_toolbar_test.dart
@@ -262,7 +262,7 @@ flutter test test/features/notes/presentation/widgets/note_toolbar_test.dart
 
 Expected: FAIL because there is no stable shell key or mode transition.
 
-- [ ] **Step 3: Add the Motor transition**
+- [x] **Step 3: Add the Motor transition**
 
 Keep the existing `ClipRRect`, blur, decoration, padding, and horizontal scroll container. Give the outer visual container:
 
@@ -278,7 +278,7 @@ const MaterialSpringMotion.standardEffectsFast()
 
 Outgoing controls reduce opacity and scale. Incoming controls use opacity, scale, and a short horizontal translation. If animations are disabled, set the controller to the final value and mount only the current row. Do not animate shell height, bottom offset, safe area, keyboard, or the `KeyboardPanelScaffold` overlay.
 
-- [ ] **Step 4: Verify transition and analyzer**
+- [x] **Step 4: Verify transition and analyzer**
 
 ```powershell
 flutter test test/features/notes/presentation/widgets/note_toolbar_test.dart
@@ -287,7 +287,7 @@ flutter analyze lib/features/notes/editor/presentation/widgets/note_toolbar.dart
 
 Expected: PASS. Shell geometry stays unchanged and only the current action set is accessible.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add lib/features/notes/editor/presentation/widgets/note_toolbar.dart test/features/notes/presentation/widgets/note_toolbar_test.dart
@@ -304,7 +304,7 @@ git commit -m "feat(editor): animate contextual toolbar"
 - Consumes: focus-aware visibility from Task 1 and toolbar modes from Tasks 2 and 3.
 - Produces: regression coverage for screen geometry and no stale formatting-panel references.
 
-- [ ] **Step 1: Add the integrated sequence**
+- [x] **Step 1: Add the integrated sequence**
 
 In the editor harness, cover:
 
@@ -322,7 +322,7 @@ expect(find.bySemanticsLabel('Título 1'), findsNothing);
 
 Run the simulated 300px keyboard inset loop after this sequence and retain the assertion that the caret bottom is at or above the toolbar top on Android and iOS.
 
-- [ ] **Step 2: Run integrated tests**
+- [x] **Step 2: Run integrated tests**
 
 ```powershell
 flutter test test/features/notes/presentation/widgets/note_editor_layout_test.dart test/features/notes/presentation/note_editor_screen_test.dart
@@ -330,7 +330,7 @@ flutter test test/features/notes/presentation/widgets/note_editor_layout_test.da
 
 Expected: PASS. Toolbar visibility follows focus, contextual actions follow selection, and the caret remains above the toolbar.
 
-- [ ] **Step 3: Run source hygiene checks**
+- [x] **Step 3: Run source hygiene checks**
 
 ```powershell
 rg -n "NoteFormattingPanel|NoteEditorPanel|Abrir formatação|Voltar a digitar|Fechar formatação" lib test
@@ -339,7 +339,7 @@ git diff --check
 
 Expected: `rg` returns no production or test references and `git diff --check` returns no whitespace errors.
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 ```powershell
 flutter test
@@ -352,7 +352,7 @@ Expected: both commands pass. Record any pre-existing warning separately from te
 
 Run the app on one Android device and one iOS device. Check toolbar focus visibility, keyboard resize without an app-bar gap, caret visibility at the end of a long note, list/task contextual controls, and an unchanged toolbar shell during every content transition.
 
-- [ ] **Step 6: Commit regression coverage**
+- [x] **Step 6: Commit regression coverage**
 
 ```powershell
 git add test/features/notes/presentation/widgets/note_editor_layout_test.dart test/features/notes/presentation/note_editor_screen_test.dart
