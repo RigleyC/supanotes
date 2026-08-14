@@ -71,15 +71,38 @@ class _AppTileState extends State<AppTile> {
           ? scheme.onSurfaceVariant
           : scheme.onSurface.withValues(alpha: 0.38),
     );
-    final leading = widget.leading == null
-        ? null
-        : IconTheme.merge(
-            data: IconThemeData(
-              color: leadingColor,
-              size: AppSpacing.tileIconSize,
-            ),
-            child: widget.leading!,
-          );
+    final leading = switch (widget.leading) {
+      null => null,
+      final Icon icon =>
+        widget.selected
+            ? Icon(
+                icon.icon,
+                key: icon.key,
+                size: icon.size ?? AppSpacing.tileIconSize,
+                fill: icon.fill,
+                weight: icon.weight,
+                grade: icon.grade,
+                opticalSize: icon.opticalSize,
+                color: leadingColor,
+                shadows: icon.shadows,
+                semanticLabel: icon.semanticLabel,
+                textDirection: icon.textDirection,
+                applyTextScaling: icon.applyTextScaling,
+                blendMode: icon.blendMode,
+                fontWeight: icon.fontWeight,
+              )
+            : IconTheme.merge(
+                data: IconThemeData(
+                  color: leadingColor,
+                  size: AppSpacing.tileIconSize,
+                ),
+                child: icon,
+              ),
+      final leadingWidget => IconTheme.merge(
+        data: IconThemeData(color: leadingColor, size: AppSpacing.tileIconSize),
+        child: leadingWidget,
+      ),
+    };
     final trailing = widget.selected && widget.trailing == null
         ? Icon(
             Icons.check_rounded,

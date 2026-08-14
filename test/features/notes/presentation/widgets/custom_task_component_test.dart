@@ -134,52 +134,44 @@ void main() {
     );
   });
 
-  testWidgets(
-    'task long press emits one long-press haptic only with callback',
-    (tester) async {
-      final recorder = HapticTestRecorder()..install();
-      addTearDown(recorder.dispose);
-      var longPressCalls = 0;
-      final document = MutableDocument(
-        nodes: [
-          TaskNode(
-            id: 'task-1',
-            text: AttributedText('Review task'),
-            isComplete: false,
-          ),
-        ],
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: MutableDocumentComposer(),
-      );
+  testWidgets('task long press calls the callback when configured', (
+    tester,
+  ) async {
+    var longPressCalls = 0;
+    final document = MutableDocument(
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Review task'),
+          isComplete: false,
+        ),
+      ],
+    );
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: MutableDocumentComposer(),
+    );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SuperEditor(
-              editor: editor,
-              componentBuilders: [
-                CustomTaskComponentBuilder(
-                  onTaskLongPress: (_) => longPressCalls++,
-                ),
-              ],
-            ),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SuperEditor(
+            editor: editor,
+            componentBuilders: [
+              CustomTaskComponentBuilder(
+                onTaskLongPress: (_) => longPressCalls++,
+              ),
+            ],
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      recorder.calls.clear();
-      final taskTopLeft = tester.getTopLeft(find.byType(CustomTaskComponent));
-      await tester.longPressAt(taskTopLeft + const Offset(16, 20));
-      await tester.pumpAndSettle();
+    final taskTopLeft = tester.getTopLeft(find.byType(CustomTaskComponent));
+    await tester.longPressAt(taskTopLeft + const Offset(16, 20));
+    await tester.pumpAndSettle();
 
-      expect(longPressCalls, 1);
-      expect(
-        recorder.calls.where((call) => call.method == 'HapticFeedback.vibrate'),
-        hasLength(1),
-      );
-    },
-  );
+    expect(longPressCalls, 1);
+  });
 }

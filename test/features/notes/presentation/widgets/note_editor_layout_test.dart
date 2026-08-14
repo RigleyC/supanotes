@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -56,19 +57,29 @@ void main() {
 
   Future<void> pumpEditor(
     WidgetTester tester, {
-    EdgeInsets viewInsets = EdgeInsets.zero,
+    List<DocumentNode>? nodes,
   }) async {
+    if (nodes != null) {
+      controller.dispose();
+      controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+        nodes: nodes,
+      );
+      session = NoteEditorSession(
+        noteId: 'note-1',
+        controller: controller,
+        syncSession: _ReadySyncHandle(),
+      );
+    }
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           appBar: AppBar(title: const Text('Note')),
-          body: MediaQuery(
-            data: MediaQueryData(viewInsets: viewInsets),
-            child: NoteEditor(
-              noteId: 'note-1',
-              session: session,
-              delegate: const NoteEditorDelegate(),
-            ),
+          body: NoteEditor(
+            noteId: 'note-1',
+            session: session,
+            delegate: const NoteEditorDelegate(),
           ),
         ),
       ),
@@ -86,12 +97,60 @@ void main() {
     expect(editor.stylesheet.documentPadding?.top, 0);
   });
 
-  testWidgets('keeps the toolbar at the resized body bottom', (tester) async {
-    await pumpEditor(tester, viewInsets: const EdgeInsets.only(bottom: 300));
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets(
+      'keeps the caret above the toolbar while typing on ${platform.name}',
+      (tester) async {
+        tester.view
+          ..physicalSize = const Size(390, 844)
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        debugDefaultTargetPlatformOverride = platform;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
-    final toolbar = find.byType(NoteToolbar);
-    final toolbarBottom = tester.getBottomRight(toolbar).dy;
+        final nodes = List<DocumentNode>.generate(
+          30,
+          (index) => ParagraphNode(
+            id: 'paragraph-$index',
+            text: AttributedText('Paragraph $index'),
+          ),
+        );
+        await pumpEditor(tester, nodes: nodes);
 
-    expect(toolbarBottom, greaterThan(500));
-  });
+        final lastParagraph = nodes.last as ParagraphNode;
+        controller.editor.execute([
+          ChangeSelectionRequest(
+            DocumentSelection.collapsed(
+              position: DocumentPosition(
+                nodeId: lastParagraph.id,
+                nodePosition: lastParagraph.endPosition,
+              ),
+            ),
+            SelectionChangeType.placeCaret,
+            SelectionReason.userInteraction,
+          ),
+        ]);
+        controller.focusNode.requestFocus();
+        await tester.pumpAndSettle();
+
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.pumpAndSettle();
+
+        for (var index = 0; index < 8; index++) {
+          await tester.testTextInput.receiveAction(TextInputAction.newline);
+          await tester.pumpAndSettle();
+
+          final caretBottom = tester
+              .getBottomLeft(find.byKey(DocumentKeys.caret))
+              .dy;
+          final toolbarTop = tester.getTopLeft(find.byType(NoteToolbar)).dy;
+          expect(caretBottom, lessThanOrEqualTo(toolbarTop));
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.reset();
+      },
+    );
+  }
 }

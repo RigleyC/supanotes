@@ -1,6 +1,9 @@
 name: iOS Build
 
-on: []
+# Temporarily disabled. Keep the workflow valid and retain the build definition
+# so it can be re-enabled without reconstructing the pipeline.
+on:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -8,6 +11,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ false }}
     runs-on: macos-latest
     timeout-minutes: 30
 

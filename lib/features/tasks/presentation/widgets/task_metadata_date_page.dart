@@ -45,50 +45,43 @@ class TaskMetadataDatePage extends StatelessWidget {
     final now = DateTime.now();
     return GlobalSheetPage(
       title: 'Escolher data',
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.5,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: QuickDueDate.values.length,
-                itemBuilder: (context, index) {
-                  final option = QuickDueDate.values[index];
-                  final date = option.compute(now);
-                  return AppTile(
-                    title: option.label,
-                    leading: Icon(option.icon),
-                    selected: selected != null && selected!.isSameDayAs(date),
-                    enableHaptics: false,
-                    onTap: () {
-                      if (selected == null || !selected!.isSameDayAs(date)) {
-                        AppHaptics.selectionChange();
-                      }
-                      onSelected(date);
-                      FamilyModalSheet.of(context).popPage();
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              CalendarDatePicker(
-                initialDate: selected ?? now.startOfDay,
-                firstDate: DateTime(now.year - 1),
-                lastDate: DateTime(now.year + 5),
-                onDateChanged: (date) {
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: QuickDueDate.values.length,
+            itemBuilder: (context, index) {
+              final option = QuickDueDate.values[index];
+              final date = option.compute(now);
+              return AppTile(
+                title: option.label,
+                leading: Icon(option.icon),
+                selected: selected != null && selected!.isSameDayAs(date),
+                enableHaptics: false,
+                onTap: () {
+                  if (selected == null || !selected!.isSameDayAs(date)) {
+                    AppHaptics.selectionChange();
+                  }
                   onSelected(date);
                   FamilyModalSheet.of(context).popPage();
                 },
-              ),
-            ],
+              );
+            },
           ),
-        ),
+          const SizedBox(height: 12),
+          CalendarDatePicker(
+            initialDate: selected ?? now.startOfDay,
+            firstDate: DateTime(now.year - 1),
+            lastDate: DateTime(now.year + 5),
+            onDateChanged: (date) {
+              onSelected(date);
+              FamilyModalSheet.of(context).popPage();
+            },
+          ),
+        ],
       ),
     );
   }

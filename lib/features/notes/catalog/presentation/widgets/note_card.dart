@@ -32,11 +32,10 @@ class NoteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final canLongPressToEditIcon =
-        NoteIconInteractionPolicy.canUseLongPress(
-          note: note,
-          onEditIcon: onEditIcon,
-        );
+    final canLongPressToEditIcon = NoteIconInteractionPolicy.canUseLongPress(
+      note: note,
+      onEditIcon: onEditIcon,
+    );
 
     return GestureDetector(
       onTap: onTap,

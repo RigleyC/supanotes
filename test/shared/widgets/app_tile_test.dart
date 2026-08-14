@@ -77,6 +77,28 @@ void main() {
     expect(find.byIcon(Icons.check_rounded), findsOneWidget);
   });
 
+  testWidgets('recolors an explicitly colored leading icon when selected', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppTile(
+            title: 'Hoje',
+            selected: true,
+            leading: const Icon(Icons.calendar_today, color: Colors.grey),
+          ),
+        ),
+      ),
+    );
+
+    final icon = tester.widget<Icon>(find.byIcon(Icons.calendar_today));
+    expect(
+      icon.color,
+      Theme.of(tester.element(find.byType(AppTile))).colorScheme.primary,
+    );
+  });
+
   testWidgets('can suppress its default haptic for selection-owned feedback', (
     tester,
   ) async {
@@ -175,7 +197,7 @@ void main() {
     );
 
     final semantics = tester.getSemantics(find.byType(AppTile));
-    expect(semantics.hasFlag(SemanticsFlag.isButton), isTrue);
+    expect(semantics.flagsCollection.isButton, isTrue);
     expect(semantics.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
   });
 

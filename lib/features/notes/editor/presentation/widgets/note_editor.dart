@@ -256,7 +256,7 @@ class _NoteEditorState extends State<NoteEditor> {
           left: 24,
           right: 24,
           top: 0,
-          bottom: _isReadOnly ? 24 : 140,
+          bottom: 24,
         );
 
         final theme = Theme.of(context);
@@ -270,110 +270,94 @@ class _NoteEditorState extends State<NoteEditor> {
           );
         }
 
-        return Stack(
+        if (_isReadOnly) {
+          return SuperReader(
+            key: ValueKey<bool>(_isReadOnly),
+            editor: controller.editor,
+            documentLayoutKey: _docLayoutKey,
+            selectionLayerLinks: _selectionLayerLinks,
+            stylesheet: _cachedStylesheet!,
+            selectionStyle: editorSelectionStyle(theme.colorScheme),
+            componentBuilders: _componentBuilders!,
+            contentTapDelegateFactory: (readerContext) => NoteLinkTapHandler(
+              readerContext.document,
+              allowInternalNoteLinks: !_isReadOnly,
+              onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
+            ),
+          );
+        }
+
+        return Column(
           children: [
-            if (_isReadOnly)
-              Positioned.fill(
-                child: SuperReader(
-                  key: ValueKey<bool>(_isReadOnly),
-                  editor: controller.editor,
-                  documentLayoutKey: _docLayoutKey,
-                  selectionLayerLinks: _selectionLayerLinks,
-                  stylesheet: _cachedStylesheet!,
-                  selectionStyle: editorSelectionStyle(theme.colorScheme),
-                  componentBuilders: _componentBuilders!,
-                  contentTapDelegateFactory: (readerContext) =>
-                      NoteLinkTapHandler(
-                        readerContext.document,
-                        allowInternalNoteLinks: !_isReadOnly,
-                        onNoteTap: (targetId) =>
-                            context.push(AppRoutes.note(targetId)),
-                      ),
-                ),
-              )
-            else
-              Positioned.fill(
-                child: SuperEditorAndroidControlsScope(
-                  controller: _controls!.androidController,
-                  child: SuperEditorIosControlsScope(
-                    controller: _controls!.iosController,
-                    child: TapRegion(
-                      groupId: noteEditorToolbarTapRegionGroup,
-                      child: ValueListenableBuilder<bool>(
-                        valueListenable: _formattingToolbarOpen,
-                        builder: (context, formattingToolbarOpen, child) =>
-                            SuperEditor(
-                              key: ValueKey<bool>(_isReadOnly),
-                              editor: controller.editor,
-                              focusNode: controller.focusNode,
-                              autofocus: widget.requestInitialFocus,
-                              inputSource: TextInputSource.ime,
-                              softwareKeyboardController:
-                                  _softwareKeyboardController,
-                              imePolicies: SuperEditorImePolicies(
-                                openKeyboardOnSelectionChange:
-                                    !formattingToolbarOpen,
-                              ),
-                              documentLayoutKey: _docLayoutKey,
-                              selectionLayerLinks: _selectionLayerLinks,
-                              stylesheet: _cachedStylesheet!,
-                              selectionStyle: editorSelectionStyle(
-                                theme.colorScheme,
-                              ),
-                              documentOverlayBuilders: [
-                                ...defaultSuperEditorDocumentOverlayBuilders
-                                    .where(
-                                      (builder) =>
-                                          builder
-                                              is! DefaultCaretOverlayBuilder,
-                                    ),
-                                DefaultCaretOverlayBuilder(
-                                  caretStyle: CaretStyle(
-                                    color: theme.colorScheme.primary,
-                                    width: 1.5,
-                                  ),
-                                ),
-                              ],
-                              contentTapDelegateFactories:
-                                  _contentTapDelegateFactories,
-                              keyboardActions: editorKeyboardActions(),
-                              componentBuilders: _componentBuilders!,
+            Expanded(
+              child: SuperEditorAndroidControlsScope(
+                controller: _controls!.androidController,
+                child: SuperEditorIosControlsScope(
+                  controller: _controls!.iosController,
+                  child: TapRegion(
+                    groupId: noteEditorToolbarTapRegionGroup,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _formattingToolbarOpen,
+                      builder: (context, formattingToolbarOpen, child) =>
+                          SuperEditor(
+                            key: ValueKey<bool>(_isReadOnly),
+                            editor: controller.editor,
+                            focusNode: controller.focusNode,
+                            autofocus: widget.requestInitialFocus,
+                            inputSource: TextInputSource.ime,
+                            softwareKeyboardController:
+                                _softwareKeyboardController,
+                            imePolicies: SuperEditorImePolicies(
+                              openKeyboardOnSelectionChange:
+                                  !formattingToolbarOpen,
                             ),
-                      ),
+                            documentLayoutKey: _docLayoutKey,
+                            selectionLayerLinks: _selectionLayerLinks,
+                            stylesheet: _cachedStylesheet!,
+                            selectionStyle: editorSelectionStyle(
+                              theme.colorScheme,
+                            ),
+                            documentOverlayBuilders: [
+                              ...defaultSuperEditorDocumentOverlayBuilders
+                                  .where(
+                                    (builder) =>
+                                        builder is! DefaultCaretOverlayBuilder,
+                                  ),
+                              DefaultCaretOverlayBuilder(
+                                caretStyle: CaretStyle(
+                                  color: theme.colorScheme.primary,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ],
+                            contentTapDelegateFactories:
+                                _contentTapDelegateFactories,
+                            keyboardActions: editorKeyboardActions(),
+                            componentBuilders: _componentBuilders!,
+                          ),
                     ),
                   ),
                 ),
               ),
-            if (!_isReadOnly) ...[
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    NoteSuggestionOverlay(
-                      editor: controller.editor,
-                      composer: controller.composer,
-                      currentNoteId: widget.noteId,
-                      onPersist: () async {},
-                    ),
-                    NoteToolbar(
-                      editor: controller.editor,
-                      composer: controller.composer,
-                      focusNode: controller.focusNode,
-                      softwareKeyboardController: _softwareKeyboardController,
-                      onFormattingModeChanged: (isOpen) =>
-                          _formattingToolbarOpen.value = isOpen,
-                      onAttachFile: () =>
-                          controller.pickAndAttachFile(imageOnly: false),
-                      onAttachImage: () =>
-                          controller.pickAndAttachFile(imageOnly: true),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
+            NoteSuggestionOverlay(
+              editor: controller.editor,
+              composer: controller.composer,
+              currentNoteId: widget.noteId,
+              onPersist: () async {},
+            ),
+            NoteToolbar(
+              editor: controller.editor,
+              composer: controller.composer,
+              focusNode: controller.focusNode,
+              softwareKeyboardController: _softwareKeyboardController,
+              onFormattingModeChanged: (isOpen) =>
+                  _formattingToolbarOpen.value = isOpen,
+              onAttachFile: () =>
+                  controller.pickAndAttachFile(imageOnly: false),
+              onAttachImage: () =>
+                  controller.pickAndAttachFile(imageOnly: true),
+            ),
           ],
         );
       },

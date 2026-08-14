@@ -11,7 +11,7 @@ Stylesheet mobileNoteStylesheet(
   return buildNoteStylesheet(
     context,
     documentPadding: documentPadding,
-    bodySize: 16,
+    bodySize: 17,
     h1Size: 32,
     h2Size: 26,
     h3Size: 22,

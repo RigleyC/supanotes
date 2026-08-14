@@ -37,9 +37,8 @@ class NoteIconPickerRootPage extends StatelessWidget {
   final NoteModel note;
   final Future<void> Function(NoteIcon? icon) onSelected;
 
-  Future<void> _select(BuildContext context, NoteIcon? icon) async {
+  Future<void> _select(NoteIcon? icon) async {
     await onSelected(icon);
-    if (context.mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -48,12 +47,7 @@ class NoteIconPickerRootPage extends StatelessWidget {
     return GlobalSheetPage(
       title: 'Selecionar ícone',
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          0,
-          AppSpacing.lg,
-          AppSpacing.sm,
-        ),
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -63,7 +57,8 @@ class NoteIconPickerRootPage extends StatelessWidget {
               onTap: () => FamilyModalSheet.of(context).pushPage(
                 NoteEmojiPickerPage(
                   current: note.noteIcon,
-                  onSelected: (icon) => _select(context, icon),
+                  onSelected: _select,
+                  dismissOnSelection: true,
                 ),
               ),
             ),
@@ -74,7 +69,8 @@ class NoteIconPickerRootPage extends StatelessWidget {
               onTap: () => FamilyModalSheet.of(context).pushPage(
                 NoteCatalogIconPickerPage(
                   current: note.noteIcon,
-                  onSelected: (icon) => _select(context, icon),
+                  onSelected: _select,
+                  dismissOnSelection: true,
                 ),
               ),
             ),
@@ -83,7 +79,7 @@ class NoteIconPickerRootPage extends StatelessWidget {
               _PickerAction(
                 icon: Icons.remove_circle_outline,
                 label: 'Remover ícone',
-                onTap: () => _select(context, null),
+                onTap: () => _select(null),
               ),
           ],
         ),
@@ -97,10 +93,12 @@ class NoteEmojiPickerPage extends StatefulWidget {
     super.key,
     this.current,
     required this.onSelected,
+    this.dismissOnSelection = false,
   });
 
   final NoteIcon? current;
   final Future<void> Function(NoteIcon icon) onSelected;
+  final bool dismissOnSelection;
 
   @override
   State<NoteEmojiPickerPage> createState() => _NoteEmojiPickerPageState();
@@ -123,6 +121,7 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
         : UnicodeEmojis.search(_query, limit: 240);
     return GlobalSheetPage(
       title: 'Escolher emoji',
+      contentPadding: EdgeInsets.zero,
       child: _PickerGridContent(
         headerChildren: [
           AppInput(
@@ -140,13 +139,16 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
             label: emoji.name,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () {
+              onTap: () async {
                 final selected =
                     widget.current?.isEmoji == true &&
                     widget.current!.value == emoji.emoji;
                 if (selected) return;
                 AppHaptics.selectionChange();
-                widget.onSelected(NoteIcon.emoji(emoji.emoji));
+                await widget.onSelected(NoteIcon.emoji(emoji.emoji));
+                if (widget.dismissOnSelection && context.mounted) {
+                  dismissGlobalSheet(context);
+                }
               },
               child: Center(
                 child: Text(emoji.emoji, style: const TextStyle(fontSize: 28)),
@@ -164,10 +166,12 @@ class NoteCatalogIconPickerPage extends StatefulWidget {
     super.key,
     required this.current,
     required this.onSelected,
+    this.dismissOnSelection = false,
   });
 
   final NoteIcon? current;
   final Future<void> Function(NoteIcon icon) onSelected;
+  final bool dismissOnSelection;
 
   @override
   State<NoteCatalogIconPickerPage> createState() =>
@@ -196,6 +200,7 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
     final scheme = Theme.of(context).colorScheme;
     return GlobalSheetPage(
       title: 'Escolher ícone',
+      contentPadding: EdgeInsets.zero,
       child: _PickerGridContent(
         headerChildren: [
           AppInput(
@@ -257,16 +262,19 @@ class _NoteCatalogIconPickerPageState extends State<NoteCatalogIconPickerPage> {
             label: catalogIconLabels[entry.key] ?? entry.key,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () {
+              onTap: () async {
                 final selected =
                     widget.current?.isEmoji == false &&
                     widget.current!.value == entry.key &&
                     widget.current!.colorKey == _colorKey;
                 if (selected) return;
                 AppHaptics.selectionChange();
-                widget.onSelected(
+                await widget.onSelected(
                   NoteIcon.catalog(id: entry.key, colorKey: _colorKey),
                 );
+                if (widget.dismissOnSelection && context.mounted) {
+                  dismissGlobalSheet(context);
+                }
               },
               child: Icon(
                 entry.value,

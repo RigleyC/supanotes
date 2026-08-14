@@ -37,22 +37,16 @@ void main() {
     expect(find.text('Escolher emoji'), findsOneWidget);
     expect(find.byType(NoteEmojiPickerPage), findsOneWidget);
 
-    final inkWells = find
+    final emojiTarget = find
         .descendant(
-          of: find.byType(NoteEmojiPickerPage),
-          matching: find.byType(InkWell),
-        );
-    debugPrint('inkWellCount=${inkWells.evaluate().length}');
-    for (final e in inkWells.evaluate().take(8)) {
-      final box = (e.renderObject as RenderBox).localToGlobal(Offset.zero);
-      debugPrint('  inkWell at ${e.renderObject} dy=${box.dy}');
-    }
-    final first = inkWells.first;
-    debugPrint('firstInkWellRect=${tester.getRect(first)}');
-    await tester.tapAt(const Offset(100, 340));
+          of: find.byType(CustomScrollView),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Semantics && widget.properties.button == true,
+          ),
+        )
+        .first;
+    await tester.tap(emojiTarget);
     await tester.pumpAndSettle();
-
-    debugPrint('selected=$selected emojiPageStillPresent=${find.byType(NoteEmojiPickerPage).evaluate().length}');
 
     expect(selected, isTrue);
     expect(find.byType(NoteEmojiPickerPage), findsNothing);

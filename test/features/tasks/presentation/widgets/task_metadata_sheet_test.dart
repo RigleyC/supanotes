@@ -151,6 +151,29 @@ void main() {
     );
   });
 
+  testWidgets('keeps task metadata visible during sheet dismissal', (
+    tester,
+  ) async {
+    final task = _task(id: 'task-dismiss-content');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Abrir metadados'));
+    await tester.pumpAndSettle();
+    expect(find.text('Diariamente'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Fechar'));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text('Diariamente'), findsOneWidget);
+  });
+
   testWidgets('modal selections persist date and recurrence', (tester) async {
     final task = _taskWithoutMetadata(id: 'task-modal-selection');
     DateTime? savedDueDate;

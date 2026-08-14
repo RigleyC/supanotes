@@ -13,13 +13,61 @@ export 'global_sheet_page.dart';
 Future<T?> showGlobalSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
+  VoidCallback? onDismissed,
 }) {
   AppHaptics.controlTap();
+  var dismissalNotified = false;
+  var listenerScheduled = false;
+  Animation<double>? routeAnimation;
+  AnimationStatusListener? dismissalListener;
+
+  void notifyDismissed() {
+    if (dismissalNotified) return;
+    dismissalNotified = true;
+    if (routeAnimation != null && dismissalListener != null) {
+      routeAnimation!.removeStatusListener(dismissalListener!);
+    }
+    onDismissed?.call();
+  }
+
   return FamilyModalSheet.show<T>(
     context: context,
     isDismissible: true,
     enableDrag: true,
     contentBackgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
-    builder: builder,
+    builder: (sheetContext) {
+      if (onDismissed != null && !listenerScheduled) {
+        listenerScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (dismissalNotified) return;
+          if (!sheetContext.mounted) {
+            notifyDismissed();
+            return;
+          }
+          routeAnimation = ModalRoute.of(sheetContext)?.animation;
+          if (routeAnimation == null) {
+            notifyDismissed();
+            return;
+          }
+          dismissalListener = (status) {
+            if (status == AnimationStatus.dismissed) notifyDismissed();
+          };
+          routeAnimation!.addStatusListener(dismissalListener!);
+          if (routeAnimation!.status == AnimationStatus.dismissed) {
+            notifyDismissed();
+          }
+        });
+      }
+      return builder(sheetContext);
+    },
   );
+}
+
+/// Dismisses a global sheet, including any pages pushed inside it.
+void dismissGlobalSheet(BuildContext context) {
+  final sheet = FamilyModalSheet.of(context);
+  while (sheet.canPopPage()) {
+    sheet.popPage();
+  }
+  sheet.popPage();
 }

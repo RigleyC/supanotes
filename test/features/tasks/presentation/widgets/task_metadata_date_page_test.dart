@@ -19,6 +19,18 @@ void main() {
     expect(find.byIcon(Icons.calendar_month_rounded), findsNWidgets(3));
   });
 
+  testWidgets('shows the complete calendar without an inner scroll view', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TaskMetadataDatePage(selected: null, onSelected: (_) {}),
+      ),
+    );
+
+    expect(find.byType(SingleChildScrollView), findsNothing);
+  });
+
   testWidgets(
     'quick date selection emits one selection haptic and returns to the root page',
     (tester) async {

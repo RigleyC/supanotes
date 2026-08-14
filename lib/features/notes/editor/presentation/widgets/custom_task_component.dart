@@ -280,7 +280,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   }
 
   void _onTouchLongPress() {
-    AppHaptics.longPress(context);
     widget.onLongPress?.call();
   }
 

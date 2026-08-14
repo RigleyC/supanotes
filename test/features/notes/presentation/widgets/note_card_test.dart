@@ -58,4 +58,40 @@ void main() {
       expect(menuIcon.color, scheme.onSurfaceVariant);
     });
   });
+
+  testWidgets('icon editing long press calls the edit callback', (
+    tester,
+  ) async {
+    var editCalls = 0;
+    final note = NoteModel(
+      id: 'note-1',
+      userId: 'user-1',
+      content: 'Note',
+      title: 'Note',
+      favorite: false,
+      archived: false,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+      hasRemoteCopy: true,
+      isEmptyDraft: false,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NoteCard(
+            note: note,
+            onTap: () {},
+            onDelete: () {},
+            onToggleFavorite: () {},
+            onEditIcon: () => editCalls++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.longPress(find.byType(NoteCard));
+
+    expect(editCalls, 1);
+  });
 }
