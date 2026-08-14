@@ -19,8 +19,11 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task
 import 'package:supanotes/features/notes/editor/presentation/widgets/hidden_task_trailing_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_config.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_formatting_panel.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+
+enum NoteEditorPanel { formatting }
 
 class NoteEditor extends StatefulWidget {
   final String noteId;
@@ -51,7 +54,10 @@ class _NoteEditorState extends State<NoteEditor> {
   final _docLayoutKey = GlobalKey();
   final _selectionLayerLinks = SelectionLayerLinks();
   final _softwareKeyboardController = SoftwareKeyboardController();
-  final _formattingToolbarOpen = ValueNotifier<bool>(false);
+  final _isImeConnected = ValueNotifier<bool>(false);
+  late final KeyboardPanelController<NoteEditorPanel> _keyboardPanelController;
+  DocumentSelection? _formattingSelection;
+  bool _toolbarWasShown = false;
   EditorControls? _controls;
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
@@ -67,6 +73,9 @@ class _NoteEditorState extends State<NoteEditor> {
   @override
   void initState() {
     super.initState();
+    _keyboardPanelController = KeyboardPanelController(
+      _softwareKeyboardController,
+    );
     _attachSession(widget.session);
   }
 
@@ -80,6 +89,7 @@ class _NoteEditorState extends State<NoteEditor> {
     _controller = controller;
     _captureSubscription = session.captureLocalOperationsChanges.listen((_) {
       if (!mounted) return;
+      _toolbarWasShown = false;
       if (_isReadOnly) {
         _controls?.dispose();
         _controls = null;
@@ -231,12 +241,40 @@ class _NoteEditorState extends State<NoteEditor> {
     setState(() {});
   }
 
+  void _openFormattingPanel(DocumentSelection? selection) {
+    _formattingSelection = selection;
+    _keyboardPanelController.showKeyboardPanel(NoteEditorPanel.formatting);
+  }
+
+  void _closeFormattingPanel() {
+    _formattingSelection = null;
+    _keyboardPanelController.hideKeyboardPanel();
+  }
+
+  void _returnToTyping() {
+    _formattingSelection = null;
+    _controller?.focusNode.requestFocus();
+    _keyboardPanelController.showSoftwareKeyboard();
+  }
+
+  void _showToolbarWhenAttached() {
+    if (_toolbarWasShown) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_keyboardPanelController.hasDelegate) return;
+      _keyboardPanelController.toolbarVisibility =
+          KeyboardToolbarVisibility.visible;
+      _toolbarWasShown = true;
+    });
+  }
+
   @override
   void dispose() {
     _controller?.removeListener(_onControllerReady);
     _controller?.onHasContentChanged = null;
     unawaited(_captureSubscription?.cancel());
-    _formattingToolbarOpen.dispose();
+    _softwareKeyboardController.detach();
+    _keyboardPanelController.dispose();
+    _isImeConnected.dispose();
     _controls?.dispose();
     super.dispose();
   }
@@ -287,78 +325,91 @@ class _NoteEditorState extends State<NoteEditor> {
           );
         }
 
-        return Column(
-          children: [
-            Expanded(
-              child: SuperEditorAndroidControlsScope(
-                controller: _controls!.androidController,
-                child: SuperEditorIosControlsScope(
-                  controller: _controls!.iosController,
-                  child: TapRegion(
-                    groupId: noteEditorToolbarTapRegionGroup,
-                    child: ValueListenableBuilder<bool>(
-                      valueListenable: _formattingToolbarOpen,
-                      builder: (context, formattingToolbarOpen, child) =>
-                          SuperEditor(
-                            key: ValueKey<bool>(_isReadOnly),
-                            editor: controller.editor,
-                            focusNode: controller.focusNode,
-                            autofocus: widget.requestInitialFocus,
-                            inputSource: TextInputSource.ime,
-                            softwareKeyboardController:
-                                _softwareKeyboardController,
-                            imePolicies: SuperEditorImePolicies(
-                              openKeyboardOnSelectionChange:
-                                  !formattingToolbarOpen,
-                            ),
-                            documentLayoutKey: _docLayoutKey,
-                            selectionLayerLinks: _selectionLayerLinks,
-                            stylesheet: _cachedStylesheet!,
-                            selectionStyle: editorSelectionStyle(
-                              theme.colorScheme,
-                            ),
-                            documentOverlayBuilders: [
-                              ...defaultSuperEditorDocumentOverlayBuilders
-                                  .where(
-                                    (builder) =>
-                                        builder is! DefaultCaretOverlayBuilder,
-                                  ),
-                              DefaultCaretOverlayBuilder(
-                                caretStyle: CaretStyle(
-                                  color: theme.colorScheme.primary,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ],
-                            contentTapDelegateFactories:
-                                _contentTapDelegateFactories,
-                            keyboardActions: editorKeyboardActions(),
-                            componentBuilders: _componentBuilders!,
+        _showToolbarWhenAttached();
+
+        return KeyboardPanelScaffold<NoteEditorPanel>(
+          controller: _keyboardPanelController,
+          isImeConnected: _isImeConnected,
+          contentBuilder: (context, openPanel) => PopScope(
+            canPop: openPanel == null,
+            onPopInvokedWithResult: (didPop, result) {
+              if (!didPop && openPanel != null) _closeFormattingPanel();
+            },
+            child: Column(
+              children: [
+                Expanded(
+                  child: SuperEditorAndroidControlsScope(
+                    controller: _controls!.androidController,
+                    child: SuperEditorIosControlsScope(
+                      controller: _controls!.iosController,
+                      child: TapRegion(
+                        groupId: noteEditorToolbarTapRegionGroup,
+                        child: SuperEditor(
+                          key: ValueKey<bool>(_isReadOnly),
+                          editor: controller.editor,
+                          focusNode: controller.focusNode,
+                          autofocus: widget.requestInitialFocus,
+                          inputSource: TextInputSource.ime,
+                          softwareKeyboardController:
+                              _softwareKeyboardController,
+                          isImeConnected: _isImeConnected,
+                          imePolicies: SuperEditorImePolicies(
+                            openKeyboardOnSelectionChange: openPanel == null,
                           ),
+                          documentLayoutKey: _docLayoutKey,
+                          selectionLayerLinks: _selectionLayerLinks,
+                          stylesheet: _cachedStylesheet!,
+                          selectionStyle: editorSelectionStyle(
+                            theme.colorScheme,
+                          ),
+                          documentOverlayBuilders: [
+                            ...defaultSuperEditorDocumentOverlayBuilders.where(
+                              (builder) =>
+                                  builder is! DefaultCaretOverlayBuilder,
+                            ),
+                            DefaultCaretOverlayBuilder(
+                              caretStyle: CaretStyle(
+                                color: theme.colorScheme.primary,
+                                width: 1.5,
+                              ),
+                            ),
+                          ],
+                          contentTapDelegateFactories:
+                              _contentTapDelegateFactories,
+                          keyboardActions: editorKeyboardActions(),
+                          componentBuilders: _componentBuilders!,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                NoteSuggestionOverlay(
+                  editor: controller.editor,
+                  composer: controller.composer,
+                  currentNoteId: widget.noteId,
+                  onPersist: () async {},
+                ),
+              ],
             ),
-            NoteSuggestionOverlay(
+          ),
+          toolbarBuilder: (context, openPanel) => NoteToolbar(
+            editor: controller.editor,
+            composer: controller.composer,
+            onOpenFormatting: () =>
+                _openFormattingPanel(controller.composer.selection),
+            onAttachFile: () => controller.pickAndAttachFile(imageOnly: false),
+            onAttachImage: () => controller.pickAndAttachFile(imageOnly: true),
+          ),
+          keyboardPanelBuilder: (context, openPanel) => switch (openPanel) {
+            NoteEditorPanel.formatting => NoteFormattingPanel(
               editor: controller.editor,
               composer: controller.composer,
-              currentNoteId: widget.noteId,
-              onPersist: () async {},
+              selection: _formattingSelection,
+              onClose: _closeFormattingPanel,
+              onReturnToTyping: _returnToTyping,
             ),
-            NoteToolbar(
-              editor: controller.editor,
-              composer: controller.composer,
-              focusNode: controller.focusNode,
-              softwareKeyboardController: _softwareKeyboardController,
-              onFormattingModeChanged: (isOpen) =>
-                  _formattingToolbarOpen.value = isOpen,
-              onAttachFile: () =>
-                  controller.pickAndAttachFile(imageOnly: false),
-              onAttachImage: () =>
-                  controller.pickAndAttachFile(imageOnly: true),
-            ),
-          ],
+            null => const SizedBox.shrink(),
+          },
         );
       },
     );

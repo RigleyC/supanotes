@@ -7,6 +7,7 @@ import 'package:supanotes/features/notes/editor/application/note_editor_controll
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_formatting_panel.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 
@@ -74,12 +75,15 @@ void main() {
     }
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          appBar: AppBar(title: const Text('Note')),
-          body: NoteEditor(
-            noteId: 'note-1',
-            session: session,
-            delegate: const NoteEditorDelegate(),
+        home: KeyboardScaffoldSafeArea(
+          child: Scaffold(
+            resizeToAvoidBottomInset: false,
+            appBar: AppBar(title: const Text('Note')),
+            body: NoteEditor(
+              noteId: 'note-1',
+              session: session,
+              delegate: const NoteEditorDelegate(),
+            ),
           ),
         ),
       ),
@@ -96,6 +100,57 @@ void main() {
 
     expect(editor.stylesheet.documentPadding?.top, 0);
   });
+
+  testWidgets('shows the formatting panel and preserves the selection', (
+    tester,
+  ) async {
+    const initialSelection = DocumentSelection.collapsed(
+      position: DocumentPosition(
+        nodeId: 'paragraph-1',
+        nodePosition: TextNodePosition(offset: 0),
+      ),
+    );
+    await pumpEditor(
+      tester,
+      nodes: [ParagraphNode(id: 'paragraph-1', text: AttributedText('Text'))],
+    );
+    controller.composer.setSelectionWithReason(initialSelection);
+    await tester.pump();
+
+    await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NoteToolbar), findsOneWidget);
+    expect(find.byType(NoteFormattingPanel), findsOneWidget);
+    expect(controller.composer.selection, initialSelection);
+  });
+
+  testWidgets(
+    'system back closes the formatting panel without leaving the note',
+    (tester) async {
+      await pumpEditor(
+        tester,
+        nodes: [ParagraphNode(id: 'paragraph-1', text: AttributedText('Text'))],
+      );
+      controller.composer.setSelectionWithReason(
+        const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'paragraph-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NoteFormattingPanel), findsNothing);
+      expect(find.byType(NoteEditor), findsOneWidget);
+    },
+  );
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets(
