@@ -125,6 +125,66 @@ void main() {
     expect(controller.composer.selection, initialSelection);
   });
 
+  testWidgets('closing formatting closes the IME until returning to typing', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1
+      ..viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.reset);
+    await pumpEditor(
+      tester,
+      nodes: [ParagraphNode(id: 'paragraph-1', text: AttributedText('Text'))],
+    );
+    controller.composer.setSelectionWithReason(
+      const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'paragraph-1',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+      ),
+    );
+    controller.focusNode.requestFocus();
+    await tester.pumpAndSettle();
+
+    const keyboardTop = 544.0;
+    expect(tester.testTextInput.hasAnyClients, isTrue);
+    expect(
+      tester.getBottomLeft(find.byType(NoteToolbar)).dy,
+      lessThanOrEqualTo(keyboardTop),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NoteFormattingPanel), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byType(NoteFormattingPanel)).dy,
+      greaterThanOrEqualTo(tester.getBottomLeft(find.byType(NoteToolbar)).dy),
+    );
+    expect(
+      tester.getBottomLeft(find.byType(NoteFormattingPanel)).dy,
+      closeTo(844, 0.01),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Fechar formatação'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NoteFormattingPanel), findsNothing);
+    final hasImeConnectionAfterClose = tester.testTextInput.hasAnyClients;
+
+    await tester.tap(find.bySemanticsLabel('Abrir formatação'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Voltar a digitar'));
+    await tester.pumpAndSettle();
+
+    expect(controller.focusNode.hasFocus, isTrue);
+    expect(tester.testTextInput.hasAnyClients, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(hasImeConnectionAfterClose, isFalse);
+  });
+
   testWidgets(
     'system back closes the formatting panel without leaving the note',
     (tester) async {
@@ -140,6 +200,10 @@ void main() {
           ),
         ),
       );
+      controller.focusNode.requestFocus();
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.hasAnyClients, isTrue);
+
       await tester.pump();
 
       await tester.tap(find.bySemanticsLabel('Abrir formatação'));
@@ -149,6 +213,10 @@ void main() {
 
       expect(find.byType(NoteFormattingPanel), findsNothing);
       expect(find.byType(NoteEditor), findsOneWidget);
+      final hasImeConnectionAfterSystemBack =
+          tester.testTextInput.hasAnyClients;
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(hasImeConnectionAfterSystemBack, isFalse);
     },
   );
 

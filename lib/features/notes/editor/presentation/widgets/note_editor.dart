@@ -248,7 +248,7 @@ class _NoteEditorState extends State<NoteEditor> {
 
   void _closeFormattingPanel() {
     _formattingSelection = null;
-    _keyboardPanelController.hideKeyboardPanel();
+    _keyboardPanelController.closeKeyboardAndPanel();
   }
 
   void _returnToTyping() {
